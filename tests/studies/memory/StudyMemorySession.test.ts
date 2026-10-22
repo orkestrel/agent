@@ -59,6 +59,84 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
+	it('W12-3 joins found and absent lookup rows to distinct result messages by call identity despite identical content', async () => {
+		const trial = await runMemoryTrial({
+			arm: 'records',
+			settings: { observe: true, checkpoints: ['inspect'] },
+			responses: [
+				{ path: '/api/chat', body: buildMemoryReply() },
+				{ path: '/api/chat', body: buildMemoryReply() },
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: 'No record',
+						calls: [
+							{ id: 'found-a', function: { name: 'lookup', arguments: { id: 'record' } } },
+							{ id: 'absent-a', function: { name: 'lookup', arguments: { id: 'missing' } } },
+						],
+					}),
+				},
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'No record' }) },
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: 'No record',
+						calls: [
+							{ id: 'found-b', function: { name: 'lookup', arguments: { id: 'record' } } },
+							{ id: 'absent-b', function: { name: 'lookup', arguments: { id: 'missing' } } },
+						],
+					}),
+				},
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'No record' }) },
+			],
+			goals: [
+				{
+					id: 'lookup',
+					input: {
+						prompt: 'No record',
+						arrivals: [{ id: 'decoy', content: 'No record' }],
+						records: [{ id: 'record', name: 'Reference', content: 'No record' }],
+					},
+				},
+				{ id: 'repeat', input: { prompt: 'No record', arrivals: [], records: [] } },
+				{ id: 'inspect', input: { prompt: 'Inspect', arrivals: [], records: [] } },
+			],
+		})
+		expect(trial.failure).toBeUndefined()
+		const conversation = readMemorySnapshot(trial.evidence, 'inspect').conversation
+		if (!isRecord(conversation) || !Array.isArray(conversation.messages))
+			throw new Error('Missing retained conversation messages')
+		const messages = conversation.messages.filter(isRecord)
+		const replies = messages.filter((message) => message.role === 'tool')
+		expect(replies.map((message) => message.call).sort()).toEqual([
+			'absent-a',
+			'absent-b',
+			'found-a',
+			'found-b',
+		])
+		expect(replies.filter((message) => message.content === 'No record')).toHaveLength(2)
+		expect(
+			replies.filter((message) => message.content === 'record: Reference\nNo record'),
+		).toHaveLength(2)
+		expect(
+			messages.some((message) => message.role !== 'tool' && message.content === 'No record'),
+		).toBe(true)
+		const rows = readMemoryEvents(trial.evidence, 'lookup')
+		expect(rows).toHaveLength(4)
+		expect(new Set(rows.map((row) => row.message)).size).toBe(4)
+		for (const reply of replies) {
+			expect(typeof reply.id).toBe('string')
+			expect(reply.id).not.toBe(reply.content)
+			expect(rows).toContainEqual({
+				id: reply.call === 'found-a' || reply.call === 'found-b' ? 'record' : 'missing',
+				found: reply.call === 'found-a' || reply.call === 'found-b',
+				message: reply.id,
+			})
+		}
+		expect(rows.map((row) => Object.keys(row).sort())).toEqual(
+			rows.map(() => STUDY_MEMORY_EVENT_KEYS.lookup),
+		)
+	})
 	it('C7 preserves the Records checkpoint shape and keeps other arms free of selection rows', async () => {
 		const records = STUDY_MEMORY_PASSIVITY_CASES.find((entry) => entry.name === 'Records')
 		if (records === undefined) throw new Error('Missing Records control')

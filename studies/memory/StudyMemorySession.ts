@@ -6,7 +6,13 @@ import type {
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { ToolContext, ToolManagerInterface } from '@orkestrel/tool'
-import type { StudyContext, StudyGoal, StudyProduct, StudySessionInterface } from '@orkestrel/study'
+import type {
+	StudyContext,
+	StudyEvidence,
+	StudyGoal,
+	StudyProduct,
+	StudySessionInterface,
+} from '@orkestrel/study'
 import type { StudyOllamaActivity } from '@orkestrel/study/server'
 import type {
 	StudyMemoryInput,
@@ -61,6 +67,8 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #messages: StudyMemoryArrival[] = []
 	readonly #sizes: number[] = []
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
+	readonly #lookups = new WeakMap<object, Readonly<Record<string, unknown>>>()
+	readonly #calls = new WeakMap<object, string>()
 	// Message ids this consumer added or named, joined to their origin; the summary instruction is fixed.
 	readonly #explicit = new Map<string, StudyMemoryProvenance>([
 		['summary-instruction', { origin: 'instructions', source: 'summary' }],
@@ -196,6 +204,9 @@ export class StudyMemorySession implements StudySessionInterface {
 			})
 			this.#agent = this.#ledger.agent
 			this.#conversation = this.#ledger.conversation
+			this.#agent.emitter.on('tool', (call) => {
+				if (call.name === 'lookup') this.#calls.set(call.arguments, call.id)
+			})
 		} else {
 			this.#ledger = undefined
 			const conversations = options.agent.createConversationManager()
@@ -345,12 +356,27 @@ export class StudyMemorySession implements StudySessionInterface {
 			throw this.#trace.translate(error)
 		} finally {
 			try {
-				await this.#trace.flush(context.evidence)
+				await this.#trace.flush({
+					append: (row) => context.evidence.append(this.#joinLookup(row)),
+				})
 			} finally {
 				this.#live.delete(activity)
 				this.#transport.clear()
 			}
 		}
+	}
+
+	#joinLookup(row: StudyEvidence): StudyEvidence {
+		if (row.event !== 'lookup' || !isObject(row.value)) return row
+		const args = this.#lookups.get(row.value)
+		const call = args === undefined ? undefined : this.#calls.get(args)
+		const message =
+			call === undefined
+				? undefined
+				: this.#conversation
+						.messages()
+						.find((entry) => entry.role === 'tool' && entry.call === call)
+		return message === undefined ? row : { ...row, value: { ...row.value, message: message.id } }
 	}
 
 	#provenance(): StudyMemoryProvenanceSource {
@@ -408,7 +434,9 @@ export class StudyMemorySession implements StudySessionInterface {
 				const value =
 					record === undefined ? 'No record' : `${record.id}: ${record.name}\n${record.content}`
 				sizes.push(encoder.encode(JSON.stringify(value)).byteLength)
-				this.#trace.append('lookup', { id: args.id, found: record !== undefined })
+				const evidence = { id: args.id, found: record !== undefined }
+				if (this.#ledger !== undefined) this.#lookups.set(evidence, args)
+				this.#trace.append('lookup', evidence)
 				signal.throwIfAborted()
 				return value
 			} finally {

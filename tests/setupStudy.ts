@@ -510,6 +510,7 @@ export const STUDY_MEMORY_TIMING = Object.freeze({
 
 /** Pins the event keys present with observation disabled. */
 export const STUDY_MEMORY_EVENT_KEYS = Object.freeze({
+	lookup: Object.freeze(['found', 'id', 'message']),
 	selection: Object.freeze(['arrivals', 'pass', 'recaps', 'receipt', 'request', 'role']),
 	dispatch: Object.freeze(['bytes', 'model', 'options', 'path', 'role']),
 	wire: Object.freeze([
