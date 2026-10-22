@@ -271,8 +271,11 @@ export interface LedgerOptions {
 	 */
 	readonly link?: boolean
 	/**
-	 * Selects BM25 briefing discovery and recall ranking.
-	 * If `true`, enables both; if `false`, retains existing selection.
+	 * Selects BM25 lexical discovery and ranked recall.
+	 * If `true`, admits unkeyed units whose BM25 score reaches the discovery floor, renders them after
+	 * every keyed unit in descending score order, cuts them before any keyed unit in ascending score
+	 * order, and ranks recall keyed-first then by BM25; keyed units keep their existing order and cut
+	 * keys. If `false`, retains existing selection.
 	 * Default: false.
 	 */
 	readonly lexical?: boolean

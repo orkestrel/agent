@@ -308,7 +308,14 @@ export const LEDGER_LEXICAL_GROUPS = Object.freeze({
 		'For Mira, amber amber 32.',
 	]),
 	unsettled: Object.freeze([2, 4]),
-	order: Object.freeze([3, 4, 2, 5, 1, 0]),
+	order: Object.freeze([3, 2, 4, 1, 5, 0]),
+})
+
+/** Supplies tied keyed sources whose length normalization reverses their cut keys under pressure. */
+export const LEDGER_LEXICAL_KEYED_CUT = Object.freeze({
+	sources: Object.freeze([`refund 10 ${'blue '.repeat(24)}ends.`, 'refund 20.']),
+	query: 'refund',
+	capacity: 56,
 })
 
 /** Carries an empty successful plan for request lifecycle controls. */

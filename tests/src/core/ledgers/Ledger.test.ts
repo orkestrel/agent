@@ -60,6 +60,7 @@ import {
 	LEDGER_LEXICAL_ROOM,
 	LEDGER_LEXICAL_AMENDMENTS,
 	LEDGER_LEXICAL_GROUPS,
+	LEDGER_LEXICAL_KEYED_CUT,
 	LEDGER_LEXICAL_PADDING,
 	LEDGER_LEXICAL_LONG_PADDING,
 	LEDGER_CUT_RECALL,
@@ -108,33 +109,73 @@ describe('Ledger', () => {
 		)
 		expect(disabled.result).toBe('ambergris 10')
 	})
-	it('L-4 preserves keyed groups and their existing score keys before discovery', async () => {
-		const fixture = LEDGER_LEXICAL_GROUPS
-		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const ledger = createLedger(
-			provider,
-			buildLedgerOptions({
-				lexical: true,
-				judge: createPhraseJudge([]),
-				lookups: [],
-				share: { tail: 0.001 },
-			}),
-		)
-		const sources = ledger.conversation.add(
-			fixture.sources.map((content): MessageInput => ({ role: 'user', content })),
-		)
-		for (const at of fixture.unsettled)
-			ledger.conversation.judgments.add(
-				buildLedgerJudgment(requireValue(sources[at]), {
-					model: 'scripted',
-					answer: { form: 'choice', probabilities: { fact: 0.2 } },
+	it.each(LEDGER_LEXICAL_ARMS)(
+		'R-L1-3 keeps tied keyed cut keys under pressure (%s)',
+		async (lexical) => {
+			const fixture = LEDGER_LEXICAL_KEYED_CUT
+			// N=11 and df(refund)=3 tie both IDF sums at ln(11/3); the later source is cut.
+			// The full system costs 48 units, room is 56/1.06 minus the 6-unit request, and the retained system costs 45.
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					...(lexical === undefined ? {} : { lexical }),
+					judge: createPhraseJudge([]),
+					lookups: [],
+					capacity: fixture.capacity,
+					share: { prompt: 1, tail: 0.001 },
 				}),
 			)
-		ledger.conversation.add(fixture.padding)
-		const result = await ledger.respond('refund Mira amber')
-		expect(result.receipts[0]?.selections[0]?.plan?.rendered).toEqual(
-			fixture.order.map((at) => sources[at]?.id),
-		)
+			const sources = ledger.conversation.add(
+				fixture.sources.map((content): MessageInput => ({ role: 'user', content })),
+			)
+			ledger.conversation.add(LEDGER_LEXICAL_PADDING)
+			const result = await ledger.respond(fixture.query)
+			const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+			expect(plan.rendered).toEqual([sources[0]?.id])
+			expect(plan.omitted).toContain(sources[1]?.id)
+			expect(plan.trims).toBe(1)
+			expect(provider.calls[0]?.messages[0]?.content).toBe(
+				`Serve the desk.\n\n## Pinned\n${fixture.sources[0]}`,
+			)
+			expect(estimateMessages([requireValue(provider.calls[0]?.messages[0])])).toBe(45)
+		},
+	)
+	it('R-L1-3 preserves IDF-sum keyed order before BM25 discovery', async () => {
+		const fixture = LEDGER_LEXICAL_GROUPS
+		// At N=19, sources 2/4 tie on refund (df=4) and amber (df=7);
+		// sources 1/5 tie on mira (df=3) and amber. Earlier position wins each tie.
+		for (const lexical of LEDGER_LEXICAL_ARMS) {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					...(lexical === undefined ? {} : { lexical }),
+					judge: createPhraseJudge([]),
+					lookups: [],
+					share: { tail: 0.001 },
+				}),
+			)
+			const sources = ledger.conversation.add(
+				fixture.sources.map((content): MessageInput => ({ role: 'user', content })),
+			)
+			for (const at of fixture.unsettled)
+				ledger.conversation.judgments.add(
+					buildLedgerJudgment(requireValue(sources[at]), {
+						model: 'scripted',
+						answer: { form: 'choice', probabilities: { fact: 0.2 } },
+					}),
+				)
+			ledger.conversation.add(fixture.padding)
+			const result = await ledger.respond('refund Mira amber')
+			const order = lexical === true ? fixture.order : fixture.order.slice(0, -1)
+			expect(result.receipts[0]?.selections[0]?.plan?.rendered).toEqual(
+				order.map((at) => sources[at]?.id),
+			)
+			expect(provider.calls[0]?.messages[0]?.content).toBe(
+				`Serve the desk.\n\n## Pinned\n${order.map((at) => fixture.sources[at]).join('\n')}`,
+			)
+		}
 	})
 	it('L-5 groups newest-first before ranking and cuts complete amendment entries', async () => {
 		const fixture = LEDGER_LEXICAL_AMENDMENTS

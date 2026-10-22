@@ -723,7 +723,7 @@ export class Ledger implements LedgerInterface {
 						? 3
 						: 4
 			const score =
-				corpus === undefined
+				corpus === undefined || group !== 4
 					? [...words]
 							.filter((word) => asked?.words.has(word))
 							.reduce((sum, word) => sum + Math.log(texts.length / (counts.get(word) ?? 1)), 0)
