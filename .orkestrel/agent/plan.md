@@ -1,0 +1,223 @@
+# Agent boost plan
+
+Agent's boost campaign plan as it stood on 2026-10-21: goal, exit, rulings, levels and gates, units, the order of dispatches, engines, open questions and history.
+
+- `.orkestrel/agent/ledger.md` holds one row per unit result; `.orkestrel/agent/boosts.md` holds the ideas, the R-L1 and R3 specifications and the boost-review rulings RV-1 to RV-19; `.orkestrel/agent/evidence.md` holds the figures.
+- Unit files live under `tmp/units/ladder/`, which git does not track; this file carries every ruling, gate and cap they hold. A record named with a commit reads through `git show COMMIT:PATH`.
+- R is Records and C is Compaction. A cap written `15/20` is 15 model minutes and 20 elapsed minutes.
+
+## Goal and exit
+
+| Item | Statement | Ruling |
+| --- | --- | --- |
+| Goal | admit work per treatment, seed and question: offline instruments first, then bounded request experiments, short spans and earned construction of later states; the early and late results must match the hypothesis declared for each horizon; micro before macro, try everything but bounded, refine an insufficient instrument before widening, seed long spans from staged checkpoints, write promotion gates first; a cap is a resource boundary, never a quality verdict | Directive, user, 2026-10-19 |
+| Exit criterion | "report the calibrated same-root pairs, the targeted semantic and cost effects, the frozen rubric by kind and quarter, every guard, and every unresolved or capped idea. Completed runs alone are not 'solid improvement'." | U12b, user, 2026-10-19 |
+| Closure | each admitted idea has a bounded disposition, each claimed improvement has frozen metric, control, denominator and lineage evidence, and only earned candidates get macro work; an idea can stay unresolved under budget without rejection | ladder plan, closure check CLOSED, 2026-10-19 |
+| State | no GPU work has run; every charge is L0; Agent 0.0.31 takes Study `^0.0.2` and Scaffold `^0.0.104`; Study `main` is `1f33206` (0.0.2) | `692e551:.orkestrel/agent/handoff.md`, 2026-10-21 |
+
+## Rulings in force
+
+| Id | Date | By | Clause |
+| --- | --- | --- | --- |
+| U1a | 2026-10-19 | ladder plan | a bounded runner screen (G0 and tape rung A) is authorized; under U1c it screens 0.40.7 |
+| U1b | 2026-10-19 | user | the boost uses the screened runner with fresh same-seed controls when the repeat and fidelity screens pass; comparisons with the sealed 0.40.3 runs are descriptive only |
+| U1c | 2026-10-21 | user | the runner is the stable Ollama 0.40.7 (`tmp/runtimes/ollama-0.40.7-receipt.json`, executable SHA-256 `563f2040…`); G0 screens it in place of 0.40.6, which holds no ladder evidence; the user restarts their own 11434 daemon |
+| U2a–c | 2026-10-19 | ladder plan | bounded judge-only tape capture, bounded repeat labeling and bounded live seeded Records evaluation are authorized; a full Records pair stays behind the L4 gate and U12b |
+| U3 | 2026-10-19 | user | seed ingress is a default-off Compaction Study adapter plus a Records harness through L3, with no Ledger restore |
+| U4 | 2026-10-19 | user | Records optimizes quality and speed, quality first; speed mechanisms are probed early without requiring better labels |
+| U5 | 2026-10-19 | user | public development projection with thread-separated tuning and validation; the evaluation oracle is read one time, aggregate-only, after freezing; never tune on its atom text |
+| U6 | 2026-10-19 | ladder plan | the trailing-space sham with the off-repeat and the clean and defective controls; its behavioral inertness is unmeasured and disclosed; stop calibration when it moves the metric beyond the band |
+| U7 | 2026-10-19 | ladder plan | R3 owner linking is default-off |
+| U8 | 2026-10-19 | user | one bounded, metered first-pass reasoning probe on the fixed L1 packet, answer pass off, full cost disclosed, no series adoption |
+| U9 | 2026-10-19 | user | hold model downloads and batching providers until the fixed classification set and the R4 and R5 evidence exist |
+| U10 | 2026-10-19 | user | the package features the user ordered in parallel on 2026-10-16 continue in isolated work, never restaged into a live pair |
+| U11 | 2026-10-15 | user | exact counting stays excluded |
+| U12a | 2026-10-19 | user | the fleet campaign is accepted (records commit `6510cbe`) |
+| U12b | 2026-10-19 | user | the exit criterion in § Goal and exit |
+| U13 | 2026-10-19 | ladder plan, conditional | decide S1's package location only if the lite fold wins: a generic Agent input with a first consumer, otherwise a Study-only seam |
+| U14 | 2026-10-19 | user | request framing is a default-off treatment in both arms, tested first in Records and disclosed in each identity |
+| U15 | 2026-10-19 | user | bounded development-atom adjudication with a measured pilot and repeat band; the official rubric stays the macro grade and never replaces atoms after an atom cap |
+| U16 | 2026-10-19 | ladder plan, conditional | separate bounded hybrid experiments only when an idea's triggering evidence appears; Q6 is always labeled hybrid |
+| Ladder choices | 2026-10-19 | ladder plan | a refusal is always reported, dominates the score and never earns improvement by suppressing output; same-seed or same-root pairs on one runner carry causality and no option omits the paired off arm; Records gets slot priority, and a missing Records dependency never idles a ready Compaction micro probe |
+| A first | 2026-10-19 | Orchestrator | unit A builds before B and B precedes G2; W4's admission reads a captured immutable runtime receipt; a receipt hashes bytes, never a version |
+| W5 host | 2026-10-20 | user | the W5 launcher's native host is TypeScript on the pinned Node v26.12.0 (`tmp/runtimes/node-v26.12.0-receipt.json`) in place of the Job Object bridge; Node 24 stays the default |
+| W6-COLD | 2026-10-21 | user | G0's cold state is model unload on the dedicated daemon, labeled "cold model state"; no fresh-daemon restart between samples; RS3 keeps its own cold-daemon requirement |
+| S-T | 2026-10-21 | user | Study gains an optional, default-off, role-aware `fetch` collaborator on its Ollama transport, built, reviewed and released in the user's window; Agent adopts the release; the RV-7 sequencing (release with Study 0.0.3 behind the Records L1 work) stays proposed until the user confirms |
+| S-T hold | 2026-10-21 | Orchestrator | the C3 and C6 repair, closure and verification ran on the branch; the Study 0.0.3 release waits until W3b's transport portion is scheduled or the F-dist and F-wording passes make a release due; the user's "build and release" ruling stands with that sequencing (RV-7, proposed); the S-T review's design reading found no other Study addition owed before Agent work, because S-T is a prerequisite only for W3b's transport (`tmp/units/study-st/st-review-astra.md`) |
+| Grok route | 2026-10-21 | Orchestrator | the `.orkestrel` map lane proved the controlled Grok route: one T3 child, file tools only, no shell, no console window; RV-4's substitution ends for mapping lanes; a labeling lane (W9, W10, the W11 pilot, B-M4) moves to Grok only on the same route, and W9 and W10 stay parked under RV-8 until R1 to R5 have an L1 result |
+| HO-1 | 2026-10-21 | Orchestrator | W6 is accepted for G0 when W6-2, W6-3, W6-4, W6-6, W6-7's validator defect, W6-8 and O1 close; the W6-5 fold-93 gap and the W6-7 late-counterpart gap are input gaps that block only G7's fold 93 and RS3 |
+| HO-2 | 2026-10-21 | Orchestrator | the runner pin is sized medium, settling the brief's "small"; Astra closes it on the isolated patch; it applies with `git apply` from `tmp/units/ladder/` after the W6 cycle, the W8 cycle and any W3b run that reads `drivers/`, `launch/`, `staging/` or `fix-w5-2/` exit; Luna verifies in place and writes `runner-0407/accepted-hashes.json` (`fix-a/audit.json`, `fix-a2/final-hashes.json` and `fix-b/source-hashes.json` overlaid by `runner-0407/after.json`), the entry pin for later briefs; G0 waits for it |
+| HO-3 | 2026-10-21 | Orchestrator | Agent's installed Study stays at registry 0.0.2 until S-T publishes and Agent adopts it; never pin `st-collaborator` into Agent; after the adoption, re-baseline unit B's installed-manifest pins |
+| HO-4 | 2026-10-21 | Orchestrator | A-G, then B-G, after the in-place runner verify and beside S-T's release; the W3b transport portion waits for S-T's adoption, A-G and B-G |
+| BOOSTS | 2026-10-21 | user | write `BOOSTS.md` and read `ANALYSIS.md`, `PROPOSAL.md` and `RESULTS.md`; supersedes the 2026-10-20 and 2026-10-21 rulings that left `PROPOSAL.md` unread |
+| PROPOSAL | 2026-10-21 | Orchestrator, RV-19, carried by the Cleanup ruling | `PROPOSAL.md` is adopted in part: its exposure repairs are the R rows, its BM25 content is R-L1, and its persistence, index and recall-continuation designs are rejected for this ladder |
+| Cleanup | 2026-10-21 | user | consolidate `.orkestrel` and absorb `ANALYSIS.md`, `BOOSTS.md`, `PROPOSAL.md` and `RESULTS.md`; retire the legacy harness under `.orkestrel/agent` and rebuild it under Study only if needed; finish W6 and W8 meanwhile; review the S-T ruling and add what Study needs before Agent work; Grok through T3, one controlled lane, no parallel processes; an Astra and Opus review and a fix round, then commit and push `.orkestrel` to `origin/main` |
+| Estimator | 2026-10-15 | user | keep the estimator, the affine coefficients and the completed Records run; record prediction misses; stop on the first actual capacity failure; no replacement, anchor, refit or cushion increase; keep the published Agent calculator contract; U2a–c supersede its Records-replay ban for bounded work |
+| Cushion, capacity | 2026-10-14, 2026-10-15 | Orchestrator, qualification record | never raise the 512-token margin from the cushion failure, and keep the actual room check apart from prediction qualification; the capacity series stays stopped with no restart or escalation, its profile context 20480, output reserve and predict 8192, safety 512, auxiliary deadline 90000 ms |
+| Think | 2026-10-07 | user | `@orkestrel/ollama`'s provider sends `think: false` when the caller sets nothing; a caller that wants reasoning sets `think: true` |
+| Recap | 2026-10-15 | rolling record | investigate the source boundary that lets an empty summarizer return become a section before any Compaction successor; reading the one terminal wire row that settles the cause needs the user's approval |
+| S4 | 2026-10-16 | user | an export with no importer stays exported and proved, or a trivial single-use declaration is folded away, per `../scaffold/AGENTS.md` § Design laws; hiding it is never the repair |
+| Brief | 2026-10-16 | user | every subagent brief carries verbatim: "Make sure you thoroughly read the AGENTS.md in the neighboring scaffold folder along with the files that it points to especially the rules/agents/skills and follow them strictly, especially in regards to repo structure." |
+
+## Standing rules
+
+| Rule | Clause | Home |
+| --- | --- | --- |
+| Ollama guard | per `.orkestrel/plan.md` § Standing readings (Ollama guard); in Agent, only the Orchestrator runs GPU work, on a dedicated 11435 daemon from the receipted executable, with recorded PIDs and deadlines, stopping the recorded process tree only and confirming it gone | fleet plan; this plan |
+| Ollama releases | check the Ollama releases before each GPU phase and each Ollama visit; adopt a stable release only after asking the user, who quits the tray app and daemon for scoop; a runner change opens a separately screened lineage; the `ollama` client conformance pin is 0.6.4 | user |
+| Study custody | never write under `tmp/studies`; read only its manifests; ladder evidence goes to create-only `tmp/units/ladder/artifacts/<unit>-<manifest-digest>/`, and the launcher refuses overwrite, traversal and a reparse point that resolves outside | this plan |
+| Sweep guard | never run `sweep.ts --tmp` in Agent while the boost is open; keep `tmp/units/ladder/`, `tmp/units/local-pin.ts`, the `compaction-output-2-*` tooling and receipts, the `study-root-install-*` runtimes, the `tmp/codex` daemon logs and the live `tmp/probes/` series probes; remove an accepted unit's disposable files one unit at a time with `sweep.ts --unit UNIT --delete` after the keep check | this plan; the fleet sweep ruling (user, 2026-10-19) in `.orkestrel/plan.md` § History |
+| Commits, secrets, pins | stage and commit by explicit path (`git commit -m MESSAGE -- PATHS`); never amend, force or skip hooks; publish only through scaffold's `window.ts` with the user's one-time code; `tmp/tarballs/pins.json` pins stay uncommitted and are restored before a scaffold verb or a publish | user; checkpoints and one writer per checkout per `../scaffold/.agents/orchestration.md` § Parallelism; worktrees per `.orkestrel/plan.md` § Rulings in force (Worktrees) |
+| Node | per `.orkestrel/plan.md` § Rulings in force (Node, user, 2026-10-20); in Agent, Node 26 is only the W5 host | fleet plan; W5 host |
+| Proof project | Agent's study proof project is `studies` with the script `test:studies`; a Compaction staging discloses `package.json` through `--delta` | study record, 2026-10-16 |
+| Evaluation canon | judge a study design, a report or a boost reading by `.orkestrel/plan.md` § Evaluation canon | fleet plan |
+| Scaffold | edit no scaffold-owned file in Agent; after `scaffold repair`, run `npx scaffold catalog`, then `npm install`; read `../scaffold/PARALLEL.md` before a scaffold commit, build or repair, reply there, never commit it | Agent `AGENTS.md`; user |
+| Host | Windows PowerShell 5.1: no `&&`, `npm.cmd` and `npx.cmd`, an absolute path in every write; a subagent's shell restarts in Agent's root on every call; never list Vitest projects without naming them, because `tests/distribution.test.ts` packs and installs at module load | this plan |
+| Scoped proof | run the minimal proof, its touched test file and only the needed scoped checks; Luna runs the tree-wide gates one time at L4 entry; profiles, scenarios and rubrics stay byte-identical; the staging receipt's `--delta` names every adapter and manifest delta; one receipted clean build and captured runtime per comparison, never restaged while a member runs | ladder plan; the `tmp/probes` importer check in `.orkestrel/plan.md` § Units each package owes (F-dist) |
+| Byte check | verify an accepted unit's bytes before relying on them: against `fix-a/audit.json`, `fix-a2/final-hashes.json` and `fix-b/source-hashes.json` under `tmp/units/ladder/` until the runner patch verifies in place, then against `runner-0407/accepted-hashes.json` | `692e551:.orkestrel/agent/handoff.md` |
+
+## Levels and gates
+
+| Budget rule | Clause |
+| --- | --- |
+| Units of account | Agent minutes are active role time; label hours are serial labeling off the GPU window; GPU minutes are measured model-call wall; the elapsed deadline bounds daemon residency and setup |
+| First cap | the first cap reached stops the unit |
+| Everything counts | every budget includes failed launches, repeats, shams, priming, continuations, tape misses and generated prefixes |
+| No transfer | spare time never moves between levels; renaming a treatment never resets its balance |
+| Ceilings | L3 and L4 are ceilings behind earned gates; present the concrete L4 inventory at U12b before the first full execution |
+
+| Level | Admitted work | Agent caps (min) | GPU caps (min) | Label caps | Promotion gate |
+| --- | --- | --- | --- | --- | --- |
+| L0 | offline rebuilds, instrumentation, protocol fixtures, exact byte differentials, minimal touched-file proofs | 120 build + 45 review + 30 verifier per unit; 3000 total | 0 | 3 h mapping + 1 h rubric repeat + 1 h atom pilot = 5 h | exact identity where observable; every metric's clean, defective and denominator controls pass; no missing input; lawful owned paths; an executable manifest with early and late membership; no model-quality claim |
+| L1 | single requests and earned batches; runner and tape screens; bounded tool continuations | 30 driver + 30 analysis per batch; 1800 total | batch 15, idea 30, level 180; S1 fold batches 20 each, 60 total, inside 180 | lexical screens 0; semantic micro packet 0.5 h; level 3 h | the request gate at both affected ends, detector controls, repeat and sham calibration, guards; one-case onset earns only another case; a seed rung opens only its named question |
+| L2 | 4–8-goal spans, survivor builds, earned prefix segments of at most 8 goals | build unit 195; driver 30 per arm; analysis 60 per contrast; 2400 total | per arm C 12, R 20 or 25 at a burst; four-arm calibration C 48, R 80/100; level 480 with a checkpoint every 120; optional S1 B0 90 inside it | 0 | metric denominator and effect, complete same-seed repeat and sham over the span, guards, both horizon contracts; `continue staging` needs mechanism and guards at that segment |
+| L3 | one strategy's 24-goal span, then at most 48 goals after it earns the extension; a frozen semantic sample | driver 60 per arm; analysis 90 per strategy; 1200 total | four arms: C at most 35 each (140), R at most 90 each (360); level 600; a stop checkpoint per 24-goal segment | 4 h per strategy, 8 h total, batches 0.5 h | same-span `r` and `s`, early and late agreement kept from L2, the semantic gate or semantic non-regression for speed; atom membership frozen before treatment labels; atoms that do not fit stop incomplete |
+| L4 | full 96-goal Study executions, one strategy at a time | driver 60 per execution; verifier 120 for tree gates; analysis 180 per strategy; 1200 total | C off, repeat, sham 60 each, on 65 (245); R 125 each, on 155 (530); level 800 | 42 h, batches 0.5 h | fresh same-root 96-goal controls, frozen rubric unchanged plus the declared claim, full membership, measured repeat, sham and judge bands, guards, quarter results; each treatment's own unchanged prefix |
+
+| Gate | Rule |
+| --- | --- |
+| Manifest | one immutable manifest per experiment, fields settled in its `types.ts`: question (one component; quality, speed, capacity or instrument claim; immediate, continued or cumulative; activation event; smallest effect worth keeping), population (exact ids and order, seed and root-ancestor digests, failing cases, an equal clean guard set, denominators, missing-value rules, early and late membership, cases apart from repeats), procedures (off, off-repeat, sham, on; reset and priming; replayed or live calls; continuation and limits; model digests and options, executable hash, build receipt, gauge, host load), expectations (signed target and minimum size at each horizon, the mechanism reading apart from the outcome reading, guards, calibrated repeat and sham bands, the semantic agreement method where needed, the exact promotion or continuation rule), resources (requests including repeats, continuations and priming; judge hits and misses; seed-generation segments; model minutes; elapsed deadline; agent minutes; labeling hours; the remaining idea and level balances), outcomes (§ Freeze, outcomes) |
+| Freeze, outcomes | freeze calibration membership before calibration and the treatment gate after it, before any treatment request; a successor manifest records a changed case, procedure, metric, threshold, build or runner and invalidates the affected controls; never select a threshold after reading treatment output; outcomes are `promote`, `continue staging`, `refuted on this population`, `inconclusive`, `incomplete under budget` or `instrument refused`, and a cap always reports `incomplete under budget` |
+| Goal defects | paired membership from public inputs and the seed; refusal, degeneracy, bad date, invention, wrong amount and retired-route action per scheduled goal, affected goals apart from events; a missing row never becomes success; a refusal is recorded apart |
+| Lookups, handoffs | malformed and missed over attempted calls, plus required-lookup fulfillment per goal from the public task; missing wire or tool rows refuse the instrument; one binary focus value per scheduled handoff, no case or tied cases read 0, `focusAbsent` apart, a no-case handoff stays counted |
+| Obligations | each public open obligation at the boundary (owner, deadline, prerequisite, status, citations); an omitted or wrong item fails; closed items feed a false-open guard; no open items is not applicable, never perfect recall |
+| Diagnostics | lexical deadline, grant and owner coverage, `priorWorkCited`, `priorWorkCarried` and `completionClaims` stay diagnostics or growth guards, published on every eligible goal and on the paired non-refusing intersection; completion status is adjudicated against receipts; a copied invented id earns nothing |
+| Recap, product | retained over required cases, obligations and supported facts, plus unsupported additions and wrongly kept closed items; a blank, tool-call or malformed recap refuses the run; required product elements by slot, where empty headings, refusal templates and an unsupported "No record" claim fail |
+| Cost | per request and role, eligible goal, fold, judge question and completion token, total wall apart from model wall; never drop slow, failed, capped or tool-only cases; a capped population has no speed verdict |
+| Semantic atoms | frozen development requirements for facts, work, obligations, revision and evidence, each dimension and critical failures reported; ambiguous or invalid labels earn no credit; invalid citations refuse the batch |
+| Noise `N` | `r = abs(off-repeat - off)`, `s = abs(sham - off)`, `N = 2 * max(r, s)`, both measured; a repeated live history that differs in content or a primary category stops promotion for that population; one bounded successor calibration can freeze a nonzero band before treatment; one request repeated is one case |
+| Count, coverage | count: `M = max(2, ceil(0.25 * B))` eligible events with `B` the off count, a reduction of at least `M + N`, and a span with `B < M + N` serves only as a guard; coverage: at least 8 eligible observations, a gain of at least 0.15 share plus `N`, or 0.10 plus `N` at 24 or more, numerator rounded up |
+| Sparse handoffs, request screen | an 8-goal L2 span holds 2 handoffs: with exact repeats and no sham flip, improve 1 and lose none at each affected endpoint, which earns L3 as a bounded handoff result only, and a 4-goal span detects failure only; the L1 request screen needs per endpoint at least 2 distinct failing cases and 2 clean guards, both fixed, no sham fix, exact repeats, no guard regression, and a partial-repair mechanism freezes a larger case list in a successor |
+| Speed, timing | targeted role cost at least 20% lower beyond timing noise; S1 also at least 25% less summary prefill and cached share at least 0.50 per fold case; a sole run-speed claim at least 15% over the span; timing noise `max(0.03, 2 * max(r_relative, s_relative))` at 24 or more goals, and a shorter probe measures its own and adds a 0.10 floor |
+| Semantic | at least 0.10 absolute gain in the targeted dimension, rounded up to whole atoms, beyond `2 * max(r, s, j)` with `j` the label-repeat disagreement; no rise in critical unsupported completion, false closure or retired-authority action; calibrate the judge before revealing identities; without `j`, inconclusive; a speed-only claim needs no lower correctness in any dimension and no added critical error; the Sol–Grok 16 of 96 reading is a cross-judge sensitivity only |
+| Immediate, fold | immediate: the target improves by `M + N` at the early end and in the same direction and size at the late end, with no sealed comparator in place of either; fold: pre-fold requests stay equal through the unchanged prefix, and the first affected fold and a later one each meet the target and guards |
+| Delayed, event | delayed: early mechanism installed with no regression and any speed overhead declared, late target beyond minimum and noise, and an early tie never parks the idea; event: unchanged behavior before, correction or retirement improving after with unrelated live records kept, at an early and a late or development event |
+| Cumulative | a same-root pair captured before activation, early mechanism and guards hold, the evolved histories show the declared gain; report the whole contrast and the suffix apart; unrelated late seeds never establish it |
+| Guards | refusals, malformed or missed required lookups, partial or length-finished products, critical semantic errors and unsupported active retired routes must not rise; unresolved `completionClaims` growth blocks promotion; every row names a mechanism and an outcome that can disagree |
+| Room, latency | prompt room 11776, no `WINDOW` failure; trim allowance 0 unless frozen with proof; additional fallback folds 0, except 1 per 8 goals predeclared by a fence experiment; latency ceilings C 1.30 times paired off, R 1.65 early, 1.25 at a burst or revisit span, 1.35 over the full horizon, repriced before treatment from G0 and rung A and never relaxed after a slow result |
+| Stop, controls | every stop names meter, budget, model or launcher cap with role and membership, or the measurement is refused; record host load before and during timing work; detector controls run apart from generation controls; the off-repeat tests repeatability and the sham spurious improvement; a changed-body control changes the hash or misses a tape key; calibration takes at most 2 bounded revisions, then reports the instrument unresolved |
+| Broaden, bundles | L0 opens the component's L1 screen; L1 opens L2 after distinct cases, controls and the mechanism pass; L2 opens L3 when both horizon ends hold, the semantic question is measurable and the L3 inventory fits; a bundle takes survivors that each keep half their single effect beyond noise; a coupled R3 and R4 candidate joins a bundle only after R3, R4 rendering and R4 classification have separate controls; an aggregate gain is never attributed to every member |
+| L4 entry | L3's calibrated result, semantic validity, both-horizon agreement, default-off byte proof, one receipted clean build, an independent review of repaired claims, Luna's tree gates, the owed decisions that touch the candidate; a flat or adverse rubric result is kept |
+| Seed admission | validate the source state, then refuse a wrong arm, unsealed source, suffix mismatch, wrong call-id length, profile drift, unpinned asset, first-body mismatch or undeclared runner; apply only the allowlisted transformation; seeded declarations admit `capacity` or `mechanism`, never `quality` |
+| Runner screen | G0 freezes the 6 shortest replay packets by cost: all match is sample agreement only; any mismatch declares non-equivalence and fresh baselines; a nonrepeating procedure blocks promotion and gets one bounded calibration successor |
+
+| Item | Expected cost | Bound |
+| --- | --- | --- |
+| Run ledger | one create-only row per execution: root, seed, goal bounds, requests by role, repeats, priming, continuations, tape misses, expected time, caps, label batches, charged level and idea | a control is shared only when build, runner, options, input bytes, lineage, span, order, reset, tool behavior, metric version and host match |
+| L1 batch | 2 failing + 2 clean cases × off, repeat, sham, on: 16 requests, 6.96 model min at the 26.1 s cold mean; 12–24 requests × 6 executions take 31.3–62.6 min | 15/20; a larger set splits into fixed batches; a late endpoint is a successor batch after the early mechanism passes |
+| Tool continuation | at most 3 model calls, 2 tool rounds, 4 tool calls and 2 recall calls per execution | 8192 cumulative completion tokens and 180 s wall; a tool-only result proves argument syntax only |
+| S1 fold batch | 6 primes + 6 summaries per fold, 9–16 min | 20/25 per fold, folds 11, 52, 93; 60 for the lite test; B0 at most 90/110 |
+| C, R short span | C 1.86–2.59 min per 4 goals off; R 2.88–9.65 | C 12/18 per arm; R 20/24, 25/32 at a named burst |
+| C, R L3 | C goals 49–96 27.14 off, on 28.0–34.6; R 67.68 off, on 59.2–81.4 | C 35/45 per arm, R 90/110 per arm; the 24-goal checkpoint decides the remainder |
+| Full series | C `3 * 46.65` + 48.2–59.2; R `3 * 105.03` + 111.1–138.5 | elapsed per execution C 75 (on 85), R 145 (on 175); daemon deadline at most 179 |
+| Labels | 12-goal L3 rubric 74.8 min C, 94.4 R; four main full packets about 22.55 h | the 42-hour cap holds up to 6 distinct packets; divergent off-repeat content stops the macro comparison before labeling |
+| Tape rungs | A goals 1–12 (48 calls) 5/8; B 13–48 8/12; C1 goal 49 9/12; C2 50–53 8/12; D 54–76 5/8; E 77 9/12; F 78–96 5/8 | a rung needs a named surviving question; F0–F3 must hold on every pre-seed goal; stop at the first fidelity failure or cap |
+| Chains | C11→C52 in 8-goal segments, C52→C79 and C93 only on a passing question; R1→R49 and R49→R77 or R85 in 4-goal segments | C 12/18 per arm segment, 220 GPU min for every C chain; R 20/24, bursts 25/32, 240 for every R chain; a further L2 allocation needs a priced proposal and a budget ruling |
+
+## Units
+
+Implementation units cap at 120 Sol build + 45 Astra review + 30 Luna verifier minutes, GPU 0, labels 0. GPU units cap at 30 driver + 30 analysis minutes per batch (G2 45 analysis), own only `tmp/units/ladder/artifacts/<unit>-<manifest-digest>/` and edit no source. The paths in this table are under `tmp/units/ladder/`.
+
+| Unit | State on 2026-10-21 | Ruling and cap | Next |
+| --- | --- | --- | --- |
+| W0 run manifest, W2 Compaction seed builder, W3 seed ingress design, W5 launcher | W0 done; W2 accepted with C17 and C52 seeds; W3 accepted with revision 1 closed (`seed-ingress-design.md`); W5 accepted, 61 fixtures, 45 source mutations | keep | W5 requalifies on a changed runtime or ABI |
+| W1 metric instrument | accepted; the renderer hardcodes its author label (`tmp/units/ladder/instrument/helpers.ts:1614`) | keep | a one-line fix at the next W1 touch |
+| W3b seed and transport portions | seed brief ready, not dispatched; transport waits on S-T's adoption, A-G and B-G | defer behind G3 | name claim 12's captured-root route, dispatch on a clean Agent checkpoint |
+| W4 Records oracle and recorder | accepted; a re-verify is owed because the pins-ledger identity moved from `251544b1` to `1974e76a` after the earlier MATCH | finish | re-verify in the runner pin's quiet window |
+| W6 request variants | accepted 2026-10-21: the fix round closed every review finding, closure CLOSED, verifier 26 of 26 and 157 of 157 hashes; the fold-93 pair and the late counterpart stay absent inputs | HO-1; gates G0, G3, G7 | none; the absent inputs block only G7's fold 93 and RS3 |
+| W7 Ledger capture | accepted, `8c62459` | keep; the proof home for every Ledger change | none |
+| W8 offline readings | accepted 2026-10-21: closure CLOSED, verifier MATCH (16 of 16, four hashes), the regenerated readings promoted over `l0-readings.json` (615,770 bytes, `54559042…`) | done | none |
+| W9, W10 | not started; mapping 3 h, repeat labels 1 h over 12 Records batches | park (RV-8) | reopen when R1 to R5 have an L1 result (Grok route) |
+| W11 projection and atom pilot | not started; projection preparation ready | keep; a Claude pilot labeler until a labeling lane runs on the Grok route | preparation when a semantic L1 claim is near; the oracle-backed pilot follows U5 |
+| W12 readers and observation | not started | keep, pulled forward | selection-evidence fields, then R3; an unavailable field opens B-M6 |
+| W13 build differential | not started | park until G3 passes (RV-9) | none |
+| A driver adapter, B stage tool | accepted | keep | re-baseline B's installed-manifest pins after the Study adoption |
+| A-G, B-G | not briefed | defer behind G3 | after the in-place runner verify (HO-4) |
+| R-G live Records capture | not started | keep | first live treated Records segment |
+| S-T | built, reviewed, fixed and verified on Study `st-collaborator` `2ad4fb2`: review FAIL C3 (cancellation waited on collaborator cooperation) and C6 (no pending-callback test), fix round, closure CLOSED, verifier MATCH (transport 72 of 72, cloners 8 of 8); the branch is held, unmerged and unpushed | S-T ruling; RV-7 proposed | the S-T release steps after the hold lifts (S-T hold) and the user settles RV-7 and the 0.0.3 scope |
+| Runner pin 0.40.7 | patch built, W5 61 of 61 and B 38 of 38 in an isolated copy, not applied | HO-2 | closure, apply, in-place verify |
+| G0 runner screen | waits on W6 and the in-place pin verify | 15/20, charged to L1 | the G0 run brief |
+| G1A, G1R, G1B | not started | G1A rung A only, 5/8, F2r disclosed; G1R one early batch, 15/20, R3 and R-L1 in separate batches; G1B rung B to the requested boundary, 8/12 | G1A, then G1R, then an earned G1B |
+| G2 C17 fidelity, G7 S1 lite fold | G2 needs W3b, A-G, B-G and S-T; G7's fold 93 is blocked by the W6-5 input gap | defer behind G3; G2 off and exact repeat over the summary and goals 17–20, 15/20; G7 fold 11 first, 20/25, a pass earns 52, then 93, inside 60 | after G3 holds across a second case |
+| G3 onset micro | needs W1, W6, G0 | the one Compaction screen: off, repeat, sham, then Q3a, then Q1, 15/20; one case earns only another case | after G1R |
+| G4, G5, G6 | not started | G4 calibration on 4–8 goals, C 48 or R 80/100; G5 R4b 5/8 or R5c 8/12; G6 one earned segment, four histories | none reachable before G1R |
+| R3 and R-L1 builds | not started | RV-2 and RV-1, default-off, R3 under U7 | R3 after W12, R-L1 after R3 with its L0 differential (`.orkestrel/agent/boosts.md` § R3 build, § R-L1 specification) |
+| Ledger golden | the harness leaves the tree | Cleanup | promote a ledger golden case into `tests/src/core/ledgers/Ledger.test.ts` from `692e551:.orkestrel/agent/instruments/harness/golden/` |
+
+## Order of dispatches
+
+Owed cycles first, then writer units on `src/core/ledgers/` and `studies/memory/` one at a time, then GPU rows under their caps (RV-3). Read-only reviews can run beside one another; every gate run is serial on a quiet host. The S-T release runs beside the writer units on Study's files after its hold lifts (S-T hold). The W6 and W8 cycles closed on 2026-10-21 (§ Units), so the order starts at the runner pin.
+
+1. Runner pin closure, apply, in-place verify (W5 61 on Node 26, B 38, `launch/Launcher.test.ts`), the W4 re-verify and the W1 label fix in the same quiet window.
+2. W12 selection-evidence fields, then R3.
+3. R-L1 with its L0 differential.
+4. G0, then G1A, then G1R with R3 on and R-L1 on in separate batches; earn G1B.
+5. G3 with Q3a, then Q1.
+6. W11 projection preparation when a semantic L1 claim is near; A-G, B-G, W3b, G2 and G7 only when G3 shows a repair that holds across a second case.
+
+- **G0 run brief, daemon.** Tell the user before the GPU phase, and stop to ask when a stable Ollama release after 0.40.7 exists, because adopting it reopens the runner pin. Use the dedicated 11435 daemon from the 0.40.7 receipt with the 0.40.3 lineage environment `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=0`, `LLAMA_ARG_CONTEXT_SHIFT=0`, `LLAMA_ARG_N_PARALLEL=1`.
+- **G0 run brief, procedure.** Run model-unload cold state (W6-COLD) on W6's post-fix construction over `tmp/units/perf-replay-packet/index.json` (`824ea009…`): an exact repeat of the frozen set and one cold, warm and changed-prefix timing triple, 15/20 charged to L1 with a run-ledger row, because the launcher refuses an L0 charge; record host load before and during; Luna drives and Astra analyzes.
+- **S-T release, scope.** Ask the user whether Study 0.0.3 carries the F-dist pass (keep the C1 driver, fold C3 and C23 into the harness rows) and F-wording as a separately scoped unit reviewed with S-T, or defers them to 0.0.4 with the deferral recorded.
+- **S-T release, verify.** After the closure passes, fast-forward Study `main` to `st-collaborator` locally without pushing; Luna verifies on `main`, serially, on a quiet host; bump to 0.0.3 per `orkestrel-publish` and run every `prepublishOnly` step in clean clones on Node 24.22.0 and the portable Node 22.18.0 with npm 11 (`tmp/runtimes/node-v22.18.0-npm11-win-x64`).
+- **S-T release, publish.** Push after the user approves; publish with `window.ts --publish DIR --otp CODE`, then `--confirm`; Agent takes `@orkestrel/study@^0.0.3` with its gates and re-baselines B's manifest pins (HO-3).
+
+## Engines and routing
+
+| Engine | Job | Rule |
+| --- | --- | --- |
+| Codex, T3 `delegate_task` provider `codex` | Sol builds; Astra designs and reviews; Luna verifies and drives (`.orkestrel/plan.md` § Routing) | at most two T3 children at a time, each spawning nothing and running serially (2026-10-21); the Cleanup clause "no parallel processes" bars processes a child launches, not two serial children; the content filter stopped Astra review lanes on security wording, so brief reviews as neutral quality assurance, write the verdict early, retry one time, then fall back to Claude |
+| Claude | the Orchestrator plans, decides and accepts; Opus writes documentation voice and holds a lane the Codex filter stops; engine roles per `../scaffold/.agents/orchestration.md:15` | in-process Workflow and Agent nodes open no console window |
+| Cursor Grok 4.7 | labeling and mapping only (`.orkestrel/plan.md` § Routing; `../scaffold/.agents/orchestration.md:152`); never Composer | the proved route is one T3 child with file tools and no shell (Grok route); W9, W10, the W11 pilot and B-M4 run on a Claude distiller or labeler until a labeling lane runs on that route, and the ledger records the substitution (RV-4); other fallbacks follow `../scaffold/.agents/orchestration.md` § Benches |
+| Unit cycle | build, independent review, a fix round when needed, a closure-only check, a verifier | when rounds touch only test plumbing, one closure-only check, then commit |
+
+## Open questions
+
+| Question | What settles it |
+| --- | --- |
+| One trajectory per configuration gives no variance or general superiority | calibrated same-root pairs with measured repeat and sham bands |
+| Operational success sits on a rubric floor for facts, work and obligations | development atoms under U15, the official rubric unchanged |
+| Source lines describe this checkout, not every captured build; one version string covered different bytes (Study 0.0.1, all 14 `dist` files) | the recorded build deltas before causal attribution; immutable runtime receipts (A first) |
+| Identical replay bodies matched sealed products at 3 of 12 checkpoints; Records lacks judge answers, selected bodies, recall arguments and phase timings | G0 and own-repeat controls on 0.40.7; W7 capture and R-G live capture, with no late checkpoint from lengths |
+| Forecast misses, room refusals and output exhaustion carry different meanings; protocol loss and the frozen tail are interpretations, not isolated effects | reports that keep each failure kind and the first failure apart (Estimator); matched results at G1R and G3 |
+| The C speed baseline holds refusal-short output; host contention and cross-adjudicator differences limit claims | same-quality output and whole-run cost before a speed claim; host load records; a same-judge repeat (W10 or its Claude substitute) |
+| Records of different dates disagree; "cushion rejected" reads as removing the 512 cushion | the later record wins and § Rulings in force holds the winners; the qualifying profile keeps the cushion and drops residual-as-failure (Cushion, capacity) |
+| q2 judge calls read 2,627 and 2,626; C run counts read seven and eight | kept as recorded in `.orkestrel/agent/evidence.md`, never reconciled silently |
+| Raw labels, custody hashes, tokenizer behavior, historical passes, l13–l15 samplers and live boost benefit are unverified | a unit whose claim needs one |
+| Whether the C L3 cold start adds to the 35-minute arm cap | a frozen ruling before the C L3 inventory runs |
+| RV-7 S-T sequencing; Study 0.0.3 scope (F-dist, F-wording) | the user |
+| Study additions and memory adoption (build only demonstrated ladder dependencies); metered-tool and goal-binding moves (keep their owners) | the user, before the first consuming Study batch or export move |
+| Agent-phase, budget D6 (freeze as retained proof; its worktree at `f0c2e03` waits); job-spec allowance, budget D7 (defer) | the user |
+| Recovery within constraints (X550b), model-visible measurements (X558b), cross-project Study adoption (X304b), the durable package-reuse record (X353) | the user, after a real failure, a budget-blind error, before the first adoption, or before the reuse evidence retires |
+| Study's `expired oversized` custody case | its owning campaign defines the smallest faithful fixture |
+
+## History
+
+| Closed | Date | Record |
+| --- | --- | --- |
+| Fleet campaign accepted (U12a) | 2026-10-19 | `6510cbe`; the release round and its rulings in `.orkestrel/plan.md` § History |
+| Boost pause for Study 0.0.2 (user), ended by the adoption; Agent repaired to Scaffold 0.0.104 | 2026-10-20 | `1153752`; `5104fef` |
+| Unit B accepted, wave 2 frozen, W7 accepted | 2026-10-21 | `42c9a0f`; `8c62459` |
+| Codex pause for the handoff (user), with the scratch sweep of accepted units (41.16 GB); the previous handoff text | 2026-10-21 | `36ab8be`; `wf_3d4335a6-cb7`, `tmp/units/sweep-1021/`; `8c62459:.orkestrel/agent/handoff.md` |
+| Boosts review | 2026-10-21 | `692e551` |
+| c1, capacity and Compaction qualification series | 2026-10-13 to 2026-10-16 | `.orkestrel/agent/evidence.md` |
+| Legacy harness, its tools and the small-model matrix rows V5 and V6, retired as moot (Cleanup) | 2026-10-21 | `692e551` |

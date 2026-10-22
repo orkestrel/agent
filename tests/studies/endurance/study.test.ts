@@ -15,7 +15,7 @@ import {
 describe('prospective public endurance declarations', () => {
 	it('preserves the complete pinned public goal and source population at their original boundaries', async () => {
 		// This public archive is retained by root as an explicit durable test dependency.
-		const path = '.orkestrel/agent/instruments/units/aggregates/endurance/runtime/evaluation.json'
+		const path = 'studies/endurance/sources/runtime/evaluation.json'
 		expect((await stat(path)).size).toBe(149851)
 		const bytes = await readFile(path)
 		expect(createHash('sha256').update(bytes).digest('hex')).toBe(
@@ -141,10 +141,7 @@ describe('prospective public endurance declarations', () => {
 
 	it('exposes every public lookup update exactly once at its first eligible goal and refuses future snapshots', async () => {
 		const source = parseJSON(
-			await readFile(
-				'.orkestrel/agent/instruments/units/aggregates/endurance/runtime/evaluation.json',
-				'utf8',
-			),
+			await readFile('studies/endurance/sources/runtime/evaluation.json', 'utf8'),
 		)
 		if (!isRecord(source) || !Array.isArray(source.lookups) || !Array.isArray(source.goals))
 			throw new Error('Invalid lookup archive')

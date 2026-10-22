@@ -2,7 +2,7 @@
 	"version": "1",
 	"adaptation": "Prospective public workload adaptation, not exact historical replay or a thinking-only ablation.",
 	"source": {
-		"path": ".orkestrel/agent/instruments/units/aggregates/endurance/runtime/evaluation.json",
+		"path": "studies/endurance/sources/runtime/evaluation.json",
 		"id": "endurance-evaluation-v 1",
 		"size": 149851,
 		"sha256": "e8b4143efbbc9251166852c2d993f6b1f0b3f44eaa181f0973c27878109a47f5"

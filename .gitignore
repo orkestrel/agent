@@ -39,8 +39,5 @@ playwright-report/
 # Model files
 *.gguf
 
-# Temporary campaign results exclusion.
-.orkestrel/agent/instruments/results/*
-
-# Temporary frozen harness build; remove after the series and dependent reporting finish.
-.orkestrel/agent/instruments/harness/.build/
+# Retired series instruments and raw results, kept on disk until the user sweeps them.
+.orkestrel/agent/instruments/
