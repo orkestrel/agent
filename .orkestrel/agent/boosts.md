@@ -205,11 +205,11 @@ One default-off Records treatment in `src/core/ledgers/` on the seams of `692e55
 
 | Part | Specification |
 | --- | --- |
-| Fix | link a lookup subject when `extractTokens` reads exactly one id from it and that id is an owner (`src/core/ledgers/helpers.ts:461`) |
+| Fix | with the `link` option on, a lookup subject that is not an id token but carries exactly one id (`extractTokens`) is treated as that id under the two existing `linkOwners` branches (an owner id links to itself; any other id links to the single owner the reading names), so the link is keyed in the form placement and the planner look up (`src/core/ledgers/helpers.ts:495-516` at `b9da929`); the build of 2026-10-22 corrected the earlier wording, "link the subject to the owner its one id names", which no consumer reads because placement and the planner look up bare ids |
 | Default | off, under U7 |
 | Controls | wrong-owner and cross-case obligation controls |
 | Order | after W12's selection-evidence fields and before R-L1, so the lexical comparison runs on corrected attribution |
-| Test | promote the probe's R3 case into `tests/src/core/ledgers/helpers.test.ts` with the fix |
+| Test | the probe's R3 case promoted into `tests/src/core/ledgers/helpers.test.ts` with the wrong-owner, two-id, two-owner and no-owner controls, and a Ledger-level case in `tests/src/core/ledgers/Ledger.test.ts` comparing provider bytes (2026-10-22) |
 
 ## Rulings of 2026-10-21
 
@@ -239,11 +239,11 @@ The rulings of the boosts review (Orchestrator, 2026-10-21, `692e551:.orkestrel/
 
 ## Probe record
 
-`tmp/probes/review-1021-proposal.test.ts` ran through the `probe` project on 2026-10-21 at 11:35: 8 passed, exit 0, 688 ms (`tmp/units/review-1021-ledger.md:44`). It ships nothing: delete it, or promote its R3 case with the R3 fix.
+`tmp/probes/review-1021-proposal.test.ts` ran through the `probe` project on 2026-10-21 at 11:35: 8 passed, exit 0, 688 ms (`tmp/units/review-1021-ledger.md:44`). It shipped nothing: its R3 case was promoted with the R3 fix on 2026-10-22 and the probe deleted.
 
 | Claim | Control | Result | Settles |
 | --- | --- | --- | --- |
 | a prefixed subject `order:BC-7301` links to no owner | a bare `bc-7301` links to `BC-7301` | confirmed; the registry names `BC-7301` under both | the R3 defect sits at `src/core/ledgers/helpers.ts:461` |
 | wording in an assistant reply is not listed by `recall` | the same wording in a user message is listed | confirmed: the reply case returns `nothing on` | wording recall reads user messages and lookup readings only (`src/core/ledgers/Ledger.ts:1098-1102`) |
 | a second identical `recall` returns the repeat note | a second recall on another topic is answered | confirmed | `recall` has no page or cursor |
-| the lookup message's record membership under both subjects | none | not shown: the lookup message joins no owner record in this fixture | the record-level effect of R3 stays unproved |
+| the lookup message's record membership under both subjects | none | not shown: the lookup message joins no owner record in this fixture | the record-level effect of R3 stayed unproved until R3's claim R3-3 (2026-10-22): a later message naming the carried id files under the named owner's record with `link` on and under none with it off |
