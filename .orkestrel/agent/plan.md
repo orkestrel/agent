@@ -151,7 +151,7 @@ Implementation units cap at 120 Sol build + 45 Astra review + 30 Luna verifier m
 | W8 offline readings | accepted 2026-10-21: closure CLOSED, verifier MATCH (16 of 16, four hashes), the regenerated readings promoted over `l0-readings.json` (615,770 bytes, `54559042…`) | done | none |
 | W9, W10 | not started; mapping 3 h, repeat labels 1 h over 12 Records batches | park (RV-8) | reopen when R1 to R5 have an L1 result (Grok route) |
 | W11 projection and atom pilot | not started; projection preparation ready | keep; a Claude pilot labeler until a labeling lane runs on the Grok route | preparation when a semantic L1 claim is near; the oracle-backed pilot follows U5 |
-| W12 readers and observation | design accepted 2026-10-21 (W12 design): W12-1 the Agent receipt, W12-2 the Study reader | keep, pulled forward; 120 build + 45 review + 30 verifier minutes per unit | W12-1 build, review, closure and verify (`tmp/units/ladder/w12-1-brief.md`); then W12-2; then R3 |
+| W12 readers and observation | W12-1 accepted 2026-10-22, `45489ce`: the receipt on `LedgerResult`, review PASS on ten claims, verifier MATCH on ten gates (`test:src:core` 1,596, `test:studies` 99); W12-2 the Study reader next (`tmp/units/ladder/w12-2-brief.md`) | keep, pulled forward; 120 build + 45 review + 30 verifier minutes per unit | W12-2 build, review, closure and verify; then R3 |
 | W13 build differential | not started | park until G3 passes (RV-9) | none |
 | A driver adapter, B stage tool | accepted | keep | re-baseline B's installed-manifest pins after the Study adoption |
 | A-G, B-G | not briefed | defer behind G3 | after the in-place runner verify (HO-4) |
