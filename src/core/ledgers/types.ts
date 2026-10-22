@@ -270,6 +270,12 @@ export interface LedgerOptions {
 	 * in the reading's text; if `false`, only id-shaped subjects link. Default: `false`.
 	 */
 	readonly link?: boolean
+	/**
+	 * Selects BM25 briefing discovery and recall ranking.
+	 * If `true`, enables both; if `false`, retains existing selection.
+	 * Default: false.
+	 */
+	readonly lexical?: boolean
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly agent?: LedgerAgentOptions
@@ -882,8 +888,21 @@ export interface GaugeInterface extends LedgerGauge {
 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void
 }
 
-/** Names a briefing source's planning group: a topic match, an off-topic rule or correction, or a name match. */
-export type LedgerPlanningGroup = 1 | 2 | 3
+/** Names a topic, rule, name, or lexical planning group. */
+export type LedgerPlanningGroup = 1 | 2 | 3 | 4
+
+/** Carries occurrence counts from the ledger's word matches. */
+export interface LedgerLexicon {
+	readonly frequencies: ReadonlyMap<string, number>
+	readonly length: number
+}
+
+/** Carries statistics over every call-free message. */
+export interface LedgerCorpus {
+	readonly count: number
+	readonly frequencies: ReadonlyMap<string, number>
+	readonly average: number
+}
 
 /** Names the machine-readable conditions a `LedgerError` error reports. */
 export type LedgerErrorCode =

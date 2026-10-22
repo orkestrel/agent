@@ -42,6 +42,7 @@ import { LedgerRequest } from './LedgerRequest.js'
 import {
 	DEFAULT_LEDGER_LIMIT,
 	DEFAULT_LEDGER_SHARE,
+	LEDGER_BM25_FLOOR,
 	LEDGER_NOTES,
 	LEDGER_OWNER_PREFIX,
 	LEDGER_RULES_KEY,
@@ -53,6 +54,9 @@ import {
 	buildLedgerSources,
 	buildRecallMessage,
 	collectProjectionIds,
+	computeLedgerCorpus,
+	computeLedgerScore,
+	countLedgerWords,
 	extractWords,
 	renderTopicNames,
 	scanAmendments,
@@ -680,14 +684,19 @@ export class Ledger implements LedgerInterface {
 				...extractWords(message),
 			}))
 		const asked = texts.find(({ message }) => message.id === request.id)
-		const counts = new Map(
-			[
-				...Map.groupBy(
-					texts.flatMap((text) => [...text.words]),
-					(word) => word,
-				),
-			].map(([word, occurrences]) => [word, occurrences.length]),
-		)
+		const corpus = this.#options.lexical
+			? computeLedgerCorpus(texts.map(({ message }) => countLedgerWords(message)))
+			: undefined
+		const counts =
+			corpus?.frequencies ??
+			new Map(
+				[
+					...Map.groupBy(
+						texts.flatMap((text) => [...text.words]),
+						(word) => word,
+					),
+				].map(([word, occurrences]) => [word, occurrences.length]),
+			)
 		const live = collectProjectionIds(projection)
 		const units = texts.flatMap(({ message, words, names }, position) => {
 			if (
@@ -713,10 +722,14 @@ export class Ledger implements LedgerInterface {
 					: [...names].some((name) => asked?.names.has(name))
 						? 3
 						: 4
-			if (group === 4) return []
-			const score = [...words]
-				.filter((word) => asked?.words.has(word))
-				.reduce((sum, word) => sum + Math.log(texts.length / (counts.get(word) ?? 1)), 0)
+			const score =
+				corpus === undefined
+					? [...words]
+							.filter((word) => asked?.words.has(word))
+							.reduce((sum, word) => sum + Math.log(texts.length / (counts.get(word) ?? 1)), 0)
+					: computeLedgerScore(countLedgerWords(message), asked?.words ?? new Set(), corpus)
+			if (group === 4 && (corpus === undefined || score <= 0 || score < LEDGER_BM25_FLOOR))
+				return []
 			return [
 				{
 					source: message.id,
@@ -735,21 +748,30 @@ export class Ledger implements LedgerInterface {
 			(left, right) =>
 				left.group - right.group ||
 				(left.group === 1 ? Number(left.unsettled) - Number(right.unsettled) : 0) ||
-				((left.group === 1 && left.unsettled) || left.group === 3 ? right.score - left.score : 0) ||
+				((left.group === 1 && left.unsettled) || left.group === 3 || left.group === 4
+					? right.score - left.score
+					: 0) ||
 				left.position - right.position,
 		)
 		const cuts = [...ordered].sort(
 			(left, right) =>
 				left.cut - right.cut ||
-				(left.cut === 0 || left.cut === 1 || left.cut === 4 ? left.score - right.score : 0) ||
+				(left.cut === -1 || left.cut === 0 || left.cut === 1 || left.cut === 4
+					? left.score - right.score
+					: 0) ||
 				right.position - left.position,
 		)
 		const rules = records.find((record) => record.key === LEDGER_RULES_KEY)
 		const steps = [
+			...cuts
+				.filter((unit) => unit.group === 4)
+				.map((unit) => ({ key: undefined, source: unit.source })),
 			...(rules?.lines
 				.filter((line) => !line.topics.some((topic) => near.has(topic)))
 				.map(() => ({ key: rules.key, source: undefined })) ?? []),
-			...cuts.map((unit) => ({ key: undefined, source: unit.source })),
+			...cuts
+				.filter((unit) => unit.group !== 4)
+				.map((unit) => ({ key: undefined, source: unit.source })),
 			...(rules?.lines
 				.filter((line) => line.topics.some((topic) => near.has(topic)))
 				.map(() => ({ key: rules.key, source: undefined })) ?? []),
@@ -1116,18 +1138,34 @@ export class Ledger implements LedgerInterface {
 			(gauge?.room(calls, this.#findLongest()) ?? 0) - estimateMessages([buildRecallMessage(topic)])
 		const { input, projection } = this.#project()
 		const registry = collectRegistry(input.readings)
+		const query = this.#options.lexical
+			? extractWords({ id: 'recall', role: 'user', content: topic }).words
+			: undefined
+		const texts = this.#options.lexical
+			? new Map(
+					input.messages
+						.filter((message) => !hasCalls(message))
+						.map((message) => [message.id, countLedgerWords(message)]),
+				)
+			: undefined
+		const corpus = texts === undefined ? undefined : computeLedgerCorpus([...texts.values()])
 		const searches = splitTopic(topic).map((part) => {
 			const words = splitWords(part)
 			const matched = new Set([
 				...[...registry.ids].filter(
 					(id) =>
-						extractTokens(part).ids.has(id) ||
-						words.every((word) =>
-							`${id} ${(registry.owners.get(id) ?? []).join(' ')}`.toLowerCase().includes(word),
-						),
+						(query === undefined || (query.size > 0 && words.length > 0)) &&
+						(extractTokens(part).ids.has(id) ||
+							words.every((word) =>
+								`${id} ${(registry.owners.get(id) ?? []).join(' ')}`.toLowerCase().includes(word),
+							)),
 				),
 				...this.#options.topics
-					.filter((one) => words.every((word) => one.name.toLowerCase().includes(word)))
+					.filter(
+						(one) =>
+							(query === undefined || (query.size > 0 && words.length > 0)) &&
+							words.every((word) => one.name.toLowerCase().includes(word)),
+					)
 					.map((one) => one.name),
 			])
 			return { words, matched }
@@ -1142,6 +1180,7 @@ export class Ledger implements LedgerInterface {
 				.map((message) => [message.id, message]),
 		)
 		const readings = new Map(input.readings.map((reading) => [reading.id, reading]))
+		const positions = new Map(input.messages.map((message, position) => [message.id, position]))
 		const matched = new Set(searches.flatMap((search) => [...search.matched]))
 		const wordings = searches.filter(
 			(search) => search.matched.size === 0 && search.words.length > 0,
@@ -1149,7 +1188,12 @@ export class Ledger implements LedgerInterface {
 		// Newest first; each item's amenders are claimed by it, so an older item never lists them again.
 		const listing = [...listable.values()].reverse().reduce<{
 			readonly done: ReadonlySet<string>
-			readonly listed: readonly string[]
+			readonly listed: ReadonlyArray<{
+				readonly text: string
+				readonly keyed: boolean
+				readonly score: number
+				readonly position: number
+			}>
 			readonly recalled: ReadonlyMap<string, string>
 		}>(
 			(state, message) => {
@@ -1171,9 +1215,13 @@ export class Ledger implements LedgerInterface {
 					[...matched].some((match) => topics.has(match))
 				const worded =
 					(message.role === 'tool' ? reading !== undefined : message.role === 'user') &&
-					wordings.some((search) =>
-						search.words.every((word) => message.content.toLowerCase().includes(word)),
-					)
+					(query === undefined
+						? wordings.some((search) =>
+								search.words.every((word) => message.content.toLowerCase().includes(word)),
+							)
+						: wordings.some((search) =>
+								search.words.every((word) => message.content.toLowerCase().includes(word)),
+							) && [...query].some((word) => texts?.get(message.id)?.frequencies.has(word)))
 				if (!onTopic && !worded) return state
 				const items = scanAmendments(
 					input.classification.amendments,
@@ -1208,16 +1256,44 @@ export class Ledger implements LedgerInterface {
 					listed:
 						items.length === 0
 							? state.listed
-							: [...state.listed, items.map((item) => item.text).join('\n')],
+							: [
+									...state.listed,
+									{
+										text: items.map((item) => item.text).join('\n'),
+										keyed: onTopic,
+										score:
+											query === undefined || corpus === undefined
+												? 0
+												: computeLedgerScore(
+														texts?.get(message.id) ?? countLedgerWords(message),
+														query,
+														corpus,
+													),
+										position: positions.get(message.id) ?? 0,
+									},
+								],
 					recalled: new Map([...state.recalled, ...items.flatMap((item) => item.stored)]),
 				}
 			},
 			{ done: new Set(), listed: [], recalled: new Map() },
 		)
+		const ordered =
+			query === undefined
+				? listing.listed
+				: [...listing.listed].sort(
+						(left, right) =>
+							Number(right.keyed) - Number(left.keyed) ||
+							right.score - left.score ||
+							right.position - left.position,
+					)
 		const result =
 			listing.listed.length === 0
 				? `nothing on "${topic}"; recall ${guidance}`
-				: cutListing(listing.listed, room)
+				: cutListing(
+						ordered.map((entry) => entry.text),
+						room,
+						this.#options.lexical,
+					)
 		request?.list(result, listing.recalled)
 		return result
 	}
@@ -1234,7 +1310,7 @@ export class Ledger implements LedgerInterface {
 					if (listing && /^nothing on /.test(message.content)) return []
 					const recalled = listing ? request.listing(message.content) : undefined
 					return splitResultLines(message.content)
-						.filter((line) => !listing || !matchesCutLine(line))
+						.filter((line) => !listing || !matchesCutLine(line, this.#options.lexical))
 						.map((line) => recalled?.get(line) ?? line)
 				}),
 			),

@@ -7,7 +7,14 @@ import type {
 	RelayOptions,
 	RelayProviderOptions,
 } from '@src/core'
-import { Classifier, createLedger, createRelay, RelayProvider, renderStub } from '@src/core'
+import {
+	Classifier,
+	createLedger,
+	createRelay,
+	LEDGER_NOTES,
+	RelayProvider,
+	renderStub,
+} from '@src/core'
 import { createBudget } from '@orkestrel/budget'
 import type {
 	AgentResult,
@@ -129,6 +136,180 @@ import { createBinaryContent, createFile, createTextContent } from '@orkestrel/w
 
 /** Supplies cut-free and fully cut capacities for composition controls. */
 export const LEDGER_RECEIPT_CAPACITIES: readonly number[] = Object.freeze([20000, 1])
+
+/** Drives stored source content through recall and its answer pass. */
+export async function observeLedgerRecall(
+	query: string,
+	contents: readonly string[],
+	lexical: boolean | undefined,
+	options: Partial<LedgerOptions> = {},
+): Promise<{ readonly result: string | undefined; readonly note: string | undefined }> {
+	const provider = createScriptedProvider(
+		[
+			{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: query } }] },
+			{ content: '' },
+			{ content: 'Done.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			...(lexical === undefined ? {} : { lexical }),
+			lookups: [],
+			share: { tail: 0.001 },
+			...options,
+		}),
+	)
+	ledger.conversation.add(contents.map((content): MessageInput => ({ role: 'user', content })))
+	await ledger.respond('Review.')
+	return {
+		result: provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+		note: ledger.conversation
+			.messages()
+			.find((message) => message.content.startsWith(LEDGER_NOTES.results))?.content,
+	}
+}
+
+/** Supplies cut suffix recognition cases for each ranking option. */
+export const LEDGER_CUT_MATCHES = Object.freeze([
+	{ line: '1 item not shown; add a topic', ranked: false, matched: false },
+	{ line: '2 items not shown; add a topic', ranked: false, matched: false },
+	{ line: '1 older item not shown; add a topic', ranked: false, matched: true },
+	{ line: '2 older items not shown; add a topic', ranked: false, matched: true },
+	{ line: '1 item not shown; add a topic', ranked: true, matched: true },
+	{ line: '2 items not shown; add a topic', ranked: true, matched: true },
+	{ line: '1 older item not shown; add a topic', ranked: true, matched: false },
+	{ line: '2 older items not shown; add a topic', ranked: true, matched: false },
+])
+
+/** Supplies a ranked recall source whose older wording must survive a generated neutral cut. */
+export const LEDGER_CUT_RECALL = Object.freeze({
+	source: `2 older items not shown; amber stock remains.\n${'amber '.repeat(200)}10`,
+	other: 'amber 20',
+})
+
+/** Supplies independent BM25 examples with occurrence lengths and document frequencies. */
+export const LEDGER_LEXICAL_NUMBERS = Object.freeze({
+	texts: Object.freeze(['amber amber blue', 'blue']),
+	query: 'amber',
+	expected: (88 / 73) * Math.log(2),
+	unicode: 'ÉLODIE, élodie! 42—42; blue.',
+	// N=2, df(élodie)=df(42)=1, L=5, avgL=3: each term contributes 22/19 * ln(2).
+	unicodeScore: (44 / 19) * Math.log(2),
+})
+
+/** Supplies the lexical rank boundary and the unchanged priority ranks. */
+export const LEDGER_LEXICAL_RANKS = Object.freeze([
+	{ group: 4, unsettled: false, category: 'fact', expected: -1 },
+	{ group: 4, unsettled: true, category: 'rule', expected: -1 },
+	{ group: 3, unsettled: true, category: 'rule', expected: 0 },
+	{ group: 1, unsettled: true, category: 'fact', expected: 1 },
+	{ group: 2, unsettled: false, category: 'correction', expected: 2 },
+	{ group: 2, unsettled: false, category: 'rule', expected: 3 },
+	{ group: 1, unsettled: false, category: 'fact', expected: 4 },
+] as const)
+
+/** Supplies equal-length floor inputs and a shorter corpus that puts the candidate below it. */
+export const LEDGER_LEXICAL_DISCOVERY = Object.freeze([
+	{ query: 'amber', filler: 'green green green', selected: true },
+	{ query: 'amber', filler: 'green green', selected: false },
+	{ query: 'violet', filler: 'green green green', selected: false },
+	{ query: '???', filler: 'green green green', selected: false },
+] as const)
+
+/** Supplies discovery sources in conversation order and their independently specified score order. */
+export const LEDGER_LEXICAL_ORDER = Object.freeze({
+	sources: Object.freeze(['amber 10', 'amber amber 20', 'amber 30']),
+	ordered: Object.freeze(['amber amber 20', 'amber 10', 'amber 30']),
+})
+
+/** Supplies call-free background messages outside every lexical candidate group. */
+export const LEDGER_LEXICAL_PADDING: readonly MessageInput[] = Object.freeze(
+	Array.from({ length: 8 }, (): MessageInput => ({ role: 'user', content: 'blue green violet' })),
+)
+
+/** Supplies complete recall entries for ranked truncation. */
+export const LEDGER_LEXICAL_ENTRIES = Object.freeze([
+	'amber root\namendment',
+	'blue root',
+	'green root',
+])
+
+/** Supplies recall roots and the keyed-first, score-first, newest-tie listing. */
+export const LEDGER_LEXICAL_RECALL = Object.freeze({
+	sources: Object.freeze([
+		'amber amber 10',
+		'amber 20',
+		'amber 30',
+		'violet 40',
+		'Desk anchor 70.',
+	]),
+	query: 'refunds, amber',
+	ordered: Object.freeze(['Desk anchor 70.', 'amber amber 10', 'amber 30', 'amber 20']),
+})
+
+/** Supplies explicit off, omitted, and enabled arms for byte captures. */
+export const LEDGER_LEXICAL_ARMS = Object.freeze([false, undefined, true])
+
+/** Supplies owners whose lookup contents have deliberately opposed lexical scores. */
+export const LEDGER_LEXICAL_OWNERS = Object.freeze([
+	{
+		id: 'BW-20931',
+		names: Object.freeze(['Brightwater Studio']),
+		text: 'Account BW-20931: Brightwater Studio.',
+	},
+	{
+		id: 'LH-81660',
+		names: Object.freeze(['Lighthouse Studio']),
+		text: `Account LH-81660: Lighthouse Studio. ${'amber '.repeat(30)}`,
+	},
+])
+
+/** Supplies a discovery source larger than the room beside an off-topic rule. */
+export const LEDGER_LEXICAL_ROOM = Object.freeze({
+	source: `${'amber '.repeat(50)}10`,
+	rule: 'Keep warehouse 42 clear.',
+	filler: 'blue green violet '.repeat(25),
+})
+
+/** Supplies long call-free background messages for discovery and amendment room proofs. */
+export const LEDGER_LEXICAL_LONG_PADDING: readonly MessageInput[] = Object.freeze(
+	Array.from({ length: 8 }, (): MessageInput => ({
+		role: 'user',
+		content: LEDGER_LEXICAL_ROOM.filler,
+	})),
+)
+
+/** Supplies matching and nonmatching amenders for whole-entry ranked cuts. */
+export const LEDGER_LEXICAL_AMENDMENTS = Object.freeze({
+	source: 'amber amber amber 10. Code AA-10.',
+	other: 'amber 20.',
+	cases: Object.freeze([
+		{ correction: 'Replace AA-10 with AA-11.', matching: false },
+		{ correction: 'amber replaces AA-10 with AA-11.', matching: true },
+	]),
+})
+
+/** Supplies planning groups with decisive precedence, score keys, and conversation ties. */
+export const LEDGER_LEXICAL_GROUPS = Object.freeze({
+	padding: Object.freeze(
+		Array.from({ length: 12 }, (): MessageInput => ({
+			role: 'user',
+			content: 'blue green violet',
+		})),
+	),
+	sources: Object.freeze([
+		'amber 40.',
+		'For Mira, amber 31.',
+		'refund amber 13.',
+		'refund amber 11.',
+		'refund amber amber 12.',
+		'For Mira, amber amber 32.',
+	]),
+	unsettled: Object.freeze([2, 4]),
+	order: Object.freeze([3, 4, 2, 5, 1, 0]),
+})
 
 /** Carries an empty successful plan for request lifecycle controls. */
 export const LEDGER_EMPTY_PLAN: LedgerPlanReceipt = Object.freeze({

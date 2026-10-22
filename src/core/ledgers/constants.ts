@@ -1,5 +1,17 @@
 import type { LedgerCategory, LedgerNote, LedgerQuestion, LedgerShare } from './types.js'
 
+/** Matches the Unicode words used by both ledger analyzers. */
+export const LEDGER_WORD_PATTERN = /[\p{L}\p{N}]+/gu
+
+/** Sets the BM25 term-frequency saturation coefficient. */
+export const LEDGER_BM25_K1 = 1.2
+
+/** Sets the BM25 length-normalization coefficient. */
+export const LEDGER_BM25_B = 0.75
+
+/** Sets the inclusive lexical discovery floor. */
+export const LEDGER_BM25_FLOOR = Math.log(2)
+
 /**
  * Lists the categories the ledger files a message under, in the order the category question
  * names them — the one list the {@link LedgerCategory} union derives from.

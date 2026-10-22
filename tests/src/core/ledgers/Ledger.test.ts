@@ -27,6 +27,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	buildDeliverySeed,
 	buildLedgerOptions,
+	observeLedgerRecall,
 	buildLedgerResponse,
 	buildLedgerJudgment,
 	buildLedgerExchange,
@@ -51,9 +52,378 @@ import {
 	LEDGER_NUMERIC_FIXTURE,
 	LEDGER_RECEIPT_CAPACITIES,
 	LEDGER_LINK_FIXTURE,
+	LEDGER_LEXICAL_DISCOVERY,
+	LEDGER_LEXICAL_ORDER,
+	LEDGER_LEXICAL_RECALL,
+	LEDGER_LEXICAL_ARMS,
+	LEDGER_LEXICAL_OWNERS,
+	LEDGER_LEXICAL_ROOM,
+	LEDGER_LEXICAL_AMENDMENTS,
+	LEDGER_LEXICAL_GROUPS,
+	LEDGER_LEXICAL_PADDING,
+	LEDGER_LEXICAL_LONG_PADDING,
+	LEDGER_CUT_RECALL,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it('F-8 enabled arm removes its neutral cut and retains an older literal line', async () => {
+		const observed = await observeLedgerRecall(
+			'amber',
+			[LEDGER_CUT_RECALL.source, LEDGER_CUT_RECALL.other],
+			true,
+			{ capacity: 512 },
+		)
+		expect(observed.result).toBe(
+			`${LEDGER_CUT_RECALL.source}\n1 item not shown; name a narrower topic to narrow the recall`,
+		)
+		expect(observed.note).toBe(`${LEDGER_NOTES.results}\n${LEDGER_CUT_RECALL.source}`)
+	})
+	it('F-8 omitted arm retains a neutral source line in recall and its results note', async () => {
+		const content = '2 items not shown; amber stock remains.'
+		const observed = await observeLedgerRecall('amber', [content], undefined)
+		expect(observed.result).toBe(content)
+		expect(observed.note).toBe(`${LEDGER_NOTES.results}\n${content}`)
+	})
+	it('F-8 false arm retains a neutral source line in recall and its results note', async () => {
+		const content = '2 items not shown; amber stock remains.'
+		const observed = await observeLedgerRecall('amber', [content], false)
+		expect(observed.result).toBe(content)
+		expect(observed.note).toBe(`${LEDGER_NOTES.results}\n${content}`)
+	})
+	it('F-7a requires every wording term before admitting an analyzed overlap', async () => {
+		const observed = await observeLedgerRecall('amber blue', ['amber 10'], true)
+		expect(observed.result).toBe(
+			'nothing on "amber blue"; recall an owner name, an id, or one of refunds',
+		)
+	})
+	it('F-7a admits a source carrying both analyzed query words', async () => {
+		const observed = await observeLedgerRecall('amber blue', ['amber blue 10'], true)
+		expect(observed.result).toBe('amber blue 10')
+	})
+	it('F-7a requires a whole-word overlap on and preserves substring admission off', async () => {
+		const enabled = await observeLedgerRecall('amber', ['ambergris 10'], true)
+		const disabled = await observeLedgerRecall('amber', ['ambergris 10'], false)
+		expect(enabled.result).toBe(
+			'nothing on "amber"; recall an owner name, an id, or one of refunds',
+		)
+		expect(disabled.result).toBe('ambergris 10')
+	})
+	it('L-4 preserves keyed groups and their existing score keys before discovery', async () => {
+		const fixture = LEDGER_LEXICAL_GROUPS
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				lexical: true,
+				judge: createPhraseJudge([]),
+				lookups: [],
+				share: { tail: 0.001 },
+			}),
+		)
+		const sources = ledger.conversation.add(
+			fixture.sources.map((content): MessageInput => ({ role: 'user', content })),
+		)
+		for (const at of fixture.unsettled)
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(requireValue(sources[at]), {
+					model: 'scripted',
+					answer: { form: 'choice', probabilities: { fact: 0.2 } },
+				}),
+			)
+		ledger.conversation.add(fixture.padding)
+		const result = await ledger.respond('refund Mira amber')
+		expect(result.receipts[0]?.selections[0]?.plan?.rendered).toEqual(
+			fixture.order.map((at) => sources[at]?.id),
+		)
+	})
+	it('L-5 groups newest-first before ranking and cuts complete amendment entries', async () => {
+		const fixture = LEDGER_LEXICAL_AMENDMENTS
+		for (const row of fixture.cases) {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'amber' } }] },
+					{ content: '' },
+					{ content: 'Done.' },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					lexical: true,
+					topics: [],
+					lookups: [],
+					capacity: 100,
+					share: { prompt: 0.001, tail: 0.001 },
+				}),
+			)
+			const source = ledger.conversation.add({ role: 'user', content: fixture.source })
+			const correction = ledger.conversation.add({ role: 'user', content: row.correction })
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(correction, {
+					answer: { form: 'choice', probabilities: { correction: 1 } },
+				}),
+			)
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', source, correction, 1))
+			ledger.conversation.judgments.add(
+				buildLedgerPairJudgment('supersedes', source, correction, 0),
+			)
+			ledger.conversation.add({ role: 'user', content: fixture.other })
+			ledger.conversation.add(LEDGER_LEXICAL_LONG_PADDING)
+			await ledger.respond('Review.')
+			const kept = row.matching ? fixture.source : `${fixture.source}\n${row.correction}`
+			const suffix = `${row.matching ? '2 items' : '1 item'} not shown; name a narrower topic to narrow the recall`
+			expect(
+				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+			).toBe(`${kept}\n${suffix}`)
+			const note = ledger.conversation
+				.messages()
+				.find((message) => message.content.startsWith(LEDGER_NOTES.results))
+			expect(note?.content).toBe(`${LEDGER_NOTES.results}\n${kept}`)
+		}
+	})
+	it('L-6 pins omitted and false briefing and recall bytes with an enabled control', async () => {
+		for (const lexical of LEDGER_LEXICAL_ARMS) {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'amber' } }] },
+					{ content: 'Done.' },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					...(lexical === undefined ? {} : { lexical }),
+					topics: [],
+					lookups: [],
+					share: { tail: 0.001 },
+				}),
+			)
+			ledger.conversation.add(
+				LEDGER_LEXICAL_ORDER.sources.map((content): MessageInput => ({ role: 'user', content })),
+			)
+			ledger.conversation.add(LEDGER_LEXICAL_PADDING)
+			await ledger.respond('amber')
+			expect(provider.calls[0]?.messages[0]?.content).toBe(
+				lexical === true
+					? `Serve the desk.\n\n## Pinned\n${LEDGER_LEXICAL_ORDER.ordered.join('\n')}`
+					: 'Serve the desk.',
+			)
+			expect(
+				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+			).toBe(
+				lexical === true
+					? 'amber amber 20\namber 30\namber 10'
+					: 'amber 30\namber amber 20\namber 10',
+			)
+		}
+	})
+
+	it('L-4 keeps keyed ownership independent of a wrong-owner high score', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				lexical: true,
+				topics: [],
+				share: { tail: 0.001 },
+				lookups: [
+					{
+						tool: createTool({ name: 'lookup', execute: () => '' }),
+						read: (args) => ({
+							ids: [],
+							owners: LEDGER_LEXICAL_OWNERS.filter((owner) => owner.id === args.id),
+						}),
+					},
+				],
+			}),
+		)
+		for (const owner of LEDGER_LEXICAL_OWNERS)
+			ledger.conversation.add(buildLedgerExchange(owner.text, owner.id, { id: owner.id }))
+		const result = await ledger.respond('amber BW-20931')
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.owners).toEqual(['BW-20931'])
+		expect(provider.calls[0]?.messages[0]?.content).toContain('Brightwater Studio')
+		expect(provider.calls[0]?.messages[0]?.content).not.toContain('Lighthouse Studio')
+	})
+
+	it('L-4 removes low-score discovery and later ties first inside the same room', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				lexical: true,
+				topics: [],
+				lookups: [],
+				capacity: 25,
+				share: { prompt: 1, tail: 0.001 },
+			}),
+		)
+		const sources = ledger.conversation.add(
+			LEDGER_LEXICAL_ORDER.sources.map((content): MessageInput => ({ role: 'user', content })),
+		)
+		ledger.conversation.add(LEDGER_LEXICAL_PADDING)
+		const result = await ledger.respond('amber')
+		expect(result.receipts[0]?.selections[0]?.plan?.rendered).toEqual([
+			sources[1]?.id,
+			sources[0]?.id,
+		])
+		expect(result.receipts[0]?.selections[0]?.plan?.trims).toBe(1)
+		// The retained system costs 17 estimate units and the request costs 6.
+		expect(estimateMessages(requireValue(provider.calls[0]).messages)).toBe(23)
+	})
+
+	it('L-4 cuts discovery before the existing off-topic-rule steps', async () => {
+		const fixture = LEDGER_LEXICAL_ROOM
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				lexical: true,
+				topics: [],
+				lookups: [],
+				capacity: 80,
+				share: { prompt: 1, tail: 0.001 },
+			}),
+		)
+		const candidate = ledger.conversation.add({ role: 'user', content: fixture.source })
+		const rule = ledger.conversation.add({ role: 'user', content: fixture.rule })
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(rule, { answer: { form: 'choice', probabilities: { rule: 1 } } }),
+		)
+		ledger.conversation.add(LEDGER_LEXICAL_LONG_PADDING)
+		const result = await ledger.respond('amber')
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.filed).toContain(candidate.id)
+		expect(plan.rendered).toEqual([rule.id])
+		expect(plan.trims).toBe(1)
+		expect(provider.calls[0]?.messages[0]?.content).toBe(
+			`Serve the desk.\n\n## Rules\n- ${fixture.rule}`,
+		)
+		expect(estimateMessages(requireValue(provider.calls[0]).messages)).toBeLessThanOrEqual(
+			80 / 1.06,
+		)
+	})
+	it('L-5 recalls keyed roots before BM25 then newer ties and keeps repeat identity', async () => {
+		const fixture = LEDGER_LEXICAL_RECALL
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'recall', name: 'recall', arguments: { topic: fixture.query } }],
+				},
+				{
+					content: '',
+					tools: [
+						{
+							id: 'again',
+							name: 'recall',
+							arguments: { topic: ` ${fixture.query} `, category: 'unused' },
+						},
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ lexical: true, lookups: [], share: { tail: 0.001 } }),
+		)
+		const sources = ledger.conversation.add(
+			fixture.sources.map((content): MessageInput => ({ role: 'user', content })),
+		)
+		const keyed = requireValue(sources.at(-1))
+		ledger.conversation.judgments.add(
+			buildLedgerTopicJudgment(keyed, { name: 'refunds', criterion: 'Refund amounts' }, 1),
+		)
+		await ledger.respond('Review the desk.')
+		expect(
+			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+		).toBe(fixture.ordered.join('\n'))
+		expect(
+			ledger.conversation
+				.messages()
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([fixture.ordered.join('\n'), LEDGER_NOTES.repeat])
+		const note = ledger.conversation
+			.messages()
+			.find((message) => message.content.startsWith(LEDGER_NOTES.results))
+		expect(note?.content).toBe(`${LEDGER_NOTES.results}\n${fixture.ordered.join('\n')}`)
+	})
+
+	it('L-5 refuses punctuation-only recall without vacuous keyed matches', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: '?!' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions({ lexical: true }))
+		ledger.conversation.add(buildLedgerExchange('Account BW-20931: Brightwater Studio.'))
+		const source = ledger.conversation.add({ role: 'user', content: 'Refunds need approval.' })
+		ledger.conversation.judgments.add(
+			buildLedgerTopicJudgment(source, { name: 'refunds', criterion: 'Refund amounts' }, 1),
+		)
+		await ledger.respond('Review.')
+		expect(
+			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+		).toBe('nothing on "?!"; recall an owner name, an id, or one of refunds')
+	})
+	it('L-4 admits discovery exactly at ln(2) and refuses below', async () => {
+		for (const row of LEDGER_LEXICAL_DISCOVERY.filter((entry) => entry.query === 'amber')) {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ lexical: true, topics: [], lookups: [], share: { tail: 0.001 } }),
+			)
+			const candidate = ledger.conversation.add({ role: 'user', content: 'amber 10' })
+			ledger.conversation.add([
+				{ role: 'user', content: 'blue blue' },
+				{ role: 'user', content: row.filler },
+			])
+			const result = await ledger.respond(row.query)
+			expect({
+				query: row.query,
+				rendered: result.receipts[0]?.selections[0]?.plan?.rendered,
+			}).toEqual({ query: row.query, rendered: row.selected ? [candidate.id] : [] })
+		}
+	})
+
+	it('L-3 never pads discovery for empty analyzed queries or no overlap', async () => {
+		for (const row of LEDGER_LEXICAL_DISCOVERY.filter((entry) => entry.query !== 'amber')) {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ lexical: true, topics: [], lookups: [], share: { tail: 0.001 } }),
+			)
+			ledger.conversation.add({ role: 'user', content: 'amber 10' })
+			const result = await ledger.respond(row.query)
+			expect(result.receipts[0]?.selections[0]?.plan?.rendered).toEqual([])
+		}
+	})
+
+	it('L-4 orders discovery by BM25 then earlier position', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ lexical: true, topics: [], share: { tail: 0.001 } }),
+		)
+		const sources = ledger.conversation.add(
+			LEDGER_LEXICAL_ORDER.sources.map((content): MessageInput => ({ role: 'user', content })),
+		)
+		ledger.conversation.add(LEDGER_LEXICAL_PADDING)
+		const result = await ledger.respond('amber')
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.owners).toEqual([])
+		expect(plan.rendered).toEqual([sources[1]?.id, sources[0]?.id, sources[2]?.id])
+		expect(provider.calls[0]?.messages[0]?.content).toBe(
+			`Serve the desk.\n\n## Pinned\n${LEDGER_LEXICAL_ORDER.ordered.join('\n')}`,
+		)
+	})
 	it('R3-4 renders a prefixed subject lookup fact only with linking on', async () => {
 		const fixture = LEDGER_LINK_FIXTURE
 		for (const link of [false, true]) {
@@ -364,7 +734,7 @@ describe('Ledger', () => {
 	it('W7-2 W7-3 W7-4 W7-5 W7-6 W7-7 captures the complete correction-sensitive API transcript', async () => {
 		const fixture = LEDGER_CAPTURE_FIXTURE
 		const repeats: Array<Readonly<Record<string, readonly string[]>>> = []
-		for (const amount of LEDGER_CAPTURE_AMOUNTS) {
+		for (const [iteration, amount] of LEDGER_CAPTURE_AMOUNTS.entries()) {
 			const asked = createRecorder<readonly [JudgeRequest]>()
 			const answered = createRecorder<readonly [JudgeResult]>()
 			const selected = createRecorder<readonly [Selection]>()
@@ -410,6 +780,7 @@ describe('Ledger', () => {
 						},
 					},
 					think: true,
+					...(iteration === 1 ? { lexical: false } : {}),
 					share: { prompt: 0.8, tail: 0.06 },
 				}),
 			)

@@ -7,6 +7,7 @@ import type {
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
 import { createConversation } from '@src/core'
+import * as lexical from '../../../../src/core/ledgers/helpers.js'
 import {
 	buildRecallMessage,
 	buildLedgerSources,
@@ -62,8 +63,99 @@ import {
 	LEDGER_HANDLE,
 	LEDGER_LINK_FIXTURE,
 	LEDGER_LINK_REFUSALS,
+	LEDGER_LEXICAL_NUMBERS,
+	LEDGER_LEXICAL_RANKS,
+	LEDGER_LEXICAL_ENTRIES,
+	LEDGER_CUT_MATCHES,
 	replaceLedgerRecord,
 } from '../../../setup.js'
+
+describe('lexical scoring', () => {
+	it('L-5 cuts ranked whole entries with a neutral recognized suffix', () => {
+		const entries = LEDGER_LEXICAL_ENTRIES
+		expect(cutListing(entries, 0, true)).toBe(
+			'amber root\namendment\n2 items not shown; name a narrower topic to narrow the recall',
+		)
+		expect(cutListing(entries, 0)).toBe(
+			'amber root\namendment\n2 older items not shown; name a narrower topic to narrow the recall',
+		)
+		expect(
+			matchesCutLine('2 items not shown; name a narrower topic to narrow the recall', true),
+		).toBe(true)
+		expect(
+			matchesCutLine('1 item not shown; name a narrower topic to narrow the recall', true),
+		).toBe(true)
+		expect(matchesCutLine('The 1 item not shown; text')).toBe(false)
+	})
+	it('L-1 returns the hand-computed 88/73 ln(2) score', () => {
+		expect(lexical).toHaveProperty('computeLedgerScore')
+		const texts = LEDGER_LEXICAL_NUMBERS.texts.map((content) =>
+			lexical.countLedgerWords(buildLedgerMessage(content, 'user', content)),
+		)
+		const corpus = lexical.computeLedgerCorpus(texts)
+		expect(corpus).toEqual({
+			count: 2,
+			average: 2,
+			frequencies: new Map([
+				['amber', 1],
+				['blue', 2],
+			]),
+		})
+		expect(
+			lexical.computeLedgerScore(
+				texts[0] ?? { length: 0, frequencies: new Map() },
+				new Set(['amber']),
+				corpus,
+			),
+		).toBeCloseTo(LEDGER_LEXICAL_NUMBERS.expected, 14)
+	})
+
+	it('L-2 counts repeated Unicode matches and distinct query terms', () => {
+		expect(lexical).toHaveProperty('countLedgerWords')
+		const message = buildLedgerMessage('unicode', 'user', LEDGER_LEXICAL_NUMBERS.unicode)
+		const text = lexical.countLedgerWords(message)
+		expect(text).toEqual({
+			length: 5,
+			frequencies: new Map([
+				['élodie', 2],
+				['42', 2],
+				['blue', 1],
+			]),
+		})
+		expect([...extractWords(message).words]).toEqual([...text.frequencies.keys()])
+		const corpus = lexical.computeLedgerCorpus([
+			text,
+			lexical.countLedgerWords(buildLedgerMessage('other', 'user', 'blue')),
+		])
+		const query = extractWords(buildLedgerMessage('query', 'user', 'Élodie élodie 42 42')).words
+		expect(lexical.computeLedgerScore(text, query, corpus)).toBeCloseTo(
+			LEDGER_LEXICAL_NUMBERS.unicodeScore,
+			14,
+		)
+		expect(lexical.countLedgerWords(message)).toEqual(text)
+	})
+
+	it('L-3 returns zero before empty divisions and for no overlap', () => {
+		expect(lexical).toHaveProperty('computeLedgerCorpus')
+		const empty = lexical.countLedgerWords(buildLedgerMessage('empty', 'user', '...'))
+		const text = lexical.countLedgerWords(buildLedgerMessage('text', 'user', 'amber'))
+		expect(lexical.computeLedgerCorpus([])).toEqual({
+			count: 0,
+			average: 0,
+			frequencies: new Map(),
+		})
+		expect(lexical.computeLedgerScore(text, new Set(), lexical.computeLedgerCorpus([text]))).toBe(0)
+		expect(
+			lexical.computeLedgerScore(text, new Set(['amber']), lexical.computeLedgerCorpus([])),
+		).toBe(0)
+		expect(
+			lexical.computeLedgerScore(empty, new Set(['amber']), lexical.computeLedgerCorpus([empty])),
+		).toBe(0)
+		expect(
+			lexical.computeLedgerScore(text, new Set(['blue']), lexical.computeLedgerCorpus([text])),
+		).toBe(0)
+	})
+})
 
 describe('extracted ledger leaves', () => {
 	it('C3 joins carriage by composition precedence and leaves a tail stub unlabelled', () => {
@@ -198,6 +290,10 @@ describe('extracted ledger leaves', () => {
 })
 
 describe('rankLedgerCut', () => {
+	it('L-4 cuts discovery before every existing priority rank', () => {
+		for (const row of LEDGER_LEXICAL_RANKS)
+			expect(rankLedgerCut(row.group, row.unsettled, row.category)).toBe(row.expected)
+	})
 	it('ranks name matches before unsettled sources, off-topic corrections, rules, and on-topic sources', () => {
 		expect(rankLedgerCut(3, true, 'rule')).toBe(0)
 		expect(rankLedgerCut(1, true, 'fact')).toBe(1)
@@ -1641,6 +1737,12 @@ describe('splitTopic', () => {
 })
 
 describe('cutListing and matchesCutLine', () => {
+	it.each(LEDGER_CUT_MATCHES)(
+		'F-8 recognizes $line with ranked=$ranked as $matched',
+		({ line, ranked, matched }) => {
+			expect(matchesCutLine(line, ranked)).toBe(matched)
+		},
+	)
 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
 
 	it('keeps every item that fits and adds no cut line', () => {
@@ -1666,7 +1768,7 @@ describe('cutListing and matchesCutLine', () => {
 
 	it('matches the cut line it writes and no other line', () => {
 		const cut = cutListing(items, 0).split('\n')
-		expect(cut.map(matchesCutLine)).toEqual([false, true])
+		expect(cut.map((line) => matchesCutLine(line))).toEqual([false, true])
 		expect(matchesCutLine('1 older item not shown; add a topic')).toBe(true)
 		expect(matchesCutLine('3 older items not shown; ')).toBe(true)
 		expect(matchesCutLine('older items not shown; ')).toBe(false)
