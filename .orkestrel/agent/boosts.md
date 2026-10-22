@@ -247,3 +247,137 @@ The rulings of the boosts review (Orchestrator, 2026-10-21, `692e551:.orkestrel/
 | wording in an assistant reply is not listed by `recall` | the same wording in a user message is listed | confirmed: the reply case returns `nothing on` | wording recall reads user messages and lookup readings only (`src/core/ledgers/Ledger.ts:1098-1102`) |
 | a second identical `recall` returns the repeat note | a second recall on another topic is answered | confirmed | `recall` has no page or cursor |
 | the lookup message's record membership under both subjects | none | not shown: the lookup message joins no owner record in this fixture | the record-level effect of R3 stayed unproved until R3's claim R3-3 (2026-10-22): a later message naming the carried id files under the named owner's record with `link` on and under none with it off |
+
+## Promotion requirements
+
+Retain these contracts for a later package campaign; U17 authorizes finishing and retiring the bench, not package promotion (`.orkestrel/agent/plan.md:41`). Read on 2026-10-22. Witnesses identify inspected test declarations and assertions; no tests were rerun. Capture-step contracts follow `tmp/units/ladder/capture-step-design.md:68` during concurrent mutation review. All paths resolve from Agent. Historical test names identify witnesses, not package policy. Exclude `tmp/units/ladder/promotion-map.md:86` in full. At the U17 retirement, the witness test files named below and the sources and fixtures they import move to `.orkestrel/agent/instruments/ladder-witnesses/`, which is kept on disk until the user sweeps it, rather than being deleted with the bench (Orchestrator, 2026-10-22), so a package campaign can still port them.
+
+### Study materialized artifact closure
+
+Owner: `@orkestrel/study/server`, extending `ArtifactLoader.inspect/verify/load`, which captures and loads bytes but exposes no materialization operation (`../study/src/server/artifacts/ArtifactLoader.ts:57`, `../study/src/server/artifacts/ArtifactLoader.ts:152`, `../study/src/server/artifacts/ArtifactLoader.ts:168`). First consumer: G1A′/G1R sharing one closure (`tmp/units/ladder/promotion-map.md:36`).
+
+The package must satisfy these requirements.
+
+1. **M1.** Create an absent, nonoverlapping destination exclusively; preserve exact bytes; verify source before and after copying and destination before returning success.
+2. **M2.** Refuse traversal, redirected ancestors, aliased members, unsafe names, duplicate keys, occupied destinations, and stale source references before copying through them.
+3. **M3.** Inventory every admitted physical member, including explicit assets and non-entry dependencies; refuse additions, omissions, or changed bytes.
+4. **M4.** Load the materialized graph through existing captured loading; refuse drift during validation before publishing a usable closure.
+
+Port these witnesses.
+
+- M1/M3 — `tmp/units/ladder/receipts/Custodian.test.ts:44`, `A8 copies exact Unicode bytes and refuses changed complete membership`: BOM/CRLF/Unicode equality; added, altered, and deleted files refuse.
+- M1/M2/M3 — `tmp/units/ladder/receipts/Custodian.test.ts:67`, `A8 refuses aliases, traversal, occupied targets, and stale source receipts before copying`: unsafe keys, duplicate members, stale references, and extra source files refuse.
+- M2 — `tmp/units/ladder/receipts/Custodian.test.ts:130`, `A8 refuses an ancestor junction without writing through it`: outside destination remains absent.
+- M2 — `tmp/units/ladder/receipts/Custodian.test.ts:19`, `A8 credential names match exact forms at archive and physical path boundaries`: forbidden names refuse; benign names remain admitted, including uppercase variants.
+- M1/M4 — `tmp/units/ladder/staging/Freeze.test.ts:13`, `B4 two captures preserve complete identical bytes and real captured Study check`: inventories match; captured Study produces its fingerprint.
+- M3 — `tmp/units/ladder/staging/Freeze.test.ts:38`, `B4 driver dependency tamper refuses the frozen inventory`: non-entry modification refuses; restored bytes verify.
+- M3 — `tmp/units/ladder/staging/Freeze.test.ts:53`, `B4 added and omitted driver, package, and seed members cannot verify`: each population is indispensable.
+- M4 — `tmp/units/ladder/staging/Freeze.test.ts:81`, `F-B4 check-time runtime write refuses before freeze receipts`: mutation during validation leaves completion receipts absent.
+
+Host/gaps: port the junction proof across supported filesystems. Study advertises Node 22.18.0 (`../study/guides/study.md:5`); these witnesses do not qualify that floor. Copying uses path checks and separate reads, not an atomic filesystem snapshot (`tmp/units/ladder/receipts/Custodian.ts:19`). Hardlink-race resistance, concurrent replacement, crash recovery, and aggregate materialization limits remain unproved. Retained file locks belong with Study, separate from process custody (`tmp/units/ladder/promotion-map.md:36`).
+
+### Study bounded exchange recording and replay
+
+Owner: `@orkestrel/study/server`, `StudyOllamaTransport` and execution custody. Main sends through native fetch (`../study/src/server/ollama/StudyOllamaTransport.ts:378`); the role-aware S-T collaborator remains held (`.orkestrel/agent/plan.md:169`). First consumers: G1A judge capture and Records prefix replay (`tmp/units/ladder/promotion-map.md:37`).
+
+The package must satisfy these requirements.
+
+1. **E1.** Keep exact-body admission; optional capture declarations must contain a positive safe byte length and no predeclared body/input receipt.
+2. **E2.** Before sending, enforce serial member, role, path, ordinal, model/options, and capture-length identity; exact mode must reject same-length substitutions.
+3. **E3.** Retain raw request/response bytes, digests, ordered identities, and attempted/terminal outcomes; refuse invalid terminal responses without manufacturing completion or usage.
+4. **E4.** Bound calls, bytes, and elapsed work; retain admitted charges after failure; latch caught refusals. Live and replay budgets must follow their respective declarations.
+5. **E5.** Bound metadata independently; verify declared version/model digests before and after execution; refuse unexpected routes/phases without model-quota charges.
+6. **E6.** Replay exact recorded exchanges offline; refuse missing, altered, or reordered evidence before dependent live work; prospective capture declarations alone cannot replay.
+7. **E7.** Seal only complete joined evidence under custody bounds; refuse duplicate, orphaned, or partial histories and unsealed exchange sidecars.
+
+Port these witnesses.
+
+- E1 — `tmp/units/ladder/records-seed/Recorder.test.ts:29`, `CS1 capture procedures pass offline admission`: valid inventory passes; body/input and invalid lengths refuse.
+- E2/E3 — `tmp/units/ladder/records-seed/Recorder.test.ts:57`, `CS2 capture steps record consumer bodies of the sealed length`: captured digest equals peer and baseline; no input field.
+- E2 — `tmp/units/ladder/records-seed/Recorder.test.ts:85`, `CS3 a capture body off its sealed length refuses before sending`: only the preceding POST arrives; no completion.
+- E2 — `tmp/units/ladder/records-seed/Recorder.test.ts:106`, `CS4 a capture step out of member order refuses before sending`: zero POSTs.
+- E2 — `tmp/units/ladder/records-seed/Recorder.test.ts:127`, `CS5 capture bodies keep the declared model options`: offline admission passes; changed options yield zero POSTs.
+- E4 — `tmp/units/ladder/records-seed/Recorder.test.ts:150`, `CS6 live Records takes the wall cap and replay keeps 120,000 ms`: covers CS6/CS7; live budget follows wall cap; replay keeps its default; no timed-stop proof.
+- E1/E2 — `tmp/units/ladder/records-seed/Recorder.test.ts:180`, `CS8 exact steps refuse a same-length changed body`: zero POSTs.
+- E1/E3 — `tmp/units/ladder/drivers/Transport.test.ts:53`, `CS8 exact exchanges keep the G0 journal key order`: exact-mode attempt/completion serialization stays unchanged.
+- E6 — `tmp/units/ladder/drivers/Transport.test.ts:95`, `CS8 the Replay consumer refuses a capture step before any request`: zero POSTs.
+- E3 — `tmp/units/ladder/drivers/Transport.test.ts:15`, `A2 preserves every role body and complete multi-chunk Unicode CRLF response through real W5`: exact request bytes; response Unicode/CRLF and role identity.
+- E1 — `tmp/units/ladder/drivers/Driver.test.ts:115`, `A1 changed inputs, absent receipt, reordered members, and changed quota refuse before peer startup`: no peer or destination.
+- E4 — `tmp/units/ladder/drivers/Driver.test.ts:46`, `A3 rejected consumer attempts stay terminal even when caught`: no completed execution.
+- E3/E4 — `tmp/units/ladder/drivers/Driver.test.ts:56`, `A3 broker quotas aborts and interrupted terminal responses retain charges and no completion`: failures retain charges; interrupted responses retain attempt/failure rows.
+- E4 — `tmp/units/ladder/drivers/Driver.test.ts:85`, `A3 body and response caps retain W5 stop attribution and cleanup`: bounded stop, correct charge, empty cleanup remainder.
+- E2/E7 — `tmp/units/ladder/drivers/Driver.test.ts:104`, `A3 concurrent calls cannot create complete evidence`: serial refusal; no completion.
+- E5 — `tmp/units/ladder/drivers/Metadata.test.ts:34`, `A4 exact bounded metadata succeeds before and after model calls without model quota charges`: exact GET/POST order and model count.
+- E5 — `tmp/units/ladder/drivers/Metadata.test.ts:56`, `A4 wrong digest or version and redirect oversized or slow metadata refuse before model POST`: zero model calls.
+- E5 — `tmp/units/ladder/drivers/Metadata.test.ts:81`, `A4 rejected routes never reach the dedicated peer`: wrong route, query, method, member, extra observation, and body refuse.
+- E5 — `tmp/units/ladder/drivers/Metadata.test.ts:112`, `A4 completion metadata cannot precede the frozen model population`: zero POSTs.
+- E5 — `tmp/units/ladder/drivers/Metadata.test.ts:9`, `F-O1 refuses a staged POST when metadata admission changes during body collection`: no tags or POST after phase failure.
+- E6 — `tmp/units/ladder/records-seed/Recorder.test.ts:298`, `A5 capture and fresh-process replays retain every later selection correction and response byte`: repeated reconstruction matches; empty/missing exchanges, altered answers/bodies/history, and incomplete goals refuse.
+- E6 — `tmp/units/ladder/staging/Reader.test.ts:15`, `F-B8 reversed A exchange identities refuse eligibility`: reversed, internally consistent exchanges still refuse the declared order.
+- E7 — `tmp/units/ladder/staging/Reader.test.ts:74`, `F-O4 A event journal admits completed projection and refuses partial history`: missing response/metadata, duplicate attempt, and incomplete terminal history refuse.
+
+Host/gaps: native fixture runs inherit the following process qualification. Live Mica response compatibility remains unproved (`tmp/units/ladder/capture-step-design.md:279`). Capture length/options do not prove content fidelity (`tmp/units/ladder/capture-step-design.md:289`). S-T integration, total journal-storage bounds, and package sealing remain obligations: the bench appends without an aggregate journal limit (`tmp/units/ladder/drivers/Transport.ts:309`), while Study seals a fixed inventory (`../study/src/server/stores/StudyResultStore.ts:170`). Add direct malformed-terminal controls beyond interrupted HTTP (`tmp/units/ladder/drivers/helpers.ts:197`). CS6/CS7 do not prove deadline enforcement (`tmp/units/ladder/capture-step-design.md:66`).
+
+### Process retained process-tree custody
+
+Owner: `@orkestrel/process/server`, strengthening `createProcess/createSession` and termination helpers (`../process/src/server/factories.ts:39`, `../process/src/server/factories.ts:61`). Existing `stopChild` returns for an exited root; Windows termination uses `taskkill` (`../process/src/server/helpers.ts:778`, `../process/src/server/helpers.ts:683`). First consumer: dedicated study daemon, then Study workers (`tmp/units/ladder/promotion-map.md:39`).
+
+The package must satisfy these requirements.
+
+1. **P1.** Establish containment and retain identity before resuming executable work; failed creation/admission must leave no runnable child.
+2. **P2.** Authorize operations by retained birth/handle identity; refuse unrelated or stale roots without affecting their occupants.
+3. **P3.** Terminate owned descendants after root exit, custody EOF, or host death, including detached descendants; preserve unrelated processes.
+4. **P4.** Bound stop/join, preserve responsiveness during another wait, confirm remaining membership, and surface cleanup failures.
+5. **P5.** Refuse unsupported hosts without weaker fallback; preserve argument/environment bytes and refuse NUL before creation.
+
+Port these witnesses.
+
+- P1 — `tmp/units/ladder/fix-w5-2/native.test.ts:399`, `native CreateProcessW error is retrieved and a later valid job remains usable`: exact native error; subsequent job succeeds.
+- P2 — `tmp/units/ladder/fix-w5-2/Launcher.test.ts:222`, `R2 reused PID birth fixture refuses handle termination and preserves current identity`: altered birth refuses; genuine root survives.
+- P2 — `tmp/units/ladder/fix-w5-2/native.test.ts:243`, `native unrelated sentinel and parent cannot become stop tree or wait roots`: all operations refuse; sentinel survives.
+- P3 — `tmp/units/ladder/fix-w5-2/native.test.ts:296`, `native ${ending} removes detached descendants and preserves unrelated sentinel`: root exit, EOF, abrupt host death; owned identities already gone.
+- P4 — `tmp/units/ladder/fix-w5-2/Launcher.test.ts:246`, `R2 native dispatcher deadline terminates only its retained job handles`: deadline exit, descendant gone, sentinel alive.
+- P4 — `tmp/units/ladder/fix-w5-2/native.test.ts:264`, `native stop remains responsive while a different job wait is pending`: second job stops within the test bound.
+- P1/P4/P5 — `tmp/units/ladder/fix-w5-2/faults.test.ts:19`, `native ${fault.name} failure refuses with durable accounting and preserves unrelated sentinel`: load, ABI, worker, stop, partial cleanup, host EOF, unsupported-host cases; failure retained, recorded children gone (`tmp/units/ladder/fix-w5-2/constants.ts:54`).
+- P5 — `tmp/units/ladder/fix-w5-2/native.test.ts:127`, `B2 native guard refuses NUL at every Win32 command path and environment field before creation`: no marker; valid control executes.
+- P5 — `tmp/units/ladder/fix-w5-2/native.test.ts:201`, `native argument quoting preserves empty quotes slashes Unicode and shell-looking values`: exact arguments/environment round-trip.
+
+Host/gaps: Windows x64 Node 26.12.0 only; `node:ffi` and experimental FFI workers (`tmp/units/ladder/launch/NativeKernel.ts:10`, `tmp/units/ladder/launch/NativeKernel.ts:33`, `tmp/units/ladder/launch/NativeWait.ts:15`). Linux, Node 22.18.0, actual PID recycling, and forced assignment/resume failures remain unqualified. P1's suspended assignment is implemented (`tmp/units/ladder/launch/NativeKernel.ts:125`, `tmp/units/ladder/launch/NativeKernel.ts:151`); the cited faults do not independently interrupt that interval.
+
+### Ollama dedicated daemon session
+
+Owner: a server-only `@orkestrel/ollama` domain composed with process custody; first consumer: Study local GPU runs (`tmp/units/ladder/promotion-map.md:40`). Core `OllamaProvider/OllamaJudge` already accept URL/fetch; exports contain no server entry (`../ollama/src/core/OllamaProvider.ts:44`, `../ollama/src/core/OllamaJudge.ts:72`, `../ollama/package.json:29`).
+
+The package must satisfy these requirements.
+
+1. **D1.** Start only the selected executable with matching digest/version evidence; refuse missing/stale identity and replacement through use.
+2. **D2.** Use an explicitly dedicated endpoint/environment; refuse occupied endpoints; override inherited variable names case-insensitively without altering unrelated values.
+3. **D3.** Bound readiness, tolerate valid delayed replies, and verify version/model identities before requests; never adopt an unrelated process as owner.
+4. **D4.** Unload only the declared model; retain maintenance identity; terminate/join only owned resources on completion, failure, or cancellation.
+
+Port these witnesses.
+
+- D1 — `tmp/units/ladder/fix-w5-2/Launcher.test.ts:33`, `R1 missing offline version receipt refuses before any child`: no destination or child cleanup.
+- D1 — `tmp/units/ladder/fix-w5-2/Launcher.test.ts:49`, `R1 receipt executable digest mismatch refuses before any child`: same refusal boundary.
+- D1 — `tmp/units/ladder/fix-w5-2/Launcher.test.ts:86`, `R1 changed runner after preflight refuses before daemon startup`: changed digest; no destination.
+- D1 — `tmp/units/ladder/fix-w5-2/native.test.ts:89`, `B1 equal-digest Unicode alias locks the selected original through use`: original/ancestor replacement denied; distinct alias remains writable.
+- D2 — `tmp/units/ladder/fix-w5-2/fixtures/Launcher.test.ts:123`, `occupied ephemeral endpoint refuses before creating a destination`: no destination.
+- D2 — `tmp/units/ladder/fix-w5-2/fixtures/Launcher.test.ts:223`, `pinned manifest, path boundaries, immutable inventory, and earliest cap have controls`: environment case variants collapse to the explicit value; unrelated value survives.
+- D3 — `tmp/units/ladder/launch/Launcher.test.ts:68`, `readiness waits through a version route that answers after 1,500 ms`: completion, start receipt, empty cleanup remainder.
+- D3 — `tmp/units/ladder/fix-w5-2/Launcher.test.ts:175`, `R1 post-start HTTP version mismatch refuses with a charged row and verified cleanup`: no driver spawn; owned daemon cleaned.
+- D3 — `tmp/units/ladder/fix-w5-2/Launcher.test.ts:187`, `R2 forged daemon receipt preserves the unrelated sentinel and refuses`: foreign PID receipt refuses; sentinel remains outside cleanup.
+- D3 — reuse E5's `A4 wrong digest or version and redirect oversized or slow metadata refuse before model POST` (`tmp/units/ladder/drivers/Metadata.test.ts:56`).
+- D4 — reuse E3's `A2 preserves every role body and complete multi-chunk Unicode CRLF response through real W5` (`tmp/units/ladder/drivers/Transport.test.ts:15`): maintenance bytes/count retained.
+- D4 — `tmp/units/ladder/drivers/Replay.test.ts:8`, `F-A7 refuses samples and timing from a different unload model`: changed, selected, and timing model mismatches refuse.
+- D4 — `tmp/units/ladder/fix-w5-2/fixtures/Launcher.test.ts:335`, `wall cap cleans only recorded trees and leaves an unrelated process alive`: both descendant chains gone; sentinel survives.
+
+Host/gaps: inherits native Windows qualification. CPU peers do not prove GPU residency or cold-cache effects. The endpoint reservation closes before launch (`tmp/units/ladder/launch/Launcher.ts:303`); readiness checks a PID receipt against owned membership, not socket ownership (`tmp/units/ladder/launch/Launcher.ts:781`). Port takeover, model-store isolation, service-version breadth, and unload residency remain unproved. Environment settings merge inherited variables; they do not isolate the host (`tmp/units/ladder/launch/Launcher.ts:715`).
+
+Counts refer to numbered requirements and named test declarations/templates per mechanism; reused witnesses count in each consumer, parameterized matrices once. Sizes concern implementation: capability additions are medium; the daemon domain and integrated cross-package campaign are large (`../scaffold/AGENTS.md:78`, `../scaffold/AGENTS.md:79`).
+
+| Mechanism | Package | Requirements | Witnesses | Size |
+| --- | --- | --- | --- | --- |
+| Materialized closure | Study | 4 | 8 | medium |
+| Exchange recording/replay | Study | 7 | 23 | medium |
+| Retained process custody | process | 5 | 9 | medium |
+| Dedicated daemon session | ollama | 4 | 13 | large |
