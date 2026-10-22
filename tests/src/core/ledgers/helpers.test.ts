@@ -60,6 +60,8 @@ import {
 	LEDGER_DESK_OWNERS,
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
+	LEDGER_LINK_FIXTURE,
+	LEDGER_LINK_REFUSALS,
 	replaceLedgerRecord,
 } from '../../../setup.js'
 
@@ -464,6 +466,66 @@ describe('renderLookupCall', () => {
 
 describe('linkOwners', () => {
 	const owners = new Map(Object.entries(LEDGER_DESK_OWNERS))
+
+	it('R3-1 links the carried id through the existing owner branches only when on', () => {
+		const fixture = LEDGER_LINK_FIXTURE
+		for (const subject of [fixture.id.toLowerCase(), fixture.subject]) {
+			const reading = buildLedgerReading(
+				'lookup',
+				'lookup',
+				{ id: subject },
+				fixture.lookup,
+				fixture.result,
+			)
+			const registry = collectRegistry([reading])
+			expect([...registry.ids]).toEqual(['BC-7301', 'BW-20931'])
+			expect([...matchEntities(registry, fixture.fact, true)]).toEqual(['BC-7301'])
+			expect([...linkOwners([reading], owners)]).toEqual(
+				subject === fixture.subject ? [] : [['BC-7301', 'BW-20931']],
+			)
+			expect([...linkOwners([reading], owners, false)]).toEqual([...linkOwners([reading], owners)])
+			expect([...linkOwners([reading], owners, true)]).toEqual([['BC-7301', 'BW-20931']])
+		}
+		const self = buildLedgerReading(
+			'self',
+			'lookup',
+			{ id: 'account:bw-20931' },
+			'No owner named.',
+			fixture.result,
+		)
+		expect([...linkOwners([self], owners, true)]).toEqual([['BW-20931', 'BW-20931']])
+		expect([...linkOwners([self], owners, false)]).toEqual([])
+		expect(normalizeArgument(fixture.subject)).toBe('ORDER:BC-7301')
+		expect([...extractTokens(fixture.subject).ids]).toEqual(['BC-7301'])
+	})
+
+	it('R3-2 refuses ambiguous subjects and readings after accepting a single carried id', () => {
+		const fixture = LEDGER_LINK_FIXTURE
+		const valid = buildLedgerReading(
+			'valid',
+			'lookup',
+			{ id: fixture.subject },
+			fixture.lookup,
+			fixture.result,
+		)
+		expect([...linkOwners([valid], owners, true)]).toEqual([['BC-7301', 'BW-20931']])
+		for (const control of LEDGER_LINK_REFUSALS) {
+			const reading = buildLedgerReading(
+				'control',
+				'lookup',
+				{ id: control.subject },
+				control.text,
+				fixture.result,
+			)
+			for (const link of [false, true])
+				expect(
+					[...linkOwners([reading], owners, link)],
+					`${control.subject}: ${control.text}; link=${link}`,
+				).toEqual([])
+		}
+		const empty = buildLedgerReading('empty', 'lookup', { id: fixture.subject }, fixture.lookup)
+		expect([...linkOwners([empty], owners, true)]).toEqual([])
+	})
 
 	it('links an owner argument to itself and another id to the one owner its text names', () => {
 		const links = linkOwners(
@@ -1090,6 +1152,48 @@ describe('buildLines', () => {
 })
 
 describe('buildRecords', () => {
+	it('R3-3 places a later bare-id fact under the linked owner and refuses cross-owner ambiguity', () => {
+		const fixture = LEDGER_LINK_FIXTURE
+		const reading = buildLedgerReading(
+			'lookup',
+			'lookup',
+			{ id: fixture.subject },
+			fixture.lookup,
+			fixture.result,
+		)
+		const input = buildLedgerInput({
+			owners: LEDGER_DESK_OWNERS,
+			messages: [buildLedgerMessage('arrival', 'user', fixture.fact)],
+			readings: [reading],
+			entities: { arrival: [...matchEntities(collectRegistry([reading]), fixture.fact, true)] },
+			classification: { categories: { arrival: 'fact' } },
+		})
+		for (const link of [false, true]) {
+			const projection = buildRecords({ ...input, link })
+			expect(
+				projection.records.map((record) => ({
+					key: record.key,
+					members: record.members,
+					texts: record.lines.map((line) => line.text),
+				})),
+			).toEqual(
+				link ? [{ key: 'owner:BW-20931', members: ['arrival'], texts: [fixture.fact] }] : [],
+			)
+			expect(projection.orphans).toEqual(link ? [] : ['arrival'])
+			const ambiguous = { ...reading, text: 'Accounts BW-20931 and OM-30418.' }
+			const cross = buildRecords({ ...input, link, readings: [ambiguous] })
+			expect(cross.records).toEqual([])
+			expect(cross.orphans).toEqual(['arrival'])
+			const self = buildRecords({
+				...input,
+				link,
+				readings: [{ ...reading, arguments: { id: 'account:BW-20931' } }],
+				entities: new Map([['arrival', ['BW-20931']]]),
+			})
+			expect(self.records.map((record) => record.key)).toEqual(['owner:BW-20931'])
+		}
+		expect(buildRecords(input)).toEqual(buildRecords({ ...input, link: false }))
+	})
 	it('retains successful readings whose bigint arguments have no lookup identity', () => {
 		const text = 'Account BW-20931 (Brightwater Studio): balance $10.00.'
 		const input = buildLedgerInput({

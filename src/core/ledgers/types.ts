@@ -264,6 +264,12 @@ export interface LedgerOptions {
 	readonly think?: boolean
 	readonly gauge?: LedgerGauge
 	readonly lookups?: readonly LedgerLookup[]
+	/**
+	 * Selects linking for lookup subjects that aren't id tokens. If `true`, a subject carrying
+	 * exactly one id links that id to itself when it is an owner, or to the single owner named
+	 * in the reading's text; if `false`, only id-shaped subjects link. Default: `false`.
+	 */
+	readonly link?: boolean
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly agent?: LedgerAgentOptions
@@ -629,6 +635,8 @@ export interface LedgerProjection {
  * the registry ids its text names.
  */
 export interface LedgerProjectionInput {
+	/** Selects the owner linking described by {@link LedgerOptions}. Default: `false`. */
+	readonly link?: boolean
 	readonly system: string
 	readonly exclusions: readonly string[]
 	readonly owners: ReadonlyMap<string, readonly string[]>

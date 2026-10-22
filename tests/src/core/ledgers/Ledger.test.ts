@@ -50,9 +50,71 @@ import {
 	LEDGER_CAPTURE_FIXTURE,
 	LEDGER_NUMERIC_FIXTURE,
 	LEDGER_RECEIPT_CAPACITIES,
+	LEDGER_LINK_FIXTURE,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it('R3-4 renders a prefixed subject lookup fact only with linking on', async () => {
+		const fixture = LEDGER_LINK_FIXTURE
+		for (const link of [false, true]) {
+			const provider = createScriptedProvider([{ content: 'Recorded.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					link,
+					topics: [],
+					lookups: [
+						{
+							tool: createTool({ name: 'lookup', execute: () => fixture.lookup }),
+							read: () => ({ ids: [], owners: fixture.result.owners }),
+						},
+					],
+				}),
+			)
+			ledger.conversation.add(
+				buildLedgerExchange(fixture.lookup, 'prefixed', { id: fixture.subject }),
+			)
+			const arrival = ledger.conversation.add({ role: 'user', content: fixture.fact })
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(arrival, { answer: { form: 'choice', probabilities: { fact: 1 } } }),
+			)
+			await ledger.respond('Check Brightwater Studio.')
+			const system = requireValue(
+				provider.calls[0]?.messages.find((message) => message.role === 'system'),
+			).content
+			expect(system, `R3-4 link=${link} provider system bytes`).toBe(
+				link ? fixture.on : fixture.off,
+			)
+			const result = await ledger.respond('Check BC-7301.')
+			expect(result.receipts[0]?.selections[0]?.plan?.owners).toEqual(link ? ['BW-20931'] : [])
+		}
+	})
+	it('R3-5 captures omitted and false options byte-identically with an enabled control', async () => {
+		const fixture = LEDGER_LINK_FIXTURE
+		for (const link of [true, false, undefined]) {
+			const provider = createScriptedProvider([{ content: 'Recorded.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					...(link === undefined ? {} : { link }),
+					topics: [],
+				}),
+			)
+			ledger.conversation.add(
+				buildLedgerExchange(fixture.lookup, 'prefixed', { id: fixture.subject }),
+			)
+			const arrival = ledger.conversation.add({ role: 'user', content: fixture.fact })
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(arrival, { answer: { form: 'choice', probabilities: { fact: 1 } } }),
+			)
+			await ledger.respond('Check Brightwater Studio.')
+			const call = requireValue(provider.calls[0])
+			expect(
+				call.messages.find((message) => message.role === 'system')?.content,
+				`R3-5 link=${link} capture bytes`,
+			).toBe(link === true ? fixture.on : fixture.off)
+		}
+	})
 	it('C3 deduplicates withdrawal pairs across stale sentences and retains effective amenders', async () => {
 		const ledger = createLedger(
 			createScriptedProvider([{ content: 'Done.' }]),

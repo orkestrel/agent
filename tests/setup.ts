@@ -3588,6 +3588,29 @@ export const LEDGER_DESK_OWNERS: Readonly<Record<string, readonly string[]>> = O
 	'OM-30418': Object.freeze(['Odile Marlow']),
 })
 
+/** Supplies the order-to-owner attribution seam and its provider system bytes. */
+export const LEDGER_LINK_FIXTURE = Object.freeze({
+	subject: 'order:BC-7301',
+	id: 'BC-7301',
+	owner: 'BW-20931',
+	lookup: 'Account BW-20931: Brightwater Studio.',
+	fact: 'Order BC-7301 requires a signature before release.',
+	result: Object.freeze({
+		ids: Object.freeze(['BC-7301', 'BW-20931']),
+		owners: Object.freeze([{ id: 'BW-20931', names: Object.freeze(['Brightwater Studio']) }]),
+	}),
+	off: 'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account BW-20931)\n- Account BW-20931: Brightwater Studio.',
+	on: 'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account BW-20931)\n- Account BW-20931: Brightwater Studio.\n- Order BC-7301 requires a signature before release.',
+})
+
+/** Lists subjects and reading texts that cannot attribute a non-owner order id. */
+export const LEDGER_LINK_REFUSALS = Object.freeze([
+	{ subject: 'orders:BC-7301,BC-7302', text: 'Account BW-20931: Brightwater Studio.' },
+	{ subject: 'order:pending', text: 'Account BW-20931: Brightwater Studio.' },
+	{ subject: 'order:BC-7301', text: 'Accounts BW-20931 and OM-30418.' },
+	{ subject: 'order:BC-7301', text: 'No owner was named.' },
+])
+
 /** Carries the parts of a classification as plain collections, which {@link buildLedgerClassification} turns into the projection's maps and sets. */
 export interface LedgerClassificationInput {
 	readonly quiet?: readonly string[]

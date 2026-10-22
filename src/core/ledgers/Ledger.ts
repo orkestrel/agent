@@ -506,6 +506,7 @@ export class Ledger implements LedgerInterface {
 		const registry = collectRegistry(readings)
 		const messages = this.#conversation.messages()
 		const input: LedgerProjectionInput = {
+			...(this.#options.link === undefined ? {} : { link: this.#options.link }),
 			system: this.#options.system,
 			exclusions: [...this.#requests, ...this.#annotations],
 			owners: registry.owners,
@@ -636,7 +637,7 @@ export class Ledger implements LedgerInterface {
 		const { input, projection } = this.#project()
 		const byId = new Map(input.messages.map((message) => [message.id, message]))
 		const registry = collectRegistry(input.readings)
-		const links = linkOwners(input.readings, registry.owners)
+		const links = linkOwners(input.readings, registry.owners, this.#options.link)
 		const near = new Set([
 			...matchEntities(registry, request.content, true),
 			...this.#classifier.topics(request.id),
