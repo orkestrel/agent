@@ -1,5 +1,5 @@
 import type { Selection } from '../contexts/types.js'
-import type { GaugeCall } from './types.js'
+import type { GaugeCall, LedgerReceipt, LedgerSelectionReceipt } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { sumUsage } from '../helpers.js'
 
@@ -19,6 +19,7 @@ export class LedgerPass {
 		| { readonly call: GaugeCall; readonly position: number }
 		| { readonly usage: { readonly prompt: number; readonly completion: number } }
 		| { readonly thinking: number }
+		| { readonly receipt: LedgerSelectionReceipt }
 	> = []
 	#selection: Selection | undefined
 	#boundary: number
@@ -100,12 +101,34 @@ export class LedgerPass {
 	}
 
 	/**
+	 * Returns the adopted selections and the observations joined at measurement time.
+	 * @returns The pass's evidence in emission order
+	 */
+	get receipt(): LedgerReceipt {
+		const calls = this.calls
+		return structuredClone({
+			selections: this.#log.flatMap((entry) => ('receipt' in entry ? [entry.receipt] : [])),
+			calls: this.#log.flatMap((entry, index) => {
+				if (!('call' in entry)) return []
+				const before = this.#log.slice(0, index)
+				const call = calls[before.filter((one) => 'call' in one).length]
+				const selections = before.filter((one) => 'receipt' in one)
+				return call === undefined
+					? []
+					: [{ ...call, selection: selections.length === 0 ? undefined : selections.length - 1 }]
+			}),
+		})
+	}
+
+	/**
 	 * Records the selection the pass's run adopted and adds the usage it spent.
 	 *
 	 * @param selection - The selection the run built its prompt from
 	 * @param boundary - The conversation length when the run adopted it
+	 * @param receipt - The filtered selection's composition evidence
 	 */
-	adopt(selection: Selection, boundary: number): void {
+	adopt(selection: Selection, boundary: number, receipt: LedgerSelectionReceipt): void {
+		this.#log = [...this.#log, { receipt: structuredClone(receipt) }]
 		this.#selection = selection
 		this.#boundary = boundary
 		if (selection.usage !== undefined) this.#usage = sumUsage(this.#usage, selection.usage)
@@ -118,7 +141,7 @@ export class LedgerPass {
 	 * @param position - The conversation length when the call starts
 	 */
 	observe(call: GaugeCall, position: number): void {
-		this.#log = [...this.#log, { call, position }]
+		this.#log = [...this.#log, { call: { ...call }, position }]
 	}
 
 	/**

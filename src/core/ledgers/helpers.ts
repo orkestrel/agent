@@ -12,6 +12,8 @@ import type {
 	LedgerRecord,
 	LedgerRegistry,
 	LedgerStaleSentence,
+	LedgerPlanReceipt,
+	LedgerSource,
 	LedgerTokenSet,
 	LedgerTopic,
 	LedgerWordSet,
@@ -23,6 +25,52 @@ import { renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 import { LedgerError } from './errors.js'
+
+/**
+ * Builds source carriage from emitted messages and established composition facts.
+ * @param emitted - The messages adopted after filtering
+ * @param stored - The conversation's stored tail messages
+ * @param sections - The compacted section ids
+ * @param plan - The successful plan facts, absent for a fallback
+ * @returns The distinct tail, rendered, and omitted sources with their strongest carriage
+ * @example
+ * ```ts
+ * buildLedgerSources([], [], [], undefined) // []
+ * ```
+ */
+export function buildLedgerSources(
+	emitted: readonly Message[],
+	stored: readonly Message[],
+	sections: readonly string[],
+	plan: LedgerPlanReceipt | undefined,
+): readonly LedgerSource[] {
+	const originals = new Map(stored.map((message) => [message.id, message.content]))
+	const messages = new Map(emitted.map((message) => [message.id, message.content]))
+	const recaps = new Set(sections)
+	const rendered = new Set(plan?.rendered)
+	const omitted = new Set(plan?.omitted)
+	const population = [
+		...new Set([
+			...emitted.map((message) => message.id),
+			...(plan?.rendered ?? []),
+			...(plan?.omitted ?? []),
+		]),
+	]
+	return population.map((source) => ({
+		source,
+		carriage: recaps.has(source)
+			? 'recap'
+			: messages.has(source) &&
+				  originals.has(source) &&
+				  originals.get(source) === messages.get(source)
+				? 'verbatim'
+				: rendered.has(source)
+					? 'record'
+					: omitted.has(source)
+						? 'absent'
+						: undefined,
+	}))
+}
 
 /**
  * Collects the live message ids placed in records or left without a record.
@@ -1039,7 +1087,7 @@ export function placeMember(
  *
  * @example
  * ```ts
- * collectStale(input, byId, ['user-1', 'user-3']) // [{ source: 'user-1', sentence: 1, tokens: ['ESC-2291'] }]
+ * collectStale(input, byId, ['user-1', 'user-3']) // [{ source: 'user-1', sentence: 1, tokens: ['ESC-2291'], later: ['user-3'] }]
  * ```
  */
 export function collectStale(
@@ -1066,7 +1114,7 @@ export function collectStale(
 			.filter((later) => effective.has(later))
 			.flatMap((later) => {
 				const message = byId.get(later)
-				return message === undefined ? [] : [extractTokens(message.content)]
+				return message === undefined ? [] : [{ id: later, ...extractTokens(message.content) }]
 			})
 		if (laters.length === 0) return []
 		return splitSentences(byId.get(id)?.content ?? '').flatMap((text, sentence) => {
@@ -1077,7 +1125,14 @@ export function collectStale(
 					...[...own.numbers].filter((token) => other.numbers.has(token)).map(String),
 				]),
 			)
-			return tokens.size > 0 ? [{ source: id, sentence, tokens: [...tokens] }] : []
+			const later = laters
+				.filter(
+					(other) =>
+						[...own.ids].some((token) => other.ids.has(token)) ||
+						[...own.numbers].some((token) => other.numbers.has(token)),
+				)
+				.map((other) => other.id)
+			return tokens.size > 0 ? [{ source: id, sentence, tokens: [...tokens], later }] : []
 		})
 	})
 }

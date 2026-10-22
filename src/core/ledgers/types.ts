@@ -270,10 +270,11 @@ export interface LedgerOptions {
 }
 
 /**
- * Carries the outcome of one request a ledger served: the agent result of its reply and every pass
- * it took.
+ * Carries the reply, passes, filing readings, and evidence of a resolved request.
  *
  * @remarks
+ * `request` identifies the message `enter` appended. `receipts` aligns with `passes`,
+ * including a recovered failed first pass. Receipts enter no provider request.
  * `passes` holds the first pass and, when the ledger ran one, the answer pass. `content` and
  * `partial` are the last pass's, `usage` sums the passes' usage, and `thinking` joins the passes'
  * reasoning; each optional member is present when any pass reported it. `stop` is the last pass's
@@ -282,8 +283,80 @@ export interface LedgerOptions {
  * its physical wire calls.
  */
 export interface LedgerResult extends AgentResult {
+	readonly request: string
 	readonly passes: readonly AgentResult[]
 	readonly readings: readonly ClassifierReading[]
+	readonly receipts: readonly LedgerReceipt[]
+}
+
+/** Names how composition carries a selected source's content. */
+export type LedgerCarriage = 'verbatim' | 'record' | 'recap' | 'absent'
+
+/** Identifies a source sentence the briefing compositor emitted. */
+export interface LedgerSentence {
+	readonly source: string
+	readonly sentence: number
+}
+
+/** Identifies an effective amendment that withdrew an earlier sentence. */
+export interface LedgerWithdrawal {
+	readonly earlier: string
+	readonly later: string
+}
+
+/** Records a selected source's established content carriage. */
+export interface LedgerSource {
+	readonly source: string
+	/** Holds undefined when none of the declared composition facts applies. */
+	readonly carriage: LedgerCarriage | undefined
+}
+
+/** Preserves the projection and composition facts of one successful plan. */
+export interface LedgerPlanReceipt {
+	readonly owners: readonly string[]
+	readonly filed: readonly string[]
+	readonly rendered: readonly string[]
+	readonly sentences: readonly LedgerSentence[]
+	readonly omitted: readonly string[]
+	readonly trims: number
+	readonly withdrawn: readonly LedgerWithdrawal[]
+}
+
+/** Holds a successful selection with its request-owned planning evidence. */
+export interface LedgerPlan extends Selection {
+	readonly receipt: LedgerPlanReceipt
+}
+
+/**
+ * Preserves one adopted selection after all message filtering.
+ * @remarks
+ * `turn` is undefined at entry, otherwise the open turn's index. `prior` contains
+ * only earlier respond-request ids present in `tail`. `plan` is undefined on a
+ * fallback or an adoption without a successful ledger plan.
+ */
+export interface LedgerSelectionReceipt {
+	readonly turn: number | undefined
+	readonly tail: readonly string[]
+	readonly prior: readonly string[]
+	readonly plan: LedgerPlanReceipt | undefined
+	readonly sources: readonly LedgerSource[]
+}
+
+/**
+ * Preserves one gauge observation and its selection at measurement time.
+ * @remarks
+ * Position is the Agent turn index, not proof of a provider dispatch. `selection`
+ * indexes this pass's selections at the turn event; it is undefined before adoption.
+ * Inherited estimate and optional prompt are the existing gauge values, not summed usage.
+ */
+export interface LedgerCall extends GaugeCall {
+	readonly selection: number | undefined
+}
+
+/** Preserves the adopted selections and gauge observations of one pass. */
+export interface LedgerReceipt {
+	readonly selections: readonly LedgerSelectionReceipt[]
+	readonly calls: readonly LedgerCall[]
 }
 
 /**
@@ -302,7 +375,7 @@ export interface LedgerRequestInterface {
 	/** Holds the request message, or undefined until `enter` appends it. */
 	readonly message: Message | undefined
 	/** Holds the selection the request's last successful plan produced, or undefined before one. */
-	readonly plan: Selection | undefined
+	readonly plan: LedgerPlan | undefined
 	/** Holds the selection the current pass's run adopted last, or undefined before one. */
 	readonly selection: Selection | undefined
 	/** Holds the conversation length at the current pass's start or at its last adopted selection, or undefined before a pass. */
@@ -313,6 +386,8 @@ export interface LedgerRequestInterface {
 	readonly calls: readonly GaugeCall[]
 	/** Holds the filing readings of every planning selection the request made, in asking order. */
 	readonly readings: readonly ClassifierReading[]
+	/** Holds the adopted selections and gauge observations of every pass in order. */
+	readonly receipts: readonly LedgerReceipt[]
 	/**
 	 * Appends the request's content to a conversation as a user message, once, and holds it as `message`.
 	 *
@@ -331,8 +406,9 @@ export interface LedgerRequestInterface {
 	 *
 	 * @param selection - The selection the run built its prompt from
 	 * @param boundary - The conversation length when the run adopted it
+	 * @param receipt - The filtered selection's composition evidence
 	 */
-	adopt(selection: Selection, boundary: number): void
+	adopt(selection: Selection, boundary: number, receipt: LedgerSelectionReceipt): void
 	/**
 	 * Starts a gauge call in the current pass, making that pass's call in flight final.
 	 *
@@ -363,7 +439,7 @@ export interface LedgerRequestInterface {
 	 * @param readings - The selection's filing readings, in asking order
 	 * @param plan - The planned selection, or undefined when planning failed
 	 */
-	file(readings: readonly ClassifierReading[], plan?: Selection): void
+	file(readings: readonly ClassifierReading[], plan?: LedgerPlan): void
 	/**
 	 * Admits one tool call of the request, compared by tool name and canonical arguments.
 	 *
@@ -518,17 +594,19 @@ export interface LedgerRecord {
 }
 
 /**
- * Carries one sentence a later message made stale, with the tokens the two share.
+ * Carries one stale sentence and the effective amenders sharing its tokens.
  *
  * @remarks
  * `source` is the earlier message's id and `sentence` the zero-based index of the sentence. The
  * projection leaves a stale sentence out of the records and the briefing. Recall and answer notes
  * keep the stored content. The seed tail replaces lookup results with status stubs.
+ * `later` preserves every contributing message id without changing sentence removal.
  */
 export interface LedgerStaleSentence {
 	readonly source: string
 	readonly sentence: number
 	readonly tokens: readonly string[]
+	readonly later: readonly string[]
 }
 
 /**

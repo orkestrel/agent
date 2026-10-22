@@ -49,9 +49,142 @@ import {
 	LEDGER_CAPTURE_CONTROLS,
 	LEDGER_CAPTURE_FIXTURE,
 	LEDGER_NUMERIC_FIXTURE,
+	LEDGER_RECEIPT_CAPACITIES,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it('C3 deduplicates withdrawal pairs across stale sentences and retains effective amenders', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Done.' }]),
+			buildLedgerOptions(),
+		)
+		const earlier = ledger.conversation.add({
+			role: 'user',
+			content: 'Code MX-4471. Code MX-4471 remains pending.',
+		})
+		const first = ledger.conversation.add({
+			role: 'user',
+			content: 'Replace MX-4471 with MX-4486.',
+		})
+		const second = ledger.conversation.add({ role: 'user', content: 'Retire MX-4471.' })
+		const unrelated = ledger.conversation.add({ role: 'user', content: 'Unrelated limit 300.' })
+		const quiet = ledger.conversation.add({ role: 'user', content: 'Ignore MX-4471.' })
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(quiet, { answer: { form: 'choice', probabilities: { distractor: 1 } } }),
+		)
+		for (const message of [first, second, unrelated, quiet]) {
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, message, 1))
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, message, 0))
+		}
+		const result = await ledger.respond('Check codes.')
+		expect(result.receipts[0]?.selections[0]?.plan?.withdrawn).toEqual([
+			{ earlier: earlier.id, later: first.id },
+			{ earlier: earlier.id, later: second.id },
+		])
+	})
+	it('C1 joins prior request ids only when fallback actually carries them', async () => {
+		const options = buildLedgerOptions()
+		const systems = new ScriptedReads<string | undefined>([options.system], undefined)
+		const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
+			...options,
+			get system() {
+				const system = systems.read()
+				if (system === undefined) throw new Error('planning unavailable')
+				return system
+			},
+		})
+		const first = await ledger.respond('Same request text.')
+		const second = await ledger.respond('Same request text.')
+		expect(first.receipts[0]?.selections[0]?.prior).toEqual([])
+		expect(second.request).not.toBe(first.request)
+		expect(second.receipts[0]?.selections[0]?.prior).toEqual([first.request])
+		expect(second.receipts[0]?.selections[0]?.tail).toContain(second.request)
+		expect(second.receipts[0]?.selections[0]?.plan).toBeUndefined()
+		expect(second.receipts[0]?.selections).toHaveLength(1)
+	})
+	it('C2 records both owner and rules sources emitted by the compositor', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Done.' }]),
+			buildLedgerOptions(),
+		)
+		const seed = ledger.conversation.add(
+			buildLedgerExchange('Account BW-20931: Brightwater Studio.'),
+		)
+		const source = requireValue(seed.find((message) => message.role === 'tool'))
+		const rule = ledger.conversation.add({
+			role: 'user',
+			content: 'Refunds over $200 need approval.',
+		})
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(rule, { answer: { form: 'choice', probabilities: { rule: 1 } } }),
+		)
+		const result = await ledger.respond('Check Brightwater Studio.')
+		expect(result.receipts[0]?.selections[0]?.plan?.rendered).toEqual([source.id, rule.id])
+	})
+	it('C2 preserves only surviving sentences on a partially trimmed owner source', async () => {
+		const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
+			...buildLedgerOptions(),
+			capacity: 48,
+			share: { prompt: 1, tail: 0.001 },
+		})
+		const seed = ledger.conversation.add(
+			buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+		)
+		const source = requireValue(seed.find((message) => message.role === 'tool'))
+		const result = await ledger.respond('Check Brightwater Studio.')
+		const receipt = requireValue(result.receipts[0]?.selections[0])
+		expect(receipt.plan?.trims).toBe(1)
+		expect(receipt.plan?.rendered).toEqual([source.id])
+		expect(receipt.plan?.sentences).toEqual([{ source: source.id, sentence: 0 }])
+		expect(receipt.plan?.omitted).toEqual([])
+		expect(receipt.sources.find((entry) => entry.source === source.id)?.carriage).toBe('record')
+	})
+
+	it('C2 files nonempty live projected orphans and excludes empty and dead sources', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Done.' }]),
+			buildLedgerOptions(),
+		)
+		const orphan = ledger.conversation.add({ role: 'user', content: 'Unsettled detail 42.' })
+		const empty = ledger.conversation.add({ role: 'user', content: '' })
+		const dead = ledger.conversation.add({ role: 'user', content: 'Retired detail 44.' })
+		const replacement = ledger.conversation.add({ role: 'user', content: 'Replacement detail 44.' })
+		for (const message of [orphan, empty])
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(message, { answer: { form: 'choice', probabilities: { fact: 0.6 } } }),
+			)
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', dead, replacement, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', dead, replacement, 1))
+		const result = await ledger.respond('Check details.')
+		expect(result.receipts[0]?.selections[0]?.plan?.filed).toEqual([orphan.id, replacement.id])
+	})
+	it('C2 records owner composition before and after the unchecked final cut', async () => {
+		for (const capacity of LEDGER_RECEIPT_CAPACITIES) {
+			const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
+				...buildLedgerOptions(),
+				capacity,
+			})
+			const seed = ledger.conversation.add(
+				buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+			)
+			const source = requireValue(seed.find((message) => message.role === 'tool'))
+			const result = await ledger.respond('Check Brightwater Studio.')
+			const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+			expect(plan.owners).toEqual(['BW-20931'])
+			expect(plan.filed).toContain(source.id)
+			expect(plan.rendered).toEqual(capacity === 1 ? [] : [source.id])
+			expect(plan.omitted).toEqual(capacity === 1 ? [source.id] : [])
+			expect(plan.sentences).toEqual(
+				capacity === 1
+					? []
+					: [
+							{ source: source.id, sentence: 0 },
+							{ source: source.id, sentence: 1 },
+						],
+			)
+			expect(plan.trims).toBe(capacity === 1 ? 2 : 0)
+		}
+	})
 	it('W7-1 preserves F0/F1 answer-independent membership and reports later calls separately', async () => {
 		const fixture = LEDGER_NUMERIC_FIXTURE
 		const agent: RecordedTransport = new RecordedTransport(
@@ -537,6 +670,21 @@ describe('Ledger', () => {
 							entries.map((entry) =>
 								JSON.stringify(entry, function (this: unknown, key, value: unknown) {
 									const parent = isRecord(this) ? this : undefined
+									if (
+										['tail', 'prior', 'filed', 'rendered', 'omitted', 'later'].includes(key) &&
+										Array.isArray(value) &&
+										value.every(isString)
+									)
+										return value.map((id) =>
+											requireValue(ids.get(id), `Unknown receipt reference ${id}`),
+										)
+									if (
+										(key === 'request'
+											? parent !== undefined && 'passes' in parent
+											: ['source', 'earlier', 'later'].includes(key)) &&
+										isString(value)
+									)
+										return requireValue(ids.get(value), `Unknown receipt source ${value}`)
 									if (key === 'questions' || key === 'answers') {
 										if (!isRecord(value)) throw new Error('Invalid question/answer map')
 										return Object.fromEntries(
@@ -806,6 +954,8 @@ describe('Ledger', () => {
 		expect(result.passes).toHaveLength(1)
 		expect(result.passes[0]?.partial).toBe(true)
 		expect(result.usage).toMatchObject({ prompt: 10, completion: 2, total: 12 })
+		expect(result.stop, 'C6 partial completion invents no stop').toBeUndefined()
+		expect(result.passes[0]?.stop, 'C6 pass stop remains absent').toBeUndefined()
 		expect(provider.calls).toHaveLength(1)
 	})
 
@@ -1935,6 +2085,22 @@ describe('Ledger', () => {
 			},
 		])
 		const result = await ledger.respond('Check Brightwater Studio.')
+		expect(result.request, 'C1 entered request identity').toBe(
+			ledger.conversation
+				.messages()
+				.find((message) => message.content === 'Check Brightwater Studio.')?.id,
+		)
+		expect(result.receipts, 'C1 one receipt per pass').toHaveLength(result.passes.length)
+		expect(result.receipts[0]?.selections, 'C1 entry adoption').toHaveLength(1)
+		expect(result.receipts[0]?.calls, 'C5 gauge usage, excluding judge totals').toEqual([
+			{
+				estimate: estimateMessages(requireValue(provider.calls[0]).messages),
+				tools: 2,
+				prompt: 100,
+				completion: 3,
+				selection: 0,
+			},
+		])
 		expect(result).toMatchObject({
 			content: 'Approved.',
 			partial: false,
@@ -1957,7 +2123,14 @@ describe('Ledger', () => {
 		expect(first.messages[0]?.content).toContain('- Account BW-20931: Brightwater Studio.')
 		expect(first.messages[0]?.content).not.toContain('lookup {"id":"BW-20931"}:')
 		expect(first.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
-		await ledger.respond('Check the desk again.')
+		const later = await ledger.respond('Check the desk again.')
+		expect(later.request, 'C1 request ids remain distinct').not.toBe(result.request)
+		expect(later.receipts, 'C1 later history starts empty').toHaveLength(1)
+		expect(later.receipts[0]?.selections, 'C1 later adoptions do not accumulate').toHaveLength(1)
+		expect(
+			later.receipts[0]?.selections[0]?.tail,
+			'C1 planned tail excludes earlier requests',
+		).not.toContain(result.request)
 		const second = requireValue(provider.calls[1])
 		expect(
 			second.messages.some(
@@ -2042,6 +2215,14 @@ describe('Ledger', () => {
 		ledger.agent.emitter.on('abort', (reason) => aborts.push(reason))
 		const result = await ledger.respond('Check Brightwater Studio.')
 		expect(result.passes.map((pass) => pass.partial)).toEqual([true, false])
+		expect(result.receipts, 'C1 answer pass alignment').toHaveLength(2)
+		expect(result.receipts[1]?.selections[0]?.tail, 'C1 records the filtered answer tail').toEqual(
+			selections[1]?.messages.map((message) => message.id),
+		)
+		expect(
+			result.receipts[1]?.selections[0]?.plan,
+			'C1 answer reuse retains successful plan',
+		).toEqual(result.receipts[0]?.selections[0]?.plan)
 		expect(result.content).toBe('Refund is $148.50.')
 		expect(result.usage).toEqual({ prompt: 350, completion: 18, total: 368 })
 		expect(result.thinking).toBe('Answered from results.')
@@ -2129,6 +2310,15 @@ describe('Ledger', () => {
 		expect(result.partial).toBe(false)
 		expect(result.content).toBe('Recovered.')
 		expect(result.usage).toEqual({ prompt: 30, completion: 5, total: 35 })
+		expect(
+			result.receipts.map((receipt) => receipt.calls.map((call) => call.prompt)),
+			'C5 keeps usage within its call and pass',
+		).toEqual([[10, undefined], [20]])
+		expect(result.receipts, 'C1 recovered failed first pass keeps its receipt').toHaveLength(2)
+		expect(
+			result.receipts[0]?.selections,
+			'C1 failed pass adoption survives recovery',
+		).toHaveLength(1)
 		expect(broken.calls[2]?.tools).toBeUndefined()
 		const slow = createScriptedProvider([{ content: 'Delayed.' }], { delay: 15, recorded: true })
 		const timed = createLedger(slow, { ...options, agent: { timeout: 1 } })
@@ -2380,7 +2570,18 @@ describe('Ledger', () => {
 			phases.handler('select')
 			selections.handler(selection, ledger.conversation.view())
 		})
-		expect((await ledger.respond('Check the account.')).content).toBe('Recovered.')
+		const result = await ledger.respond('Check the account.')
+		expect(result.content).toBe('Recovered.')
+		expect(
+			result.receipts.map((receipt) => receipt.selections.map((selection) => selection.plan)),
+			'C6 fallback has no plan',
+		).toEqual([[undefined], [undefined]])
+		expect(
+			result.receipts.map((receipt) => receipt.selections[0]?.tail),
+			'C6 fallback tail survives',
+		).toEqual(
+			selections.calls.map(([selection]) => selection.messages.map((message) => message.id)),
+		)
 		expect(phases.calls).toEqual([['start'], ['select'], ['start'], ['select']])
 		// Each pass's selection falls back to the whole view it was selected from, with the fault.
 		expect(selections.calls).toEqual([
@@ -2475,6 +2676,15 @@ describe('Ledger', () => {
 			fault,
 		})
 		expect(selection).not.toHaveProperty('readings')
+		expect(result.usage, 'C5 judge usage remains in result aggregation').toEqual({
+			prompt: 50,
+			completion: 1,
+			total: 51,
+		})
+		expect(
+			result.receipts[0]?.calls[0]?.prompt,
+			'C5 missing provider usage is not judge usage',
+		).toBeUndefined()
 		expect(summarizeReadings(result.readings)).toEqual([
 			{
 				key: JSON.stringify(['category', request.id]),
@@ -3040,7 +3250,15 @@ describe('Ledger', () => {
 					),
 				)
 		}
-		await ledger.respond('Check Mira receipt.')
+		const result = await ledger.respond('Check Mira receipt.')
+		expect(
+			result.receipts[0]?.selections[0]?.plan?.rendered,
+			'C2 includes the emitted amendment source',
+		).toEqual([source.id, correction.id])
+		expect(
+			result.receipts[0]?.selections[0]?.plan?.withdrawn,
+			'C3 carries effective withdrawal identities',
+		).toEqual([{ earlier: source.id, later: correction.id }])
 		const expected = `For Mira, keep the receipt.\n${correction.content}`
 		expect(provider.calls[0]?.messages[0]?.content).toContain(expected)
 		expect(

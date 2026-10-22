@@ -11,6 +11,7 @@ import type {
 	LedgerLine,
 	LedgerLookupReading,
 	LedgerOptions,
+	LedgerPlan,
 	LedgerProjection,
 	LedgerProjectionInput,
 	LedgerRecord,
@@ -49,6 +50,7 @@ import {
 import { isLedgerError, LedgerError } from './errors.js'
 import {
 	buildLines,
+	buildLedgerSources,
 	buildRecallMessage,
 	collectProjectionIds,
 	extractWords,
@@ -209,7 +211,23 @@ export class Ledger implements LedgerInterface {
 		})
 		this.#agent.emitter.on('select', (selection) => {
 			if (isLedgerError(selection.fault) && selection.fault.code === 'REQUEST') return
-			this.#current()?.adopt(selection, this.#conversation.messages().length)
+			const request = this.#current()
+			if (request === undefined) return
+			const plan = selection.fault === undefined ? request.plan?.receipt : undefined
+			const tail = selection.messages.map((message) => message.id)
+			const calls = request.receipts.at(-1)?.calls ?? []
+			request.adopt(selection, this.#conversation.messages().length, {
+				turn: calls.length === 0 ? undefined : calls.length - 1,
+				tail,
+				prior: tail.filter((id) => id !== request.message?.id && this.#requests.has(id)),
+				plan,
+				sources: buildLedgerSources(
+					selection.messages,
+					this.#conversation.messages(),
+					this.#conversation.sections.map((section) => section.id),
+					plan,
+				),
+			})
 		})
 		this.#agent.emitter.on('turn', () => this.#observeTurn())
 		this.#agent.emitter.on('usage', (usage) => this.#current()?.spend(usage))
@@ -328,10 +346,12 @@ export class Ledger implements LedgerInterface {
 			// Joined as a `joinThinking` fold would join them: an empty part adds no separator.
 			const parts = passes.flatMap((pass) => (pass.thinking === undefined ? [] : [pass.thinking]))
 			return {
+				request: entered.id,
 				content: last.content,
 				partial: last.partial,
 				passes,
 				readings: request.readings,
+				receipts: request.receipts,
 				...(usage === undefined ? {} : { usage }),
 				...(parts.length === 0
 					? {}
@@ -502,10 +522,17 @@ export class Ledger implements LedgerInterface {
 		return { input, projection: buildRecords(input) }
 	}
 
-	#projectLines(input: LedgerProjectionInput, projection: LedgerProjection, id: string) {
+	#projectLines(
+		input: LedgerProjectionInput,
+		projection: LedgerProjection,
+		id: string,
+		byId: ReadonlyMap<string, Message> = new Map(
+			input.messages.map((message) => [message.id, message]),
+		),
+	) {
 		return buildLines(
 			input,
-			new Map(input.messages.map((message) => [message.id, message])),
+			byId,
 			id,
 			new Set(projection.stale.map((line) => `${line.source} ${line.sentence}`)),
 			[...input.owners.values()].flat(),
@@ -582,12 +609,13 @@ export class Ledger implements LedgerInterface {
 		})
 		request.file(readings, planned.success ? planned.value : undefined)
 		if (!planned.success) return this.#refuse(planned.error, filed)
+		const { receipt: _receipt, ...selection } = planned.value
 		return this.#annotations.has(message.id)
 			? {
-					...planned.value,
+					...selection,
 					messages: [...planned.value.messages, ...this.#collectAfter(selected)],
 				}
-			: planned.value
+			: selection
 	}
 
 	// Falls back to the conversation view with the failure as the selection's fault, keeping the
@@ -604,8 +632,9 @@ export class Ledger implements LedgerInterface {
 		return (this.#gauge?.scale ?? 1) * estimateMessages(messages)
 	}
 
-	#plan(request: Message): Pick<Selection, 'messages' | 'briefing'> {
+	#plan(request: Message): Pick<LedgerPlan, 'messages' | 'briefing' | 'receipt'> {
 		const { input, projection } = this.#project()
+		const byId = new Map(input.messages.map((message) => [message.id, message]))
 		const registry = collectRegistry(input.readings)
 		const links = linkOwners(input.readings, registry.owners)
 		const near = new Set([
@@ -740,6 +769,25 @@ export class Ledger implements LedgerInterface {
 			cap,
 		)
 		const briefing = trimmed.briefing
+		const before = [
+			...records.flatMap((record) => record.lines),
+			...mapped.flatMap((unit) => unit.record.lines),
+		]
+		const after = [
+			...trimmed.records.flatMap((record) => record.lines),
+			...mapped
+				.filter((unit) => trimmed.included.has(unit.source))
+				.flatMap((unit) => unit.record.lines),
+		]
+		const rendered = [...new Set(after.map((line) => line.source))]
+		const sentences = [
+			...new Map(
+				after.map((line) => [
+					`${line.source} ${line.sentence}`,
+					{ source: line.source, sentence: line.sentence },
+				]),
+			).values(),
+		]
 		const shown = new Set([
 			...trimmed.included,
 			...records.flatMap((record) =>
@@ -754,6 +802,27 @@ export class Ledger implements LedgerInterface {
 			),
 		])
 		return {
+			receipt: {
+				owners: [...new Set(owners)],
+				filed: [...live].filter(
+					(source) => this.#projectLines(input, projection, source, byId).length > 0,
+				),
+				rendered,
+				sentences,
+				omitted: [...new Set(before.map((line) => line.source))].filter(
+					(source) => !rendered.includes(source),
+				),
+				trims: trimmed.trims,
+				withdrawn: [
+					...new Map(
+						projection.stale.flatMap((line) =>
+							line.later.map(
+								(later) => [`${line.source} ${later}`, { earlier: line.source, later }] as const,
+							),
+						),
+					).values(),
+				],
+			},
 			messages: tail.map((message) =>
 				message.role === 'tool' ? this.#renderTailStub(message, shown) : message,
 			),
@@ -774,11 +843,13 @@ export class Ledger implements LedgerInterface {
 		readonly briefing: string
 		readonly records: readonly LedgerRecord[]
 		readonly included: ReadonlySet<string>
+		readonly trims: number
 	} {
 		const trimmed = steps.reduce<{
 			readonly briefing: string | undefined
 			readonly records: readonly LedgerRecord[]
 			readonly included: ReadonlySet<string>
+			readonly trims: number
 		}>(
 			(cut, step) => {
 				if (cut.briefing !== undefined) return cut
@@ -788,17 +859,19 @@ export class Ledger implements LedgerInterface {
 					return { ...cut, briefing }
 				return {
 					briefing: undefined,
+					trims: cut.trims + 1,
 					records: cut.records.map((record) =>
 						record.key === step.key ? { ...record, lines: record.lines.slice(0, -1) } : record,
 					),
 					included: new Set([...cut.included].filter((source) => source !== step.source)),
 				}
 			},
-			{ briefing: undefined, records, included },
+			{ briefing: undefined, records, included, trims: 0 },
 		)
 		return {
 			records: trimmed.records,
 			included: trimmed.included,
+			trims: trimmed.trims,
 			briefing: trimmed.briefing ?? this.#render(trimmed.records, mapped, trimmed.included),
 		}
 	}

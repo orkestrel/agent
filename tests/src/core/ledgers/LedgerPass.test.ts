@@ -1,8 +1,35 @@
 import type { Selection } from '../../../../src/core/contexts/types.js'
 import { describe, expect, it } from 'vitest'
 import { LedgerPass } from '../../../../src/core/ledgers/LedgerPass.js'
+import { LEDGER_EMPTY_RECEIPT } from '../../../setup.js'
 
 describe('LedgerPass', () => {
+	it('C5 joins calls to adoption at observation and preserves missing usage', () => {
+		const pass = new LedgerPass(0)
+		const selection: Selection = { messages: [], judgments: [] }
+		pass.observe({ estimate: 3, tools: 0 }, 0)
+		pass.adopt(selection, 1, { turn: 0, tail: ['entry'], prior: [], plan: undefined, sources: [] })
+		pass.observe({ estimate: 7, tools: 2 }, 1)
+		pass.bill({ prompt: 11, completion: 2, total: 13 })
+		pass.adopt(selection, 2, { turn: 1, tail: ['fold'], prior: [], plan: undefined, sources: [] })
+		pass.observe({ estimate: 9, tools: 0 }, 2)
+		expect(pass.receipt.calls).toEqual([
+			{ estimate: 3, tools: 0, selection: undefined },
+			{ estimate: 7, tools: 2, prompt: 11, completion: 2, selection: 0 },
+			{ estimate: 9, tools: 0, selection: 1 },
+		])
+	})
+	it('C1 retains every adoption in order and snapshots caller collections', () => {
+		const pass = new LedgerPass(0)
+		const tail = ['entry']
+		const selection: Selection = { messages: [], judgments: [] }
+		pass.adopt(selection, 1, { turn: undefined, tail, prior: [], plan: undefined, sources: [] })
+		tail.push('changed')
+		pass.observe({ estimate: 7, tools: 0 }, 1)
+		pass.adopt(selection, 2, { turn: 0, tail: ['fold'], prior: [], plan: undefined, sources: [] })
+		expect(pass.receipt.selections.map((receipt) => receipt.tail)).toEqual([['entry'], ['fold']])
+		expect(pass.receipt.selections.map((receipt) => receipt.turn)).toEqual([undefined, 0])
+	})
 	it('opens at its boundary with no selection, usage, call, or position', () => {
 		const pass = new LedgerPass(3)
 		expect(pass.boundary).toBe(3)
@@ -21,8 +48,8 @@ describe('LedgerPass', () => {
 			usage: { prompt: 5, completion: 1, total: 6 },
 		}
 		const second: Selection = { messages: [], judgments: [] }
-		pass.adopt(first, 2)
-		pass.adopt(second, 4)
+		pass.adopt(first, 2, LEDGER_EMPTY_RECEIPT)
+		pass.adopt(second, 4, LEDGER_EMPTY_RECEIPT)
 		expect(pass.selection).toBe(second)
 		expect(pass.boundary).toBe(4)
 		expect(pass.usage).toEqual({ prompt: 5, completion: 1, total: 6 })

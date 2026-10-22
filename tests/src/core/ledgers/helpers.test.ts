@@ -6,8 +6,10 @@ import type {
 	LedgerRecord,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
+import { createConversation } from '@src/core'
 import {
 	buildRecallMessage,
+	buildLedgerSources,
 	collectProjectionIds,
 	extractWords,
 	renderCauseChain,
@@ -48,6 +50,7 @@ import {
 	buildGaugeCall,
 	measureRoom,
 	LEDGER_EMPTY_FOUND,
+	LEDGER_CARRIAGE_PLAN,
 	buildLedgerInput,
 	buildLedgerMessage,
 	buildLedgerReading,
@@ -61,6 +64,47 @@ import {
 } from '../../../setup.js'
 
 describe('extracted ledger leaves', () => {
+	it('C3 joins carriage by composition precedence and leaves a tail stub unlabelled', () => {
+		const stored = ['recap', 'whole', 'partial', 'cut', 'stub'].map((id) =>
+			buildLedgerMessage(id, 'user', `${id} original`),
+		)
+		const emitted = stored.map((message) =>
+			['partial', 'cut', 'stub'].includes(message.id)
+				? { ...message, content: 'changed' }
+				: message,
+		)
+		expect(buildLedgerSources(emitted, stored, ['recap'], LEDGER_CARRIAGE_PLAN)).toEqual([
+			{ source: 'recap', carriage: 'recap' },
+			{ source: 'whole', carriage: 'verbatim' },
+			{ source: 'partial', carriage: 'record' },
+			{ source: 'cut', carriage: 'absent' },
+			{ source: 'stub', carriage: undefined },
+			{ source: 'record', carriage: 'record' },
+			{ source: 'absent', carriage: 'absent' },
+		])
+		expect(buildLedgerSources([], [], [], undefined)).toEqual([])
+	})
+
+	it('C3 reads recap carriage from a real compacted conversation fallback', async () => {
+		const conversation = createConversation({
+			summarize: async () => 'The refund needs approval.',
+			keep: 0,
+		})
+		conversation.add([
+			{ role: 'user', content: 'Refund 42.' },
+			{ role: 'assistant', content: 'Recorded.' },
+			{ role: 'user', content: 'Next.' },
+		])
+		const section = await conversation.compact()
+		expect(section).toBeDefined()
+		const sources = buildLedgerSources(
+			conversation.view(),
+			conversation.messages(),
+			conversation.sections.map((entry) => entry.id),
+			undefined,
+		)
+		expect(sources.find((source) => source.source === section?.id)?.carriage).toBe('recap')
+	})
 	it('collects placed and orphan ids without duplicates', () => {
 		expect([
 			...collectProjectionIds({
@@ -818,12 +862,34 @@ describe('placeMember', () => {
 })
 
 describe('collectStale', () => {
+	it('C3 retains only effective later identities sharing each stale sentence token', () => {
+		const input = buildLedgerInput({
+			messages: [
+				buildLedgerMessage('earlier', 'user', 'Code MX-4471. Limit 200.'),
+				buildLedgerMessage('first', 'user', 'Replace MX-4471 with MX-4486.'),
+				buildLedgerMessage('second', 'user', 'Retire MX-4471.'),
+				buildLedgerMessage('unrelated', 'user', 'Limit 300.'),
+				buildLedgerMessage('quiet', 'user', 'Code MX-4471.'),
+			],
+			classification: {
+				amendments: { earlier: ['first', 'second', 'unrelated', 'quiet'] },
+				quiet: ['quiet'],
+			},
+		})
+		expect(
+			collectStale(
+				input,
+				new Map(input.messages.map((message) => [message.id, message])),
+				collectLive(input),
+			),
+		).toEqual([{ source: 'earlier', sentence: 0, tokens: ['MX-4471'], later: ['first', 'second'] }])
+	})
 	const desk = createLedgerDesk()
 	const byId = new Map(desk.messages.map((message) => [message.id, message]))
 
 	it('lists a sentence of a live message that shares an id or a number with its amending message', () => {
 		expect(collectStale(desk, byId, collectLive(desk))).toEqual([
-			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] },
+			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
 		])
 	})
 
@@ -843,7 +909,7 @@ describe('collectStale', () => {
 		expect(live).toEqual(['user-a', 'user-c'])
 		expect(
 			collectStale(input, new Map(input.messages.map((message) => [message.id, message])), live),
-		).toEqual([{ source: 'user-a', sentence: 0, tokens: ['MX-4471'] }])
+		).toEqual([{ source: 'user-a', sentence: 0, tokens: ['MX-4471'], later: ['user-b'] }])
 	})
 
 	it('keeps a sentence stale when its correction is itself corrected (R2b)', () => {
@@ -904,7 +970,7 @@ describe('collectStale', () => {
 		).toEqual([])
 		const control = buildLedgerInput({ messages, classification })
 		expect(collectStale(control, byMessage, collectLive(control))).toEqual([
-			{ source: 'user-a', sentence: 0, tokens: ['MX-4471'] },
+			{ source: 'user-a', sentence: 0, tokens: ['MX-4471'], later: ['user-b'] },
 		])
 	})
 })
@@ -1064,7 +1130,9 @@ describe('buildRecords', () => {
 				'Correction: the manager code is MX-4486, not MX-4471.',
 			],
 		])
-		expect(built.stale).toEqual([{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] }])
+		expect(built.stale).toEqual([
+			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
+		])
 		expect(built.orphans).toEqual([])
 		expect(checkLedgerProjection(built, createLedgerDesk())).toEqual([])
 	})
@@ -1176,7 +1244,9 @@ describe('buildRecords', () => {
 			},
 		})
 		const built = buildRecords(input)
-		expect(built.stale).toEqual([{ source: 'user-a', sentence: 0, tokens: ['MX-4471'] }])
+		expect(built.stale).toEqual([
+			{ source: 'user-a', sentence: 0, tokens: ['MX-4471'], later: ['user-b'] },
+		])
 		const texts = built.records.flatMap((record) => record.lines.map((line) => line.text))
 		expect(texts.some((text) => text.includes('MX-4471'))).toBe(false)
 		expect(texts).toContain('Ask the lead.')
