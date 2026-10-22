@@ -134,7 +134,7 @@ The idea record for Agent's memory boosts as it stood on 2026-10-21: the code se
 | B-M3 stop layers | model finish, agent stop, study failure and launcher cap stay distinct | `stop` is inherited | adopt | no second stop flag |
 | B-M4 agreement; E3 | a same-judge repeat bounds label noise | Sol and Grok agree on 362 of 384 (`.orkestrel/agent/evidence.md:168`), a cross-judge reading | park with W10 (2026-10-21); a Claude labeler until a labeling lane runs on the Grok route | same-judge repeat and sample-specific atom agreement |
 | B-M5 semantic labeling lifecycle | controlled runner, pilot and create-only outputs keep labels valid | the Grok schema v1 failed its first batch | retain | stop at the first invalid batch; a changed judge needs its own calibration |
-| B-M6 package source carriage; RQ6; `692e551:.orkestrel/agent/direction.md` § 4 | a package API reports which sources a prompt carried | Study observation serves this ladder | park | W12 names a required selection fact public state lacks, with its first consumer; one Astra design before Sol builds |
+| B-M6 package source carriage; RQ6; `692e551:.orkestrel/agent/direction.md` § 4 | a package API reports which sources a prompt carried | Study observation serves this ladder | adopted (2026-10-21) | the Astra design `tmp/units/ladder/w12-design.md` names the absent facts and their first consumer, the W12 reader; W12-1 builds the receipt on `LedgerResult` (`.orkestrel/agent/plan.md` § Rulings in force, W12 design) |
 | B-M7 boosted-only versus sealed | matched off, repeat, sham and on from one seed carry causality | the 2026-10-19 ladder superseded the 2026-10-16 boosted-only choice | retain the matched-pair rule | sealed comparisons stay descriptive |
 | B-M8 development and held-out split | tuning on development text keeps evaluation honest | no split frozen | adopt | W11 projection and frozen split; the evaluation oracle stays aggregate-only under U5 |
 | B-M9 per-goal completion | a later failure never erases an earlier executed fact | grading repair, offline | probe offline | controls truncate a later attempt and keep earlier observations |
@@ -213,7 +213,7 @@ One default-off Records treatment in `src/core/ledgers/` on the seams of `692e55
 
 ## Rulings of 2026-10-21
 
-The rulings of the boosts review (Orchestrator, 2026-10-21, `692e551:.orkestrel/ledger.md:567-569`), accepted by the user in the cleanup instruction of 2026-10-21. RV-7 stays proposed until the user confirms it.
+The rulings of the boosts review (Orchestrator, 2026-10-21, `692e551:.orkestrel/ledger.md:567-569`), accepted by the user in the cleanup instruction of 2026-10-21. RV-7 is in force (the Decisions ruling in `.orkestrel/agent/plan.md` § Rulings in force).
 
 | Id | Kind | Ruling | State |
 | --- | --- | --- | --- |
@@ -223,7 +223,7 @@ The rulings of the boosts review (Orchestrator, 2026-10-21, `692e551:.orkestrel/
 | RV-4 | change | every Grok row (W9, W10, the W11 pilot, B-M4) runs on a Claude distiller or labeler until a labeling lane runs on the proved Grok route (`.orkestrel/agent/plan.md` § Rulings in force, Grok route); record each substitution | in force; the map lane of 2026-10-21 proved the route for mapping |
 | RV-5 | change | the R-Q5 diagnosis precedes any excerpt treatment and reads W12 fields | in force |
 | RV-6 | change | Compaction gets one screen first: G3 with Q3a, then Q1, on W6's onset body for 15 model minutes; every other Compaction row waits for it | in force |
-| RV-7 | change | review S-T in the first read-only lane; release it with Study 0.0.3 behind the Records L1 work | proposed |
+| RV-7 | change | review S-T in the first read-only lane; release it with Study 0.0.3 behind the Records L1 work | in force (Decisions, 2026-10-21) |
 | RV-8 | park | W9 and W10 until R1 to R5 have an L1 result; the Grok route alone does not reopen them (Grok route) | in force |
 | RV-9 | park | W13 until G3 passes | in force |
 | RV-10 | park | R-S1, R-S2, R-S4, R-S5, RS6, RS9 and RS5 under the ladder's reopening conditions | in force |
