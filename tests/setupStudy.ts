@@ -35,6 +35,8 @@ import type {
 import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
 import type { JSONValue } from '@orkestrel/contract'
+import type { LedgerResult } from '@orkestrel/agent'
+import type { StudyMemoryReceipt, StudyMemoryRequirement } from '../studies/memory/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { createRecorder } from '@orkestrel/test'
@@ -48,6 +50,7 @@ import {
 	StudyScope,
 } from '@orkestrel/study'
 import { readStudyDeclaration } from '@orkestrel/study/server'
+import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
@@ -507,6 +510,7 @@ export const STUDY_MEMORY_TIMING = Object.freeze({
 
 /** Pins the event keys present with observation disabled. */
 export const STUDY_MEMORY_EVENT_KEYS = Object.freeze({
+	selection: Object.freeze(['arrivals', 'pass', 'recaps', 'receipt', 'request', 'role']),
 	dispatch: Object.freeze(['bytes', 'model', 'options', 'path', 'role']),
 	wire: Object.freeze([
 		'bytes',
@@ -560,6 +564,140 @@ export const STUDY_MEMORY_REFUSAL_KEYS = Object.freeze([
 
 /** Pins the evidence events only observation adds, so an off-versus-on comparison can exclude exactly them. */
 export const STUDY_MEMORY_OBSERVED_EVENTS = Object.freeze(['context', 'estimate', 'refusal'])
+
+/** Builds inert receipt identities with a fallback adoption and independent tails. @returns A resolved Ledger result fixture. */
+export function buildMemorySelectionResult(): LedgerResult {
+	return {
+		request: 'request-2',
+		content: 'Answer',
+		partial: false,
+		readings: [],
+		passes: [{ content: 'Answer', partial: false }],
+		receipts: [
+			{
+				selections: [
+					{
+						turn: undefined,
+						tail: ['arrival-1', 'request-1', 'section-old', 'request-2'],
+						prior: ['request-1'],
+						plan: undefined,
+						sources: [{ source: 'section-old', carriage: 'recap' }],
+					},
+				],
+				calls: [{ selection: 0, estimate: 20, tools: 0 }],
+			},
+		],
+	}
+}
+
+/** Resolves a real Ledger whose inert system input fails after construction. @returns The resolved fallback receipt. */
+export async function runMemoryFallback(): Promise<LedgerResult> {
+	const systems = new ScriptedReads<string | undefined>(['Serve the desk.'], undefined)
+	const ledger = agent.createLedger(createScriptedProvider([{ content: 'Fallback answer' }]), {
+		...buildLedgerOptions(),
+		topics: [],
+		lookups: [],
+		get system() {
+			const system = systems.read()
+			if (system === undefined) throw new Error('Fixture system unavailable')
+			return system
+		},
+	})
+	try {
+		return await ledger.respond('Respond')
+	} finally {
+		ledger.agent.emitter.destroy()
+		ledger.conversation.emitter.destroy()
+	}
+}
+
+/** Pins retained arrival-message identities, including an arrival outside the selected tail. */
+export const STUDY_MEMORY_SELECTION_ARRIVALS = Object.freeze([
+	Object.freeze({ id: 'outside', message: 'arrival-2' }),
+	Object.freeze({ id: 'first', message: 'arrival-1' }),
+])
+
+/** Builds declared carriage facts for the independent selection-class controls. @returns An owned pass value with a held source, a missing sentence and correct carriage. */
+export function buildMemoryClassificationReceipt(): StudyMemoryReceipt {
+	return {
+		request: 'request',
+		pass: 0,
+		role: 'agent',
+		arrivals: [],
+		recaps: [],
+		stop: undefined,
+		receipt: {
+			calls: [],
+			selections: [
+				{
+					turn: undefined,
+					tail: ['verbatim'],
+					prior: [],
+					plan: {
+						owners: ['owner'],
+						filed: ['held', 'wrong', 'correct', 'clean'],
+						rendered: ['wrong', 'correct', 'clean'],
+						omitted: ['held'],
+						trims: 1,
+						sentences: [
+							{ source: 'correct', sentence: 0 },
+							{ source: 'clean', sentence: 0 },
+						],
+						withdrawn: [],
+					},
+					sources: [
+						{ source: 'held', carriage: 'absent' },
+						{ source: 'wrong', carriage: 'record' },
+						{ source: 'correct', carriage: 'record' },
+						{ source: 'clean', carriage: 'record' },
+					],
+				},
+			],
+		},
+	}
+}
+
+/** Declares an independent source for each selection failure class. */
+export const STUDY_MEMORY_SELECTION_REQUIREMENTS: readonly StudyMemoryRequirement[] = Object.freeze(
+	['missing', 'held', 'wrong', 'correct'].map((source) =>
+		Object.freeze({ source, owner: 'owner', sentences: Object.freeze([0]) }),
+	),
+)
+
+/** Pins distinct goals with identical prompt and arrival text for identity controls. */
+export const STUDY_MEMORY_IDENTITY_GOALS: readonly StudyGoal[] = Object.freeze([
+	{
+		id: 'same-1',
+		input: { prompt: 'Same text', arrivals: [{ id: 'a', content: 'Same text' }], records: [] },
+	},
+	{
+		id: 'same-2',
+		input: { prompt: 'Same text', arrivals: [{ id: 'b', content: 'Same text' }], records: [] },
+	},
+])
+
+/** Builds accounting allowances for a complete CPU-scripted endurance trial. @param url - The ephemeral protocol fixture origin. @returns The finite profile used across all declared goals. */
+export function buildMemoryEnduranceProfile(url: string): StudyProfile {
+	const base = buildMemoryProfile({ url })
+	return {
+		...base,
+		bounds: {
+			...base.bounds,
+			goal: { duration: 300000, calls: 32768, tokens: 268435456, bytes: 1073741824 },
+			trial: { duration: 300000, calls: 32768, tokens: 268435456, bytes: 1073741824 },
+			series: { duration: 360000, calls: 65536, tokens: 536870912, bytes: 2147483648 },
+		},
+	}
+}
+
+/** Builds the calibration replies followed by the shared observation trajectory. @returns Ordered inert replies for the real Records arm. */
+export function buildMemoryRecordsResponses(): readonly MemoryWireFixture[] {
+	return [
+		{ path: '/api/chat', body: buildMemoryReply() },
+		{ path: '/api/chat', body: buildMemoryReply() },
+		...buildMemoryObservationResponses(STUDY_MEMORY_TIMING),
+	]
+}
 
 /** Pins settings the driver must refuse with CONFIG: checkpoints without observation, a text switch, an unrelated key and an unknown key. */
 export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
@@ -1462,3 +1600,63 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 		evidence: { [first.id]: complete.evidence, [second.id]: [] },
 	}
 }
+
+/** Pins the shared public trajectory and protocol replies for observation proofs. */
+export const STUDY_MEMORY_PASSIVITY_BASE: MemoryTrialFixture = Object.freeze({
+	arm: 'full',
+	responses: buildMemoryObservationResponses(STUDY_MEMORY_TIMING),
+	goals: STUDY_MEMORY_OBSERVATION_GOALS,
+})
+
+/** Pins every memory treatment's passive byte-equality controls and changed-goal trajectory. */
+export const STUDY_MEMORY_PASSIVITY_CASES = Object.freeze([
+	{
+		name: 'Records',
+		trial: {
+			...STUDY_MEMORY_PASSIVITY_BASE,
+			arm: 'records' as const,
+			responses: buildMemoryRecordsResponses(),
+		},
+		settings: undefined,
+		observed: STUDY_MEMORY_OBSERVED_SETTINGS,
+		changed: buildMemoryObservationGoals('Look up order-2'),
+		products: ['Initial handoff', 'Corrected handoff', 'Closed handoff'],
+		chats: 6,
+		tools: 1,
+	},
+	{
+		name: 'Full',
+		trial: STUDY_MEMORY_PASSIVITY_BASE,
+		settings: undefined,
+		observed: STUDY_MEMORY_OBSERVED_SETTINGS,
+		changed: buildMemoryObservationGoals('Look up order-2'),
+		products: ['Initial handoff', 'Corrected handoff', 'Closed handoff'],
+		chats: 4,
+		tools: 1,
+	},
+	{
+		name: 'Compaction',
+		trial: { ...STUDY_MEMORY_PASSIVITY_BASE, arm: 'compaction' as const },
+		settings: STUDY_MEMORY_FIXED_SETTINGS,
+		observed: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
+		changed: buildMemoryObservationGoals('Look up order-2'),
+		products: ['Initial handoff', 'Corrected handoff', 'Closed handoff'],
+		chats: 4,
+		tools: 1,
+	},
+	{
+		name: 'fold',
+		trial: {
+			arm: 'compaction' as const,
+			responses: [],
+			goals: buildMemoryFoldGoals(),
+			room: STUDY_MEMORY_SUMMARY_ROOM,
+		},
+		settings: STUDY_MEMORY_SETTINGS,
+		observed: { ...STUDY_MEMORY_SETTINGS, observe: true },
+		changed: buildMemoryFoldGoals('Maintain this other detail. '),
+		products: ['Receipt retained.'],
+		chats: 2,
+		tools: 0,
+	},
+])

@@ -14,6 +14,7 @@ import type {
 	StudyMemoryProvenanceSource,
 	StudyMemorySessionOptions,
 	StudyMemoryObservation,
+	StudyMemoryArrival,
 } from './types.js'
 import { createBudget } from '@orkestrel/budget'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
@@ -33,10 +34,14 @@ import {
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
+	STUDY_MEMORY_WORKLOAD_BYTES,
 } from './constants.js'
 import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
+	buildStudyMemoryReceipts,
+	buildStudyMemoryEvidence,
+	measureStudyMemoryEvidence,
 	readStudyMemoryCompaction,
 	resolveStudyMemoryObservation,
 } from './helpers.js'
@@ -53,6 +58,8 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
 	readonly #arrivals = new Set<string>()
+	readonly #messages: StudyMemoryArrival[] = []
+	readonly #sizes: number[] = []
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
 	// Message ids this consumer added or named, joined to their origin; the summary instruction is fixed.
 	readonly #explicit = new Map<string, StudyMemoryProvenance>([
@@ -272,6 +279,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					role: 'user',
 					content: `[Source ${arrival.id}] ${arrival.content}`,
 				})
+				this.#messages.push({ id: arrival.id, message: message.id })
 				if (this.#observation.observe)
 					this.#explicit.set(message.id, { origin: 'arrival', source: arrival.id })
 				await context.evidence.append({
@@ -288,10 +296,24 @@ export class StudyMemorySession implements StudySessionInterface {
 					this.#explicit.set(prompt.id, { origin: 'input', source: goal })
 				}
 			}
+			const sections = this.#ledger === undefined ? [] : this.#conversation.snapshot().sections
 			const result: unknown =
 				this.#ledger === undefined
 					? await this.#agent.generate({ signal })
 					: await this.#ledger.respond(input.prompt, signal)
+			if (this.#ledger !== undefined) {
+				const snapshot = { sections: [...sections, ...this.#conversation.snapshot().sections] }
+				for (const receipt of buildStudyMemoryReceipts(result, this.#messages, snapshot)) {
+					const value = buildStudyMemoryEvidence(goal, receipt)
+					const bytes = measureStudyMemoryEvidence(goal, value)
+					if (
+						this.#sizes.reduce((total, size) => total + size, bytes) > STUDY_MEMORY_WORKLOAD_BYTES
+					)
+						throw new StudyError('CAPACITY', 'Memory selection workload exceeds the byte bound')
+					this.#sizes.push(bytes)
+					this.#trace.append('selection', value)
+				}
+			}
 			this.#transport.check()
 			signal.throwIfAborted()
 			if (

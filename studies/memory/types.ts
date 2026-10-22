@@ -1,7 +1,9 @@
 import type {
 	Agent,
+	AgentStop,
 	LEDGER_QUESTIONS,
 	LedgerGauge,
+	LedgerReceipt,
 	createConversationManager,
 	createLedger,
 } from '@orkestrel/agent'
@@ -135,3 +137,69 @@ export type StudyMemoryAssertion =
 	| { readonly observation: 'lookup'; readonly id: string }
 	| { readonly observation: 'summary' }
 	| { readonly observation: 'operational' }
+
+/** Carries one pass's evidence and the consumer's identity joins. */
+export interface StudyMemoryReceipt {
+	readonly request: string
+	readonly pass: number
+	readonly role: 'agent'
+	readonly receipt: LedgerReceipt
+	readonly arrivals: readonly StudyMemoryArrival[]
+	readonly recaps: readonly string[]
+	readonly stop: AgentStop | undefined
+}
+
+/** Identifies a public arrival by the message the session appended. */
+export interface StudyMemoryArrival {
+	readonly id: string
+	readonly message: string
+}
+
+/** Declares the source, owner and sentence identities required by an independent goal reading. */
+export interface StudyMemoryRequirement {
+	readonly source: string
+	readonly owner: string | undefined
+	readonly sentences: readonly number[]
+}
+
+/** Declares a goal's nonempty required-source denominator and optional independent product reading. */
+export interface StudyMemoryDeclaration {
+	readonly goal: string
+	readonly sources: readonly StudyMemoryRequirement[]
+	/** Reports whether the independently read product satisfies the goal; absence establishes no ignored class. */
+	readonly product: boolean | undefined
+}
+
+/** Reports a failure count over the declared required-source population. */
+export interface StudyMemoryRatio {
+	readonly count: number
+	readonly denominator: number
+}
+
+/** Reports selection failure classes over an explicit required-source denominator. */
+export interface StudyMemoryClassification {
+	readonly unfiled: StudyMemoryRatio
+	readonly unselected: StudyMemoryRatio
+	readonly incorrect: StudyMemoryRatio
+	/** Holds no reading without independent product evidence. */
+	readonly ignored: StudyMemoryRatio | undefined
+}
+
+/** Holds the foreign result members the selection reader dereferences. */
+export interface StudyMemoryResult {
+	readonly request: string
+	readonly receipts: readonly LedgerReceipt[]
+	readonly passes: ReadonlyArray<{ readonly stop?: AgentStop | undefined }>
+}
+
+/** Holds section identities available before or after a goal changes its snapshot. */
+export interface StudyMemorySections {
+	readonly sections: ReadonlyArray<{ readonly id: string }>
+}
+
+/** Holds an evidence envelope before its selection value is validated. */
+export interface StudyMemoryEvidence {
+	readonly event: string
+	readonly goal?: string | undefined
+	readonly value: unknown
+}

@@ -1,14 +1,23 @@
 import type { MemoryTrialFixture } from './types.js'
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
 import { isStudyError, readStudyFailure, validateStudyInputs } from '@orkestrel/study'
-import { StudyMemoryDriver } from '../../../studies/memory/index.js'
+import {
+	StudyMemoryDriver,
+	isStudyMemoryReceipt,
+	buildStudyMemoryReceipts,
+} from '../../../studies/memory/index.js'
 import {
 	buildMemoryEdge,
+	buildMemorySelectionResult,
+	STUDY_MEMORY_PASSIVITY_CASES,
+	STUDY_MEMORY_PASSIVITY_BASE,
+	buildMemoryEnduranceProfile,
+	STUDY_MEMORY_IDENTITY_GOALS,
+	runMemoryFallback,
 	buildMemoryFoldGoals,
-	buildMemoryObservationGoals,
-	buildMemoryObservationResponses,
 	buildMemoryProfile,
 	buildMemoryReply,
 	buildMemoryRollingGoals,
@@ -40,7 +49,6 @@ import {
 	STUDY_MEMORY_SUMMARY_PROJECTIONS,
 	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_MODULES,
-	STUDY_MEMORY_OBSERVATION_GOALS,
 	STUDY_MEMORY_OBSERVED_KEYS,
 	STUDY_MEMORY_OBSERVED_SETTINGS,
 	STUDY_MEMORY_PASSIVE_SETTINGS,
@@ -51,6 +59,146 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
+	it('C7 preserves the Records checkpoint shape and keeps other arms free of selection rows', async () => {
+		const records = STUDY_MEMORY_PASSIVITY_CASES.find((entry) => entry.name === 'Records')
+		if (records === undefined) throw new Error('Missing Records control')
+		const retained = await runMemoryTrial({ ...records.trial, settings: records.observed })
+		expect(retained.failure).toBeUndefined()
+		expect(Object.keys(readMemorySnapshot(retained.evidence, 'opening')).sort()).toEqual([
+			'arrivals',
+			'conversation',
+			'gauge',
+			'input',
+			'records',
+		])
+		expect(readMemorySnapshot(retained.evidence, 'opening').arrivals).toEqual([])
+		for (const entry of STUDY_MEMORY_PASSIVITY_CASES.filter(
+			(candidate) => candidate.name !== 'Records',
+		)) {
+			const off = await runMemoryTrial({
+				...entry.trial,
+				...(entry.settings === undefined ? {} : { settings: entry.settings }),
+			})
+			const on = await runMemoryTrial({ ...entry.trial, settings: entry.observed })
+			expect(off.failure).toBeUndefined()
+			expect(on.failure).toBeUndefined()
+			expect(off.evidence.filter((row) => row.event === 'selection')).toEqual([])
+			expect(on.evidence.filter((row) => row.event === 'selection')).toEqual([])
+		}
+	})
+	it('C4 keeps identical request text distinct and joins retained arrivals with observation off and on', async () => {
+		for (const observe of [false, true]) {
+			const trial = await runMemoryTrial({
+				arm: 'records',
+				responses: [],
+				settings: { observe },
+				goals: STUDY_MEMORY_IDENTITY_GOALS,
+			})
+			expect(trial.failure).toBeUndefined()
+			const rows = trial.evidence.filter((row) => row.event === 'selection').map((row) => row.value)
+			expect(rows).toHaveLength(2)
+			if (!isStudyMemoryReceipt(rows[0]) || !isStudyMemoryReceipt(rows[1]))
+				throw new Error('Missing actual selection rows')
+			expect(rows[0].request).not.toBe(rows[1].request)
+			const first = rows[0].request
+			const arrivals = readMemoryEvents(trial.evidence, 'arrival')
+			for (const row of rows) {
+				if (!isStudyMemoryReceipt(row)) throw new Error('Malformed selection row')
+				const tail = row.receipt.selections.flatMap((selection) => selection.tail)
+				expect(row.arrivals).toEqual(
+					arrivals.filter((arrival) => tail.includes(String(arrival.message))),
+				)
+				expect(row.arrivals.some((arrival) => arrival.message === first)).toBe(false)
+			}
+			expect(rows[0].arrivals.map((arrival) => arrival.id)).toEqual(['a'])
+			expect(rows[1].arrivals.map((arrival) => arrival.id)).toEqual(['a'])
+		}
+	})
+	it('C6 records every resolved pass before later validation and copies stops without inference', async () => {
+		const trial = await runMemoryTrial({
+			arm: 'records',
+			responses: [],
+			goals: [{ id: 'resolved', input: { prompt: 'Respond', arrivals: [], records: [] } }],
+		})
+		expect(trial.failure).toBeUndefined()
+		const rows = trial.evidence.filter((row) => row.event === 'selection')
+		expect(rows.length).toBeGreaterThan(0)
+		expect(rows.every((row) => isStudyMemoryReceipt(row.value))).toBe(true)
+		expect(rows.map((row) => row.value)).toEqual([
+			expect.objectContaining({ pass: 0, role: 'agent' }),
+		])
+		expect(rows[0]?.value).not.toHaveProperty('stop')
+		expect(Object.keys(rows[0]?.value ?? {}).sort()).toEqual(STUDY_MEMORY_EVENT_KEYS.selection)
+		const fixture = buildMemorySelectionResult()
+		const fallback = buildStudyMemoryReceipts(await runMemoryFallback(), [], { sections: [] })
+		expect(fallback).toHaveLength(1)
+		expect(fallback[0]?.receipt.selections[0]?.plan, 'C6 fallback plan is absent').toBeUndefined()
+		const stopped = buildStudyMemoryReceipts(
+			{ ...fixture, passes: [{ ...fixture.passes[0], stop: { layer: 'model', id: 'model' } }] },
+			[],
+			{ sections: [] },
+		)
+		expect(stopped[0]?.stop, 'C6 stop is copied').toEqual({ layer: 'model', id: 'model' })
+		expect(
+			buildStudyMemoryReceipts({ ...fixture, partial: true }, [], { sections: [] })[0]?.stop,
+			'C6 partial infers no stop',
+		).toBeUndefined()
+	})
+
+	it('C6 rejects a failed respond without fabricating selection evidence', async () => {
+		const trial = await runMemoryTrial({
+			arm: 'records',
+			responses: [{ path: '/api/chat', status: 500, body: 'Provider failed' }],
+			goals: [{ id: 'rejected', input: { prompt: 'Respond', arrivals: [], records: [] } }],
+		})
+		expect(trial.failure).toBeDefined()
+		expect(trial.products).toEqual([])
+		expect(trial.evidence.some((row) => row.event === 'failure')).toBe(true)
+		expect(trial.evidence.filter((row) => row.event === 'selection')).toEqual([])
+	})
+
+	it('C7 bounds the complete 96-goal endurance selection envelopes', async () => {
+		const server = await createMemoryServer()
+		const profile = buildMemoryEnduranceProfile(server.url)
+		const fixture = createMemoryContext(profile)
+		try {
+			const declaration = await loadMemoryInputs(profile, 'endurance')
+			const goals = declaration.scenarios.flatMap((scenario) => scenario.goals)
+			expect(goals).toHaveLength(96)
+			expect(goals[0]?.id).toBe('ev-01-1')
+			expect(goals.at(-1)?.id).toBe('ev-24-4')
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				{ id: 'complete', scenario: 'endurance', arm: 'records', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				for (const goal of goals) await session.execute(goal, fixture.context)
+				const rows = fixture.evidence.filter((row) => row.event === 'selection')
+				expect(rows).toHaveLength(96)
+				expect(new Set(rows.map((row) => row.goal))).toEqual(new Set(goals.map((goal) => goal.id)))
+				expect(rows.every((row) => isStudyMemoryReceipt(row.value))).toBe(true)
+				expect(rows[0]?.value).toEqual(
+					expect.objectContaining({
+						arrivals: expect.arrayContaining([expect.objectContaining({ id: 'endurance-desk' })]),
+					}),
+				)
+				expect(rows.at(-1)?.value).toEqual(expect.objectContaining({ request: expect.any(String) }))
+				const bytes = rows.map(
+					(row) => new TextEncoder().encode(`${JSON.stringify(row)}\n`).byteLength,
+				)
+				expect(Math.max(...bytes)).toBeLessThanOrEqual(262144)
+				expect(bytes.reduce((total, size) => total + size, 0)).toBeLessThanOrEqual(50331648)
+				process.stdout.write(
+					`C7 workload bytes ${JSON.stringify({ goals: goals.length, rows: rows.length, largest: Math.max(...bytes), total: bytes.reduce((total, size) => total + size, 0) })}\n`,
+				)
+			} finally {
+				await session.close()
+			}
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	}, 300000)
 	it('releases and replaces snapshots while preserving earlier wire receipts and fresh trial isolation', async () => {
 		const server = await createMemoryServer(
 			Array.from({ length: 5 }, () => [
@@ -863,6 +1011,10 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				),
 			).rejects.toBeDefined()
 			expect(server.requests.filter((request) => request.path === '/api/generate')).toHaveLength(1)
+			expect(
+				fixture.evidence.filter((row) => row.event === 'selection'),
+				'C6 rejected respond fabricates no fallback row',
+			).toEqual([])
 			const requests = server.requests.length
 			await expect(
 				session.execute(
@@ -1281,50 +1433,9 @@ describe('summary admission under the Compaction gauge', () => {
 })
 
 describe('passive observation of actual memory requests', () => {
-	const goals = STUDY_MEMORY_OBSERVATION_GOALS
-	const base: MemoryTrialFixture = {
-		arm: 'full',
-		responses: buildMemoryObservationResponses(STUDY_MEMORY_TIMING),
-		goals,
-	}
-
-	it.each([
-		{
-			name: 'Full',
-			trial: base,
-			settings: undefined,
-			observed: STUDY_MEMORY_OBSERVED_SETTINGS,
-			changed: buildMemoryObservationGoals('Look up order-2'),
-			products: ['Initial handoff', 'Corrected handoff', 'Closed handoff'],
-			chats: 4,
-			tools: 1,
-		},
-		{
-			name: 'Compaction',
-			trial: { ...base, arm: 'compaction' as const },
-			settings: STUDY_MEMORY_FIXED_SETTINGS,
-			observed: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
-			changed: buildMemoryObservationGoals('Look up order-2'),
-			products: ['Initial handoff', 'Corrected handoff', 'Closed handoff'],
-			chats: 4,
-			tools: 1,
-		},
-		{
-			name: 'fold',
-			trial: {
-				arm: 'compaction' as const,
-				responses: [],
-				goals: buildMemoryFoldGoals(),
-				room: STUDY_MEMORY_SUMMARY_ROOM,
-			},
-			settings: STUDY_MEMORY_SETTINGS,
-			observed: { ...STUDY_MEMORY_SETTINGS, observe: true },
-			changed: buildMemoryFoldGoals('Maintain this other detail. '),
-			products: ['Receipt retained.'],
-			chats: 2,
-			tools: 0,
-		},
-	])(
+	const base = STUDY_MEMORY_PASSIVITY_BASE
+	const goals = base.goals
+	it.each(STUDY_MEMORY_PASSIVITY_CASES)(
 		'keeps the $name trajectory identical with observation off and on, and fails on a changed byte',
 		async ({ trial, settings, observed, changed, products, chats, tools }) => {
 			const off = await runMemoryTrial({
@@ -1354,6 +1465,12 @@ describe('passive observation of actual memory requests', () => {
 			expect(moved.requests.map((request) => request.body)).not.toEqual(
 				off.requests.map((request) => request.body),
 			)
+			if (trial.arm === 'records')
+				process.stdout.write(
+					`C7 transcript bytes ${createHash('sha256')
+						.update(JSON.stringify(readMemoryAdmission(off)))
+						.digest('hex')}\n`,
+				)
 			// Absent and false observation settings leave every existing event at its unobserved keys.
 			for (const result of [off, control]) {
 				for (const event of ['dispatch', 'wire'] as const) {

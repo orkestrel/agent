@@ -2,6 +2,10 @@
 export const STUDY_MEMORY_TEXT = 16384
 /** Bounds arrivals and reference records in one public goal. */
 export const STUDY_MEMORY_ENTRIES = 64
+/** Bounds one compact UTF-8 selection envelope including its newline. */
+export const STUDY_MEMORY_ROW_BYTES = 262144
+/** Bounds added selection envelopes over the declared 96-goal workload. */
+export const STUDY_MEMORY_WORKLOAD_BYTES = 50331648
 /** Pins the prospective desk instructions independently of held-out labels. */
 export const STUDY_MEMORY_SYSTEM =
 	'You operate a support desk. Preserve source attribution, corrections, obligations and handoffs. Use lookup when reference records are needed. Answer the current request from the available conversation and references.'

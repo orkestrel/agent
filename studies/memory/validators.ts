@@ -7,8 +7,27 @@ import type {
 	StudyMemoryOptions,
 	StudyMemoryProvider,
 	StudyMemoryRuntime,
+	StudyMemoryReceipt,
+	StudyMemoryResult,
+	StudyMemoryDeclaration,
 } from './types.js'
-import { holds, isArray, isBoolean, isFiniteNumber, isObject, isRecord } from '@orkestrel/contract'
+import type { AgentStop, LedgerReceipt } from '@orkestrel/agent'
+import {
+	holds,
+	isArray,
+	isBoolean,
+	isFiniteNumber,
+	isObject,
+	isRecord,
+	objectOf,
+	recordOf,
+	arrayOf,
+	isString,
+	isNumber,
+	isNonNegativeInteger,
+	optionalOf,
+} from '@orkestrel/contract'
+import { isTokenUsage } from '@orkestrel/budget'
 import { isStudyAgentRuntime } from '@orkestrel/study'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
@@ -155,6 +174,180 @@ export function isStudyMemoryAssertion(value: unknown): value is StudyMemoryAsse
 		return (
 			(value.observation === 'arrival' || value.observation === 'lookup') &&
 			typeof value.id === 'string'
+		)
+	})
+}
+
+/** Checks the foreign stop members without inferring a stop from partial state. @param value - A stop reading. @returns True if the published stop contract holds; false otherwise. */
+export function isStudyMemoryStop(value: unknown): value is AgentStop {
+	return holds(
+		() =>
+			objectOf({
+				layer: (layer) => layer === 'model' || layer === 'meter' || layer === 'budget',
+				id: isString,
+				estimate: optionalOf(isNumber),
+				usage: optionalOf(isTokenUsage),
+			})(value) &&
+			(value.layer === 'model' || objectOf({ max: isNumber, consumed: isNumber })(value)),
+	)
+}
+
+/** Checks the foreign ledger adoption and gauge evidence. @param value - A pass receipt. @returns True if every dereferenced receipt member holds; false otherwise. */
+export function isStudyMemoryPass(value: unknown): value is LedgerReceipt {
+	return objectOf({
+		selections: arrayOf(
+			objectOf({
+				turn: optionalOf(isNumber),
+				tail: arrayOf(isString),
+				prior: arrayOf(isString),
+				plan: optionalOf(
+					objectOf({
+						owners: arrayOf(isString),
+						filed: arrayOf(isString),
+						rendered: arrayOf(isString),
+						omitted: arrayOf(isString),
+						trims: isNumber,
+						sentences: arrayOf(objectOf({ source: isString, sentence: isNumber })),
+						withdrawn: arrayOf(objectOf({ earlier: isString, later: isString })),
+					}),
+				),
+				sources: arrayOf(
+					objectOf({
+						source: isString,
+						carriage: (carriage) =>
+							carriage === undefined ||
+							carriage === 'verbatim' ||
+							carriage === 'record' ||
+							carriage === 'recap' ||
+							carriage === 'absent',
+					}),
+				),
+			}),
+		),
+		calls: arrayOf(
+			objectOf({
+				selection: optionalOf(isNumber),
+				estimate: isNumber,
+				tools: isNumber,
+				prompt: optionalOf(isNumber),
+				completion: optionalOf(isNumber),
+				thinking: optionalOf(isNumber),
+			}),
+		),
+	})(value)
+}
+
+/** Checks the owned foreign result members the consumer dereferences and narrows nothing. @remarks Foreign members retain their published types and admit unknown members; the consumer-owned receipt validates its joins and bounds separately. @param value - A resolved result. @returns True if request, passes and receipts align; false otherwise. */
+export function isStudyMemoryResult(value: unknown): value is StudyMemoryResult {
+	return holds(
+		() =>
+			objectOf({
+				request: isString,
+				receipts: arrayOf(isStudyMemoryPass),
+				passes: arrayOf(objectOf({ stop: optionalOf(isStudyMemoryStop) })),
+			})(value) && value.receipts.length === value.passes.length,
+	)
+}
+
+/** Checks an independent goal's required-source declaration. @param value - A declaration before classification. @returns True if its source identities and product reading are shaped; false otherwise. */
+export function isStudyMemoryDeclaration(value: unknown): value is StudyMemoryDeclaration {
+	return recordOf(
+		{
+			goal: isString,
+			sources: arrayOf(
+				recordOf(
+					{
+						source: isString,
+						owner: optionalOf(isString),
+						sentences: arrayOf(isNonNegativeInteger),
+					},
+					['owner'],
+				),
+			),
+			product: optionalOf(isBoolean),
+		},
+		['product'],
+	)(value)
+}
+
+/** Checks a selection evidence value and its exact tail joins. @param value - An evidence value. @returns True if the row is well formed and its dictionaries agree with its tails; false otherwise. */
+export function isStudyMemoryReceipt(value: unknown): value is StudyMemoryReceipt {
+	return holds(() => {
+		if (
+			!recordOf(
+				{
+					request: isString,
+					pass: isNonNegativeInteger,
+					role: (role) => role === 'agent',
+					receipt: isStudyMemoryPass,
+					arrivals: arrayOf(recordOf({ id: isString, message: isString })),
+					recaps: arrayOf(isString),
+					stop: optionalOf(isStudyMemoryStop),
+				},
+				['stop'],
+			)(value)
+		)
+			return false
+		const tail = new Set(value.receipt.selections.flatMap((selection) => selection.tail))
+		const prior = new Set(value.receipt.selections.flatMap((selection) => selection.prior))
+		return (
+			Object.keys(value.receipt).every((key) => ['selections', 'calls'].includes(key)) &&
+			value.receipt.selections.every(
+				(selection) =>
+					Object.keys(selection).every((key) =>
+						['turn', 'tail', 'prior', 'plan', 'sources'].includes(key),
+					) &&
+					selection.prior.every((id) => selection.tail.includes(id) && id !== value.request) &&
+					selection.sources.every((source) =>
+						Object.keys(source).every((key) => ['source', 'carriage'].includes(key)),
+					) &&
+					(selection.plan === undefined ||
+						(Object.keys(selection.plan).every((key) =>
+							[
+								'owners',
+								'filed',
+								'rendered',
+								'sentences',
+								'omitted',
+								'trims',
+								'withdrawn',
+							].includes(key),
+						) &&
+							selection.plan.sentences.every((sentence) =>
+								Object.keys(sentence).every((key) => ['source', 'sentence'].includes(key)),
+							) &&
+							selection.plan.withdrawn.every((pair) =>
+								Object.keys(pair).every((key) => ['earlier', 'later'].includes(key)),
+							))),
+			) &&
+			(value.stop === undefined ||
+				(Object.keys(value.stop).every((key) =>
+					['layer', 'id', 'max', 'consumed', 'estimate', 'usage'].includes(key),
+				) &&
+					(value.stop.usage === undefined ||
+						Object.keys(value.stop.usage).every((key) =>
+							['prompt', 'completion', 'total'].includes(key),
+						)))) &&
+			new Set(value.arrivals.map((arrival) => arrival.id)).size === value.arrivals.length &&
+			new Set(value.arrivals.map((arrival) => arrival.message)).size === value.arrivals.length &&
+			new Set(value.recaps).size === value.recaps.length &&
+			value.arrivals.every(
+				(arrival) =>
+					tail.has(arrival.message) &&
+					arrival.message !== value.request &&
+					!prior.has(arrival.message),
+			) &&
+			value.recaps.every((id) => tail.has(id)) &&
+			value.receipt.calls.every(
+				(call) =>
+					(call.selection === undefined || call.selection < value.receipt.selections.length) &&
+					Object.keys(call).every((key) =>
+						['selection', 'estimate', 'tools', 'prompt', 'completion', 'thinking'].includes(key),
+					) &&
+					[call.estimate, call.tools, call.prompt, call.completion, call.thinking].every(
+						(reading) => reading === undefined || isFiniteNumber(reading),
+					),
+			)
 		)
 	})
 }
