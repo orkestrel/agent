@@ -1443,7 +1443,9 @@ describe('checkLedgerProjection', () => {
 			'owner:BW-20931',
 			'rules',
 		])
-		expect(clean.stale).toEqual([{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] }])
+		expect(clean.stale).toEqual([
+			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
+		])
 		expect(checkLedgerProjection(clean, input)).toEqual([])
 	})
 
@@ -1572,7 +1574,9 @@ describe('checkLedgerProjection', () => {
 			},
 		})
 		const built = buildRecords(supersessions)
-		expect(built.stale).toEqual([{ source: 'user-01', sentence: 1, tokens: ['MX-4471'] }])
+		expect(built.stale).toEqual([
+			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
+		])
 		expect(checkLedgerProjection(built, supersessions)).toEqual([])
 		expect(
 			checkLedgerProjection({ ...built, stale: [] }, supersessions).some((fault) =>
