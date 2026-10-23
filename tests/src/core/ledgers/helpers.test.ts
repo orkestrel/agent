@@ -12,6 +12,7 @@ import {
 	buildRecallMessage,
 	buildLedgerSources,
 	collectProjectionIds,
+	collectLedgerWork,
 	extractWords,
 	renderCauseChain,
 	renderTopicNames,
@@ -38,6 +39,7 @@ import {
 	placeMember,
 	renderLedgerPinned,
 	renderLedgerRecord,
+	renderLedgerWork,
 	renderLookupCall,
 	renderStub,
 	selectRecords,
@@ -45,7 +47,7 @@ import {
 	splitSentences,
 	splitTopic,
 } from '../../../../src/core/ledgers/helpers.js'
-import { captureError } from '@orkestrel/test'
+import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildGaugeCall,
@@ -67,8 +69,29 @@ import {
 	LEDGER_LEXICAL_RANKS,
 	LEDGER_LEXICAL_ENTRIES,
 	LEDGER_CUT_MATCHES,
+	LEDGER_WORK_FIXTURE,
 	replaceLedgerRecord,
 } from '../../../setup.js'
+
+describe('earlier work', () => {
+	it('R2 collects final answer replies and skips call-only blank and reply-less requests', () => {
+		const fixture = LEDGER_WORK_FIXTURE
+		const pairs = collectLedgerWork(fixture.history, new Set(fixture.requests))
+		expect(pairs.map((work) => [work.request.id, work.reply.id])).toEqual([
+			['first', 'final'],
+			['third', 'partial'],
+		])
+		expect(pairs[0]?.request).toBe(fixture.history.find((message) => message.id === 'first'))
+		expect(pairs[0]?.reply).toBe(fixture.history.find((message) => message.id === 'final'))
+		expect(collectLedgerWork([], new Set(fixture.requests))).toEqual([])
+		expect(collectLedgerWork(fixture.history, new Set())).toEqual([])
+	})
+	it('R2 renders the work name and exact reply whitespace', () => {
+		const fixture = LEDGER_WORK_FIXTURE
+		const partial = requireValue(collectLedgerWork(fixture.history, new Set(fixture.requests))[1])
+		expect(renderLedgerWork('W-2', partial)).toBe('[W-2]   Partial draft.\r\n')
+	})
+})
 
 describe('lexical scoring', () => {
 	it('L-5 cuts ranked whole entries with a neutral recognized suffix', () => {

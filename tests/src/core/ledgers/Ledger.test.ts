@@ -28,6 +28,9 @@ import {
 	buildDeliverySeed,
 	observeLedgerTail,
 	LEDGER_TAIL_FIXTURE,
+	observeLedgerWork,
+	LEDGER_WORK_FIXTURE,
+	serializeLedgerRequests,
 	buildLedgerOptions,
 	observeLedgerRecall,
 	buildLedgerResponse,
@@ -69,6 +72,156 @@ import {
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it('R2 carries every matched earlier draft in order and cuts the oldest work first', async () => {
+		const fixture = LEDGER_WORK_FIXTURE
+		const observations = []
+		for (const capacity of [4096, 300]) {
+			const provider = createScriptedProvider(fixture.collection, { recorded: true, repeat: false })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					capacity,
+					work: true,
+					name: (request) => request.content,
+					lookups: [],
+					share: { prompt: 1, tail: 0.001 },
+				}),
+			)
+			const results: LedgerResult[] = []
+			for (const goal of fixture.goals) results.push(await ledger.respond(goal))
+			observations.push({ calls: provider.calls, results })
+		}
+		const full = requireValue(observations[0]?.calls[2]?.messages[0]).content
+		expect(full).toContain('[W-1] An older draft requires another review.')
+		expect(full).toContain('[W-2] A later short draft.')
+		expect(full.indexOf('[W-1]')).toBeLessThan(full.indexOf('[W-2]'))
+		const cut = requireValue(observations[1]?.calls[2]?.messages[0]).content
+		expect(cut).not.toContain('[W-1]')
+		expect(cut).toContain('[W-2] A later short draft.')
+		expect(observations[1]?.results[2]?.receipts[0]?.selections[0]?.plan?.trims).toBe(1)
+	})
+	it('R2 carries a named wrong reply exactly as agent-authored work without changing any judge request', async () => {
+		const fixture = LEDGER_WORK_FIXTURE
+		const baseline = await observeLedgerWork()
+		const enabled = await observeLedgerWork({ work: true })
+		const system = requireValue(enabled.calls[1]?.messages[0]).content
+		expect(system).toContain(
+			'## Earlier work\nYour own earlier replies, named as the request names them.',
+		)
+		expect(system).toContain('A reply is your draft, not evidence that an action happened.')
+		expect(system.endsWith(`[W-1] ${fixture.reply}`)).toBe(true)
+		expect(enabled.results[0]?.content).toBe(fixture.reply)
+		expect(enabled.calls[1]?.messages.at(-1)?.content).toBe(fixture.reference)
+		expect(serializeLedgerRequests(enabled.ledger, enabled.calls.slice(0, 1), [])).toBe(
+			serializeLedgerRequests(baseline.ledger, baseline.calls.slice(0, 1), []),
+		)
+		const reply = requireValue(
+			enabled.ledger.conversation.messages().find((message) => message.content === fixture.reply),
+		)
+		const selection = requireValue(enabled.results[1]?.receipts[0]?.selections[0])
+		expect(selection.plan?.filed).not.toContain(reply.id)
+		expect(selection.plan?.rendered).not.toContain(reply.id)
+		expect(selection.plan?.sentences.some((sentence) => sentence.source === reply.id)).toBe(false)
+		expect(selection.sources.some((source) => source.source === reply.id)).toBe(false)
+		expect(selection.prior).toEqual([])
+		expect(selection.plan?.owners).toEqual([])
+		expect(enabled.judges.length).toBeGreaterThan(0)
+		expect(serializeLedgerRequests(enabled.ledger, [], enabled.judges)).toBe(
+			serializeLedgerRequests(baseline.ledger, [], baseline.judges),
+		)
+	})
+	it('R2 preserves unrelated and adjacent-token requests and names nothing without a handler', async () => {
+		for (const goal of LEDGER_WORK_FIXTURE.negatives) {
+			const baseline = await observeLedgerWork({}, goal)
+			const enabled = await observeLedgerWork({ work: true }, goal)
+			expect(enabled.transcript).toBe(baseline.transcript)
+		}
+		const unnamed = await observeLedgerWork({ work: true }, undefined, undefined, false)
+		expect(unnamed.transcript).toBe((await observeLedgerWork()).transcript)
+		const disabled = await observeLedgerWork({
+			work: false,
+			name: () => {
+				throw new Error('off handler ran')
+			},
+		})
+		expect(disabled.transcript).toBe((await observeLedgerWork()).transcript)
+	})
+	it('R2 cuts work before factual briefing content and records the cut without source authority', async () => {
+		const fixture = LEDGER_WORK_FIXTURE
+		const baseline = await observeLedgerWork({ capacity: 300 }, fixture.reference, fixture.pressure)
+		const enabled = await observeLedgerWork(
+			{ capacity: 300, work: true },
+			fixture.reference,
+			fixture.pressure,
+		)
+		expect(enabled.calls[1]?.messages[0]?.content).toContain(fixture.rule)
+		expect(enabled.calls[1]?.messages[0]?.content).not.toContain('## Earlier work')
+		expect(enabled.transcript).toBe(baseline.transcript)
+		const receipt = requireValue(enabled.results[1]?.receipts[0]?.selections[0]?.plan)
+		expect(receipt.trims).toBe(1)
+		expect(receipt.omitted).toEqual([])
+		expect(baseline.results[1]?.receipts[0]?.selections[0]?.plan?.trims).toBe(0)
+	})
+	it('R2 leaves an earlier reply in the recent tail without duplicating its work section', async () => {
+		const observed = await observeLedgerWork({
+			work: true,
+			recent: true,
+			share: { prompt: 1, tail: 0.9 },
+		})
+		const messages = requireValue(observed.calls[1]).messages
+		expect(messages[0]?.content).not.toContain('## Earlier work')
+		expect(
+			messages.filter((message) => message.content === LEDGER_WORK_FIXTURE.reply),
+		).toHaveLength(1)
+		expect(observed.results[1]?.receipts[0]?.selections[0]?.prior).toEqual([
+			observed.results[0]?.request,
+		])
+	})
+	it('R2 carries the final answer-pass reply rather than an intermediate assistant turn', async () => {
+		const fixture = LEDGER_WORK_FIXTURE
+		const observed = await observeLedgerWork({ work: true }, fixture.reference, fixture.answer)
+		expect(observed.results[0]?.passes).toHaveLength(2)
+		expect(observed.calls[2]?.messages[0]?.content).toContain('[W-1] Final answer-pass draft.')
+	})
+	it('R2 carries an aborted partial draft unchanged and never files its reply', async () => {
+		const fixture = LEDGER_WORK_FIXTURE
+		const provider = createScriptedProvider(fixture.turns, { recorded: true, repeat: false })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				work: true,
+				name: () => fixture.name,
+				lookups: [],
+			}),
+		)
+		const controller = new AbortController()
+		ledger.agent.emitter.once('usage', () => controller.abort())
+		const first = await ledger.respond(fixture.request, controller.signal)
+		expect(first.partial).toBe(true)
+		expect(first.content).toBe(fixture.reply)
+		const second = await ledger.respond(fixture.reference)
+		expect(provider.calls[1]?.messages[0]?.content).toContain(`[W-1] ${fixture.reply}`)
+		const reply = requireValue(
+			ledger.conversation
+				.messages()
+				.find((message) => message.role === 'assistant' && message.content === first.content),
+		)
+		expect(second.receipts[0]?.selections[0]?.plan?.filed).not.toContain(reply.id)
+	})
+	it('R2 omitted and false switches preserve every request with acting construction handlers', async () => {
+		const omitted = await observeLedgerWork({}, undefined, undefined, false)
+		const handled = await observeLedgerWork()
+		const disabled = await observeLedgerWork({
+			work: false,
+			recent: false,
+			pins: () => true,
+			name: () => LEDGER_WORK_FIXTURE.name,
+		})
+		expect(omitted.calls).toHaveLength(2)
+		expect(omitted.judges.length).toBeGreaterThan(0)
+		expect(handled.transcript).toBe(omitted.transcript)
+		expect(disabled.transcript).toBe(omitted.transcript)
+	})
 	it('R1 omitted and false switches preserve every request with an acting pin handler', async () => {
 		const omitted = await observeLedgerTail()
 		const handled = await observeLedgerTail({ pins: () => true })
@@ -892,7 +1045,15 @@ describe('Ledger', () => {
 						},
 					},
 					think: true,
-					...(iteration === 1 ? { lexical: false, recent: false, pins: () => true } : {}),
+					...(iteration === 1
+						? {
+								lexical: false,
+								recent: false,
+								pins: () => true,
+								work: false,
+								name: () => 'BW-20931',
+							}
+						: {}),
 					share: { prompt: 0.8, tail: 0.06 },
 				}),
 			)

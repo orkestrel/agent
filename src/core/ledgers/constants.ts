@@ -100,6 +100,13 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 		'recall is closed for the rest of this request; give your final answer from what you have',
 })
 
+/** Heads the briefing section carrying the agent's named earlier replies. */
+export const LEDGER_WORK_HEADING = '## Earlier work'
+
+/** Labels earlier replies as the agent's drafts rather than evidence of an action. */
+export const LEDGER_WORK_NOTE =
+	'Your own earlier replies, named as the request names them. A reply is your draft, not evidence that an action happened.'
+
 /**
  * Supplies the default prompt and tail shares.
  */

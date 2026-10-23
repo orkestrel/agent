@@ -47,6 +47,8 @@ import {
 	LEDGER_OWNER_PREFIX,
 	LEDGER_RULES_KEY,
 	LEDGER_SCALE_DRIFT,
+	LEDGER_WORK_HEADING,
+	LEDGER_WORK_NOTE,
 } from './constants.js'
 import { isLedgerError, LedgerError } from './errors.js'
 import {
@@ -54,6 +56,7 @@ import {
 	buildLedgerSources,
 	buildRecallMessage,
 	collectProjectionIds,
+	collectLedgerWork,
 	computeLedgerCorpus,
 	computeLedgerScore,
 	countLedgerWords,
@@ -74,6 +77,7 @@ import {
 	matchesCutLine,
 	renderLedgerPinned,
 	renderLedgerRecord,
+	renderLedgerWork,
 	renderLookupCall,
 	renderStub,
 	selectRecords,
@@ -661,6 +665,7 @@ export class Ledger implements LedgerInterface {
 		const tail = this.#selectTail(request, total * this.#share.tail, input)
 		const cap = total - this.#price(stripThinking(tail, this.#replay))
 		const tailIds = new Set(tail.map((message) => message.id))
+		const work = this.#selectWork(request, tailIds, input)
 		const scoped = records.some((record) => record.key !== LEDGER_RULES_KEY)
 		const held = new Set([
 			...projection.records
@@ -763,6 +768,7 @@ export class Ledger implements LedgerInterface {
 		)
 		const rules = records.find((record) => record.key === LEDGER_RULES_KEY)
 		const steps = [
+			...Array.from(work.keys(), (source) => ({ key: undefined, source })),
 			...cuts
 				.filter((unit) => unit.group === 4)
 				.map((unit) => ({ key: undefined, source: unit.source })),
@@ -788,8 +794,9 @@ export class Ledger implements LedgerInterface {
 			steps,
 			records,
 			mapped,
-			new Set(ordered.map((unit) => unit.source)),
+			new Set([...ordered.map((unit) => unit.source), ...work.keys()]),
 			cap,
+			work,
 		)
 		const briefing = trimmed.briefing
 		const before = [
@@ -862,6 +869,7 @@ export class Ledger implements LedgerInterface {
 		mapped: ReadonlyArray<{ readonly source: string; readonly record: LedgerRecord }>,
 		included: ReadonlySet<string>,
 		cap: number,
+		work: ReadonlyMap<string, string>,
 	): {
 		readonly briefing: string
 		readonly records: readonly LedgerRecord[]
@@ -876,7 +884,7 @@ export class Ledger implements LedgerInterface {
 		}>(
 			(cut, step) => {
 				if (cut.briefing !== undefined) return cut
-				const briefing = this.#render(cut.records, mapped, cut.included)
+				const briefing = this.#render(cut.records, mapped, cut.included, work)
 				const content = [this.#options.system, briefing].filter((part) => part !== '').join('\n\n')
 				if (this.#price([{ id: 'system', role: 'system', content }]) <= cap)
 					return { ...cut, briefing }
@@ -895,7 +903,7 @@ export class Ledger implements LedgerInterface {
 			records: trimmed.records,
 			included: trimmed.included,
 			trims: trimmed.trims,
-			briefing: trimmed.briefing ?? this.#render(trimmed.records, mapped, trimmed.included),
+			briefing: trimmed.briefing ?? this.#render(trimmed.records, mapped, trimmed.included, work),
 		}
 	}
 
@@ -939,6 +947,7 @@ export class Ledger implements LedgerInterface {
 		records: readonly LedgerRecord[],
 		mapped: ReadonlyArray<{ readonly source: string; readonly record: LedgerRecord }>,
 		included: ReadonlySet<string>,
+		work: ReadonlyMap<string, string>,
 	): string {
 		const owners = records
 			.filter((record) => record.key !== LEDGER_RULES_KEY && record.lines.length > 0)
@@ -970,6 +979,7 @@ export class Ledger implements LedgerInterface {
 		const record = records.find(
 			(candidate) => candidate.key === LEDGER_RULES_KEY && candidate.lines.length > 0,
 		)
+		const replies = [...work].filter(([source]) => included.has(source)).map(([, text]) => text)
 		return [
 			body === '' ? '' : `## Pinned\n${body}`,
 			record === undefined
@@ -977,9 +987,32 @@ export class Ledger implements LedgerInterface {
 					? ''
 					: ['## Rules', ...rules].join('\n')
 				: [renderLedgerRecord(record), ...rules].join('\n'),
+			replies.length === 0 ? '' : [LEDGER_WORK_HEADING, LEDGER_WORK_NOTE, ...replies].join('\n'),
 		]
 			.filter((text) => text !== '')
 			.join('\n\n')
+	}
+
+	#selectWork(
+		request: Message,
+		tail: ReadonlySet<string>,
+		input: LedgerProjectionInput,
+	): ReadonlyMap<string, string> {
+		if (!this.#options.work || this.#options.name === undefined) return new Map()
+		const ids = extractTokens(request.content).ids
+		const earlier = input.messages.slice(
+			0,
+			input.messages.findIndex((message) => message.id === request.id),
+		)
+		return new Map(
+			collectLedgerWork(earlier, this.#requests).flatMap((work) => {
+				if (tail.has(work.request.id) || tail.has(work.reply.id)) return []
+				const name = this.#options.name?.(work.request)
+				return name === undefined || ![...extractTokens(name).ids].some((id) => ids.has(id))
+					? []
+					: [[work.request.id, renderLedgerWork(name, work)]]
+			}),
+		)
 	}
 
 	#selectTail(request: Message, cap: number, input: LedgerProjectionInput): readonly Message[] {

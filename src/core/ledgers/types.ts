@@ -240,6 +240,23 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
  */
 export type LedgerPinHandler = (message: Message) => boolean
 
+/** Pairs an earlier request with its last nonempty call-free assistant reply before the next request. */
+export interface LedgerWork {
+	readonly request: Message
+	readonly reply: Message
+}
+
+/**
+ * Names an earlier request for matching against the current request's id tokens.
+ * @param request - An earlier request message with an eligible reply
+ * @returns The work name, or undefined to leave the request unnamed
+ * @example
+ * ```ts
+ * const name: LedgerNameHandler = (request) => names.get(request.id)
+ * ```
+ */
+export type LedgerNameHandler = (request: Message) => string | undefined
+
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
  * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall,
@@ -299,6 +316,15 @@ export interface LedgerOptions {
 	readonly recent?: boolean
 	/** Holds a history message's exchange while `recent` is true; omission holds no exchange. */
 	readonly pins?: LedgerPinHandler
+	/**
+	 * Selects named earlier replies for the briefing. If `true`, carries replies outside the tail
+	 * whose `name` shares an id token with this request, labelled as the agent's own drafts and cut
+	 * before other briefing content; if `false`, leaves earlier replies out of the briefing.
+	 * Replies remain chatter and never become sources. Default: false.
+	 */
+	readonly work?: boolean
+	/** Names earlier requests while `work` is true; omission names no request. */
+	readonly name?: LedgerNameHandler
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly agent?: LedgerAgentOptions

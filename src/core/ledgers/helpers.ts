@@ -19,11 +19,12 @@ import type {
 	LedgerTokenSet,
 	LedgerTopic,
 	LedgerWordSet,
+	LedgerWork,
 } from './types.js'
 import type { ToolCall } from '@orkestrel/tool'
 import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { renderJSON } from '../helpers.js'
+import { hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 import {
 	LEDGER_BM25_B,
@@ -34,6 +35,51 @@ import {
 	PLACED_CATEGORIES,
 } from './constants.js'
 import { LedgerError } from './errors.js'
+
+/**
+ * Collects each request's last nonempty call-free assistant reply before the next request.
+ * @param messages - The history in conversation order
+ * @param requests - The identities of requests entered through the ledger
+ * @returns The request and reply pairs in conversation order, skipping requests without a reply
+ * @example
+ * ```ts
+ * collectLedgerWork([
+ * 	{ id: 'request', role: 'user', content: 'Draft the review.' },
+ * 	{ id: 'reply', role: 'assistant', content: 'Review draft.' },
+ * ], new Set(['request'])) // [{ request: ..., reply: ... }]
+ * ```
+ */
+export function collectLedgerWork(
+	messages: readonly Message[],
+	requests: ReadonlySet<string>,
+): readonly LedgerWork[] {
+	return messages.flatMap((request, position) => {
+		if (!requests.has(request.id)) return []
+		const following = messages.slice(position + 1)
+		const next = following.findIndex((message) => requests.has(message.id))
+		const reply = following
+			.slice(0, next < 0 ? following.length : next)
+			.findLast(
+				(message) =>
+					message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== '',
+			)
+		return reply === undefined ? [] : [{ request, reply }]
+	})
+}
+
+/**
+ * Renders one named earlier reply without changing its content.
+ * @param name - The consumer's work name
+ * @param work - The earlier request and reply
+ * @returns The name in brackets followed by the exact reply content
+ * @example
+ * ```ts
+ * renderLedgerWork('W-1', work) // '[W-1] Review draft.'
+ * ```
+ */
+export function renderLedgerWork(name: string, work: LedgerWork): string {
+	return `[${name}] ${work.reply.content}`
+}
 
 /**
  * Builds source carriage from emitted messages and established composition facts.

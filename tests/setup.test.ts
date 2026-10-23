@@ -1,6 +1,9 @@
 import {
 	buildLedgerTailScenario,
 	observeLedgerTail,
+	observeLedgerWork,
+	serializeLedgerRequests,
+	LEDGER_WORK_FIXTURE,
 	MEASURE_CALLS,
 	MEASURE_CIRCULAR,
 	MESSAGE_MEASURE_CASES,
@@ -193,6 +196,20 @@ import { rawShape, stringShape } from '@orkestrel/contract'
 const messages: readonly Message[] = [{ id: 'm1', role: 'user', content: 'go' }]
 
 describe('agent scenario infrastructure', () => {
+	it('records the named-work fixture and preserves every non-identity request byte', async () => {
+		const observed = await observeLedgerWork()
+		expect(observed.results).toHaveLength(2)
+		expect(observed.calls).toHaveLength(2)
+		expect(observed.judges.length).toBeGreaterThan(0)
+		expect(observed.results[0]?.content).toBe(LEDGER_WORK_FIXTURE.reply)
+		expect(observed.transcript).toBe((await observeLedgerWork()).transcript)
+		expect(serializeLedgerRequests(observed.ledger, observed.calls, observed.judges)).toBe(
+			observed.transcript,
+		)
+		expect(serializeLedgerRequests(observed.ledger, [], observed.judges)).not.toBe(
+			observed.transcript,
+		)
+	})
 	it('records the tail fixture request prefix and stable request identities', async () => {
 		const observed = await observeLedgerTail({}, 1)
 		expect(observed.results).toHaveLength(1)

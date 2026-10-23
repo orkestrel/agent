@@ -161,6 +161,115 @@ export const LEDGER_TAIL_FIXTURE = Object.freeze({
 	]),
 })
 
+/** Supplies named drafts, unrelated requests, and room pressure for earlier-work controls. */
+export const LEDGER_WORK_FIXTURE = Object.freeze({
+	name: 'W-1',
+	request: 'Draft a refund review.',
+	reference: 'Revisit W-1.',
+	reply: 'Wrong draft: the refund is $999.50.\r\n  Approval is still pending.  ',
+	rule: 'Refunds over $100 need a manager.',
+	negatives: Object.freeze(['Review the schedule.', 'Revisit W-10.']),
+	turns: Object.freeze<ScriptedTurn[]>([
+		{
+			content: 'Wrong draft: the refund is $999.50.\r\n  Approval is still pending.  ',
+			usage: { prompt: 10, completion: 20, total: 30 },
+		},
+		{ content: 'Review complete.' },
+	]),
+	pressure: Object.freeze<ScriptedTurn[]>([
+		{ content: 'An unfinished draft requires another review. '.repeat(40) },
+		{ content: 'Review complete.' },
+	]),
+	answer: Object.freeze<ScriptedTurn[]>([
+		{ content: '' },
+		{ content: 'Final answer-pass draft.' },
+		{ content: 'Review complete.' },
+	]),
+	history: Object.freeze<Message[]>([
+		{ id: 'orphan', role: 'assistant', content: 'No request owns this.' },
+		{ id: 'first', role: 'user', content: 'Draft the review.' },
+		{ id: 'intermediate', role: 'assistant', content: 'An intermediate draft.' },
+		{ id: 'cue', role: 'user', content: 'Answer from the results.' },
+		{ id: 'final', role: 'assistant', content: 'Final answer-pass draft.' },
+		{ id: 'second', role: 'user', content: 'A call without a reply.' },
+		{
+			id: 'call',
+			role: 'assistant',
+			content: 'Still reading.',
+			calls: [{ id: 'read', name: 'lookup', arguments: {} }],
+		},
+		{ id: 'blank', role: 'assistant', content: '  \r\n ' },
+		{ id: 'third', role: 'user', content: 'Draft another review.' },
+		{ id: 'partial', role: 'assistant', content: '  Partial draft.\r\n', calls: [] },
+		{ id: 'fourth', role: 'user', content: 'No reply yet.' },
+	]),
+	requests: Object.freeze(['first', 'second', 'third', 'fourth']),
+	goals: Object.freeze(['W-1', 'W-2', 'Compare w-1 with W-2.']),
+	collection: Object.freeze<ScriptedTurn[]>([
+		{ content: 'An older draft requires another review. '.repeat(40) },
+		{ content: 'A later short draft.' },
+		{ content: 'Review complete.' },
+	]),
+})
+
+/**
+ * Drives named earlier work through the real ledger with every provider and judge request recorded.
+ * @param options - The ledger options to override; the default naming handler names the first request
+ * @param followup - The request after the draft
+ * @param turns - The provider script
+ * @param named - If true, supplies the fixture's naming handler; if false, omits it. Default: true.
+ * @returns The ledger, requests, results, and normalized transcript
+ */
+export async function observeLedgerWork(
+	options: Partial<LedgerOptions> = {},
+	followup: string = LEDGER_WORK_FIXTURE.reference,
+	turns: readonly ScriptedTurn[] = LEDGER_WORK_FIXTURE.turns,
+	named = true,
+): Promise<{
+	readonly ledger: LedgerInterface
+	readonly calls: readonly ScriptedCall[]
+	readonly judges: readonly JudgeRequest[]
+	readonly results: readonly LedgerResult[]
+	readonly transcript: string
+}> {
+	const fixture = LEDGER_WORK_FIXTURE
+	const provider = createScriptedProvider(turns, { recorded: true, repeat: false })
+	const inner = createPhraseJudge(['Refunds over'])
+	const asked = createRecorder<readonly [JudgeRequest]>()
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			judge: {
+				...inner,
+				ask: (request, signal) => {
+					asked.handler(structuredClone(request))
+					return inner.ask(request, signal)
+				},
+			},
+			...(named
+				? {
+						name: (request: Message) =>
+							request.content === fixture.request ? fixture.name : undefined,
+					}
+				: {}),
+			share: { prompt: 1, tail: 0.001 },
+			lookups: [],
+			...options,
+		}),
+	)
+	ledger.conversation.add({ role: 'user', content: fixture.rule })
+	const results: LedgerResult[] = []
+	for (const goal of [fixture.request, followup]) results.push(await ledger.respond(goal))
+	const judges = asked.calls.map(([request]) => request)
+	return {
+		ledger,
+		calls: provider.calls,
+		judges,
+		results,
+		transcript: serializeLedgerRequests(ledger, provider.calls, judges),
+	}
+}
+
 /**
  * Serializes provider and judge requests with conversation-local identities replaced in order.
  * @param ledger - The ledger that owns the message identities
