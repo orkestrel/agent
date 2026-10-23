@@ -986,7 +986,9 @@ export class Ledger implements LedgerInterface {
 		const first = input.messages.findIndex((message) => this.#requests.has(message.id))
 		const seed = input.messages.slice(
 			0,
-			first < 0 ? input.messages.findIndex((message) => message.id === request.id) : first,
+			this.#options.recent || first < 0
+				? input.messages.findIndex((message) => message.id === request.id)
+				: first,
 		)
 		const groups = collectToolGroups(seed).flatMap((group) => {
 			const leader = group[0]
@@ -1027,16 +1029,21 @@ export class Ledger implements LedgerInterface {
 							: { id: message.id, role: message.role, content: message.content }
 						: message,
 			)
-		// Newest exchange first: the tail keeps every exchange before the first whose addition passes
-		// `cap`, and each candidate is the kept exchanges in conversation order, then the request.
 		const exchanges = collectExchanges(history).toReversed()
-		const stop = exchanges.findIndex(
+		const held = this.#options.recent
+			? exchanges.filter((exchange) => exchange.some((message) => this.#options.pins?.(message)))
+			: []
+		const unheld = exchanges.filter((exchange) => !held.includes(exchange))
+		const stop = unheld.findIndex(
 			(_exchange, index) =>
 				this.#price(
 					stripThinking(
 						[
 							...exchanges
-								.slice(0, index + 1)
+								.filter(
+									(exchange) =>
+										held.includes(exchange) || unheld.slice(0, index + 1).includes(exchange),
+								)
 								.toReversed()
 								.flat(),
 							request,
@@ -1045,9 +1052,10 @@ export class Ledger implements LedgerInterface {
 					),
 				) > cap,
 		)
+		const kept = unheld.slice(0, stop === -1 ? unheld.length : stop)
 		return [
 			...exchanges
-				.slice(0, stop === -1 ? exchanges.length : stop)
+				.filter((exchange) => held.includes(exchange) || kept.includes(exchange))
 				.toReversed()
 				.flat(),
 			request,

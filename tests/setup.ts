@@ -1,6 +1,7 @@
 import type { LedgerPlanReceipt, LedgerSelectionReceipt } from '@src/core'
 import type {
 	LedgerLookup,
+	LedgerInterface,
 	LedgerTopic,
 	LedgerResult,
 	LedgerGauge,
@@ -136,6 +137,93 @@ import { createBinaryContent, createFile, createTextContent } from '@orkestrel/w
 
 /** Supplies cut-free and fully cut capacities for composition controls. */
 export const LEDGER_RECEIPT_CAPACITIES: readonly number[] = Object.freeze([20000, 1])
+
+/** Supplies a pinned protocol, replaceable seed context, and exchanges spanning a recent tail. */
+export const LEDGER_TAIL_FIXTURE = Object.freeze({
+	seed: Object.freeze<MessageInput[]>([
+		{ role: 'user', content: 'Standing protocol: keep the approval record.' },
+		{ role: 'user', content: 'The day is Monday. '.repeat(5) },
+		{ role: 'user', content: 'The old case is closed. '.repeat(5) },
+	]),
+	goals: Object.freeze(['Review BW-20931.', 'Continue the review.', 'Finish the review.']),
+	turns: Object.freeze<ScriptedTurn[]>([
+		{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+		{ content: 'The first review is complete.' },
+		{ content: 'The second review carries the recent details. '.repeat(8) },
+		{ content: 'The final review is complete.' },
+	]),
+	capacity: 1600,
+	share: Object.freeze({ prompt: 1, tail: 0.12 }),
+	pressure: Object.freeze<MessageInput[]>([
+		{ role: 'user', content: 'Standing protocol: '.repeat(80) },
+		{ role: 'user', content: 'Standing protocol: '.repeat(80) },
+		{ role: 'user', content: 'Refunds over $100 need a manager.' },
+	]),
+})
+
+/**
+ * Serializes provider and judge requests with conversation-local identities replaced in order.
+ * @param ledger - The ledger that owns the message identities
+ * @param calls - The recorded provider calls
+ * @param judges - The recorded judge requests
+ * @returns The complete request transcript, preserving all non-identity bytes
+ */
+export function serializeLedgerRequests(
+	ledger: LedgerInterface,
+	calls: readonly ScriptedCall[],
+	judges: readonly JudgeRequest[],
+): string {
+	const identities = [
+		...new Set([
+			...ledger.conversation.messages().map((message) => message.id),
+			...calls.flatMap((call) => call.messages.map((message) => message.id)),
+		]),
+	]
+	return identities.reduce(
+		(text, id, position) => text.replaceAll(id, `@message:${position}`),
+		JSON.stringify({ providers: calls.map(readCallRequest), judges }),
+	)
+}
+
+/**
+ * Drives the recent-tail fixture through the real ledger and records every request and result.
+ * @param options - The options to override
+ * @param count - The request prefix to execute
+ * @returns The ledger, seed, recorded calls, results, and normalized request transcript
+ */
+export async function observeLedgerTail(
+	options: Partial<LedgerOptions> = {},
+	count = LEDGER_TAIL_FIXTURE.goals.length,
+): Promise<{
+	readonly ledger: LedgerInterface
+	readonly seed: readonly Message[]
+	readonly calls: readonly ScriptedCall[]
+	readonly results: readonly LedgerResult[]
+	readonly transcript: string
+}> {
+	const fixture = LEDGER_TAIL_FIXTURE
+	const provider = createScriptedProvider(fixture.turns, { recorded: true, repeat: false })
+	const judge = new RecordingJudge()
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			judge,
+			capacity: fixture.capacity,
+			share: fixture.share,
+			...options,
+		}),
+	)
+	const seed = ledger.conversation.add(fixture.seed)
+	const results: LedgerResult[] = []
+	for (const goal of fixture.goals.slice(0, count)) results.push(await ledger.respond(goal))
+	return {
+		ledger,
+		seed,
+		calls: provider.calls,
+		results,
+		transcript: serializeLedgerRequests(ledger, provider.calls, judge.requests),
+	}
+}
 
 /** Drives stored source content through recall and its answer pass. */
 export async function observeLedgerRecall(

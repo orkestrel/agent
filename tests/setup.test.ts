@@ -1,5 +1,6 @@
 import {
 	buildLedgerTailScenario,
+	observeLedgerTail,
 	MEASURE_CALLS,
 	MEASURE_CIRCULAR,
 	MESSAGE_MEASURE_CASES,
@@ -192,6 +193,15 @@ import { rawShape, stringShape } from '@orkestrel/contract'
 const messages: readonly Message[] = [{ id: 'm1', role: 'user', content: 'go' }]
 
 describe('agent scenario infrastructure', () => {
+	it('records the tail fixture request prefix and stable request identities', async () => {
+		const observed = await observeLedgerTail({}, 1)
+		expect(observed.results).toHaveLength(1)
+		expect(observed.calls).toHaveLength(2)
+		expect(observed.seed).toHaveLength(3)
+		expect(observed.transcript).toContain('@message:0')
+		expect(observed.transcript).not.toContain(observed.seed[0]?.id)
+		expect(observed.transcript).toBe((await observeLedgerTail({}, 1)).transcript)
+	})
 	it('builds authority and message fixtures and totals recorded usage', () => {
 		expect(createAuthorityContext('read', { path: 'note' })).toEqual({
 			call: { id: 'c1', name: 'read', arguments: { path: 'note' } },

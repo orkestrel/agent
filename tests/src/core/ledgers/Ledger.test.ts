@@ -26,6 +26,8 @@ import { createRecorder, requireValue, waitForEvent } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildDeliverySeed,
+	observeLedgerTail,
+	LEDGER_TAIL_FIXTURE,
 	buildLedgerOptions,
 	observeLedgerRecall,
 	buildLedgerResponse,
@@ -67,6 +69,75 @@ import {
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it('R1 omitted and false switches preserve every request with an acting pin handler', async () => {
+		const omitted = await observeLedgerTail()
+		const handled = await observeLedgerTail({ pins: () => true })
+		const disabled = await observeLedgerTail({ recent: false, pins: () => true })
+		expect(omitted.calls).toHaveLength(4)
+		expect(handled.transcript).toBe(omitted.transcript)
+		expect(disabled.transcript).toBe(omitted.transcript)
+	})
+	it('R1 carries the newest earlier exchange and holds the protocol as whole lookup groups leave', async () => {
+		const observed = await observeLedgerTail({
+			recent: true,
+			pins: (message) => message.content.startsWith('Standing protocol:'),
+		})
+		const second = requireValue(observed.calls[2]).messages
+		const third = requireValue(observed.calls[3]).messages
+		const first = requireValue(observed.results[0])
+		expect(second.some((message) => message.id === first.request)).toBe(true)
+		expect(second.some((message) => message.call === 'read')).toBe(true)
+		expect(second.some((message) => message.calls?.some((call) => call.id === 'read'))).toBe(true)
+		expect(third.some((message) => message.id === observed.results[1]?.request)).toBe(true)
+		expect(third.some((message) => message.call === 'read')).toBe(false)
+		expect(third.some((message) => message.calls?.some((call) => call.id === 'read'))).toBe(false)
+		expect(third.some((message) => message.id === first.request)).toBe(false)
+		expect(third.some((message) => message.id === observed.seed[0]?.id)).toBe(true)
+		for (const message of observed.seed.slice(1))
+			expect(third.some((one) => one.id === message.id)).toBe(false)
+		const receipt = requireValue(observed.results[2]?.receipts[0]?.selections[0])
+		expect(receipt.prior).toEqual([observed.results[1]?.request])
+		expect(receipt.sources).toContainEqual({ source: observed.seed[0]?.id, carriage: 'verbatim' })
+		expect(receipt.plan).toBeDefined()
+	})
+	it('R1 leaves a single request byte-identical on and off and permits an absent pin handler', async () => {
+		const baseline = await observeLedgerTail({}, 1)
+		const enabled = await observeLedgerTail({ recent: true }, 1)
+		expect(enabled.transcript).toBe(baseline.transcript)
+		const moved = await observeLedgerTail({ recent: true })
+		expect(
+			moved.calls[3]?.messages.some((message) => message.id === moved.results[1]?.request),
+		).toBe(true)
+	})
+	it('R1 keeps pins over the allowance and records the briefing cut they force', async () => {
+		const observations = []
+		for (const recent of [false, true]) {
+			const provider = createScriptedProvider([{ content: 'Reviewed.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					judge: createPhraseJudge(['Refunds over']),
+					recent,
+					pins: (message) => message.content.startsWith('Standing protocol:'),
+					capacity: 760,
+					share: { prompt: 1, tail: 0.01 },
+				}),
+			)
+			const seed = ledger.conversation.add(LEDGER_TAIL_FIXTURE.pressure)
+			const result = await ledger.respond('Which refund rule applies?')
+			observations.push({ seed, result, calls: provider.calls })
+		}
+		const baseline = requireValue(observations[0])
+		const enabled = requireValue(observations[1])
+		const receipt = requireValue(enabled.result.receipts[0]?.selections[0])
+		for (const message of enabled.seed.slice(0, 2)) expect(receipt.tail).toContain(message.id)
+		expect(receipt.plan?.trims).toBeGreaterThan(0)
+		expect(receipt.plan?.omitted).toContain(enabled.seed[2]?.id)
+		expect(baseline.result.receipts[0]?.selections[0]?.plan?.omitted).toEqual([])
+		expect(baseline.calls[0]?.messages[0]?.content).toContain('Refunds over $100')
+		expect(enabled.calls[0]?.messages[0]?.content).not.toContain('Refunds over $100')
+		expect(receipt.plan).toBeDefined()
+	})
 	it('F-8 enabled arm removes its neutral cut and retains an older literal line', async () => {
 		const observed = await observeLedgerRecall(
 			'amber',
@@ -821,7 +892,7 @@ describe('Ledger', () => {
 						},
 					},
 					think: true,
-					...(iteration === 1 ? { lexical: false } : {}),
+					...(iteration === 1 ? { lexical: false, recent: false, pins: () => true } : {}),
 					share: { prompt: 0.8, tail: 0.06 },
 				}),
 			)

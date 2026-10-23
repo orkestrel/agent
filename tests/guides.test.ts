@@ -1462,7 +1462,7 @@ await new GuideCommand({
 					(1 + LEDGER_SCALE_DRIFT),
 			)
 			expect(guideText).toContain(
-				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
+				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share while `recent` is off',
 			)
 		})
 
@@ -1610,7 +1610,7 @@ await new GuideCommand({
 				)?.content,
 			).toContain(LEDGER_AMENDED_RULE)
 			expect(guideText).toContain(
-				'the projection lists it in its `stale` member and leaves it out of every record and the briefing. The `recall` tool and the answer note keep the stored content of each message they carry, stale sentences included. The seed tail keeps stored content except for lookup results, which the plan replaces with stubs.',
+				'the projection lists it in its `stale` member and leaves it out of every record and the briefing. The `recall` tool and the answer note keep the stored content of each message they carry, stale sentences included. The tail keeps stored content except for lookup results, which the plan replaces with stubs.',
 			)
 		})
 
@@ -2272,7 +2272,7 @@ await new GuideCommand({
 			])
 			expect(requireValue(system, 'Missing system message').content).toContain(later)
 			expect(guideText).toContain(
-				'Only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the briefing or the `recall` tool.',
+				'With `recent` omitted or false, only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the briefing or the `recall` tool.',
 			)
 		})
 

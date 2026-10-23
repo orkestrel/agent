@@ -230,6 +230,17 @@ export interface LedgerGauge {
 export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
 
 /**
+ * Decides whether the recent tail holds a history message's whole exchange regardless of age.
+ * @param message - A message before the request; a lookup result arrives as its stub with its id kept
+ * @returns True if the exchange stays held; false otherwise
+ * @example
+ * ```ts
+ * const pins: LedgerPinHandler = (message) => message.content.startsWith('Standing protocol:')
+ * ```
+ */
+export type LedgerPinHandler = (message: Message) => boolean
+
+/**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
  * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall,
  * and agent bounds.
@@ -279,6 +290,15 @@ export interface LedgerOptions {
 	 * Default: false.
 	 */
 	readonly lexical?: boolean
+	/**
+	 * Selects a recent tail. If `true`, holds exchanges selected by `pins` and fills the tail allowance
+	 * with the newest unheld whole exchanges before this request; if `false`, selects only the seed
+	 * before the first request. Held exchanges can exceed the allowance and force briefing cuts.
+	 * Default: false.
+	 */
+	readonly recent?: boolean
+	/** Holds a history message's exchange while `recent` is true; omission holds no exchange. */
+	readonly pins?: LedgerPinHandler
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly agent?: LedgerAgentOptions
