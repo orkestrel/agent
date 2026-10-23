@@ -225,7 +225,7 @@ The rulings of the boosts review (Orchestrator, 2026-10-21, `692e551:.orkestrel/
 | RV-4 | change | every Grok row (W9, W10, the W11 pilot, B-M4) runs on a Claude distiller or labeler until a labeling lane runs on the proved Grok route (`.orkestrel/agent/plan.md` § Rulings in force, Grok route); record each substitution | in force; the map lane of 2026-10-21 proved the route for mapping |
 | RV-5 | change | the R-Q5 diagnosis precedes any excerpt treatment and reads W12 fields | in force |
 | RV-6 | change | Compaction gets one screen first: G3 with Q3a, then Q1, on W6's onset body for 15 model minutes; every other Compaction row waits for it | in force |
-| RV-7 | change | review S-T in the first read-only lane; release it with Study 0.0.3 behind the Records L1 work | in force (Decisions, 2026-10-21) |
+| RV-7 | change | review S-T in the first read-only lane; release it with Study 0.0.3 behind the Records L1 work | superseded (MR-7, 2026-10-23): S-T is merged into Study `main` (`2ad4fb2`) in the Mechanisms campaign and releases with Study 0.0.3 at that campaign's acceptance (`.orkestrel/plan.md` § Mechanisms campaign) |
 | RV-8 | park | W9 and W10 until R1 to R5 have an L1 result; the Grok route alone does not reopen them (Grok route) | in force |
 | RV-9 | park | W13 until G3 passes | in force |
 | RV-10 | park | R-S1, R-S2, R-S4, R-S5, RS6, RS9 and RS5 under the ladder's reopening conditions | in force |
