@@ -9,7 +9,7 @@ The fleet's plan as it stood on 2026-10-21: state, rulings in force, packages an
 
 | Item | Statement | Record |
 | --- | --- | --- |
-| Campaign | the fleet campaign of 2026-10-17 is accepted (U12a) and its successors are closed; the Mechanisms campaign (U20) opened and was accepted on 2026-10-23; no fleet campaign with an exit criterion is open; U21 (the boost campaign's resumption on the new mechanisms) is due | `6510cbe`; § History; § Mechanisms campaign |
+| Campaign | the fleet campaign of 2026-10-17 is accepted (U12a) and its successors are closed; the Mechanisms campaign (U20) opened and was accepted on 2026-10-23; the Recording campaign (U23, U24) opened on 2026-10-23 and is the instrument U21's resumption needs | `6510cbe`; § History; § Mechanisms campaign; § Recording campaign |
 | Live work | the `.orkestrel` consolidation, the scaffold 0.0.105 queue, and the units each package owes at its next visit | Cleanup, user, 2026-10-21 |
 | Releases | Scaffold 0.0.104 and Study 0.0.2 are published (2026-10-20); every package of the Agent session takes Scaffold 0.0.104 with no bump | ledger rows "Scaffold 0.0.104 published", "Study 0.0.2 published", "fleet repair onto 0.0.104" |
 | Scaffold window | no scaffold window is open on 2026-10-21; each queue item goes into `../scaffold/PARALLEL.md` before its unit runs | `.orkestrel/agent/plan.md` § Standing rules, Scaffold |
@@ -85,6 +85,54 @@ Codex engines per the user's routing: Astra writes contracts and audits, Sol bui
 | 7 | `mech-verify` | all | the tree-wide gates once per changed package on Node 24 and the portable 22.18.0 | verifier, Luna | `mech-falsify` |
 
 Writers: at most three in one checkout under the parallel protocol (Study in wave 3), with one runner lane for every process once more than two lanes run at once. Publication order after acceptance, the user's decision: Ollama 0.0.25 (its process range stays `^0.0.15`), then Study 0.0.3, then Agent's development re-pins with no bump.
+
+## Recording campaign
+
+Opened on 2026-10-23 under U23 and U24 (`.orkestrel/agent/plan.md` § Rulings in force). It is a large change under `../scaffold/AGENTS.md` § Work loop (Study and Agent's consumer), run through each phase of `../scaffold/.agents/orchestration.md` § Campaign.
+
+| Item | Statement |
+| --- | --- |
+| Goal | give Study open recording, attributable replay and continuation, and give Agent's memory study the consumer wiring and the default-off treatment switches, so the boost campaign can record bounded live runs on the dedicated daemon, extend a sealed recording by its next eight-goal segment without regenerating it, and replay a recording with one treatment on to find where it first changes a request |
+| Exit criterion | Study 0.0.4 registry-confirmed with open recording, attributable open replay, continuation and the `runtime` and `content` identities; Agent on `@orkestrel/study` `^0.0.4` with the witnesses AO1, AC1, AP1, AD1, AD2 and AS1 green in `test:studies`; one falsify round confirmed; tree-wide gates green in both checkouts; no Agent release (U23) |
+| Phases | absorb (the u21 plan `tmp/units/u21-design.md` and the static census, `.orkestrel/agent/boosts.md` § U21 static census), one blind design round (planner Opus, `tmp/units/rec-design-planner.md`; analyst Astra, `tmp/units/rec-design-analyst.md`; the Sonnet comparison `tmp/units/rec-design-diff.json`), implement, integrate, falsify, verify, release, accept |
+| State (2026-10-23) | design reconciled; S1 dispatched |
+| Records | briefs and reports under `tmp/units/` with the `rec-` prefix; one row per dispatch in `.orkestrel/agent/ledger.md` |
+
+### Reconciled design
+
+The Orchestrator took the planner design as the base, because it closes each gap with fewer public surfaces, and grafted the analyst's points that close a hole the planner left open.
+
+| Id | Ruling |
+| --- | --- |
+| RC-1 | rejected from the analyst design: the `record.open` flag, segment and goal rows, the handoff IPC operation, the `StudyRecording` engine class, the `StudyReplayDifference` failure type, the `--seal`, `--prefix` and `--limit` continuation flags, and the Agent service test project; each adds a public surface the planner's shape does without |
+| RC-2 | open form: `StudyRecord` becomes `{ bytes, calls, duration }`, and a profile without `settings.procedure` records open; the declared form stays, because `../scaffold/AGENTS.md` § Minimal public API removes a symbol only when its capability must not exist |
+| RC-3 | one declaration: the parent composes it once (`buildStudyExchangeDeclaration`), the sink exposes it, and the transport drops `version` and `procedure`; the row carries `goals` and a `configuration` digest; no roles map, since role policy stays the consumer's `roles` option and the body keeps model and options byte for byte |
+| RC-4 | exactness at the replay boundary: the attempt row is written before the replay compares, so a diverging body is kept with its failure row and a reason naming ordinal, step, goal, role, member and offset; `StudyOllamaReplay` serves the recorded cursor and drops `procedure`; `scanStudyDivergence` (Study) and `readStudyMemoryDifferential` (Agent) read the first divergence, and the differential's `selection` comparison reports a changed Ledger plan even when requests are equal. Analyst graft: RP2 adds a same-length substitution that stops at its exact ordinal and offset with zero sends |
+| RC-5 | identity: `StudyIdentity` gains location-independent `runtime` and `content` digests, because 0.0.3's path-bound digests make a second closure unreplayable (`../study/src/server/processes/StudyArtifactLoader.ts:74-80`). Replay requires an equal `runtime`, admits a different `content` and retains both; continuation requires both equal. This was the planner's one user decision; the Orchestrator ruled it, because the cheap check U23 asks for replays one baseline with a default-off prototype on, and an equal-`content` rule would cost a fresh GPU recording per prototype |
+| RC-6 | continuation: `study execute --extend <result>`; the parent derives an `offline: false` prefix that stops before the ancestor's postflight; the daemon starts and unloads before the replayed prefix, with no handoff operation; the descendant's sidecar is a complete flat history linked to its immediate ancestor. Analyst grafts: the ancestor's seal enters the checked execution fingerprint, `--extend` passes through `check` and the launcher as `--replay` does, an interrupted ancestor is ineligible, trial order and driver must match, and the `configuration` digest leaves out the resource ceilings (`record`, `bounds`) so a later segment may raise them |
+| RC-7 | bounds: `record.calls` counts every execution exchange the sidecar keeps, replayed ones included; `record.duration` sums send-to-settlement milliseconds, so a replayed prefix costs almost nothing and the live suffix is the charge; the transport enforces both. U24's 30 model minutes map to `record.duration` and its 40 elapsed minutes to `bounds.series.duration`, per recording from what is left; no cap rises automatically |
+| RC-8 | treatments: `StudyMemoryOptions.ledger` typed `Pick<LedgerOptions, 'link' \| 'lexical'>`, refused on an arm that builds no Ledger (only the records arm does, `studies/memory/StudyMemorySession.ts:188`); each later prototype adds its key with a positive control |
+| RC-9 | proofs: the planner's witnesses O1 to O6, RP1 to RP4 and CT1 to CT3 in Study, and AO1, AC1, AP1, AD1, AD2 and AS1 in Agent. Analyst graft: AC1 also asserts the replayed goals' products equal the ancestor's. Every real recording is replayed offline right after its seal (CPU) |
+| RC-10 | release: Study 0.0.4 does not read 0.0.3 recordings or closures, and none is an ancestor; Agent re-pins `^0.0.4` with no Agent release; Ollama and process do not change |
+
+### Units
+
+Codex engines per the user's routing. Study's units run serially, because they share files.
+
+| Unit | Package | Objective | Role, engine | Depends |
+| --- | --- | --- | --- | --- |
+| `rec-open` (S1) | Study | open recording: the declaration, admission, bounds, rows, reader and seal join; O1 to O6; the append-time reading at the planner's 3 MB load | builder, Sol | — |
+| `rec-replay` (S2) | Study | replay of an open recording, exactness at the boundary, `scanStudyDivergence`, the identities; RP1 to RP4 | builder, Sol | S1 |
+| `rec-extend` (S3) | Study | `--extend`, its checks and the handover; CT1 to CT3 | builder, Sol | S2 |
+| `rec-verify-study` (V1) | Study | tree gates | verifier, Luna | S3 |
+| `rec-consumer` (A1) | Agent | the memory study's recording and continuation wiring under a local Study pin; AO1, AC1, AP1 | builder, Sol | V1 |
+| `rec-differential` (A2) | Agent | the treatment switches and the differential reader; AD1, AD2, AS1 | builder, Sol | A1 |
+| `rec-falsify` (F1) | both | one falsify round: E1 to E7 as the planner's § 1.4 marks them, each witness, RC-5 | analyst, Astra; reviewer, Opus | A2 |
+| `rec-verify` (V2) | both | tree gates, Agent's `test:studies` included | verifier, Luna | F1 and its fixes |
+| `rec-release` | both | Study 0.0.4 in the user's window; Agent's pin restored and `^0.0.4` installed | Orchestrator, user | V2 |
+| `rec-declarations` (A3) | Agent | the R packet and Compaction lineage declarations and scenarios (u21 § 2, with the census's off-focus shifts 2 and 14); machine-specific profiles untracked under `tmp/units/rec-profiles/` | builder, Sol | `rec-release` |
+
+GPU work starts after A3, Orchestrator-owned and serial, under U24's reservation.
 
 ## Packages and layer order
 
