@@ -8,6 +8,7 @@ The idea record for Agent's memory boosts as it stood on 2026-10-21: the code se
 - The idea rows draw on `692e551:ANALYSIS.md:246-407` and `tmp/units/ladder/ladder-2.md:271-379`; where the two differ, the later ladder row wins and the row names the difference.
 - Status `adopt` builds the idea or keeps it as an instrument; `probe` runs only the named next step; `retain` keeps proved behavior; `park` removes the idea from the active plan until its reopening condition holds; `excluded` records a reasoned rejection. An unrun idea has not failed.
 - Every live row inherits the ladder's controls (off, exact repeat, sham, on), its guards and its level caps. A threshold in a gate is a prospective decision rule, not a result.
+- Resumption (U21, user, 2026-10-23): when the Mechanisms campaign of `.orkestrel/plan.md` lands, the unrun ideas run first on its instrument: R1, R2, R4a, R4b, R5a, R5b, R5c, R-Q5, R-Q7 and the Compaction screen G3 (S5 with Q3a, then Q1); each passes a cheap check that its mechanism can act on the instrument's data before any measurement is built.
 
 ## Code seams
 
