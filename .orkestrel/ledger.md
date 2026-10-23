@@ -430,3 +430,13 @@ The fleet routing ledger as it stood on 2026-10-21: one row per dispatch, ruling
 | `.orkestrel` review result | analyst, reviewer, Orchestrator | Astra xhigh, Opus xhigh | T3; Workflow | `orkestrel-review-astra-1`, `wf_f7660736-28d` | Astra FAIL 1, 2, 4, 6, 8, 9, 10, 11, 12; Opus FAIL 1, 7, 8, 9, 11 with O1 to O6; one fix round with a Sonnet closure check (`wf_12535197-e9d`), then the commit and the push | `.orkestrel/agent/ledger.md` |
 | Cleanup committed | Orchestrator | — | direct | — | `c179edd` "Consolidate .orkestrel into six records and retire the legacy harness": 17 kept or moved paths, 1,528 deletions, pushed to `origin/main` | `c179edd` |
 | Decisions | user; Orchestrator | — | conversation; direct | — | the open decisions delegated to the Orchestrator on 2026-10-21: Study 0.0.3 carries S-T and Study's next-release units (F-dist, F-floor, F-wording, F-errors where owed) after the S-T hold lifts; the Study worktree sweep runs in Study's release visit | `.orkestrel/agent/plan.md` § Rulings in force (Decisions) |
+
+## Mechanisms campaign (2026-10-23)
+
+| Unit | Role | Engine | Transport | Id | Result | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| U20 | user | — | conversation | — | "Proceed with building the four promotable mechanisms properly into Study, process and ollama"; the Mechanisms campaign opens | `.orkestrel/plan.md` § Mechanisms campaign |
+| absorb maps | Orchestrator | — | direct | — | `map.ts` trees and export lines over process, Ollama and Study, and the witness tree (67 files, 18,244 lines); the registry read process 0.0.15, Ollama 0.0.24, Study 0.0.2, Agent 0.0.31, contract 0.0.19 and emitter 0.0.12 | `tmp/units/mech/` |
+| `mech-absorb-witnesses` | grok | Grok 4.7 | T3 `delegate_task`, provider `cursor` | `mech-absorb-witnesses-1` | dispatched | `tmp/units/mech-absorb-witnesses-brief.md` |
+| `mech-absorb-process`, `mech-absorb-study`, `mech-absorb-ollama` | distiller | Sonnet | in-process Agent tool | — | dispatched beside the Grok lane under the distill-first routing | `tmp/units/mech-absorb-process-brief.md`, `tmp/units/mech-absorb-study-brief.md`, `tmp/units/mech-absorb-ollama-brief.md` |
+| `mech-absorb-research` | researcher | Sonnet | in-process Agent tool | — | dispatched | `tmp/units/mech-absorb-research-brief.md` |

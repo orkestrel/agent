@@ -9,7 +9,7 @@ The fleet's plan as it stood on 2026-10-21: state, rulings in force, packages an
 
 | Item | Statement | Record |
 | --- | --- | --- |
-| Campaign | the fleet campaign of 2026-10-17 is accepted (U12a) and its successors are closed; no fleet campaign with an exit criterion is open | `6510cbe`; § History |
+| Campaign | the fleet campaign of 2026-10-17 is accepted (U12a) and its successors are closed; the Mechanisms campaign opened on 2026-10-23 under the user's ruling U20 | `6510cbe`; § History; § Mechanisms campaign |
 | Live work | the `.orkestrel` consolidation, the scaffold 0.0.105 queue, and the units each package owes at its next visit | Cleanup, user, 2026-10-21 |
 | Releases | Scaffold 0.0.104 and Study 0.0.2 are published (2026-10-20); every package of the Agent session takes Scaffold 0.0.104 with no bump | ledger rows "Scaffold 0.0.104 published", "Study 0.0.2 published", "fleet repair onto 0.0.104" |
 | Scaffold window | no scaffold window is open on 2026-10-21; each queue item goes into `../scaffold/PARALLEL.md` before its unit runs | `.orkestrel/agent/plan.md` § Standing rules, Scaffold |
@@ -28,7 +28,21 @@ The fleet's plan as it stood on 2026-10-21: state, rulings in force, packages an
 | Dependencies | by 2026-10-16 | user | needed `@orkestrel/*` dependencies are authorized without another request, each at its highest published version; a non-Orkestrel addition still needs explicit authorization |
 | Engines | by 2026-10-16 | user | the final Fable allowance is consumed, so never invoke it without further permission; Opus 5.5 stays authorized for subjective and skeptical work; no parallel GPU work |
 | Cleanup | 2026-10-21 | user | consolidate `.orkestrel`, absorb the root `ANALYSIS.md`, `BOOSTS.md`, `PROPOSAL.md` and `RESULTS.md`, and retire the legacy harness under `.orkestrel/agent`; the full clause is in `.orkestrel/agent/plan.md` § Rulings in force |
+| Mechanisms | 2026-10-23 | user | build the four promotable mechanisms of `.orkestrel/agent/boosts.md` § Promotion requirements into Study, process and Ollama (U20 in `.orkestrel/agent/plan.md`); § Mechanisms campaign holds the goal and the exit criterion |
 | Harness | 2026-10-21 | user, Cleanup | the retirement order of 2026-10-20 is void; the legacy harness, its tools and its records left the tree in the Cleanup change, readable at `692e551`; the endurance sources live at `studies/endurance/sources/`; the Ledger golden promotion is an Agent unit (`.orkestrel/agent/plan.md` § Units) |
+
+## Mechanisms campaign
+
+Opened on 2026-10-23 under U20. It is a large change under `../scaffold/AGENTS.md` § Work loop (work across packages), run once through each phase of `../scaffold/.agents/orchestration.md` § Campaign.
+
+| Item | Statement |
+| --- | --- |
+| Goal | build the four mechanisms the retired ladder bench proved as package capabilities, each with a first real consumer: retained process-tree custody in `@orkestrel/process`, a dedicated daemon session in a server environment of `@orkestrel/ollama`, and the materialized artifact closure and the bounded exchange recording and replay in `@orkestrel/study` |
+| Exit criterion | each mechanism meets its numbered requirements in `.orkestrel/agent/boosts.md` § Promotion requirements (M1 to M4, E1 to E7, P1 to P5, D1 to D4) on its owner package's `main`, or the user waives a named requirement; each requirement is proved by a witness test in the owner package, ported or rewritten from `.orkestrel/agent/instruments/ladder-witnesses/`; every test passes on Node 22.18.0 and Node 24 on Windows, and a host the design does not support refuses the capability rather than weakening it (P5); each capability ships with its first real consumer in the same campaign; one falsify round confirms the integrated result; the tree-wide gates of every changed package are green; and each changed package is release-ready, with publication the user's decision |
+| Packages and order | process (custody) first, then Ollama (the daemon session, composing custody), then Study (the closure, and the exchange recording and replay, consuming the daemon session); Agent's studies change only as a consumer the design names |
+| Phases | absorb (2026-10-23: the Grok lane `mech-absorb-witnesses`, and the Sonnet lanes `mech-absorb-process`, `mech-absorb-study`, `mech-absorb-ollama` and `mech-absorb-research`), then one blind design round (planner and analyst), implement, integrate, audit, verify, re-baseline and accept |
+| Known gaps | the bench met P1 to P5 only on Windows x64 under Node 26.12.0 through `node:ffi`, which the Node ruling keeps out of packages, so custody needs a Node 22 and 24 route; the native kernel sources were deleted with the bench, and their design survives in the W5 records under `.orkestrel/agent/instruments/ladder-records/` |
+| Records | briefs and reports under `tmp/units/` with the `mech-` prefix and the maps under `tmp/units/mech/`; one row per dispatch in `.orkestrel/ledger.md` § Mechanisms campaign |
 
 ## Packages and layer order
 
