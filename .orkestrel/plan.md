@@ -95,7 +95,7 @@ Opened on 2026-10-23 under U23 and U24 (`.orkestrel/agent/plan.md` § Rulings in
 | Goal | give Study open recording, attributable replay and continuation, and give Agent's memory study the consumer wiring and the default-off treatment switches, so the boost campaign can record bounded live runs on the dedicated daemon, extend a sealed recording by its next eight-goal segment without regenerating it, and replay a recording with one treatment on to find where it first changes a request |
 | Exit criterion | Study 0.0.4 registry-confirmed with open recording, attributable open replay, continuation and the `runtime` and `content` identities; Agent on `@orkestrel/study` `^0.0.4` with the witnesses AO1, AC1, AP1, AD1, AD2 and AS1 green in `test:studies`; one falsify round confirmed; tree-wide gates green in both checkouts; no Agent release (U23) |
 | Phases | absorb (the u21 plan `tmp/units/u21-design.md` and the static census, `.orkestrel/agent/boosts.md` § U21 static census), one blind design round (planner Opus, `tmp/units/rec-design-planner.md`; analyst Astra, `tmp/units/rec-design-analyst.md`; the Sonnet comparison `tmp/units/rec-design-diff.json`), implement, integrate, falsify, verify, release, accept |
-| State (2026-10-23) | design reconciled; S1 accepted (Study `9260c5a`, local); S2 built (Study `267da00`, local); S3 in its pre-dispatch check |
+| State (2026-10-23) | design reconciled; S1 accepted (Study `9260c5a`, local); S2 built (Study `267da00`, local); S3 built (Study `f559ac4`, local); Study's Node types `fa29162`; V1 running |
 | Records | briefs and reports under `tmp/units/` with the `rec-` prefix; one row per dispatch in `.orkestrel/agent/ledger.md` |
 
 ### Reconciled design
