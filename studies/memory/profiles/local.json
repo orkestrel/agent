@@ -10,6 +10,7 @@
 		"node_modules/@orkestrel/database",
 		"node_modules/@orkestrel/emitter",
 		"node_modules/@orkestrel/indexeddb",
+		"node_modules/@orkestrel/process",
 		"node_modules/@orkestrel/queue",
 		"node_modules/@orkestrel/sqlite",
 		"node_modules/@orkestrel/study",

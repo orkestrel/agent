@@ -1,3 +1,12 @@
+import type { StudyOllamaMetadata } from '@orkestrel/study/server'
+
+/** Bounds trial-wide metadata independently of model calls, tokens and bytes. */
+export const STUDY_MEMORY_METADATA: StudyOllamaMetadata = Object.freeze({
+	calls: 8192,
+	bytes: 67108864,
+	duration: 600000,
+})
+
 /** Bounds every public input string in UTF-16 code units. */
 export const STUDY_MEMORY_TEXT = 16384
 /** Bounds arrivals and reference records in one public goal. */

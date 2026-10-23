@@ -6,6 +6,7 @@ import type {
 	MemoryNativeFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
+	MemoryReplayFixture,
 	MemoryServerFixture,
 	MemoryTrialFixture,
 	MemoryTrialResult,
@@ -32,7 +33,7 @@ import type {
 	StudyProfile,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyValidation } from '@orkestrel/study/server'
+import type { StudyOllamaStep, StudyValidation } from '@orkestrel/study/server'
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
 import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerResult } from '@orkestrel/agent'
@@ -49,9 +50,9 @@ import {
 	StudyMeter,
 	StudyScope,
 } from '@orkestrel/study'
-import { readStudyDeclaration } from '@orkestrel/study/server'
+import { readStudyDeclaration, valueToWire } from '@orkestrel/study/server'
 import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
-import { StudyMemoryDriver } from '../studies/memory/index.js'
+import { StudyMemoryDriver, buildStudyMemoryRoles } from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
@@ -61,6 +62,134 @@ import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+
+/** Pins the public Records trajectory whose wire lengths are calibrated before declaration. */
+export const STUDY_MEMORY_REPLAY_GOALS: readonly StudyGoal[] = Object.freeze([
+	Object.freeze({
+		id: 'opening',
+		input: {
+			prompt: 'Retain the order count',
+			arrivals: [{ id: 'source', content: 'The order count is two.' }],
+			records: [],
+		},
+	}),
+	Object.freeze({
+		id: 'closure',
+		input: { prompt: 'State the retained order count', arrivals: [], records: [] },
+	}),
+])
+
+/** Captures installed runtimes and authors a finite Records recording over independently observed lengths.
+ * @param scratch - Exclusive fixture owner.
+ * @param url - Ephemeral protocol peer.
+ * @param baseline - Unrecorded real Records execution with the same public inputs.
+ * @returns The installed command and recording profile.
+ */
+export function createMemoryReplayFixture(
+	scratch: ScratchInterface,
+	url: string,
+	baseline: MemoryTrialResult,
+): MemoryReplayFixture {
+	const fixture = createStudyInstallFixture(scratch, url)
+	const base = buildMemoryProfile({ url })
+	const roles = buildStudyMemoryRoles(base, 'records')
+	const requests = baseline.requests.filter(
+		(request) => request.path === '/api/chat' || request.path === '/api/generate',
+	)
+	const dispatches = baseline.evidence.filter(
+		(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.role !== 'metadata',
+	)
+	const procedure = dispatches.map((row, index): StudyOllamaStep => {
+		const request = requests[index]
+		if (
+			request === undefined ||
+			!isRecord(row.value) ||
+			(row.value.role !== 'agent' && row.value.role !== 'judge') ||
+			(request.path !== '/api/chat' && request.path !== '/api/generate') ||
+			row.goal === undefined
+		)
+			throw new Error('Missing calibrated Records model request')
+		const policy = roles[row.value.role]
+		if (policy === undefined) throw new Error('Missing calibrated Records policy')
+		return {
+			ordinal: index + 1,
+			goal: row.goal,
+			role: row.value.role,
+			path: request.path,
+			policy,
+			admission: 'capture',
+			bytes: Buffer.byteLength(request.body),
+		}
+	})
+	const installed = parseStudyProfile(
+		parseJSON(scratch.read('studies/memory/profiles/local.json') ?? ''),
+	)
+	const { qualification: _qualification, ...selected } = installed
+	const profile = parseStudyProfile({
+		...selected,
+		room: base.room,
+		bounds: {
+			...selected.bounds,
+			request: { ...selected.bounds.request, tokens: base.bounds.request.tokens },
+		},
+		record: { bytes: 1048576 },
+		settings: {
+			version: 'fixture-1',
+			metadata: { calls: 64, bytes: 1048576, duration: 30000 },
+			procedure: valueToWire(procedure),
+		},
+	})
+	scratch.write('studies/memory/profiles/local.json', JSON.stringify(profile))
+	scratch.write(
+		'studies/memory/study.json',
+		JSON.stringify({
+			name: 'memory',
+			version: '1',
+			question: 'Does Records replay preserve the product?',
+			purpose: 'mechanism',
+			driver: 'memory',
+			arms: ['records'],
+			scenarios: ['replay'],
+			order: [['records']],
+			retries: 0,
+			rubric: 'rubric.json',
+		}),
+	)
+	scratch.write(
+		'studies/memory/scenarios/replay.json',
+		JSON.stringify({
+			id: 'replay',
+			goals: STUDY_MEMORY_REPLAY_GOALS,
+		}),
+	)
+	scratch.write(
+		'studies/memory/rubric.json',
+		JSON.stringify({
+			version: '1',
+			criteria: STUDY_MEMORY_REPLAY_GOALS.map((goal) => ({
+				id: goal.id,
+				scenario: 'replay',
+				goal: goal.id,
+				method: 'state',
+				critical: true,
+				assertion: { observation: 'operational' },
+			})),
+		}),
+	)
+	// This boundary records process identities while returning the actual authored adapter unchanged.
+	scratch.write(
+		'studies/memory/index.ts',
+		`
+import { appendFileSync } from 'node:fs'
+import { createStudyAdapter as createMemoryAdapter } from './factories.js'
+export function createStudyAdapter() {
+	appendFileSync(new URL('../../workers.jsonl', import.meta.url), JSON.stringify({ pid: process.pid }) + '\\n')
+	return createMemoryAdapter()
+}
+`,
+	)
+	return { ...fixture, profile }
+}
 
 /** Composes the selected built Agent as both runtime and tested subject with the installed public Ollama provider; a distinct subject replaces only `subject`. */
 export const STUDY_MEMORY_MODULES = Object.freeze({ agent, subject: agent, provider })

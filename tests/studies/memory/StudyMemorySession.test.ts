@@ -59,6 +59,68 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
+	it('bounds metadata independently while preserving a one-call model allowance', async () => {
+		const server = await createMemoryServer()
+		try {
+			for (const calls of [1, 8]) {
+				const base = buildMemoryProfile({
+					url: server.url,
+					settings: { metadata: { calls, bytes: 65536, duration: 2000 } },
+				})
+				const profile = {
+					...base,
+					bounds: { ...base.bounds, goal: { ...base.bounds.goal, calls: 1 } },
+				}
+				const fixture = createMemoryContext(profile)
+				try {
+					const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+						{ id: 'metadata', scenario: 'public', arm: 'full', repetition: 0 },
+						fixture.context.signal,
+					)
+					try {
+						const before = server.requests.length
+						const outcome = await session.execute(WINDOW_GOAL, fixture.context).then(
+							(product) => ({ product, failure: undefined }),
+							(failure: unknown) => ({ product: undefined, failure }),
+						)
+						expect(outcome).toMatchObject(
+							calls === 1
+								? {
+										product: undefined,
+										failure: { code: 'CAPACITY' },
+									}
+								: {
+										product: { value: { content: 'Receipt retained.' }, partial: false },
+										failure: undefined,
+									},
+						)
+						expect(
+							server.requests.slice(before).filter((request) => request.path !== '/api/chat'),
+						).toHaveLength(calls === 1 ? 1 : 6)
+						expect(fixture.context.meter.usage).toMatchObject(
+							calls === 1 ? [] : [{ role: 'agent', calls: 1 }],
+						)
+						const repeated =
+							calls === 1
+								? await session.execute(WINDOW_GOAL, fixture.context).then(
+										() => undefined,
+										(error: unknown) => error,
+									)
+								: undefined
+						const refusal = expect.objectContaining({ code: 'CAPACITY' })
+						expect(repeated).toEqual(calls === 1 ? refusal : undefined)
+						expect(server.requests).toHaveLength(before + (calls === 1 ? 1 : 7))
+					} finally {
+						await session.close()
+					}
+				} finally {
+					fixture.close()
+				}
+			}
+		} finally {
+			await server.close()
+		}
+	})
 	it('W12-3 joins found and absent lookup rows to distinct result messages by call identity despite identical content', async () => {
 		const trial = await runMemoryTrial({
 			arm: 'records',
@@ -515,7 +577,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			},
 		])
 		const base = buildMemoryProfile({ url: server.url })
-		const profile = { ...base, bounds: { ...base.bounds, goal: { ...base.bounds.goal, calls: 4 } } }
+		const profile = { ...base, bounds: { ...base.bounds, goal: { ...base.bounds.goal, calls: 1 } } }
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
 			{ id: 'refusal', scenario: 'handoff', arm: 'full', repetition: 0 },
@@ -741,7 +803,9 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(
 				server.requests.filter((request) => request.path === '/api/chat').at(-1)?.body,
 			).toContain('Correction: count is two.')
-			expect(fixture.context.meter.usage).toHaveLength(server.requests.length + 1)
+			expect(fixture.context.meter.usage).toHaveLength(
+				server.requests.filter((request) => request.path === '/api/chat').length + 1,
+			)
 			expect(fixture.context.meter.usage.filter((row) => row.role === 'tool')).toEqual([
 				expect.objectContaining({
 					calls: 1,
@@ -806,7 +870,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 						row.value.finish === 'length',
 				),
 			).toBe(true)
-			expect(fixture.context.meter.usage).toHaveLength(server.requests.length)
+			expect(fixture.context.meter.usage).toHaveLength(
+				server.requests.filter(
+					(request) => request.path === '/api/chat' || request.path === '/api/generate',
+				).length,
+			)
 		} finally {
 			await session.close()
 			fixture.close()
@@ -843,7 +911,9 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			)
 			expect(fixture.evidence.some((row) => row.event === 'summary')).toBe(true)
 			expect(fixture.context.meter.usage.some((row) => row.role === 'summary')).toBe(true)
-			expect(fixture.context.meter.usage).toHaveLength(server.requests.length)
+			expect(fixture.context.meter.usage).toHaveLength(
+				server.requests.filter((request) => request.path === '/api/chat').length,
+			)
 		} finally {
 			await session.close()
 			fixture.close()

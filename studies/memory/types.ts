@@ -9,6 +9,12 @@ import type {
 } from '@orkestrel/agent'
 import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/ollama'
 import type { StudyAgentRuntime, StudyProfile } from '@orkestrel/study'
+import type {
+	StudyExchangeSinkInterface,
+	StudyOllamaMetadata,
+	StudyOllamaReplayInterface,
+	StudyOllamaStep,
+} from '@orkestrel/study/server'
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
@@ -20,6 +26,12 @@ export interface StudyMemoryOptions {
 	readonly checkpoints?: readonly string[] | undefined
 	/** Rolls each compaction into one section covering the prior recaps; forwarded only in the compaction arm. */
 	readonly rolling?: boolean | undefined
+	/** Bounds metadata independently; required with a recording declaration. */
+	readonly metadata?: StudyOllamaMetadata | undefined
+	/** Pins the serving version with the complete model procedure. */
+	readonly version?: string | undefined
+	/** Declares ordered model requests for recording or replay. */
+	readonly procedure?: readonly StudyOllamaStep[] | undefined
 }
 
 /** Holds public arrivals and reference snapshots released before a goal. */
@@ -110,6 +122,8 @@ export interface StudyMemoryDriverOptions {
 	readonly subject: unknown
 	readonly provider: unknown
 	readonly profile: StudyProfile
+	readonly exchanges?: StudyExchangeSinkInterface | undefined
+	readonly replay?: StudyOllamaReplayInterface | undefined
 }
 
 /** Holds the shared implementation's irreducible memory treatment. */
@@ -128,6 +142,8 @@ export interface StudyMemorySessionOptions {
 	readonly profile: StudyProfile
 	readonly arm: StudyMemoryArm
 	readonly signal: AbortSignal
+	readonly exchanges?: StudyExchangeSinkInterface | undefined
+	readonly replay?: StudyOllamaReplayInterface | undefined
 }
 
 /** Holds mechanical predicates over retained observations. */

@@ -325,6 +325,17 @@ export function validateStudyMemoryProfile(
 	const { room, provider } = profile
 	if (profile.settings !== undefined && !isStudyMemoryOptions(profile.settings))
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
+	if (
+		profile.record !== undefined &&
+		(!isStudyMemoryOptions(profile.settings) ||
+			profile.settings.version === undefined ||
+			profile.settings.procedure === undefined ||
+			profile.settings.metadata === undefined)
+	)
+		throw new StudyError(
+			'CONFIG',
+			'Memory recording requires version, metadata and procedure settings',
+		)
 	if (provider === undefined || !isStudyProvider(provider))
 		throw new StudyError('CONFIG', 'Memory provider declaration is invalid')
 	if (arms.includes('records') && provider.judge === undefined)

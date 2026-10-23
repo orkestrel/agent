@@ -5,6 +5,10 @@ import type {
 	StudyTrial,
 } from '@orkestrel/study'
 import type {
+	StudyExchangeSinkInterface,
+	StudyOllamaReplayInterface,
+} from '@orkestrel/study/server'
+import type {
 	StudyMemoryClassifier,
 	StudyMemoryDriverOptions,
 	StudyMemoryLedger,
@@ -30,6 +34,8 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 	// Present only when the admitted namespace exposes what the records arm alone invokes.
 	readonly #ledger: StudyMemoryLedger | undefined
 	readonly #classifier: StudyMemoryClassifier | undefined
+	readonly #exchanges: StudyExchangeSinkInterface | undefined
+	readonly #replay: StudyOllamaReplayInterface | undefined
 
 	/** Validates the admitted runtime surfaces and finite profile. @param options - Admitted Agent runtime, tested subject identity, provider and profile. */
 	constructor(options: StudyMemoryDriverOptions) {
@@ -44,6 +50,8 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 		this.#provider = options.provider
 		this.#ledger = isStudyMemoryLedger(options.agent) ? options.agent : undefined
 		this.#classifier = isStudyMemoryClassifier(options.provider) ? options.provider : undefined
+		this.#exchanges = options.exchanges
+		this.#replay = options.replay
 	}
 
 	/** Creates one independent trial session. @param trial - Scheduled treatment. @param signal - Parent cancellation. @returns Fresh state with no previous trial messages. */
@@ -65,6 +73,8 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 			profile: this.#profile,
 			arm: trial.arm,
 			signal,
+			exchanges: this.#exchanges,
+			replay: this.#replay,
 		})
 	}
 }

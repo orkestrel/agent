@@ -16,6 +16,11 @@ import type {
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
 
+/** Holds an authored recording fixture and its exact executing profile. */
+export interface MemoryReplayFixture extends StudyInstallFixture {
+	readonly profile: StudyProfile
+}
+
 /** Holds one copied package selection in the installed fixture closure. */
 export interface StudyInstallPackage {
 	readonly name: string

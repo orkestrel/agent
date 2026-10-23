@@ -13,7 +13,7 @@ import type {
 	StudyProduct,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyOllamaActivity } from '@orkestrel/study/server'
+import type { StudyOllamaActivity, StudyOllamaStep } from '@orkestrel/study/server'
 import type {
 	StudyMemoryInput,
 	StudyMemoryProvenance,
@@ -36,6 +36,7 @@ import {
 } from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_JUDGE,
+	STUDY_MEMORY_METADATA,
 	STUDY_MEMORY_SUMMARY,
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_THRESHOLDS,
@@ -60,6 +61,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #trace: StudyAgentTrace
 	readonly #tools: ToolManagerInterface
 	readonly #observation: StudyMemoryObservation
+	readonly #procedure: readonly StudyOllamaStep[] | undefined
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
@@ -94,15 +96,40 @@ export class StudyMemorySession implements StudySessionInterface {
 		const roles = buildStudyMemoryRoles(options.profile, options.arm)
 		const policy = roles.agent
 		if (policy === undefined) throw new StudyError('CONFIG', 'Memory agent role is required')
+		const settings = isStudyMemoryOptions(options.profile.settings)
+			? options.profile.settings
+			: undefined
+		const recorded = options.profile.record !== undefined
+		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
+			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
+		this.#procedure = recorded
+			? structuredClone(options.replay?.procedure ?? settings?.procedure)
+			: undefined
+		const declaration =
+			recorded &&
+			options.exchanges !== undefined &&
+			settings?.version !== undefined &&
+			this.#procedure !== undefined
+				? {
+						version: settings.version,
+						procedure: this.#procedure,
+						exchanges: options.exchanges,
+					}
+				: undefined
+		if (recorded && (declaration === undefined || settings?.metadata === undefined))
+			throw new StudyError('CONFIG', 'Memory recording requires declarations and an exchange sink')
 		this.#transport = new StudyOllamaTransport({
 			url: provider.url,
 			room,
 			limit: options.profile.bounds.request,
+			metadata: settings?.metadata ?? STUDY_MEMORY_METADATA,
 			models: buildStudyOllamaModels(provider),
 			roles,
 			signal: options.signal,
 			observe: this.#observation.observe,
 			timing: options.provider.extractTiming,
+			...declaration,
+			...(options.replay === undefined ? {} : { fetch: options.replay.fetch }),
 		})
 		this.#trace = new StudyAgentTrace({
 			runtime: options.agent,
@@ -278,7 +305,8 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#input = undefined
 		this.#live.add(activity)
 		try {
-			await this.#transport.verify()
+			if (this.#procedure === undefined || this.#procedure[0]?.goal === goal)
+				await this.#transport.verify()
 			for (const record of input.records) {
 				this.#records.set(record.id, Object.freeze({ ...record }))
 			}
@@ -350,7 +378,8 @@ export class StudyMemorySession implements StudySessionInterface {
 			})
 			this.#transport.check()
 			signal.throwIfAborted()
-			await this.#transport.verify()
+			if (this.#procedure === undefined || this.#procedure.at(-1)?.goal === goal)
+				await this.#transport.verify()
 			return product
 		} catch (error) {
 			throw this.#trace.translate(error)

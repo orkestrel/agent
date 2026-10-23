@@ -29,6 +29,7 @@ import {
 } from '@orkestrel/contract'
 import { isTokenUsage } from '@orkestrel/budget'
 import { isStudyAgentRuntime } from '@orkestrel/study'
+import { isStudyOllamaMetadata, isStudyOllamaStep } from '@orkestrel/study/server'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
 /** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent and conversation factories exist. */
@@ -61,11 +62,32 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		if (!isRecord(value)) return false
 		if (
 			Object.keys(value).some(
-				(key) => !['gauge', 'observe', 'checkpoints', 'rolling'].includes(key),
+				(key) =>
+					![
+						'gauge',
+						'observe',
+						'checkpoints',
+						'rolling',
+						'metadata',
+						'version',
+						'procedure',
+					].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, rolling } = value
+		const { gauge, observe, checkpoints, rolling, metadata, version, procedure } = value
+		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
+		if (version !== undefined || procedure !== undefined) {
+			if (
+				typeof version !== 'string' ||
+				version.length === 0 ||
+				metadata === undefined ||
+				!isArray(procedure) ||
+				procedure.length === 0 ||
+				!procedure.every((step, index) => isStudyOllamaStep(step) && step.ordinal === index + 1)
+			)
+				return false
+		}
 		if (rolling !== undefined && !isBoolean(rolling)) return false
 		if (gauge !== undefined) {
 			if (

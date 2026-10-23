@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+	buildStudyMemoryRoles,
 	isStudyMemoryArm,
 	isStudyMemoryAssertion,
 	isStudyMemoryClassifier,
@@ -9,9 +10,41 @@ import {
 	isStudyMemoryProvider,
 	isStudyMemoryRuntime,
 } from '../../../studies/memory/index.js'
-import { STUDY_MEMORY_MODULES } from '../../setupStudy.js'
+import { buildMemoryProfile, STUDY_MEMORY_MODULES } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
+	it('admits explicit metadata and complete ordered recording settings through Study guards', () => {
+		const policy = buildStudyMemoryRoles(
+			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
+			'records',
+		).agent
+		const metadata = { calls: 8, bytes: 65536, duration: 2000 }
+		const step = {
+			ordinal: 1,
+			goal: 'opening',
+			role: 'agent',
+			path: '/api/chat',
+			policy,
+			admission: 'capture',
+			bytes: 100,
+		}
+		const settings = { version: 'fixture-1', metadata, procedure: [step] }
+		expect(isStudyMemoryOptions(settings)).toBe(true)
+		expect(isStudyMemoryOptions({ metadata })).toBe(true)
+		for (const invalid of [
+			{ ...settings, metadata: { ...metadata, calls: 0 } },
+			{ ...settings, metadata: { ...metadata, duration: Number.NaN } },
+			{ ...settings, version: '' },
+			{ ...settings, version: undefined },
+			{ ...settings, procedure: undefined },
+			{ ...settings, metadata: undefined },
+			{ ...settings, procedure: [] },
+			{ ...settings, procedure: [{ ...step, ordinal: 2 }] },
+			{ ...settings, procedure: [{ ...step, body: undefined }] },
+			{ ...settings, procedure: [{ ...step, bytes: 0 }] },
+		])
+			expect(isStudyMemoryOptions(invalid)).toBe(false)
+	})
 	it('accepts exactly the declared settings members and refuses unknown keys and invalid values', () => {
 		const gauge = { scale: 1.5, overhead: 0 }
 		const names = Array.from({ length: 13 }, (_, index) => `checkpoint-${index}`)
