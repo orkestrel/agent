@@ -252,7 +252,7 @@ export interface LedgerWork {
  * @returns The work name, or undefined to leave the request unnamed
  * @example
  * ```ts
- * const name: LedgerNameHandler = (request) => names.get(request.id)
+ * const names: LedgerNameHandler = (request) => requests.get(request.id)
  * ```
  */
 export type LedgerNameHandler = (request: Message) => string | undefined
@@ -273,6 +273,10 @@ export type LedgerNameHandler = (request: Message) => string | undefined
  * `'CAPACITY'` otherwise. The plan budgets
  * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
  * Recall closes when `remainder - predict < 2 * reserve`.
+ * `recent` selects history before the current request; its optional `pins` handler holds matching
+ * whole exchanges and is inert while `recent` is off. `work` carries named earlier replies;
+ * its optional `names` handler names earlier requests and is inert while `work` is off.
+ * Omission of either handler selects no pins or names, respectively. Both switches default off.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
@@ -318,13 +322,13 @@ export interface LedgerOptions {
 	readonly pins?: LedgerPinHandler
 	/**
 	 * Selects named earlier replies for the briefing. If `true`, carries replies outside the tail
-	 * whose `name` shares an id token with this request, labelled as the agent's own drafts and cut
+	 * whose name shares an id token with this request, labelled as the agent's own drafts and cut
 	 * before other briefing content; if `false`, leaves earlier replies out of the briefing.
 	 * Replies remain chatter and never become sources. Default: false.
 	 */
 	readonly work?: boolean
 	/** Names earlier requests while `work` is true; omission names no request. */
-	readonly name?: LedgerNameHandler
+	readonly names?: LedgerNameHandler
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly agent?: LedgerAgentOptions

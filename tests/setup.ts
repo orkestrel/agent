@@ -154,6 +154,7 @@ export const LEDGER_TAIL_FIXTURE = Object.freeze({
 	]),
 	capacity: 1600,
 	share: Object.freeze({ prompt: 1, tail: 0.12 }),
+	tight: Object.freeze({ prompt: 1, tail: 0.001 }),
 	pressure: Object.freeze<MessageInput[]>([
 		{ role: 'user', content: 'Standing protocol: '.repeat(80) },
 		{ role: 'user', content: 'Standing protocol: '.repeat(80) },
@@ -164,7 +165,7 @@ export const LEDGER_TAIL_FIXTURE = Object.freeze({
 /** Supplies named drafts, unrelated requests, and room pressure for earlier-work controls. */
 export const LEDGER_WORK_FIXTURE = Object.freeze({
 	name: 'W-1',
-	request: 'Draft a refund review.',
+	request: 'Draft a refund review for W-1.',
 	reference: 'Revisit W-1.',
 	reply: 'Wrong draft: the refund is $999.50.\r\n  Approval is still pending.  ',
 	rule: 'Refunds over $100 need a manager.',
@@ -210,7 +211,123 @@ export const LEDGER_WORK_FIXTURE = Object.freeze({
 		{ content: 'A later short draft.' },
 		{ content: 'Review complete.' },
 	]),
+	capacities: Object.freeze([4096, 300]),
 })
+
+/** Supplies disabled and enabled recent-history arms for the held-pin pressure control. */
+export const LEDGER_RECENT_ARMS = Object.freeze([false, true])
+
+/** Supplies fixed request bytes with identity-shaped text outside identity positions. */
+export const LEDGER_TRANSCRIPT_EXPECTED = Object.freeze({
+	providers: [
+		{
+			messages: [
+				{ id: 'system', role: 'system', content: 'system' },
+				{ id: '@message:0', role: 'user', content: 'provider-id' },
+				{
+					id: '@message:1',
+					role: 'assistant',
+					content: 'A reply.\r\n  ',
+					calls: [
+						{ id: 'provider-id', name: 'lookup', arguments: { id: 'provider-id', role: 'system' } },
+					],
+				},
+			],
+			tools: [
+				{
+					name: 'lookup',
+					description: 'system provider-id @message:1',
+					parameters: { type: 'object' },
+				},
+			],
+			options: { think: false, schema: { description: 'system provider-id @message:1' } },
+		},
+	],
+	judges: [
+		{
+			state: 'provider-id',
+			questions: {
+				'["category","@message:0"]': {
+					form: 'noul',
+					instructions: 'provider-id',
+					criteria: { true: 'system', false: '@message:1' },
+				},
+				'["amends","@message:0","@message:1"]': { form: 'noul' },
+				plain: { form: 'noul', instructions: 'provider-id' },
+				'"provider-id"': { form: 'noul' },
+			},
+		},
+	],
+})
+
+/** Configures non-identity text changes in a fixed transcript fixture. */
+export interface LedgerTranscriptOptions {
+	readonly content?: string
+	readonly state?: string
+	readonly instructions?: string
+	readonly system?: string
+}
+
+/**
+ * Builds a real ledger and independent provider and judge request fixtures with known identity positions.
+ * @param options - The non-identity bytes to override
+ * @returns The ledger and request populations, including a provider-only message identity
+ */
+export function buildLedgerTranscriptFixture(options: LedgerTranscriptOptions = {}): {
+	readonly ledger: LedgerInterface
+	readonly calls: readonly ScriptedCall[]
+	readonly judges: readonly JudgeRequest[]
+} {
+	const ledger = createLedger(createScriptedProvider([]), buildLedgerOptions())
+	const seed = ledger.conversation.add({ role: 'user', content: 'Seed.' })
+	return {
+		ledger,
+		calls: [
+			{
+				messages: [
+					{ id: 'system', role: 'system', content: options.system ?? 'system' },
+					{ id: seed.id, role: 'user', content: options.content ?? 'provider-id' },
+					{
+						id: 'provider-id',
+						role: 'assistant',
+						content: 'A reply.\r\n  ',
+						calls: [
+							{
+								id: 'provider-id',
+								name: 'lookup',
+								arguments: { id: 'provider-id', role: 'system' },
+							},
+						],
+					},
+				],
+				tools: [
+					{
+						name: 'lookup',
+						description: 'system provider-id @message:1',
+						parameters: { type: 'object' },
+					},
+				],
+				options: { think: false, schema: { description: 'system provider-id @message:1' } },
+				signal: new AbortController().signal,
+			},
+		],
+		judges: [
+			{
+				state: options.state ?? 'provider-id',
+				questions: {
+					[JSON.stringify(['category', seed.id])]: {
+						form: 'noul',
+						instructions: options.instructions ?? 'provider-id',
+						criteria: { true: 'system', false: '@message:1' },
+					},
+					[JSON.stringify(['amends', seed.id, 'provider-id'])]: { form: 'noul' },
+					plain: { form: 'noul', instructions: 'provider-id' },
+					'"provider-id"': { form: 'noul' },
+				},
+			},
+		],
+	}
+}
 
 /**
  * Drives named earlier work through the real ledger with every provider and judge request recorded.
@@ -248,7 +365,7 @@ export async function observeLedgerWork(
 			},
 			...(named
 				? {
-						name: (request: Message) =>
+						names: (request: Message) =>
 							request.content === fixture.request ? fixture.name : undefined,
 					}
 				: {}),
@@ -282,16 +399,41 @@ export function serializeLedgerRequests(
 	calls: readonly ScriptedCall[],
 	judges: readonly JudgeRequest[],
 ): string {
-	const identities = [
-		...new Set([
-			...ledger.conversation.messages().map((message) => message.id),
-			...calls.flatMap((call) => call.messages.map((message) => message.id)),
-		]),
-	]
-	return identities.reduce(
-		(text, id, position) => text.replaceAll(id, `@message:${position}`),
-		JSON.stringify({ providers: calls.map(readCallRequest), judges }),
+	const identities = new Map(
+		[
+			...new Set([
+				...ledger.conversation.messages().map((message) => message.id),
+				...calls.flatMap((call) => call.messages.map((message) => message.id)),
+			]),
+		]
+			.filter((id) => id !== 'system')
+			.map((id, position) => [id, `@message:${position}`]),
 	)
+	return JSON.stringify({
+		providers: calls.map((call) => ({
+			...readCallRequest(call),
+			messages: call.messages.map((message) => ({
+				...message,
+				id: message.id === 'system' ? message.id : requireValue(identities.get(message.id)),
+			})),
+		})),
+		judges: judges.map((request) => ({
+			...request,
+			questions: Object.fromEntries(
+				Object.entries(request.questions).map(([key, question]) => {
+					const parts: readonly unknown[] | undefined = parseJSONAs(key, Array.isArray)
+					return [
+						parts === undefined
+							? key
+							: JSON.stringify(
+									parts.map((part) => (isString(part) ? (identities.get(part) ?? part) : part)),
+								),
+						question,
+					]
+				}),
+			),
+		})),
+	})
 }
 
 /**

@@ -998,7 +998,7 @@ export class Ledger implements LedgerInterface {
 		tail: ReadonlySet<string>,
 		input: LedgerProjectionInput,
 	): ReadonlyMap<string, string> {
-		if (!this.#options.work || this.#options.name === undefined) return new Map()
+		if (!this.#options.work || this.#options.names === undefined) return new Map()
 		const ids = extractTokens(request.content).ids
 		const earlier = input.messages.slice(
 			0,
@@ -1007,7 +1007,7 @@ export class Ledger implements LedgerInterface {
 		return new Map(
 			collectLedgerWork(earlier, this.#requests).flatMap((work) => {
 				if (tail.has(work.request.id) || tail.has(work.reply.id)) return []
-				const name = this.#options.name?.(work.request)
+				const name = this.#options.names?.(work.request)
 				return name === undefined || ![...extractTokens(name).ids].some((id) => ids.has(id))
 					? []
 					: [[work.request.id, renderLedgerWork(name, work)]]

@@ -4,6 +4,7 @@ import type {
 	JudgeResult,
 	LedgerGauge,
 	LedgerResult,
+	Message,
 	MessageInput,
 	Selection,
 	ThinkingReplay,
@@ -28,6 +29,7 @@ import {
 	buildDeliverySeed,
 	observeLedgerTail,
 	LEDGER_TAIL_FIXTURE,
+	LEDGER_RECENT_ARMS,
 	observeLedgerWork,
 	LEDGER_WORK_FIXTURE,
 	serializeLedgerRequests,
@@ -75,14 +77,14 @@ describe('Ledger', () => {
 	it('R2 carries every matched earlier draft in order and cuts the oldest work first', async () => {
 		const fixture = LEDGER_WORK_FIXTURE
 		const observations = []
-		for (const capacity of [4096, 300]) {
+		for (const capacity of fixture.capacities) {
 			const provider = createScriptedProvider(fixture.collection, { recorded: true, repeat: false })
 			const ledger = createLedger(
 				provider,
 				buildLedgerOptions({
 					capacity,
 					work: true,
-					name: (request) => request.content,
+					names: (request) => request.content,
 					lookups: [],
 					share: { prompt: 1, tail: 0.001 },
 				}),
@@ -140,7 +142,7 @@ describe('Ledger', () => {
 		expect(unnamed.transcript).toBe((await observeLedgerWork()).transcript)
 		const disabled = await observeLedgerWork({
 			work: false,
-			name: () => {
+			names: () => {
 				throw new Error('off handler ran')
 			},
 		})
@@ -162,6 +164,24 @@ describe('Ledger', () => {
 		expect(receipt.omitted).toEqual([])
 		expect(baseline.results[1]?.receipts[0]?.selections[0]?.plan?.trims).toBe(0)
 	})
+	it('R2 leaves an eligible earlier request unnamed when its enabled handler returns undefined', async () => {
+		const baseline = await observeLedgerWork()
+		const asked = createRecorder<readonly [Message]>()
+		const unnamed = await observeLedgerWork({
+			work: true,
+			names: (request) => {
+				asked.handler(request)
+				return undefined
+			},
+		})
+		const named = await observeLedgerWork({ work: true })
+		expect(asked.calls.map(([request]) => request.content)).toEqual([LEDGER_WORK_FIXTURE.request])
+		expect(LEDGER_WORK_FIXTURE.request).toContain('W-1')
+		expect(unnamed.calls[1]?.messages[0]?.content).not.toContain('## Earlier work')
+		expect(unnamed.transcript).toBe(baseline.transcript)
+		expect(named.calls[1]?.messages[0]?.content).toContain(`[W-1] ${LEDGER_WORK_FIXTURE.reply}`)
+		expect(named.transcript).not.toBe(baseline.transcript)
+	})
 	it('R2 leaves an earlier reply in the recent tail without duplicating its work section', async () => {
 		const observed = await observeLedgerWork({
 			work: true,
@@ -177,7 +197,7 @@ describe('Ledger', () => {
 			observed.results[0]?.request,
 		])
 	})
-	it('R2 carries the final answer-pass reply rather than an intermediate assistant turn', async () => {
+	it('R2 carries an answer-pass reply after an empty first pass', async () => {
 		const fixture = LEDGER_WORK_FIXTURE
 		const observed = await observeLedgerWork({ work: true }, fixture.reference, fixture.answer)
 		expect(observed.results[0]?.passes).toHaveLength(2)
@@ -190,7 +210,7 @@ describe('Ledger', () => {
 			provider,
 			buildLedgerOptions({
 				work: true,
-				name: () => fixture.name,
+				names: () => fixture.name,
 				lookups: [],
 			}),
 		)
@@ -210,25 +230,130 @@ describe('Ledger', () => {
 	})
 	it('R2 omitted and false switches preserve every request with acting construction handlers', async () => {
 		const omitted = await observeLedgerWork({}, undefined, undefined, false)
-		const handled = await observeLedgerWork()
+		const omittedPins = createRecorder<readonly [Message]>()
+		const omittedNames = createRecorder<readonly [Message]>()
+		const falsePins = createRecorder<readonly [Message]>()
+		const falseNames = createRecorder<readonly [Message]>()
+		const enabledPins = createRecorder<readonly [Message]>()
+		const enabledNames = createRecorder<readonly [Message]>()
+		const handled = await observeLedgerWork({
+			pins: (message) => {
+				omittedPins.handler(message)
+				return true
+			},
+			names: (request) => {
+				omittedNames.handler(request)
+				return LEDGER_WORK_FIXTURE.name
+			},
+		})
 		const disabled = await observeLedgerWork({
 			work: false,
 			recent: false,
-			pins: () => true,
-			name: () => LEDGER_WORK_FIXTURE.name,
+			pins: (message) => {
+				falsePins.handler(message)
+				return true
+			},
+			names: (request) => {
+				falseNames.handler(request)
+				return LEDGER_WORK_FIXTURE.name
+			},
+		})
+		const enabled = await observeLedgerWork({
+			work: true,
+			recent: true,
+			pins: (message) => {
+				enabledPins.handler(message)
+				return false
+			},
+			names: (request) => {
+				enabledNames.handler(request)
+				return LEDGER_WORK_FIXTURE.name
+			},
 		})
 		expect(omitted.calls).toHaveLength(2)
 		expect(omitted.judges.length).toBeGreaterThan(0)
 		expect(handled.transcript).toBe(omitted.transcript)
 		expect(disabled.transcript).toBe(omitted.transcript)
+		expect(omittedPins.count).toBe(0)
+		expect(omittedNames.count).toBe(0)
+		expect(falsePins.count).toBe(0)
+		expect(falseNames.count).toBe(0)
+		expect(enabledPins.count).toBeGreaterThan(0)
+		expect(enabledNames.calls.map(([request]) => request.content)).toEqual([
+			LEDGER_WORK_FIXTURE.request,
+		])
+		expect(enabled.calls[1]?.messages[0]?.content).toContain('## Earlier work')
 	})
 	it('R1 omitted and false switches preserve every request with an acting pin handler', async () => {
 		const omitted = await observeLedgerTail()
-		const handled = await observeLedgerTail({ pins: () => true })
-		const disabled = await observeLedgerTail({ recent: false, pins: () => true })
+		const omittedPins = createRecorder<readonly [Message]>()
+		const falsePins = createRecorder<readonly [Message]>()
+		const enabledPins = createRecorder<readonly [Message]>()
+		const handled = await observeLedgerTail({
+			pins: (message) => {
+				omittedPins.handler(message)
+				return true
+			},
+		})
+		const disabled = await observeLedgerTail({
+			recent: false,
+			pins: (message) => {
+				falsePins.handler(message)
+				return true
+			},
+		})
+		await observeLedgerTail({
+			recent: true,
+			pins: (message) => {
+				enabledPins.handler(message)
+				return true
+			},
+		})
 		expect(omitted.calls).toHaveLength(4)
 		expect(handled.transcript).toBe(omitted.transcript)
 		expect(disabled.transcript).toBe(omitted.transcript)
+		expect(omittedPins.count).toBe(0)
+		expect(falsePins.count).toBe(0)
+		expect(enabledPins.count).toBeGreaterThan(0)
+	})
+	it('R1 holds an older whole lookup exchange pinned only by its tool result', async () => {
+		const baseline = await observeLedgerTail({ recent: true, share: LEDGER_TAIL_FIXTURE.tight })
+		const held = await observeLedgerTail({
+			recent: true,
+			share: LEDGER_TAIL_FIXTURE.tight,
+			pins: (message) => message.role === 'tool' && message.call === 'read',
+		})
+		const first = requireValue(held.results[0]).request
+		const next = requireValue(held.results[1]).request
+		const history = held.ledger.conversation.messages()
+		const exchange = history.slice(
+			history.findIndex((message) => message.id === first),
+			history.findIndex((message) => message.id === next),
+		)
+		expect(exchange.map((message) => message.role)).toEqual([
+			'user',
+			'assistant',
+			'tool',
+			'assistant',
+		])
+		expect(exchange[1]?.calls?.map((call) => call.id)).toEqual(['read'])
+		expect(exchange[2]?.call).toBe('read')
+		expect(exchange[3]?.content).toBe('The first review is complete.')
+		expect(
+			baseline.calls[3]?.messages.some((message) => message.id === baseline.results[0]?.request),
+		).toBe(false)
+		expect(baseline.results[2]?.receipts[0]?.selections[0]?.tail).not.toContain(
+			baseline.results[0]?.request,
+		)
+		const ids = exchange.map((message) => message.id)
+		expect(
+			requireValue(held.calls[3])
+				.messages.slice(1, 1 + exchange.length)
+				.map((message) => message.id),
+		).toEqual(ids)
+		expect(
+			requireValue(held.results[2]?.receipts[0]?.selections[0]).tail.slice(0, exchange.length),
+		).toEqual(ids)
 	})
 	it('R1 carries the newest earlier exchange and holds the protocol as whole lookup groups leave', async () => {
 		const observed = await observeLedgerTail({
@@ -264,20 +389,25 @@ describe('Ledger', () => {
 	})
 	it('R1 keeps pins over the allowance and records the briefing cut they force', async () => {
 		const observations = []
-		for (const recent of [false, true]) {
+		for (const recent of LEDGER_RECENT_ARMS) {
+			const pins = createRecorder<readonly [Message]>()
 			const provider = createScriptedProvider([{ content: 'Reviewed.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
 				buildLedgerOptions({
 					judge: createPhraseJudge(['Refunds over']),
 					recent,
-					pins: (message) => message.content.startsWith('Standing protocol:'),
+					pins: (message) => {
+						pins.handler(message)
+						return message.content.startsWith('Standing protocol:')
+					},
 					capacity: 760,
 					share: { prompt: 1, tail: 0.01 },
 				}),
 			)
 			const seed = ledger.conversation.add(LEDGER_TAIL_FIXTURE.pressure)
 			const result = await ledger.respond('Which refund rule applies?')
+			expect(pins.count).toBe(recent ? seed.length : 0)
 			observations.push({ seed, result, calls: provider.calls })
 		}
 		const baseline = requireValue(observations[0])
@@ -1014,6 +1144,8 @@ describe('Ledger', () => {
 				repeat: false,
 				replay: 'all',
 			})
+			const pins = createRecorder<readonly [Message]>()
+			const names = createRecorder<readonly [Message]>()
 			const options = buildUncalibratedOptions(
 				buildLedgerOptions({
 					judge: {
@@ -1049,9 +1181,15 @@ describe('Ledger', () => {
 						? {
 								lexical: false,
 								recent: false,
-								pins: () => true,
+								pins: (message: Message) => {
+									pins.handler(message)
+									return true
+								},
 								work: false,
-								name: () => 'BW-20931',
+								names: (request: Message) => {
+									names.handler(request)
+									return 'BW-20931'
+								},
 							}
 						: {}),
 					share: { prompt: 0.8, tail: 0.06 },
@@ -1094,6 +1232,8 @@ describe('Ledger', () => {
 			}
 			expect(capture.providers.length, 'W7-4 nonempty complete provider population').toBe(8)
 			expect(capture.judges.length, 'W7-4 nonempty complete judge population').toBe(27)
+			expect(pins.count).toBe(0)
+			expect(names.count).toBe(0)
 			expect(
 				capture.selections.map((selection) => selection.fault),
 				'W7-4 real plans',
