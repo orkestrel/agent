@@ -383,3 +383,22 @@ Counts refer to numbered requirements and named test declarations/templates per 
 | Exchange recording/replay | Study | 7 | 23 | medium |
 | Retained process custody | process | 5 | 9 | medium |
 | Dedicated daemon session | ollama | 4 | 13 | large |
+
+## U21 static census
+
+Five read-only Sonnet lanes read the retained real series on 2026-10-23 (Workflow `wf_7aafb1f1-285`; full census `tmp/units/u21-census.json`): Records `tmp/studies/endurance-capacity-3/` trial `r1-s1-a1` and Compaction `tmp/studies/compaction-output-2/` trial `r1-s1-a1`, with the public endurance sources. A trigger present means the idea's mechanism has something to act on in real data; it is not an effect.
+
+| Idea | Trigger | Finding | Next |
+| --- | --- | --- | --- |
+| R1 | present | the tail is ev-01-1's eight opening arrivals for all 96 goals (it never moves); 21 of 24 handoffs miss their shift's thread; 8 clear and 2 borderline stale-date stamps | the packet uses off-focus handoffs (shifts 2 and 14), because ev-01-4 and ev-13-4 are on focus at baseline; pin only the three standing ids |
+| R2 | present | 95 of 96 prompts name earlier products; every revisit product checked misstates or substitutes one; 0 of 100 lookups ask for a goal id | run with R1 off; carry the goal id in the work identity |
+| R-L1 | present | 10 of 24 handoff requests go out with an empty briefing (byte-identical across shifts), so group-4 discovery has candidates | the offline replay differential decides |
+| R5b | present | goals 49, 53 and 77 hold 410 of 729 judge calls (377 pair calls); inert on a shortened packet | a recording with ancestry to goal 48, or an offline enumeration of candidate pairs |
+| R5c | present | 11 explicit retirement arrivals in shifts 15 to 23 drew zero pair questions | a bounded development arrival set with judge bodies |
+| S5 | present | one onset with a lookup at goal 17; 74 refusals in goals 17 to 92 | a fresh-lineage reproduction at goal 17 |
+| Q3a | present | the repairable population is 3 bare-id lookups (goals 17, 21, 25), not 62 of 67: 50 are goal-id requests outside any lookup grammar | denominator 3; Records' 100 of 100 found as the guard |
+| Q1 | present | all three standing sources fold away at goal 11; 0 of 10 summaries carry an account id; the first wrong account id appears at goal 14 | pins start before fold 1 at goal 11 |
+| R4a | undecidable | the retained runs hold no plan or selection rows | the L0 fixture on public text now; an observe-on recording for real data |
+| R4b | undecidable | 0 of 128 arrivals quiet or non-decisive by call counts; the classifier answers are not retained | a fixed classifier packet (about 12 to 20 calls) through the exact recording contract |
+| R5a | undecidable | 19 retirement arrivals, only 5 at goals where pair questions ran | the goal-49 classification from a recording |
+| R3 | absent | 100 of 100 lookups take prefixed ids; no lookup returns a bare owner id | parked; U19 stands |
