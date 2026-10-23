@@ -18,7 +18,7 @@ The fleet's plan as it stood on 2026-10-21: state, rulings in force, packages an
 
 | Id | Date | By | Clause |
 | --- | --- | --- | --- |
-| Node | 2026-10-20 | user | packages support the Node 22 and 24 LTS lines only; 22 is the floor because Claude Code cloud defaults to it; Node 26 is an isolated local tool runtime (the W5 host), never a package dependency |
+| Node | 2026-10-20, 2026-10-23 | user | packages support the Node 22 and 24 LTS lines only; 22 is the floor because Claude Code cloud defaults to it. 2026-10-23: "Do not use any other node versions, 22.18.* is the lowest and node 24.*.* is the highest" — no Node below 22.18 or above the 24 line anywhere: CI matrices, local runs and tools (Node 26 is retired as a local tool runtime, and `tmp/runtimes/node-v26.12.0-win-x64` is not used); `@types/node` belongs within the 24 line |
 | Node floor gate | 2026-10-20 | user | every release also gates on Node 22.18.0, the declared floor, from the portable runtime under `tmp/runtimes/`; each package raises `engines.node` to `>=22.18.0` at its next release (F-floor) |
 | Let sweep | 2026-10-19 | user | finish the `let` sweep per package visit, each with a census and a review; the Bindings lint rule lands in scaffold after the last visit |
 | Rewording | 2026-10-20 | user | "Rule + sweep at visits": each package rewords its guide and source comments against `writing.md` § Substitutions at its next release visit (F-wording); identifiers stay |
@@ -163,7 +163,7 @@ Layers are the catalog's (`.claude/agents/orkestrel.md:49-98`). Each repair row 
 | Unit | Package | Scope | Condition |
 | --- | --- | --- | --- |
 | F-dist | every package | delete an unmodified template copy of the distribution proof so `repair` restores the thin proof; a customized copy keeps its cases, moves its helpers to `tests/setupServer.ts` and imports the harness case table; Agent's `tests/distribution.test.ts` still stages at module load; Study keeps its C1 driver and folds C3 and C23 into the harness rows | next release; check the `tmp/probes` importers before moving an export |
-| F-floor | every package whose `engines.node` is under 22.18.0 | `engines.node` `>=22.18.0` and the CI floor row 22.18.0; sea keeps `>=24.8.0` for its build API | next release |
+| F-floor | every package whose `engines.node` is under 22.18.0 or whose CI runs another line | `engines.node` `>=22.18.0` and the CI matrix `['22.18.0', '24']` (no 26, per the Node ruling of 2026-10-23); sea keeps `>=24.8.0` for its build API; Agent done in `f2a67063` (2026-10-23); the fleet scan of 2026-10-23 found 14 packages whose CI runs 22.12.0 and 26 (budget, terminal, workflow, mcp, middleware, browser, probe, toolbox, process, contract, supervisor, tool, abort, emitter) | next release, or a sweep the user rules |
 | F-errors | every package with a public error guard | the brand form under `../scaffold/.claude/rules/typescript.md` § Errors and outcomes, which `BudgetError` holds as a `Symbol.for` brand from budget 0.0.14 (`53f3b46`): Agent's six classes; budget and contract drop `name`; contract validates `context`; lsp, probe and process validate `context` and `result` and take the identity stamp; server's `isHTTPError` and middleware's `MultipartError` guard owe a full rewrite | next release |
 | F-wording | every package | reword the guide and source comments against the judged rows of `writing.md` § Substitutions; the hosted guides held 220 hits in 44 guides on 2026-10-20 | next release visit |
 | F-census | each `let` visit | run the census on `bindings.md` and judge with `equivalence.md`; expect count-only recorder candidates in packages already swept | each visit |
@@ -185,7 +185,7 @@ Layers are the catalog's (`.claude/agents/orkestrel.md:49-98`). Each repair row 
 | Item | Source | Clause |
 | --- | --- | --- |
 | L1, L2, L5, L7 | `tmp/units/scaffold-0104/plan.md` § 1.2 | the window refusals, the `--digest` comparison, the resume ranges and the swap fresh baseline |
-| `@types/node` | same | against the 22.18.0 floor, after its own fleet scan |
+| `@types/node` | same; the Node ruling of 2026-10-23 | scaffold supplies `@types/node` ^26.6.4 to every consumer (`../scaffold/src/core/constants.ts:654` reads its own manifest), and every package carries ^26; move it within the 24 line, after its own fleet scan |
 | BR-2 instrument | same; BR-2 ruling | a policy check after the fleet conforms to the brand rule |
 | Alias lint | same | the alias lint over `app/*` |
 | Bindings lint rule | Let sweep ruling | lands after the last `let` visit |
