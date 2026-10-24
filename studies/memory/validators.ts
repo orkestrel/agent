@@ -11,6 +11,7 @@ import type {
 	StudyMemoryResult,
 	StudyMemoryDeclaration,
 	StudyMemoryLedgerOptions,
+	StudyMemoryLookupOptions,
 	StudyMemoryProvenance,
 } from './types.js'
 import type { AgentStop, LedgerReceipt } from '@orkestrel/agent'
@@ -32,7 +33,23 @@ import {
 import { isTokenUsage } from '@orkestrel/budget'
 import { isStudyAgentRuntime } from '@orkestrel/study'
 import { isStudyOllamaMetadata, isStudyOllamaStep } from '@orkestrel/study/server'
-import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT, STUDY_MEMORY_LEDGER_KEYS } from './constants.js'
+import {
+	STUDY_MEMORY_ENTRIES,
+	STUDY_MEMORY_TEXT,
+	STUDY_MEMORY_LEDGER_KEYS,
+	STUDY_MEMORY_LOOKUP_KEYS,
+} from './constants.js'
+
+/** Checks the declared boolean lookup settings. @param value - The lookup group. @returns True if every key is admitted and boolean; false otherwise. */
+export function isStudyMemoryLookupOptions(value: unknown): value is StudyMemoryLookupOptions {
+	return holds(
+		() =>
+			isRecord(value) &&
+			Object.keys(value).every(
+				(key) => STUDY_MEMORY_LOOKUP_KEYS.some((known) => known === key) && isBoolean(value[key]),
+			),
+	)
+}
 
 /** Checks exactly the declared boolean Ledger treatments. @param value - The settings group. @returns True if every present key is admitted and boolean; false otherwise. */
 export function isStudyMemoryLedgerOptions(value: unknown): value is StudyMemoryLedgerOptions {
@@ -101,12 +118,14 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'version',
 						'procedure',
 						'ledger',
+						'lookup',
 					].includes(key),
 			)
 		)
 			return false
 		const { gauge, observe, checkpoints, rolling, metadata, version, procedure, ledger } = value
 		if ('ledger' in value && !isStudyMemoryLedgerOptions(ledger)) return false
+		if ('lookup' in value && !isStudyMemoryLookupOptions(value.lookup)) return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
 		if (version !== undefined || procedure !== undefined) {
 			if (typeof version !== 'string' || version.length === 0 || metadata === undefined)

@@ -24,6 +24,8 @@ import type {
 export interface StudyMemoryOptions {
 	/** Forwards declared default-off Ledger treatments on the records arm only. */
 	readonly ledger?: StudyMemoryLedgerOptions
+	/** Configures the lookup tool on every memory arm. */
+	readonly lookup?: StudyMemoryLookupOptions
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */
@@ -42,6 +44,12 @@ export interface StudyMemoryOptions {
 
 /** Selects the Ledger treatments admitted by the memory study. */
 export type StudyMemoryLedgerOptions = Pick<LedgerOptions, 'link' | 'lexical' | 'recent' | 'work'>
+
+/** Holds the lookup tool's default-off treatment. */
+export interface StudyMemoryLookupOptions {
+	/** Advertises order and customer id prefixes if `true`; preserves the base description if `false`. Default: false. */
+	readonly grammar?: boolean
+}
 
 /** Names the request-body members compared in precedence order. */
 export type StudyMemoryMember = 'model' | 'messages' | 'tools' | 'options' | 'prompt' | 'flags'

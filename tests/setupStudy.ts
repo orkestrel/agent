@@ -132,6 +132,23 @@ export const STUDY_MEMORY_LEDGER_INVALID: readonly unknown[] = Object.freeze([
 	[],
 ])
 
+/** Supplies admitted lookup groups independently of the validator. */
+export const STUDY_MEMORY_LOOKUP_VALID = Object.freeze([
+	Object.freeze({}),
+	Object.freeze({ grammar: false }),
+	Object.freeze({ grammar: true }),
+])
+
+/** Supplies malformed lookup groups, including an explicitly undefined leaf. */
+export const STUDY_MEMORY_LOOKUP_INVALID: readonly unknown[] = Object.freeze([
+	null,
+	[],
+	{ unknown: true },
+	{ grammar: 1 },
+	{ grammar: 'true' },
+	{ grammar: undefined },
+])
+
 /** Builds linked receipt identities for normalization and changed-plan controls.
  * @param prefix - The run's minted identity prefix.
  * @param owner - The public owner retained by its plan.
@@ -531,6 +548,38 @@ export function buildMemoryWorkFixture(): MemoryDifferentialFixture {
 		responses: [
 			...Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
 			{ path: '/api/chat', body: buildMemoryReply({ content: STUDY_MEMORY_WORK_REPLY }) },
+			{ path: '/api/chat', body: buildMemoryReply() },
+		],
+	}
+}
+
+/** Builds lookup requests that separate exact syntax from release availability.
+ * @returns A compaction trial with released, bare, and unreleased lookup identities.
+ */
+export function buildMemoryGrammarTrial(): MemoryTrialFixture {
+	return {
+		arm: 'compaction',
+		settings: { ...STUDY_MEMORY_SETTINGS, observe: true, lookup: { grammar: true } },
+		goals: [
+			{
+				id: 'opening',
+				input: {
+					prompt: 'Read only released public records.',
+					arrivals: [],
+					records: [{ id: 'order:BC-7301', name: 'Mara', content: 'Released reference.' }],
+				},
+			},
+		],
+		responses: [
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: ['order:BC-7301', 'BC-7301', 'customer:BC-4101'].map((id) => ({
+						function: { name: 'lookup', arguments: { id } },
+					})),
+				}),
+			},
 			{ path: '/api/chat', body: buildMemoryReply() },
 		],
 	}

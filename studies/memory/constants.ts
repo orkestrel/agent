@@ -1,9 +1,24 @@
 import type { StudyOllamaMetadata } from '@orkestrel/study/server'
-import type { StudyMemoryLedgerOptions, StudyMemoryMember } from './types.js'
+import type {
+	StudyMemoryLedgerOptions,
+	StudyMemoryLookupOptions,
+	StudyMemoryMember,
+} from './types.js'
 
 /** Lists the admitted default-off Ledger switches. */
 export const STUDY_MEMORY_LEDGER_KEYS: ReadonlyArray<keyof StudyMemoryLedgerOptions> =
 	Object.freeze(['link', 'lexical', 'recent', 'work'])
+
+/** Lists the admitted boolean lookup treatments. */
+export const STUDY_MEMORY_LOOKUP_KEYS: ReadonlyArray<keyof StudyMemoryLookupOptions> =
+	Object.freeze(['grammar'])
+
+/** Preserves the lookup description used without the grammar treatment. */
+export const STUDY_MEMORY_LOOKUP = 'Reads the latest released public reference snapshot by id'
+
+/** States the exact public lookup id grammar without naming a released record. */
+export const STUDY_MEMORY_GRAMMAR =
+	'Pass an id of order:<order id> for an order or customer:<account id> for a customer account.'
 
 /**
  * Names the public desk policy, grant obligation, and case register held across shifts.

@@ -40,6 +40,8 @@ import {
 	STUDY_MEMORY_SUMMARY,
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_STANDING,
+	STUDY_MEMORY_LOOKUP,
+	STUDY_MEMORY_GRAMMAR,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
 	STUDY_MEMORY_WORKLOAD_BYTES,
@@ -172,7 +174,10 @@ export class StudyMemorySession implements StudySessionInterface {
 					})
 		const lookup = createTool({
 			name: 'lookup',
-			description: 'Reads the latest released public reference snapshot by id',
+			description:
+				settings?.lookup?.grammar === true
+					? `${STUDY_MEMORY_LOOKUP}. ${STUDY_MEMORY_GRAMMAR}`
+					: STUDY_MEMORY_LOOKUP,
 			parameters: {
 				type: 'object',
 				properties: { id: { type: 'string' } },
