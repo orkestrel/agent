@@ -1,5 +1,5 @@
 import type { JSONValue } from '@orkestrel/contract'
-import type { LedgerResult } from '@orkestrel/agent'
+import type { LedgerResult, LedgerInterface, LedgerOptions } from '@orkestrel/agent'
 import type {
 	StudyAttempt,
 	StudyContext,
@@ -13,6 +13,7 @@ import type {
 	StudyProduct,
 	StudyProfile,
 	StudyRole,
+	StudySessionInterface,
 	StudyRubric,
 	StudyTrial,
 } from '@orkestrel/study'
@@ -139,6 +140,8 @@ export interface MemoryWireFixture {
 	readonly body: string
 	readonly status?: number
 	readonly open?: boolean
+	/** Parks the response until this fixture-owned signal aborts. */
+	readonly signal?: AbortSignal
 }
 /** Holds an actual protocol fixture and captured request bytes. */
 export interface MemoryServerFixture {
@@ -196,6 +199,16 @@ export interface MemoryTrialResult {
 	readonly failure: string | undefined
 	readonly usage: readonly MemoryUsageFixture[]
 	readonly evidence: readonly StudyEvidence[]
+}
+
+/** Holds a live session and the unchanged real Ledger captured at its factory boundary. */
+export interface MemoryLedgerFixture {
+	readonly session: StudySessionInterface
+	readonly ledger: LedgerInterface
+	readonly options: LedgerOptions
+	readonly server: MemoryServerFixture
+	readonly context: MemoryContextFixture
+	close(): Promise<void>
 }
 /** Holds what a real trial raised at its first failing goal and at the goal after it, with the wire state at both points. */
 export interface MemoryFailureResult {

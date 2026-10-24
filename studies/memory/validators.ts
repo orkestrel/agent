@@ -49,9 +49,11 @@ export function isStudyMemoryInstructionOptions(
 	return holds(
 		() =>
 			isRecord(value) &&
-			Object.keys(value).every(
+			Reflect.ownKeys(value).every(
 				(key) =>
-					STUDY_MEMORY_INSTRUCTION_KEYS.some((known) => known === key) && isBoolean(value[key]),
+					typeof key === 'string' &&
+					STUDY_MEMORY_INSTRUCTION_KEYS.some((known) => known === key) &&
+					isBoolean(value[key]),
 			),
 	)
 }
@@ -61,8 +63,11 @@ export function isStudyMemoryLookupOptions(value: unknown): value is StudyMemory
 	return holds(
 		() =>
 			isRecord(value) &&
-			Object.keys(value).every(
-				(key) => STUDY_MEMORY_LOOKUP_KEYS.some((known) => known === key) && isBoolean(value[key]),
+			Reflect.ownKeys(value).every(
+				(key) =>
+					typeof key === 'string' &&
+					STUDY_MEMORY_LOOKUP_KEYS.some((known) => known === key) &&
+					isBoolean(value[key]),
 			),
 	)
 }
@@ -72,8 +77,11 @@ export function isStudyMemoryLedgerOptions(value: unknown): value is StudyMemory
 	return holds(
 		() =>
 			isRecord(value) &&
-			Object.keys(value).every(
-				(key) => STUDY_MEMORY_LEDGER_KEYS.some((known) => known === key) && isBoolean(value[key]),
+			Reflect.ownKeys(value).every(
+				(key) =>
+					typeof key === 'string' &&
+					STUDY_MEMORY_LEDGER_KEYS.some((known) => known === key) &&
+					isBoolean(value[key]),
 			),
 	)
 }

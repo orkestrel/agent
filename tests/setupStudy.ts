@@ -22,6 +22,7 @@ import type {
 	MemoryRecordingFixture,
 	MemoryRecordingReading,
 	MemoryRecordingResult,
+	MemoryLedgerFixture,
 	StudyInstallFixture,
 	StudyInstallPackage,
 	StudyInstallResult,
@@ -44,10 +45,15 @@ import type {
 	StudyProfile,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyValidation, StudySealedResult } from '@orkestrel/study/server'
+import type { StudyValidation, StudySealedResult, StudyGradeReading } from '@orkestrel/study/server'
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
 import type { JSONValue } from '@orkestrel/contract'
-import type { LedgerResult, LedgerOptions, ProviderInterface } from '@orkestrel/agent'
+import type {
+	LedgerResult,
+	LedgerOptions,
+	LedgerInterface,
+	ProviderInterface,
+} from '@orkestrel/agent'
 import type {
 	StudyMemoryReceipt,
 	StudyMemoryRequirement,
@@ -63,7 +69,7 @@ import {
 	isString,
 	isNumber,
 } from '@orkestrel/contract'
-import { createRecorder, waitForCondition } from '@orkestrel/test'
+import { createRecorder, waitForCondition, waitForAbort } from '@orkestrel/test'
 import { createLoopback, isRunning, createScratch, destroyScratch } from '@orkestrel/test/server'
 import {
 	parseStudyProfile,
@@ -82,7 +88,14 @@ import {
 	collectStudyEvidence,
 } from '@orkestrel/study/server'
 import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
-import { StudyMemoryDriver, readStudyMemoryDifferential } from '../studies/memory/index.js'
+import {
+	StudyMemoryDriver,
+	readStudyMemoryDifferential,
+	readStudyMemoryGrade,
+	isStudyMemoryLedgerOptions,
+	isStudyMemoryLookupOptions,
+	isStudyMemoryInstructionOptions,
+} from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
@@ -169,6 +182,188 @@ export const STUDY_MEMORY_INSTRUCTION_INVALID: readonly unknown[] = Object.freez
 	{ standing: 'true' },
 	{ standing: undefined },
 ])
+
+/** Pins the public standing source identities independently of study policy. */
+export const STUDY_MEMORY_STANDING_SOURCES: readonly string[] = Object.freeze([
+	'endurance-desk',
+	'ev-opening',
+	'ev-register',
+])
+
+/** Pins the pre-treatment lookup description independently of production constants. */
+export const STUDY_MEMORY_LOOKUP_DESCRIPTION =
+	'Reads the latest released public reference snapshot by id'
+
+/** Pins the complete single-sentence grammar extension independently of production constants. */
+export const STUDY_MEMORY_GRAMMAR_DESCRIPTION =
+	'Reads the latest released public reference snapshot by id. Pass an id of order:<order id> for an order or customer:<account id> for a customer account.'
+
+/** Supplies the omitted, false, empty, and enabled recent-tail replay settings. */
+export const STUDY_MEMORY_RECENT_TREATMENTS: MemoryRecordingFixture['treatments'] = Object.freeze({
+	omitted: {},
+	disabled: { ledger: { recent: false } },
+	empty: { ledger: {} },
+	enabled: { ledger: { recent: true } },
+})
+
+/** Supplies the omitted, false, empty, and enabled named-work replay settings. */
+export const STUDY_MEMORY_WORK_TREATMENTS: MemoryRecordingFixture['treatments'] = Object.freeze({
+	omitted: {},
+	disabled: { ledger: { work: false } },
+	empty: { ledger: {} },
+	enabled: { ledger: { work: true } },
+})
+
+/** Supplies the omitted, false, empty, and enabled grammar replay settings. */
+export const STUDY_MEMORY_GRAMMAR_TREATMENTS: MemoryRecordingFixture['treatments'] = Object.freeze({
+	omitted: {},
+	disabled: { lookup: { grammar: false } },
+	empty: { lookup: {} },
+	enabled: { lookup: { grammar: true } },
+})
+
+/** Supplies the omitted, false, empty, and enabled standing-instruction replay settings. */
+export const STUDY_MEMORY_STANDING_TREATMENTS: MemoryRecordingFixture['treatments'] = Object.freeze(
+	{
+		omitted: {},
+		disabled: { instructions: { standing: false } },
+		empty: { instructions: {} },
+		enabled: { instructions: { standing: true } },
+	},
+)
+
+/** Supplies complete-own-key guard cases independently of the admitted-key constants. */
+export const STUDY_MEMORY_GROUP_CASES = Object.freeze([
+	Object.freeze({ name: 'ledger', leaf: 'recent', guard: isStudyMemoryLedgerOptions }),
+	Object.freeze({ name: 'lookup', leaf: 'grammar', guard: isStudyMemoryLookupOptions }),
+	Object.freeze({ name: 'instructions', leaf: 'standing', guard: isStudyMemoryInstructionOptions }),
+])
+
+/** Builds hidden invalid leaves, unknown string and symbol keys, and unreadable inputs.
+ * @param leaf - The independently declared boolean member.
+ * @returns Invalid plain records and unreadable objects every total group guard refuses.
+ */
+export function buildMemoryHiddenGroups(leaf: string): readonly unknown[] {
+	const revoked = Proxy.revocable({}, {})
+	revoked.revoke()
+	return [
+		Object.defineProperty({}, leaf, { value: 1 }),
+		Object.defineProperty({}, leaf, { value: 'true' }),
+		Object.defineProperty({}, 'unknown', { value: true }),
+		Object.defineProperty({}, Symbol('unknown'), { value: true }),
+		Object.defineProperty({}, leaf, {
+			get: () => {
+				throw new Error('unreadable')
+			},
+		}),
+		new Proxy(
+			{},
+			{
+				ownKeys: () => {
+					throw new Error('unreadable')
+				},
+			},
+		),
+		revoked.proxy,
+	]
+}
+
+/** Starts a real records session while recording its factory options and Ledger identity.
+ * @param settings - Study settings passed unchanged to the driver.
+ * @param responses - Native protocol replies, including pending or partial terminals.
+ * @param direct - If `true`, uses the real Ollama provider directly so a protocol refusal reaches Ledger without Study accounting aborting its caller; if `false`, keeps the Study provider boundary.
+ * @returns The live fixture whose caller closes every resource.
+ */
+export async function createMemoryLedgerFixture(
+	settings: StudyProfile['settings'],
+	responses: readonly MemoryWireFixture[] = [],
+	direct = false,
+): Promise<MemoryLedgerFixture> {
+	const server = await createMemoryServer(responses)
+	const profile = buildMemoryProfile({ url: server.url, settings })
+	const context = createMemoryContext(profile)
+	const recorder = createRecorder<readonly [LedgerOptions, LedgerInterface]>()
+	try {
+		const session = await new StudyMemoryDriver({
+			...STUDY_MEMORY_MODULES,
+			agent: {
+				...agent,
+				createLedger: (upstream: ProviderInterface, options: LedgerOptions) => {
+					const ledger = agent.createLedger(
+						direct ? provider.createOllama({ url: server.url, model: 'model' }) : upstream,
+						options,
+					)
+					recorder.handler(options, ledger)
+					return ledger
+				},
+			},
+			profile,
+		}).open(
+			{ id: 'handlers', scenario: 'public', arm: 'records', repetition: 0 },
+			context.context.signal,
+		)
+		const [captured] = recorder.calls
+		if (captured === undefined) {
+			await session.close()
+			throw new Error('Missing real Ledger factory call')
+		}
+		const [options, ledger] = captured
+		return {
+			session,
+			ledger,
+			options,
+			server,
+			context,
+			async close() {
+				try {
+					await session.close()
+				} finally {
+					context.close()
+					await server.close()
+				}
+			},
+		}
+	} catch (error) {
+		context.close()
+		await server.close()
+		throw error
+	}
+}
+
+/** Builds gated first-pass and answer-pass refusals after successful real calibration.
+ * @param signal - The fixture gate that releases the pending first response.
+ * @returns Native protocol replies that make the real Ledger response reject.
+ */
+export function buildMemoryRejectedWorkResponses(
+	signal: AbortSignal,
+): readonly MemoryWireFixture[] {
+	return [
+		{ path: '/api/chat', body: buildMemoryReply() },
+		{ path: '/api/chat', body: buildMemoryReply() },
+		{ path: '/api/chat', body: 'Rejected work', status: 500, signal },
+		{ path: '/api/chat', body: 'Rejected answer pass', status: 500 },
+	]
+}
+
+/** Builds distinct partial passes and later complete products for work-identity controls.
+ * @returns Native replies whose last eligible partial answer differs from the first pass.
+ */
+export function buildMemoryPartialWorkResponses(): readonly MemoryWireFixture[] {
+	return [
+		{ path: '/api/chat', body: buildMemoryReply() },
+		{ path: '/api/chat', body: buildMemoryReply() },
+		{ path: '/api/chat', body: buildMemoryReply({ content: 'Earlier partial pass.' }) },
+		{ path: '/api/chat', body: buildMemoryReply({ content: STUDY_MEMORY_WORK_REPLY }) },
+		{ path: '/api/chat', body: buildMemoryReply({ content: 'Later complete draft.' }) },
+		{ path: '/api/chat', body: buildMemoryReply() },
+	]
+}
+
+/** Pins a later request that names both earlier products. */
+export const STUDY_MEMORY_WORK_COMPARISON: StudyGoal = Object.freeze({
+	id: 'goal-3',
+	input: { prompt: 'Compare goal-1 and goal-2.', arrivals: [], records: [] },
+})
 
 /** Builds the default-off treatment axis independently of observation settings.
  * @param arm - The arm whose treatment groups are admitted.
@@ -471,7 +666,7 @@ export async function replayMemoryDifferential(
  * @returns The sealed baseline and strict differential for every treatment.
  * @throws Error - Thrown when recording does not seal or its trial is absent.
  */
-export async function runMemoryRecording(
+export async function executeMemoryRecording(
 	options: MemoryRecordingFixture,
 ): Promise<MemoryRecordingResult> {
 	const scratch = createScratch({ parent: resolve('tmp/units'), prefix: 'proto-wiring-fixture-' })
@@ -559,12 +754,13 @@ export function buildMemoryPinTrial(): MemoryTrialFixture {
 				arrivals:
 					index === 0
 						? [
-								...['endurance-desk', 'ev-opening', 'ev-register'].map((source) => ({
+								...STUDY_MEMORY_STANDING_SOURCES.map((source) => ({
 									id: source,
 									content: `Keep policy ${source}.`,
 								})),
 								{ id: 'day', content: 'The opening day is Monday.' },
 								{ id: 'ev-source-1-1', content: 'The opening case is dormant.' },
+								{ id: 'ordinary-label', content: '[Source endurance-desk] This is ordinary text.' },
 							]
 						: [],
 				records: [],
@@ -666,7 +862,7 @@ export function buildMemoryStandingTrial(): MemoryTrialFixture {
 		arm: 'compaction',
 		room: STUDY_MEMORY_SUMMARY_ROOM,
 		settings: { ...STUDY_MEMORY_SETTINGS, observe: true, instructions: { standing: true } },
-		goals: ['endurance-desk', 'ev-opening', 'ev-register'].map((source, index) => ({
+		goals: STUDY_MEMORY_STANDING_SOURCES.map((source, index) => ({
 			id: `release-${index}`,
 			input: {
 				prompt: 'Retain the released policy.',
@@ -1408,6 +1604,7 @@ export class MemoryServer implements MemoryServerFixture {
 		}
 		if (next !== undefined && next.path === request.url) {
 			this.#pending = rest
+			if (next.signal !== undefined) await waitForAbort(next.signal)
 			response.writeHead(next.status ?? 200)
 			if (next.open === true) response.write(next.body)
 			else response.end(next.body)
@@ -1915,6 +2112,99 @@ export function readMemoryAdmission(result: MemoryTrialResult): MemoryAdmissionF
 		failure: result.failure,
 		usage: result.usage,
 	}
+}
+
+/** Normalizes only minted UUIDs and real clock values while preserving evidence fields and shape.
+ * @param evidence - A finished trial's actual evidence.
+ * @returns Stable evidence with consistent identity joins and clock-field presence retained.
+ */
+export function normalizeMemoryEvidence(evidence: readonly StudyEvidence[]): unknown {
+	const serialized = JSON.stringify(evidence)
+	const identities = new Map(
+		[...new Set(serialized.match(/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}/gi))].map(
+			(id, index) => [id, `identity:${index}`],
+		),
+	)
+	// Canonical revisions include minted message ids; retain their equality joins after renaming.
+	const revisions = [
+		...new Set([...serialized.matchAll(/"revision":"([a-f0-9]{64})"/g)].map((match) => match[1])),
+	]
+	return normalizeMemoryEvidenceValue(
+		evidence,
+		new Map([
+			...identities,
+			...revisions.flatMap((revision, index): ReadonlyArray<[string, string]> =>
+				revision === undefined ? [] : [[revision, `revision:${index}`]],
+			),
+		]),
+	)
+}
+
+/** Projects evidence recursively without dropping optional keys or unrecognized stable fields.
+ * @param value - An evidence subtree.
+ * @param identities - The run's canonical minted identities.
+ * @returns The normalized subtree.
+ */
+export function normalizeMemoryEvidenceValue(
+	value: unknown,
+	identities: ReadonlyMap<string, string>,
+): unknown {
+	if (typeof value === 'string')
+		return (
+			identities.get(value) ??
+			value.replace(
+				/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}/gi,
+				(id) => identities.get(id) ?? id,
+			)
+		)
+	if (Array.isArray(value))
+		return value.map((entry) => normalizeMemoryEvidenceValue(entry, identities))
+	if (!isRecord(value)) return value
+	return Object.fromEntries(
+		Object.entries(value).map(([key, entry]) => [
+			key,
+			['started', 'sent', 'elapsed', 'duration', 'time'].includes(key)
+				? '<clock>'
+				: normalizeMemoryEvidenceValue(entry, identities),
+		]),
+	)
+}
+
+/** Grades one arrival assertion against a run's actual products and evidence.
+ * @param result - The finished run.
+ * @param goals - Its executed goal declarations.
+ * @returns The first arrival's grade, including its actual evidence reference.
+ */
+export function readMemoryArrivalGrade(
+	result: MemoryTrialResult,
+	goals: readonly StudyGoal[],
+): StudyGradeReading {
+	const fixture = buildMemoryGradingFixture()
+	const [goal] = goals
+	if (goal === undefined || !isRecord(goal.input) || !Array.isArray(goal.input.arrivals))
+		throw new Error('Missing passivity arrival')
+	const [arrival] = goal.input.arrivals
+	if (!isRecord(arrival) || typeof arrival.id !== 'string') throw new Error('Missing arrival id')
+	return readStudyMemoryGrade({
+		trial: fixture.complete.trial,
+		criterion: {
+			...fixture.source,
+			goal: goal.id,
+			assertion: { observation: 'arrival', id: arrival.id },
+		},
+		attempt: {
+			...fixture.complete.attempt,
+			observations: goals.map((entry, index) => ({
+				goal: entry.id,
+				product: result.products[index],
+				failure: undefined,
+				usage: [],
+				duration: 1,
+				executed: true,
+			})),
+		},
+		evidence: result.evidence,
+	})
 }
 
 /** Sums admitted calls and known tokens per role for comparisons that cannot assume request order.

@@ -1,7 +1,21 @@
 import { parseJSON, isRecord } from '@orkestrel/contract'
 import { expect, it } from 'vitest'
+import { waitForCondition } from '@orkestrel/test'
 import {
-	runMemoryRecording,
+	executeMemoryRecording,
+	STUDY_MEMORY_RECENT_TREATMENTS,
+	STUDY_MEMORY_WORK_TREATMENTS,
+	STUDY_MEMORY_GRAMMAR_TREATMENTS,
+	STUDY_MEMORY_STANDING_TREATMENTS,
+	STUDY_MEMORY_STANDING_SOURCES,
+	STUDY_MEMORY_LOOKUP_DESCRIPTION,
+	STUDY_MEMORY_GRAMMAR_DESCRIPTION,
+	STUDY_MEMORY_GROUP_CASES,
+	buildMemoryHiddenGroups,
+	createMemoryLedgerFixture,
+	buildMemoryRejectedWorkResponses,
+	buildMemoryPartialWorkResponses,
+	STUDY_MEMORY_WORK_COMPARISON,
 	buildMemoryRecentGoals,
 	buildMemoryPinTrial,
 	runMemoryTrial,
@@ -25,21 +39,15 @@ import {
 import {
 	isStudyMemoryOptions,
 	validateStudyMemoryProfile,
-	STUDY_MEMORY_LOOKUP,
-	STUDY_MEMORY_GRAMMAR,
 	readStudyMemoryGrade,
+	isStudyMemoryReceipt,
 } from '../../../studies/memory/index.js'
 
 it('R1 changes closure agent messages at ordinal 14 and replays omitted, false, and empty groups fully', async () => {
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'records',
 		goals: buildMemoryRecentGoals(),
-		treatments: {
-			omitted: {},
-			disabled: { ledger: { recent: false } },
-			empty: { ledger: {} },
-			enabled: { ledger: { recent: true } },
-		},
+		treatments: STUDY_MEMORY_RECENT_TREATMENTS,
 	})
 	expect(result.replayed).toBe(0)
 	for (const reading of result.readings.filter(({ name }) => name !== 'enabled')) {
@@ -71,7 +79,7 @@ it('R1 changes closure agent messages at ordinal 14 and replays omitted, false, 
 }, 480000)
 
 it('R1 replays the first goal fully when there is no completed earlier exchange', async () => {
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'records',
 		goals: buildMemoryRecentGoals().slice(0, 1),
 		treatments: { enabled: { ledger: { recent: true } } },
@@ -87,15 +95,10 @@ it('R1 replays the first goal fully when there is no completed earlier exchange'
 }, 180000)
 
 it('Q3a changes the first agent tools at ordinal 5 while omitted, false, and empty lookup groups replay fully', async () => {
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'compaction',
 		goals: buildMemoryRecentGoals().slice(0, 1),
-		treatments: {
-			omitted: {},
-			disabled: { lookup: { grammar: false } },
-			empty: { lookup: {} },
-			enabled: { lookup: { grammar: true } },
-		},
+		treatments: STUDY_MEMORY_GRAMMAR_TREATMENTS,
 	})
 	for (const reading of result.readings.filter(({ name }) => name !== 'enabled')) {
 		expect(reading.command.code).toBe(0)
@@ -127,7 +130,7 @@ it('Q3a changes the first agent tools at ordinal 5 while omitted, false, and emp
 			type: 'function',
 			function: {
 				name: 'lookup',
-				description: STUDY_MEMORY_LOOKUP,
+				description: STUDY_MEMORY_LOOKUP_DESCRIPTION,
 				parameters: {
 					type: 'object',
 					properties: { id: { type: 'string' } },
@@ -142,7 +145,7 @@ it('Q3a changes the first agent tools at ordinal 5 while omitted, false, and emp
 			type: 'function',
 			function: {
 				name: 'lookup',
-				description: `${STUDY_MEMORY_LOOKUP}. ${STUDY_MEMORY_GRAMMAR}`,
+				description: STUDY_MEMORY_GRAMMAR_DESCRIPTION,
 				parameters: {
 					type: 'object',
 					properties: { id: { type: 'string' } },
@@ -156,7 +159,7 @@ it('Q3a changes the first agent tools at ordinal 5 while omitted, false, and emp
 }, 480000)
 
 it('Q3a leaves the summary request unchanged and first changes the post-fold agent tools at ordinal 6', async () => {
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'compaction',
 		goals: buildMemoryFoldGoals(),
 		treatments: { enabled: { lookup: { grammar: true } } },
@@ -207,7 +210,7 @@ it('R1 holds only the declared standing arrivals after whole recent replies exce
 	const body = parseJSON(request?.body ?? '')
 	if (!isRecord(body) || !Array.isArray(body.messages)) throw new Error('Missing agent messages')
 	const users = body.messages.filter((message) => isRecord(message) && message.role === 'user')
-	for (const source of ['endurance-desk', 'ev-opening', 'ev-register']) {
+	for (const source of STUDY_MEMORY_STANDING_SOURCES) {
 		expect(users).toContainEqual(
 			expect.objectContaining({ content: `[Source ${source}] Keep policy ${source}.` }),
 		)
@@ -218,21 +221,146 @@ it('R1 holds only the declared standing arrivals after whole recent replies exce
 	expect(users).not.toContainEqual(
 		expect.objectContaining({ content: '[Source ev-source-1-1] The opening case is dormant.' }),
 	)
-	expect(readMemoryEvents(result.evidence, 'selection').length).toBeGreaterThan(0)
+	expect(users).not.toContainEqual(
+		expect.objectContaining({
+			content: '[Source ordinary-label] [Source endurance-desk] This is ordinary text.',
+		}),
+	)
+	const rows = readMemoryEvents(result.evidence, 'selection', 'closure')
+	expect(rows.length).toBeGreaterThan(0)
+	for (const row of rows) {
+		if (!isStudyMemoryReceipt(row)) throw new Error('Malformed adopted selection')
+		expect(row.receipt.calls.length).toBeGreaterThan(0)
+		for (const call of row.receipt.calls) {
+			if (call.selection === undefined) throw new Error('Missing adopted selection index')
+			const selection = row.receipt.selections[call.selection]
+			expect(selection).toBeDefined()
+			for (const id of STUDY_MEMORY_STANDING_SOURCES) {
+				const arrival = row.arrivals.find((entry) => entry.id === id)
+				expect(arrival?.message).toBeDefined()
+				expect(selection?.tail).toContain(arrival?.message)
+			}
+			const ordinary = readMemoryEvents(result.evidence, 'arrival').find(
+				(entry) => entry.id === 'ordinary-label',
+			)
+			expect(ordinary?.message).toBeDefined()
+			expect(selection?.tail).not.toContain(ordinary?.message)
+		}
+	}
 })
+
+it('R1 pins the real standing arrival identity and refuses a different message with identical content', async () => {
+	const fixture = await createMemoryLedgerFixture({ ledger: { recent: true } })
+	try {
+		const [goal] = buildMemoryRecentGoals()
+		if (goal === undefined) throw new Error('Missing standing goal')
+		await fixture.session.execute(goal, fixture.context.context)
+		const arrival = fixture.ledger.conversation
+			.messages()
+			.find((message) => message.content === '[Source endurance-desk] Keep the public desk policy.')
+		if (arrival === undefined || fixture.options.pins === undefined)
+			throw new Error('Missing arrival or pin handler')
+		expect(fixture.options.pins(arrival)).toBe(true)
+		expect(fixture.options.pins({ ...arrival, id: 'different-message' })).toBe(false)
+	} finally {
+		await fixture.close()
+	}
+})
+
+it('R2 leaves pending and rejected requests unnamed on the real Ledger', async () => {
+	const controller = new AbortController()
+	const fixture = await createMemoryLedgerFixture(
+		{ ledger: { work: true } },
+		buildMemoryRejectedWorkResponses(controller.signal),
+		true,
+	)
+	try {
+		const [goal] = buildMemoryWorkFixture().goals
+		if (goal === undefined) throw new Error('Missing work goal')
+		const pending = fixture.session.execute(goal, fixture.context.context).then(
+			(product) => ({ product, error: undefined }),
+			(error: unknown) => ({ product: undefined, error }),
+		)
+		await waitForCondition(
+			'the pending work request reaches the protocol peer',
+			() => fixture.server.requests.filter(({ path }) => path === '/api/chat').length === 3,
+		)
+		const request = fixture.ledger.conversation
+			.messages()
+			.find((message) => message.content === 'Prepare the desk draft.')
+		if (request === undefined || fixture.options.names === undefined)
+			throw new Error('Missing current request or naming handler')
+		expect(fixture.options.names(request)).toBeUndefined()
+		controller.abort(new Error('Rejected work control'))
+		const rejected = await pending
+		expect(rejected.error).toBeDefined()
+		expect(rejected.product).toBeUndefined()
+		expect(fixture.options.names(request)).toBeUndefined()
+	} finally {
+		controller.abort()
+		await fixture.close()
+	}
+})
+
+it('R2 names resolved partial work and carries its exact eligible reply without changing earlier associations', async () => {
+	const fixture = await createMemoryLedgerFixture(
+		{ observe: true, ledger: { work: true } },
+		buildMemoryPartialWorkResponses(),
+	)
+	try {
+		const [first, second] = buildMemoryWorkFixture().goals
+		if (first === undefined || second === undefined || fixture.options.names === undefined)
+			throw new Error('Missing work controls')
+		fixture.ledger.agent.emitter.on('usage', () => fixture.ledger.agent.abort())
+		const product = await fixture.session
+			.execute(first, fixture.context.context)
+			.finally(() => fixture.ledger.agent.emitter.clear('usage'))
+		expect(product).toEqual({ value: { content: STUDY_MEMORY_WORK_REPLY }, partial: true })
+		const request = fixture.ledger.conversation
+			.messages()
+			.find((message) => message.content === 'Prepare the desk draft.')
+		if (request === undefined) throw new Error('Missing partial work request')
+		expect(fixture.options.names(request)).toBe('goal-1')
+		await fixture.session.execute(second, fixture.context.context)
+		const later = fixture.ledger.conversation
+			.messages()
+			.find((message) => message.content === 'Revise goal-1 using the available evidence.')
+		if (later === undefined) throw new Error('Missing later request')
+		expect(fixture.options.names(request)).toBe('goal-1')
+		expect(fixture.options.names(later)).toBe('goal-2')
+		const body = fixture.server.requests.filter(({ path }) => path === '/api/chat').at(-1)?.body
+		expect(body).toContain(`[goal-1] ${STUDY_MEMORY_WORK_REPLY}`)
+		expect(body).not.toContain('[goal-1] Earlier partial pass.')
+		await fixture.session.execute(STUDY_MEMORY_WORK_COMPARISON, fixture.context.context)
+		expect(fixture.options.names(request)).toBe('goal-1')
+		expect(fixture.options.names(later)).toBe('goal-2')
+		const final = fixture.server.requests.filter(({ path }) => path === '/api/chat').at(-1)?.body
+		expect(final).toContain(`[goal-1] ${STUDY_MEMORY_WORK_REPLY}`)
+		expect(final).toContain('[goal-2] Later complete draft.')
+	} finally {
+		await fixture.close()
+	}
+})
+
+it.each(STUDY_MEMORY_GROUP_CASES)(
+	'$name checks all own keys and refuses hidden invalid or unknown fields and unreadable groups',
+	({ name, leaf, guard }) => {
+		expect(guard(Object.defineProperty({}, leaf, { value: true }))).toBe(true)
+		expect(guard(Object.defineProperty({}, leaf, { value: false }))).toBe(true)
+		for (const value of buildMemoryHiddenGroups(leaf)) {
+			expect(guard(value)).toBe(false)
+			expect(isStudyMemoryOptions({ [name]: value })).toBe(false)
+		}
+	},
+)
 
 it('R2 changes goal-2 agent messages at ordinal 10 with the exact wrong earlier draft and passive controls', async () => {
 	const fixture = buildMemoryWorkFixture()
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'records',
 		goals: fixture.goals,
 		responses: fixture.responses,
-		treatments: {
-			omitted: {},
-			disabled: { ledger: { work: false } },
-			empty: { ledger: {} },
-			enabled: { ledger: { work: true } },
-		},
+		treatments: STUDY_MEMORY_WORK_TREATMENTS,
 	})
 	for (const reading of result.readings.filter(({ name }) => name !== 'enabled')) {
 		expect(reading.command.code).toBe(0)
@@ -263,7 +391,7 @@ it('R2 changes goal-2 agent messages at ordinal 10 with the exact wrong earlier 
 }, 480000)
 
 it('R2 replays fully when later prompts name no earlier goal', async () => {
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'records',
 		goals: buildMemoryRecentGoals(),
 		treatments: { enabled: { ledger: { work: true } } },
@@ -279,15 +407,10 @@ it('R2 replays fully when later prompts name no earlier goal', async () => {
 }, 180000)
 
 it('Q1 changes opening agent system messages at ordinal 5 and replays omitted, false, and empty groups fully', async () => {
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'compaction',
 		goals: buildMemoryStandingGoals(),
-		treatments: {
-			omitted: {},
-			disabled: { instructions: { standing: false } },
-			empty: { instructions: {} },
-			enabled: { instructions: { standing: true } },
-		},
+		treatments: STUDY_MEMORY_STANDING_TREATMENTS,
 	})
 	for (const reading of result.readings.filter(({ name }) => name !== 'enabled')) {
 		expect(reading.command.code).toBe(0)
@@ -316,7 +439,7 @@ it('Q1 changes opening agent system messages at ordinal 5 and replays omitted, f
 	const system = actual.messages.find((message) => isRecord(message) && message.role === 'system')
 	if (!isRecord(system) || typeof system.content !== 'string')
 		throw new Error('Missing standing system message')
-	for (const source of ['endurance-desk', 'ev-opening', 'ev-register']) {
+	for (const source of STUDY_MEMORY_STANDING_SOURCES) {
 		expect(system.content).toContain(`[Source ${source}]`)
 		expect(
 			JSON.stringify(actual.messages).match(new RegExp(`\\[Source ${source}\\]`, 'g')),
@@ -330,7 +453,7 @@ it('Q1 changes opening agent system messages at ordinal 5 and replays omitted, f
 }, 480000)
 
 it('Q1 replays a complete forced fold when no standing source arrives', async () => {
-	const result = await runMemoryRecording({
+	const result = await executeMemoryRecording({
 		arm: 'compaction',
 		goals: buildMemoryFoldGoals(),
 		treatments: { enabled: { instructions: { standing: true } } },
@@ -364,7 +487,7 @@ it('Q1 retains released standing instructions through repeated real folds withou
 		const system = body.messages.find((message) => isRecord(message) && message.role === 'system')
 		if (!isRecord(system) || typeof system.content !== 'string')
 			throw new Error('Missing post-fold instructions')
-		for (const [position, source] of ['endurance-desk', 'ev-opening', 'ev-register'].entries()) {
+		for (const [position, source] of STUDY_MEMORY_STANDING_SOURCES.entries()) {
 			expect(system.content.includes(`[Source ${source}] Standing text for ${source}.`)).toBe(
 				position <= index,
 			)
@@ -380,9 +503,7 @@ it('Q1 retains released standing instructions through repeated real folds withou
 	const arrivals = readMemoryEvents(result.evidence, 'arrival').filter(
 		(row) => row.instruction !== undefined,
 	)
-	expect(arrivals).toEqual(
-		['endurance-desk', 'ev-opening', 'ev-register'].map((id) => ({ id, instruction: id })),
-	)
+	expect(arrivals).toEqual(STUDY_MEMORY_STANDING_SOURCES.map((id) => ({ id, instruction: id })))
 	expect(
 		readMemoryEvents(result.evidence, 'context').filter(
 			(row) => row.role === 'agent' && row.stage === 'dispatch',
@@ -430,7 +551,7 @@ it('Q1 refuses instruction groups outside compaction and validates every leaf', 
 it.each(STUDY_MEMORY_PROTOTYPE_DRY_RUNS)(
 	'$name reads its first changed public packet request on CPU',
 	async ({ name, arm, enabled, disabled }) => {
-		const result = await runMemoryRecording({
+		const result = await executeMemoryRecording({
 			arm,
 			goals: readMemoryPrototypeGoals(arm),
 			room: { context: 32768, output: 512, recap: 256 },

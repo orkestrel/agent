@@ -29,6 +29,8 @@ import {
 	listMemoryKeys,
 	loadMemoryInputs,
 	readMemoryAdmission,
+	normalizeMemoryEvidence,
+	readMemoryArrivalGrade,
 	readMemoryEvents,
 	readMemoryOrigins,
 	readMemoryParts,
@@ -1620,7 +1622,21 @@ describe('passive observation of actual memory requests', () => {
 				const captured = await runMemoryTrial({ ...trial, settings: { ...observed, ...treatment } })
 				expect(readMemoryAdmission(passive)).toEqual(readMemoryAdmission(off))
 				expect(readMemoryAdmission(captured)).toEqual(readMemoryAdmission(off))
+				expect(readMemoryArrivalGrade(passive, trial.goals)).toEqual(
+					readMemoryArrivalGrade(off, trial.goals),
+				)
+				expect(readMemoryArrivalGrade(captured, trial.goals)).toEqual(
+					readMemoryArrivalGrade(on, trial.goals),
+				)
+				expect(normalizeMemoryEvidence(passive.evidence)).toEqual(
+					normalizeMemoryEvidence(off.evidence),
+				)
+				expect(normalizeMemoryEvidence(captured.evidence)).toEqual(
+					normalizeMemoryEvidence(on.evidence),
+				)
 			}
+			expect(readMemoryArrivalGrade(off, trial.goals).verdict).toBe('achieved')
+			expect(readMemoryArrivalGrade(on, trial.goals).verdict).toBe('achieved')
 			expect(
 				on.evidence
 					.filter((row) => !STUDY_MEMORY_OBSERVED_EVENTS.includes(row.event))
