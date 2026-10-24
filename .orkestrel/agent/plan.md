@@ -12,12 +12,12 @@ Resume the Ledger fixes under U26, U27 and U28. The instrument is accepted for l
 
 ### Pick up here
 
-Updated 2026-10-24 after D2's acceptance and the Codex recovery of the interrupted D1 review. Do these first, in order:
+Updated 2026-10-24 after D2's acceptance and the Codex recovery of the interrupted D1 review. The user's later instruction prioritizes preparing Study and Scaffold for publication; `.orkestrel/release.md` owns that work. Preserve the D1 reviews and resume their reconciliation after release preparation. No D1 implementation or calibration is authorized by a review return alone. Do these first, in order:
 
 1. **Read the tree.** Run `git status --short` and `git log --oneline -5` in Agent. `package.json` and `package-lock.json` always show modified: they are the local Study pin (U25) and are never staged, committed or restored. A running builder's owned files may also show modified (§ In flight names any). Any other uncommitted tracked change has no known owner: stop and find it before anything else.
 2. **D2 build:** done and accepted on 2026-10-24 (Agent `bf854029`; `boosts.md` LR-2; the CPU replay `tmp/units/rec-gpu/d2-differentials.json`). Nothing to recover.
 3. **Reconcile fact check** (Astra, `ledger-sentence-reconcile-check-astra-1`): returned complete, `tmp/units/ledger-sentence-reconcile-check.md`, ten points with evidence; its findings are in § In flight. Nothing to recover.
-4. **Recover D1's review.** Read `tmp/units/ledger-sentence-review-recovery.md` for the active taskIds and briefs, and use T3 `task_status` before dispatching anything. The earlier Claude workflow finished without verdicts because every lane hit its usage limit. Independent Astra objective and design-fit reviews replace that failed work under scaffold's Codex mapping. Keep at most two T3 children at a time. The draft `tmp/units/ledger-sentence-design.md` exists; reconcile the returned reviews before recording LR-5 or starting labels and calibration.
+4. **Recover D1's review.** Read `tmp/units/ledger-sentence-review-recovery.md` for the taskIds and briefs, and use T3 `task_status` before dispatching anything. The earlier Claude workflow finished without verdicts because every lane hit its usage limit. The objective recovery report is saved at `tmp/units/ledger-sentence-review-objective-report.md`: FAIL claims 2–6, with corrections to wire sentence identity, partial-result caching, calibration partitions and noise, continuation admission, owned scope and evidence custody. These findings await reproduction and reconciliation. The design-fit review remains active. Keep at most two T3 children at a time. The draft `tmp/units/ledger-sentence-design.md` exists; reconcile the returned reviews before recording LR-5 or starting labels and calibration.
 
 ### Where things stand
 
