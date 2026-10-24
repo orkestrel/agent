@@ -74,9 +74,56 @@ import {
 	LEDGER_DISCOVERY_FIXTURE,
 	LEDGER_DISCOVERY_OFF_CASES,
 	createLedgerDiscoveryFixture,
+	LEDGER_OWNER_FIXTURE,
+	LEDGER_OWNER_RENDER_CASES,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it.each(LEDGER_OWNER_RENDER_CASES)('$title', async (row) => {
+		const fixture = LEDGER_OWNER_FIXTURE
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				judge: createPhraseJudge([]),
+				topics: [],
+				capacity: row.capacity,
+				share: { prompt: 1, tail: 0.001 },
+				lookups: [
+					{
+						tool: createTool({ name: 'lookup', execute: () => '' }),
+						read: (values) => ({
+							ids: [],
+							owners: fixture.owners.filter((owner) => owner.id === values.id),
+						}),
+					},
+				],
+			}),
+		)
+		const readings = fixture.readings.map((content, at) =>
+			requireValue(
+				ledger.conversation.add(
+					buildLedgerExchange(content, `owner-${at}`, { id: fixture.owners[at]?.id }),
+				)[1],
+			),
+		)
+		ledger.conversation.add(LEDGER_LEXICAL_PADDING)
+		const result = await ledger.respond(fixture.request)
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		const system = requireValue(provider.calls[0]?.messages[0]).content
+		expect(system).toBe(row.system)
+		expect(system.match(/^### /gm)).toHaveLength(1)
+		expect(plan.owners).toEqual(['order:BW-5512', 'customer:BW-20931'])
+		expect(plan.trims).toBe(row.trims)
+		expect(plan.rendered).toEqual(readings.map((reading) => reading.id))
+		expect(plan.sentences).toEqual([
+			{ source: readings[0]?.id, sentence: 0 },
+			{ source: readings[0]?.id, sentence: 1 },
+			{ source: readings[1]?.id, sentence: 0 },
+			...(row.trims === 0 ? [{ source: readings[1]?.id, sentence: 1 }] : []),
+		])
+	})
+
 	it("T3-1 refuses another owner's discovery when an unknown party supplies the keyed case", async () => {
 		const fixture = LEDGER_DISCOVERY_FIXTURE
 		const { ledger, provider, reading, keyed } = createLedgerDiscoveryFixture(fixture.foreign)

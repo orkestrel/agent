@@ -609,6 +609,60 @@ export const LEDGER_DISCOVERY_FIXTURE = Object.freeze({
 	surviving: 'amber amber lantern glaze.',
 })
 
+/** Supplies equal-member owner records and a separate rules record for request views. */
+export const LEDGER_OWNER_PROJECTION: LedgerProjection = Object.freeze({
+	records: Object.freeze([
+		...['BW-5512', 'BW-20931'].map((id) => ({
+			key: `owner:${id}`,
+			title: `Brightwater Studio (account ${id})`,
+			members: ['shared-a', 'shared-b'],
+			lines: [
+				buildLedgerLine('shared-a', 0, 'Brightwater Studio ordered glazed lanterns.'),
+				buildLedgerLine('shared-b', 0, 'Collection is Friday.'),
+			],
+		})),
+		{
+			key: 'rules',
+			title: 'Rules',
+			members: ['rule'],
+			lines: [buildLedgerLine('rule', 0, 'Keep the receipt.')],
+		},
+	]),
+	stale: [],
+	orphans: [],
+})
+
+/** Supplies distinct lookup subjects whose shared name places both readings on both owners. */
+export const LEDGER_OWNER_FIXTURE = Object.freeze({
+	owners: Object.freeze([
+		{ id: 'order:BW-5512', names: ['Brightwater Studio'] },
+		{ id: 'customer:BW-20931', names: ['Brightwater Studio'] },
+	]),
+	readings: Object.freeze([
+		'Brightwater Studio ordered glazed lanterns. Collection is Friday.',
+		'Brightwater Studio paid in full. Keep the receipt.',
+	]),
+	request: 'Check Brightwater Studio.',
+})
+
+/** Supplies full and single-cut provider bytes for the equal-member owner view. */
+export const LEDGER_OWNER_RENDER_CASES = Object.freeze([
+	{
+		title: 'T2-4 renders equal-member owners once and keeps both receipt owners',
+		capacity: 4096,
+		trims: 0,
+		system:
+			'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
+	},
+	{
+		title: 'T2-5 trims the merged owner record by one final line',
+		capacity: 80,
+		trims: 1,
+		system:
+			'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.',
+	},
+])
+
 /** Supplies scored sources whose ownership exercises case derivation and shared membership. */
 export const LEDGER_DISCOVERY_UNITS = Object.freeze([
 	{ source: 'orphan', group: 4, score: 9 },

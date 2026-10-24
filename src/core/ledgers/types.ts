@@ -650,8 +650,9 @@ export interface LedgerLine {
  *
  * @remarks
  * `key` is `rules` for the rules record and `owner:` followed by the owner id for an owner record.
- * `title` is `Rules`, or the owner's first name with its id. `members` lists the placed message ids
- * in conversation order.
+ * `title` is `Rules`, or the owner's first name with its id. In a request view, owner records with
+ * the same member ids in the same order render once, under their titles joined with `; `.
+ * `members` lists the placed message ids in conversation order.
  */
 export interface LedgerRecord {
 	readonly key: string

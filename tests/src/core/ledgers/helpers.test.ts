@@ -73,6 +73,8 @@ import {
 	LEDGER_WORK_FIXTURE,
 	LEDGER_DISCOVERY_UNITS,
 	LEDGER_DISCOVERY_RECORDS,
+	LEDGER_OWNER_PROJECTION,
+	buildLedgerLine,
 	replaceLedgerRecord,
 } from '../../../setup.js'
 
@@ -1606,6 +1608,56 @@ describe('buildRecords', () => {
 
 describe('selectRecords', () => {
 	const built = buildRecords(createLedgerDesk())
+
+	it('T2-1 collapses equal-member owners under joined titles before the rules record', () => {
+		const projection = LEDGER_OWNER_PROJECTION
+		const before = JSON.stringify(projection)
+		const views = selectRecords(projection, { owners: ['BW-5512', 'BW-20931'], topics: [] })
+		expect(views).toEqual([
+			{
+				...projection.records[0],
+				title: 'Brightwater Studio (account BW-5512); Brightwater Studio (account BW-20931)',
+			},
+			projection.records[2],
+		])
+		expect(JSON.stringify(projection)).toBe(before)
+		expect(views[0]).not.toBe(projection.records[0])
+		expect(views[0]?.members).not.toBe(projection.records[0]?.members)
+		expect(views[0]?.lines[0]).not.toBe(projection.records[0]?.lines[0])
+	})
+
+	it('T2-2 keeps same-name owners separate when one member or its order differs', () => {
+		const projection = replaceLedgerRecord(LEDGER_OWNER_PROJECTION, 'owner:BW-5512', (record) => ({
+			...record,
+			members: [...record.members, 'only-order'],
+			lines: [...record.lines, buildLedgerLine('only-order', 0, 'BW-5512 shipped.')],
+		}))
+		const request = { owners: ['BW-5512', 'BW-20931'], topics: [] }
+		expect(JSON.stringify(selectRecords(projection, request))).toBe(
+			JSON.stringify(projection.records),
+		)
+		const reversed = replaceLedgerRecord(LEDGER_OWNER_PROJECTION, 'owner:BW-20931', (record) => ({
+			...record,
+			members: record.members.toReversed(),
+		}))
+		expect(selectRecords(reversed, request)).toEqual(reversed.records)
+		expect(selectRecords(LEDGER_OWNER_PROJECTION, { owners: ['BW-20931'], topics: [] })).toEqual([
+			LEDGER_OWNER_PROJECTION.records[1],
+			LEDGER_OWNER_PROJECTION.records[2],
+		])
+	})
+
+	it('T2-3 keeps the first requested owner key and joins titles in request order', () => {
+		const views = selectRecords(LEDGER_OWNER_PROJECTION, {
+			owners: ['BW-20931', 'missing', 'BW-5512', 'BW-20931'],
+			topics: [],
+		})
+		expect(views.map((record) => record.key)).toEqual(['owner:BW-20931', 'rules'])
+		expect(views[0]).toEqual({
+			...LEDGER_OWNER_PROJECTION.records[1],
+			title: 'Brightwater Studio (account BW-20931); Brightwater Studio (account BW-5512)',
+		})
+	})
 
 	it('lists the requested owner records in the order named, then the rules record', () => {
 		const views = selectRecords(built, {

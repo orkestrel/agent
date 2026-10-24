@@ -896,12 +896,14 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 }
 
 /**
- * Selects a request's view of the projected records.
+ * Selects a request's records, collapsing owners with equal ordered member ids under titles joined with `; `.
  *
  * @remarks
  * The view holds the owner records the request names in the order it names them, then the rules
  * record with the lines whose topics meet the request's first, each group in position order. The
- * returned records and lines are copies.
+ * returned records and lines are copies. Owner records with the same member ids in the same order
+ * collapse into the first requested record, keeping its key, members, and lines and joining their
+ * titles with `; ` before trimming.
  *
  * @param projection - The output of {@link buildRecords}
  * @param request - The owners and the desk topics the request names
@@ -925,11 +927,22 @@ export function selectRecords(
 		(rules?.lines ?? []).filter(() => true),
 		(line) => line.topics.some((topic) => topics.has(topic)),
 	)
+	const owners = [...new Set(request.owners)].flatMap((owner) => {
+		const record = projection.records.find((one) => one.key === `${LEDGER_OWNER_PREFIX}${owner}`)
+		return record === undefined ? [] : [record]
+	})
+	const groups = Map.groupBy(owners, (record) => JSON.stringify(record.members))
 	return [
-		...[...new Set(request.owners)].flatMap((owner) => {
-			const record = projection.records.find((one) => one.key === `${LEDGER_OWNER_PREFIX}${owner}`)
-			return record === undefined ? [] : [structuredClone(record)]
-		}),
+		...[...groups.values()].flatMap(([record, ...rest]) =>
+			record === undefined
+				? []
+				: [
+						structuredClone({
+							...record,
+							title: [record.title, ...rest.map((one) => one.title)].join('; '),
+						}),
+					],
+		),
 		...(rules === undefined
 			? []
 			: [
