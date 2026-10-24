@@ -30,6 +30,7 @@ import {
 	rankLedgerCut,
 	cutListing,
 	extractTokens,
+	filterLedgerDiscovery,
 	fitSlope,
 	identifyLookup,
 	linkOwners,
@@ -70,8 +71,42 @@ import {
 	LEDGER_LEXICAL_ENTRIES,
 	LEDGER_CUT_MATCHES,
 	LEDGER_WORK_FIXTURE,
+	LEDGER_DISCOVERY_UNITS,
+	LEDGER_DISCOVERY_RECORDS,
 	replaceLedgerRecord,
 } from '../../../setup.js'
+
+describe('filterLedgerDiscovery', () => {
+	it('T3-5 preserves open cases keyed units orphans rules shared owners and input order', () => {
+		const units = LEDGER_DISCOVERY_UNITS
+		const records = LEDGER_DISCOVERY_RECORDS
+		const before = JSON.stringify({ units, records })
+		const selected = filterLedgerDiscovery(units, records, [])
+		expect(selected.map((unit) => unit.source)).toEqual([
+			'orphan',
+			'keyed',
+			'same',
+			'rule',
+			'shared',
+			'keyed-rule',
+			'keyed-name',
+		])
+		expect(selected[0]).toBe(units[0])
+		const discovery = units.filter((unit) => unit.group === 4)
+		expect(filterLedgerDiscovery(discovery, records, [])).toEqual(discovery)
+		expect(
+			filterLedgerDiscovery(discovery, records, ['FOREIGN']).map((unit) => unit.source),
+		).toEqual(['orphan', 'foreign', 'rule', 'shared'])
+		expect(
+			filterLedgerDiscovery([{ source: 'unknown-keyed', group: 3 }, ...discovery], records, []).map(
+				(unit) => unit.source,
+			),
+		).toEqual(['unknown-keyed', 'orphan', 'rule'])
+		expect(filterLedgerDiscovery([], records, ['SAME'])).toEqual([])
+		expect(filterLedgerDiscovery(units, [], ['SAME'])).toEqual(units)
+		expect(JSON.stringify({ units, records })).toBe(before)
+	})
+})
 
 describe('earlier work', () => {
 	it('R2 collects final answer replies and skips call-only blank and reply-less requests', () => {

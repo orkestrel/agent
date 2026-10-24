@@ -37,6 +37,37 @@ import {
 import { LedgerError } from './errors.js'
 
 /**
+ * Filters discovery sources by the request's named owners and the owners of its keyed units.
+ * @param units - Scored units, with group 4 marking discovery and other groups establishing the case
+ * @param records - Every projected record, including owner records outside the selected view
+ * @param owners - The owner ids named by the request
+ * @returns The eligible units in input order; keyed units and ownerless sources stay eligible,
+ * and a request with no keyed unit or named owner keeps discovery open
+ * @example
+ * ```ts
+ * filterLedgerDiscovery([{ source: 'note', group: 4 }], [], []) // [{ source: 'note', group: 4 }]
+ * ```
+ */
+export function filterLedgerDiscovery<
+	T extends { readonly source: string; readonly group: number },
+>(units: readonly T[], records: readonly LedgerRecord[], owners: readonly string[]): readonly T[] {
+	const keyed = new Set(units.filter((unit) => unit.group !== 4).map((unit) => unit.source))
+	if (keyed.size === 0 && owners.length === 0) return units
+	const owned = records.filter((record) => record.key.startsWith(LEDGER_OWNER_PREFIX))
+	const scope = new Set([
+		...owners.map((owner) => `${LEDGER_OWNER_PREFIX}${owner}`),
+		...owned
+			.filter((record) => record.members.some((source) => keyed.has(source)))
+			.map((record) => record.key),
+	])
+	return units.filter((unit) => {
+		if (unit.group !== 4) return true
+		const holders = owned.filter((record) => record.members.includes(unit.source))
+		return holders.length === 0 || holders.some((record) => scope.has(record.key))
+	})
+}
+
+/**
  * Collects each request's last nonempty call-free assistant reply before the next request.
  * @param messages - The history in conversation order
  * @param requests - The identities of requests entered through the ledger

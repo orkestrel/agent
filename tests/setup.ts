@@ -40,6 +40,7 @@ import type {
 	LedgerProjection,
 	LedgerProjectionInput,
 	LedgerProjectionRequest,
+	LedgerRecord,
 	LedgerThreshold,
 	AgentContextInterface,
 	AgentInterface,
@@ -590,6 +591,91 @@ export const LEDGER_LEXICAL_RECALL = Object.freeze({
 
 /** Supplies explicit off, omitted, and enabled arms for byte captures. */
 export const LEDGER_LEXICAL_ARMS = Object.freeze([false, undefined, true])
+
+/** Supplies owned discovery readings and requests with open, orphan-keyed, and owner-keyed cases. */
+export const LEDGER_DISCOVERY_FIXTURE = Object.freeze({
+	owner: { id: 'LH-81660', names: ['Lighthouse Studio'] },
+	reading: 'Account LH-81660: Lighthouse Studio. The amber lantern glaze is reserved.',
+	registration: 'Account LH-81660: Lighthouse Studio.',
+	foreign: 'Odile Marlow asked about the glaze order.',
+	keyed: 'Lighthouse Studio asked about refunds.',
+	closed: 'Odile Marlow asks about amber lantern glaze.',
+	open: 'Write the handoff about amber lantern glaze.',
+	same: 'Review refunds for amber lantern glaze.',
+	handoff:
+		'Write the handoff about amber lantern glaze; preserve unresolved earlier promises even for another case.',
+	amendment: 'Lighthouse Studio confirms the cobalt delivery receipt for batch 10.',
+	root: 'amber amber lantern glaze. Batch 10.',
+	surviving: 'amber amber lantern glaze.',
+})
+
+/** Supplies scored sources whose ownership exercises case derivation and shared membership. */
+export const LEDGER_DISCOVERY_UNITS = Object.freeze([
+	{ source: 'orphan', group: 4, score: 9 },
+	{ source: 'foreign', group: 4, score: 8 },
+	{ source: 'keyed', group: 1, score: 7 },
+	{ source: 'same', group: 4, score: 6 },
+	{ source: 'rule', group: 4, score: 5 },
+	{ source: 'shared', group: 4, score: 4 },
+	{ source: 'keyed-rule', group: 2, score: 3 },
+	{ source: 'keyed-name', group: 3, score: 2 },
+])
+
+/** Supplies every owner record, with a shared source held by both a foreign and an eligible owner. */
+export const LEDGER_DISCOVERY_RECORDS: readonly LedgerRecord[] = Object.freeze([
+	{ key: 'owner:FOREIGN', title: 'Foreign', members: ['foreign', 'shared'], lines: [] },
+	{ key: 'owner:SAME', title: 'Same', members: ['keyed', 'same', 'shared'], lines: [] },
+	{ key: 'rules', title: 'Rules', members: ['rule'], lines: [] },
+])
+
+/** Supplies the off-arm requests corresponding to the closed, open, and same-case controls. */
+export const LEDGER_DISCOVERY_OFF_CASES = Object.freeze([
+	{ arrival: LEDGER_DISCOVERY_FIXTURE.foreign, query: LEDGER_DISCOVERY_FIXTURE.closed },
+	{ arrival: undefined, query: LEDGER_DISCOVERY_FIXTURE.open },
+	{ arrival: LEDGER_DISCOVERY_FIXTURE.keyed, query: LEDGER_DISCOVERY_FIXTURE.same },
+])
+
+/**
+ * Creates a ledger with a registered owner's reading and an optional keyed arrival.
+ * @param arrival - The case material, or undefined for an open request
+ * @param overrides - The ledger options to replace
+ * @param content - The registered owner's lookup text
+ * @returns The ledger, recorded provider, lookup source, and optional arrival
+ */
+export function createLedgerDiscoveryFixture(
+	arrival: string | undefined,
+	overrides: Partial<LedgerOptions> = { lexical: true },
+	content: string = LEDGER_DISCOVERY_FIXTURE.reading,
+): {
+	readonly ledger: LedgerInterface
+	readonly provider: ScriptedProviderInterface
+	readonly reading: Message
+	readonly keyed: Message | undefined
+} {
+	const fixture = LEDGER_DISCOVERY_FIXTURE
+	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			judge: createPhraseJudge([]),
+			share: { prompt: 1, tail: 0.001 },
+			lookups: [
+				{
+					tool: createTool({ name: 'lookup', execute: () => content }),
+					read: () => ({ ids: [fixture.owner.id], owners: [fixture.owner] }),
+				},
+			],
+			...overrides,
+		}),
+	)
+	const reading = requireValue(
+		ledger.conversation.add(buildLedgerExchange(content, 'discovery', { id: fixture.owner.id }))[1],
+	)
+	const keyed =
+		arrival === undefined ? undefined : ledger.conversation.add({ role: 'user', content: arrival })
+	ledger.conversation.add(LEDGER_LEXICAL_PADDING)
+	return { ledger, provider, reading, keyed }
+}
 
 /** Supplies owners whose lookup contents have deliberately opposed lexical scores. */
 export const LEDGER_LEXICAL_OWNERS = Object.freeze([

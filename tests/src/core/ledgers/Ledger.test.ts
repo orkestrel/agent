@@ -71,9 +71,114 @@ import {
 	LEDGER_LEXICAL_PADDING,
 	LEDGER_LEXICAL_LONG_PADDING,
 	LEDGER_CUT_RECALL,
+	LEDGER_DISCOVERY_FIXTURE,
+	LEDGER_DISCOVERY_OFF_CASES,
+	createLedgerDiscoveryFixture,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it("T3-1 refuses another owner's discovery when an unknown party supplies the keyed case", async () => {
+		const fixture = LEDGER_DISCOVERY_FIXTURE
+		const { ledger, provider, reading, keyed } = createLedgerDiscoveryFixture(fixture.foreign)
+		const result = await ledger.respond(fixture.closed)
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.owners).toEqual([])
+		expect(plan.filed).toContain(reading.id)
+		expect(plan.rendered).toEqual([requireValue(keyed).id])
+		expect(provider.calls[0]?.messages[0]?.content).toBe(
+			`Serve the desk.\n\n## Pinned\n${fixture.foreign}`,
+		)
+	})
+	it('T3-2 discovers an owner-held reading when the case is open', async () => {
+		const fixture = LEDGER_DISCOVERY_FIXTURE
+		const { ledger, provider, reading } = createLedgerDiscoveryFixture(undefined)
+		const result = await ledger.respond(fixture.open)
+		expect(result.receipts[0]?.selections[0]?.plan?.rendered).toEqual([reading.id])
+		expect(provider.calls[0]?.messages[0]?.content).toContain(fixture.reading)
+	})
+	it('T3-3 discovers an unmentioned owner through a topic-keyed unit', async () => {
+		const fixture = LEDGER_DISCOVERY_FIXTURE
+		const { ledger, provider, reading, keyed } = createLedgerDiscoveryFixture(fixture.keyed)
+		const result = await ledger.respond(fixture.same)
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.owners).toEqual([])
+		expect(plan.rendered).toEqual([requireValue(keyed).id, reading.id])
+		const content = requireValue(provider.calls[0]?.messages[0]).content
+		expect(content).toContain(fixture.reading)
+		expect(content.indexOf(fixture.keyed)).toBeLessThan(content.indexOf(fixture.reading))
+	})
+	it('T3-4 keeps omitted and false provider bytes identical across discovery cases', async () => {
+		const fixture = LEDGER_DISCOVERY_FIXTURE
+		const transcripts = []
+		for (const lexical of LEDGER_LEXICAL_ARMS.filter((arm) => arm !== true)) {
+			const calls = []
+			for (const row of LEDGER_DISCOVERY_OFF_CASES) {
+				const { ledger, provider, reading } = createLedgerDiscoveryFixture(row.arrival, {
+					...(lexical === undefined ? {} : { lexical }),
+				})
+				const result = await ledger.respond(row.query)
+				expect(result.receipts[0]?.selections[0]?.plan?.rendered).not.toContain(reading.id)
+				expect(provider.calls[0]?.messages[0]?.content).not.toContain(fixture.reading)
+				calls.push(serializeLedgerRequests(ledger, provider.calls, []))
+			}
+			transcripts.push(calls)
+		}
+		expect(transcripts[0]).toEqual(transcripts[1])
+	})
+	it('T3-L1 keeps cross-case discovery open for a handoff naming no case', async () => {
+		const fixture = LEDGER_DISCOVERY_FIXTURE
+		const { ledger, provider, reading } = createLedgerDiscoveryFixture(fixture.foreign)
+		const result = await ledger.respond(fixture.handoff)
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.owners).toEqual([])
+		expect(plan.rendered).toContain(reading.id)
+		expect(provider.calls[0]?.messages[0]?.content).toContain(fixture.reading)
+	})
+	it('T3-L2 reads the case as open when its keyed material is in the recent tail', async () => {
+		const fixture = LEDGER_DISCOVERY_FIXTURE
+		const { ledger, provider, reading, keyed } = createLedgerDiscoveryFixture(fixture.foreign, {
+			lexical: true,
+			recent: true,
+			share: { prompt: 1, tail: 0.5 },
+		})
+		const result = await ledger.respond(fixture.closed)
+		const selection = requireValue(result.receipts[0]?.selections[0])
+		expect(selection.tail).toContain(requireValue(keyed).id)
+		expect(selection.plan?.owners).toEqual([])
+		expect(selection.plan?.rendered).toEqual([reading.id])
+		expect(provider.calls[0]?.messages[0]?.content).toContain(fixture.reading)
+	})
+	it('T3-A refuses a foreign amendment carried by an eligible orphan discovery root', async () => {
+		const fixture = LEDGER_DISCOVERY_FIXTURE
+		const { ledger, provider, reading, keyed } = createLedgerDiscoveryFixture(
+			fixture.foreign,
+			{ lexical: true },
+			fixture.registration,
+		)
+		const root = ledger.conversation.add({ role: 'user', content: fixture.root })
+		const amendment = ledger.conversation.add({ role: 'user', content: fixture.amendment })
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(amendment, {
+				model: 'scripted',
+				answer: { form: 'choice', probabilities: { fact: 1, correction: 0.6 } },
+			}),
+		)
+		ledger.conversation.judgments.add({
+			...buildLedgerPairJudgment('amends', root, amendment, 1),
+			model: 'scripted',
+		})
+		ledger.conversation.judgments.add({
+			...buildLedgerPairJudgment('supersedes', root, amendment, 0),
+			model: 'scripted',
+		})
+		const result = await ledger.respond(fixture.closed)
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.filed).toContain(amendment.id)
+		expect(plan.rendered).toEqual([requireValue(keyed).id, root.id])
+		expect(plan.rendered).not.toContain(reading.id)
+		expect(provider.calls[0]?.messages[0]?.content).toContain(fixture.surviving)
+		expect(provider.calls[0]?.messages[0]?.content).not.toContain(fixture.amendment)
+	})
 	it('R2 carries every matched earlier draft in order and cuts the oldest work first', async () => {
 		const fixture = LEDGER_WORK_FIXTURE
 		const observations = []

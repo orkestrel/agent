@@ -307,7 +307,9 @@ export interface LedgerOptions {
 	 * If `true`, admits unkeyed units whose BM25 score reaches the discovery floor, renders them after
 	 * every keyed unit in descending score order, cuts them before any keyed unit in ascending score
 	 * order, and ranks recall keyed-first then by BM25; keyed units keep their existing order and cut
-	 * keys. If `false`, retains existing selection.
+	 * keys. An owner-held discovery source must share an owner with the request or a keyed unit;
+	 * when neither a keyed unit nor a named owner exists, discovery stays open. The same check applies
+	 * to carried amendment sources. If `false`, retains existing selection.
 	 * Default: false.
 	 */
 	readonly lexical?: boolean

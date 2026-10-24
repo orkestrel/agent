@@ -69,6 +69,7 @@ import {
 	collectRegistry,
 	cutListing,
 	extractTokens,
+	filterLedgerDiscovery,
 	linkOwners,
 	matchEntities,
 	rankLedgerCut,
@@ -749,7 +750,10 @@ export class Ledger implements LedgerInterface {
 				},
 			]
 		})
-		const ordered = [...units].sort(
+		const eligible = this.#options.lexical
+			? filterLedgerDiscovery(units, projection.records, owners)
+			: units
+		const ordered = [...eligible].sort(
 			(left, right) =>
 				left.group - right.group ||
 				(left.group === 1 ? Number(left.unsettled) - Number(right.unsettled) : 0) ||
@@ -786,10 +790,31 @@ export class Ledger implements LedgerInterface {
 				.flatMap((record) => record.lines.map(() => ({ key: record.key, source: undefined })))
 				.reverse(),
 		]
-		const mapped = ordered.map((unit) => ({
-			source: unit.source,
-			record: this.#buildUnitRecord(unit.source, unit.category, input, projection, held),
-		}))
+		const mapped = ordered.map((unit) => {
+			const record = this.#buildUnitRecord(unit.source, unit.category, input, projection, held)
+			if (!this.#options.lexical || unit.group !== 4) return { source: unit.source, record }
+			const amendments = new Set(
+				filterLedgerDiscovery(
+					[
+						...units.filter((candidate) => candidate.group !== 4),
+						...record.lines
+							.filter((line) => line.source !== unit.source)
+							.map((line) => ({ source: line.source, group: 4 })),
+					],
+					projection.records,
+					owners,
+				).map((candidate) => candidate.source),
+			)
+			return {
+				source: unit.source,
+				record: {
+					...record,
+					lines: record.lines.filter(
+						(line) => line.source === unit.source || amendments.has(line.source),
+					),
+				},
+			}
+		})
 		const trimmed = this.#trim(
 			steps,
 			records,
