@@ -591,8 +591,6 @@ export async function createMemoryDaemonFixture(
 	await reserved.destroy()
 	if (new URL(url).port === '11434') throw new Error('Reserved the forbidden daemon port')
 	const executable = realpathSync(process.execPath)
-	if (process.versions.node.split('.')[0] !== '24')
-		throw new Error('Memory daemon requires Node 24')
 	const preload = scratch.write(
 		'daemon.ts',
 		readFileSync(resolve('tests/studies/memory/fixtures/daemon.ts'), 'utf8'),
