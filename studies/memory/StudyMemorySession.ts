@@ -72,7 +72,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #ledger: LedgerInterface | undefined
 	readonly #arrivals = new Set<string>()
 	readonly #messages: StudyMemoryArrival[] = []
-	readonly #names = new Map<string, string>()
+	#names: ReadonlyMap<string, string> = new Map()
 	readonly #sizes: number[] = []
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
 	readonly #lookups = new WeakMap<object, Readonly<Record<string, unknown>>>()
@@ -365,7 +365,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					: await this.#ledger.respond(input.prompt, signal)
 			if (this.#ledger !== undefined) {
 				const captured = buildStudyMemoryResult(result)
-				this.#names.set(captured.request, goal)
+				this.#names = new Map([...this.#names, [captured.request, goal]])
 				const snapshot = {
 					sections: [...sections, ...this.#conversation.snapshot().sections],
 					messages: this.#conversation.messages().map((message) => message.id),
