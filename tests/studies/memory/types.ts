@@ -17,7 +17,34 @@ import type {
 	StudyTrial,
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
-import type { StudyResultReading } from '@orkestrel/study/server'
+import type { StudyResultReading, StudyExchangeHistory } from '@orkestrel/study/server'
+import type { StudyMemoryDifferential } from '../../../studies/memory/types.js'
+
+/** Holds a CPU recording and the settings replayed against its sealed history. */
+export interface MemoryRecordingFixture {
+	readonly arm: 'records' | 'compaction'
+	readonly goals: readonly StudyGoal[]
+	readonly responses?: readonly MemoryWireFixture[]
+	readonly treatments: Readonly<Record<string, Readonly<Record<string, JSONValue>>>>
+	readonly room?: Partial<StudyProfile['room']>
+}
+
+/** Holds the strict differential and native outcome of one offline treatment replay. */
+export interface MemoryRecordingReading {
+	readonly name: string
+	readonly command: StudyInstallResult
+	readonly status: StudyResultReading['status']
+	readonly differential: StudyMemoryDifferential
+}
+
+/** Holds a sealed CPU history and its offline treatment readings after cleanup. */
+export interface MemoryRecordingResult {
+	readonly history: StudyExchangeHistory
+	readonly evidence: readonly StudyEvidence[]
+	readonly readings: readonly MemoryRecordingReading[]
+	readonly sent: number
+	readonly replayed: number
+}
 
 /** Holds a resolved real Ledger fallback and its independently captured conversation order. */
 export interface MemoryFallbackResult extends LedgerResult {
@@ -43,6 +70,7 @@ export interface MemoryReplayOptions {
 	readonly goals?: readonly StudyGoal[]
 	readonly daemon?: StudyDaemon
 	readonly settings?: Readonly<Record<string, JSONValue>>
+	readonly room?: Partial<StudyProfile['room']>
 }
 
 /** Holds a prospective treatment trajectory and the text it must add to a request. */

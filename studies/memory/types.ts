@@ -41,7 +41,7 @@ export interface StudyMemoryOptions {
 }
 
 /** Selects the Ledger treatments admitted by the memory study. */
-export type StudyMemoryLedgerOptions = Pick<LedgerOptions, 'link' | 'lexical'>
+export type StudyMemoryLedgerOptions = Pick<LedgerOptions, 'link' | 'lexical' | 'recent'>
 
 /** Names the request-body members compared in precedence order. */
 export type StudyMemoryMember = 'model' | 'messages' | 'tools' | 'options' | 'prompt' | 'flags'

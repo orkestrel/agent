@@ -62,6 +62,11 @@ it('forwards omitted, false, and enabled Ledger keys exactly to the real factory
 	expect(disabled).not.toHaveProperty('lexical')
 	expect(enabled).toHaveProperty('lexical', true)
 	expect(enabled).not.toHaveProperty('link')
+	const [recent] = await captureMemoryLedgerOptions({ ledger: { recent: false } })
+	expect(omitted).not.toHaveProperty('recent')
+	expect(empty).not.toHaveProperty('recent')
+	expect(recent).toHaveProperty('recent', false)
+	expect(recent?.pins).toBeTypeOf('function')
 })
 
 it('refuses malformed and unreadable treatment groups and provenance without inventing sources', () => {

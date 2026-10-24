@@ -3,7 +3,19 @@ import type { StudyMemoryLedgerOptions, StudyMemoryMember } from './types.js'
 
 /** Lists the admitted default-off Ledger switches. */
 export const STUDY_MEMORY_LEDGER_KEYS: ReadonlyArray<keyof StudyMemoryLedgerOptions> =
-	Object.freeze(['link', 'lexical'])
+	Object.freeze(['link', 'lexical', 'recent'])
+
+/**
+ * Names the public desk policy, grant obligation, and case register held across shifts.
+ * @remarks
+ * The day stamp is excluded because the census found stale dates matching the opening stamp.
+ * The opening case sources are excluded because off-focus handoffs retained that case.
+ */
+export const STUDY_MEMORY_STANDING: readonly string[] = Object.freeze([
+	'endurance-desk',
+	'ev-opening',
+	'ev-register',
+])
 
 /** Orders parsed request differences before the remaining native flags. */
 export const STUDY_MEMORY_MEMBERS: readonly StudyMemoryMember[] = Object.freeze([

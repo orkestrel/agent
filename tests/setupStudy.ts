@@ -19,6 +19,9 @@ import type {
 	MemoryUsageFixture,
 	MemoryWireFixture,
 	MemoryWorker,
+	MemoryRecordingFixture,
+	MemoryRecordingReading,
+	MemoryRecordingResult,
 	StudyInstallFixture,
 	StudyInstallPackage,
 	StudyInstallResult,
@@ -57,7 +60,7 @@ import {
 	isNumber,
 } from '@orkestrel/contract'
 import { createRecorder, waitForCondition } from '@orkestrel/test'
-import { createLoopback, isRunning } from '@orkestrel/test/server'
+import { createLoopback, isRunning, createScratch, destroyScratch } from '@orkestrel/test/server'
 import {
 	parseStudyProfile,
 	parseStudyScenario,
@@ -72,9 +75,10 @@ import {
 	readStudyDeclaration,
 	readStudyExchanges,
 	readStudyResult,
+	collectStudyEvidence,
 } from '@orkestrel/study/server'
 import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
-import { StudyMemoryDriver } from '../studies/memory/index.js'
+import { StudyMemoryDriver, readStudyMemoryDifferential } from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
@@ -118,7 +122,8 @@ export const STUDY_MEMORY_LEDGER_CONTROLS: Readonly<
 
 /** Supplies unknown keys and non-boolean treatment groups that admission must refuse. */
 export const STUDY_MEMORY_LEDGER_INVALID: readonly unknown[] = Object.freeze([
-	{ recent: true },
+	{ unknown: true },
+	{ recent: 1 },
 	{ link: 1 },
 	{ lexical: 'true' },
 	{ link: undefined },
@@ -397,6 +402,114 @@ export async function replayMemoryDifferential(
 	return { command, result: await readStudyResult(output) }
 }
 
+/** Records inert replies, replays treatments offline, and releases every fixture resource.
+ * @param options - The public goal horizon, arm, and treatment settings.
+ * @returns The sealed baseline and strict differential for every treatment.
+ * @throws Error - Thrown when recording does not seal or its trial is absent.
+ */
+export async function runMemoryRecording(
+	options: MemoryRecordingFixture,
+): Promise<MemoryRecordingResult> {
+	const scratch = createScratch({ parent: resolve('tmp/units'), prefix: 'proto-wiring-fixture-' })
+	const server = await createMemoryServer(options.responses)
+	try {
+		const fixture = createMemoryReplayFixture(scratch, server.url, options.arm, {
+			goals: options.goals,
+			settings: { observe: true },
+			...(options.room === undefined ? {} : { room: options.room }),
+		})
+		const output = join(scratch.path, 'recorded')
+		const command = await executeStudyInstall(
+			fixture,
+			['execute', 'memory', '--out', output],
+			120000,
+		)
+		if (command.code !== 0) throw new Error(JSON.stringify(command))
+		const baseline = await readStudyResult(output)
+		if (baseline.status !== 'sealed') throw new Error('CPU recording did not seal')
+		const [trial] = baseline.manifest.schedule
+		if (trial === undefined) throw new Error('Missing CPU recording trial')
+		const history = await readStudyExchanges(baseline, trial.id)
+		const evidence = (await collectStudyEvidence(baseline))[trial.id]
+		if (evidence === undefined) throw new Error('Missing CPU recording evidence')
+		const sent = server.requests.length
+		const readings: MemoryRecordingReading[] = []
+		for (const [name, settings] of Object.entries(options.treatments)) {
+			const replay = await replayMemoryDifferential(fixture, baseline, name, settings)
+			readings.push({
+				name,
+				command: replay.command,
+				status: replay.result.status,
+				differential: await readStudyMemoryDifferential({
+					baseline,
+					replay: replay.result,
+					trial: trial.id,
+				}),
+			})
+		}
+		return { history, evidence, readings, sent, replayed: server.requests.length - sent }
+	} finally {
+		await server.close()
+		destroyScratch(scratch)
+	}
+}
+
+/** Builds a named two-goal trajectory whose second request follows a completed exchange.
+ * @returns Public standing and ordinary arrivals followed by a later request.
+ */
+export function buildMemoryRecentGoals(): readonly StudyGoal[] {
+	return [
+		{
+			id: 'opening',
+			input: {
+				prompt: 'Acknowledge the desk.',
+				arrivals: [
+					{ id: 'endurance-desk', content: 'Keep the public desk policy.' },
+					{ id: 'day', content: 'The opening day is Monday.' },
+				],
+				records: [],
+			},
+		},
+		{ id: 'closure', input: { prompt: 'Continue the desk.', arrivals: [], records: [] } },
+	]
+}
+
+/** Builds a tight recent-tail trial with standing sources older than oversized completed replies.
+ * @returns A CPU trial that must retain the standing sources and evict ordinary seed messages.
+ */
+export function buildMemoryPinTrial(): MemoryTrialFixture {
+	return {
+		arm: 'records',
+		room: { context: 4096 },
+		settings: { observe: true, ledger: { recent: true } },
+		goals: ['opening', 'middle', 'closure'].map((id, index) => ({
+			id,
+			input: {
+				prompt: `Acknowledge desk request ${index}.`,
+				arrivals:
+					index === 0
+						? [
+								...['endurance-desk', 'ev-opening', 'ev-register'].map((source) => ({
+									id: source,
+									content: `Keep policy ${source}.`,
+								})),
+								{ id: 'day', content: 'The opening day is Monday.' },
+								{ id: 'ev-source-1-1', content: 'The opening case is dormant.' },
+							]
+						: [],
+				records: [],
+			},
+		})),
+		responses: [
+			...Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
+			...Array.from({ length: 3 }, () => ({
+				path: '/api/chat',
+					body: buildMemoryReply({ content: 'Inert draft. '.repeat(60000) }),
+			})),
+		],
+	}
+}
+
 /** Builds the public recording horizon, adding arrivals that force a compaction fold.
  * @param arm - The treatment being recorded.
  * @returns The lookup and correction goals, with a folding opening on compaction.
@@ -468,7 +581,7 @@ export function createMemoryReplayFixture(
 	const fixture = createStudyInstallFixture(scratch, url)
 	const base = buildMemoryProfile({
 		url,
-		...(arm === 'compaction' ? { room: STUDY_MEMORY_SUMMARY_ROOM } : {}),
+		room: { ...(arm === 'compaction' ? STUDY_MEMORY_SUMMARY_ROOM : {}), ...options.room },
 	})
 	const goals = options.goals ?? buildMemoryReplayGoals(arm)
 	const installed = parseStudyProfile(

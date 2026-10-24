@@ -39,6 +39,7 @@ import {
 	STUDY_MEMORY_METADATA,
 	STUDY_MEMORY_SUMMARY,
 	STUDY_MEMORY_SYSTEM,
+	STUDY_MEMORY_STANDING,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
 	STUDY_MEMORY_WORKLOAD_BYTES,
@@ -198,6 +199,11 @@ export class StudyMemorySession implements StudySessionInterface {
 			)
 			this.#ledger = options.ledger.createLedger(observer, {
 				...settings?.ledger,
+				pins: (message) =>
+					this.#messages.some(
+						(arrival) =>
+							arrival.message === message.id && STUDY_MEMORY_STANDING.includes(arrival.id),
+					),
 				judge,
 				system: STUDY_MEMORY_SYSTEM,
 				topics: STUDY_MEMORY_TOPICS,
