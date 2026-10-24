@@ -13,7 +13,7 @@ import type {
 	StudyProduct,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyOllamaActivity, StudyOllamaStep } from '@orkestrel/study/server'
+import type { StudyOllamaActivity } from '@orkestrel/study/server'
 import type {
 	StudyMemoryInput,
 	StudyMemoryProvenance,
@@ -61,7 +61,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #trace: StudyAgentTrace
 	readonly #tools: ToolManagerInterface
 	readonly #observation: StudyMemoryObservation
-	readonly #procedure: readonly StudyOllamaStep[] | undefined
+	readonly #goals: readonly string[] | undefined
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
@@ -102,22 +102,15 @@ export class StudyMemorySession implements StudySessionInterface {
 		const recorded = options.profile.record !== undefined
 		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
 			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
-		this.#procedure = recorded
-			? structuredClone(options.replay?.procedure ?? settings?.procedure)
-			: undefined
-		const declaration =
+		const declaration = options.exchanges?.declaration
+		if (
 			recorded &&
-			options.exchanges !== undefined &&
-			settings?.version !== undefined &&
-			this.#procedure !== undefined
-				? {
-						version: settings.version,
-						procedure: this.#procedure,
-						exchanges: options.exchanges,
-					}
-				: undefined
-		if (recorded && (declaration === undefined || settings?.metadata === undefined))
+			(declaration === undefined ||
+				settings?.version === undefined ||
+				settings.metadata === undefined)
+		)
 			throw new StudyError('CONFIG', 'Memory recording requires declarations and an exchange sink')
+		this.#goals = declaration === undefined ? undefined : [...declaration.goals]
 		this.#transport = new StudyOllamaTransport({
 			url: provider.url,
 			room,
@@ -128,7 +121,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			signal: options.signal,
 			observe: this.#observation.observe,
 			timing: options.provider.extractTiming,
-			...declaration,
+			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),
 			...(options.replay === undefined ? {} : { fetch: options.replay.fetch }),
 		})
 		this.#trace = new StudyAgentTrace({
@@ -305,8 +298,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#input = undefined
 		this.#live.add(activity)
 		try {
-			if (this.#procedure === undefined || this.#procedure[0]?.goal === goal)
-				await this.#transport.verify()
+			if (this.#goals === undefined || this.#goals[0] === goal) await this.#transport.verify()
 			for (const record of input.records) {
 				this.#records.set(record.id, Object.freeze({ ...record }))
 			}
@@ -378,8 +370,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			})
 			this.#transport.check()
 			signal.throwIfAborted()
-			if (this.#procedure === undefined || this.#procedure.at(-1)?.goal === goal)
-				await this.#transport.verify()
+			if (this.#goals === undefined || this.#goals.at(-1) === goal) await this.#transport.verify()
 			return product
 		} catch (error) {
 			throw this.#trace.translate(error)

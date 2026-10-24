@@ -31,12 +31,13 @@ describe('memory declaration and mechanical evidence', () => {
 		const settings = { version: 'fixture-1', metadata, procedure: [step] }
 		expect(isStudyMemoryOptions(settings)).toBe(true)
 		expect(isStudyMemoryOptions({ metadata })).toBe(true)
+		expect(isStudyMemoryOptions({ version: 'fixture-1', metadata })).toBe(true)
+		expect(isStudyMemoryOptions({ ...settings, procedure: undefined })).toBe(true)
 		for (const invalid of [
 			{ ...settings, metadata: { ...metadata, calls: 0 } },
 			{ ...settings, metadata: { ...metadata, duration: Number.NaN } },
 			{ ...settings, version: '' },
 			{ ...settings, version: undefined },
-			{ ...settings, procedure: undefined },
 			{ ...settings, metadata: undefined },
 			{ ...settings, procedure: [] },
 			{ ...settings, procedure: [{ ...step, ordinal: 2 }] },

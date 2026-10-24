@@ -78,16 +78,16 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		const { gauge, observe, checkpoints, rolling, metadata, version, procedure } = value
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
 		if (version !== undefined || procedure !== undefined) {
-			if (
-				typeof version !== 'string' ||
-				version.length === 0 ||
-				metadata === undefined ||
-				!isArray(procedure) ||
-				procedure.length === 0 ||
-				!procedure.every((step, index) => isStudyOllamaStep(step) && step.ordinal === index + 1)
-			)
+			if (typeof version !== 'string' || version.length === 0 || metadata === undefined)
 				return false
 		}
+		if (
+			procedure !== undefined &&
+			(!isArray(procedure) ||
+				procedure.length === 0 ||
+				!procedure.every((step, index) => isStudyOllamaStep(step) && step.ordinal === index + 1))
+		)
+			return false
 		if (rolling !== undefined && !isBoolean(rolling)) return false
 		if (gauge !== undefined) {
 			if (

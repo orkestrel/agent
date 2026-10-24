@@ -2,6 +2,7 @@ import type { JSONValue } from '@orkestrel/contract'
 import type {
 	StudyAttempt,
 	StudyContext,
+	StudyDaemon,
 	StudyCriterion,
 	StudyDefinition,
 	StudyEvidence,
@@ -19,6 +20,38 @@ import type { ScratchInterface } from '@orkestrel/test/server'
 /** Holds an authored recording fixture and its exact executing profile. */
 export interface MemoryReplayFixture extends StudyInstallFixture {
 	readonly profile: StudyProfile
+}
+
+/** Holds optional recording horizon and execution-owned daemon declarations. */
+export interface MemoryReplayOptions {
+	readonly goals?: readonly StudyGoal[]
+	readonly daemon?: StudyDaemon
+}
+
+/** Holds environment overrides passed through the CLI to fresh workers. */
+export interface StudyInstallOptions {
+	readonly environment?: Readonly<Record<string, string>>
+}
+
+/** Holds a reserved daemon origin and its protocol preload declaration. */
+export interface MemoryDaemonFixture {
+	readonly url: string
+	readonly declaration: StudyDaemon
+	readonly requests: readonly MemoryDaemonRequest[]
+	readonly pids: readonly number[]
+	close(): Promise<void>
+}
+
+/** Holds a request received by the execution-owned stand-in daemon. */
+export interface MemoryDaemonRequest {
+	readonly method: string
+	readonly path: string
+	readonly body: string
+	readonly positions: ReadonlyArray<{
+		readonly ordinal: number
+		readonly goal: string
+		readonly stage: string
+	}>
 }
 
 /** Holds one copied package selection in the installed fixture closure. */

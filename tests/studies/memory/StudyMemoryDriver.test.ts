@@ -19,18 +19,19 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
-	it('refuses recording without complete version, metadata and procedure settings', () => {
+	it('refuses recording without version and metadata settings', () => {
 		const base = buildMemoryProfile({ url: 'http://127.0.0.1:1' })
 		for (const settings of [
 			undefined,
 			{},
+			{ version: 'fixture-1' },
 			{ metadata: { calls: 8, bytes: 65536, duration: 2000 } },
 		]) {
 			expect(
 				() =>
 					new StudyMemoryDriver({
 						...STUDY_MEMORY_MODULES,
-						profile: { ...base, record: { bytes: 1048576 }, settings },
+						profile: { ...base, record: { bytes: 1048576, calls: 256, duration: 30000 }, settings },
 					}),
 			).toThrow(expect.objectContaining({ code: 'CONFIG' }))
 		}

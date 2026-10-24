@@ -28,9 +28,9 @@ export interface StudyMemoryOptions {
 	readonly rolling?: boolean | undefined
 	/** Bounds metadata independently; required with a recording declaration. */
 	readonly metadata?: StudyOllamaMetadata | undefined
-	/** Pins the serving version with the complete model procedure. */
+	/** Pins the serving version; required with recording. */
 	readonly version?: string | undefined
-	/** Declares ordered model requests for recording or replay. */
+	/** Optionally restricts recording to declared model requests; omission records an open sequence. */
 	readonly procedure?: readonly StudyOllamaStep[] | undefined
 }
 

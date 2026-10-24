@@ -329,13 +329,9 @@ export function validateStudyMemoryProfile(
 		profile.record !== undefined &&
 		(!isStudyMemoryOptions(profile.settings) ||
 			profile.settings.version === undefined ||
-			profile.settings.procedure === undefined ||
 			profile.settings.metadata === undefined)
 	)
-		throw new StudyError(
-			'CONFIG',
-			'Memory recording requires version, metadata and procedure settings',
-		)
+		throw new StudyError('CONFIG', 'Memory recording requires version and metadata settings')
 	if (provider === undefined || !isStudyProvider(provider))
 		throw new StudyError('CONFIG', 'Memory provider declaration is invalid')
 	if (arms.includes('records') && provider.judge === undefined)

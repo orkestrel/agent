@@ -1,12 +1,15 @@
 import type {
 	MemoryAdmissionFixture,
 	MemoryContextFixture,
+	MemoryDaemonFixture,
+	MemoryDaemonRequest,
 	MemoryFailureResult,
 	MemoryGradingFixture,
 	MemoryNativeFixture,
 	MemoryProfileFixture,
 	MemoryReplyFixture,
 	MemoryReplayFixture,
+	MemoryReplayOptions,
 	MemoryServerFixture,
 	MemoryTrialFixture,
 	MemoryTrialResult,
@@ -15,6 +18,7 @@ import type {
 	StudyInstallFixture,
 	StudyInstallPackage,
 	StudyInstallResult,
+	StudyInstallOptions,
 } from './studies/memory/types.js'
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
@@ -33,14 +37,15 @@ import type {
 	StudyProfile,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyOllamaStep, StudyValidation } from '@orkestrel/study/server'
+import type { StudyValidation } from '@orkestrel/study/server'
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
 import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerResult } from '@orkestrel/agent'
 import type { StudyMemoryReceipt, StudyMemoryRequirement } from '../studies/memory/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
-import { isRecord, parseJSON } from '@orkestrel/contract'
-import { createRecorder } from '@orkestrel/test'
+import { isRecord, parseJSON, recordOf, arrayOf, isString, isNumber } from '@orkestrel/contract'
+import { createRecorder, waitForCondition } from '@orkestrel/test'
+import { createLoopback, isRunning } from '@orkestrel/test/server'
 import {
 	parseStudyProfile,
 	parseStudyScenario,
@@ -50,93 +55,134 @@ import {
 	StudyMeter,
 	StudyScope,
 } from '@orkestrel/study'
-import { readStudyDeclaration, valueToWire } from '@orkestrel/study/server'
+import { hashStudyBytes, readStudyDeclaration } from '@orkestrel/study/server'
 import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
-import { StudyMemoryDriver, buildStudyMemoryRoles } from '../studies/memory/index.js'
+import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
 import { execFile } from 'node:child_process'
-import { cpSync, lstatSync, readFileSync } from 'node:fs'
+import { cpSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-/** Pins the public Records trajectory whose wire lengths are calibrated before declaration. */
+/** Pins a lookup and correction trajectory without measuring requests before recording. */
 export const STUDY_MEMORY_REPLAY_GOALS: readonly StudyGoal[] = Object.freeze([
 	Object.freeze({
 		id: 'opening',
 		input: {
-			prompt: 'Retain the order count',
-			arrivals: [{ id: 'source', content: 'The order count is two.' }],
-			records: [],
+			prompt: 'Look up order-1 and retain the order count',
+			arrivals: [{ id: 'source', content: 'The order count is three.' }],
+			records: [{ id: 'order-1', name: 'Owner', content: 'The order count is three.' }],
 		},
 	}),
 	Object.freeze({
 		id: 'closure',
-		input: { prompt: 'State the retained order count', arrivals: [], records: [] },
+		input: {
+			prompt: 'State the corrected order count',
+			arrivals: [{ id: 'correction', content: 'Correction: the order count is two.' }],
+			records: [{ id: 'order-1', name: 'Owner', content: 'The order count is two.' }],
+		},
 	}),
 ])
 
-/** Captures installed runtimes and authors a finite Records recording over independently observed lengths.
+/** Builds the public recording horizon, adding arrivals that force a compaction fold.
+ * @param arm - The treatment being recorded.
+ * @returns The lookup and correction goals, with a folding opening on compaction.
+ */
+export function buildMemoryReplayGoals(arm: 'records' | 'compaction'): readonly StudyGoal[] {
+	if (arm === 'records') return STUDY_MEMORY_REPLAY_GOALS
+	const [opening, closure] = STUDY_MEMORY_REPLAY_GOALS
+	if (opening === undefined || closure === undefined || !isRecord(opening.input))
+		throw new Error('Missing recording goals')
+	return [
+		{
+			...opening,
+			input: {
+				...opening.input,
+				arrivals: [
+					...Array.from({ length: 7 }, (_, index) => ({
+						id: `fold-${index}`,
+						content: 'Retain the public obligation. '.repeat(41),
+					})),
+					{ id: 'source', content: 'The order count is three.' },
+				],
+			},
+		},
+		closure,
+	]
+}
+
+/** Builds summary, lookup and distinct per-goal replies for an open recording.
+ * @param arm - The treatment whose protocol requests receive the replies.
+ * @returns Ordered chat replies; metadata and judge use the fixture's protocol defaults.
+ */
+export function buildMemoryReplayResponses(
+	arm: 'records' | 'compaction',
+): readonly MemoryWireFixture[] {
+	return [
+		...(arm === 'compaction'
+			? [{ path: '/api/chat', body: buildMemoryReply({ content: 'Public obligations retained.' }) }]
+			: []),
+		...(arm === 'records'
+			? Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() }))
+			: []),
+		{
+			path: '/api/chat',
+			body: buildMemoryReply({
+				content: '',
+				calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
+			}),
+		},
+		...['Initial count is three.', 'Corrected count is two.'].map((content) => ({
+			path: '/api/chat',
+			body: buildMemoryReply({ content }),
+		})),
+	]
+}
+
+/** Captures installed runtimes and authors a bounded open recording without calibration.
  * @param scratch - Exclusive fixture owner.
  * @param url - Ephemeral protocol peer.
- * @param baseline - Unrecorded real Records execution with the same public inputs.
+ * @param arm - The treatment being recorded.
+ * @param options - Optional goal horizon and execution-owned daemon.
  * @returns The installed command and recording profile.
  */
 export function createMemoryReplayFixture(
 	scratch: ScratchInterface,
 	url: string,
-	baseline: MemoryTrialResult,
+	arm: 'records' | 'compaction',
+	options: MemoryReplayOptions = {},
 ): MemoryReplayFixture {
 	const fixture = createStudyInstallFixture(scratch, url)
-	const base = buildMemoryProfile({ url })
-	const roles = buildStudyMemoryRoles(base, 'records')
-	const requests = baseline.requests.filter(
-		(request) => request.path === '/api/chat' || request.path === '/api/generate',
-	)
-	const dispatches = baseline.evidence.filter(
-		(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.role !== 'metadata',
-	)
-	const procedure = dispatches.map((row, index): StudyOllamaStep => {
-		const request = requests[index]
-		if (
-			request === undefined ||
-			!isRecord(row.value) ||
-			(row.value.role !== 'agent' && row.value.role !== 'judge') ||
-			(request.path !== '/api/chat' && request.path !== '/api/generate') ||
-			row.goal === undefined
-		)
-			throw new Error('Missing calibrated Records model request')
-		const policy = roles[row.value.role]
-		if (policy === undefined) throw new Error('Missing calibrated Records policy')
-		return {
-			ordinal: index + 1,
-			goal: row.goal,
-			role: row.value.role,
-			path: request.path,
-			policy,
-			admission: 'capture',
-			bytes: Buffer.byteLength(request.body),
-		}
+	const base = buildMemoryProfile({
+		url,
+		...(arm === 'compaction' ? { room: STUDY_MEMORY_SUMMARY_ROOM } : {}),
 	})
+	const goals = options.goals ?? buildMemoryReplayGoals(arm)
 	const installed = parseStudyProfile(
 		parseJSON(scratch.read('studies/memory/profiles/local.json') ?? ''),
 	)
 	const { qualification: _qualification, ...selected } = installed
+	if (selected.provider === undefined) throw new Error('Missing recording provider')
 	const profile = parseStudyProfile({
 		...selected,
 		room: base.room,
 		bounds: {
 			...selected.bounds,
-			request: { ...selected.bounds.request, tokens: base.bounds.request.tokens },
+			request: { ...selected.bounds.request, duration: 15000, tokens: base.bounds.request.tokens },
 		},
-		record: { bytes: 1048576 },
+		provider: {
+			...selected.provider,
+			...(options.daemon === undefined ? {} : { daemon: options.daemon }),
+		},
+		record: { bytes: 4194304, calls: 256, duration: 60000 },
 		settings: {
 			version: 'fixture-1',
 			metadata: { calls: 64, bytes: 1048576, duration: 30000 },
-			procedure: valueToWire(procedure),
+			...(arm === 'compaction' ? STUDY_MEMORY_SETTINGS : {}),
 		},
 	})
 	scratch.write('studies/memory/profiles/local.json', JSON.stringify(profile))
@@ -145,28 +191,47 @@ export function createMemoryReplayFixture(
 		JSON.stringify({
 			name: 'memory',
 			version: '1',
-			question: 'Does Records replay preserve the product?',
+			question: 'Does memory replay preserve the product?',
 			purpose: 'mechanism',
 			driver: 'memory',
-			arms: ['records'],
+			arms: [arm],
 			scenarios: ['replay'],
-			order: [['records']],
+			order: [[arm]],
 			retries: 0,
 			rubric: 'rubric.json',
 		}),
 	)
+	writeMemoryReplayHorizon(scratch, goals)
+	// This boundary records process identities while returning the actual authored adapter unchanged.
 	scratch.write(
-		'studies/memory/scenarios/replay.json',
-		JSON.stringify({
-			id: 'replay',
-			goals: STUDY_MEMORY_REPLAY_GOALS,
-		}),
+		'studies/memory/index.ts',
+		`
+import { appendFileSync } from 'node:fs'
+import { createStudyAdapter as createMemoryAdapter } from './factories.js'
+export function createStudyAdapter() {
+	appendFileSync(new URL('../../workers.jsonl', import.meta.url), JSON.stringify({ pid: process.pid, tz: process.env.TZ, lang: process.env.LANG }) + '\\n')
+	return createMemoryAdapter()
+}
+`,
 	)
+	return { ...fixture, profile }
+}
+
+/** Writes a recording scenario and its matching operational rubric without changing executable bytes.
+ * @param scratch - Owner of the authored consumer tree.
+ * @param goals - The complete ordered horizon, including the ancestor's unchanged prefix.
+ * @returns Nothing after both declarations are retained.
+ */
+export function writeMemoryReplayHorizon(
+	scratch: ScratchInterface,
+	goals: readonly StudyGoal[],
+): void {
+	scratch.write('studies/memory/scenarios/replay.json', JSON.stringify({ id: 'replay', goals }))
 	scratch.write(
 		'studies/memory/rubric.json',
 		JSON.stringify({
 			version: '1',
-			criteria: STUDY_MEMORY_REPLAY_GOALS.map((goal) => ({
+			criteria: goals.map((goal) => ({
 				id: goal.id,
 				scenario: 'replay',
 				goal: goal.id,
@@ -176,19 +241,101 @@ export function createMemoryReplayFixture(
 			})),
 		}),
 	)
-	// This boundary records process identities while returning the actual authored adapter unchanged.
-	scratch.write(
-		'studies/memory/index.ts',
-		`
-import { appendFileSync } from 'node:fs'
-import { createStudyAdapter as createMemoryAdapter } from './factories.js'
-export function createStudyAdapter() {
-	appendFileSync(new URL('../../workers.jsonl', import.meta.url), JSON.stringify({ pid: process.pid }) + '\\n')
-	return createMemoryAdapter()
 }
-`,
+
+/** Reserves an origin and declares a Node 24 protocol stand-in owned by Study execution.
+ * @param scratch - Owner of the preload, process receipts and request journal.
+ * @param target - The memory protocol peer receiving unchanged model requests.
+ * @returns A declaration and cleanup boundary; no daemon is started by this factory.
+ */
+export async function createMemoryDaemonFixture(
+	scratch: ScratchInterface,
+	target: string,
+): Promise<MemoryDaemonFixture> {
+	const reserved = await createLoopback(createServer())
+	const url = reserved.url
+	await reserved.destroy()
+	if (new URL(url).port === '11434') throw new Error('Reserved the forbidden daemon port')
+	const executable = realpathSync(process.execPath)
+	if (process.versions.node.split('.')[0] !== '24')
+		throw new Error('Memory daemon requires Node 24')
+	const preload = scratch.write(
+		'daemon.ts',
+		readFileSync(resolve('tests/studies/memory/fixtures/daemon.ts'), 'utf8'),
 	)
-	return { ...fixture, profile }
+	return {
+		url,
+		declaration: {
+			executable,
+			digest: hashStudyBytes(readFileSync(executable)),
+			version: 'fixture-1',
+			environment: {
+				NODE_OPTIONS: `--import=${pathToFileURL(preload).href}`,
+				MEMORY_DAEMON_TARGET: target,
+				MEMORY_DAEMON_REQUESTS: join(scratch.path, 'daemon-requests.jsonl'),
+				MEMORY_DAEMON_PIDS: join(scratch.path, 'daemon-pids.jsonl'),
+				MEMORY_DAEMON_EVIDENCE: scratch.path,
+				MEMORY_DAEMON_VERSION: 'fixture-1',
+			},
+			models: [
+				{ name: 'model', digest: 'a'.repeat(64) },
+				{ name: 'judge', digest: 'b'.repeat(64) },
+			],
+		},
+		get requests() {
+			return readMemoryDaemonRequests(scratch.read('daemon-requests.jsonl') ?? '')
+		},
+		get pids() {
+			return readMemoryDaemonPids(scratch.read('daemon-pids.jsonl') ?? '')
+		},
+		async close() {
+			for (const pid of readMemoryDaemonPids(scratch.read('daemon-pids.jsonl') ?? '')) {
+				if (isRunning(pid)) process.kill(pid, 'SIGKILL')
+				await waitForCondition('memory daemon process exit', () => !isRunning(pid), {
+					budget: 10000,
+				})
+			}
+		},
+	}
+}
+
+/** Reads the complete request journal produced by the Node preload.
+ * @param text - LF-framed received requests.
+ * @returns Validated requests and their durable sidecar positions.
+ */
+export function readMemoryDaemonRequests(text: string): readonly MemoryDaemonRequest[] {
+	return text
+		.split(/\r\n|\n/)
+		.filter(Boolean)
+		.map((line) => {
+			const row = parseJSON(line)
+			if (
+				!recordOf({
+					method: isString,
+					path: isString,
+					body: isString,
+					positions: arrayOf(recordOf({ ordinal: isNumber, goal: isString, stage: isString })),
+				})(row)
+			)
+				throw new Error('Malformed daemon request journal')
+			return row
+		})
+}
+
+/** Reads process ids retained by the stand-in across ancestor and continuation executions.
+ * @param text - LF-framed process ids.
+ * @returns Positive integer process ids.
+ */
+export function readMemoryDaemonPids(text: string): readonly number[] {
+	return text
+		.split(/\r\n|\n/)
+		.filter(Boolean)
+		.map((line) => {
+			const pid = parseJSON(line)
+			if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 0)
+				throw new Error('Malformed daemon process receipt')
+			return pid
+		})
 }
 
 /** Composes the selected built Agent as both runtime and tested subject with the installed public Ollama provider; a distinct subject replaces only `subject`. */
@@ -396,26 +543,35 @@ export function createStudyInstallFixture(
  * @param fixture - Captured installed command and working directory.
  * @param arguments_ - Exact public command arguments, including emitted next hints.
  * @param duration - Outer bound; execution retains its own request, trial and series limits.
+ * @param options - Environment overrides inherited by the command's fresh workers.
  * @returns Native exit and separate stdout/stderr bytes.
  */
 export function executeStudyInstall(
 	fixture: StudyInstallFixture,
 	arguments_: readonly string[],
 	duration = 60000,
+	options: StudyInstallOptions = {},
 ): Promise<StudyInstallResult> {
-	return executeStudyProcess([fixture.entry, ...arguments_], fixture.scratch.path, duration)
+	return executeStudyProcess(
+		[fixture.entry, ...arguments_],
+		fixture.scratch.path,
+		duration,
+		options,
+	)
 }
 
 /** Executes a real Node entry with bounded output and preserves failure diagnostics.
  * @param arguments_ - Exact Node arguments, including its JavaScript entry.
  * @param root - Native working directory.
  * @param duration - Outer process deadline in milliseconds.
+ * @param options - Environment overrides merged by case-insensitive name.
  * @returns Native exit and separate stdout/stderr bytes.
  */
 export function executeStudyProcess(
 	arguments_: readonly string[],
 	root: string,
 	duration: number,
+	options: StudyInstallOptions = {},
 ): Promise<StudyInstallResult> {
 	return new Promise((done) =>
 		execFile(
@@ -426,6 +582,17 @@ export function executeStudyProcess(
 				windowsHide: true,
 				timeout: duration,
 				maxBuffer: 16 * 1024 * 1024,
+				env: {
+					...Object.fromEntries(
+						Object.entries(process.env).filter(
+							([name]) =>
+								!Object.keys(options.environment ?? {}).some(
+									(key) => key.toLowerCase() === name.toLowerCase(),
+								),
+						),
+					),
+					...options.environment,
+				},
 			},
 			(error, stdout, stderr) =>
 				done({
@@ -558,6 +725,10 @@ export class MemoryServer implements MemoryServerFixture {
 			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
 		this.#requests.push({ path: request.url ?? '', body: Buffer.concat(chunks).toString('utf8') })
 		const [next, ...rest] = this.#pending
+		if (request.url === '/api/version' && next?.path !== '/api/version') {
+			response.end(JSON.stringify({ version: 'fixture-1' }))
+			return
+		}
 		if (request.url === '/api/tags' && next?.path !== '/api/tags') {
 			response.end(
 				JSON.stringify({
@@ -1619,6 +1790,8 @@ export function buildCustodyManifest(
 		id: 'a'.repeat(64),
 		created: '2026-10-14T12:00:00.000Z',
 		identity: {
+			runtime: 'e'.repeat(64),
+			content: 'f'.repeat(64),
 			agent: 'a'.repeat(64),
 			subject: 'a'.repeat(64),
 			provider: identity,
