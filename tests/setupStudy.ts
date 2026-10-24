@@ -1,3 +1,4 @@
+import type { StudySentenceInput, StudySentencePopulation } from '../studies/sentences/types.js'
 import type {
 	MemoryAdmissionFixture,
 	MemoryDifferentialFixture,
@@ -105,6 +106,30 @@ import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { isStudySentencePopulation } from '../studies/sentences/validators.js'
+import sentencePopulation from '../studies/sentences/population.json'
+import sentenceScenario from '../studies/memory/scenarios/endurance.json'
+
+/** Builds the complete public sentence fixture with admitted real lexical helpers. @param population - Explicit declaration overrides for rejecting controls. @returns Real scenario and runtime without model access. */
+export function buildStudySentenceFixture(
+	population: Partial<StudySentencePopulation> = {},
+): StudySentenceInput {
+	if (!isStudySentencePopulation(sentencePopulation))
+		throw new Error('Invalid public sentence declaration')
+	return { scenario: sentenceScenario, agent, population: { ...sentencePopulation, ...population } }
+}
+
+/** Pins the public bounded draw's ordinal SHA-256 ranks, independently recomputable from the accepted tuples. */
+export const STUDY_SENTENCE_DRAW = Object.freeze([
+	'07a2741812654dbba437429af4d690fdd7695835514a6859f12d3cad5ae40699',
+	'0ae7b6f642abcb177d64a6274a1f94c6179139940208fd9ea1e89f2e82dbb9ce',
+	'0bc3e3dfbdd736154603749cb3123945cfa6093e96650cf2c09033d7e9f8c00a',
+	'0cfd3605b2ccd3f366fe6555a8c3ecded43b8a6c1f2185164e70b525dc0265d4',
+	'21cfecdcf0001eac370d7eddb1c4639570bd53e6d558cabfa76afb94111b7abf',
+	'30592c9428f24d15d432d3b270a4b1f3cb2a1b9ecab7b4f7e5b44929bfaa2acf',
+	'3180fec21c118b28513d7775ca3d915e2b4f29260b97f4da98bc8d7380686db9',
+	'45af7e7bfc587d04ee84524baa31eb2e79086166d2f62e4c6af99b4fe70f744c',
+])
 
 /** Pins a lookup and correction trajectory without measuring requests before recording. */
 export const STUDY_MEMORY_REPLAY_GOALS: readonly StudyGoal[] = Object.freeze([

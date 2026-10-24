@@ -5,7 +5,9 @@ import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
+import * as sentenceRuntime from '../dist/src/core/index.js'
 import {
+	buildStudySentenceFixture,
 	MemoryServer,
 	buildCustodyManifest,
 	buildMemoryGradingFixture,
@@ -52,6 +54,16 @@ import {
 	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_TIMING,
 } from './setupStudy.js'
+
+it('builds the public sentence fixture with real helpers and explicit declaration overrides', () => {
+	const input = buildStudySentenceFixture()
+	expect(input.agent.extractTokens).toBe(sentenceRuntime.extractTokens)
+	expect(input.agent.splitSentences).toBe(sentenceRuntime.splitSentences)
+	expect(input.scenario.id).toBe('endurance')
+	expect(input.population.cases).toHaveLength(12)
+	expect(buildStudySentenceFixture({ aliases: [] }).population.aliases).toEqual([])
+	expect(input.population.aliases).toHaveLength(30)
+})
 
 describe('study meter fixture lifecycle', () => {
 	it('owns its primitive lifetimes and closes admission without cancelling completed work', () => {
