@@ -10,7 +10,17 @@ Agent's boost campaign plan: the handoff of 2026-10-24, then goal, exit, rulings
 
 Resume the Ledger fixes under U26, U27 and U28. The instrument is accepted for local use; no live boost benefit is established, and U12b's exit criterion remains unmet. This section updates the dated status and dispatch rows; the rulings, gates, and dispositions in this plan and `.orkestrel/agent/boosts.md` still bind.
 
-### Pick up here
+### Recovery checkpoint after A2 run 3 (2026-10-24)
+
+This checkpoint supersedes the earlier dated handoff and in-flight descriptions that follow. A1 is accepted at `603d9dfb`; the repaired population is 212 base packets. U29 permits a 13.5-minute forecast with U28's 15 model / 20 elapsed hard cap unchanged. Labels are frozen in `tmp/units/ledger-sentence-labels/final.json` (`4132aef9f65a9de972944474ba9a0d9cb8bf350cd8809ac41fd115f1c2e5093d`), recorded by `af324fc1`. A2 run 3 measured 226 requests / 807.385 forecast seconds and passed host feasibility and an earlier synthetic full CPU rehearsal. It stopped with 15 passing proofs and one failing partial-response evidence assertion. No calibration or D1 product implementation has run.
+
+The A2 draft is uncommitted: sentence-study code and declarations, sentence tests, and sentence additions in the shared study fixtures. Preserve those edits and the modified package pins. Read `tmp/units/ledger-sentence-calibration/report-3.md` before work. All A2 processes ended; root confirmed proof PID 76928 and cleanup PID 70500 absent. The next unit is a bounded Astra cause analysis under `tmp/units/ledger-sentence-partial-brief.md`: establish whether the bytes were lost or the assertion expects the wrong transport event, then prescribe the repair. The launch identity belongs in `tmp/units/ledger-sentence-resume.md`. Do not duplicate a live lane.
+
+The user's terminal constraint is one process-running lane across the host, including root. After diagnosis: finish A2, obtain its independent review and CPU gates, notify the user before the bounded GPU calibration, and build D1 only on an accepted calibration. D2 remains accepted; D3 awaits integrated review. Preserve U24's remaining allowance and the original recordings/captured Study installation. Full studies gates use the evidenced 2400-second cap.
+
+The user approved removing R3's unused `link` option and retiring experiments that show no measured benefit after L1. Queue R3 removal after the sole A2 writer exits; preserve baseline evidence and update all consumers in its bounded unit. No agent-quality gain is established. This cleanup decision changes no calibration population, cap, or acceptance floor.
+
+### Earlier handoff (superseded by the recovery checkpoint)
 
 Updated 2026-10-24 after A1 returned. Scaffold 0.0.106 and Study 0.0.4 are registry-confirmed; `.orkestrel/release.md` records their evidence. D2 remains accepted and D3 awaits the integrated review. The user authorized proceeding with the fixes. Preserve Agent's captured Study build and local pin. A1's enumeration is built but unaccepted; independent implementation review and CPU gates precede A2 and labels. Read `boosts.md` LR-5 and `tmp/units/ledger-sentence-resume.md` for ownership, task identities, and recovery. No D1 product implementation or calibration has run. Do these first, in order:
 
