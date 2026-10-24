@@ -1,5 +1,43 @@
 # Study and Scaffold release preparation, 2026-10-24
 
+## Ready for publication
+
+Preparation is complete. No package has been uploaded. All release tasks are terminal, both release repositories are clean and pushed, and the prepared archives are retained. Agent's package.json/package-lock.json local Study pin remains intentionally dirty and unchanged.
+
+| Package | Prepared version | Pushed main | Archive |
+| --- | --- | --- | --- |
+| Scaffold | 0.0.106 | b92f12067faca7f42dec3e7073c6af75b326d70c | ../scaffold/tmp/releases/20261024/orkestrel-scaffold-0.0.106.tgz |
+| Study | 0.0.4 | c56619841d9dcde72fa1f07fe91c057c96b2e2cb | ../study/tmp/releases/20261024/orkestrel-study-0.0.4.tgz |
+
+Study passed full prepublishOnly on Node24.22.1 and22.18.0. Scaffold passed full prepublishOnly on Node24.22.1 and completed every Node22 gate across the original run and successful templates/distribution continuations. The original Node22 invocation and first distribution attempt remain failed due to registry metadata refusals; they were not relabeled. Final distribution on an isolated cache passed11/1skip in300.876seconds. Final comparison exited0 in3.525seconds and resolved dist moved/ranges unchanged. Root checked the actual outer result and launcher exit directly. No source or dependency change was needed after those registry refusals.
+
+Scaffold's archive was packed with --ignore-scripts in1.782seconds. Its243 entries match npm's complete file list; the208-entry archived host digest equals the generated checkout inventory. The archive contains only the package manifest, license, README, runtime/declarations/maps, host authority/files, and executable skill twins. SHA-256: `c61065c32efc2f1696fbdb4007305e9dec3fd0a23f45f95a1e96596bb72548ae`. Integrity: `sha512-MWoeUGPiELtuYhmjvYqw/WpjwJXHP28VodP3NGyoZlW0aKEZAU86OX+aWlJIywxYJQoiOq98ZPin0LU5d9OJvQ==`. Study's archive identity is recorded under its acceptance section and was rechecked unchanged. Do not rebuild either prepared artifact before upload without recording the changed identity and applicable validation.
+
+Final registry reads still served Scaffold0.0.105 and Study0.0.3. Both git comparisons returned0/0 against origin/main. The read-only authentication probe answered live for mikesaintsg; the upload runner rechecks authentication immediately before sending. Publishing remains the user's action and code.
+
+The accepted Scaffold review report is also retained at `tmp/releases/20261024/scaffold-review-report.md`, SHA-256 `04f2ee352dcc55747024d998715ecd6be322350a3e89e5509c8ad0cd27bfe1f7`, with its destination citation record alongside it. Gate reports, failure logs, original seals, and D1 reports remain under their recorded paths. A read-only cleanup inventory is at `tmp/units/release-20261024-cleanup-inventory.json` (plain report text). Automatic approval review rejected the command combining scoped review cleanup with recursive removal of the isolated npm cache, giving only “blocked by policy”; none of that command ran. Keep the isolated cache and original review files rather than repeating the rejected deletion. The redundant root log-reader process was identified by its exact owned command and PID67420, then stopped; it wrote no files. No verifier or release process remains active.
+
+## Enter the publication code locally
+
+The private secret tool returns an opaque reference, and no available terminal/upload tool accepts that reference. Do not request a private code that cannot be forwarded, and do not ask for it in chat. When the user is ready, they can run the following command in their local PowerShell terminal. It reads the code without echo, uses the existing serial upload runner against the prepared primary checkouts, skips gates during upload, and clears the local code variables afterward. The runner captures each npm subprocess and stops on an authentication refusal; never retry a refused code. This block has not been executed.
+
+```powershell
+Set-Location 'C:\Users\mikes\WebstormProjects\scaffold'
+$env:OLLAMA_HOST = 'http://127.0.0.1:1'
+$env:PATH = 'C:\Users\mikes\scoop\apps\nodejs-lts\current;' + $env:PATH
+$releaseSecureCode = Read-Host 'npm one-time code' -AsSecureString
+try {
+    $releaseCode = [System.Net.NetworkCredential]::new('', $releaseSecureCode).Password
+    node .agents/skills/orkestrel-dispatch/scripts/launch.ts --journal tmp/units/release-20261024-publish.log --errors tmp/units/release-20261024-publish.err --cap 600 --status -- node .agents/skills/orkestrel-publish/scripts/window.ts --publish 'C:\Users\mikes\WebstormProjects\scaffold' 'C:\Users\mikes\WebstormProjects\study' --otp $releaseCode --json
+} finally {
+    $releaseCode = $null
+    $releaseSecureCode.Dispose()
+    $releaseSecureCode = $null
+}
+```
+
+After upload, root reads both publish journals, confirms exact registry versions/integrities, and records the outcome. Do not infer publication from this preparation or a terminal exit alone. Preserve Agent's captured Study build/pin until adoption is proved. D1 design reconciliation remains the underlying campaign task after this release window; its reports and limits follow in the historical record.
+
 The user requested preparation of Study and Scaffold for their next publication and a readiness report before supplying the one-time code. This authorizes the repository visits, necessary release repairs, commits, and pushes for these packages. Upload waits for the code. It opens scaffold work previously held by U23 and Study release preparation previously held by U25; it does not authorize an Agent release or an unrelated roadmap campaign.
 
 ## Entry and order
@@ -29,11 +67,11 @@ The first verifier used the wrong Scaffold checkout (`scaffold-release-0105`); d
 
 ## Active dispatches
 
-- Scaffold isolated-cache distribution verifier: GPT-6 Luna medium, task `node:delegated-task:command%3Amcp%3A0cc53948-e0cd-428d-bcba-9827c577dde4%3Adelegate-task%3Arelease-20261024-scaffold-distribution-r1`. Immutable brief: `../scaffold/tmp/units/release-20261024-scaffold-distribution-brief.md`; expected report: Agent's `tmp/units/release-20261024-scaffold-distribution-report.md`. Owns heavy execution: remaining Node22 release distribution with the designated isolated npm cache, then final comparison. Source remains maina3d4c33b6/version106; only generated host.json is dirty. No source writer, other runner, install, build, or package operation in Scaffold until it returns. Study is complete and idle.
+None. Scaffold's final task `node:delegated-task:command%3Amcp%3A0cc53948-e0cd-428d-bcba-9827c577dde4%3Adelegate-task%3Arelease-20261024-scaffold-distribution-r1` completed successfully. Report: `tmp/units/release-20261024-scaffold-distribution-report.md`. Its independent gate result is accepted; inventory committed and pushed, archive inspected. The following sections retain prior measurements and failures as history; the ready-for-publication section owns the next action.
 
 The first builder stopped correctly without writes: its baseline had four compiler failures (three manifest snapshots plus the showcase expectation) and one selected CLI diagnostic failure. The original brief incorrectly treated showcase Vite 8.3.4 as an immutable source pin. Root read `src/core/constants.ts:740-743`, which derives showcase Vite from the package manifest, and `blueprintToDevDependencies`, which applies that selected pair after extras. The successor moves the dependent expected literals to 8.3.5 while retaining singlefile 2.3.3 and every unrelated canned registry value; it changes no product source. The earlier failure logs are retained and need no repeated baseline.
 
-At most two T3 children run; only Scaffold's final verifier is active. After its result, inspect both raw gate exits and the generated host inventory diff, pack with --ignore-scripts, inspect archive contents/identity, commit the final inventory, and push. Study's full gates, comparison, archive, commit, and push are complete. Record every command and duration. Complete Scaffold preparation before asking for a code; the combined release window is not ready.
+At most two T3 children were allowed. Preparation for both packages is complete; no child remains active. The next release action is the user's authenticated upload, followed by root registry confirmation and adoption checks.
 
 ## Study acceptance and preparation
 
@@ -87,4 +125,4 @@ That successor is complete: templates passed84/0skips in200.461seconds. Distribu
 
 Root traced the adopter environment at tests/distribution.test.ts:65–130. It inherits the parent cache and invokes install with --prefer-offline; it does not provide a cache override. Installed npm-registry-fetch chooses force-cache for preferOffline before checking preferOnline, so an environment prefer-online setting alone cannot supersede that argument. Root created the isolated cache `../scaffold/tmp/units/release-20261024-floor-npm-cache` and read the exact Guide range live through it. Guide0.0.25 resolves with integrity `sha512-LrKyjMqREkHuYwB0YWj6uV20TmtWwbQ6yTgUSXPLhI4opQX0gtJ3fyHDvGEgPd7AfPuMfQP8qwWDqZs1BBLyNQ==`, exit0 in0.709seconds; see Scaffold's `tmp/units/release-20261024-guide-registry-read.log` and `.err`. Shared caches and source remain untouched. The active verifier reruns only distribution with npm_config_cache pointing at this isolated directory, then comparison if green. Retain failed runs and do not rerun successful ordinary/template gates. No package dependency or test was weakened to obtain a pass.
 
-RELEASE: OPEN — Scaffold and Study are in preparation.
+RELEASE: OPEN — Scaffold0.0.106 and Study0.0.4 are prepared; upload awaits the user's code.
