@@ -3,7 +3,7 @@ import type { StudyMemoryLedgerOptions, StudyMemoryMember } from './types.js'
 
 /** Lists the admitted default-off Ledger switches. */
 export const STUDY_MEMORY_LEDGER_KEYS: ReadonlyArray<keyof StudyMemoryLedgerOptions> =
-	Object.freeze(['link', 'lexical', 'recent'])
+	Object.freeze(['link', 'lexical', 'recent', 'work'])
 
 /**
  * Names the public desk policy, grant obligation, and case register held across shifts.

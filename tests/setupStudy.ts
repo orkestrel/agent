@@ -124,6 +124,7 @@ export const STUDY_MEMORY_LEDGER_CONTROLS: Readonly<
 export const STUDY_MEMORY_LEDGER_INVALID: readonly unknown[] = Object.freeze([
 	{ unknown: true },
 	{ recent: 1 },
+	{ work: 'true' },
 	{ link: 1 },
 	{ lexical: 'true' },
 	{ link: undefined },
@@ -504,8 +505,33 @@ export function buildMemoryPinTrial(): MemoryTrialFixture {
 			...Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
 			...Array.from({ length: 3 }, () => ({
 				path: '/api/chat',
-					body: buildMemoryReply({ content: 'Inert draft. '.repeat(60000) }),
+				body: buildMemoryReply({ content: 'Inert draft. '.repeat(60000) }),
 			})),
+		],
+	}
+}
+
+/** Pins an incorrect agent-authored product whose exact text earlier-work carriage preserves. */
+export const STUDY_MEMORY_WORK_REPLY = 'Wrong draft: thirty units approved without evidence.'
+
+/** Builds a named earlier product and a request referring to that goal identity.
+ * @returns A public named-work trajectory with distinct inert replies.
+ */
+export function buildMemoryWorkFixture(): MemoryDifferentialFixture {
+	return {
+		ordinal: 10,
+		marker: '[goal-1]',
+		goals: [
+			{ id: 'goal-1', input: { prompt: 'Prepare the desk draft.', arrivals: [], records: [] } },
+			{
+				id: 'goal-2',
+				input: { prompt: 'Revise goal-1 using the available evidence.', arrivals: [], records: [] },
+			},
+		],
+		responses: [
+			...Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
+			{ path: '/api/chat', body: buildMemoryReply({ content: STUDY_MEMORY_WORK_REPLY }) },
+			{ path: '/api/chat', body: buildMemoryReply() },
 		],
 	}
 }

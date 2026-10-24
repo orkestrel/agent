@@ -54,7 +54,7 @@ import {
 	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
 } from './helpers.js'
-import { isStudyMemoryInput, isStudyMemoryOptions } from './validators.js'
+import { isStudyMemoryInput, isStudyMemoryOptions, isStudyMemoryResult } from './validators.js'
 
 /** Preserves actual Agent, Ledger and conversation state across a trial's goals. */
 export class StudyMemorySession implements StudySessionInterface {
@@ -69,6 +69,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #ledger: LedgerInterface | undefined
 	readonly #arrivals = new Set<string>()
 	readonly #messages: StudyMemoryArrival[] = []
+	readonly #names = new Map<string, string>()
 	readonly #sizes: number[] = []
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
 	readonly #lookups = new WeakMap<object, Readonly<Record<string, unknown>>>()
@@ -199,6 +200,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			)
 			this.#ledger = options.ledger.createLedger(observer, {
 				...settings?.ledger,
+				names: (message) => this.#names.get(message.id),
 				pins: (message) =>
 					this.#messages.some(
 						(arrival) =>
@@ -342,6 +344,9 @@ export class StudyMemorySession implements StudySessionInterface {
 					? await this.#agent.generate({ signal })
 					: await this.#ledger.respond(input.prompt, signal)
 			if (this.#ledger !== undefined) {
+				if (!isStudyMemoryResult(result))
+					throw new StudyError('FAULT', 'Malformed resolved memory work')
+				this.#names.set(result.request, goal)
 				const snapshot = {
 					sections: [...sections, ...this.#conversation.snapshot().sections],
 					messages: this.#conversation.messages().map((message) => message.id),

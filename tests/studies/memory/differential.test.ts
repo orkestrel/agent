@@ -45,7 +45,9 @@ it('AS1 admits only boolean Ledger switches and refuses the group on arms withou
 		expect.objectContaining({ code: 'CONFIG' }),
 	)
 	expect(() =>
-		validateStudyMemoryProfile({ ...profile, settings: { ledger: { work: true } } }, ['records']),
+		validateStudyMemoryProfile({ ...profile, settings: { ledger: { unknown: true } } }, [
+			'records',
+		]),
 	).toThrow(expect.objectContaining({ code: 'CONFIG' }))
 })
 
@@ -67,6 +69,11 @@ it('forwards omitted, false, and enabled Ledger keys exactly to the real factory
 	expect(empty).not.toHaveProperty('recent')
 	expect(recent).toHaveProperty('recent', false)
 	expect(recent?.pins).toBeTypeOf('function')
+	const [work] = await captureMemoryLedgerOptions({ ledger: { work: false } })
+	expect(omitted).not.toHaveProperty('work')
+	expect(empty).not.toHaveProperty('work')
+	expect(work).toHaveProperty('work', false)
+	expect(work?.names).toBeTypeOf('function')
 })
 
 it('refuses malformed and unreadable treatment groups and provenance without inventing sources', () => {

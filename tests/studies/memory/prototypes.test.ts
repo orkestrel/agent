@@ -6,6 +6,8 @@ import {
 	buildMemoryPinTrial,
 	runMemoryTrial,
 	readMemoryEvents,
+	buildMemoryWorkFixture,
+	STUDY_MEMORY_WORK_REPLY,
 } from '../../setupStudy.js'
 
 it('R1 changes closure agent messages at ordinal 14 and replays omitted, false, and empty groups fully', async () => {
@@ -84,3 +86,60 @@ it('R1 holds only the declared standing arrivals after whole recent replies exce
 	)
 	expect(readMemoryEvents(result.evidence, 'selection').length).toBeGreaterThan(0)
 })
+
+it('R2 changes goal-2 agent messages at ordinal 10 with the exact wrong earlier draft and passive controls', async () => {
+	const fixture = buildMemoryWorkFixture()
+	const result = await runMemoryRecording({
+		arm: 'records',
+		goals: fixture.goals,
+		responses: fixture.responses,
+		treatments: {
+			omitted: {},
+			disabled: { ledger: { work: false } },
+			empty: { ledger: {} },
+			enabled: { ledger: { work: true } },
+		},
+	})
+	for (const reading of result.readings.filter(({ name }) => name !== 'enabled')) {
+		expect(reading.command.code).toBe(0)
+		expect(reading.differential).toEqual({
+			complete: true,
+			divergence: undefined,
+			change: undefined,
+			selection: undefined,
+		})
+	}
+	const enabled = result.readings.find(({ name }) => name === 'enabled')
+	expect(enabled?.differential.divergence).toMatchObject({
+		ordinal: 10,
+		expected: { goal: 'goal-2', role: 'agent' },
+	})
+	expect(enabled?.differential.change).toMatchObject({
+		member: 'messages',
+		index: 0,
+		origin: 'mixed',
+	})
+	const body = Buffer.from(enabled?.differential.divergence?.actual?.body ?? '', 'base64').toString(
+		'utf8',
+	)
+	expect(body).toContain(`[goal-1] ${STUDY_MEMORY_WORK_REPLY}`)
+	expect(body).toContain('Your own earlier replies')
+	expect(body).toContain('not evidence that an action happened')
+	expect(result.replayed).toBe(0)
+}, 480000)
+
+it('R2 replays fully when later prompts name no earlier goal', async () => {
+	const result = await runMemoryRecording({
+		arm: 'records',
+		goals: buildMemoryRecentGoals(),
+		treatments: { enabled: { ledger: { work: true } } },
+	})
+	expect(result.readings[0]?.command.code).toBe(0)
+	expect(result.readings[0]?.differential).toEqual({
+		complete: true,
+		divergence: undefined,
+		change: undefined,
+		selection: undefined,
+	})
+	expect(result.replayed).toBe(0)
+}, 180000)
