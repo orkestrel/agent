@@ -51,6 +51,7 @@ import {
 	measureStudyMemoryEvidence,
 	readStudyMemoryCompaction,
 	resolveStudyMemoryObservation,
+	validateStudyMemoryProfile,
 } from './helpers.js'
 import { isStudyMemoryInput, isStudyMemoryOptions } from './validators.js'
 
@@ -83,6 +84,7 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
 	constructor(options: StudyMemorySessionOptions) {
+		validateStudyMemoryProfile(options.profile, [options.arm])
 		const compaction =
 			options.arm === 'compaction' ? readStudyMemoryCompaction(options.profile) : undefined
 		const gauge = compaction?.gauge
@@ -195,6 +197,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				this.#transport,
 			)
 			this.#ledger = options.ledger.createLedger(observer, {
+				...settings?.ledger,
 				judge,
 				system: STUDY_MEMORY_SYSTEM,
 				topics: STUDY_MEMORY_TOPICS,

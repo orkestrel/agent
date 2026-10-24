@@ -4,6 +4,7 @@ import type {
 	LEDGER_QUESTIONS,
 	LedgerGauge,
 	LedgerReceipt,
+	LedgerOptions,
 	createConversationManager,
 	createLedger,
 } from '@orkestrel/agent'
@@ -14,10 +15,15 @@ import type {
 	StudyOllamaMetadata,
 	StudyOllamaReplayInterface,
 	StudyOllamaStep,
+	StudyExchangeDivergence,
+	StudyResultReading,
+	StudySealedResult,
 } from '@orkestrel/study/server'
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
+	/** Forwards declared default-off Ledger treatments on the records arm only. */
+	readonly ledger?: StudyMemoryLedgerOptions
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */
@@ -32,6 +38,46 @@ export interface StudyMemoryOptions {
 	readonly version?: string | undefined
 	/** Optionally restricts recording to declared model requests; omission records an open sequence. */
 	readonly procedure?: readonly StudyOllamaStep[] | undefined
+}
+
+/** Selects the Ledger treatments admitted by the memory study. */
+export type StudyMemoryLedgerOptions = Pick<LedgerOptions, 'link' | 'lexical'>
+
+/** Names the request-body members compared in precedence order. */
+export type StudyMemoryMember = 'model' | 'messages' | 'tools' | 'options' | 'prompt' | 'flags'
+
+/** Holds the first parsed request difference with bounded text and baseline provenance. */
+export interface StudyMemoryChange {
+	readonly member: StudyMemoryMember
+	readonly index: number | undefined
+	/** Counts UTF-16 code units within the changed message content or canonical member text. */
+	readonly offset: number
+	readonly expected: string
+	readonly actual: string
+	readonly origin: StudyMemoryOrigin | undefined
+	readonly source: string | undefined
+}
+
+/** Holds the first differing normalized selection, including an unmatched pass. */
+export interface StudyMemorySelection {
+	readonly goal: string
+	readonly pass: number
+	readonly expected: StudyMemoryReceipt | undefined
+	readonly actual: StudyMemoryReceipt | undefined
+}
+
+/** Holds the sealed observed baseline and a sealed or interrupted replay of one trial. */
+export interface StudyMemoryDifferentialOptions {
+	readonly baseline: StudySealedResult
+	readonly replay: StudyResultReading
+	readonly trial: string
+}
+
+/** Reports wire, parsed-body, and sealed selection differences independently. */
+export interface StudyMemoryDifferential {
+	readonly divergence: StudyExchangeDivergence | undefined
+	readonly change: StudyMemoryChange | undefined
+	readonly selection: StudyMemorySelection | undefined
 }
 
 /** Holds public arrivals and reference snapshots released before a goal. */

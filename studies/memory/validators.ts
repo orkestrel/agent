@@ -10,6 +10,8 @@ import type {
 	StudyMemoryReceipt,
 	StudyMemoryResult,
 	StudyMemoryDeclaration,
+	StudyMemoryLedgerOptions,
+	StudyMemoryProvenance,
 } from './types.js'
 import type { AgentStop, LedgerReceipt } from '@orkestrel/agent'
 import {
@@ -30,7 +32,34 @@ import {
 import { isTokenUsage } from '@orkestrel/budget'
 import { isStudyAgentRuntime } from '@orkestrel/study'
 import { isStudyOllamaMetadata, isStudyOllamaStep } from '@orkestrel/study/server'
-import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
+import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT, STUDY_MEMORY_LEDGER_KEYS } from './constants.js'
+
+/** Checks exactly the declared boolean Ledger treatments. @param value - The settings group. @returns True if every present key is admitted and boolean; false otherwise. */
+export function isStudyMemoryLedgerOptions(value: unknown): value is StudyMemoryLedgerOptions {
+	return holds(
+		() =>
+			isRecord(value) &&
+			Object.keys(value).every(
+				(key) => STUDY_MEMORY_LEDGER_KEYS.some((known) => known === key) && isBoolean(value[key]),
+			),
+	)
+}
+
+/** Checks retained message provenance without inferring a source from text. @param value - A context origin entry. @returns True if its origin and optional source are shaped; false otherwise. */
+export function isStudyMemoryProvenance(value: unknown): value is StudyMemoryProvenance {
+	return objectOf({
+		origin: (origin) =>
+			origin === 'input' ||
+			origin === 'arrival' ||
+			origin === 'summary' ||
+			origin === 'tool' ||
+			origin === 'history' ||
+			origin === 'instructions' ||
+			origin === 'mixed' ||
+			origin === 'unknown',
+		source: optionalOf(isString),
+	})(value)
+}
 
 /** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent and conversation factories exist. */
 export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntime {
@@ -71,11 +100,13 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'metadata',
 						'version',
 						'procedure',
+						'ledger',
 					].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, rolling, metadata, version, procedure } = value
+		const { gauge, observe, checkpoints, rolling, metadata, version, procedure, ledger } = value
+		if ('ledger' in value && !isStudyMemoryLedgerOptions(ledger)) return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
 		if (version !== undefined || procedure !== undefined) {
 			if (typeof version !== 'string' || version.length === 0 || metadata === undefined)

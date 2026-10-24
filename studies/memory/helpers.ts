@@ -19,17 +19,335 @@ import type {
 	StudyMemoryClassification,
 	StudyMemoryResult,
 	StudyMemorySections,
+	StudyMemoryChange,
+	StudyMemoryDifferential,
+	StudyMemoryDifferentialOptions,
+	StudyMemorySelection,
 } from './types.js'
-import { isRecord, parseJSON, isJSONValue, isObject, isArray, attempt } from '@orkestrel/contract'
+import {
+	isRecord,
+	parseJSON,
+	isJSONValue,
+	isObject,
+	isArray,
+	attempt,
+	canonicalStringify,
+} from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
-import { STUDY_MEMORY_ROW_BYTES } from './constants.js'
+import {
+	collectStudyEvidence,
+	readStudyExchanges,
+	readStudyExchangeRows,
+	scanStudyDivergence,
+} from '@orkestrel/study/server'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { STUDY_MEMORY_ROW_BYTES, STUDY_MEMORY_MEMBERS, STUDY_MEMORY_EXCERPT } from './constants.js'
 import {
 	isStudyMemoryAssertion,
 	isStudyMemoryOptions,
 	isStudyMemoryResult,
 	isStudyMemoryReceipt,
 	isStudyMemoryDeclaration,
+	isStudyMemoryProvenance,
 } from './validators.js'
+
+/** Finds the first parsed request member difference in declared precedence order.
+ * @remarks Message content offsets count UTF-16 code units; other differences use canonical JSON.
+ * Excerpts retain at most the declared bound around that offset. Provenance belongs only to the
+ * expected-side message at the changed index.
+ * @param expected - The parsed baseline body.
+ * @param actual - The parsed replay body.
+ * @param origins - Baseline context annotations aligned with baseline messages.
+ * @returns The first semantic difference, or undefined for equal bodies.
+ * @throws StudyError - Thrown with FAULT when either body is not a JSON object.
+ * @example
+ * ```ts
+ * scanStudyMemoryChange({ prompt: 'before' }, { prompt: 'after' }, [])
+ * ```
+ */
+export function scanStudyMemoryChange(
+	expected: unknown,
+	actual: unknown,
+	origins: readonly StudyMemoryProvenance[],
+): StudyMemoryChange | undefined {
+	if (!isRecord(expected) || !isJSONValue(expected) || !isRecord(actual) || !isJSONValue(actual))
+		throw new StudyError('FAULT', 'Memory differential requires parsed JSON request objects')
+	const members = STUDY_MEMORY_MEMBERS.map((member) => {
+		const values = [expected, actual].map((body) =>
+			member === 'flags'
+				? Object.fromEntries(
+						Object.entries(body).filter(
+							([key]) => !STUDY_MEMORY_MEMBERS.some((known) => known !== 'flags' && known === key),
+						),
+					)
+				: body[member],
+		)
+		return { member, expected: values[0], actual: values[1] }
+	})
+	const changed = members.find(
+		(entry) => canonicalStringify(entry.expected) !== canonicalStringify(entry.actual),
+	)
+	if (changed === undefined) return undefined
+	const index =
+		changed.member === 'messages' && isArray(changed.expected) && isArray(changed.actual)
+			? Array.from(
+					{ length: Math.max(changed.expected.length, changed.actual.length) },
+					(_, position) => position,
+				).find(
+					(position) =>
+						canonicalStringify(
+							isArray(changed.expected) ? changed.expected[position] : undefined,
+						) !==
+						canonicalStringify(isArray(changed.actual) ? changed.actual[position] : undefined),
+				)
+			: undefined
+	const entries = [changed.expected, changed.actual].map((value) =>
+		index !== undefined && isArray(value) ? value[index] : value,
+	)
+	const [left, right] = entries
+	const content =
+		isRecord(left) &&
+		isRecord(right) &&
+		typeof left.content === 'string' &&
+		typeof right.content === 'string' &&
+		left.content !== right.content
+	const texts = entries.map((value) =>
+		content && isRecord(value) && typeof value.content === 'string'
+			? value.content
+			: (canonicalStringify(value) ?? ''),
+	)
+	const [before = '', after = ''] = texts
+	const offset =
+		Array.from({ length: Math.min(before.length, after.length) }, (_, position) => position).find(
+			(position) => before[position] !== after[position],
+		) ?? Math.min(before.length, after.length)
+	const start = Math.max(0, offset - Math.floor(STUDY_MEMORY_EXCERPT / 4))
+	const provenance = index === undefined ? undefined : origins[index]
+	return {
+		member: changed.member,
+		index,
+		offset,
+		expected: before.slice(start, start + STUDY_MEMORY_EXCERPT),
+		actual: after.slice(start, start + STUDY_MEMORY_EXCERPT),
+		origin: provenance?.origin,
+		source: provenance?.source,
+	}
+}
+
+/** Normalizes arrival message ids to public sources and other message ids to first-appearance positions.
+ * @remarks Public owner ids, pass indices, call readings, and plan relationships remain unchanged.
+ * The request appears first, followed by each selection's tails and plan references, then recaps.
+ * @param value - A validated pass receipt.
+ * @returns An independent receipt with deterministic message identities.
+ * @throws StudyError - Thrown with FAULT when the receipt is malformed.
+ * @example
+ * ```ts
+ * normalizeStudyMemoryReceipt(receipt)
+ * ```
+ */
+export function normalizeStudyMemoryReceipt(value: StudyMemoryReceipt): StudyMemoryReceipt {
+	if (!isStudyMemoryReceipt(value))
+		throw new StudyError('FAULT', 'Malformed memory differential receipt')
+	const arrivals = new Map(
+		value.arrivals.map((arrival) => [arrival.message, `source:${arrival.id}`]),
+	)
+	const ids = [
+		...new Set([
+			value.request,
+			...value.receipt.selections.flatMap((selection) => [
+				...selection.tail,
+				...selection.prior,
+				...(selection.plan === undefined
+					? []
+					: [
+							...selection.plan.filed,
+							...selection.plan.rendered,
+							...selection.plan.omitted,
+							...selection.plan.sentences.map((sentence) => sentence.source),
+							...selection.plan.withdrawn.flatMap((pair) => [pair.earlier, pair.later]),
+						]),
+				...selection.sources.map((source) => source.source),
+			]),
+			...value.recaps,
+		]),
+	].filter((id) => !arrivals.has(id))
+	const names = new Map([
+		...arrivals,
+		...ids.map((id, index): readonly [string, string] => [id, `message:${index}`]),
+	])
+	return {
+		...value,
+		request: names.get(value.request) ?? value.request,
+		arrivals: value.arrivals.map((arrival) => ({
+			...arrival,
+			message: names.get(arrival.message) ?? arrival.message,
+		})),
+		recaps: value.recaps.map((id) => names.get(id) ?? id),
+		stop: value.stop === undefined ? undefined : structuredClone(value.stop),
+		receipt: {
+			calls: value.receipt.calls.map((call) => ({ ...call })),
+			selections: value.receipt.selections.map((selection) => ({
+				...selection,
+				tail: selection.tail.map((id) => names.get(id) ?? id),
+				prior: selection.prior.map((id) => names.get(id) ?? id),
+				sources: selection.sources.map((source) => ({
+					...source,
+					source: names.get(source.source) ?? source.source,
+				})),
+				plan:
+					selection.plan === undefined
+						? undefined
+						: {
+								...selection.plan,
+								owners: [...selection.plan.owners],
+								filed: selection.plan.filed.map((id) => names.get(id) ?? id),
+								rendered: selection.plan.rendered.map((id) => names.get(id) ?? id),
+								omitted: selection.plan.omitted.map((id) => names.get(id) ?? id),
+								sentences: selection.plan.sentences.map((sentence) => ({
+									...sentence,
+									source: names.get(sentence.source) ?? sentence.source,
+								})),
+								withdrawn: selection.plan.withdrawn.map((pair) => ({
+									earlier: names.get(pair.earlier) ?? pair.earlier,
+									later: names.get(pair.later) ?? pair.later,
+								})),
+							},
+			})),
+		},
+	}
+}
+
+/** Finds the first changed goal and pass after normalizing receipt identities.
+ * @param expected - Baseline evidence in retained order.
+ * @param actual - Sealed replay evidence.
+ * @returns The first changed or unmatched receipt, or undefined.
+ * @throws StudyError - Thrown with FAULT for malformed or duplicated selection evidence.
+ * @example
+ * ```ts
+ * scanStudyMemorySelection([], []) // undefined
+ * ```
+ */
+export function scanStudyMemorySelection(
+	expected: readonly StudyMemoryEvidence[],
+	actual: readonly StudyMemoryEvidence[],
+): StudyMemorySelection | undefined {
+	const [left = [], right = []] = [expected, actual].map((evidence) => {
+		const rows = evidence
+			.filter((row) => row.event === 'selection')
+			.map((row) => {
+				if (row.goal === undefined || !isStudyMemoryReceipt(row.value))
+					throw new StudyError('FAULT', 'Malformed memory selection evidence')
+				return { goal: row.goal, value: normalizeStudyMemoryReceipt(row.value) }
+			})
+		if (new Set(rows.map((row) => JSON.stringify([row.goal, row.value.pass]))).size !== rows.length)
+			throw new StudyError('FAULT', 'Duplicated memory selection pass')
+		return rows
+	})
+	return [...left, ...right]
+		.map((row) => ({
+			goal: row.goal,
+			pass: row.value.pass,
+			expected: left.find((entry) => entry.goal === row.goal && entry.value.pass === row.value.pass)
+				?.value,
+			actual: right.find((entry) => entry.goal === row.goal && entry.value.pass === row.value.pass)
+				?.value,
+		}))
+		.find(
+			(row) =>
+				canonicalStringify(parseJSON(JSON.stringify(row.expected))) !==
+				canonicalStringify(parseJSON(JSON.stringify(row.actual))),
+		)
+}
+
+/** Reads the first wire difference and the independent sealed selection difference for one trial.
+ * @remarks The baseline must be sealed and recorded with `settings.observe: true`. Replay rows admit
+ * interrupted prefixes. A parsed change requires both attempts on the same path; metadata path
+ * changes and unmatched attempts retain only divergence. Origins come exclusively from the baseline
+ * dispatch and its dispatch-stage context row.
+ * @param options - Baseline, replay, and scheduled trial id.
+ * @returns Wire divergence, parsed change, and a selection difference only for a sealed replay.
+ * @throws StudyError - Thrown with CONFIG for an unobserved baseline or missing trial, or FAULT for malformed provenance.
+ * @example
+ * ```ts
+ * await readStudyMemoryDifferential({ baseline, replay, trial: 'r1-s1-a1' })
+ * ```
+ */
+export async function readStudyMemoryDifferential(
+	options: StudyMemoryDifferentialOptions,
+): Promise<StudyMemoryDifferential> {
+	const { baseline, replay, trial } = options
+	const history = await readStudyExchanges(baseline, trial)
+	const evidence = (await collectStudyEvidence(baseline))[trial]
+	if (
+		evidence === undefined ||
+		!evidence.some(
+			(row) => row.event === 'context' && isRecord(row.value) && row.value.stage === 'dispatch',
+		)
+	)
+		throw new StudyError('CONFIG', 'Memory differential requires an observed baseline')
+	if (!replay.manifest?.schedule.some((entry) => entry.id === trial))
+		throw new StudyError('CONFIG', 'Memory differential replay trial is absent')
+	const rows = readStudyExchangeRows(
+		await readFile(join(replay.directory, 'execution', 'trials', trial, 'exchanges.jsonl')),
+		false,
+	)
+	const divergence = scanStudyDivergence(history, rows)
+	const dispatch = evidence.find(
+		(row) =>
+			row.event === 'dispatch' && isRecord(row.value) && row.value.ordinal === divergence?.ordinal,
+	)
+	const canonical =
+		dispatch !== undefined && isRecord(dispatch.value) ? dispatch.value.canonical : undefined
+	const context =
+		typeof canonical !== 'number'
+			? undefined
+			: evidence.find(
+					(row) =>
+						row.event === 'context' &&
+						row.goal === dispatch?.goal &&
+						isRecord(row.value) &&
+						row.value.stage === 'dispatch' &&
+						row.value.dispatch === canonical,
+				)
+	const origins: unknown =
+		context !== undefined && isRecord(context.value) ? context.value.origins : []
+	if (!isArray(origins) || !origins.every(isStudyMemoryProvenance))
+		throw new StudyError('FAULT', 'Malformed memory differential provenance')
+	const provenance = origins.filter(isStudyMemoryProvenance)
+	const expected =
+		divergence?.expected === undefined
+			? undefined
+			: parseJSON(Buffer.from(divergence.expected.body, 'base64').toString('utf8'))
+	const actual =
+		divergence?.actual === undefined
+			? undefined
+			: parseJSON(Buffer.from(divergence.actual.body, 'base64').toString('utf8'))
+	if (
+		typeof canonical === 'number' &&
+		(context === undefined ||
+			(isRecord(expected) &&
+				isArray(expected.messages) &&
+				provenance.length !== expected.messages.length))
+	)
+		throw new StudyError(
+			'FAULT',
+			'Memory differential context does not align with the baseline dispatch',
+		)
+	const change =
+		divergence?.expected === undefined ||
+		divergence.actual === undefined ||
+		divergence.expected.path !== divergence.actual.path ||
+		!isRecord(expected) ||
+		!isRecord(actual)
+			? undefined
+			: scanStudyMemoryChange(expected, actual, provenance)
+	const selection =
+		replay.status !== 'sealed'
+			? undefined
+			: scanStudyMemorySelection(evidence, (await collectStudyEvidence(replay))[trial] ?? [])
+	return { divergence, change, selection }
+}
 
 /** Captures each named foreign member once, including a public inherited member. @remarks Unlike the contract record-field reader, this boundary admits class implementations and produces an owned member envelope without retaining unknown members. @param value - The foreign object. @param members - Public members to capture. @returns A fresh member envelope. @throws StudyError - Thrown with FAULT when the container is not an object. */
 export function readStudyMemoryMembers(
@@ -325,6 +643,8 @@ export function validateStudyMemoryProfile(
 	const { room, provider } = profile
 	if (profile.settings !== undefined && !isStudyMemoryOptions(profile.settings))
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
+	if (profile.settings?.ledger !== undefined && arms.some((arm) => arm !== 'records'))
+		throw new StudyError('CONFIG', 'Memory ledger settings require the records arm')
 	if (
 		profile.record !== undefined &&
 		(!isStudyMemoryOptions(profile.settings) ||

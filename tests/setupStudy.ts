@@ -1,5 +1,7 @@
 import type {
 	MemoryAdmissionFixture,
+	MemoryDifferentialFixture,
+	MemoryDifferentialResult,
 	MemoryContextFixture,
 	MemoryDaemonFixture,
 	MemoryDaemonRequest,
@@ -37,10 +39,10 @@ import type {
 	StudyProfile,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyValidation } from '@orkestrel/study/server'
+import type { StudyValidation, StudySealedResult } from '@orkestrel/study/server'
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
 import type { JSONValue } from '@orkestrel/contract'
-import type { LedgerResult } from '@orkestrel/agent'
+import type { LedgerResult, LedgerOptions, ProviderInterface } from '@orkestrel/agent'
 import type { StudyMemoryReceipt, StudyMemoryRequirement } from '../studies/memory/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { isRecord, parseJSON, recordOf, arrayOf, isString, isNumber } from '@orkestrel/contract'
@@ -55,7 +57,12 @@ import {
 	StudyMeter,
 	StudyScope,
 } from '@orkestrel/study'
-import { hashStudyBytes, readStudyDeclaration } from '@orkestrel/study/server'
+import {
+	hashStudyBytes,
+	readStudyDeclaration,
+	readStudyExchanges,
+	readStudyResult,
+} from '@orkestrel/study/server'
 import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as agent from '../dist/src/core/index.js'
@@ -87,6 +94,258 @@ export const STUDY_MEMORY_REPLAY_GOALS: readonly StudyGoal[] = Object.freeze([
 		},
 	}),
 ])
+
+/** Lists each Ledger treatment whose passivity and positive controls are exercised. */
+export const STUDY_MEMORY_DIFFERENTIAL_SWITCHES = Object.freeze(['link', 'lexical'] as const)
+
+/** Supplies omitted and explicitly disabled treatment groups for full offline replay. */
+export const STUDY_MEMORY_LEDGER_CONTROLS: Readonly<
+	Record<string, Readonly<Record<string, JSONValue>>>
+> = Object.freeze({
+	omitted: Object.freeze({}),
+	disabled: Object.freeze({ ledger: Object.freeze({ link: false, lexical: false }) }),
+})
+
+/** Supplies unknown keys and non-boolean treatment groups that admission must refuse. */
+export const STUDY_MEMORY_LEDGER_INVALID: readonly unknown[] = Object.freeze([
+	{ recent: true },
+	{ link: 1 },
+	{ lexical: 'true' },
+	{ link: undefined },
+	null,
+	[],
+])
+
+/** Builds linked receipt identities for normalization and changed-plan controls.
+ * @param prefix - The run's minted identity prefix.
+ * @param owner - The public owner retained by its plan.
+ * @returns A valid pass receipt with arrival, recap, and prior-message joins.
+ */
+export function buildMemoryDifferentialReceipt(
+	prefix: string,
+	owner = 'owner',
+): StudyMemoryReceipt {
+	return {
+		request: `${prefix}-request`,
+		pass: 0,
+		role: 'agent',
+		arrivals: [{ id: 'receipt', message: `${prefix}-arrival` }],
+		recaps: [`${prefix}-recap`],
+		stop: undefined,
+		receipt: {
+			calls: [{ selection: 0, estimate: 50, tools: 1, prompt: 30, completion: 5, thinking: 2 }],
+			selections: [
+				{
+					turn: 0,
+					tail: [`${prefix}-arrival`, `${prefix}-recap`, `${prefix}-history`, `${prefix}-request`],
+					prior: [`${prefix}-history`],
+					plan: {
+						owners: [owner],
+						filed: [`${prefix}-arrival`, `${prefix}-history`],
+						rendered: [`${prefix}-arrival`],
+						omitted: [`${prefix}-history`],
+						trims: 1,
+						sentences: [{ source: `${prefix}-arrival`, sentence: 0 }],
+						withdrawn: [{ earlier: `${prefix}-history`, later: `${prefix}-arrival` }],
+					},
+					sources: [
+						{ source: `${prefix}-arrival`, carriage: 'record' },
+						{ source: `${prefix}-history`, carriage: 'absent' },
+						{ source: `${prefix}-recap`, carriage: 'recap' },
+					],
+				},
+			],
+		},
+	}
+}
+
+/** Captures the exact options passed to the real Ledger factory without executing a goal.
+ * @param settings - The memory study settings admitted by the driver.
+ * @returns The factory's unchanged option objects after the real session closes.
+ */
+export async function captureMemoryLedgerOptions(
+	settings: StudyProfile['settings'],
+): Promise<readonly LedgerOptions[]> {
+	const recorder = createRecorder<readonly [LedgerOptions]>()
+	const driver = new StudyMemoryDriver({
+		...STUDY_MEMORY_MODULES,
+		agent: {
+			...agent,
+			createLedger: (upstream: ProviderInterface, options: LedgerOptions) => {
+				recorder.handler(options)
+				return agent.createLedger(upstream, options)
+			},
+		},
+		profile: buildMemoryProfile({ url: 'http://127.0.0.1:1', settings }),
+	})
+	const session = await driver.open(
+		{ id: 'capture', scenario: 'public', arm: 'records', repetition: 0 },
+		new AbortController().signal,
+	)
+	try {
+		return recorder.calls.map(([options]) => options)
+	} finally {
+		await session.close()
+	}
+}
+
+/** Builds a compound-subject lookup whose order fact needs owner linking.
+ * @returns Goals and native replies that expose the link treatment.
+ */
+export function buildMemoryLinkFixture(): MemoryDifferentialFixture {
+	return {
+		ordinal: 13,
+		marker: 'Order BC-7301 requires a signature before release.',
+		goals: [
+			{
+				id: 'opening',
+				input: {
+					prompt: 'Read the public reference snapshots.',
+					arrivals: [
+						{ id: 'signature', content: 'Order BC-7301 requires a signature before release.' },
+					],
+					records: [
+						{
+							id: 'BW-20931',
+							name: 'Brightwater Studio',
+							content: 'Account BW-20931: Brightwater Studio.',
+						},
+						{
+							id: 'order:BC-7301',
+							name: 'Parcel',
+							content: 'Account BW-20931: Brightwater Studio.',
+						},
+					],
+				},
+			},
+			{
+				id: 'closure',
+				input: { prompt: 'State the release requirement for BW-20931.', arrivals: [], records: [] },
+			},
+		],
+		responses: [
+			...Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: [
+						{ function: { name: 'lookup', arguments: { id: 'BW-20931' } } },
+						{ function: { name: 'lookup', arguments: { id: 'order:BC-7301' } } },
+					],
+				}),
+			},
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'References retained.' }) },
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Signature required.' }) },
+		],
+	}
+}
+
+/** Builds unkeyed lookup content whose rare query terms reach lexical discovery.
+ * @returns Goals and native replies that expose the lexical treatment.
+ */
+export function buildMemoryLexicalFixture(): MemoryDifferentialFixture {
+	return {
+		ordinal: 27,
+		marker: 'Amber zephyr quartz requires a signature.',
+		goals: [
+			{
+				id: 'opening',
+				input: {
+					prompt: 'Read the public reference snapshot.',
+					arrivals: Array.from({ length: 8 }, (_, index) => ({
+						id: `padding-${index}`,
+						content: 'Blue green violet.',
+					})),
+					records: [
+						{
+							id: 'BW-20931',
+							name: 'Brightwater Studio',
+							content: 'Amber zephyr quartz requires a signature.',
+						},
+					],
+				},
+			},
+			{
+				id: 'closure',
+				input: { prompt: 'What does amber zephyr quartz require?', arrivals: [], records: [] },
+			},
+		],
+		responses: [
+			...Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: [{ function: { name: 'lookup', arguments: { id: 'BW-20931' } } }],
+				}),
+			},
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Reference retained.' }) },
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Signature required.' }) },
+		],
+	}
+}
+
+/** Builds a recording with no lookup units for either treatment to select.
+ * @returns A single goal and its calibration and answer replies.
+ */
+export function buildMemoryInertFixture(): MemoryDifferentialFixture {
+	return {
+		marker: '',
+		goals: [
+			{ id: 'opening', input: { prompt: 'Acknowledge the desk.', arrivals: [], records: [] } },
+		],
+		responses: Array.from({ length: 3 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
+	}
+}
+
+/** Replays a sealed fixture offline with declared treatment settings and retains interrupted results.
+ * @param fixture - The installed memory fixture.
+ * @param baseline - The sealed recording.
+ * @param target - A fresh scratch-relative result directory.
+ * @param settings - Settings merged into the recording profile.
+ * @returns The native outcome and retained sealed or interrupted replay.
+ */
+export async function replayMemoryDifferential(
+	fixture: MemoryReplayFixture,
+	baseline: StudySealedResult,
+	target: string,
+	settings: Readonly<Record<string, JSONValue>>,
+): Promise<MemoryDifferentialResult> {
+	const prefix = Object.fromEntries(
+		await Promise.all(
+			baseline.manifest.schedule.map(async (trial) => [
+				trial.id,
+				(await readStudyExchanges(baseline, trial.id)).completion.count,
+			]),
+		),
+	)
+	fixture.scratch.write(
+		'studies/memory/profiles/local.json',
+		JSON.stringify({
+			...fixture.profile,
+			settings: { ...fixture.profile.settings, ...settings },
+		}),
+	)
+	const output = join(fixture.scratch.path, target)
+	const command = await executeStudyInstall(
+		fixture,
+		[
+			'execute',
+			'memory',
+			'--out',
+			output,
+			'--replay',
+			baseline.directory,
+			'--prefix',
+			JSON.stringify(prefix),
+			'--offline',
+			'true',
+		],
+		120000,
+	)
+	return { command, result: await readStudyResult(output) }
+}
 
 /** Builds the public recording horizon, adding arrivals that force a compaction fold.
  * @param arm - The treatment being recorded.
@@ -183,6 +442,7 @@ export function createMemoryReplayFixture(
 			version: 'fixture-1',
 			metadata: { calls: 64, bytes: 1048576, duration: 30000 },
 			...(arm === 'compaction' ? STUDY_MEMORY_SETTINGS : {}),
+			...options.settings,
 		},
 	})
 	scratch.write('studies/memory/profiles/local.json', JSON.stringify(profile))

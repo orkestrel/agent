@@ -1,4 +1,22 @@
 import type { StudyOllamaMetadata } from '@orkestrel/study/server'
+import type { StudyMemoryLedgerOptions, StudyMemoryMember } from './types.js'
+
+/** Lists the admitted default-off Ledger switches. */
+export const STUDY_MEMORY_LEDGER_KEYS: ReadonlyArray<keyof StudyMemoryLedgerOptions> =
+	Object.freeze(['link', 'lexical'])
+
+/** Orders parsed request differences before the remaining native flags. */
+export const STUDY_MEMORY_MEMBERS: readonly StudyMemoryMember[] = Object.freeze([
+	'model',
+	'messages',
+	'tools',
+	'options',
+	'prompt',
+	'flags',
+])
+
+/** Bounds each request-difference excerpt in UTF-16 code units. */
+export const STUDY_MEMORY_EXCERPT = 256
 
 /** Bounds trial-wide metadata independently of model calls, tokens and bytes. */
 export const STUDY_MEMORY_METADATA: StudyOllamaMetadata = Object.freeze({

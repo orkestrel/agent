@@ -16,6 +16,7 @@ import type {
 	StudyTrial,
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
+import type { StudyResultReading } from '@orkestrel/study/server'
 
 /** Holds an authored recording fixture and its exact executing profile. */
 export interface MemoryReplayFixture extends StudyInstallFixture {
@@ -26,6 +27,22 @@ export interface MemoryReplayFixture extends StudyInstallFixture {
 export interface MemoryReplayOptions {
 	readonly goals?: readonly StudyGoal[]
 	readonly daemon?: StudyDaemon
+	readonly settings?: Readonly<Record<string, JSONValue>>
+}
+
+/** Holds a prospective treatment trajectory and the text it must add to a request. */
+export interface MemoryDifferentialFixture {
+	/** Predicts the first changed request; absent for an inert trajectory. */
+	readonly ordinal?: number
+	readonly goals: readonly StudyGoal[]
+	readonly responses: readonly MemoryWireFixture[]
+	readonly marker: string
+}
+
+/** Holds the native replay command outcome and its retained result reading. */
+export interface MemoryDifferentialResult {
+	readonly command: StudyInstallResult
+	readonly result: StudyResultReading
 }
 
 /** Holds environment overrides passed through the CLI to fresh workers. */
