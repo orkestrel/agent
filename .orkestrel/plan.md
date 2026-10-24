@@ -129,8 +129,8 @@ Codex engines per the user's routing. Study's units run serially, because they s
 | `rec-differential` (A2) | Agent | the treatment switches and the differential reader; AD1, AD2, AS1 | builder, Sol | A1 |
 | `rec-falsify` (F1) | both | one falsify round: E1 to E7 as the planner's § 1.4 marks them, each witness, RC-5 | analyst, Astra; reviewer, Opus | A2 |
 | `rec-verify` (V2) | both | tree gates, Agent's `test:studies` included | verifier, Luna | F1 and its fixes |
-| `rec-release` | both | Study 0.0.4 in the user's window; Agent's pin restored and `^0.0.4` installed | Orchestrator, user | V2 |
-| `rec-declarations` (A3) | Agent | the R packet (`.orkestrel/agent/boosts.md` § U21 prototypes, PR-1: `ev-01-1` and shift 2, then shift 14 by continuation) and the Compaction lineage (u21 § 2) declarations and scenarios; machine-specific profiles untracked under `tmp/units/rec-profiles/` | builder, Sol | `rec-release` |
+| `rec-release` | both | deferred by U25 (2026-10-23): Study stays local and Agent stays on the fresh local pin; when the user rules a release, Study 0.0.4 in the user's window and Agent's pin restored to `^0.0.4` | Orchestrator, user | V2, the user |
+| `rec-declarations` (A3) | Agent (on the local pin, U25) | the R packet (`.orkestrel/agent/boosts.md` § U21 prototypes, PR-1: `ev-01-1` and shift 2, then shift 14 by continuation) and the Compaction lineage (u21 § 2) declarations and scenarios; machine-specific profiles untracked under `tmp/units/rec-profiles/` | builder, Sol | `rec-release` |
 
 GPU work starts after A3, Orchestrator-owned and serial, under U24's reservation.
 
