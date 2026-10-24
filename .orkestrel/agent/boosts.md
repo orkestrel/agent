@@ -418,3 +418,27 @@ Default-off prototypes for R1, R2, Q3a and Q1, so the replay differential (`.ork
 | PR-7 | readings: the first divergence is reported as found. It reads "can act" when it is the idea's intended member on an agent request (R1, R2 and Q1: `messages`; Q3a: `tools`), and "inconclusive, acts elsewhere" otherwise. A section cut everywhere for room reads "blocked by room" (inconclusive), never inert. A full replay with equal requests and equal normalized selection reads inert on that population. An omitted or `false` arm diverging, or a positive control failing, reads "instrument refused" |
 | PR-8 | passivity: the planner's three layers (the W7 capture with an acting handler under explicit `false`; the study passivity cases with a treatment axis; omitted and `false` replays of every sealed recording) and the analyst's omitted-group and empty-group cases. Population passivity against today's code: the baseline replays fully under a frozen closure of the pre-prototype build (RC-5 admits the content change) |
 | PR-9 | units: `proto-ledger` (R1, then R2, in `src/core/ledgers/`; Sol; now, beside the Study units; one commit per idea; product fixtures and guide rows, R2's constants and helpers included), then one read-only review (Astra) and a gate (Luna); `proto-wiring` after `rec-release` (the R1 and R2 study keys, Q3a and Q1; Sol; owns `studies/memory/` and its tests, and generalizes the replay fixture by arm for a Compaction recording), then review and gate; then the dry runs on CPU; then the differentials on the sealed recordings. A prototype is accepted only with its consumer and its positive replay control |
+
+## U21 baselines and first differentials
+
+The five baseline recordings of 2026-10-24 on Ollama 0.40.10 (dedicated daemon on 11435), Study `6e30457` pinned locally (U25), Agent content `4cd54ecd…` for every segment; caps per U24 (30 model, 40 elapsed minutes), C first fold re-allocated to 10/13 within that reservation after C opening ran 1.33× its 0.40.3 analogue. Each recording sealed and replayed fully offline on CPU (13 to 14 s, zero model requests). Records: `tmp/units/rec-runs/`, logs `tmp/units/rec-gpu/`.
+
+| Recording | Goals (live) | Result, seal | Live calls | Live model min | Elapsed min | Sidecar |
+| --- | --- | --- | --- | --- | --- | --- |
+| R opening | `ev-01-1`, `ev-02-1` to `ev-02-4` (5) | `4621d216`, `c4b9d4aa` | 12 agent, 31 judge | 4.131 | 4.40 | 1.24 MB |
+| R revisit | + `ev-14-1` to `ev-14-4` (4; 43 replayed calls in 0.25 s) | `f172d3cf`, `c55506ca` | 9 agent, 49 judge | 4.052 | 4.43 | 2.22 MB |
+| C opening | goals 1 to 8 (8) | `b794c119`, `c3c90b00` | 10 agent | 3.320 | 3.58 | 1.67 MB |
+| C first fold | goals 9 to 16 (8; 10 replayed in 0.4 s) | `ada9007d`, `26af5eab` | 12 agent, 2 summary | 6.527 | 6.87 | 4.04 MB |
+| C onset | goal 17 `ev-05-1` (1; 24 replayed in 1.0 s) | `9dcaeac6`, `2967f8fe` | 1 agent, no lookup | 0.815 | 1.17 | 4.30 MB |
+| Total | | | | 18.85 | about 22 with checks and replays | |
+
+First differentials (offline, A2's reader, R packet; omitted arms are the reproduction replays above):
+
+| Treatment | R opening | R revisit | Reading (PR-7) |
+| --- | --- | --- | --- |
+| `lexical` (R-L1, BM25) `false` | sealed, equal | sealed, equal | passive |
+| `lexical` on | diverges at ordinal 39, goal `ev-02-1`, agent request, `messages[0]` (origin `mixed`) at offset 2124: adds `lookup {"id":"customer:BC-4101"}` — Mara Ellison, account BC-4101, order BC-7301 — shift 1's customer, into the briefing for shift 2's case (Ivo Mercer, BC-7302) | same | **can act**, at the first new case; what it surfaces is the previous customer's record, a likely contamination rather than a help |
+| `link` (R3) `false` | sealed, equal | sealed, equal | passive |
+| `link` on | sealed, equal requests and equal normalized selection | same | **inert** on this population (U19 stands) |
+
+C onset carries no lookup at goal 17, so the historical S5/Q3a onset trigger (a malformed lookup at `ev-05-1`) is absent from this fresh lineage.
