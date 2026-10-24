@@ -15,6 +15,7 @@ import {
 	STUDY_MEMORY_SELECTION_MESSAGES,
 	STUDY_MEMORY_PASSIVITY_CASES,
 	STUDY_MEMORY_PASSIVITY_BASE,
+	buildMemoryPassiveTreatments,
 	buildMemoryEnduranceProfile,
 	STUDY_MEMORY_IDENTITY_GOALS,
 	runMemoryFallback,
@@ -1614,6 +1615,12 @@ describe('passive observation of actual memory requests', () => {
 			expect(off.usage.filter((row) => row.role === 'tool')).toHaveLength(tools)
 			expect(readMemoryAdmission(control)).toEqual(readMemoryAdmission(off))
 			expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
+			for (const treatment of Object.values(buildMemoryPassiveTreatments(trial.arm))) {
+				const passive = await runMemoryTrial({ ...trial, settings: { ...settings, ...treatment } })
+				const captured = await runMemoryTrial({ ...trial, settings: { ...observed, ...treatment } })
+				expect(readMemoryAdmission(passive)).toEqual(readMemoryAdmission(off))
+				expect(readMemoryAdmission(captured)).toEqual(readMemoryAdmission(off))
+			}
 			expect(
 				on.evidence
 					.filter((row) => !STUDY_MEMORY_OBSERVED_EVENTS.includes(row.event))

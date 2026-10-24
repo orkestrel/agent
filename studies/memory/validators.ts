@@ -12,6 +12,7 @@ import type {
 	StudyMemoryDeclaration,
 	StudyMemoryLedgerOptions,
 	StudyMemoryLookupOptions,
+	StudyMemoryInstructionOptions,
 	StudyMemoryProvenance,
 } from './types.js'
 import type { AgentStop, LedgerReceipt } from '@orkestrel/agent'
@@ -38,7 +39,22 @@ import {
 	STUDY_MEMORY_TEXT,
 	STUDY_MEMORY_LEDGER_KEYS,
 	STUDY_MEMORY_LOOKUP_KEYS,
+	STUDY_MEMORY_INSTRUCTION_KEYS,
 } from './constants.js'
+
+/** Checks the declared boolean instruction settings. @param value - The instruction group. @returns True if every key is admitted and boolean; false otherwise. */
+export function isStudyMemoryInstructionOptions(
+	value: unknown,
+): value is StudyMemoryInstructionOptions {
+	return holds(
+		() =>
+			isRecord(value) &&
+			Object.keys(value).every(
+				(key) =>
+					STUDY_MEMORY_INSTRUCTION_KEYS.some((known) => known === key) && isBoolean(value[key]),
+			),
+	)
+}
 
 /** Checks the declared boolean lookup settings. @param value - The lookup group. @returns True if every key is admitted and boolean; false otherwise. */
 export function isStudyMemoryLookupOptions(value: unknown): value is StudyMemoryLookupOptions {
@@ -119,6 +135,7 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'procedure',
 						'ledger',
 						'lookup',
+						'instructions',
 					].includes(key),
 			)
 		)
@@ -126,6 +143,8 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		const { gauge, observe, checkpoints, rolling, metadata, version, procedure, ledger } = value
 		if ('ledger' in value && !isStudyMemoryLedgerOptions(ledger)) return false
 		if ('lookup' in value && !isStudyMemoryLookupOptions(value.lookup)) return false
+		if ('instructions' in value && !isStudyMemoryInstructionOptions(value.instructions))
+			return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
 		if (version !== undefined || procedure !== undefined) {
 			if (typeof version !== 'string' || version.length === 0 || metadata === undefined)

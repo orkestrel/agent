@@ -314,6 +314,8 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#input = undefined
 		this.#live.add(activity)
 		try {
+			const settings = this.#options.profile.settings
+			const standing = isStudyMemoryOptions(settings) && settings.instructions?.standing === true
 			if (this.#goals === undefined || this.#goals[0] === goal) await this.#transport.verify()
 			for (const record of input.records) {
 				this.#records.set(record.id, Object.freeze({ ...record }))
@@ -322,6 +324,18 @@ export class StudyMemorySession implements StudySessionInterface {
 				if (this.#arrivals.has(arrival.id))
 					throw new StudyError('CONFIG', 'Source arrival was replayed within a trial')
 				this.#arrivals.add(arrival.id)
+				if (standing && STUDY_MEMORY_STANDING.includes(arrival.id)) {
+					this.#agent.context.instructions.add({
+						name: arrival.id,
+						content: `[Source ${arrival.id}] ${arrival.content}`,
+					})
+					await context.evidence.append({
+						event: 'arrival',
+						goal,
+						value: { id: arrival.id, instruction: arrival.id },
+					})
+					continue
+				}
 				const message = this.#conversation.add({
 					role: 'user',
 					content: `[Source ${arrival.id}] ${arrival.content}`,
@@ -426,7 +440,11 @@ export class StudyMemorySession implements StudySessionInterface {
 			explicit: this.#explicit,
 			sections: new Set(this.#conversation.sections.map((section) => section.id)),
 			members: new Set(this.#conversation.messages().map((message) => message.id)),
-			composed: this.#options.arm === 'records',
+			composed:
+				this.#options.arm === 'records' ||
+				this.#agent.context.instructions
+					.instructions()
+					.some((instruction) => STUDY_MEMORY_STANDING.includes(instruction.name)),
 		}
 	}
 

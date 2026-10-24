@@ -14,12 +14,20 @@ import {
 	buildMemoryProfile,
 	STUDY_MEMORY_LOOKUP_VALID,
 	STUDY_MEMORY_LOOKUP_INVALID,
+	STUDY_MEMORY_INSTRUCTION_VALID,
+	STUDY_MEMORY_INSTRUCTION_INVALID,
+	buildMemoryStandingGoals,
+	buildMemoryStandingTrial,
+	buildMemoryGradingFixture,
+	STUDY_MEMORY_PROTOTYPE_DRY_RUNS,
+	readMemoryPrototypeGoals,
 } from '../../setupStudy.js'
 import {
 	isStudyMemoryOptions,
 	validateStudyMemoryProfile,
 	STUDY_MEMORY_LOOKUP,
 	STUDY_MEMORY_GRAMMAR,
+	readStudyMemoryGrade,
 } from '../../../studies/memory/index.js'
 
 it('R1 changes closure agent messages at ordinal 14 and replays omitted, false, and empty groups fully', async () => {
@@ -269,3 +277,179 @@ it('R2 replays fully when later prompts name no earlier goal', async () => {
 	})
 	expect(result.replayed).toBe(0)
 }, 180000)
+
+it('Q1 changes opening agent system messages at ordinal 5 and replays omitted, false, and empty groups fully', async () => {
+	const result = await runMemoryRecording({
+		arm: 'compaction',
+		goals: buildMemoryStandingGoals(),
+		treatments: {
+			omitted: {},
+			disabled: { instructions: { standing: false } },
+			empty: { instructions: {} },
+			enabled: { instructions: { standing: true } },
+		},
+	})
+	for (const reading of result.readings.filter(({ name }) => name !== 'enabled')) {
+		expect(reading.command.code).toBe(0)
+		expect(reading.differential).toEqual({
+			complete: true,
+			divergence: undefined,
+			change: undefined,
+			selection: undefined,
+		})
+	}
+	const enabled = result.readings.find(({ name }) => name === 'enabled')
+	expect(enabled?.differential.divergence).toMatchObject({
+		ordinal: 5,
+		expected: { goal: 'opening', role: 'agent' },
+	})
+	expect(enabled?.differential.change).toMatchObject({
+		member: 'messages',
+		index: 0,
+		origin: 'instructions',
+	})
+	const actual = parseJSON(
+		Buffer.from(enabled?.differential.divergence?.actual?.body ?? '', 'base64').toString('utf8'),
+	)
+	if (!isRecord(actual) || !Array.isArray(actual.messages))
+		throw new Error('Missing standing request')
+	const system = actual.messages.find((message) => isRecord(message) && message.role === 'system')
+	if (!isRecord(system) || typeof system.content !== 'string')
+		throw new Error('Missing standing system message')
+	for (const source of ['endurance-desk', 'ev-opening', 'ev-register']) {
+		expect(system.content).toContain(`[Source ${source}]`)
+		expect(
+			JSON.stringify(actual.messages).match(new RegExp(`\\[Source ${source}\\]`, 'g')),
+		).toHaveLength(1)
+	}
+	expect(actual.messages).toContainEqual({
+		role: 'user',
+		content: '[Source ordinary] This arrival stays in conversation.',
+	})
+	expect(result.replayed).toBe(0)
+}, 480000)
+
+it('Q1 replays a complete forced fold when no standing source arrives', async () => {
+	const result = await runMemoryRecording({
+		arm: 'compaction',
+		goals: buildMemoryFoldGoals(),
+		treatments: { enabled: { instructions: { standing: true } } },
+	})
+	expect(result.history.exchanges.some(({ attempt }) => attempt.role === 'summary')).toBe(true)
+	expect(result.readings[0]?.command.code).toBe(0)
+	expect(result.readings[0]?.differential).toEqual({
+		complete: true,
+		divergence: undefined,
+		change: undefined,
+		selection: undefined,
+	})
+	expect(result.replayed).toBe(0)
+}, 180000)
+
+it('Q1 retains released standing instructions through repeated real folds without duplicates or premature sources and grades the arrival id', async () => {
+	const trial = buildMemoryStandingTrial()
+	const result = await runMemoryTrial(trial)
+	expect(result.failure).toBeUndefined()
+	expect(result.products).toHaveLength(3)
+	const summaries = readMemoryEvents(result.evidence, 'summary')
+	expect(summaries.length).toBeGreaterThanOrEqual(2)
+	const chats = result.requests
+		.filter(({ path }) => path === '/api/chat')
+		.map(({ body }) => parseJSON(body))
+	const agents = chats.filter((body) => isRecord(body) && Array.isArray(body.tools))
+	expect(agents).toHaveLength(3)
+	for (const [index, body] of agents.entries()) {
+		if (!isRecord(body) || !Array.isArray(body.messages))
+			throw new Error('Missing post-fold agent messages')
+		const system = body.messages.find((message) => isRecord(message) && message.role === 'system')
+		if (!isRecord(system) || typeof system.content !== 'string')
+			throw new Error('Missing post-fold instructions')
+		for (const [position, source] of ['endurance-desk', 'ev-opening', 'ev-register'].entries()) {
+			expect(system.content.includes(`[Source ${source}] Standing text for ${source}.`)).toBe(
+				position <= index,
+			)
+			expect(
+				JSON.stringify(body.messages).match(new RegExp(`\\[Source ${source}\\]`, 'g'))?.length ?? 0,
+			).toBe(position <= index ? 1 : 0)
+		}
+	}
+	for (const body of chats.filter((entry) => isRecord(entry) && entry.tools === undefined)) {
+		expect(JSON.stringify(body)).not.toContain('Standing text for')
+		expect(JSON.stringify(body)).toContain('Public case detail.')
+	}
+	const arrivals = readMemoryEvents(result.evidence, 'arrival').filter(
+		(row) => row.instruction !== undefined,
+	)
+	expect(arrivals).toEqual(
+		['endurance-desk', 'ev-opening', 'ev-register'].map((id) => ({ id, instruction: id })),
+	)
+	expect(
+		readMemoryEvents(result.evidence, 'context').filter(
+			(row) => row.role === 'agent' && row.stage === 'dispatch',
+		),
+	).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				origins: expect.arrayContaining([expect.objectContaining({ origin: 'mixed' })]),
+			}),
+		]),
+	)
+	const grading = buildMemoryGradingFixture()
+	expect(
+		readStudyMemoryGrade({
+			trial: grading.complete.trial,
+			criterion: { ...grading.source, assertion: { observation: 'arrival', id: 'endurance-desk' } },
+			attempt: grading.complete.attempt,
+			evidence: result.evidence.map((row) => ({ ...row, goal: 'goal' })),
+		}).verdict,
+	).toBe('achieved')
+})
+
+it('Q1 refuses instruction groups outside compaction and validates every leaf', () => {
+	for (const instructions of STUDY_MEMORY_INSTRUCTION_VALID) {
+		expect(isStudyMemoryOptions({ instructions })).toBe(true)
+		const profile = buildMemoryProfile({
+			url: 'http://127.0.0.1:1',
+			settings: { ...STUDY_MEMORY_SETTINGS, instructions },
+		})
+		expect(() => validateStudyMemoryProfile(profile, ['compaction'])).not.toThrow()
+		expect(() => validateStudyMemoryProfile(profile, ['records'])).toThrow(
+			expect.objectContaining({ code: 'CONFIG' }),
+		)
+		expect(() => validateStudyMemoryProfile(profile, ['full'])).toThrow(
+			expect.objectContaining({ code: 'CONFIG' }),
+		)
+		expect(() => validateStudyMemoryProfile(profile, ['compaction', 'records'])).toThrow(
+			expect.objectContaining({ code: 'CONFIG' }),
+		)
+	}
+	for (const instructions of STUDY_MEMORY_INSTRUCTION_INVALID)
+		expect(isStudyMemoryOptions({ instructions })).toBe(false)
+})
+
+it.each(STUDY_MEMORY_PROTOTYPE_DRY_RUNS)(
+	'$name reads its first changed public packet request on CPU',
+	async ({ name, arm, enabled, disabled }) => {
+		const result = await runMemoryRecording({
+			arm,
+			goals: readMemoryPrototypeGoals(arm),
+			room: { context: 32768, output: 512, recap: 256 },
+			treatments: { disabled, enabled },
+		})
+		const off = result.readings.find((reading) => reading.name === 'disabled')
+		expect(off?.command.code).toBe(0)
+		expect(off?.differential).toEqual({
+			complete: true,
+			divergence: undefined,
+			change: undefined,
+			selection: undefined,
+		})
+		expect(result.replayed).toBe(0)
+		const on = result.readings.find((reading) => reading.name === 'enabled')
+		const first = on?.differential.divergence
+		process.stdout.write(
+			`PROTOTYPE_DRY_RUN ${JSON.stringify({ name, arm, goals: result.history.declaration.goals, first: first === undefined ? undefined : { ordinal: first.ordinal, goal: first.expected?.goal, role: first.expected?.role, member: on?.differential.change?.member, index: on?.differential.change?.index }, complete: on?.differential.complete, baseline: result.history.completion, status: on?.status })}\n`,
+		)
+	},
+	480000,
+)

@@ -26,6 +26,8 @@ export interface StudyMemoryOptions {
 	readonly ledger?: StudyMemoryLedgerOptions
 	/** Configures the lookup tool on every memory arm. */
 	readonly lookup?: StudyMemoryLookupOptions
+	/** Configures standing source placement on the compaction arm only. */
+	readonly instructions?: StudyMemoryInstructionOptions
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */
@@ -49,6 +51,12 @@ export type StudyMemoryLedgerOptions = Pick<LedgerOptions, 'link' | 'lexical' | 
 export interface StudyMemoryLookupOptions {
 	/** Advertises order and customer id prefixes if `true`; preserves the base description if `false`. Default: false. */
 	readonly grammar?: boolean
+}
+
+/** Holds the compaction instruction set's default-off treatment. */
+export interface StudyMemoryInstructionOptions {
+	/** Moves released standing sources into instructions if `true`; keeps arrivals in conversation if `false`. Default: false. Refused outside compaction. */
+	readonly standing?: boolean
 }
 
 /** Names the request-body members compared in precedence order. */

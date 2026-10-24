@@ -2,6 +2,7 @@ import type { StudyOllamaMetadata } from '@orkestrel/study/server'
 import type {
 	StudyMemoryLedgerOptions,
 	StudyMemoryLookupOptions,
+	StudyMemoryInstructionOptions,
 	StudyMemoryMember,
 } from './types.js'
 
@@ -12,6 +13,10 @@ export const STUDY_MEMORY_LEDGER_KEYS: ReadonlyArray<keyof StudyMemoryLedgerOpti
 /** Lists the admitted boolean lookup treatments. */
 export const STUDY_MEMORY_LOOKUP_KEYS: ReadonlyArray<keyof StudyMemoryLookupOptions> =
 	Object.freeze(['grammar'])
+
+/** Lists the admitted boolean instruction treatments. */
+export const STUDY_MEMORY_INSTRUCTION_KEYS: ReadonlyArray<keyof StudyMemoryInstructionOptions> =
+	Object.freeze(['standing'])
 
 /** Preserves the lookup description used without the grammar treatment. */
 export const STUDY_MEMORY_LOOKUP = 'Reads the latest released public reference snapshot by id'

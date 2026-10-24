@@ -647,6 +647,8 @@ export function validateStudyMemoryProfile(
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
 	if (profile.settings?.ledger !== undefined && arms.some((arm) => arm !== 'records'))
 		throw new StudyError('CONFIG', 'Memory ledger settings require the records arm')
+	if (profile.settings?.instructions !== undefined && arms.some((arm) => arm !== 'compaction'))
+		throw new StudyError('CONFIG', 'Memory instructions settings require the compaction arm')
 	if (
 		profile.record !== undefined &&
 		(!isStudyMemoryOptions(profile.settings) ||

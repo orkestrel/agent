@@ -48,7 +48,11 @@ import type { StudyValidation, StudySealedResult } from '@orkestrel/study/server
 import type { StudyMeterFixture, StudyToolsFixture } from './studies/tools/types.js'
 import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerResult, LedgerOptions, ProviderInterface } from '@orkestrel/agent'
-import type { StudyMemoryReceipt, StudyMemoryRequirement } from '../studies/memory/types.js'
+import type {
+	StudyMemoryReceipt,
+	StudyMemoryRequirement,
+	StudyMemoryArm,
+} from '../studies/memory/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import {
 	isRecord,
@@ -148,6 +152,48 @@ export const STUDY_MEMORY_LOOKUP_INVALID: readonly unknown[] = Object.freeze([
 	{ grammar: 'true' },
 	{ grammar: undefined },
 ])
+
+/** Supplies admitted instruction groups independently of the validator. */
+export const STUDY_MEMORY_INSTRUCTION_VALID = Object.freeze([
+	Object.freeze({}),
+	Object.freeze({ standing: false }),
+	Object.freeze({ standing: true }),
+])
+
+/** Supplies malformed instruction groups, including an explicitly undefined leaf. */
+export const STUDY_MEMORY_INSTRUCTION_INVALID: readonly unknown[] = Object.freeze([
+	null,
+	[],
+	{ unknown: true },
+	{ standing: 1 },
+	{ standing: 'true' },
+	{ standing: undefined },
+])
+
+/** Builds the default-off treatment axis independently of observation settings.
+ * @param arm - The arm whose treatment groups are admitted.
+ * @returns Omitted settings, explicit false leaves, omitted groups, and empty groups.
+ */
+export function buildMemoryPassiveTreatments(
+	arm: StudyMemoryArm,
+): Readonly<Record<string, Readonly<Record<string, JSONValue>> | undefined>> {
+	return {
+		omitted: undefined,
+		disabled: {
+			lookup: { grammar: false },
+			...(arm === 'records'
+				? { ledger: { link: false, lexical: false, recent: false, work: false } }
+				: {}),
+			...(arm === 'compaction' ? { instructions: { standing: false } } : {}),
+		},
+		ungrouped: {},
+		empty: {
+			lookup: {},
+			...(arm === 'records' ? { ledger: {} } : {}),
+			...(arm === 'compaction' ? { instructions: {} } : {}),
+		},
+	}
+}
 
 /** Builds linked receipt identities for normalization and changed-plan controls.
  * @param prefix - The run's minted identity prefix.
@@ -583,6 +629,100 @@ export function buildMemoryGrammarTrial(): MemoryTrialFixture {
 			{ path: '/api/chat', body: buildMemoryReply() },
 		],
 	}
+}
+
+/** Builds short released standing sources and one ordinary arrival for opening carriage.
+ * @returns One public opening goal without a compaction fold.
+ */
+export function buildMemoryStandingGoals(): readonly StudyGoal[] {
+	return [
+		{
+			id: 'opening',
+			input: {
+				prompt: 'Acknowledge the desk.',
+				arrivals: [
+					{ id: 'endurance-desk', content: 'Preserve the public policy.' },
+					{ id: 'ev-opening', content: 'Keep the grant obligation open.' },
+					{ id: 'ev-register', content: 'Preserve distinct account identities.' },
+					{ id: 'ordinary', content: 'This arrival stays in conversation.' },
+				],
+				records: [],
+			},
+		},
+	]
+}
+
+/** Builds late standing releases across repeated real folds with summaries that omit their text.
+ * @returns A compaction trial whose agent requests retain only the standing sources released so far.
+ */
+export function buildMemoryStandingTrial(): MemoryTrialFixture {
+	return {
+		arm: 'compaction',
+		room: STUDY_MEMORY_SUMMARY_ROOM,
+		settings: { ...STUDY_MEMORY_SETTINGS, observe: true, instructions: { standing: true } },
+		goals: ['endurance-desk', 'ev-opening', 'ev-register'].map((source, index) => ({
+			id: `release-${index}`,
+			input: {
+				prompt: 'Retain the released policy.',
+				arrivals: [
+					{ id: source, content: `Standing text for ${source}.` },
+					...(index === 0
+						? []
+						: Array.from({ length: 8 }, (_, position) => ({
+								id: `ordinary-${index}-${position}`,
+								content: 'Public case detail. '.repeat(60),
+							}))),
+				],
+				records: [],
+			},
+		})),
+		responses: [
+			{ path: '/api/chat', body: buildMemoryReply() },
+			...Array.from({ length: 2 }, () => [
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Recap omits standing text.' }) },
+				{ path: '/api/chat', body: buildMemoryReply() },
+			]).flat(),
+		],
+	}
+}
+
+/** Declares each public packet dry run with exactly one enabled prototype. */
+export const STUDY_MEMORY_PROTOTYPE_DRY_RUNS = Object.freeze([
+	Object.freeze({
+		name: 'R1',
+		arm: 'records' as const,
+		enabled: { ledger: { recent: true } },
+		disabled: { ledger: { recent: false } },
+	}),
+	Object.freeze({
+		name: 'R2',
+		arm: 'records' as const,
+		enabled: { ledger: { work: true } },
+		disabled: { ledger: { work: false } },
+	}),
+	Object.freeze({
+		name: 'Q3a',
+		arm: 'compaction' as const,
+		enabled: { lookup: { grammar: true } },
+		disabled: { lookup: { grammar: false } },
+	}),
+	Object.freeze({
+		name: 'Q1',
+		arm: 'compaction' as const,
+		enabled: { instructions: { standing: true } },
+		disabled: { instructions: { standing: false } },
+	}),
+])
+
+/** Reads only the public packet or lineage's opening goals for an inert CPU dry run.
+ * @param arm - The records packet or compaction lineage selection.
+ * @returns The opening public goals, with hidden grading declarations absent.
+ */
+export function readMemoryPrototypeGoals(arm: 'records' | 'compaction'): readonly StudyGoal[] {
+	const name = arm === 'records' ? 'records-packet.json' : 'compaction-lineage.json'
+	return parseStudyScenario(
+		parseJSON(readFileSync(resolve('studies/memory/scenarios', name), 'utf8')),
+	).goals.slice(0, 5)
 }
 
 /** Builds the public recording horizon, adding arrivals that force a compaction fold.
