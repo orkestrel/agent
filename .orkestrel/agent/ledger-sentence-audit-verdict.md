@@ -1,6 +1,6 @@
 # D1 recovered review reconciliation
 
-The original proposal is refused. The corrected proposal remains under independent review; LR-5 is not recorded. The user authorized proceeding after the releases on 2026-10-24. D2 is accepted at `bf854029`; D3 at `a0981f93` still owes the combined review.
+The original proposal is refused. The corrected contract is accepted as LR-5 after the independent correction review passed on 2026-10-24. This ruling admits the CPU instrument unit; it certifies no implemented instrument, calibrated cutoff, D1 product, or live route. D2 is accepted at `bf854029`; D3 at `a0981f93` still owes the combined review.
 
 ## Evidence and lanes
 
@@ -31,8 +31,8 @@ The preliminary root census measured 178 same-case targets in 156 pairs. It incl
 
 U28 remains fifteen model / twenty elapsed minutes. U24 remains approximately 11.15 model / eighteen elapsed minutes. No model or live-service call ran during reconciliation. The old revisit suffix cost 4.052 model / 4.43 elapsed minutes; this is a reference, not an upper bound. The retained profile's ten-minute recording-duration and thirteen-minute series-duration limits still bind the replacement route.
 
-## Active correction review
+## Correction review closure
 
-The successor is `tmp/units/ledger-sentence-design-2.md`, SHA-256 `0dd585607980d35dd8417be06a8ecb5a7015856086486065adb835c632841cc2`. One independent reviewer on GPT-6 Astra high/default holds the repaired claims in `tmp/units/ledger-sentence-correction-review-claims.md`, through the checked immutable brief beside it. Task suffix: `ledger-sentence-correction-review-20261024-r1`; exact taskId in `tmp/units/ledger-sentence-resume.md`.
+The successor is `tmp/units/ledger-sentence-design-2.md`, SHA-256 `0dd585607980d35dd8417be06a8ecb5a7015856086486065adb835c632841cc2`. One independent reviewer on GPT-6 Astra high/default confirmed the repaired claims in a 227-second inspection, with no outside finding. Its immutable report is `tmp/units/ledger-sentence-correction-review-report.md`, task suffix `ledger-sentence-correction-review-20261024-r1`. Root checked the unchanged proposal hash and all 23 actual Markdown destinations, with the absent-destination rejecting control; the generic citation tool retained its scoped-path parsing limitation. Root had directly inspected the cited installed grading carrier, replay guards, and CPU counterexamples before dispatch.
 
-This lane is the single correction pass required for departures from the prior prescriptions. It is not a repeated blind design round or the later integrated implementation audit. On return, save the immutable verdict, reproduce concrete findings, and record LR-5 only when the dispatch contract closes. Preserve the proposal and evidence while this seam is open. The next writing unit owns the consumer instrument and final enumeration; labels and calibration follow its CPU proofs.
+This was the single correction pass required for departures from the prior prescriptions. Its claims could be falsified by concrete partition, grading-carrier, and admission counterexamples; the pass stands. LR-5 in `boosts.md` records the accepted contract. The next writing slice A1 owns final enumeration; A2 owns the remaining consumer host and scoring after the census is known. Labels and calibration follow their CPU proofs. Preserve the original proposal, reports, and reproductions until their load-bearing controls are promoted into the owned tests; this planning acceptance does not discharge those implementation gates.
