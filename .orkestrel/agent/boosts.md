@@ -442,3 +442,14 @@ First differentials (offline, A2's reader, R packet; omitted arms are the reprod
 | `link` on | sealed, equal requests and equal normalized selection | same | **inert** on this population (U19 stands) |
 
 C onset carries no lookup at goal 17, so the historical S5/Q3a onset trigger (a malformed lookup at `ev-05-1`) is absent from this fresh lineage.
+
+Prototype differentials (2026-10-24, offline, the build with `proto-wiring` `8f0328d5`..`ab9309f5`, a different `content` from the baselines, which replay admits under RC-5): on every recording, the unchanged baseline profile and each switch explicitly `false` replay fully with equal normalized selection (population passivity across the code change); each switch on diverges at its predicted point (PR-7 "can act"):
+
+| Idea | Recordings | First divergence | Change |
+| --- | --- | --- | --- |
+| R1 `recent` | R opening, R revisit | ordinal 39, `ev-02-1`, agent `messages[0]` (10,814 to 14,352 bytes) | the briefing is recomposed: the standing desk rules held, recent history carried where the baseline pinned shift 2's sources |
+| R2 `work` | R opening, R revisit | ordinal 42, `ev-02-2`, agent `messages[0]` (10,512 to 12,177 bytes) | an "Earlier work" section carries the agent's own `ev-02-1` decision sheet for Ivo Mercer (BC-7302), the case `ev-02-2` names |
+| Q3a `lookup.grammar` | C opening, C first fold, C onset | ordinal 5, `ev-01-1`, agent `tools` | the lookup description gains the `order:` and `customer:` id sentence |
+| Q1 `instructions.standing` | C opening, C first fold, C onset | ordinal 5, `ev-01-1`, agent `messages[0]` (origin `instructions`) | the three standing sources move into the agent's instructions |
+
+Reachability only (u21 § 1 step 7): each replay stops at its first divergence, so Q3a's target (bare-id lookups at goals 17, 21, 25) and Q1's (the goal-11 fold) lie past it; this lineage made no lookup at goal 17. Readings: `tmp/units/rec-gpu/prototype-differentials.json`.
