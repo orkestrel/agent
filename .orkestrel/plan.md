@@ -185,7 +185,7 @@ Layers are the catalog's (`.claude/agents/orkestrel.md:49-98`). Each repair row 
 | Item | Source | Clause |
 | --- | --- | --- |
 | L1, L2, L5, L7 | `tmp/units/scaffold-0104/plan.md` § 1.2 | the window refusals, the `--digest` comparison, the resume ranges and the swap fresh baseline |
-| `@types/node` | same; the Node ruling of 2026-10-23 | scaffold supplies `@types/node` ^26.6.4 to every consumer (`../scaffold/src/core/constants.ts:654` reads its own manifest), and every package carries ^26; move it within the 24 line, after its own fleet scan |
+| `@types/node` | the Node ruling of 2026-10-23 | done on scaffold `main` (`ce5393a26`, 2026-10-23, after 0.0.105): ^24.19.2; ships with scaffold's next release |
 | BR-2 instrument | same; BR-2 ruling | a policy check after the fleet conforms to the brand rule |
 | Alias lint | same | the alias lint over `app/*` |
 | Bindings lint rule | Let sweep ruling | lands after the last `let` visit |
