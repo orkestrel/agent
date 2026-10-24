@@ -475,7 +475,10 @@ export async function runMemoryRecording(
 	options: MemoryRecordingFixture,
 ): Promise<MemoryRecordingResult> {
 	const scratch = createScratch({ parent: resolve('tmp/units'), prefix: 'proto-wiring-fixture-' })
-	const server = await createMemoryServer(options.responses)
+	const server = await createMemoryServer(options.responses).catch(async (error: unknown) => {
+		await destroyScratch(scratch)
+		throw error
+	})
 	try {
 		const fixture = createMemoryReplayFixture(scratch, server.url, options.arm, {
 			goals: options.goals,
@@ -513,8 +516,11 @@ export async function runMemoryRecording(
 		}
 		return { history, evidence, readings, sent, replayed: server.requests.length - sent }
 	} finally {
-		await server.close()
-		destroyScratch(scratch)
+		try {
+			await server.close()
+		} finally {
+			await destroyScratch(scratch)
+		}
 	}
 }
 

@@ -50,13 +50,14 @@ import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
 	buildStudyMemoryReceipts,
+	buildStudyMemoryResult,
 	buildStudyMemoryEvidence,
 	measureStudyMemoryEvidence,
 	readStudyMemoryCompaction,
 	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
 } from './helpers.js'
-import { isStudyMemoryInput, isStudyMemoryOptions, isStudyMemoryResult } from './validators.js'
+import { isStudyMemoryInput, isStudyMemoryOptions } from './validators.js'
 
 /** Preserves actual Agent, Ledger and conversation state across a trial's goals. */
 export class StudyMemorySession implements StudySessionInterface {
@@ -363,14 +364,13 @@ export class StudyMemorySession implements StudySessionInterface {
 					? await this.#agent.generate({ signal })
 					: await this.#ledger.respond(input.prompt, signal)
 			if (this.#ledger !== undefined) {
-				if (!isStudyMemoryResult(result))
-					throw new StudyError('FAULT', 'Malformed resolved memory work')
-				this.#names.set(result.request, goal)
+				const captured = buildStudyMemoryResult(result)
+				this.#names.set(captured.request, goal)
 				const snapshot = {
 					sections: [...sections, ...this.#conversation.snapshot().sections],
 					messages: this.#conversation.messages().map((message) => message.id),
 				}
-				for (const receipt of buildStudyMemoryReceipts(result, this.#messages, snapshot)) {
+				for (const receipt of buildStudyMemoryReceipts(captured, this.#messages, snapshot)) {
 					const value = buildStudyMemoryEvidence(goal, receipt)
 					const bytes = measureStudyMemoryEvidence(goal, value)
 					if (
