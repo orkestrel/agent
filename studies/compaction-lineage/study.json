@@ -1,0 +1,12 @@
+{
+	"name": "compaction-lineage",
+	"version": "1",
+	"question": "Can a Compaction lineage record public goals ev-01-1 through ev-02-4, then append ev-03-1 through ev-04-4, then ev-05-1, each by continuation? Each segment omits the public goals and arrivals beyond its admitted prefix; ev-05-2 through ev-24-4 remain omitted throughout. Historical assistant replies and summaries are omitted.",
+	"purpose": "mechanism",
+	"driver": "memory",
+	"arms": ["compaction"],
+	"scenarios": ["compaction-lineage"],
+	"order": [["compaction"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

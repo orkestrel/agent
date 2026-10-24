@@ -1,0 +1,121 @@
+{
+	"id": "records-packet",
+	"goals": [
+		{
+			"id": "ev-01-1",
+			"input": {
+				"prompt": "Shift 1 queue decision sheet for Mara Ellison, BC-7301, concerning ceramic filter breakage. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote.",
+				"arrivals": [
+					{
+						"id": "endurance-desk",
+						"content": "You are the support operator for Beacon Cooperative. Maintain one continuous work history and answer the current desk request. Treat external source messages and actual lookup receipts as evidence. Distinguish approval, draft preparation, initiation, and completion. Preserve unfinished obligations and revise your earlier work when facts change. Do not invent tool receipts, sent messages, completed refunds, shipments, deliveries, or closed cases. Available read-only lookup tools are lookup with an id of order:<order id> and lookup with an id of customer:<account id>. They reveal the version released by the current source boundary. Your written packet is a draft unless an external source confirms the action."
+					},
+					{
+						"id": "ev-opening",
+						"content": "Beacon Cooperative support desk opening note. Each numbered shift is one workday. Preserve unresolved commitments across shifts and distinguish a prepared draft from an externally completed action. Customer remedies require the case-specific approval and evidence. Money is in USD; round monetary results to cents. A confirmed posting, collection, delivery, or acceptance needs its own receipt. The desk holds an early grant-evidence obligation for Soren Ashby, order BC-7312, account BC-4112: assemble the corrected legal-name document set and obtain grant-officer acceptance by the end of shift 24. The payment and delivery already occurred, but the corrected invoice and grant acceptance have not. Keep this obligation open until its actual final evidence arrives. Mara Ellison's BC-7301 case will have no updates during shifts 2 through 12; do not invent progress while it is dormant."
+					},
+					{
+						"id": "ev-register",
+						"content": "Customer/order register. Each entry is one continuing thread; a shared surname is not proof of identity.\nMara Ellison; account BC-4101; order BC-7301; subject ceramic filter breakage.\nIvo Mercer; account BC-4102; order BC-7302; subject meter delivery to a locked site.\nNadia Solano; account BC-4103; order BC-7303; subject duplicate bench-vise charge.\nTomas Wren; account BC-4104; order BC-7304; subject pump warranty diagnosis.\nLeonie Hart; account BC-4105; order BC-7305; subject cut cable quantity correction.\nOren Vale; account BC-4106; order BC-7306; subject credit-account release hold.\nCelia Quill; account BC-4107; order BC-7307; subject rental return and deposit.\nBram Fenwick; account BC-4108; order BC-7308; subject partial tool-kit cancellation.\nEsme Rowan; account BC-4109; order BC-7309; subject sensor compatibility exchange.\nDario Finch; account BC-4110; order BC-7310; subject backordered lamp allocation.\nAnika Moss; account BC-4111; order BC-7311; subject safety recall and replacement consent.\nSoren Ashby; account BC-4112; order BC-7312; subject year-end grant reimbursement evidence.\nThe register identifies the queued cases but does not supply approval, payment, or receipt evidence. Use the scheduled source messages and the lookup versions available at the time of the request."
+					},
+					{
+						"id": "endurance-day:2031-02-02",
+						"content": "Current workday: 2031-02-02."
+					},
+					{
+						"id": "ev-source-1-1",
+						"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.1] Customer message, Mara Ellison: I ordered six ceramic filters for the Alderbrook repair workshop. Two arrived with cracks across the threaded neck; the other four passed our water test and are installed. The workshop has no need for replacement filters after the winter session. Please price a refund for the damaged pair only. The cardholder name matches my account, but the workshop treasurer controls the card. I can send photographs today; do not mistake my willingness to send them for receipt by your warehouse. The damaged pieces remain packed in the original cartons because our caretaker cannot dispose of them without written clearance."
+					},
+					{
+						"id": "ev-source-1-2",
+						"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.2] Invoice BC-7301, accounts clerk: Six filters at $42.50 each produce a merchandise subtotal of $255.00. The invoice applies a 10% merchandise discount before 8% tax. Freight is $18.00 and is not taxable. The customer paid $265.86. A refund for a damaged unit returns its discounted price and the associated tax. Freight is refundable only if every unit is unusable. No restocking deduction applies to damage confirmed by intake. The invoice has no credit already applied. Do not convert the remaining four installed units into a return claim merely to recover freight."
+					},
+					{
+						"id": "ev-source-1-3",
+						"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.3] Intake coordinator, document IN-7301: The reported cracks could have been caused in transit, but the photographs are not in the intake folder. The evidence required is a photograph showing both serial stickers and both cracked necks, plus a written count from the customer. A draft request can be sent to the account contact in the lookup. An approved refund requires the intake finding, not a carrier claim number. Keep the cartons until intake records whether a pickup is necessary. The carrier deadline expires after shift 14, and the support desk owns the reminder."
+					},
+					{
+						"id": "ev-source-1-4",
+						"content": "[2031-02-02; Mara Ellison; BC-7301; document 1.4] Authorization desk, memo AU-7301: Mara may receive a damage-remedy draft while intake is pending. No one has authorized a refund posting. Team lead Dana Voss can approve up to $100.00 after the evidence arrives; larger amounts go to finance. The customer asked for email, not a telephone callback. Place the tentative amount, evidence gap, and approver in the work packet. This case will receive no external update until shift 13; absence of a message is not a denial, and another case's warehouse receipt cannot satisfy this one."
+					}
+				],
+				"records": [
+					{
+						"id": "order:BC-7301",
+						"name": "Mara Ellison",
+						"content": "Invoice BC-7301; owner Mara Ellison; six ceramic filters; paid $265.86; no refund posted; intake photographs pending; contact mara@alderbrook.example."
+					},
+					{
+						"id": "customer:BC-4101",
+						"name": "Mara Ellison",
+						"content": "Account BC-4101; owner Mara Ellison; order BC-7301; authorized correspondence follows the account-contact notice in this case. Active email mara@alderbrook.example."
+					}
+				]
+			}
+		},
+		{
+			"id": "ev-02-1",
+			"input": {
+				"prompt": "Shift 2 queue decision sheet for Ivo Mercer, BC-7302, concerning meter delivery to a locked site. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Set a priority, name the immediate owner and blocker, and distinguish the next feasible action from an action that still lacks approval or evidence. Reconcile the active due tasks with the commitments in your previous shift's handoff. Include the long-running grant-evidence obligation if it is still open. Do not infer an external action from a draft you wrote.",
+				"arrivals": [
+					{
+						"id": "endurance-day:2031-02-03",
+						"content": "Current workday: 2031-02-03."
+					},
+					{
+						"id": "ev-source-2-1",
+						"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.1] Ivo Mercer, site supervisor: Four moisture meters for the Linden pump room show delivered in tracking, but none is in our stores. The carrier photograph shows a blue door; our stores entrance is green. A contract electrician was on site and could have signed, but they are not authorized to accept equipment for us. Please find where the parcel went before promising another set. We can borrow meters for two days. After that we must delay a scheduled inspection. Our purchase order names the pump room, while the invoice uses our central office billing address."
+					},
+					{
+						"id": "ev-source-2-2",
+						"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.2] Dispatch docket DP-7302: Four meters cost $180.00 each. There was no discount, and this wholesale order is tax exempt. Freight of $24.00 brought the paid total to $744.00. The carrier marks delivered at 14:08 yesterday under signature IM. The driver has not identified the signer. A no-charge reshipment requires either a written carrier loss finding or recovery of the misdelivered carton into Beacon custody. A tracking status alone proves neither loss nor correct delivery. Freight is included in a full non-delivery refund if finance later authorizes that option."
+					},
+					{
+						"id": "ev-source-2-3",
+						"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.3] Operations note OP-7302: The central office address cannot accept meters because its mail room closes before the carrier route arrives. The usable delivery point is the pump room stores gate. The gate opens 07:30 to 11:00 on workdays and requires the purchase-order number on the label. The customer contact can nominate an authorized signer through the account record. Do not instruct the driver to leave the carton outside. Today's queue decision must choose a carrier trace owner and an escalation time before the borrowed instruments are due back."
+					},
+					{
+						"id": "ev-source-2-4",
+						"content": "[2031-02-03; Ivo Mercer; BC-7302; document 2.4] Authority AU-7302: Dana Voss has authorized a carrier trace and a draft explaining the evidence gap. Replacement stock is reserved through shift 6, but a reservation is not shipment. Warehouse will release it only after the required carrier evidence and a verified destination. Finance has not approved a refund. Keep the original charge outstanding in reconciliation and track the stock reservation separately from the customer's money. If a trace fails, seek a loss finding; do not turn silence from the carrier into a loss confirmation."
+					}
+				],
+				"records": [
+					{
+						"id": "order:BC-7302",
+						"name": "Ivo Mercer",
+						"content": "Order BC-7302; owner Ivo Mercer; four moisture meters; $744.00 settled; disputed carrier delivery; destination Linden pump room; no replacement or refund authorized."
+					},
+					{
+						"id": "customer:BC-4102",
+						"name": "Ivo Mercer",
+						"content": "Account BC-4102; owner Ivo Mercer; order BC-7302; authorized correspondence follows the account-contact notice in this case. Active email ivo.mercer@bc-4102.example."
+					}
+				]
+			}
+		},
+		{
+			"id": "ev-02-2",
+			"input": {
+				"prompt": "Prepare the resolution packet for BC-7302, following your actual queue decision ev-02-1. Include a remedy calculation with the relevant arithmetic, a usable customer draft addressed through the active account route, and an internal authorization note. Read lookup (id order:<order id>) and lookup (id customer:<account id>) before finalizing it. State what evidence permits the proposed action, what remains blocked, and the next responsible owner. Use only external evidence available at this boundary. Start a work record that later shifts can revise. Keep a draft or approval distinct from a posted payment, shipment, receipt, or completed external submission.",
+				"arrivals": [],
+				"records": []
+			}
+		},
+		{
+			"id": "ev-02-3",
+			"input": {
+				"prompt": "Reconcile BC-7302 against your actual packet ev-02-2 and the earlier financial position, if present. Separate original payment, retained or due amount, proposed adjustment, and confirmed adjustment. Explain any changed amount and correct an earlier wrong calculation without treating repetition as support. Reconcile physical or documentary completion separately from money. Cite the available evidence for each closure and carry unconfirmed receipts forward with their prerequisites. A stated intention or customer agreement cannot prove that an external transaction occurred.",
+				"arrivals": [],
+				"records": []
+			}
+		},
+		{
+			"id": "ev-02-4",
+			"input": {
+				"prompt": "Write the shift 2 handoff using your actual queue ev-02-1, packet ev-02-2, and reconciliation ev-02-3. Carry the remaining obligations, deadlines, owners, and evidence prerequisites. Identify withdrawn instructions and superseded destinations that the next operator must not act on. Distinguish completed work, prepared drafts, and pending external actions. Preserve unresolved earlier promises even if they concern another case. Give the next shift a specific recovery step for any required fact that could not be retrieved.",
+				"arrivals": [],
+				"records": []
+			}
+		}
+	]
+}

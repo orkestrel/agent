@@ -1,0 +1,12 @@
+{
+	"name": "records-packet",
+	"version": "1",
+	"question": "Can a shortened mechanism-only Records lineage record ev-01-1 and ev-02-1 through ev-02-4, then append ev-14-1 through ev-14-4 by continuation? The opening segment omits ev-01-2 through ev-01-4 and ev-03-1 through ev-24-4; continuation admits only shift 14 from those omissions. All other goals, their arrivals, and historical assistant replies are omitted. This packet does not reproduce the historical late horizon.",
+	"purpose": "mechanism",
+	"driver": "memory",
+	"arms": ["records"],
+	"scenarios": ["records-packet"],
+	"order": [["records"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}
