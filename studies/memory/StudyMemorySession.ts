@@ -336,7 +336,10 @@ export class StudyMemorySession implements StudySessionInterface {
 					? await this.#agent.generate({ signal })
 					: await this.#ledger.respond(input.prompt, signal)
 			if (this.#ledger !== undefined) {
-				const snapshot = { sections: [...sections, ...this.#conversation.snapshot().sections] }
+				const snapshot = {
+					sections: [...sections, ...this.#conversation.snapshot().sections],
+					messages: this.#conversation.messages().map((message) => message.id),
+				}
 				for (const receipt of buildStudyMemoryReceipts(result, this.#messages, snapshot)) {
 					const value = buildStudyMemoryEvidence(goal, receipt)
 					const bytes = measureStudyMemoryEvidence(goal, value)

@@ -73,8 +73,10 @@ export interface StudyMemoryDifferentialOptions {
 	readonly trial: string
 }
 
-/** Reports wire, parsed-body, and sealed selection differences independently. */
+/** Reports replay completion and independent wire, parsed-body, and sealed selection differences. */
 export interface StudyMemoryDifferential {
+	/** Requires a sealed successful trial, complete goal products and sidecar, and consumption of the baseline's full non-maintenance history; inertness also requires every difference to be absent. */
+	readonly complete: boolean
 	readonly divergence: StudyExchangeDivergence | undefined
 	readonly change: StudyMemoryChange | undefined
 	readonly selection: StudyMemorySelection | undefined
@@ -203,6 +205,8 @@ export type StudyMemoryAssertion =
 /** Carries one pass's evidence and the consumer's identity joins. */
 export interface StudyMemoryReceipt {
 	readonly request: string
+	/** Lists the session's conversation message ids in append order, independently of selection order. */
+	readonly messages: readonly string[]
 	readonly pass: number
 	readonly role: 'agent'
 	readonly receipt: LedgerReceipt
@@ -254,9 +258,11 @@ export interface StudyMemoryResult {
 	readonly passes: ReadonlyArray<{ readonly stop?: AgentStop | undefined }>
 }
 
-/** Holds section identities available before or after a goal changes its snapshot. */
+/** Holds section identities and conversation order available when a goal resolves. */
 export interface StudyMemorySections {
 	readonly sections: ReadonlyArray<{ readonly id: string }>
+	/** Lists conversation messages in append order, including messages outside the selected tail. */
+	readonly messages: readonly string[]
 }
 
 /** Holds an evidence envelope before its selection value is validated. */

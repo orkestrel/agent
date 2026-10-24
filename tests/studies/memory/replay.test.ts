@@ -1,4 +1,4 @@
-import { isRecord, parseJSON } from '@orkestrel/contract'
+import { isRecord } from '@orkestrel/contract'
 import {
 	collectStudyEvidence,
 	readStudyExchanges,
@@ -15,6 +15,7 @@ import {
 	buildMemoryReplayResponses,
 	executeStudyInstall,
 	readMemoryEvents,
+	readMemoryWorkers,
 	STUDY_MEMORY_EVENT_KEYS,
 } from '../../setupStudy.js'
 
@@ -33,7 +34,7 @@ it.each(['records', 'compaction'] as const)(
 				fixture,
 				['execute', 'memory', '--out', output],
 				120000,
-				{ environment: { TZ: 'UTC', LANG: 'en_US.UTF-8' } },
+				{ environment: { TZ: 'UTC', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' } },
 			)
 			if (recorded.code !== 0) throw new Error(JSON.stringify(recorded))
 			const result = await readStudyResult(output)
@@ -81,10 +82,7 @@ it.each(['records', 'compaction'] as const)(
 					.flatMap((attempt) => attempt.observations.flatMap((row) => row.usage))
 					.some((usage) => usage.role === 'metadata'),
 			).toBe(false)
-			const original = (scratch.read('workers.jsonl') ?? '')
-				.split(/\r\n|\n/)
-				.filter(Boolean)
-				.map(parseJSON)
+			const original = readMemoryWorkers(scratch)
 			const offline = join(scratch.path, 'offline')
 			const prefix = JSON.stringify({ [trial.id]: sent.length })
 			const replayed = await executeStudyInstall(
@@ -102,7 +100,7 @@ it.each(['records', 'compaction'] as const)(
 					'true',
 				],
 				120000,
-				{ environment: { TZ: 'Pacific/Auckland', LANG: 'tr_TR.UTF-8' } },
+				{ environment: { TZ: 'Pacific/Auckland', LANG: 'tr_TR.UTF-8', LC_ALL: 'tr_TR.UTF-8' } },
 			)
 			if (replayed.code !== 0) throw new Error(JSON.stringify(replayed))
 			expect(server.requests).toEqual(sent)
@@ -116,25 +114,25 @@ it.each(['records', 'compaction'] as const)(
 			expect(readMemoryEvents(replayRows, 'result').map((row) => row.conversation)).not.toEqual(
 				readMemoryEvents(rows, 'result').map((row) => row.conversation),
 			)
-			const workers = (scratch.read('workers.jsonl') ?? '')
-				.split(/\r\n|\n/)
-				.filter(Boolean)
-				.map(parseJSON)
+			const workers = readMemoryWorkers(scratch)
 			expect(original.length).toBeGreaterThan(0)
 			expect(
-				original.filter(isRecord).every((row) => row.tz === 'UTC' && row.lang === 'en_US.UTF-8'),
+				original.every(
+					(row) => row.tz === 'UTC' && row.lang === 'en_US.UTF-8' && row.intl.timeZone === 'UTC',
+				),
 			).toBe(true)
 			expect(workers.length).toBeGreaterThan(original.length)
-			const pids = original.filter(isRecord).map((row) => row.pid)
+			const pids = original.map((row) => row.pid)
 			expect(
 				workers
 					.slice(original.length)
-					.filter(isRecord)
 					.every(
 						(row) =>
 							!pids.includes(row.pid) &&
 							row.tz === 'Pacific/Auckland' &&
-							row.lang === 'tr_TR.UTF-8',
+							row.lang === 'tr_TR.UTF-8' &&
+							row.intl.timeZone === 'Pacific/Auckland' &&
+							original.every((before) => before.intl.timeZone !== row.intl.timeZone),
 					),
 			).toBe(true)
 			const replayHistory = await readStudyExchanges(replay, trial.id)
@@ -254,3 +252,82 @@ it.each(['records', 'compaction'] as const)(
 	},
 	300000,
 )
+
+// ICU's win32 uprv_getDefaultLocaleID reads the Windows user locale instead of LANG:
+// https://github.com/unicode-org/icu/blob/main/icu4c/source/common/putil.cpp#L1732
+it.skipIf(process.platform === 'win32')(
+	'AP1 replays under different resolved locales where ICU lets LANG select the default locale',
+	async () => {
+		const scratch = createScratch({ parent: resolve('tmp/units'), prefix: 'rec-fix-locale-' })
+		const server = await createMemoryServer(buildMemoryReplayResponses('records'))
+		try {
+			const fixture = createMemoryReplayFixture(scratch, server.url, 'records')
+			const output = join(scratch.path, 'recorded')
+			const recorded = await executeStudyInstall(
+				fixture,
+				['execute', 'memory', '--out', output],
+				120000,
+				{ environment: { TZ: 'UTC', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' } },
+			)
+			if (recorded.code !== 0) throw new Error(JSON.stringify(recorded))
+			const baseline = await readStudyResult(output)
+			if (baseline.status !== 'sealed') throw new Error('Locale baseline did not seal')
+			const [trial] = baseline.manifest.schedule
+			if (trial === undefined) throw new Error('Missing locale trial')
+			const history = await readStudyExchanges(baseline, trial.id)
+			const original = readMemoryWorkers(scratch)
+			expect(original.length).toBeGreaterThan(0)
+			const sent = server.requests
+			const replayed = await executeStudyInstall(
+				fixture,
+				[
+					'execute',
+					'memory',
+					'--out',
+					join(scratch.path, 'offline'),
+					'--replay',
+					output,
+					'--prefix',
+					JSON.stringify({ [trial.id]: history.completion.count }),
+					'--offline',
+					'true',
+				],
+				120000,
+				{ environment: { TZ: 'Pacific/Auckland', LANG: 'tr_TR.UTF-8', LC_ALL: 'tr_TR.UTF-8' } },
+			)
+			if (replayed.code !== 0) throw new Error(JSON.stringify(replayed))
+			const replay = await readStudyResult(join(scratch.path, 'offline'))
+			if (replay.status !== 'sealed') throw new Error('Locale replay did not seal')
+			const workers = readMemoryWorkers(scratch).slice(original.length)
+			expect(workers.length).toBeGreaterThan(0)
+			expect(
+				workers.every((row) => original.every((before) => before.intl.locale !== row.intl.locale)),
+			).toBe(true)
+			expect((await readStudyExchanges(replay, trial.id)).exchanges).toEqual(history.exchanges)
+			expect(server.requests).toEqual(sent)
+		} finally {
+			await server.close()
+			destroyScratch(scratch)
+		}
+	},
+	240000,
+)
+
+it('AP1 validates every worker resolved locale and time zone observation', () => {
+	const scratch = createScratch({ parent: resolve('tmp/units'), prefix: 'rec-fix-workers-' })
+	try {
+		expect(readMemoryWorkers(scratch)).toEqual([])
+		const row = {
+			pid: process.pid,
+			tz: 'UTC',
+			lang: 'en_US.UTF-8',
+			intl: Intl.DateTimeFormat().resolvedOptions(),
+		}
+		scratch.write('workers.jsonl', JSON.stringify(row))
+		expect(readMemoryWorkers(scratch)).toEqual([row])
+		scratch.write('workers.jsonl', JSON.stringify({ ...row, intl: { timeZone: 'UTC' } }))
+		expect(() => readMemoryWorkers(scratch)).toThrow('Malformed memory worker observation')
+	} finally {
+		destroyScratch(scratch)
+	}
+})

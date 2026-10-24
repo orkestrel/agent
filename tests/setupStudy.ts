@@ -6,6 +6,7 @@ import type {
 	MemoryDaemonFixture,
 	MemoryDaemonRequest,
 	MemoryFailureResult,
+	MemoryFallbackResult,
 	MemoryGradingFixture,
 	MemoryNativeFixture,
 	MemoryProfileFixture,
@@ -17,6 +18,7 @@ import type {
 	MemoryTrialResult,
 	MemoryUsageFixture,
 	MemoryWireFixture,
+	MemoryWorker,
 	StudyInstallFixture,
 	StudyInstallPackage,
 	StudyInstallResult,
@@ -45,7 +47,15 @@ import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerResult, LedgerOptions, ProviderInterface } from '@orkestrel/agent'
 import type { StudyMemoryReceipt, StudyMemoryRequirement } from '../studies/memory/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
-import { isRecord, parseJSON, recordOf, arrayOf, isString, isNumber } from '@orkestrel/contract'
+import {
+	isRecord,
+	parseJSON,
+	recordOf,
+	objectOf,
+	arrayOf,
+	isString,
+	isNumber,
+} from '@orkestrel/contract'
 import { createRecorder, waitForCondition } from '@orkestrel/test'
 import { createLoopback, isRunning } from '@orkestrel/test/server'
 import {
@@ -127,6 +137,7 @@ export function buildMemoryDifferentialReceipt(
 ): StudyMemoryReceipt {
 	return {
 		request: `${prefix}-request`,
+		messages: ['arrival', 'recap', 'history', 'request'].map((id) => `${prefix}-${id}`),
 		pass: 0,
 		role: 'agent',
 		arrivals: [{ id: 'receipt', message: `${prefix}-arrival` }],
@@ -153,6 +164,45 @@ export function buildMemoryDifferentialReceipt(
 						{ source: `${prefix}-history`, carriage: 'absent' },
 						{ source: `${prefix}-recap`, carriage: 'recap' },
 					],
+				},
+			],
+		},
+	}
+}
+
+/** Builds a pass whose earlier messages retain their conversation order outside the selection.
+ * @param prefix - The run's minted identity prefix.
+ * @param pass - The retained pass index.
+ * @returns A receipt with independent earlier and unanchored message identities.
+ */
+export function buildMemoryIdentityReceipt(prefix: string, pass: number): StudyMemoryReceipt {
+	return {
+		request: `${prefix}-request`,
+		messages: ['earlier', 'later', 'unseen-1', 'unseen-2', 'request'].map(
+			(id) => `${prefix}-${id}`,
+		),
+		pass,
+		role: 'agent',
+		arrivals: [],
+		recaps: [],
+		stop: undefined,
+		receipt: {
+			calls: [],
+			selections: [
+				{
+					turn: undefined,
+					tail: [`${prefix}-earlier`, `${prefix}-later`, `${prefix}-request`],
+					prior: [],
+					sources: [],
+					plan: {
+						owners: [],
+						filed: [],
+						rendered: [],
+						omitted: [],
+						sentences: [],
+						withdrawn: [],
+						trims: 0,
+					},
 				},
 			],
 		},
@@ -469,12 +519,36 @@ export function createMemoryReplayFixture(
 import { appendFileSync } from 'node:fs'
 import { createStudyAdapter as createMemoryAdapter } from './factories.js'
 export function createStudyAdapter() {
-	appendFileSync(new URL('../../workers.jsonl', import.meta.url), JSON.stringify({ pid: process.pid, tz: process.env.TZ, lang: process.env.LANG }) + '\\n')
+	appendFileSync(new URL('../../workers.jsonl', import.meta.url), JSON.stringify({ pid: process.pid, tz: process.env.TZ, lang: process.env.LANG, intl: Intl.DateTimeFormat().resolvedOptions() }) + '\\n')
 	return createMemoryAdapter()
 }
 `,
 	)
 	return { ...fixture, profile }
+}
+
+/** Reads every retained worker's resolved Intl options without dropping malformed rows.
+ * @param scratch - The fixture that owns the worker journal.
+ * @returns Validated worker observations in launch order.
+ * @throws Error - Thrown when a worker row is malformed.
+ */
+export function readMemoryWorkers(scratch: ScratchInterface): readonly MemoryWorker[] {
+	const rows = (scratch.read('workers.jsonl') ?? '')
+		.split(/\r\n|\n/)
+		.filter(Boolean)
+		.map(parseJSON)
+	if (
+		!arrayOf(
+			recordOf({
+				pid: isNumber,
+				tz: isString,
+				lang: isString,
+				intl: objectOf({ locale: isString, timeZone: isString }),
+			}),
+		)(rows)
+	)
+		throw new Error('Malformed memory worker observation')
+	return rows
 }
 
 /** Writes a recording scenario and its matching operational rubric without changing executable bytes.
@@ -1071,7 +1145,15 @@ export const STUDY_MEMORY_TIMING = Object.freeze({
 /** Pins the event keys present with observation disabled. */
 export const STUDY_MEMORY_EVENT_KEYS = Object.freeze({
 	lookup: Object.freeze(['found', 'id', 'message']),
-	selection: Object.freeze(['arrivals', 'pass', 'recaps', 'receipt', 'request', 'role']),
+	selection: Object.freeze([
+		'arrivals',
+		'messages',
+		'pass',
+		'recaps',
+		'receipt',
+		'request',
+		'role',
+	]),
 	dispatch: Object.freeze(['bytes', 'model', 'options', 'path', 'role']),
 	wire: Object.freeze([
 		'bytes',
@@ -1152,7 +1234,7 @@ export function buildMemorySelectionResult(): LedgerResult {
 }
 
 /** Resolves a real Ledger whose inert system input fails after construction. @returns The resolved fallback receipt. */
-export async function runMemoryFallback(): Promise<LedgerResult> {
+export async function runMemoryFallback(): Promise<MemoryFallbackResult> {
 	const systems = new ScriptedReads<string | undefined>(['Serve the desk.'], undefined)
 	const ledger = agent.createLedger(createScriptedProvider([{ content: 'Fallback answer' }]), {
 		...buildLedgerOptions(),
@@ -1165,7 +1247,8 @@ export async function runMemoryFallback(): Promise<LedgerResult> {
 		},
 	})
 	try {
-		return await ledger.respond('Respond')
+		const result = await ledger.respond('Respond')
+		return { ...result, messages: ledger.conversation.messages().map((message) => message.id) }
 	} finally {
 		ledger.agent.emitter.destroy()
 		ledger.conversation.emitter.destroy()
@@ -1178,10 +1261,21 @@ export const STUDY_MEMORY_SELECTION_ARRIVALS = Object.freeze([
 	Object.freeze({ id: 'first', message: 'arrival-1' }),
 ])
 
+/** Lists the independent conversation identities used by the inert selection fixtures. */
+export const STUDY_MEMORY_SELECTION_MESSAGES: readonly string[] = Object.freeze([
+	'arrival-1',
+	'request-1',
+	'section-old',
+	'request-2',
+	'source',
+	'request-3',
+])
+
 /** Builds declared carriage facts for the independent selection-class controls. @returns An owned pass value with a held source, a missing sentence and correct carriage. */
 export function buildMemoryClassificationReceipt(): StudyMemoryReceipt {
 	return {
 		request: 'request',
+		messages: ['held', 'wrong', 'correct', 'clean', 'verbatim', 'request'],
 		pass: 0,
 		role: 'agent',
 		arrivals: [],

@@ -28,6 +28,7 @@ import {
 	buildMemoryClassificationReceipt,
 	STUDY_MEMORY_SELECTION_REQUIREMENTS,
 	STUDY_MEMORY_SELECTION_ARRIVALS,
+	STUDY_MEMORY_SELECTION_MESSAGES,
 	buildMemoryGradingFixture,
 	buildMemoryProfile,
 	omitMemoryAuxiliaries,
@@ -56,7 +57,7 @@ describe('memory declaration and mechanical evidence', () => {
 				],
 			},
 			STUDY_MEMORY_SELECTION_ARRIVALS,
-			{ sections: [] },
+			{ sections: [], messages: STUDY_MEMORY_SELECTION_MESSAGES },
 		)
 		tail.push('later')
 		expect(rows[0]?.receipt.selections[0]?.tail).toEqual(['arrival-1'])
@@ -93,7 +94,10 @@ describe('memory declaration and mechanical evidence', () => {
 		expect
 			.soft(isStudyMemoryResult(result), 'foreign members retain their published types')
 			.toBe(true)
-		const rows = buildStudyMemoryReceipts(result, [], { sections: [] })
+		const rows = buildStudyMemoryReceipts(result, [], {
+			sections: [],
+			messages: STUDY_MEMORY_SELECTION_MESSAGES,
+		})
 		expect(rows).toHaveLength(1)
 		expect(rows[0]).toMatchObject({
 			pass: 0,
@@ -113,10 +117,15 @@ describe('memory declaration and mechanical evidence', () => {
 		const row = buildStudyMemoryReceipts(
 			buildMemorySelectionResult(),
 			STUDY_MEMORY_SELECTION_ARRIVALS,
-			{ sections: [{ id: 'section-old' }] },
+			{ sections: [{ id: 'section-old' }], messages: STUDY_MEMORY_SELECTION_MESSAGES },
 		)[0]
 		if (row === undefined) throw new Error('Missing fixture row')
 		expect(isStudyMemoryReceipt(row)).toBe(true)
+		expect(row.messages).toEqual(STUDY_MEMORY_SELECTION_MESSAGES)
+		expect(isStudyMemoryReceipt({ ...row, messages: [...row.messages, row.request] })).toBe(false)
+		expect(
+			isStudyMemoryReceipt({ ...row, messages: row.messages.filter((id) => id !== row.request) }),
+		).toBe(false)
 		expect(
 			isStudyMemoryReceipt({ ...row, arrivals: [{ id: 'bad', message: 'not-in-tail' }] }),
 		).toBe(false)
@@ -187,7 +196,10 @@ describe('memory declaration and mechanical evidence', () => {
 			'denominator',
 		)
 		expect(() => classifyStudyMemorySelection([], clean)).toThrow('selection evidence')
-		const fallback = buildStudyMemoryReceipts(buildMemorySelectionResult(), [], { sections: [] })
+		const fallback = buildStudyMemoryReceipts(buildMemorySelectionResult(), [], {
+			sections: [],
+			messages: STUDY_MEMORY_SELECTION_MESSAGES,
+		})
 		expect(() =>
 			classifyStudyMemorySelection(
 				fallback.map((value) => ({ event: 'selection', goal: 'goal', value })),
@@ -212,6 +224,7 @@ describe('memory declaration and mechanical evidence', () => {
 		const result = buildMemorySelectionResult()
 		const rows = buildStudyMemoryReceipts(result, STUDY_MEMORY_SELECTION_ARRIVALS, {
 			sections: [{ id: 'section-old' }, { id: 'section-new' }],
+			messages: STUDY_MEMORY_SELECTION_MESSAGES,
 		})
 		expect(rows).toHaveLength(1)
 		expect(rows[0]?.arrivals).toEqual([{ id: 'first', message: 'arrival-1' }])
@@ -224,7 +237,7 @@ describe('memory declaration and mechanical evidence', () => {
 		const next = buildStudyMemoryReceipts(
 			{ ...result, request: 'request-3' },
 			STUDY_MEMORY_SELECTION_ARRIVALS,
-			{ sections: [] },
+			{ sections: [], messages: STUDY_MEMORY_SELECTION_MESSAGES },
 		)
 		expect(next[0]?.request).toBe('request-3')
 		expect(next[0]?.recaps).toEqual([])

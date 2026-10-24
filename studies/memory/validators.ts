@@ -330,6 +330,7 @@ export function isStudyMemoryReceipt(value: unknown): value is StudyMemoryReceip
 			!recordOf(
 				{
 					request: isString,
+					messages: arrayOf(isString),
 					pass: isNonNegativeInteger,
 					role: (role) => role === 'agent',
 					receipt: isStudyMemoryPass,
@@ -343,7 +344,27 @@ export function isStudyMemoryReceipt(value: unknown): value is StudyMemoryReceip
 			return false
 		const tail = new Set(value.receipt.selections.flatMap((selection) => selection.tail))
 		const prior = new Set(value.receipt.selections.flatMap((selection) => selection.prior))
+		const references = [
+			value.request,
+			...value.recaps,
+			...value.receipt.selections.flatMap((selection) => [
+				...selection.tail,
+				...selection.prior,
+				...selection.sources.map((source) => source.source),
+				...(selection.plan === undefined
+					? []
+					: [
+							...selection.plan.filed,
+							...selection.plan.rendered,
+							...selection.plan.omitted,
+							...selection.plan.sentences.map((sentence) => sentence.source),
+							...selection.plan.withdrawn.flatMap((pair) => [pair.earlier, pair.later]),
+						]),
+			]),
+		]
 		return (
+			new Set(value.messages).size === value.messages.length &&
+			references.every((id) => value.messages.includes(id)) &&
 			Object.keys(value.receipt).every((key) => ['selections', 'calls'].includes(key)) &&
 			value.receipt.selections.every(
 				(selection) =>

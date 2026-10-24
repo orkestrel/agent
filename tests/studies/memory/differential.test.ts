@@ -16,6 +16,7 @@ import {
 	buildMemoryLexicalFixture,
 	buildMemoryInertFixture,
 	buildMemoryDifferentialReceipt,
+	buildMemoryIdentityReceipt,
 	captureMemoryLedgerOptions,
 	STUDY_MEMORY_DIFFERENTIAL_SWITCHES,
 	STUDY_MEMORY_LEDGER_CONTROLS,
@@ -91,7 +92,7 @@ it('AD2 normalizes equal minted histories equally and keeps changed selection pl
 		'source:receipt',
 		'message:1',
 		'message:2',
-		'message:0',
+		'message:3',
 	])
 	const changed = buildMemoryDifferentialReceipt('second', 'different-owner')
 	expect(normalizeStudyMemoryReceipt(first)).not.toEqual(normalizeStudyMemoryReceipt(changed))
@@ -149,6 +150,207 @@ it('reports unmatched selection passes and refuses malformed or duplicated evide
 		normalizeStudyMemoryReceipt({ ...receipt, arrivals: [{ id: 'source', message: 'missing' }] }),
 	).toThrow('Malformed')
 })
+
+it('AD2 detects an established message reorder across passes while accepting uniform minted renaming', () => {
+	const earlier = buildMemoryIdentityReceipt('recorded', 0)
+	const later = buildMemoryIdentityReceipt('recorded', 1)
+	const renamed = buildMemoryIdentityReceipt('replayed', 1)
+	const expected = [earlier, later].map((value) => ({ event: 'selection', goal: 'opening', value }))
+	expect(
+		scanStudyMemorySelection(expected, [
+			{ event: 'selection', goal: 'opening', value: buildMemoryIdentityReceipt('replayed', 0) },
+			{ event: 'selection', goal: 'opening', value: renamed },
+		]),
+	).toBeUndefined()
+	const reordered = {
+		...renamed,
+		receipt: {
+			...renamed.receipt,
+			selections: renamed.receipt.selections.map((selection) => ({
+				...selection,
+				tail: ['replayed-later', 'replayed-earlier', 'replayed-request'],
+			})),
+		},
+	}
+	expect(
+		scanStudyMemorySelection(expected, [
+			{ event: 'selection', goal: 'opening', value: buildMemoryIdentityReceipt('replayed', 0) },
+			{ event: 'selection', goal: 'opening', value: reordered },
+		]),
+	).toMatchObject({ goal: 'opening', pass: 1 })
+})
+
+it.each(['filed', 'rendered', 'omitted'] as const)(
+	'AD2 distinguishes different unanchored %s messages in selection plans',
+	(member) => {
+		const recorded = buildMemoryIdentityReceipt('recorded', 0)
+		const replayed = buildMemoryIdentityReceipt('replayed', 0)
+		const [expected, actual] = [recorded, replayed].map((receipt, index) => ({
+			event: 'selection',
+			goal: 'opening',
+			value: {
+				...receipt,
+				receipt: {
+					...receipt.receipt,
+					selections: receipt.receipt.selections.map((selection) => {
+						if (selection.plan === undefined) throw new Error('Missing identity plan')
+						return {
+							...selection,
+							plan: {
+								...selection.plan,
+								[member]: [index === 0 ? 'recorded-unseen-1' : 'replayed-unseen-2'],
+							},
+						}
+					}),
+				},
+			},
+		}))
+		if (expected === undefined || actual === undefined) throw new Error('Missing identity controls')
+		const renamed = {
+			...replayed,
+			receipt: {
+				...replayed.receipt,
+				selections: replayed.receipt.selections.map((selection) => {
+					if (selection.plan === undefined) throw new Error('Missing identity plan')
+					return { ...selection, plan: { ...selection.plan, [member]: ['replayed-unseen-1'] } }
+				}),
+			},
+		}
+		expect(scanStudyMemorySelection([expected], [{ ...actual, value: renamed }])).toBeUndefined()
+		expect(scanStudyMemorySelection([expected], [actual])).toMatchObject({
+			goal: 'opening',
+			pass: 0,
+		})
+		const anchored = [expected, actual].map((row, index) => ({
+			...row,
+			value: {
+				...row.value,
+				receipt: {
+					...row.value.receipt,
+					selections: row.value.receipt.selections.map((selection) => ({
+						...selection,
+						tail: [
+							...selection.tail,
+							...(index === 0
+								? ['recorded-unseen-1', 'recorded-unseen-2']
+								: ['replayed-unseen-1', 'replayed-unseen-2']),
+						],
+					})),
+				},
+			},
+		}))
+		expect(scanStudyMemorySelection(anchored.slice(0, 1), anchored.slice(1))).toMatchObject({
+			goal: 'opening',
+			pass: 0,
+		})
+	},
+)
+
+it('AD1 keeps a replay interrupted after its last recorded response distinct from an inert sealed replay', async () => {
+	const scratch = createScratch({ parent: resolve('tmp/units'), prefix: 'rec-fix-completion-' })
+	const trajectory = buildMemoryInertFixture()
+	const server = await createMemoryServer(trajectory.responses)
+	try {
+		const fixture = createMemoryReplayFixture(scratch, server.url, 'records', {
+			goals: trajectory.goals,
+			settings: { observe: true },
+		})
+		const output = join(scratch.path, 'recorded')
+		const command = await executeStudyInstall(
+			fixture,
+			['execute', 'memory', '--out', output],
+			120000,
+		)
+		if (command.code !== 0) throw new Error(JSON.stringify(command))
+		const baseline = await readStudyResult(output)
+		if (baseline.status !== 'sealed') throw new Error('Completion baseline did not seal')
+		const [trial] = baseline.manifest.schedule
+		if (trial === undefined) throw new Error('Missing completion trial')
+		const sent = server.requests
+		const original = scratch.read('studies/memory/StudyMemorySession.ts')
+		if (original === undefined) throw new Error('Missing captured session')
+		const history = await readStudyExchanges(baseline, trial.id)
+		const interrupted = original
+			.replace('#input: string | undefined', '#replayed = 0\n\t#input: string | undefined')
+			.replace(
+				'fetch: options.replay.fetch',
+				`fetch: async (...args) => {
+				this.#replayed += 1
+				const response = await options.replay?.fetch(...args)
+				if (response === undefined) throw new StudyError('FAULT', 'Missing replay')
+				if (this.#replayed !== ${history.completion.count}) return response
+				await response.arrayBuffer()
+				return new Response(new ReadableStream({ start(controller) {
+					controller.error(new StudyError('FAULT', 'Fixture failed after final recorded response'))
+				} }), { status: response.status, headers: response.headers })
+			}`,
+			)
+		expect(interrupted).not.toBe(original)
+		scratch.write('studies/memory/StudyMemorySession.ts', interrupted)
+		const replay = await replayMemoryDifferential(fixture, baseline, 'interrupted', {})
+		expect(replay.command.code).not.toBe(0)
+		expect(replay.result.status).toBe('interrupted')
+		expect(
+			await readStudyMemoryDifferential({ baseline, replay: replay.result, trial: trial.id }),
+		).toEqual({
+			complete: false,
+			divergence: undefined,
+			change: undefined,
+			selection: undefined,
+		})
+		scratch.write('studies/memory/StudyMemorySession.ts', original)
+		const sealed = await replayMemoryDifferential(fixture, baseline, 'sealed', {})
+		expect(sealed.command.code).toBe(0)
+		expect(
+			await readStudyMemoryDifferential({ baseline, replay: sealed.result, trial: trial.id }),
+		).toEqual({
+			complete: true,
+			divergence: undefined,
+			change: undefined,
+			selection: undefined,
+		})
+		const early = original.replace(
+			'if (this.#goals === undefined || this.#goals.at(-1) === goal) await this.#transport.verify()',
+			"throw new StudyError('FAULT', 'Fixture ended before postflight')",
+		)
+		expect(early).not.toBe(original)
+		scratch.write('studies/memory/StudyMemorySession.ts', early)
+		const ended = await replayMemoryDifferential(fixture, baseline, 'early', {})
+		expect(ended.command.code).not.toBe(0)
+		expect(ended.result.status).toBe('interrupted')
+		expect(
+			await readStudyMemoryDifferential({ baseline, replay: ended.result, trial: trial.id }),
+		).toMatchObject({
+			complete: false,
+			change: undefined,
+			selection: undefined,
+			divergence: { expected: { stage: 'postflight' }, actual: undefined },
+		})
+		scratch.write('studies/memory/StudyMemorySession.ts', original)
+		const refused = original.replace(
+			'return product',
+			"throw new StudyError('FAULT', 'Fixture refused the completed product')",
+		)
+		expect(refused).not.toBe(original)
+		scratch.write('studies/memory/StudyMemorySession.ts', refused)
+		const failed = await replayMemoryDifferential(fixture, baseline, 'refused', {})
+		expect(failed.command.code).not.toBe(0)
+		expect(failed.result.status).toBe('sealed')
+		expect(
+			await readStudyMemoryDifferential({ baseline, replay: failed.result, trial: trial.id }),
+		).toEqual({
+			complete: false,
+			divergence: undefined,
+			change: undefined,
+			selection: undefined,
+		})
+		scratch.write('studies/memory/StudyMemorySession.ts', original)
+		expect(server.requests).toEqual(sent)
+	} finally {
+		await server.close()
+		destroyScratch(scratch)
+	}
+}, 240000)
 
 it('attributes the first changed message by baseline index and bounds UTF-16 excerpts', () => {
 	const expected = { model: 'model', messages: [{ role: 'user', content: 'é😀same' }] }
@@ -241,7 +443,12 @@ it.each(STUDY_MEMORY_DIFFERENTIAL_SWITCHES)(
 				})
 				expect(replay.command.code).toBe(0)
 				expect(replay.result.status).toBe('sealed')
-				expect(reading).toEqual({ divergence: undefined, change: undefined, selection: undefined })
+				expect(reading).toEqual({
+					complete: true,
+					divergence: undefined,
+					change: undefined,
+					selection: undefined,
+				})
 			}
 			const enabled = await replayMemoryDifferential(fixture, baseline, 'enabled', {
 				ledger: { [treatment]: true },
@@ -258,6 +465,7 @@ it.each(STUDY_MEMORY_DIFFERENTIAL_SWITCHES)(
 			expect(reading.divergence?.ordinal).toBe(trajectory.ordinal)
 			expect(enabled.command.code).not.toBe(0)
 			expect(enabled.result.status).toBe('interrupted')
+			expect(reading.complete).toBe(false)
 			expect(reading.divergence?.expected?.goal).toBe('closure')
 			expect(reading.change).toMatchObject({
 				member: 'messages',
@@ -310,7 +518,7 @@ it('AD1 replays both enabled switches fully when the recording contains no selec
 			expect(replay.result.status).toBe('sealed')
 			expect(
 				await readStudyMemoryDifferential({ baseline, replay: replay.result, trial: trial.id }),
-			).toEqual({ divergence: undefined, change: undefined, selection: undefined })
+			).toEqual({ complete: true, divergence: undefined, change: undefined, selection: undefined })
 		}
 		const helper = scratch.read('studies/memory/helpers.ts')
 		if (helper === undefined) throw new Error('Missing captured memory helpers')

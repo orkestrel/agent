@@ -135,9 +135,9 @@ export function scanStudyMemoryChange(
 	}
 }
 
-/** Normalizes arrival message ids to public sources and other message ids to first-appearance positions.
+/** Normalizes arrival message ids to public sources and other message ids to conversation positions.
  * @remarks Public owner ids, pass indices, call readings, and plan relationships remain unchanged.
- * The request appears first, followed by each selection's tails and plan references, then recaps.
+ * Conversation order comes from the session rather than the plan being compared.
  * @param value - A validated pass receipt.
  * @returns An independent receipt with deterministic message identities.
  * @throws StudyError - Thrown with FAULT when the receipt is malformed.
@@ -152,32 +152,13 @@ export function normalizeStudyMemoryReceipt(value: StudyMemoryReceipt): StudyMem
 	const arrivals = new Map(
 		value.arrivals.map((arrival) => [arrival.message, `source:${arrival.id}`]),
 	)
-	const ids = [
-		...new Set([
-			value.request,
-			...value.receipt.selections.flatMap((selection) => [
-				...selection.tail,
-				...selection.prior,
-				...(selection.plan === undefined
-					? []
-					: [
-							...selection.plan.filed,
-							...selection.plan.rendered,
-							...selection.plan.omitted,
-							...selection.plan.sentences.map((sentence) => sentence.source),
-							...selection.plan.withdrawn.flatMap((pair) => [pair.earlier, pair.later]),
-						]),
-				...selection.sources.map((source) => source.source),
-			]),
-			...value.recaps,
-		]),
-	].filter((id) => !arrivals.has(id))
 	const names = new Map([
+		...value.messages.map((id, index): readonly [string, string] => [id, `message:${index}`]),
 		...arrivals,
-		...ids.map((id, index): readonly [string, string] => [id, `message:${index}`]),
 	])
 	return {
 		...value,
+		messages: value.messages.map((id) => names.get(id) ?? id),
 		request: names.get(value.request) ?? value.request,
 		arrivals: value.arrivals.map((arrival) => ({
 			...arrival,
@@ -266,7 +247,7 @@ export function scanStudyMemorySelection(
  * changes and unmatched attempts retain only divergence. Origins come exclusively from the baseline
  * dispatch and its dispatch-stage context row.
  * @param options - Baseline, replay, and scheduled trial id.
- * @returns Wire divergence, parsed change, and a selection difference only for a sealed replay.
+ * @returns Completion eligibility, wire divergence, parsed change, and a selection difference only for a sealed replay.
  * @throws StudyError - Thrown with CONFIG for an unobserved baseline or missing trial, or FAULT for malformed provenance.
  * @example
  * ```ts
@@ -293,6 +274,26 @@ export async function readStudyMemoryDifferential(
 		false,
 	)
 	const divergence = scanStudyDivergence(history, rows)
+	const finished =
+		replay.status === 'sealed'
+			? replay.attempts.find((entry) => entry.trial.id === trial)
+			: undefined
+	const complete =
+		finished !== undefined &&
+		finished.executed &&
+		finished.failure === undefined &&
+		history.declaration.goals.every((goal) =>
+			finished.observations.some(
+				(observation) =>
+					observation.goal === goal &&
+					observation.executed &&
+					observation.failure === undefined &&
+					observation.product?.partial === false,
+			),
+		) &&
+		rows.some((row) => row.phase === 'complete') &&
+		rows.filter((row) => row.phase === 'response' && row.stage !== 'maintenance').length ===
+			history.exchanges.filter(({ attempt: request }) => request.stage !== 'maintenance').length
 	const dispatch = evidence.find(
 		(row) =>
 			row.event === 'dispatch' && isRecord(row.value) && row.value.ordinal === divergence?.ordinal,
@@ -346,7 +347,7 @@ export async function readStudyMemoryDifferential(
 		replay.status !== 'sealed'
 			? undefined
 			: scanStudyMemorySelection(evidence, (await collectStudyEvidence(replay))[trial] ?? [])
-	return { divergence, change, selection }
+	return { complete, divergence, change, selection }
 }
 
 /** Captures each named foreign member once, including a public inherited member. @remarks Unlike the contract record-field reader, this boundary admits class implementations and produces an owned member envelope without retaining unknown members. @param value - The foreign object. @param members - Public members to capture. @returns A fresh member envelope. @throws StudyError - Thrown with FAULT when the container is not an object. */
@@ -471,6 +472,7 @@ export function buildStudyMemoryReceipts(
 		const tail = new Set(receipt.selections.flatMap((selection) => selection.tail))
 		const row: StudyMemoryReceipt = {
 			request: owned.request,
+			messages: [...snapshot.messages],
 			pass,
 			role: 'agent',
 			receipt,

@@ -12,6 +12,7 @@ import {
 import {
 	buildMemoryEdge,
 	buildMemorySelectionResult,
+	STUDY_MEMORY_SELECTION_MESSAGES,
 	STUDY_MEMORY_PASSIVITY_CASES,
 	STUDY_MEMORY_PASSIVITY_BASE,
 	buildMemoryEnduranceProfile,
@@ -240,6 +241,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			if (!isStudyMemoryReceipt(rows[0]) || !isStudyMemoryReceipt(rows[1]))
 				throw new Error('Missing actual selection rows')
 			expect(rows[0].request).not.toBe(rows[1].request)
+			expect(rows[1].messages.slice(0, rows[0].messages.length)).toEqual(rows[0].messages)
+			expect(rows[0].messages.indexOf(rows[0].request)).toBeGreaterThanOrEqual(0)
+			expect(rows[1].messages.indexOf(rows[1].request)).toBeGreaterThan(
+				rows[1].messages.indexOf(rows[0].request),
+			)
 			const first = rows[0].request
 			const arrivals = readMemoryEvents(trial.evidence, 'arrival')
 			for (const row of rows) {
@@ -270,17 +276,24 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		expect(rows[0]?.value).not.toHaveProperty('stop')
 		expect(Object.keys(rows[0]?.value ?? {}).sort()).toEqual(STUDY_MEMORY_EVENT_KEYS.selection)
 		const fixture = buildMemorySelectionResult()
-		const fallback = buildStudyMemoryReceipts(await runMemoryFallback(), [], { sections: [] })
+		const resolved = await runMemoryFallback()
+		const fallback = buildStudyMemoryReceipts(resolved, [], {
+			sections: [],
+			messages: resolved.messages,
+		})
 		expect(fallback).toHaveLength(1)
 		expect(fallback[0]?.receipt.selections[0]?.plan, 'C6 fallback plan is absent').toBeUndefined()
 		const stopped = buildStudyMemoryReceipts(
 			{ ...fixture, passes: [{ ...fixture.passes[0], stop: { layer: 'model', id: 'model' } }] },
 			[],
-			{ sections: [] },
+			{ sections: [], messages: STUDY_MEMORY_SELECTION_MESSAGES },
 		)
 		expect(stopped[0]?.stop, 'C6 stop is copied').toEqual({ layer: 'model', id: 'model' })
 		expect(
-			buildStudyMemoryReceipts({ ...fixture, partial: true }, [], { sections: [] })[0]?.stop,
+			buildStudyMemoryReceipts({ ...fixture, partial: true }, [], {
+				sections: [],
+				messages: STUDY_MEMORY_SELECTION_MESSAGES,
+			})[0]?.stop,
 			'C6 partial infers no stop',
 		).toBeUndefined()
 	})

@@ -1,4 +1,5 @@
 import type { JSONValue } from '@orkestrel/contract'
+import type { LedgerResult } from '@orkestrel/agent'
 import type {
 	StudyAttempt,
 	StudyContext,
@@ -17,6 +18,20 @@ import type {
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type { StudyResultReading } from '@orkestrel/study/server'
+
+/** Holds a resolved real Ledger fallback and its independently captured conversation order. */
+export interface MemoryFallbackResult extends LedgerResult {
+	readonly messages: readonly string[]
+}
+
+/** Holds the worker's process identity, supplied environment, and resolved Intl options. */
+export interface MemoryWorker {
+	readonly pid: number
+	readonly tz: string
+	readonly lang: string
+	/** Mirrors the locale and timeZone members of Intl.ResolvedDateTimeFormatOptions. */
+	readonly intl: Pick<Intl.ResolvedDateTimeFormatOptions, 'locale' | 'timeZone'>
+}
 
 /** Holds an authored recording fixture and its exact executing profile. */
 export interface MemoryReplayFixture extends StudyInstallFixture {
