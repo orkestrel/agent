@@ -8,7 +8,11 @@ Agent's boost campaign plan: the handoff of 2026-10-24, then goal, exit, rulings
 
 ## Handoff (2026-10-25)
 
-### Current checkpoint: marked-request CPU preparation accepted; live attempt approved
+### Current checkpoint: marked-request calibration refused; D1 decision pending
+
+U30's single marked-request attempt completed all 226 valid observations and sealed result `eb9a16fe-568c-4770-a5ce-0e9e52ff2326`, seal `e0be752a1e2c65aeac9c293d0059459aa5188ccd58e98b7149334ef7795723f7`. Fitting refused: noise `0.13484452741521347` exceeds `0.05`; no nominal cutoff reaches precision `0.90` either. At `0.70`, TP13/FP7 gives precision `0.65`, versus `0.80` in the first calibration. No cutoff was selected, validation stayed ungraded, and product D1 remains unimplemented. This candidate is rejected. No retry, alternate prompt, or reduced floor is admitted. Report: `tmp/units/ledger-sentence-target-live-2/report.md`.
+
+Charge this attempt 516783 model ms and 563919 elapsed ms: live chain 555316 ms plus measured admission/diagnostic commands 8603 ms. Cumulative U28 use is 969075 / 1052460 ms; remaining amended allowance is 383217 model ms / 636081 elapsed ms. U24 is unchanged. The sealed result, exact fitting diagnostic, source capture, and immutable launcher are retained; temporary executable admission/probe copies are archived and removed. All recorded processes ended and port11435 has no listener. Only protected package pins remain modified before this campaign-record commit. D2 stays accepted; D3's integrated review awaits the D1 scope decision. R3 removal stays closed.
 
 U30 (user, 2026-10-25): approved the prepared marked-request calibration amendment and instructed execution. Restore exactly one attempt with 900000 model ms / 1200000 elapsed ms, retaining the preceding charge of 452292 / 488541 ms. Cumulative U28 ceilings become 1352292 model ms / 1688541 elapsed ms. For this attempt alone, U29 preflight admission becomes 900000 model ms; the byte-scaled planning proxy is 891803.541 ms and is not measured latency or a bound. Keep the fixed 212 bases, 226 observations, request digest, labels, model, floors, controls, and all tighter profile limits. No automatic retry or prompt variant. Fit first, validate only the frozen passing selection, and stop on any refusal. U24 is unchanged. Root owns the sole live process lane under `tmp/units/ledger-sentence-target-launch.ts`; output is `tmp/units/ledger-sentence-target-live-2/attempt`.
 

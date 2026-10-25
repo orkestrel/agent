@@ -12,11 +12,13 @@ The idea record for Agent's memory boosts as it stood on 2026-10-21: the code se
 
 ## D1 marked-request successor (2026-10-25)
 
+The user-approved live attempt is rejected for product D1. All 226 observations were valid and sealed, but fitting noise `0.1348445274` exceeds `0.05`; no nominal cutoff reaches precision `0.90`. At `0.70`, precision is `0.65` versus `0.80` for the preceding wording. Validation remains ungraded and no cutoff exists. Preserve `tmp/units/ledger-sentence-target-live-2/report.md` and its complete custody. U30 admits no retry or another wording change. The earlier CPU acceptance remains an implementation result, not semantic acceptance. D1 needs a scope decision before D3's integrated review and the remaining quality campaign proceed.
+
 CPU preparation is accepted after independent review, exact prescribed repairs, and independent project gates. This successor marks only the selected original sentence occurrence inside the complete earlier text, preserves source characters through the declared escaping, and binds every generated/admitted request to digest `85a94b1d934e4f44d6ff757048846ee6c2d5eced5966fc18a31b8bcbcc8bf31d`. It supersedes the old sentence request's pair-prefix promise; ordinary pair requests retain their existing renderer. The exact contract is in `tmp/units/ledger-sentence-target-design-report.md`, implemented under `studies/sentences/`. Product D1 must match these calibrated wire bytes if calibration passes.
 
 The complete population, labels, observation membership, scoring floors, and hard controls remain unchanged. The observed encoded-body total is 583422 bytes versus 528195; semantic accuracy and latency remain unmeasured. The initial calibration failure and its unused held-out scores remain retained. Independent setup passed 183 tests and studies passed 208 with the existing locale skip; studies took 1270558 ms uncapped. Formal MCP attempts produced no receipt; the retained ordinary tests and discriminating mutations are separate evidence. No repeat CPU audit or project gate is owed on these bytes.
 
-Live successor admission awaits the explicit U28/U29 amendment proposed in `tmp/units/ledger-sentence-target-live-proposal.md`. No cutoff, product implementation, or quality gain is established. After accepted calibration, retain the integrated D1/D2/D3 review, gates, replacement revisit, and complete offline replay requirements. R3 cleanup remains accepted.
+U30 admitted the single successor described in `tmp/units/ledger-sentence-target-live-proposal.md`; its refusal is recorded earlier in this section. No cutoff, product implementation, or quality gain is established. A future accepted calibration would still require the integrated D1/D2/D3 review, gates, replacement revisit, and complete offline replay. R3 cleanup remains accepted.
 
 ## Code seams
 
