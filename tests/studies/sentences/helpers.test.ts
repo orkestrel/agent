@@ -26,60 +26,157 @@ import {
 
 describe('public sentence population', () => {
 	it('distinguishes every exact target identity component', () => {
-		const target = { earlier: { id: 'receipt', version: 4 }, later: { id: 'correction', version: 52 }, sentence: 0 }
-		expect(matchesStudySentenceTarget(target, { earlier: { id: 'receipt', version: 4 }, later: { id: 'correction', version: 52 }, sentence: 0 })).toBe(true)
+		const target = {
+			earlier: { id: 'receipt', version: 4 },
+			later: { id: 'correction', version: 52 },
+			sentence: 0,
+		}
+		expect(
+			matchesStudySentenceTarget(target, {
+				earlier: { id: 'receipt', version: 4 },
+				later: { id: 'correction', version: 52 },
+				sentence: 0,
+			}),
+		).toBe(true)
 		for (const other of [
-			{ earlier: { id: 'other', version: 4 }, later: { id: 'correction', version: 52 }, sentence: 0 },
-			{ earlier: { id: 'receipt', version: 5 }, later: { id: 'correction', version: 52 }, sentence: 0 },
+			{
+				earlier: { id: 'other', version: 4 },
+				later: { id: 'correction', version: 52 },
+				sentence: 0,
+			},
+			{
+				earlier: { id: 'receipt', version: 5 },
+				later: { id: 'correction', version: 52 },
+				sentence: 0,
+			},
 			{ earlier: { id: 'receipt', version: 4 }, later: { id: 'other', version: 52 }, sentence: 0 },
-			{ earlier: { id: 'receipt', version: 4 }, later: { id: 'correction', version: 53 }, sentence: 0 },
-			{ earlier: { id: 'receipt', version: 4 }, later: { id: 'correction', version: 52 }, sentence: 1 },
-		]) expect(matchesStudySentenceTarget(target, other)).toBe(false)
+			{
+				earlier: { id: 'receipt', version: 4 },
+				later: { id: 'correction', version: 53 },
+				sentence: 0,
+			},
+			{
+				earlier: { id: 'receipt', version: 4 },
+				later: { id: 'correction', version: 52 },
+				sentence: 1,
+			},
+		])
+			expect(matchesStudySentenceTarget(target, other)).toBe(false)
 	})
 
 	it('retains the exact shared-case opening target before standing drawing', () => {
 		const input = buildStudySentenceFixture()
 		const manifest = buildStudySentenceManifest(input)
-		const packet = requireValue(manifest.packets.find((entry) => entry.id === '94c4a4d03f27571c25b98a043ac77456418c8fb624edbbc481a66ac3659ca5bf'))
-		expect([packet.earlier.id, packet.earlier.version, packet.later.id, packet.later.version, packet.sentence]).toEqual(['ev-opening', 0, 'ev-source-13-3', 48, 9])
+		const packet = requireValue(
+			manifest.packets.find(
+				(entry) => entry.id === '94c4a4d03f27571c25b98a043ac77456418c8fb624edbbc481a66ac3659ca5bf',
+			),
+		)
+		expect([
+			packet.earlier.id,
+			packet.earlier.version,
+			packet.later.id,
+			packet.later.version,
+			packet.sentence,
+		]).toEqual(['ev-opening', 0, 'ev-source-13-3', 48, 9])
 		expect(packet.earlier.cases).toEqual(['BC-7301', 'BC-7312'])
 		expect(packet.later.cases).toEqual(['BC-7301'])
 		expect(packet.partition).toBe('fitting')
 		expect(packet.stratum).toBe('same')
-		expect(packet.text).toBe("Mara Ellison's BC-7301 case will have no updates during shifts 2 through 12; do not invent progress while it is dormant.")
+		expect(packet.text).toBe(
+			"Mara Ellison's BC-7301 case will have no updates during shifts 2 through 12; do not invent progress while it is dormant.",
+		)
 		expect(packet.text).toBe(input.agent.splitSentences(packet.earlier.text)[9])
 		expect(sharesStudySentenceTokens(packet.text, packet.later.text, input.agent)).toBe(true)
 		expect(input.population.standing).toContain('ev-opening')
 		expect(manifest.packets.some((entry) => entry.earlier.id === 'ev-register')).toBe(false)
-		expect(manifest.excluded.some((row) => row.reason === 'partition' && row.packet.earlier.id === 'ev-source-2-2' && row.packet.later.id === 'ev-source-13-2' && row.packet.sentence === 3)).toBe(true)
+		expect(
+			manifest.excluded.some(
+				(row) =>
+					row.reason === 'partition' &&
+					row.packet.earlier.id === 'ev-source-2-2' &&
+					row.packet.later.id === 'ev-source-13-2' &&
+					row.packet.sentence === 3,
+			),
+		).toBe(true)
 	})
 
 	it('refuses an eligible sibling replacing the exact required original sentence', () => {
 		const input = buildStudySentenceFixture()
 		const baseline = buildStudySentenceManifest(input)
-		expect(baseline.packets.filter((packet) => packet.required && packet.earlier.id === 'ev-source-2-1').map((packet) => packet.sentence)).toEqual([0])
-		const variants = ['Receipt remains filed. Order BC-7302 remains open.', 'Receipt remains filed. Correspondence stays available.', 'Order BC-7302 remains filed. Order BC-7302 remains open.'].map((content) => ({
+		expect(
+			baseline.packets
+				.filter((packet) => packet.required && packet.earlier.id === 'ev-source-2-1')
+				.map((packet) => packet.sentence),
+		).toEqual([0])
+		const variants = [
+			'Receipt remains filed. Order BC-7302 remains open.',
+			'Receipt remains filed. Correspondence stays available.',
+			'Order BC-7302 remains filed. Order BC-7302 remains open.',
+		].map((content) => ({
 			...input,
-			population: { ...input.population, aliases: input.population.aliases.map((alias) => alias.source.id === 'ev-source-2-1' && alias.source.version === 4 ? { ...alias, text: `[Source ev-source-2-1] ${content}` } : alias) },
-			scenario: { ...input.scenario, goals: input.scenario.goals.map((goal) => {
-				if (!isStudyMemoryInput(goal.input)) throw new Error('Invalid public scenario input')
-				const released: StudyMemoryInput = goal.input
-				return { ...goal, input: { ...released, arrivals: released.arrivals.map((arrival) => arrival.id === 'ev-source-2-1' ? { ...arrival, content } : arrival) } }
-			}) },
+			population: {
+				...input.population,
+				aliases: input.population.aliases.map((alias) =>
+					alias.source.id === 'ev-source-2-1' && alias.source.version === 4
+						? { ...alias, text: `[Source ev-source-2-1] ${content}` }
+						: alias,
+				),
+			},
+			scenario: {
+				...input.scenario,
+				goals: input.scenario.goals.map((goal) => {
+					if (!isStudyMemoryInput(goal.input)) throw new Error('Invalid public scenario input')
+					const released: StudyMemoryInput = goal.input
+					return {
+						...goal,
+						input: {
+							...released,
+							arrivals: released.arrivals.map((arrival) =>
+								arrival.id === 'ev-source-2-1' ? { ...arrival, content } : arrival,
+							),
+						},
+					}
+				}),
+			},
 		}))
 		const sibling = requireValue(variants[0])
 		const empty = requireValue(variants[1])
 		const sources = collectStudySentenceSources(sibling)
-		const earlier = resolveStudySentenceSource({ id: 'ev-source-2-1', version: 4 }, sources, sibling.population.aliases)
-		const later = resolveStudySentenceSource({ id: 'ev-source-14-2', version: 52 }, sources, sibling.population.aliases)
+		const earlier = resolveStudySentenceSource(
+			{ id: 'ev-source-2-1', version: 4 },
+			sources,
+			sibling.population.aliases,
+		)
+		const later = resolveStudySentenceSource(
+			{ id: 'ev-source-14-2', version: 52 },
+			sources,
+			sibling.population.aliases,
+		)
 		const sentences = input.agent.splitSentences(earlier.text)
-		expect(sharesStudySentenceTokens(requireValue(sentences[0]), later.text, input.agent)).toBe(false)
-		expect(sharesStudySentenceTokens(requireValue(sentences[1]), later.text, input.agent)).toBe(true)
+		expect(sharesStudySentenceTokens(requireValue(sentences[0]), later.text, input.agent)).toBe(
+			false,
+		)
+		expect(sharesStudySentenceTokens(requireValue(sentences[1]), later.text, input.agent)).toBe(
+			true,
+		)
 		expect(() => buildStudySentenceManifest(sibling)).toThrow('Missing required R target')
 		expect(() => buildStudySentenceManifest(empty)).toThrow('Missing required R target')
 		const both = buildStudySentenceManifest(requireValue(variants[2]))
-		expect(both.packets.filter((packet) => packet.required && packet.earlier.id === 'ev-source-2-1').map((packet) => packet.sentence)).toEqual([0])
-		expect(both.packets.some((packet) => packet.earlier.id === 'ev-source-2-1' && packet.later.id === 'ev-source-14-2' && packet.sentence === 1 && !packet.required)).toBe(true)
+		expect(
+			both.packets
+				.filter((packet) => packet.required && packet.earlier.id === 'ev-source-2-1')
+				.map((packet) => packet.sentence),
+		).toEqual([0])
+		expect(
+			both.packets.some(
+				(packet) =>
+					packet.earlier.id === 'ev-source-2-1' &&
+					packet.later.id === 'ev-source-14-2' &&
+					packet.sentence === 1 &&
+					!packet.required,
+			),
+		).toBe(true)
 	})
 
 	it('retains complete public bytes, side membership, required R versions, and blind custody', () => {
@@ -425,8 +522,29 @@ describe('public sentence population', () => {
 		]
 		const draw = drawStudySentencePackets(candidates)
 		for (const packet of draw) {
-			expect(packet.rank).toBe(createHash('sha256').update(JSON.stringify(['d1-partition-v1', packet.earlier.id, packet.earlier.version, packet.later.id, packet.later.version, packet.sentence])).digest('hex'))
-			expect(candidates.filter((other) => other.later.id === packet.later.id && other.later.version === packet.later.version && other.stratum === packet.stratum && other.rank < packet.rank)).toEqual([])
+			expect(packet.rank).toBe(
+				createHash('sha256')
+					.update(
+						JSON.stringify([
+							'd1-partition-v1',
+							packet.earlier.id,
+							packet.earlier.version,
+							packet.later.id,
+							packet.later.version,
+							packet.sentence,
+						]),
+					)
+					.digest('hex'),
+			)
+			expect(
+				candidates.filter(
+					(other) =>
+						other.later.id === packet.later.id &&
+						other.later.version === packet.later.version &&
+						other.stratum === packet.stratum &&
+						other.rank < packet.rank,
+				),
+			).toEqual([])
 		}
 		expect(draw.map((packet) => packet.rank)).toEqual(STUDY_SENTENCE_DRAW)
 		expect(drawStudySentencePackets(candidates.toReversed())).toEqual(draw)

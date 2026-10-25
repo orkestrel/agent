@@ -1,5 +1,147 @@
 import type { Message, NoulQuestion, extractTokens, splitSentences } from '@orkestrel/agent'
-import type { StudyScenario } from '@orkestrel/study'
+import type { StudyScenario, StudyProfile, StudyRubric } from '@orkestrel/study'
+import type { createOllamaJudge, extractTiming } from '@orkestrel/ollama'
+import type { StudyDriverOptions, StudyOllamaMetadata } from '@orkestrel/study/server'
+
+/** Holds the admitted provider's real judge and timing capabilities. */
+export interface StudySentenceProvider {
+	readonly createOllamaJudge: typeof createOllamaJudge
+	readonly extractTiming: typeof extractTiming
+}
+
+/** Holds one trial's admitted provider and source-bound execution settings. */
+export interface StudySentenceSessionOptions extends StudyDriverOptions {
+	readonly provider: StudySentenceProvider
+	readonly signal: AbortSignal
+}
+
+/** Holds label-free frozen execution receipts alongside the Study recording settings. */
+export interface StudySentenceSettings {
+	readonly binding: StudySentenceBinding
+	readonly inputs: Readonly<Record<string, string>>
+	readonly goals: readonly string[]
+	readonly version: string
+	readonly metadata: StudyOllamaMetadata
+}
+
+/** Holds pure generated declarations before the node-only launcher runs. */
+export interface StudySentenceDeclarations {
+	readonly scenario: StudyScenario
+	readonly initial: StudyRubric
+	readonly fitting: StudyRubric
+	readonly validation: StudyRubric
+	readonly profile: StudyProfile
+}
+
+/** Holds the public memory input admitted by the sentence enumerator's local mirror. */
+export interface StudySentenceMemory {
+	readonly prompt: string
+	readonly arrivals: ReadonlyArray<{ readonly id: string; readonly content: string }>
+	readonly records: ReadonlyArray<{
+		readonly id: string
+		readonly name: string
+		readonly content: string
+	}>
+}
+
+/** Holds a frozen blind label, with unresolved entries removed before admission. */
+export interface StudySentenceLabel {
+	readonly id: string
+	readonly label: 'yes' | 'no' | 'unresolved'
+}
+
+/** Names the independently dispatched observation category. */
+export type StudySentenceCategory = 'base' | 'repeat' | 'sham'
+
+/** Holds the declared public goal fields, without labels or control intent. */
+export interface StudySentenceGoal {
+	readonly id: string
+	readonly observation: string
+	/** Mirrors the goal input field mandated by the calibration declaration. */
+	readonly kind: StudySentenceCategory
+	readonly state: string
+	readonly key: string
+	readonly digests: readonly string[]
+}
+
+/** Holds the selected noise count for one partition, category, and label. */
+export interface StudySentenceCell {
+	readonly partition: StudySentencePartition
+	readonly category: 'repeat' | 'sham'
+	readonly label: 'yes' | 'no'
+	readonly packets: readonly StudySentencePacket[]
+	readonly count: number
+}
+
+/** Holds deterministic sample admission, separate from the enumerator's minimum forecast. */
+export interface StudySentenceSample {
+	readonly packets: readonly StudySentencePacket[]
+	readonly excluded: readonly string[]
+	readonly initial: readonly StudySentenceCell[]
+	readonly cells: readonly StudySentenceCell[]
+	readonly goals: readonly StudySentenceGoal[]
+	readonly requests: number
+	readonly seconds: number
+}
+
+/** Holds immutable calibration inputs shared by independent grading declarations. */
+export interface StudySentenceBinding {
+	readonly manifest: string
+	readonly labels: string
+	readonly scenario: string
+	readonly agent: string
+	readonly fitting: string
+	readonly validation: string
+}
+
+/** Holds a validated complete score with its request identity. */
+export interface StudySentenceObservation {
+	readonly observation: string
+	readonly id: string
+	readonly score: number
+	readonly digest: string
+	readonly binding: string
+}
+
+/** Holds one partition's independent grading target and hard control. */
+export interface StudySentenceTargetLabel {
+	readonly id: string
+	readonly label: boolean
+	readonly control: boolean | undefined
+}
+
+/** Holds finite-set performance at one cutoff. */
+export interface StudySentenceMatrix {
+	readonly cutoff: number
+	readonly tp: number
+	readonly fp: number
+	readonly tn: number
+	readonly fn: number
+	readonly precision: number
+	readonly recall: number
+	readonly margin: number
+}
+
+/** Holds the immutable fitting result copied through the Study judgment reason. */
+export interface StudySentenceSelection {
+	readonly binding: StudySentenceBinding
+	readonly cutoff: number
+	readonly noise: number
+	readonly matrices: readonly StudySentenceMatrix[]
+	readonly observations: string
+	readonly targets: readonly StudySentenceTargetLabel[]
+	readonly policy: string
+}
+
+/** Holds the consumer grading declaration outside public goals. */
+export interface StudySentenceAssertion {
+	readonly phase: 'initial' | 'fitting' | 'validation'
+	readonly binding: StudySentenceBinding
+	readonly targets: readonly StudySentenceTargetLabel[]
+	readonly selection: StudySentenceSelection | undefined
+	readonly digest: string | undefined
+	readonly grading: string | undefined
+}
 
 /** Names the frozen case partition. */
 export type StudySentencePartition = 'fitting' | 'validation'

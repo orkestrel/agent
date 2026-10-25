@@ -1,5 +1,13 @@
 import type { StudySentenceInput, StudySentencePopulation } from '../studies/sentences/types.js'
 import type {
+	StudySentenceFixture,
+	StudySentenceNoiseVector,
+	StudySentenceSessionFixture,
+	StudySentenceSessionFixtureOptions,
+} from './studies/sentences/types.js'
+import { StudySentenceDriver } from '../studies/sentences/StudySentenceDriver.js'
+import type { StudyAdjudication } from '@orkestrel/study/server'
+import type {
 	MemoryAdmissionFixture,
 	MemoryDifferentialFixture,
 	MemoryDifferentialResult,
@@ -74,6 +82,7 @@ import { createRecorder, waitForCondition, waitForAbort } from '@orkestrel/test'
 import { createLoopback, isRunning, createScratch, destroyScratch } from '@orkestrel/test/server'
 import {
 	parseStudyProfile,
+	parseStudyDefinition,
 	parseStudyScenario,
 	buildStudySchedule,
 	validateStudyInputs,
@@ -87,6 +96,7 @@ import {
 	readStudyExchanges,
 	readStudyResult,
 	collectStudyEvidence,
+	encodeStudyJSON,
 } from '@orkestrel/study/server'
 import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
 import {
@@ -109,6 +119,317 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isStudySentencePopulation } from '../studies/sentences/validators.js'
 import sentencePopulation from '../studies/sentences/population.json'
 import sentenceScenario from '../studies/memory/scenarios/endurance.json'
+import sentenceDefinition from '../studies/sentences/study.json'
+import sentenceProfile from '../studies/sentences/profiles/calibration.json'
+import {
+	buildStudySentenceDeclarations,
+	buildStudySentenceManifest,
+	sampleStudySentences,
+	isStudySentenceSettings,
+	isStudySentenceGoal,
+} from '../studies/sentences/index.js'
+
+/** Builds synthetic labels and exact public packets for consumer calibration proofs. @param url - Ephemeral protocol fixture origin. @returns A complete calibration fixture without reading frozen labels. */
+export function buildStudySentenceCalibration(url = 'http://127.0.0.1:1'): StudySentenceFixture {
+	const manifest = buildStudySentenceManifest(buildStudySentenceFixture())
+	const labels = manifest.packets.map((packet, index) => ({
+		id: packet.id,
+		label:
+			(packet.control?.intent ?? packet.constraint?.intent ?? index % 3 === 0)
+				? ('yes' as const)
+				: ('no' as const),
+	}))
+	const profile = parseStudyProfile({
+		...sentenceProfile,
+		agent: realpathSync('dist/src/core/index.js'),
+		subject: realpathSync('dist/src/core/index.js'),
+		roots: sentenceProfile.roots.map((root) => realpathSync(root)),
+		provider: {
+			entry: realpathSync('node_modules/@orkestrel/ollama/dist/src/core/index.js'),
+			url,
+			model: 'model',
+			judge: 'judge',
+			digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+		},
+	})
+	const generated = buildStudySentenceDeclarations(
+		manifest,
+		labels,
+		{
+			manifest: hashStudyBytes(encodeStudyJSON(manifest)),
+			labels: hashStudyBytes(encodeStudyJSON(labels)),
+			agent: hashStudyBytes(readFileSync('dist/src/core/index.js')),
+		},
+		profile,
+	)
+	const declarations = {
+		...generated,
+		profile: parseStudyProfile({
+			...generated.profile,
+			settings: { ...generated.profile.settings, version: 'fixture-1' },
+			bounds: {
+				...generated.profile.bounds,
+				request: { ...generated.profile.bounds.request, duration: 10000 },
+				goal: { ...generated.profile.bounds.goal, duration: 20000 },
+				trial: { ...generated.profile.bounds.trial, duration: 120000 },
+				series: { ...generated.profile.bounds.series, duration: 120000 },
+			},
+		}),
+	}
+	const population = buildCustodyManifest(
+		parseStudyDefinition(sentenceDefinition),
+		[declarations.scenario],
+		declarations.profile.bounds,
+	)
+	const sample = sampleStudySentences(manifest, labels)
+	const fixture = {
+		manifest,
+		labels,
+		sample,
+		declarations,
+		input: { manifest: population, rubric: declarations.fitting, attempts: [], evidence: {} },
+	}
+	return { ...fixture, input: buildStudySentenceAdjudication(fixture) }
+}
+
+/** Owns an actual session and loopback protocol peer with deterministic cleanup. @param options - Inert replies and native deadlines. @returns A live session fixture whose caller closes every resource. */
+export async function createStudySentenceSessionFixture(
+	options: StudySentenceSessionFixtureOptions = {},
+): Promise<StudySentenceSessionFixture> {
+	const server = await createMemoryServer(options.responses)
+	const fixture = buildStudySentenceCalibration(server.url)
+	const declared = fixture.declarations.profile
+	const profile = parseStudyProfile({
+		...declared,
+		record: undefined,
+		bounds: {
+			...declared.bounds,
+			request: {
+				...declared.bounds.request,
+				duration: options.duration ?? declared.bounds.request.duration,
+			},
+		},
+	})
+	const context = createMemoryContext(profile, options.signal)
+	try {
+		const session = await new StudySentenceDriver({
+			...STUDY_MEMORY_MODULES,
+			profile,
+			directory: process.cwd(),
+		}).open(
+			{ id: 'cpu', scenario: 'd1', arm: 'calibration', repetition: 0 },
+			context.context.signal,
+		)
+		return {
+			fixture,
+			session,
+			context,
+			server,
+			async close() {
+				try {
+					await session.close()
+				} finally {
+					context.close()
+					await server.close()
+				}
+			},
+		}
+	} catch (error) {
+		context.close()
+		await server.close()
+		throw error
+	}
+}
+
+/** Checks exact response retention against the actual judge dispatch and request bytes. @param evidence - Retained transport evidence. @param goal - Executed goal identity. @param request - Actual encoded request body. @param body - Expected response bytes. @returns True if exactly one matching terminal retains the byte relationship; false otherwise. */
+export function retainsStudySentenceResponse(
+	evidence: readonly StudyEvidence[],
+	goal: string,
+	request: string,
+	body: string,
+): boolean {
+	const dispatch = evidence.filter(
+		(row) =>
+			row.event === 'dispatch' &&
+			row.goal === goal &&
+			isRecord(row.value) &&
+			row.value.role === 'judge' &&
+			row.value.path === '/api/generate',
+	)
+	const value = dispatch[0]?.value
+	if (dispatch.length !== 1 || !isRecord(value)) return false
+	return (
+		evidence.filter(
+			(row) =>
+				row.goal === goal &&
+				isRecord(row.value) &&
+				row.value.id === value.id &&
+				row.value.role === 'judge' &&
+				row.value.path === '/api/generate' &&
+				row.value.status === 200 &&
+				row.value.bytes === Buffer.byteLength(request) + Buffer.byteLength(body),
+		).length === 1
+	)
+}
+
+/** Builds retained synthetic scores and their independently shaped evidence rows. @param fixture - Public calibration declarations and synthetic labels. @param scores - Optional score overrides keyed by observation identity. @returns Complete custody-shaped adjudication inputs. */
+export function buildStudySentenceAdjudication(
+	fixture: StudySentenceFixture,
+	scores: Readonly<Record<string, number>> = {},
+): StudyAdjudication {
+	const settings = fixture.declarations.profile.settings
+	if (!isStudySentenceSettings(settings))
+		throw new Error('Synthetic execution settings are malformed')
+	const trial = fixture.input.manifest.schedule[0]
+	if (trial === undefined) throw new Error('Synthetic trial is absent')
+	const observations = fixture.declarations.scenario.goals.map((goal) => {
+		if (!isStudySentenceGoal(goal.input)) throw new Error('Synthetic goal is malformed')
+		const identity = goal.input.id
+		const label = fixture.labels.find((entry) => entry.id === identity)
+		return {
+			goal: goal.id,
+			executed: true,
+			failure: undefined,
+			duration: 1,
+			usage: [],
+			product: {
+				partial: false,
+				value: {
+					id: goal.input.id,
+					observation: goal.id,
+					score: scores[goal.id] ?? (label?.label === 'yes' ? 0.9 : 0.1),
+					digest: hashStudyBytes(encodeStudyJSON(goal.input)),
+					binding: hashStudyBytes(encodeStudyJSON(settings.binding)),
+				},
+			},
+		}
+	})
+	return {
+		...fixture.input,
+		attempts: [
+			{ trial, executed: true, failure: undefined, duration: observations.length, observations },
+		],
+		evidence: {
+			[trial.id]: observations.map((observation) => ({
+				event: 'sentence',
+				goal: observation.goal,
+				value: observation.product.value,
+			})),
+		},
+	}
+}
+
+/** Encodes one completed Ollama judge response with both candidate log probabilities. @param score - Desired Yes probability. @returns Protocol bytes consumed by the real installed decoder. */
+export function renderStudySentenceReply(score: number): string {
+	return JSON.stringify({
+		model: 'judge',
+		done: true,
+		done_reason: 'length',
+		response: score >= 0.5 ? 'Yes' : 'No',
+		prompt_eval_count: 10,
+		eval_count: 1,
+		logprobs: [
+			{
+				token: score >= 0.5 ? 'Yes' : 'No',
+				logprob: Math.log(Math.max(score, 1 - score)),
+				top_logprobs: [
+					{ token: 'Yes', logprob: Math.log(score) },
+					{ token: 'No', logprob: Math.log(1 - score) },
+				],
+			},
+		],
+	})
+}
+
+/** Copies only this consumer's source and synthetic declarations into an owned CPU workspace. @param scratch - Exclusive workspace owner. @param fixture - Synthetic labels and ephemeral provider profile. @returns The run directory relative to that workspace. */
+export function prepareStudySentenceWorkspace(
+	scratch: ScratchInterface,
+	fixture: StudySentenceFixture,
+): string {
+	for (const file of [
+		'types.ts',
+		'constants.ts',
+		'helpers.ts',
+		'validators.ts',
+		'factories.ts',
+		'StudySentenceAdapter.ts',
+		'StudySentenceDriver.ts',
+		'StudySentenceSession.ts',
+		'index.ts',
+		'study.json',
+	])
+		scratch.write(
+			join('studies/sentences', file),
+			readFileSync(resolve('studies/sentences', file), 'utf8'),
+		)
+	scratch.write(
+		'studies/sentences/scenarios/d1.json',
+		JSON.stringify(fixture.declarations.scenario),
+	)
+	scratch.write(
+		'studies/sentences/profiles/calibration.json',
+		JSON.stringify(fixture.declarations.profile),
+	)
+	scratch.write('studies/sentences/rubric.json', JSON.stringify(fixture.declarations.initial))
+	scratch.write('run/fitting.json', JSON.stringify(fixture.declarations.fitting))
+	scratch.write('run/validation.json', JSON.stringify(fixture.declarations.validation))
+	return 'run'
+}
+
+/** Copies a loadable changed Agent entry for raw frozen-build admission controls. @param scratch - Exclusive workspace owner. @param fixture - Original declarations. @param receipt - If true, binds declarations to the copied bytes; if false, retains the earlier receipt. @returns Declarations selecting the explicitly admitted fixture package. */
+export function prepareStudySentenceBuild(
+	scratch: ScratchInterface,
+	fixture: StudySentenceFixture,
+	receipt: boolean,
+): StudySentenceFixture {
+	const profile = fixture.declarations.profile
+	if (!isStudySentenceSettings(profile.settings)) throw new Error('Missing frozen settings')
+	scratch.write(
+		'candidate/package.json',
+		JSON.stringify({ name: '@fixture/agent-drift', version: '0.0.0', type: 'module' }),
+	)
+	scratch.write(
+		'candidate/dist/index.js',
+		readFileSync(profile.agent, 'utf8') + '\n// Compatible frozen-build drift control.\n',
+	)
+	const candidate = resolve(scratch.path, 'candidate/dist/index.js')
+	const selected = parseStudyProfile({
+		...profile,
+		agent: 'candidate/dist/index.js',
+		subject: candidate,
+		roots: [...profile.roots, resolve(scratch.path, 'candidate')],
+	})
+	const generated = buildStudySentenceDeclarations(
+		fixture.manifest,
+		fixture.labels,
+		{ ...profile.settings.binding, agent: hashStudyBytes(readFileSync(candidate)) },
+		selected,
+	)
+	const declarations = receipt
+		? {
+				...generated,
+				profile: parseStudyProfile({
+					...selected,
+					settings: { ...generated.profile.settings, version: profile.settings.version },
+				}),
+			}
+		: { ...fixture.declarations, profile: selected }
+	return { ...fixture, declarations }
+}
+
+/** Retains a real CLI check reply then changes only profile whitespace before launcher admission. @param scratch - Exclusive workspace owner. @returns The fixture entry that delegates to the installed CLI. */
+export function prepareStudySentenceDrift(scratch: ScratchInterface): string {
+	return scratch.write(
+		'profile-drift.ts',
+		[
+			"import { execFileSync } from 'node:child_process'",
+			"import { appendFileSync } from 'node:fs'",
+			`const stdout = execFileSync(process.execPath, [${JSON.stringify(resolve('node_modules/@orkestrel/study/dist/bin/main.js'))}, ...process.argv.slice(2)], { encoding: 'utf8', windowsHide: true })`,
+			"appendFileSync('studies/sentences/profiles/calibration.json', '\\n')",
+			'process.stdout.write(stdout)',
+		].join('\n') + '\n',
+	)
+}
 
 /** Builds the complete public sentence fixture with admitted real lexical helpers. @param population - Explicit declaration overrides for rejecting controls. @returns Real scenario and runtime without model access. */
 export function buildStudySentenceFixture(
@@ -2964,3 +3285,135 @@ export const STUDY_MEMORY_PASSIVITY_CASES = Object.freeze([
 		tools: 0,
 	},
 ])
+
+/** Returns independently fixed tuple hashes and selected noise members for the synthetic labels. @returns Canonical cell vectors in reduction order. */
+export function buildStudySentenceNoiseVectors(): readonly StudySentenceNoiseVector[] {
+	return [
+		{
+			partition: 'fitting',
+			category: 'repeat',
+			label: 'no',
+			expected: [
+				{
+					id: '38ba154d78df5832643e6a0a6112fc1e57bc9a0af45b3d2ed486418e828b0e63',
+					tuple: ['d1-repeat-v1', 'customer:BC-4101', 0, 'ev-source-13-2', 48, 0],
+					rank: '08e1cb90872cae4dae9357a47f00a2e9759ec60b6f7a347c3e4dcef8ce2072eb',
+				},
+			],
+		},
+		{
+			partition: 'fitting',
+			category: 'repeat',
+			label: 'yes',
+			expected: [
+				{
+					id: 'f01d025864a690f54ee9d9c878511d897b3e56c1681b15903b10e24bc4e15115',
+					tuple: ['d1-repeat-v1', 'fictional-0-2-earlier', 0, 'fictional-0-2-later', 0, 0],
+					rank: '05fca6b3fe553a90004a8c7b97d8e55867a87d08b5ed4ab376e8f42c509bdf2e',
+				},
+			],
+		},
+		{
+			partition: 'fitting',
+			category: 'sham',
+			label: 'no',
+			expected: [
+				{
+					id: '713f91bf22038326cb4e0012e1e93fb3edf50e59d802a1b3afba3eb3f072ead6',
+					tuple: ['d1-sham-v1', 'ev-source-16-1', 60, 'ev-source-16-3', 60, 0],
+					rank: '01fcee59fdd4ae2c7d7724bacb0e71b026f437778e8737a1ef2816894e6247a3',
+				},
+				{
+					id: '55fb87fdd1e26a3015aa5d9b40d2d6c5ae5b23a528a46c2b9de33731bd7f708b',
+					tuple: ['d1-sham-v1', 'ev-source-21-1', 80, 'ev-source-21-2', 80, 3],
+					rank: '03b95ace5709c3c7b5504ff24caa4e8793404c685a1a587b35fabc2ed9fcfef5',
+				},
+			],
+		},
+		{
+			partition: 'fitting',
+			category: 'sham',
+			label: 'yes',
+			expected: [
+				{
+					id: '192c85a80e28dd7fe34c20eabdd7cc7b1c212569d110f3dfdef6455cf1a5082d',
+					tuple: ['d1-sham-v1', 'ev-source-5-2', 16, 'ev-source-17-1', 64, 0],
+					rank: '06332e6ef215243cf19d267636b87db2193b3a883f631fd1a7676fe32d419f49',
+				},
+				{
+					id: 'b005eaa3e158d4818c384f1f7dda77b365eb60f8c2d1eed284790873fed591c6',
+					tuple: ['d1-sham-v1', 'ev-source-17-2', 64, 'ev-source-17-4', 64, 0],
+					rank: '09f067196b161c9f16aea54452b9bb996e26e336ace5374e389d0919f2ecdf89',
+				},
+			],
+		},
+		{
+			partition: 'validation',
+			category: 'repeat',
+			label: 'no',
+			expected: [
+				{
+					id: '50ae1f67ae8102ea5108d282aad6cea506262aa0af2924cfa3d02887613b4c0d',
+					tuple: ['d1-repeat-v1', 'fictional-1-7-earlier', 0, 'fictional-1-7-later', 0, 1],
+					rank: '006c10a8072fb39b2eec7a2c0f0b69a07ba59c915b17ec169c8d501c42714879',
+				},
+				{
+					id: '1870437a3e8a4042ad653166546b3a94ae4745a57341b4b718f5ac0b6b798f9b',
+					tuple: ['d1-repeat-v1', 'ev-source-8-2', 28, 'ev-source-20-1', 76, 0],
+					rank: '080e18cd7ee74f4cd6d41f97942d97bdf45ae339d0cba929c107698c9be5dfc0',
+				},
+			],
+		},
+		{
+			partition: 'validation',
+			category: 'repeat',
+			label: 'yes',
+			expected: [
+				{
+					id: '6013ae82d86d17a8de0c724d5718565536aaebf3f83d19e71f433dedf3abb405',
+					tuple: ['d1-repeat-v1', 'ev-source-3-3', 8, 'ev-source-15-4', 56, 0],
+					rank: '03ca7b41866594a66b26f44110b29b01e488b3dbbbdd15a766bc5c59560454f9',
+				},
+				{
+					id: '1edbecd370cef7ac83b46b965a369bfd6e33b5c05072c4ca5a9961d927fa1f4b',
+					tuple: ['d1-repeat-v1', 'ev-source-15-1', 56, 'ev-source-15-4', 56, 0],
+					rank: '07450bebb9a4a0b6dca484565866e25fbcf25dca8bc7248669dc2aee1c85ef03',
+				},
+			],
+		},
+		{
+			partition: 'validation',
+			category: 'sham',
+			label: 'no',
+			expected: [
+				{
+					id: '1e504698ee462f28ff9554ce4278801ed6b6f137989af7b904d07f9ad2c5e55d',
+					tuple: ['d1-sham-v1', 'ev-source-3-1', 8, 'ev-source-15-3', 56, 0],
+					rank: '024dcee0ca781bbcb00543b0d632768f8d523ff1cff61ded7805d617a2d13d92',
+				},
+				{
+					id: 'c9e2ac8b4a255194661eb6c6a28692105f48e4d0651ad1772791056c313265b1',
+					tuple: ['d1-sham-v1', 'ev-source-2-3', 4, 'ev-source-14-2', 52, 2],
+					rank: '035816181e2cb13bee53cc55dc282ce0302c12a9918f9744d3240719edb7d9f6',
+				},
+			],
+		},
+		{
+			partition: 'validation',
+			category: 'sham',
+			label: 'yes',
+			expected: [
+				{
+					id: 'e26f0806e25dd34780c92c008630e06c432d68c7743beee3adc89af08efa08a6',
+					tuple: ['d1-sham-v1', 'ev-source-23-1', 88, 'ev-source-23-3', 88, 0],
+					rank: '0b5fce5582c2f8dd16868d8ff2ce111a72f082e0dd267dd55e13fe277595d8a6',
+				},
+				{
+					id: '861a5492de834000bd9f2df1947af6018c7d3d71675682d4979b489cd6d8b3cc',
+					tuple: ['d1-sham-v1', 'ev-source-10-2', 36, 'ev-source-22-1', 84, 0],
+					rank: '15f6e5368e2e7e9e6a832f85ecce00a25ddd5ba6af2e2aff41363e251286c0c5',
+				},
+			],
+		},
+	]
+}

@@ -1,5 +1,6 @@
 import { isRecord, parseJSON } from '@orkestrel/contract'
-import { isStudyCustodyManifest } from '@orkestrel/study/server'
+import { hashStudyBytes, isStudyCustodyManifest } from '@orkestrel/study/server'
+import { isStudySentenceSettings } from '../studies/sentences/index.js'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -8,6 +9,14 @@ import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as sentenceRuntime from '../dist/src/core/index.js'
 import {
 	buildStudySentenceFixture,
+	buildStudySentenceCalibration,
+	buildStudySentenceAdjudication,
+	renderStudySentenceReply,
+	prepareStudySentenceWorkspace,
+	prepareStudySentenceBuild,
+	prepareStudySentenceDrift,
+	buildStudySentenceNoiseVectors,
+	createStudySentenceSessionFixture,
 	MemoryServer,
 	buildCustodyManifest,
 	buildMemoryGradingFixture,
@@ -55,6 +64,45 @@ import {
 	STUDY_MEMORY_TIMING,
 } from './setupStudy.js'
 
+it('builds synthetic sentence declarations, attributable scores, protocol replies, and an owned workspace', async () => {
+	const fixture = buildStudySentenceCalibration()
+	const first = fixture.declarations.scenario.goals[0]
+	if (first === undefined) throw new Error('Missing synthetic goal')
+	expect(fixture.labels).toHaveLength(fixture.manifest.packets.length)
+	expect(fixture.declarations.profile.provider?.url).toBe('http://127.0.0.1:1')
+	expect(
+		buildStudySentenceAdjudication(fixture, { [first.id]: 0.75 }).attempts[0]?.observations[0]
+			?.product?.value,
+	).toMatchObject({ observation: first.id, score: 0.75 })
+	expect(parseJSON(renderStudySentenceReply(0.75))).toMatchObject({
+		done: true,
+		done_reason: 'length',
+		response: 'Yes',
+		logprobs: [
+			{
+				top_logprobs: [
+					{ token: 'Yes', logprob: Math.log(0.75) },
+					{ token: 'No', logprob: Math.log(0.25) },
+				],
+			},
+		],
+	})
+	const scratch = createScratch()
+	try {
+		expect(prepareStudySentenceWorkspace(scratch, fixture)).toBe('run')
+		expect(parseJSON(scratch.read('run/fitting.json') ?? '')).toEqual(fixture.declarations.fitting)
+		expect(scratch.has('studies/sentences/StudySentenceSession.ts')).toBe(true)
+		expect(scratch.has('studies/memory')).toBe(false)
+	} finally {
+		await destroyScratch(scratch)
+	}
+	const live = await createStudySentenceSessionFixture()
+	const origin = live.server.url
+	expect(origin).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/u)
+	await live.close()
+	await expect(fetch(origin)).rejects.toThrow('fetch failed')
+})
+
 it('builds the public sentence fixture with real helpers and explicit declaration overrides', () => {
 	const input = buildStudySentenceFixture()
 	expect(input.agent.extractTokens).toBe(sentenceRuntime.extractTokens)
@@ -63,6 +111,40 @@ it('builds the public sentence fixture with real helpers and explicit declaratio
 	expect(input.population.cases).toHaveLength(12)
 	expect(buildStudySentenceFixture({ aliases: [] }).population.aliases).toEqual([])
 	expect(input.population.aliases).toHaveLength(30)
+})
+
+it('prepares copied sentence builds with stale or matching receipts and fixed independent noise vectors', async () => {
+	const fixture = buildStudySentenceCalibration()
+	for (const receipt of [false, true]) {
+		const scratch = createScratch()
+		try {
+			const candidate = prepareStudySentenceBuild(scratch, fixture, receipt)
+			expect(candidate.declarations.profile.agent).toBe('candidate/dist/index.js')
+			expect(scratch.read('candidate/package.json')).toContain('@fixture/agent-drift')
+			expect(scratch.read('candidate/dist/index.js')).toContain(
+				'// Compatible frozen-build drift control.',
+			)
+			const settings = candidate.declarations.profile.settings
+			const original = fixture.declarations.profile.settings
+			if (!isStudySentenceSettings(settings) || !isStudySentenceSettings(original))
+				throw new Error('Missing sentence build settings')
+			expect(settings.binding.agent).toBe(
+				receipt
+					? hashStudyBytes(
+							readFileSync(resolve(scratch.path, candidate.declarations.profile.agent)),
+						)
+					: original.binding.agent,
+			)
+			expect(settings.binding.agent === original.binding.agent).toBe(!receipt)
+			expect(prepareStudySentenceDrift(scratch)).toBe(resolve(scratch.path, 'profile-drift.ts'))
+			expect(scratch.read('profile-drift.ts')).toContain('execFileSync(process.execPath')
+		} finally {
+			await destroyScratch(scratch)
+		}
+	}
+	expect(buildStudySentenceNoiseVectors().map((cell) => cell.expected.length)).toEqual([
+		1, 1, 2, 2, 2, 2, 2, 2,
+	])
 })
 
 describe('study meter fixture lifecycle', () => {
