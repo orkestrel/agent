@@ -33,4 +33,6 @@ The runner restores helpers.ts byte-for-byte in finally. Root confirmed recorded
 
 ## Closure
 
-Apply the reviewer prescriptions through the checked fix brief. A verbatim repair closes these claims with the named failing/restored mutation controls and independent verification; do not repeat the all-confirmed claims. A departure needs one bounded review of the repaired claim. Independent verifier then runs scoped check/lint/setup and the studies project under the evidenced 2400-second cap. Only after acceptance and frozen live admission does root notify the user and spend U28. Calibration has not started.
+Root inspected the returned launch-5, exact member assertions, held-out fixture, and full named red/restored logs in report-5. The prescriptions were applied without a policy or implementation departure. Removing the raw-build guard reaches one inference instead of zero; removing profile verification admits changed bytes; reversing ranking changes the fixed selected identity; removing only the held-out floor makes the isolated failure accepted. Restored controls pass. The known failed-history limits remain unchanged. Claims 4 and 6 close on independent verification; no repeated review is required.
+
+Independent verifier runs scoped check/lint/setup and the studies project under the evidenced 2400-second cap. Only after acceptance and frozen live admission does root notify the user and spend U28. Calibration has not started.
