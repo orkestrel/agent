@@ -8,6 +8,14 @@ Agent's boost campaign plan: the handoff of 2026-10-24, then goal, exit, rulings
 
 ## Handoff (2026-10-24)
 
+### Current checkpoint: calibration refused; R3 removal next
+
+This paragraph supersedes all older in-flight descriptions below. A2 is accepted and committed at `d8c93cc2`: independent studies verification passed 199 tests with the existing locale skip. The frozen live calibration then completed all 226 observations and sealed result `28edacfa-1d68-430d-9774-b321fc898204`, but fitting returned `Sentence fitting has no qualifying cutoff`. Nominal precision never reaches 0.90; at 0.70 it is 16 true withdrawals / 4 false withdrawals, precision 0.80. Validation was not graded, no cutoff was selected, and D1 remains unimplemented. Preserve `tmp/units/ledger-sentence-calibration/report-live-1.md` and its complete `run-live-1` evidence.
+
+Charge U28 452292 ms model and 488541 ms elapsed, leaving 447708 ms model / 711459 ms elapsed. The unchanged 807385 ms full-population forecast cannot fit the remainder. No automatic retry, fallback, changed wording, or reduced floor is admitted. U24 remains approximately 11.15 model / 18 elapsed minutes. All recorded live/diagnostic processes are absent and dedicated port 11435 is closed. No unit is running at this checkpoint.
+
+Proceed with the user's already authorized removal of R3's unused `link` option, preserving ordinary owner linking and updating every consumer. The bounded census is `tmp/units/ledger-link-removal-map-2.txt`. Use one Sol writer and one process lane, then independent review and scoped gates. Preserve the frozen calibration build before any rebuild; protected package pins, original recordings, A2 declarations, D2 and D3 stay outside this removal. D2 is accepted; D3 still needs integrated review. No measured agent-quality gain is established.
+
 Resume the Ledger fixes under U26, U27 and U28. The instrument is accepted for local use; no live boost benefit is established, and U12b's exit criterion remains unmet. This section updates the dated status and dispatch rows; the rulings, gates, and dispositions in this plan and `.orkestrel/agent/boosts.md` still bind.
 
 ### Recovery checkpoint after A2 run 3 (2026-10-24)
