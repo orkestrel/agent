@@ -7,6 +7,8 @@ Agent's boost dispatch ledger as it stood on 2026-10-21: one row per unit with i
 
 | Unit | Role | Engine | Transport | Id | Result | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
+| D1 target-isolation successor opinion | analyst | Astra xhigh | native after T3 parent_not_active | sentence_target_design | root selected CPU preparation of exact in-place marking and request binding; semantic effect and live admission remain unproved; 24 citations resolve | `tmp/units/ledger-sentence-target-design-report.md` |
+| D1 marked-request CPU implementation | builder | Sol | native | sentence_target_cpu | dispatch prepared after the campaign checkpoint; sole command lane; unchanged labels, population, floors, and caps | `tmp/units/ledger-sentence-target-cpu-brief.md` |
 | Directive, U1a to U16 | user | — | conversation | — | the ladder plan's settled rulings, U12b the exit criterion | `.orkestrel/agent/plan.md` § Rulings in force |
 | W0 run manifest | Orchestrator | Claude Fable 5.1 | direct | — | the dispatch ledger with rulings, budgets and the custody policy | `tmp/units/ladder/dispatch-ledger.md` |
 | W1 metric instrument | builder, reviewer, verifier | Sol high, Astra xhigh, Luna medium | T3 `codex` | `ladder-w1-*` | accepted: review FAIL 1, 2, 6, 7, O1, fix round, closure CLOSED, Luna verified through `main.ts --out`; 836 control observations pass and both sealed arms reproduce; the first review and verifier lanes failed at session start on an MCP handshake timeout and were rerun | `tmp/units/ladder/w1-fix-report.md` |
