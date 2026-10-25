@@ -641,12 +641,10 @@ export function identifyLookup(
  * @remarks
  * An owner argument links to itself. Any other id-shaped argument links to the single owner id its
  * reading's text names. An empty reading links nothing, and a later reading overwrites an earlier
- * link of the same argument. With `link` on, a non-id subject carrying exactly one id uses that id
- * under the same rules, and the map is keyed by the carried id.
+ * link of the same argument. Only a complete normalized argument that is itself an id participates.
  *
  * @param readings - The lookup readings in conversation order
  * @param owners - The owners keyed by id
- * @param link - If `true`, a non-id subject carrying exactly one id uses that id; if `false`, only id-shaped subjects link. Default: `false`
  * @returns The owner id of each linked argument id; a non-owner id whose text names no owner or several is absent
  *
  * @example
@@ -660,7 +658,6 @@ export function identifyLookup(
 export function linkOwners(
 	readings: readonly LedgerLookupReading[],
 	owners: ReadonlyMap<string, readonly string[]>,
-	link = false,
 ): ReadonlyMap<string, string> {
 	// A later pair of the same argument overwrites an earlier one, as the `Map` constructor does. The
 	// spread visits a hole in `readings` as an undefined reading, as iteration does; `flatMap` skips it.
@@ -672,11 +669,7 @@ export function linkOwners(
 			return Object.values(reading.arguments)
 				.filter(isString)
 				.map((value) => normalizeArgument(value))
-				.flatMap((subject) => {
-					const ids = extractTokens(subject).ids
-					if (ids.has(subject)) return [subject]
-					return link && ids.size === 1 ? [...ids] : []
-				})
+				.filter((subject) => extractTokens(subject).ids.has(subject))
 				.flatMap((subject) => {
 					if (owners.has(subject)) return [[subject, subject] as const]
 					return named.length === 1 && only !== undefined ? [[subject, only] as const] : []
@@ -835,7 +828,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 	const position = new Map(input.messages.map((message, at) => [message.id, at]))
 	const byId = new Map(input.messages.map((message) => [message.id, message]))
 	const live = collectLive(input)
-	const links = linkOwners(input.readings, input.owners, input.link)
+	const links = linkOwners(input.readings, input.owners)
 	const amending = new Map(
 		[
 			...Map.groupBy(

@@ -45,7 +45,7 @@ export interface StudyMemoryOptions {
 }
 
 /** Selects the Ledger treatments admitted by the memory study. */
-export type StudyMemoryLedgerOptions = Pick<LedgerOptions, 'link' | 'lexical' | 'recent' | 'work'>
+export type StudyMemoryLedgerOptions = Pick<LedgerOptions, 'lexical' | 'recent' | 'work'>
 
 /** Holds the lookup tool's default-off treatment. */
 export interface StudyMemoryLookupOptions {

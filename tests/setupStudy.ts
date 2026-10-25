@@ -473,14 +473,14 @@ export const STUDY_MEMORY_REPLAY_GOALS: readonly StudyGoal[] = Object.freeze([
 ])
 
 /** Lists each Ledger treatment whose passivity and positive controls are exercised. */
-export const STUDY_MEMORY_DIFFERENTIAL_SWITCHES = Object.freeze(['link', 'lexical'] as const)
+export const STUDY_MEMORY_DIFFERENTIAL_SWITCHES = Object.freeze(['lexical'] as const)
 
 /** Supplies omitted and explicitly disabled treatment groups for full offline replay. */
 export const STUDY_MEMORY_LEDGER_CONTROLS: Readonly<
 	Record<string, Readonly<Record<string, JSONValue>>>
 > = Object.freeze({
 	omitted: Object.freeze({}),
-	disabled: Object.freeze({ ledger: Object.freeze({ link: false, lexical: false }) }),
+	disabled: Object.freeze({ ledger: Object.freeze({ lexical: false }) }),
 })
 
 /** Supplies unknown keys and non-boolean treatment groups that admission must refuse. */
@@ -489,6 +489,8 @@ export const STUDY_MEMORY_LEDGER_INVALID: readonly unknown[] = Object.freeze([
 	{ recent: 1 },
 	{ work: 'true' },
 	{ link: 1 },
+	{ link: true },
+	{ link: false },
 	{ lexical: 'true' },
 	{ link: undefined },
 	null,
@@ -722,9 +724,7 @@ export function buildMemoryPassiveTreatments(
 		omitted: undefined,
 		disabled: {
 			lookup: { grammar: false },
-			...(arm === 'records'
-				? { ledger: { link: false, lexical: false, recent: false, work: false } }
-				: {}),
+			...(arm === 'records' ? { ledger: { lexical: false, recent: false, work: false } } : {}),
 			...(arm === 'compaction' ? { instructions: { standing: false } } : {}),
 		},
 		ungrouped: {},
@@ -846,58 +846,6 @@ export async function captureMemoryLedgerOptions(
 		return recorder.calls.map(([options]) => options)
 	} finally {
 		await session.close()
-	}
-}
-
-/** Builds a compound-subject lookup whose order fact needs owner linking.
- * @returns Goals and native replies that expose the link treatment.
- */
-export function buildMemoryLinkFixture(): MemoryDifferentialFixture {
-	return {
-		ordinal: 13,
-		marker: 'Order BC-7301 requires a signature before release.',
-		goals: [
-			{
-				id: 'opening',
-				input: {
-					prompt: 'Read the public reference snapshots.',
-					arrivals: [
-						{ id: 'signature', content: 'Order BC-7301 requires a signature before release.' },
-					],
-					records: [
-						{
-							id: 'BW-20931',
-							name: 'Brightwater Studio',
-							content: 'Account BW-20931: Brightwater Studio.',
-						},
-						{
-							id: 'order:BC-7301',
-							name: 'Parcel',
-							content: 'Account BW-20931: Brightwater Studio.',
-						},
-					],
-				},
-			},
-			{
-				id: 'closure',
-				input: { prompt: 'State the release requirement for BW-20931.', arrivals: [], records: [] },
-			},
-		],
-		responses: [
-			...Array.from({ length: 2 }, () => ({ path: '/api/chat', body: buildMemoryReply() })),
-			{
-				path: '/api/chat',
-				body: buildMemoryReply({
-					content: '',
-					calls: [
-						{ function: { name: 'lookup', arguments: { id: 'BW-20931' } } },
-						{ function: { name: 'lookup', arguments: { id: 'order:BC-7301' } } },
-					],
-				}),
-			},
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'References retained.' }) },
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'Signature required.' }) },
-		],
 	}
 }
 

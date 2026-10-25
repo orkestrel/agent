@@ -12,7 +12,6 @@ import {
 	isStudyMemoryProvenance,
 } from '../../../studies/memory/index.js'
 import {
-	buildMemoryLinkFixture,
 	buildMemoryLexicalFixture,
 	buildMemoryInertFixture,
 	buildMemoryDifferentialReceipt,
@@ -30,12 +29,12 @@ import {
 
 it('AS1 admits only boolean Ledger switches and refuses the group on arms without a Ledger', () => {
 	expect(isStudyMemoryOptions({ ledger: {} })).toBe(true)
-	expect(isStudyMemoryOptions({ ledger: { link: false, lexical: true } })).toBe(true)
+	expect(isStudyMemoryOptions({ ledger: { lexical: true } })).toBe(true)
 	for (const ledger of STUDY_MEMORY_LEDGER_INVALID)
 		expect(isStudyMemoryOptions({ ledger })).toBe(false)
 	const profile = buildMemoryProfile({
 		url: 'http://127.0.0.1:1',
-		settings: { ledger: { link: false } },
+		settings: { ledger: { lexical: false } },
 	})
 	expect(() => validateStudyMemoryProfile(profile, ['records'])).not.toThrow()
 	expect(() => validateStudyMemoryProfile(profile, ['compaction'])).toThrow(
@@ -54,14 +53,14 @@ it('AS1 admits only boolean Ledger switches and refuses the group on arms withou
 it('forwards omitted, false, and enabled Ledger keys exactly to the real factory', async () => {
 	const [omitted] = await captureMemoryLedgerOptions(undefined)
 	const [empty] = await captureMemoryLedgerOptions({ ledger: {} })
-	const [disabled] = await captureMemoryLedgerOptions({ ledger: { link: false } })
+	const [disabled] = await captureMemoryLedgerOptions({ ledger: { lexical: false } })
 	const [enabled] = await captureMemoryLedgerOptions({ ledger: { lexical: true } })
 	expect(omitted).not.toHaveProperty('link')
 	expect(omitted).not.toHaveProperty('lexical')
 	expect(empty).not.toHaveProperty('link')
 	expect(empty).not.toHaveProperty('lexical')
-	expect(disabled).toHaveProperty('link', false)
-	expect(disabled).not.toHaveProperty('lexical')
+	expect(disabled).not.toHaveProperty('link')
+	expect(disabled).toHaveProperty('lexical', false)
 	expect(enabled).toHaveProperty('lexical', true)
 	expect(enabled).not.toHaveProperty('link')
 	const [recent] = await captureMemoryLedgerOptions({ ledger: { recent: false } })
@@ -83,7 +82,7 @@ it('refuses malformed and unreadable treatment groups and provenance without inv
 	expect(
 		isStudyMemoryOptions({
 			ledger: {
-				get link() {
+				get lexical() {
 					throw new Error('unreadable')
 				},
 			},
@@ -426,7 +425,7 @@ it.each(STUDY_MEMORY_DIFFERENTIAL_SWITCHES)(
 			parent: resolve('tmp/units'),
 			prefix: `rec-differential-${treatment}-`,
 		})
-		const trajectory = treatment === 'link' ? buildMemoryLinkFixture() : buildMemoryLexicalFixture()
+		const trajectory = buildMemoryLexicalFixture()
 		const server = await createMemoryServer(trajectory.responses)
 		try {
 			const fixture = createMemoryReplayFixture(scratch, server.url, 'records', {

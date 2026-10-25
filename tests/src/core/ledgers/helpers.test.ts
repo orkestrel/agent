@@ -623,7 +623,7 @@ describe('renderLookupCall', () => {
 describe('linkOwners', () => {
 	const owners = new Map(Object.entries(LEDGER_DESK_OWNERS))
 
-	it('R3-1 links the carried id through the existing owner branches only when on', () => {
+	it('links a bare id and refuses the same id in a prefixed subject', () => {
 		const fixture = LEDGER_LINK_FIXTURE
 		for (const subject of [fixture.id.toLowerCase(), fixture.subject]) {
 			const reading = buildLedgerReading(
@@ -639,8 +639,6 @@ describe('linkOwners', () => {
 			expect([...linkOwners([reading], owners)]).toEqual(
 				subject === fixture.subject ? [] : [['BC-7301', 'BW-20931']],
 			)
-			expect([...linkOwners([reading], owners, false)]).toEqual([...linkOwners([reading], owners)])
-			expect([...linkOwners([reading], owners, true)]).toEqual([['BC-7301', 'BW-20931']])
 		}
 		const self = buildLedgerReading(
 			'self',
@@ -649,22 +647,21 @@ describe('linkOwners', () => {
 			'No owner named.',
 			fixture.result,
 		)
-		expect([...linkOwners([self], owners, true)]).toEqual([['BW-20931', 'BW-20931']])
-		expect([...linkOwners([self], owners, false)]).toEqual([])
+		expect([...linkOwners([self], owners)]).toEqual([])
 		expect(normalizeArgument(fixture.subject)).toBe('ORDER:BC-7301')
 		expect([...extractTokens(fixture.subject).ids]).toEqual(['BC-7301'])
 	})
 
-	it('R3-2 refuses ambiguous subjects and readings after accepting a single carried id', () => {
+	it('refuses mixed subjects and readings without exactly one known owner', () => {
 		const fixture = LEDGER_LINK_FIXTURE
 		const valid = buildLedgerReading(
 			'valid',
 			'lookup',
-			{ id: fixture.subject },
+			{ id: fixture.id },
 			fixture.lookup,
 			fixture.result,
 		)
-		expect([...linkOwners([valid], owners, true)]).toEqual([['BC-7301', 'BW-20931']])
+		expect([...linkOwners([valid], owners)]).toEqual([['BC-7301', 'BW-20931']])
 		for (const control of LEDGER_LINK_REFUSALS) {
 			const reading = buildLedgerReading(
 				'control',
@@ -673,14 +670,10 @@ describe('linkOwners', () => {
 				control.text,
 				fixture.result,
 			)
-			for (const link of [false, true])
-				expect(
-					[...linkOwners([reading], owners, link)],
-					`${control.subject}: ${control.text}; link=${link}`,
-				).toEqual([])
+			expect([...linkOwners([reading], owners)], `${control.subject}: ${control.text}`).toEqual([])
 		}
 		const empty = buildLedgerReading('empty', 'lookup', { id: fixture.subject }, fixture.lookup)
-		expect([...linkOwners([empty], owners, true)]).toEqual([])
+		expect([...linkOwners([empty], owners)]).toEqual([])
 	})
 
 	it('links an owner argument to itself and another id to the one owner its text names', () => {
@@ -1308,7 +1301,7 @@ describe('buildLines', () => {
 })
 
 describe('buildRecords', () => {
-	it('R3-3 places a later bare-id fact under the linked owner and refuses cross-owner ambiguity', () => {
+	it('places a later fact through a bare lookup id and refuses a prefixed lookup id', () => {
 		const fixture = LEDGER_LINK_FIXTURE
 		const reading = buildLedgerReading(
 			'lookup',
@@ -1324,8 +1317,11 @@ describe('buildRecords', () => {
 			entities: { arrival: [...matchEntities(collectRegistry([reading]), fixture.fact, true)] },
 			classification: { categories: { arrival: 'fact' } },
 		})
-		for (const link of [false, true]) {
-			const projection = buildRecords({ ...input, link })
+		for (const subject of [fixture.subject, fixture.id]) {
+			const projection = buildRecords({
+				...input,
+				readings: [{ ...reading, arguments: { id: subject } }],
+			})
 			expect(
 				projection.records.map((record) => ({
 					key: record.key,
@@ -1333,22 +1329,26 @@ describe('buildRecords', () => {
 					texts: record.lines.map((line) => line.text),
 				})),
 			).toEqual(
-				link ? [{ key: 'owner:BW-20931', members: ['arrival'], texts: [fixture.fact] }] : [],
+				subject === fixture.id
+					? [{ key: 'owner:BW-20931', members: ['arrival'], texts: [fixture.fact] }]
+					: [],
 			)
-			expect(projection.orphans).toEqual(link ? [] : ['arrival'])
-			const ambiguous = { ...reading, text: 'Accounts BW-20931 and OM-30418.' }
-			const cross = buildRecords({ ...input, link, readings: [ambiguous] })
+			expect(projection.orphans).toEqual(subject === fixture.id ? [] : ['arrival'])
+			const ambiguous = {
+				...reading,
+				arguments: { id: subject },
+				text: 'Accounts BW-20931 and OM-30418.',
+			}
+			const cross = buildRecords({ ...input, readings: [ambiguous] })
 			expect(cross.records).toEqual([])
 			expect(cross.orphans).toEqual(['arrival'])
 			const self = buildRecords({
 				...input,
-				link,
 				readings: [{ ...reading, arguments: { id: 'account:BW-20931' } }],
 				entities: new Map([['arrival', ['BW-20931']]]),
 			})
 			expect(self.records.map((record) => record.key)).toEqual(['owner:BW-20931'])
 		}
-		expect(buildRecords(input)).toEqual(buildRecords({ ...input, link: false }))
 	})
 	it('retains successful readings whose bigint arguments have no lookup identity', () => {
 		const text = 'Account BW-20931 (Brightwater Studio): balance $10.00.'

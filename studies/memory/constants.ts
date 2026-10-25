@@ -8,7 +8,7 @@ import type {
 
 /** Lists the admitted default-off Ledger switches. */
 export const STUDY_MEMORY_LEDGER_KEYS: ReadonlyArray<keyof StudyMemoryLedgerOptions> =
-	Object.freeze(['link', 'lexical', 'recent', 'work'])
+	Object.freeze(['lexical', 'recent', 'work'])
 
 /** Lists the admitted boolean lookup treatments. */
 export const STUDY_MEMORY_LOOKUP_KEYS: ReadonlyArray<keyof StudyMemoryLookupOptions> =

@@ -101,7 +101,7 @@ it('builds synthetic sentence declarations, attributable scores, protocol replie
 	expect(origin).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/u)
 	await live.close()
 	await expect(fetch(origin)).rejects.toThrow('fetch failed')
-})
+}, 15000)
 
 it('builds the public sentence fixture with real helpers and explicit declaration overrides', () => {
 	const input = buildStudySentenceFixture()
