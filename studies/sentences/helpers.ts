@@ -25,6 +25,7 @@ import type {
 	StudySentenceTargetLabel,
 	StudySentenceAssertion,
 	StudySentenceDeclarations,
+	StudySentenceSpan,
 } from './types.js'
 import type { StudyScenario, StudyProfile, StudyRubric } from '@orkestrel/study'
 import type { StudyAdjudication, StudyOllamaPolicy } from '@orkestrel/study/server'
@@ -39,6 +40,7 @@ import {
 	STUDY_SENTENCE_VALIDATION,
 	STUDY_SENTENCE_POLICY,
 	STUDY_SENTENCE_GRID,
+	STUDY_SENTENCE_REQUEST,
 } from './constants.js'
 import {
 	isStudySentenceGoal,
@@ -98,6 +100,12 @@ export function buildStudySentenceDeclarations(
 	binding: Pick<StudySentenceBinding, 'manifest' | 'labels' | 'agent'>,
 	profile: StudyProfile,
 ): StudySentenceDeclarations {
+	if (
+		manifest.request !== hashStudySentenceRequest() ||
+		hashStudyBytes(encodeStudyJSON(manifest.question)) !==
+			hashStudyBytes(encodeStudyJSON(STUDY_SENTENCE_QUESTION))
+	)
+		throw new StudyError('CONFIG', 'Sentence manifest request contract changed')
 	const sample = sampleStudySentences(manifest, labels)
 	const scenario = buildStudySentenceScenario(sample)
 	const targets = sample.packets.map((packet) => ({
@@ -114,6 +122,7 @@ export function buildStudySentenceDeclarations(
 		.map(({ partition: _partition, ...target }) => target)
 	const identity = {
 		...binding,
+		request: hashStudySentenceRequest(),
 		scenario: hashStudyBytes(encodeStudyJSON(scenario)),
 		fitting: hashStudyBytes(encodeStudyJSON(fitting)),
 		validation: hashStudyBytes(encodeStudyJSON(validation)),
@@ -166,6 +175,8 @@ export function collectStudySentenceObservations(
 	input: StudyAdjudication,
 	binding: StudySentenceBinding,
 ): readonly StudySentenceObservation[] {
+	if (binding.request !== hashStudySentenceRequest())
+		throw new StudyError('EVIDENCE', 'Sentence request binding changed')
 	const scenario = input.manifest.scenarios[0]
 	const attempt = input.attempts[0]
 	if (
@@ -649,14 +660,50 @@ export function compareStudySentenceRank(
 	return left.rank < right.rank ? -1 : left.rank > right.rank ? 1 : 0
 }
 
-/** Renders the frozen index-bearing request state. @param earlier - Complete earlier source. @param later - Complete later source. @param sentence - Original zero-based index. @param text - Exact split sentence. @returns Frozen proposal state bytes. */
+/** Encodes source text without changing whitespace or decoding existing entities. @param text - Original source text. @returns Escaped source bytes. */
+export function encodeStudySentenceText(text: string): string {
+	return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+}
+
+/** Hashes the local immutable request contract with Study's JSON encoding. @returns The request SHA-256 receipt. */
+export function hashStudySentenceRequest(): string {
+	return hashStudyBytes(encodeStudyJSON(STUDY_SENTENCE_REQUEST))
+}
+
+/** Reads an indexed tokenizer span while validating complete source alignment. @param source - Complete original text. @param sentence - Original zero-based index. @param text - Expected tokenizer output. @param agent - Admitted actual tokenizer. @returns Original start and end offsets; throws on any mismatch. */
+export function readStudySentenceSpan(
+	source: string,
+	sentence: number,
+	text: string,
+	agent: StudySentenceRuntime,
+): StudySentenceSpan {
+	const sentences = agent.splitSentences(source)
+	if (!Number.isSafeInteger(sentence) || sentence < 0 || sentences[sentence] !== text)
+		throw new StudyError('CONFIG', 'Sentence target index or text differs from tokenizer')
+	const spans = sentences.reduce<readonly StudySentenceSpan[]>((previous, entry) => {
+		const end = previous.at(-1)?.end ?? 0
+		const start = source.indexOf(entry, end)
+		if (entry.length === 0 || start < end || source.slice(end, start).trim() !== '')
+			throw new StudyError('CONFIG', 'Sentence tokenizer alignment failed')
+		return [...previous, { start, end: start + entry.length }]
+	}, [])
+	if (source.slice(spans.at(-1)?.end ?? 0).trim() !== '')
+		throw new StudyError('CONFIG', 'Sentence tokenizer remainder is not whitespace')
+	const span = spans[sentence]
+	if (span === undefined) throw new StudyError('CONFIG', 'Sentence target span is absent')
+	return span
+}
+
+/** Renders one marked occurrence in the complete original context. @param earlier - Complete earlier source. @param later - Complete later source. @param sentence - Original zero-based index. @param text - Exact split sentence. @param agent - Admitted actual tokenizer. @returns Frozen marked state bytes. */
 export function renderStudySentenceState(
 	earlier: Pick<StudySentenceSource, 'role' | 'text'>,
 	later: Pick<StudySentenceSource, 'role' | 'text'>,
 	sentence: number,
 	text: string,
+	agent: StudySentenceRuntime,
 ): string {
-	return `Earlier message: ${earlier.role}: ${earlier.text}\nLater message: ${later.role}: ${later.text}\nSentence index (zero-based): ${sentence}\nSentence of the earlier message: ${text}`
+	const span = readStudySentenceSpan(earlier.text, sentence, text, agent)
+	return `<earlier role="${earlier.role}">${encodeStudySentenceText(earlier.text.slice(0, span.start))}<target>${encodeStudySentenceText(text)}</target>${encodeStudySentenceText(earlier.text.slice(span.end))}</earlier>\n<later role="${later.role}">${encodeStudySentenceText(later.text)}</later>\nSentence index (zero-based): ${sentence}`
 }
 
 /** Derives complete-text membership, refusing undeclared case-bearing sources. @param id - Canonical source id. @param text - Complete rendered text. @param population - Explicit public register and membership. @returns All continuing cases in ordinal order. */
@@ -790,7 +837,7 @@ export function sharesStudySentenceTokens(
 	)
 }
 
-/** Assembles one sentence observation retaining both canonical versions. @param earlier - Complete earlier source. @param later - Complete correction. @param sentence - Original sentence index. @param text - Exact sentence bytes. @param population - Partition and standing declarations. @param required - If true, retains required R membership; if false, adds no required constraint. @param control - Authored fictional metadata, if applicable. @returns Canonical packet before eligibility and partition filtering. */
+/** Assembles one sentence observation retaining both canonical versions. @param earlier - Complete earlier source. @param later - Complete correction. @param sentence - Original sentence index. @param text - Exact sentence bytes. @param population - Partition and standing declarations. @param required - If true, retains required R membership; if false, adds no required constraint. @param agent - Admitted actual tokenizer. @param control - Authored fictional metadata, if applicable. @returns Canonical packet before eligibility and partition filtering. */
 export function buildStudySentencePacket(
 	earlier: StudySentenceSource,
 	later: StudySentenceSource,
@@ -798,6 +845,7 @@ export function buildStudySentencePacket(
 	text: string,
 	population: StudySentencePopulation,
 	required: boolean,
+	agent: StudySentenceRuntime,
 	control?: StudySentenceControl,
 ): StudySentencePacket {
 	const cases = [...new Set([...earlier.cases, ...later.cases])].toSorted()
@@ -827,7 +875,7 @@ export function buildStudySentencePacket(
 		later,
 		sentence,
 		text,
-		state: renderStudySentenceState(earlier, later, sentence, text),
+		state: renderStudySentenceState(earlier, later, sentence, text, agent),
 		key: JSON.stringify(['changes', earlier.id, later.id, sentence]),
 		rank: hashStudyBytes(JSON.stringify(['d1-partition-v1', ...tuple])),
 		cases,
@@ -977,7 +1025,7 @@ export function buildStudySentenceManifest(input: StudySentenceInput): StudySent
 			input.agent
 				.splitSentences(earlier.text)
 				.map((text, sentence) =>
-					buildStudySentencePacket(earlier, later, sentence, text, population, false),
+					buildStudySentencePacket(earlier, later, sentence, text, population, false, input.agent),
 				),
 		),
 	)
@@ -997,6 +1045,7 @@ export function buildStudySentenceManifest(input: StudySentenceInput): StudySent
 						STUDY_SENTENCE_REQUIRED.some((target) =>
 							matchesStudySentenceTarget(target, { earlier, later, sentence }),
 						),
+					input.agent,
 				),
 			)
 	})
@@ -1031,6 +1080,7 @@ export function buildStudySentenceManifest(input: StudySentenceInput): StudySent
 			text,
 			population,
 			false,
+			input.agent,
 			control,
 		)
 	})
@@ -1059,6 +1109,7 @@ export function buildStudySentenceManifest(input: StudySentenceInput): StudySent
 		throw new StudyError('CONFIG', 'Missing required R target')
 	return {
 		question: STUDY_SENTENCE_QUESTION,
+		request: hashStudySentenceRequest(),
 		sources: [...sources, ...controls.flatMap((packet) => [packet.earlier, packet.later])],
 		population,
 		packets,

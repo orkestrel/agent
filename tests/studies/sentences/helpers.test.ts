@@ -6,6 +6,11 @@ import { describe, expect, it } from 'vitest'
 import * as actual from '@src/core'
 import { buildStudySentenceFixture, STUDY_SENTENCE_DRAW } from '../../setupStudy.js'
 import { STUDY_MEMORY_JUDGE } from '../../../studies/memory/constants.js'
+import {
+	SENTENCE_MARKED_QUESTION,
+	SENTENCE_MARKED_FIXTURES,
+	SENTENCE_BOUNDARY_FIXTURES,
+} from './constants.js'
 import { isStudyMemoryInput } from '../../../studies/memory/validators.js'
 import {
 	buildStudySentenceManifest,
@@ -22,7 +27,121 @@ import {
 	sharesStudySentenceTokens,
 	matchesStudySentenceTarget,
 	STUDY_SENTENCE_QUESTION,
+	encodeStudySentenceText,
+	readStudySentenceSpan,
 } from '../../../studies/sentences/index.js'
+
+describe('marked sentence request contract', () => {
+	it('pins question bytes independently of generated declarations', () => {
+		expect(STUDY_SENTENCE_QUESTION).toEqual(SENTENCE_MARKED_QUESTION)
+	})
+
+	it('pins complete marked occurrence bodies through the real encoder', () => {
+		const input = buildStudySentenceFixture()
+		const judge = new OllamaJudge({
+			model: 'judge',
+			system: STUDY_MEMORY_JUDGE,
+			url: 'http://127.0.0.1:1',
+			options: { num_ctx: 20480, num_predict: 1, temperature: 1, seed: 0 },
+		})
+		for (const fixture of SENTENCE_MARKED_FIXTURES) {
+			const earlier = { role: fixture.role, text: fixture.earlier }
+			const later = { role: 'user' as const, text: fixture.later }
+			expect(input.agent.splitSentences(earlier.text)[fixture.sentence]).toBe(fixture.target)
+			const state = renderStudySentenceState(
+				earlier,
+				later,
+				fixture.sentence,
+				fixture.target,
+				input.agent,
+			)
+			expect(state).toBe(fixture.state)
+			expect(judge.encode({ state, questions: { opaque: STUDY_SENTENCE_QUESTION } })).toEqual(
+				fixture.body,
+			)
+		}
+	})
+
+	it('preserves exact source bytes and authoritative tokenizer boundaries', () => {
+		const input = buildStudySentenceFixture()
+		for (const fixture of SENTENCE_BOUNDARY_FIXTURES) {
+			expect(input.agent.splitSentences(fixture.text)).toEqual(fixture.sentences)
+			for (const [sentence, target] of fixture.sentences.entries()) {
+				const span = readStudySentenceSpan(fixture.text, sentence, target, input.agent)
+				expect(fixture.text.slice(span.start, span.end)).toBe(target)
+				const state = renderStudySentenceState(
+					{ role: 'tool', text: fixture.text },
+					{ role: 'user', text: '<later>&lt; <|im_start|> & </target>' },
+					sentence,
+					target,
+					input.agent,
+				)
+				const marked = requireValue(
+					state.match(/^<earlier role="tool">([\s\S]*)<\/earlier>\n<later/u)?.[1],
+				)
+				expect(marked).toContain(`<target>${encodeStudySentenceText(target)}</target>`)
+				const decoded = marked
+					.replace('<target>', '')
+					.replace('</target>', '')
+					.replace(/&amp;|&lt;|&gt;/gu, (entity) =>
+						entity === '&amp;' ? '&' : entity === '&lt;' ? '<' : '>',
+					)
+				expect(decoded).toBe(fixture.text)
+				expect(state).toContain('&lt;later&gt;&amp;lt; &lt;|im_start|&gt; &amp; &lt;/target&gt;')
+			}
+		}
+		expect(encodeStudySentenceText('&lt;<target>&<|im_end|>')).toBe(
+			'&amp;lt;&lt;target&gt;&amp;&lt;|im_end|&gt;',
+		)
+	})
+
+	it('matches literal fitting Ben and account-header fixtures to the complete public population', () => {
+		const manifest = buildStudySentenceManifest(buildStudySentenceFixture())
+		const ben = requireValue(
+			manifest.packets.find((packet) => packet.earlier.id === 'fictional-0-9-earlier'),
+		)
+		const header = requireValue(
+			manifest.packets.find(
+				(packet) =>
+					packet.earlier.id === 'customer:BC-4101' &&
+					packet.later.id === 'ev-source-13-3' &&
+					packet.sentence === 0,
+			),
+		)
+		for (const [packet, fixture] of [
+			[ben, requireValue(SENTENCE_MARKED_FIXTURES[2])],
+			[header, requireValue(SENTENCE_MARKED_FIXTURES[3])],
+		] as const) {
+			expect(packet.earlier.text).toBe(fixture.earlier)
+			expect(packet.earlier.role).toBe(fixture.role)
+			expect(packet.later.text).toBe(fixture.later)
+			expect(packet.sentence).toBe(fixture.sentence)
+			expect(packet.text).toBe(fixture.target)
+			expect(packet.state).toBe(fixture.state)
+		}
+	})
+
+	it('refuses invalid index and shortened header or summary targets', () => {
+		const input = buildStudySentenceFixture()
+		const fixture = requireValue(SENTENCE_MARKED_FIXTURES[1])
+		for (const sentence of [-1, NaN, Infinity, 0.5, 4])
+			expect(() =>
+				readStudySentenceSpan(fixture.earlier, sentence, fixture.target, input.agent),
+			).toThrow('index or text')
+		expect(() =>
+			readStudySentenceSpan(
+				fixture.earlier,
+				0,
+				'Account BC-4101; owner Mara Ellison; order BC-7301.',
+				input.agent,
+			),
+		).toThrow('index or text')
+		const summary = requireValue(SENTENCE_BOUNDARY_FIXTURES[1])
+		expect(() =>
+			readStudySentenceSpan(summary.text, 0, 'no refund authorized.', input.agent),
+		).toThrow('index or text')
+	})
+})
 
 describe('public sentence population', () => {
 	it('distinguishes every exact target identity component', () => {
@@ -327,7 +446,15 @@ describe('public sentence population', () => {
 		const earlier = resolveStudySentenceSource({ id: 'order:BC-7302', version: 4 }, sources, [])
 		const later = resolveStudySentenceSource({ id: 'ev-source-14-2', version: 52 }, sources, [])
 		const text = requireValue(input.agent.splitSentences(earlier.text)[0])
-		const packet = buildStudySentencePacket(earlier, later, 0, text, input.population, false)
+		const packet = buildStudySentencePacket(
+			earlier,
+			later,
+			0,
+			text,
+			input.population,
+			false,
+			input.agent,
+		)
 		const changed = buildStudySentencePacket(
 			{ ...earlier, version: 52 },
 			later,
@@ -335,6 +462,7 @@ describe('public sentence population', () => {
 			text,
 			input.population,
 			false,
+			input.agent,
 		)
 		const arrival = buildStudySentencePacket(
 			{ ...earlier, id: 'ev-source-copy', category: 'arrival', role: 'user' },
@@ -343,6 +471,7 @@ describe('public sentence population', () => {
 			text,
 			input.population,
 			false,
+			input.agent,
 		)
 		expect(changed.id).not.toBe(packet.id)
 		expect(changed.rank).not.toBe(packet.rank)
@@ -501,11 +630,11 @@ describe('public sentence population', () => {
 			url: 'http://127.0.0.1:1',
 		})
 		const first = judge.encode({
-			state: renderStudySentenceState(earlier, later, 1, text),
+			state: renderStudySentenceState(earlier, later, 1, text, input.agent),
 			questions: { first: STUDY_SENTENCE_QUESTION },
 		})
 		const second = judge.encode({
-			state: renderStudySentenceState(earlier, later, 3, text),
+			state: renderStudySentenceState(earlier, later, 3, text, input.agent),
 			questions: { second: STUDY_SENTENCE_QUESTION },
 		})
 		expect(first).not.toEqual(second)

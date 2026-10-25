@@ -96,6 +96,7 @@ export function isStudySentenceScore(value: unknown): value is number {
 export function isStudySentenceBinding(value: unknown): value is StudySentenceBinding {
 	return recordOf({
 		manifest: isStudyDigest,
+		request: isStudyDigest,
 		labels: isStudyDigest,
 		scenario: isStudyDigest,
 		agent: isStudyDigest,

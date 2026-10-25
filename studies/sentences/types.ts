@@ -86,6 +86,7 @@ export interface StudySentenceSample {
 
 /** Holds immutable calibration inputs shared by independent grading declarations. */
 export interface StudySentenceBinding {
+	readonly request: string
 	readonly manifest: string
 	readonly labels: string
 	readonly scenario: string
@@ -226,6 +227,12 @@ export interface StudySentenceRuntime {
 	readonly splitSentences: typeof splitSentences
 }
 
+/** Holds an exact original-text sentence interval in UTF-16 offsets. */
+export interface StudySentenceSpan {
+	readonly start: number
+	readonly end: number
+}
+
 /** Holds the complete public inputs; contains no labels or model results. */
 export interface StudySentenceInput {
 	readonly scenario: StudyScenario
@@ -279,6 +286,7 @@ export interface StudySentenceForecast {
 
 /** Holds the full canonical population and all exclusion and alias dispositions. */
 export interface StudySentenceManifest {
+	readonly request: string
 	readonly question: NoulQuestion
 	readonly sources: readonly StudySentenceSource[]
 	readonly population: StudySentencePopulation

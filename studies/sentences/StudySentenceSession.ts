@@ -13,7 +13,7 @@ import {
 	hashStudyBytes,
 	valueToWire,
 } from '@orkestrel/study/server'
-import { buildStudySentenceRole } from './helpers.js'
+import { buildStudySentenceRole, hashStudySentenceRequest } from './helpers.js'
 import { STUDY_SENTENCE_JUDGE, STUDY_SENTENCE_QUESTION } from './constants.js'
 import { isStudySentenceGoal, isStudySentenceScore, isStudySentenceSettings } from './validators.js'
 
@@ -32,6 +32,8 @@ export class StudySentenceSession implements StudySessionInterface {
 		const provider = profile.provider
 		if (provider === undefined || !isStudySentenceSettings(profile.settings))
 			throw new StudyError('CONFIG', 'Sentence profile lacks provider or frozen receipts')
+		if (profile.settings.binding.request !== hashStudySentenceRequest())
+			throw new StudyError('CONFIG', 'Sentence request binding changed')
 		if (profile.record !== undefined && options.exchanges === undefined)
 			throw new StudyError('CONFIG', 'Sentence recording requires its exchange sink')
 		this.#settings = profile.settings

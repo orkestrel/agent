@@ -1,3 +1,4 @@
+import type { StudyAdjudication } from '@orkestrel/study/server'
 import { describe, expect, it } from 'vitest'
 import { requireValue } from '@orkestrel/test'
 import { encodeStudyJSON, hashStudyBytes } from '@orkestrel/study/server'
@@ -36,8 +37,76 @@ import {
 	validateStudySentenceDecisions,
 	validateStudySentenceSelection,
 	StudySentenceAdapter,
+	buildStudySentenceDeclarations,
+	hashStudySentenceRequest,
+	STUDY_SENTENCE_REQUEST,
+	buildStudySentenceRubric,
 } from '../../../studies/sentences/index.js'
 import memoryScenario from '../../../studies/memory/scenarios/endurance.json'
+
+it('binds local request identity before declaration generation, adapter admission, or grading', () => {
+	const fixture = buildStudySentenceCalibration()
+	const settings = fixture.declarations.profile.settings
+	if (!isStudySentenceSettings(settings)) throw new Error('Missing settings')
+	expect(settings.binding.request).toBe(hashStudyBytes(encodeStudyJSON(STUDY_SENTENCE_REQUEST)))
+	expect(fixture.manifest.request).toBe(hashStudySentenceRequest())
+	for (const manifest of [
+		{ ...fixture.manifest, request: '0'.repeat(64) },
+		{
+			...fixture.manifest,
+			question: { ...fixture.manifest.question, instructions: 'Drifted question' },
+		},
+	])
+		expect(() =>
+			buildStudySentenceDeclarations(
+				manifest,
+				fixture.labels,
+				settings.binding,
+				fixture.declarations.profile,
+			),
+		).toThrow('request contract')
+	const binding = { ...settings.binding, request: '0'.repeat(64) }
+	const profile = parseStudyProfile({
+		...fixture.declarations.profile,
+		settings: { ...settings, binding },
+	})
+	expect(() =>
+		new StudySentenceAdapter().validate({
+			definition: fixture.input.manifest.definition,
+			scenarios: [fixture.declarations.scenario],
+			rubric: buildStudySentenceRubric(fixture.declarations.scenario, {
+				phase: 'initial',
+				binding,
+				targets: [],
+				selection: undefined,
+				digest: undefined,
+				grading: undefined,
+			}),
+			profile,
+		}),
+	).toThrow('request binding')
+	const criterion = requireValue(fixture.declarations.fitting.criteria[0])
+	const assertion: unknown = criterion.assertion
+	if (!isStudySentenceAssertion(assertion)) throw new Error('Missing assertion')
+	const stale = buildStudySentenceAdjudication({
+		...fixture,
+		declarations: { ...fixture.declarations, profile },
+	})
+	expect(() => gradeStudySentencePartition({ ...assertion, binding }, stale)).toThrow(
+		'request binding',
+	)
+	expect(() =>
+		collectStudySentenceObservations(
+			{
+				...stale,
+				get attempts(): StudyAdjudication['attempts'] {
+					throw new Error('Score custody accessed before request identity')
+				},
+			},
+			binding,
+		),
+	).toThrow('request binding')
+})
 import committedScenario from '../../../studies/sentences/scenarios/d1.json'
 
 const fixture = buildStudySentenceCalibration()
@@ -425,6 +494,7 @@ describe('independent fitting and held-out grading', () => {
 			{ ...selection, observations: '0'.repeat(64) },
 			{ ...selection, policy: '0'.repeat(64) },
 			{ ...selection, binding: { ...selection.binding, manifest: '0'.repeat(64) } },
+			{ ...selection, binding: { ...selection.binding, request: '0'.repeat(64) } },
 		]) {
 			expect(() =>
 				validateStudySentenceSelection(

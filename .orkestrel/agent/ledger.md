@@ -7,6 +7,7 @@ Agent's boost dispatch ledger as it stood on 2026-10-21: one row per unit with i
 
 | Unit | Role | Engine | Transport | Id | Result | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
+| D1 marked-request CPU review | reviewer | Astra xhigh | native after T3 parent_not_active | sentence_target_review | FAIL 3 and 5; root reproduced outer grading order and confirmed fixture placement; exact repair prescribed, other claims held | `tmp/units/ledger-sentence-target-review-report.md`, `ledger-sentence-target-audit-verdict.md` |
 | D1 target-isolation successor opinion | analyst | Astra xhigh | native after T3 parent_not_active | sentence_target_design | root selected CPU preparation of exact in-place marking and request binding; semantic effect and live admission remain unproved; 24 citations resolve | `tmp/units/ledger-sentence-target-design-report.md` |
 | D1 marked-request CPU implementation | builder | Sol | native | sentence_target_cpu | dispatch prepared after the campaign checkpoint; sole command lane; unchanged labels, population, floors, and caps | `tmp/units/ledger-sentence-target-cpu-brief.md` |
 | Directive, U1a to U16 | user | — | conversation | — | the ladder plan's settled rulings, U12b the exit criterion | `.orkestrel/agent/plan.md` § Rulings in force |

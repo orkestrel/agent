@@ -7,7 +7,7 @@ import type {
 } from '@orkestrel/study/server'
 import { StudyError, validateStudyInputs } from '@orkestrel/study'
 import { encodeStudyJSON, gradeStudyEvidence, hashStudyBytes } from '@orkestrel/study/server'
-import { gradeStudySentencePartition } from './helpers.js'
+import { gradeStudySentencePartition, hashStudySentenceRequest } from './helpers.js'
 import {
 	isStudySentenceAssertion,
 	isStudySentenceGoal,
@@ -36,6 +36,8 @@ export class StudySentenceAdapter implements StudyAdapterInterface {
 				'CONFIG',
 				'Sentence calibration requires one trial and frozen execution settings',
 			)
+		if (settings.binding.request !== hashStudySentenceRequest())
+			throw new StudyError('CONFIG', 'Sentence request binding changed')
 		if (
 			hashStudyBytes(encodeStudyJSON(scenario)) !== settings.binding.scenario ||
 			Object.keys(settings.inputs).length !== scenario.goals.length ||
