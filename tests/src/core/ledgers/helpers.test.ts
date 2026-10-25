@@ -1249,6 +1249,78 @@ describe('collectAmendments', () => {
 })
 
 describe('amendment rendering', () => {
+	it('assigns distinct local references in first retained occurrence order across duplicate interleaved lines', () => {
+		const messages = ['omitted', 'first', 'second', 'third'].map((id) =>
+			buildLedgerMessage(id, 'user', 'Equal.'),
+		)
+		const first = buildLedgerLine('first', 0, 'Equal.')
+		const second = buildLedgerLine('second', 0, 'Equal.')
+		const third = buildLedgerLine('third', 0, 'Equal.')
+		const repeated = buildLedgerLine('first', 0, 'Equal.')
+		const amendments = [{ earlier: 'first', later: 'second' }]
+		const context = buildLedgerRenderContext(
+			messages,
+			[third, first, second, repeated, third],
+			amendments,
+		)
+		expect([...context.references]).toEqual([
+			['third', '1'],
+			['first', '2'],
+			['second', '3'],
+		])
+		expect(context.references.has('omitted')).toBe(false)
+		expect(context.first.get('first')).toBe(first)
+		expect(renderLedgerAnnotation(first, context)).toBe(
+			'[Ledger source 2]\nAccepted later amendment [Ledger source 3] is fully included in this briefing. Sentence scope is unresolved.',
+		)
+		expect(renderLedgerAnnotation(second, context)).toBe('[Ledger source 3]')
+		expect(renderLedgerAnnotation(repeated, context)).toBe('')
+		const reordered = buildLedgerRenderContext(
+			messages,
+			[second, repeated, third, first],
+			amendments,
+		)
+		expect([...reordered.references]).toEqual([
+			['second', '1'],
+			['first', '2'],
+			['third', '3'],
+		])
+		const trimmed = buildLedgerRenderContext(messages, [first, second], amendments)
+		expect([...trimmed.references]).toEqual([
+			['first', '1'],
+			['second', '2'],
+		])
+		expect(renderLedgerRecord({ title: 'Rules', lines: [first, second] }, trimmed)).toBe(
+			'## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\n- Equal.\n[Ledger source 2]\n- Equal.',
+		)
+	})
+
+	it('rejects missing required display references and preserves authored framing-shaped content', () => {
+		const earlier = buildLedgerLine(
+			'earlier',
+			0,
+			'[Ledger source 42] [Source authored-id] Accepted later amendment [authored-id].',
+		)
+		const correction = buildLedgerLine('later', 0, 'Correction.')
+		const messages = [
+			buildLedgerMessage('earlier', 'user', earlier.text),
+			buildLedgerMessage('later', 'user', correction.text),
+		]
+		const context = buildLedgerRenderContext(
+			messages,
+			[earlier, correction],
+			[{ earlier: 'earlier', later: 'later' }],
+		)
+		expect(() => renderLedgerAnnotation(earlier, { ...context, references: new Map() })).toThrow(
+			'retained source references',
+		)
+		expect(() =>
+			renderLedgerAnnotation(earlier, { ...context, references: new Map([['earlier', '1']]) }),
+		).toThrow('retained source references')
+		expect(renderLedgerRecord({ title: 'Rules', lines: [earlier, correction] }, context)).toContain(
+			`- ${earlier.text}`,
+		)
+	})
 	it('distinguishes complete correction identities from duplicates partial and absent text', () => {
 		const messages = [
 			buildLedgerMessage('earlier', 'user', 'Account header. Original value.'),
@@ -1261,14 +1333,14 @@ describe('amendment rendering', () => {
 		const complete = buildLedgerRenderContext(messages, [earlier, later, end], amendments)
 		expect([...complete.complete]).toEqual(['later'])
 		expect(renderLedgerAnnotation(earlier, complete)).toBe(
-			'[Source earlier]\nAccepted later amendment [later] is fully included in this briefing. Sentence scope is unresolved.',
+			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.',
 		)
-		expect(renderLedgerAnnotation(later, complete)).toBe('[Source later]')
+		expect(renderLedgerAnnotation(later, complete)).toBe('[Ledger source 2]')
 		expect(renderLedgerAnnotation(end, complete)).toBe('')
 		const partial = buildLedgerRenderContext(messages, [earlier, later, later], amendments)
 		expect([...partial.complete]).toEqual([])
 		expect(renderLedgerAnnotation(earlier, partial)).toBe(
-			'[Source earlier]\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+			'[Ledger source 1]\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
 		)
 		expect(renderLedgerAnnotation(later, partial)).toBe('')
 		const absent = buildLedgerRenderContext(messages, [earlier], amendments)
@@ -1294,9 +1366,9 @@ describe('amendment rendering', () => {
 		const trimmed = buildLedgerRenderContext(messages, [original, correction], amendments)
 		const rendered = renderLedgerRecord({ title: 'Rules', lines: [original, correction] }, trimmed)
 		expect(rendered).toContain(
-			'[Source earlier]\nAccepted later amendment [included] is fully included in this briefing. Sentence scope is unresolved.\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.\n- Original.',
+			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.\n- Original.',
 		)
-		expect(rendered).toContain('[Source included]\n- Correction.')
+		expect(rendered).toContain('[Ledger source 2]\n- Correction.')
 		expect(rendered).not.toContain('hidden-owner-secret')
 		expect(rendered).not.toContain('Foreign owner secret')
 		const removed = buildLedgerRenderContext(messages, [correction], amendments)

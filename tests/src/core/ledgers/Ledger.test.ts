@@ -21,7 +21,7 @@ import {
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
 import { attempt, isRecord, isString } from '@orkestrel/contract'
-import { createOllama, createOllamaJudge } from '@orkestrel/ollama'
+import { createOllama, createOllamaJudge, OllamaProvider } from '@orkestrel/ollama'
 import { createTool } from '@orkestrel/tool'
 import { createRecorder, requireValue, waitForEvent } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
@@ -59,7 +59,6 @@ import {
 	LEDGER_NUMERIC_FIXTURE,
 	LEDGER_RECEIPT_CAPACITIES,
 	LEDGER_PRESERVATION_FIXTURE,
-	normalizeLedgerAmendmentFraming,
 	LEDGER_LINK_FIXTURE,
 	LEDGER_LEXICAL_DISCOVERY,
 	LEDGER_LEXICAL_ORDER,
@@ -79,6 +78,53 @@ import {
 	LEDGER_OWNER_FIXTURE,
 	LEDGER_OWNER_RENDER_CASES,
 } from '../../../setup.js'
+
+it('reconstructs identical raw provider briefing bytes when only internal message IDs differ', async () => {
+	const texts: string[] = []
+	const identities: string[] = []
+	const bodies: string[] = []
+	const encoder = new OllamaProvider({ model: 'replay', url: 'http://127.0.0.1:1' })
+	for (const count of [1, 2]) {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 1000, share: { prompt: 1, tail: 0.001 } }),
+		)
+		const seed = ledger.conversation.add(buildLedgerExchange(LEDGER_PRESERVATION_FIXTURE.earlier))
+		const earlier = requireValue(seed.find((message) => message.role === 'tool'))
+		const later = ledger.conversation.add({
+			role: 'user',
+			content: LEDGER_PRESERVATION_FIXTURE.later,
+		})
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+		const result = await ledger.respond('Check Brightwater Studio.')
+		const call = requireValue(provider.calls[0])
+		texts.push(requireValue(call.messages[0]?.content))
+		expect(texts).toHaveLength(count)
+		identities.push(earlier.id)
+		bodies.push(JSON.stringify(encoder.encode(readCallRequest(call))))
+		const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+		expect(plan.amendments).toEqual([{ earlier: earlier.id, later: later.id }])
+		expect(plan.sentences).toEqual([
+			{ source: earlier.id, sentence: 0 },
+			{ source: earlier.id, sentence: 1 },
+			{ source: later.id, sentence: 0 },
+			{ source: later.id, sentence: 1 },
+		])
+		expect(ledger.conversation.message(earlier.id)?.content).toBe(
+			LEDGER_PRESERVATION_FIXTURE.earlier,
+		)
+		expect(ledger.conversation.message(later.id)?.content).toBe(LEDGER_PRESERVATION_FIXTURE.later)
+	}
+	expect(identities[0]).not.toBe(identities[1])
+	expect.soft(texts[0]).toBe(texts[1])
+	expect.soft(bodies[0]).toBe(bodies[1])
+	expect(texts[0]).toContain('[Ledger source 1]')
+	expect(texts[0]).toContain(
+		'Accepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.',
+	)
+})
 
 describe('Ledger', () => {
 	it.each(LEDGER_OWNER_RENDER_CASES)('$title', async (row) => {
@@ -229,7 +275,7 @@ describe('Ledger', () => {
 		expect(provider.calls[0]?.messages[0]?.content).not.toContain(fixture.amendment)
 		expect(provider.calls[0]?.messages[0]?.content).not.toContain(amendment.id)
 		expect(provider.calls[0]?.messages[0]?.content).toContain(
-			`[Source ${root.id}]\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.`,
+			`[Ledger source 2]\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.`,
 		)
 		expect(plan.amendments).toEqual([{ earlier: root.id, later: amendment.id }])
 	})
@@ -1136,8 +1182,8 @@ describe('Ledger', () => {
 			expect(plan.amendments).toEqual(
 				sentences === 0 ? [] : [{ earlier: earlier.id, later: later.id }],
 			)
-			expect(text.includes(`[Source ${earlier.id}]`)).toBe(sentences > 0)
-			expect(text.includes(earlier.id)).toBe(sentences > 0)
+			expect(text.includes('[Ledger source 1]')).toBe(sentences > 0)
+			expect(text.includes(earlier.id)).toBe(false)
 			expect(text.includes('Account BW-20931: Brightwater Studio.')).toBe(sentences > 0)
 			expect(text.includes('Ben may collect BW-20931.')).toBe(sentences > 1)
 			expect(text.includes('For BW-20931 revoke Ada permission.')).toBe(sentences > 2)
@@ -1147,11 +1193,11 @@ describe('Ledger', () => {
 			expect(text.split('Sentence scope is unresolved.')).toHaveLength(sentences === 0 ? 1 : 2)
 			expect(
 				text.includes(
-					`Accepted later amendment [${later.id}] is fully included in this briefing. Sentence scope is unresolved.`,
+					`Accepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.`,
 				),
 			).toBe(sentences === 4)
-			expect(text.includes(`[Source ${later.id}]`)).toBe(sentences === 4)
-			expect(text.includes(later.id)).toBe(sentences === 4)
+			expect(text.includes('[Ledger source 2]')).toBe(sentences === 4)
+			expect(text.includes(later.id)).toBe(false)
 			expect(
 				text.includes(
 					'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
@@ -1710,11 +1756,6 @@ describe('Ledger', () => {
 							entries.map((entry) =>
 								JSON.stringify(entry, function (this: unknown, key, value: unknown) {
 									const parent = isRecord(this) ? this : undefined
-									if (
-										(key === 'briefing' || (key === 'content' && parent?.role === 'system')) &&
-										isString(value)
-									)
-										return normalizeLedgerAmendmentFraming(value, ids)
 									if (
 										['tail', 'prior', 'filed', 'rendered', 'omitted', 'later'].includes(key) &&
 										Array.isArray(value) &&
@@ -4135,7 +4176,7 @@ describe('Ledger', () => {
 		const result = await ledger.respond('Review the desk.')
 		expect(result.passes).toHaveLength(2)
 		expect(provider.calls[0]?.messages[0]?.content).toContain(
-			`## Rules\n[Source ${old.id}]\nAccepted later amendment [${correction.id}] is fully included in this briefing. Sentence scope is unresolved.\n- Refunds over $200 require approval.`,
+			`## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\n- Refunds over $200 require approval.`,
 		)
 		for (const call of provider.calls)
 			expect(call.messages[0]?.content).toContain('Use code MX-4471.')
@@ -4304,7 +4345,7 @@ describe('Ledger', () => {
 			result.receipts[0]?.selections[0]?.plan?.amendments,
 			'C3 carries accepted amendment identities',
 		).toEqual([{ earlier: source.id, later: correction.id }])
-		const expected = `[Source ${source.id}]\nAccepted later amendment [${correction.id}] is fully included in this briefing. Sentence scope is unresolved.\n${source.content}\n[Source ${correction.id}]\n${correction.content}`
+		const expected = `[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\n${source.content}\n[Ledger source 2]\n${correction.content}`
 		expect(provider.calls[0]?.messages[0]?.content).toContain(expected)
 		expect(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,

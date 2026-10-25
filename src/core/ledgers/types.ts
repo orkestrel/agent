@@ -371,12 +371,15 @@ export interface LedgerAmendment {
  * @remarks
  * `first` identifies each source's first retained line object in actual emission order. Build this
  * context from the same line objects passed to the renderers after filtering, deduplication, and
- * trimming; recompute it when the retained population changes.
+ * trimming; recompute it when the retained population changes. `references` assigns each distinct
+ * retained source its decimal display reference in first-occurrence order, starting at 1. These
+ * briefing-local references can change after trimming; audit receipts retain original source IDs.
  */
 export interface LedgerRenderContext {
 	readonly amendments: readonly LedgerAmendment[]
 	readonly complete: ReadonlySet<string>
 	readonly first: ReadonlyMap<string, LedgerLine>
+	readonly references: ReadonlyMap<string, string>
 }
 
 /** Records a selected source's established content carriage. */

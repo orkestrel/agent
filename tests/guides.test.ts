@@ -10,6 +10,7 @@ import type {
 	JudgeRequest,
 	JudgeResult,
 	LedgerLookup,
+	LedgerLine,
 	Message,
 	MessageInput,
 	ProviderDelta,
@@ -85,6 +86,7 @@ await new GuideCommand({
 		createDatabaseConversationStore,
 		createInstructionManager,
 		createLedger,
+		buildLedgerRenderContext,
 		createMemoryConversationStore,
 		createRelay,
 		createRelayProvider,
@@ -2042,6 +2044,22 @@ await new GuideCommand({
 			})
 			expect(guideText).toContain(
 				'an `amends` answer at its cutoff marks a pair amended only when the two messages share an id or a number, and a `supersedes` answer at its cutoff marks the pair superseded and amended whatever they share.',
+			)
+		})
+
+		it('numbers briefing-local display references while preserving source identities', () => {
+			const first: LedgerLine = {
+				text: 'Keep the receipt.',
+				source: 'stored-source-id',
+				sentence: 0,
+				topics: [],
+				role: 'user',
+			}
+			const display = buildLedgerRenderContext([], [first], [])
+			expect(display.references.get('stored-source-id')).toBe('1')
+			expect(first.source).toBe('stored-source-id')
+			expect(guideText).toContain(
+				'References are local to one briefing and are recomputed after each trim; omitted sources do not shift them.',
 			)
 		})
 

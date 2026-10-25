@@ -997,7 +997,7 @@ export function renderLedgerPinned(
 }
 
 /**
- * Derives complete source identities and first occurrences from the actual briefing lines.
+ * Derives complete source identities, first occurrences, and local references from the actual briefing lines.
  * @param messages - Original messages whose indexed sentences establish completeness
  * @param lines - Retained lines in rendering order after filtering and deduplication
  * @param amendments - Accepted direct message amendment edges
@@ -1028,13 +1028,19 @@ export function buildLedgerRenderContext(
 				.map((message) => message.id),
 		),
 		first: new Map(lines.toReversed().map((line) => [line.source, line])),
+		references: new Map(
+			[...new Set(lines.map((line) => line.source))].map((source, index) => [
+				source,
+				String(index + 1),
+			]),
+		),
 	}
 }
 
 /**
  * Renders source framing and unresolved amendment scope at a source's first retained line.
  * @param line - The retained occurrence to annotate
- * @param context - Actual complete sources, first occurrences, and accepted amendment edges
+ * @param context - Actual complete sources, first occurrences, local references, and accepted amendment edges
  * @returns Source framing and truthful inclusion notes, or empty text for an unrelated or repeated occurrence
  *
  * @example
@@ -1049,14 +1055,18 @@ export function renderLedgerAnnotation(line: LedgerLine, context: LedgerRenderCo
 		context.complete.has(line.source) &&
 		context.amendments.some((pair) => pair.later === line.source && context.first.has(pair.earlier))
 	if (amendments.length === 0 && !endpoint) return ''
+	const included = amendments.filter((pair) => context.complete.has(pair.later))
+	if (
+		context.references.get(line.source) === undefined ||
+		included.some((pair) => context.references.get(pair.later) === undefined)
+	)
+		throw new LedgerError('REQUEST', 'Ledger rendering requires retained source references')
 	return [
-		`[Source ${line.source}]`,
-		...amendments
-			.filter((pair) => context.complete.has(pair.later))
-			.map(
-				(pair) =>
-					`Accepted later amendment [${pair.later}] is fully included in this briefing. Sentence scope is unresolved.`,
-			),
+		`[Ledger source ${context.references.get(line.source)}]`,
+		...included.map(
+			(pair) =>
+				`Accepted later amendment [Ledger source ${context.references.get(pair.later)}] is fully included in this briefing. Sentence scope is unresolved.`,
+		),
 		...(amendments.some((pair) => !context.complete.has(pair.later))
 			? [
 					'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
