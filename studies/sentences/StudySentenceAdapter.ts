@@ -74,6 +74,14 @@ export class StudySentenceAdapter implements StudyAdapterInterface {
 
 	/** Grades retained scores with rubric-only labels. @param input - Sealed execution and independent rubric. @returns Attributable judgments with a JSON fitting carrier. */
 	grade(input: StudyAdjudication): readonly StudyJudgment[] {
+		if (
+			input.rubric.criteria.some(
+				(criterion) =>
+					isStudySentenceAssertion(criterion.assertion) &&
+					criterion.assertion.binding.request !== hashStudySentenceRequest(),
+			)
+		)
+			throw new StudyError('EVIDENCE', 'Sentence request binding changed')
 		return gradeStudyEvidence(input, (target) => {
 			try {
 				if (!isStudySentenceAssertion(target.criterion.assertion))

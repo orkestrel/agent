@@ -10,7 +10,7 @@ import {
 	SENTENCE_MARKED_QUESTION,
 	SENTENCE_MARKED_FIXTURES,
 	SENTENCE_BOUNDARY_FIXTURES,
-} from './constants.js'
+} from '../../setupStudy.js'
 import { isStudyMemoryInput } from '../../../studies/memory/validators.js'
 import {
 	buildStudySentenceManifest,

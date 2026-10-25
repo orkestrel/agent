@@ -109,6 +109,59 @@ it('binds local request identity before declaration generation, adapter admissio
 })
 import committedScenario from '../../../studies/sentences/scenarios/d1.json'
 
+it('grades matching request bindings and retains malformed-assertion judgments', () => {
+	const fixture = buildStudySentenceCalibration()
+	const adapter = new StudySentenceAdapter()
+	expect(adapter.grade(fixture.input).every((judgment) => judgment.verdict === 'achieved')).toBe(
+		true,
+	)
+	const malformed = adapter.grade({
+		...fixture.input,
+		rubric: {
+			...fixture.input.rubric,
+			criteria: fixture.input.rubric.criteria.map((criterion, index) =>
+				index === 0 ? { ...criterion, assertion: { invalid: true } } : criterion,
+			),
+		},
+	})
+	expect(requireValue(malformed[0])).toMatchObject({
+		verdict: 'unsuccessful',
+		reason: JSON.stringify({ explanation: 'Sentence grading assertion is malformed' }),
+	})
+	expect(malformed.slice(1).every((judgment) => judgment.verdict === 'achieved')).toBe(true)
+})
+
+it('rejects a foreign request before adapter grading reads custody', () => {
+	const admittedFixture = buildStudySentenceCalibration()
+	const settings = admittedFixture.declarations.profile.settings
+	if (!isStudySentenceSettings(settings)) throw new Error('Missing settings')
+	const binding = { ...settings.binding, request: '0'.repeat(64) }
+	const profile = parseStudyProfile({
+		...admittedFixture.declarations.profile,
+		settings: { ...settings, binding },
+	})
+	const stale = buildStudySentenceAdjudication({
+		...admittedFixture,
+		declarations: { ...admittedFixture.declarations, profile },
+	})
+	const input: StudyAdjudication = {
+		...stale,
+		rubric: buildStudySentenceRubric(admittedFixture.declarations.scenario, {
+			phase: 'initial',
+			binding,
+			targets: [],
+			selection: undefined,
+			digest: undefined,
+			grading: undefined,
+		}),
+		get attempts(): StudyAdjudication['attempts'] {
+			throw new Error('Score custody accessed before request identity')
+		},
+	}
+	const adapter = new StudySentenceAdapter()
+	expect(() => adapter.grade(input)).toThrow('request binding')
+}, 15000)
+
 const fixture = buildStudySentenceCalibration()
 const assertion: unknown = fixture.declarations.fitting.criteria[0]?.assertion
 if (!isStudySentenceAssertion(assertion)) throw new Error('Synthetic fitting assertion is absent')
