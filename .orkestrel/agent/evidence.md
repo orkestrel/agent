@@ -1,5 +1,9 @@
 # Agent series evidence
 
+## Post-fix R1/R2 controls — 2026-10-25
+
+At `4e96561e`, both explicit false arms reproduce the 110-exchange replacement fully with equal raw requests and normalized selections. Enabled R1 first changes ordinal 39, ev-02-1; enabled R2 first changes ordinal 42, ev-02-2, adding the actual earlier queue reply. Real Ledger fixtures distinguish the range's endpoint-only carriage from the explicit list's four replies. The experimental request correction applies to ev-14-1 and ev-14-2; retained inputs remain unchanged. CPU duration: 164716 ms; no live calls or quality claim. The failed lowercase-token probe and corrected three-test pass remain separate. See `tmp/units/r1r2-screen-20261025/report-cpu.md`.
+
 ## D1/D3 successor — 2026-10-25
 
 Product `dd300e48`; replacement result `75d51eea-28cb-4785-a26d-cd51062d7a62`, seal `098cd42db42303b53d1b80a14180e3766122fac56bc10e99913bb89815db5d88`. Same-scenario replay reconstructed prefix 49 and recorded 57 new execution calls (49 judge, eight agent). Complete count: 110; model time: 268679.8465 ms, charged 268680 ms; live outer elapsed: 300745 ms. Full offline replay and lexical-false replay are complete with equal raw requests and normalized selections. Lexical true first changes system content at ordinal 42 (`ev-02-2`), adding the workday stamp. The first revisit briefing retains price, trace authorization, carrier finding, and historical tracking with amendment notices; superseded `ev-source-2-3` is absent. Exact sentence withdrawal and quality improvement are not established. The final handoff mixes cases; this is an inspected output defect, not a blinded grade. Complete evidence, failed preparation runs, and total elapsed charge of 576436 ms: `tmp/units/ledger-preservation-replay-20261025/report.md` and its adjacent `budget.json`.

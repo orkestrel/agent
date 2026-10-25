@@ -1,5 +1,12 @@
 # Agent boost ledger
 
+## R1/R2 continuation — 2026-10-25
+
+| Unit | Role and engine | Result | Evidence |
+| --- | --- | --- | --- |
+| Post-fix CPU controls | root, sole execution lane | Both false arms seal with full raw/selection equality. R1 true first differs at ordinal 39; R2 true at 42 with Earlier work. Real Ledger range control carries endpoints, explicit list carries every intended reply. L0 164716 ms, no model calls. Lowercase-token assertion failure retained; corrected range proofs pass. | `tmp/units/r1r2-screen-20261025/report-cpu.md` |
+| R2 screen design | GPT-6 Astra xhigh, standard service, T3 | Read-only bounded design; task `node:delegated-task:command%3Amcp%3Aa6e3bdfb-adb4-4c27-8c95-1098364bfb05%3Adelegate-task%3Ar1r2-screen-design-20261025-r1`; session uses the same suffix under `thread:delegated-task:`. Original brief retained; authority delta delivered as an in-flight steer. No execution or source ownership. | `tmp/units/r1r2-screen-design-20261025-brief.md` |
+
 ## D1/D3 continuation — 2026-10-25
 
 | Unit | Role and engine | Result | Evidence |
