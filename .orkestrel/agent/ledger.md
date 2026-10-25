@@ -1,5 +1,13 @@
 # Agent boost ledger
 
+## D1/D3 continuation — 2026-10-25
+
+| Unit | Role and engine | Result | Evidence |
+| --- | --- | --- | --- |
+| D2/D3 integrated review | independent native GPT-6 Astra xhigh | PASS on product `aff4320a`; supplied hashes stable; inspection only, all commands ended. Closes the pending static LR-4 review of unchanged D2/D3; D1 integration and final gates remain owed. | `tmp/units/ledger-d2d3-review-20261025-report.md` |
+| D1 preservation decision | root with resumed Astra design adviser | Remove destructive token-overlap omission, retain accepted direct amendment edges with truthful complete/omitted correction notes. Preserve whole-message supersession, D2, D3, and recall. Semantic sentence withdrawal remains unimplemented after failed calibrations. | `tmp/units/ledger-preservation-design-20261025.md`; `tmp/units/ledger-preservation-20261025-brief.md` |
+| Scope cancellation | user U32; root | Instruction-refinement branch cancelled; owned Cursor process tree stopped and absence checked. No Scaffold edits. D1/D3 continues serially under U31. | `plan.md` active work |
+
 Agent's boost dispatch ledger as it stood on 2026-10-21: one row per unit with its last result, in dispatch order, from the boost ladder of 2026-10-19 onward; user rulings are rows with the role `user`, and `.orkestrel/agent/plan.md` holds their clauses.
 
 - A path under `tmp/` is a gitignored working file on disk on 2026-10-21, and a `tmp/units/ladder/PATH` path reads at the same relative path under `.orkestrel/agent/instruments/ladder-records/` or `.orkestrel/agent/instruments/ladder-witnesses/` after the U19 retirement of 2026-10-23, or names a deleted file; a bare commit names an Agent commit.
