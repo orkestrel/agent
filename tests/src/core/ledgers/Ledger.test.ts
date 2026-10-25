@@ -58,6 +58,8 @@ import {
 	LEDGER_CAPTURE_FIXTURE,
 	LEDGER_NUMERIC_FIXTURE,
 	LEDGER_RECEIPT_CAPACITIES,
+	LEDGER_PRESERVATION_FIXTURE,
+	normalizeLedgerAmendmentFraming,
 	LEDGER_LINK_FIXTURE,
 	LEDGER_LEXICAL_DISCOVERY,
 	LEDGER_LEXICAL_ORDER,
@@ -225,6 +227,11 @@ describe('Ledger', () => {
 		expect(plan.rendered).not.toContain(reading.id)
 		expect(provider.calls[0]?.messages[0]?.content).toContain(fixture.surviving)
 		expect(provider.calls[0]?.messages[0]?.content).not.toContain(fixture.amendment)
+		expect(provider.calls[0]?.messages[0]?.content).not.toContain(amendment.id)
+		expect(provider.calls[0]?.messages[0]?.content).toContain(
+			`[Source ${root.id}]\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.`,
+		)
+		expect(plan.amendments).toEqual([{ earlier: root.id, later: amendment.id }])
 	})
 	it('R2 carries every matched earlier draft in order and cuts the oldest work first', async () => {
 		const fixture = LEDGER_WORK_FIXTURE
@@ -1005,11 +1012,9 @@ describe('Ledger', () => {
 			)
 		}
 	})
-	it('C3 deduplicates withdrawal pairs across stale sentences and retains effective amenders', async () => {
-		const ledger = createLedger(
-			createScriptedProvider([{ content: 'Done.' }]),
-			buildLedgerOptions(),
-		)
+	it('C3 reports direct accepted amendments only when their earlier source is rendered', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
 		const earlier = ledger.conversation.add({
 			role: 'user',
 			content: 'Code MX-4471. Code MX-4471 remains pending.',
@@ -1022,17 +1027,30 @@ describe('Ledger', () => {
 		const unrelated = ledger.conversation.add({ role: 'user', content: 'Unrelated limit 300.' })
 		const quiet = ledger.conversation.add({ role: 'user', content: 'Ignore MX-4471.' })
 		ledger.conversation.judgments.add(
+			buildLedgerJudgment(earlier, { answer: { form: 'choice', probabilities: { rule: 1 } } }),
+		)
+		ledger.conversation.judgments.add(
 			buildLedgerJudgment(quiet, { answer: { form: 'choice', probabilities: { distractor: 1 } } }),
 		)
 		for (const message of [first, second, unrelated, quiet]) {
 			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, message, 1))
 			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, message, 0))
 		}
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', first, second, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', first, second, 1))
 		const result = await ledger.respond('Check codes.')
-		expect(result.receipts[0]?.selections[0]?.plan?.withdrawn).toEqual([
+		expect(result.receipts[0]?.selections[0]?.plan?.amendments).toEqual([
 			{ earlier: earlier.id, later: first.id },
 			{ earlier: earlier.id, later: second.id },
 		])
+		const text = requireValue(provider.calls[0]?.messages[0]?.content)
+		expect(text).toContain('- Code MX-4471.\n- Code MX-4471 remains pending.')
+		expect(text).toContain(
+			'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+		)
+		expect(text).not.toContain(first.id)
+		expect(text).not.toContain(first.content)
+		expect(ledger.conversation.message(first.id)?.content).toBe(first.content)
 	})
 	it('C1 joins prior request ids only when fallback actually carries them', async () => {
 		const options = buildLedgerOptions()
@@ -1092,6 +1110,57 @@ describe('Ledger', () => {
 		expect(receipt.sources.find((entry) => entry.source === source.id)?.carriage).toBe('record')
 	})
 
+	it('preservation prices notes and distinguishes full partial omitted and trimmed source text at the provider', async () => {
+		const fixture = LEDGER_PRESERVATION_FIXTURE
+		for (const { capacity, sentences } of fixture.cases) {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 } }),
+			)
+			const seed = ledger.conversation.add(buildLedgerExchange(fixture.earlier))
+			const earlier = requireValue(seed.find((message) => message.role === 'tool'))
+			const later = ledger.conversation.add({ role: 'user', content: fixture.later })
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+			const result = await ledger.respond('Check Brightwater Studio.')
+			const plan = requireValue(result.receipts[0]?.selections[0]?.plan)
+			const text = requireValue(provider.calls[0]?.messages[0]?.content)
+			const identities = [
+				{ source: earlier.id, sentence: 0 },
+				{ source: earlier.id, sentence: 1 },
+				{ source: later.id, sentence: 0 },
+				{ source: later.id, sentence: 1 },
+			]
+			expect.soft(plan.sentences, `capacity ${capacity}`).toEqual(identities.slice(0, sentences))
+			expect(plan.amendments).toEqual(
+				sentences === 0 ? [] : [{ earlier: earlier.id, later: later.id }],
+			)
+			expect(text.includes(`[Source ${earlier.id}]`)).toBe(sentences > 0)
+			expect(text.includes(earlier.id)).toBe(sentences > 0)
+			expect(text.includes('Account BW-20931: Brightwater Studio.')).toBe(sentences > 0)
+			expect(text.includes('Ben may collect BW-20931.')).toBe(sentences > 1)
+			expect(text.includes('For BW-20931 revoke Ada permission.')).toBe(sentences > 2)
+			expect(text.includes('confirms the scheduled pickup time with the account holder.')).toBe(
+				sentences === 4,
+			)
+			expect(text.split('Sentence scope is unresolved.')).toHaveLength(sentences === 0 ? 1 : 2)
+			expect(
+				text.includes(
+					`Accepted later amendment [${later.id}] is fully included in this briefing. Sentence scope is unresolved.`,
+				),
+			).toBe(sentences === 4)
+			expect(text.includes(`[Source ${later.id}]`)).toBe(sentences === 4)
+			expect(text.includes(later.id)).toBe(sentences === 4)
+			expect(
+				text.includes(
+					'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+				),
+			).toBe(sentences > 0 && sentences < 4)
+			expect(ledger.conversation.message(earlier.id)?.content).toBe(fixture.earlier)
+			expect(ledger.conversation.message(later.id)?.content).toBe(fixture.later)
+		}
+	})
 	it('C2 files nonempty live projected orphans and excludes empty and dead sources', async () => {
 		const ledger = createLedger(
 			createScriptedProvider([{ content: 'Done.' }]),
@@ -1641,6 +1710,11 @@ describe('Ledger', () => {
 							entries.map((entry) =>
 								JSON.stringify(entry, function (this: unknown, key, value: unknown) {
 									const parent = isRecord(this) ? this : undefined
+									if (
+										(key === 'briefing' || (key === 'content' && parent?.role === 'system')) &&
+										isString(value)
+									)
+										return normalizeLedgerAmendmentFraming(value, ids)
 									if (
 										['tail', 'prior', 'filed', 'rendered', 'omitted', 'later'].includes(key) &&
 										Array.isArray(value) &&
@@ -4007,7 +4081,7 @@ describe('Ledger', () => {
 		expect(states).not.toContain(`user: ${LEDGER_NOTES.cue}`)
 	})
 
-	it('keeps stale sentences and replaced messages in recall results while the briefing drops them', async () => {
+	it('preserves amended sentences in briefing and recall while whole-message replacement remains independent', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
@@ -4061,10 +4135,10 @@ describe('Ledger', () => {
 		const result = await ledger.respond('Review the desk.')
 		expect(result.passes).toHaveLength(2)
 		expect(provider.calls[0]?.messages[0]?.content).toContain(
-			'## Rules\n- Refunds over $200 require approval.',
+			`## Rules\n[Source ${old.id}]\nAccepted later amendment [${correction.id}] is fully included in this briefing. Sentence scope is unresolved.\n- Refunds over $200 require approval.`,
 		)
 		for (const call of provider.calls)
-			expect(call.messages[0]?.content).not.toContain('Use code MX-4471.')
+			expect(call.messages[0]?.content).toContain('Use code MX-4471.')
 		expect(provider.calls[0]?.messages.find((message) => message.id === old.id)?.content).toBe(
 			old.content,
 		)
@@ -4227,10 +4301,10 @@ describe('Ledger', () => {
 			'C2 includes the emitted amendment source',
 		).toEqual([source.id, correction.id])
 		expect(
-			result.receipts[0]?.selections[0]?.plan?.withdrawn,
-			'C3 carries effective withdrawal identities',
+			result.receipts[0]?.selections[0]?.plan?.amendments,
+			'C3 carries accepted amendment identities',
 		).toEqual([{ earlier: source.id, later: correction.id }])
-		const expected = `For Mira, keep the receipt.\n${correction.content}`
+		const expected = `[Source ${source.id}]\nAccepted later amendment [${correction.id}] is fully included in this briefing. Sentence scope is unresolved.\n${source.content}\n[Source ${correction.id}]\n${correction.content}`
 		expect(provider.calls[0]?.messages[0]?.content).toContain(expected)
 		expect(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,

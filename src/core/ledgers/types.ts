@@ -359,10 +359,24 @@ export interface LedgerSentence {
 	readonly sentence: number
 }
 
-/** Identifies an effective amendment that withdrew an earlier sentence. */
-export interface LedgerWithdrawal {
+/** Identifies an accepted direct message amendment whose sentence scope remains unresolved. */
+export interface LedgerAmendment {
 	readonly earlier: string
 	readonly later: string
+}
+
+/**
+ * Supplies accepted amendments and completely included sources for one briefing rendering.
+ *
+ * @remarks
+ * `first` identifies each source's first retained line object in actual emission order. Build this
+ * context from the same line objects passed to the renderers after filtering, deduplication, and
+ * trimming; recompute it when the retained population changes.
+ */
+export interface LedgerRenderContext {
+	readonly amendments: readonly LedgerAmendment[]
+	readonly complete: ReadonlySet<string>
+	readonly first: ReadonlyMap<string, LedgerLine>
 }
 
 /** Records a selected source's established content carriage. */
@@ -380,7 +394,7 @@ export interface LedgerPlanReceipt {
 	readonly sentences: readonly LedgerSentence[]
 	readonly omitted: readonly string[]
 	readonly trims: number
-	readonly withdrawn: readonly LedgerWithdrawal[]
+	readonly amendments: readonly LedgerAmendment[]
 }
 
 /** Holds a successful selection with its request-owned planning evidence. */
@@ -656,28 +670,12 @@ export interface LedgerRecord {
 }
 
 /**
- * Carries one stale sentence and the effective amenders sharing its tokens.
- *
- * @remarks
- * `source` is the earlier message's id and `sentence` the zero-based index of the sentence. The
- * projection leaves a stale sentence out of the records and the briefing. Recall and answer notes
- * keep the stored content. The seed tail replaces lookup results with status stubs.
- * `later` preserves every contributing message id without changing sentence removal.
- */
-export interface LedgerStaleSentence {
-	readonly source: string
-	readonly sentence: number
-	readonly tokens: readonly string[]
-	readonly later: readonly string[]
-}
-
-/**
- * Carries the records projected from a conversation, the stale sentences, and the live messages no
+ * Carries the records projected from a conversation, accepted amendments, and the live messages no
  * record placed.
  */
 export interface LedgerProjection {
 	readonly records: readonly LedgerRecord[]
-	readonly stale: readonly LedgerStaleSentence[]
+	readonly amendments: readonly LedgerAmendment[]
 	readonly orphans: readonly string[]
 }
 

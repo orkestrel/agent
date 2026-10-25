@@ -767,7 +767,7 @@ export function buildMemoryDifferentialReceipt(
 						omitted: [`${prefix}-history`],
 						trims: 1,
 						sentences: [{ source: `${prefix}-arrival`, sentence: 0 }],
-						withdrawn: [{ earlier: `${prefix}-history`, later: `${prefix}-arrival` }],
+						amendments: [{ earlier: `${prefix}-history`, later: `${prefix}-arrival` }],
 					},
 					sources: [
 						{ source: `${prefix}-arrival`, carriage: 'record' },
@@ -810,7 +810,7 @@ export function buildMemoryIdentityReceipt(prefix: string, pass: number): StudyM
 						rendered: [],
 						omitted: [],
 						sentences: [],
-						withdrawn: [],
+						amendments: [],
 						trims: 0,
 					},
 				},
@@ -2121,7 +2121,7 @@ export function buildMemoryClassificationReceipt(): StudyMemoryReceipt {
 							{ source: 'correct', sentence: 0 },
 							{ source: 'clean', sentence: 0 },
 						],
-						withdrawn: [],
+						amendments: [],
 					},
 					sources: [
 						{ source: 'held', carriage: 'absent' },

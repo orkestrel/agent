@@ -1507,21 +1507,19 @@ describe('checkLedgerProjection', () => {
 			'owner:BW-20931',
 			'rules',
 		])
-		expect(clean.stale).toEqual([
-			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
-		])
+		expect(clean.amendments).toEqual([{ earlier: 'user-01', later: 'user-04' }])
 		expect(checkLedgerProjection(clean, input)).toEqual([])
 	})
 
-	it('names a stale line that a record kept', () => {
+	it('names an amended original sentence that a record dropped', () => {
 		const input = createLedgerDesk()
 		const clean = buildRecords(input)
 		const built = replaceLedgerRecord(clean, 'rules', (record) => ({
 			...record,
-			lines: [...record.lines, buildLedgerLine('user-01', 1, 'This week code is MX-4471.')],
+			lines: record.lines.filter((line) => line.source !== 'user-01' || line.sentence !== 1),
 		}))
 		expect(
-			checkLedgerProjection(built, input).some((fault) => fault.startsWith('dead rules')),
+			checkLedgerProjection(built, input).some((fault) => fault.startsWith('coverage rules')),
 		).toBe(true)
 	})
 
@@ -1588,7 +1586,7 @@ describe('checkLedgerProjection', () => {
 		).toBe(true)
 	})
 
-	it('names a sentence that is neither a line nor stale', () => {
+	it('names an original live sentence missing from its record', () => {
 		const input = createLedgerDesk()
 		const clean = buildRecords(input)
 		const built = replaceLedgerRecord(clean, 'rules', (record) => ({
@@ -1600,12 +1598,12 @@ describe('checkLedgerProjection', () => {
 		).toBe(true)
 	})
 
-	it('names a stale list that differs from the amendment pairs', () => {
+	it('names an amendment list that differs from the accepted pairs', () => {
 		const input = createLedgerDesk()
 		const clean = buildRecords(input)
 		expect(
-			checkLedgerProjection({ ...clean, stale: [] }, input).some((fault) =>
-				fault.startsWith('stale:'),
+			checkLedgerProjection({ ...clean, amendments: [] }, input).some((fault) =>
+				fault.startsWith('amendments:'),
 			),
 		).toBe(true)
 	})
@@ -1619,7 +1617,7 @@ describe('checkLedgerProjection', () => {
 		)
 	})
 
-	it('passes a replaced correction that keeps its stale effect, and names a build that revives the value', () => {
+	it('passes effective superseded-amender provenance and names missing edges', () => {
 		const input = createLedgerDesk()
 		const supersessions = buildLedgerInput({
 			...{ system: input.system, exclusions: input.exclusions },
@@ -1638,13 +1636,11 @@ describe('checkLedgerProjection', () => {
 			},
 		})
 		const built = buildRecords(supersessions)
-		expect(built.stale).toEqual([
-			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
-		])
+		expect(built.amendments).toEqual([{ earlier: 'user-01', later: 'user-04' }])
 		expect(checkLedgerProjection(built, supersessions)).toEqual([])
 		expect(
-			checkLedgerProjection({ ...built, stale: [] }, supersessions).some((fault) =>
-				fault.startsWith('stale:'),
+			checkLedgerProjection({ ...built, amendments: [] }, supersessions).some((fault) =>
+				fault.startsWith('amendments:'),
 			),
 		).toBe(true)
 	})
@@ -1693,7 +1689,7 @@ describe('checkLedgerProjection', () => {
 					],
 				},
 			],
-			stale: [],
+			amendments: [],
 			orphans: [],
 		}
 		const faults = checkLedgerProjection(kept, empty)

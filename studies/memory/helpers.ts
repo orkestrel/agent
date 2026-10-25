@@ -189,7 +189,7 @@ export function normalizeStudyMemoryReceipt(value: StudyMemoryReceipt): StudyMem
 									...sentence,
 									source: names.get(sentence.source) ?? sentence.source,
 								})),
-								withdrawn: selection.plan.withdrawn.map((pair) => ({
+								amendments: selection.plan.amendments.map((pair) => ({
 									earlier: names.get(pair.earlier) ?? pair.earlier,
 									later: names.get(pair.later) ?? pair.later,
 								})),
@@ -425,7 +425,7 @@ export function buildStudyMemoryResult(result: unknown): StudyMemoryResult {
 														'sentences',
 														'omitted',
 														'trims',
-														'withdrawn',
+														'amendments',
 													])
 										return {
 											...adopted,
@@ -439,9 +439,9 @@ export function buildStudyMemoryResult(result: unknown): StudyMemoryResult {
 																: plan.sentences.map((sentence) =>
 																		readStudyMemoryMembers(sentence, ['source', 'sentence']),
 																	),
-															withdrawn: !isArray(plan.withdrawn)
-																? plan.withdrawn
-																: plan.withdrawn.map((pair) =>
+															amendments: !isArray(plan.amendments)
+																? plan.amendments
+																: plan.amendments.map((pair) =>
 																		readStudyMemoryMembers(pair, ['earlier', 'later']),
 																	),
 														},

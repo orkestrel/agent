@@ -307,7 +307,7 @@ export function isStudyMemoryPass(value: unknown): value is LedgerReceipt {
 						omitted: arrayOf(isString),
 						trims: isNumber,
 						sentences: arrayOf(objectOf({ source: isString, sentence: isNumber })),
-						withdrawn: arrayOf(objectOf({ earlier: isString, later: isString })),
+						amendments: arrayOf(objectOf({ earlier: isString, later: isString })),
 					}),
 				),
 				sources: arrayOf(
@@ -404,7 +404,7 @@ export function isStudyMemoryReceipt(value: unknown): value is StudyMemoryReceip
 							...selection.plan.rendered,
 							...selection.plan.omitted,
 							...selection.plan.sentences.map((sentence) => sentence.source),
-							...selection.plan.withdrawn.flatMap((pair) => [pair.earlier, pair.later]),
+							...selection.plan.amendments.flatMap((pair) => [pair.earlier, pair.later]),
 						]),
 			]),
 		]
@@ -430,13 +430,13 @@ export function isStudyMemoryReceipt(value: unknown): value is StudyMemoryReceip
 								'sentences',
 								'omitted',
 								'trims',
-								'withdrawn',
+								'amendments',
 							].includes(key),
 						) &&
 							selection.plan.sentences.every((sentence) =>
 								Object.keys(sentence).every((key) => ['source', 'sentence'].includes(key)),
 							) &&
-							selection.plan.withdrawn.every((pair) =>
+							selection.plan.amendments.every((pair) =>
 								Object.keys(pair).every((key) => ['earlier', 'later'].includes(key)),
 							))),
 			) &&

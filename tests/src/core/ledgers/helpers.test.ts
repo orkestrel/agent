@@ -19,11 +19,13 @@ import {
 	scanAmendments,
 	splitWords,
 	buildLines,
+	buildLedgerRenderContext,
+	renderLedgerAnnotation,
 	buildRecords,
 	collectLive,
 	collectNames,
 	collectRegistry,
-	collectStale,
+	collectAmendments,
 	computeThinking,
 	resolvePredict,
 	findLedgerCall,
@@ -263,11 +265,11 @@ describe('extracted ledger leaves', () => {
 		expect([
 			...collectProjectionIds({
 				records: [{ key: 'rules', title: 'Rules', members: ['same', 'placed'], lines: [] }],
-				stale: [],
+				amendments: [],
 				orphans: ['same', 'orphan'],
 			}),
 		]).toEqual(['same', 'orphan', 'placed'])
-		expect([...collectProjectionIds({ records: [], stale: [], orphans: [] })]).toEqual([])
+		expect([...collectProjectionIds({ records: [], amendments: [], orphans: [] })]).toEqual([])
 	})
 
 	it('walks amendments breadth first, cuts refused branches, and closes cycles', () => {
@@ -1072,8 +1074,59 @@ describe('placeMember', () => {
 	})
 })
 
-describe('collectStale', () => {
-	it('C3 retains only effective later identities sharing each stale sentence token', () => {
+describe('collectAmendments', () => {
+	it('keeps direct edges in conversation order without duplicate or transitive edges', () => {
+		const input = buildLedgerInput({
+			messages: [
+				buildLedgerMessage('a', 'user', 'Original.'),
+				buildLedgerMessage('b', 'user', 'Correction.'),
+				buildLedgerMessage('c', 'user', 'Further correction.'),
+				buildLedgerMessage('other', 'user', 'Unrelated.'),
+			],
+			classification: { amendments: { b: ['c'], a: ['b', 'b', 'missing'] } },
+		})
+		expect(
+			collectAmendments(
+				input,
+				new Map(input.messages.map((message) => [message.id, message])),
+				collectLive(input),
+			),
+		).toEqual([
+			{ earlier: 'a', later: 'b' },
+			{ earlier: 'b', later: 'c' },
+		])
+	})
+	it('preserves headers sibling facts and person-specific permission after an accepted amendment', () => {
+		const input = buildLedgerInput({
+			messages: [
+				buildLedgerMessage(
+					'earlier',
+					'user',
+					'Account AC-7302 belongs to Ada. Ben may collect AC-7302. Ada may collect AC-7302.',
+				),
+				buildLedgerMessage(
+					'correction',
+					'user',
+					'For AC-7302 revoke Ada permission; Ben permission remains.',
+				),
+			],
+			classification: {
+				categories: { earlier: 'rule', correction: 'correction' },
+				amendments: { earlier: ['correction'] },
+			},
+		})
+		expect(
+			buildRecords(input)
+				.records.flatMap((record) => record.lines)
+				.filter((line) => line.source === 'earlier')
+				.map((line) => [line.sentence, line.text]),
+		).toEqual([
+			[0, 'Account AC-7302 belongs to Ada.'],
+			[1, 'Ben may collect AC-7302.'],
+			[2, 'Ada may collect AC-7302.'],
+		])
+	})
+	it('C3 retains accepted effective identities without another token comparison', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage('earlier', 'user', 'Code MX-4471. Limit 200.'),
@@ -1088,23 +1141,27 @@ describe('collectStale', () => {
 			},
 		})
 		expect(
-			collectStale(
+			collectAmendments(
 				input,
 				new Map(input.messages.map((message) => [message.id, message])),
 				collectLive(input),
 			),
-		).toEqual([{ source: 'earlier', sentence: 0, tokens: ['MX-4471'], later: ['first', 'second'] }])
+		).toEqual([
+			{ earlier: 'earlier', later: 'first' },
+			{ earlier: 'earlier', later: 'second' },
+			{ earlier: 'earlier', later: 'unrelated' },
+		])
 	})
 	const desk = createLedgerDesk()
 	const byId = new Map(desk.messages.map((message) => [message.id, message]))
 
-	it('lists a sentence of a live message that shares an id or a number with its amending message', () => {
-		expect(collectStale(desk, byId, collectLive(desk))).toEqual([
-			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
+	it('lists the accepted direct edge of a live message', () => {
+		expect(collectAmendments(desk, byId, collectLive(desk))).toEqual([
+			{ earlier: 'user-01', later: 'user-04' },
 		])
 	})
 
-	it('keeps a sentence stale after its correction is itself supersessions (R2b)', () => {
+	it('keeps provenance after its correction is itself superseded (R2b)', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage('user-a', 'user', 'The code is MX-4471. Refunds over $200 need it.'),
@@ -1119,11 +1176,15 @@ describe('collectStale', () => {
 		const live = collectLive(input)
 		expect(live).toEqual(['user-a', 'user-c'])
 		expect(
-			collectStale(input, new Map(input.messages.map((message) => [message.id, message])), live),
-		).toEqual([{ source: 'user-a', sentence: 0, tokens: ['MX-4471'], later: ['user-b'] }])
+			collectAmendments(
+				input,
+				new Map(input.messages.map((message) => [message.id, message])),
+				live,
+			),
+		).toEqual([{ earlier: 'user-a', later: 'user-b' }])
 	})
 
-	it('keeps a sentence stale when its correction is itself corrected (R2b)', () => {
+	it('keeps direct chain provenance when its correction is itself corrected (R2b)', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage('user-a', 'user', 'The code is MX-4471.'),
@@ -1134,14 +1195,15 @@ describe('collectStale', () => {
 				amendments: { 'user-a': ['user-b'], 'user-b': ['user-c'] },
 			},
 		})
-		const stale = collectStale(
+		const amendments = collectAmendments(
 			input,
 			new Map(input.messages.map((message) => [message.id, message])),
 			collectLive(input),
 		)
-		expect(
-			stale.map((entry) => `${entry.source} ${entry.sentence} ${entry.tokens.join(',')}`),
-		).toEqual(['user-a 0 MX-4471', 'user-b 0 MX-4486'])
+		expect(amendments).toEqual([
+			{ earlier: 'user-a', later: 'user-b' },
+			{ earlier: 'user-b', later: 'user-c' },
+		])
 	})
 
 	it('never lets an excluded, quiet, or assistant message take effect', () => {
@@ -1164,7 +1226,7 @@ describe('collectStale', () => {
 				classification,
 				...variant,
 			})
-			expect(collectStale(input, byMessage, collectLive(input))).toEqual([])
+			expect(collectAmendments(input, byMessage, collectLive(input))).toEqual([])
 		}
 		const assistant = [
 			buildLedgerMessage('user-a', 'user', 'The code is MX-4471.'),
@@ -1173,22 +1235,78 @@ describe('collectStale', () => {
 		]
 		const spoken = buildLedgerInput({ messages: assistant, classification })
 		expect(
-			collectStale(
+			collectAmendments(
 				spoken,
 				new Map(assistant.map((message) => [message.id, message])),
 				collectLive(spoken),
 			),
 		).toEqual([])
 		const control = buildLedgerInput({ messages, classification })
-		expect(collectStale(control, byMessage, collectLive(control))).toEqual([
-			{ source: 'user-a', sentence: 0, tokens: ['MX-4471'], later: ['user-b'] },
+		expect(collectAmendments(control, byMessage, collectLive(control))).toEqual([
+			{ earlier: 'user-a', later: 'user-b' },
 		])
 	})
 })
 
-describe('buildLines', () => {
-	const none = new Set<string>()
+describe('amendment rendering', () => {
+	it('distinguishes complete correction identities from duplicates partial and absent text', () => {
+		const messages = [
+			buildLedgerMessage('earlier', 'user', 'Account header. Original value.'),
+			buildLedgerMessage('later', 'user', 'Replacement value. Unchanged permission.'),
+		]
+		const earlier = buildLedgerLine('earlier', 0, 'Account header.')
+		const later = buildLedgerLine('later', 0, 'Replacement value.')
+		const end = buildLedgerLine('later', 1, 'Unchanged permission.')
+		const amendments = [{ earlier: 'earlier', later: 'later' }]
+		const complete = buildLedgerRenderContext(messages, [earlier, later, end], amendments)
+		expect([...complete.complete]).toEqual(['later'])
+		expect(renderLedgerAnnotation(earlier, complete)).toBe(
+			'[Source earlier]\nAccepted later amendment [later] is fully included in this briefing. Sentence scope is unresolved.',
+		)
+		expect(renderLedgerAnnotation(later, complete)).toBe('[Source later]')
+		expect(renderLedgerAnnotation(end, complete)).toBe('')
+		const partial = buildLedgerRenderContext(messages, [earlier, later, later], amendments)
+		expect([...partial.complete]).toEqual([])
+		expect(renderLedgerAnnotation(earlier, partial)).toBe(
+			'[Source earlier]\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+		)
+		expect(renderLedgerAnnotation(later, partial)).toBe('')
+		const absent = buildLedgerRenderContext(messages, [earlier], amendments)
+		expect(renderLedgerAnnotation(earlier, absent)).toBe(renderLedgerAnnotation(earlier, partial))
+		expect(renderLedgerAnnotation(earlier, absent)).not.toContain('[later]')
+	})
 
+	it('moves annotation to the first surviving earlier line and coexists with omitted corrections', () => {
+		const messages = [
+			buildLedgerMessage('earlier', 'user', 'Header. Original.'),
+			buildLedgerMessage('included', 'user', 'Correction.'),
+			buildLedgerMessage('hidden-owner-secret', 'user', 'Foreign owner secret.'),
+		]
+		const header = buildLedgerLine('earlier', 0, 'Header.')
+		const original = buildLedgerLine('earlier', 1, 'Original.')
+		const correction = buildLedgerLine('included', 0, 'Correction.')
+		const amendments = [
+			{ earlier: 'earlier', later: 'included' },
+			{ earlier: 'earlier', later: 'hidden-owner-secret' },
+		]
+		const full = buildLedgerRenderContext(messages, [header, original, correction], amendments)
+		expect(renderLedgerAnnotation(original, full)).toBe('')
+		const trimmed = buildLedgerRenderContext(messages, [original, correction], amendments)
+		const rendered = renderLedgerRecord({ title: 'Rules', lines: [original, correction] }, trimmed)
+		expect(rendered).toContain(
+			'[Source earlier]\nAccepted later amendment [included] is fully included in this briefing. Sentence scope is unresolved.\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.\n- Original.',
+		)
+		expect(rendered).toContain('[Source included]\n- Correction.')
+		expect(rendered).not.toContain('hidden-owner-secret')
+		expect(rendered).not.toContain('Foreign owner secret')
+		const removed = buildLedgerRenderContext(messages, [correction], amendments)
+		expect(renderLedgerRecord({ title: 'Rules', lines: [correction] }, removed)).toBe(
+			'## Rules\n- Correction.',
+		)
+	})
+})
+
+describe('buildLines', () => {
 	it('turns each sentence into a line that carries its source, index, topics, and role', () => {
 		const input = buildLedgerInput({
 			messages: [buildLedgerMessage('user-a', 'user', 'First sentence. Second sentence.')],
@@ -1198,7 +1316,6 @@ describe('buildLines', () => {
 			input,
 			new Map(input.messages.map((message) => [message.id, message])),
 			'user-a',
-			none,
 			[],
 			[],
 		)
@@ -1220,15 +1337,16 @@ describe('buildLines', () => {
 		])
 	})
 
-	it('leaves out a dead sentence and an absent message', () => {
+	it('preserves both original sentences and leaves out an absent message', () => {
 		const input = buildLedgerInput({
 			messages: [buildLedgerMessage('user-a', 'user', 'One. Two.')],
 		})
 		const byId = new Map(input.messages.map((message) => [message.id, message]))
-		expect(
-			buildLines(input, byId, 'user-a', new Set(['user-a 0']), [], []).map((line) => line.text),
-		).toEqual(['Two.'])
-		expect(buildLines(input, byId, 'user-z', none, [], [])).toEqual([])
+		expect(buildLines(input, byId, 'user-a', [], []).map((line) => line.text)).toEqual([
+			'One.',
+			'Two.',
+		])
+		expect(buildLines(input, byId, 'user-z', [], [])).toEqual([])
 	})
 
 	it('prefixes the party named in the sentence before a pronoun-opening sentence', () => {
@@ -1245,7 +1363,6 @@ describe('buildLines', () => {
 			input,
 			new Map(input.messages.map((message) => [message.id, message])),
 			'user-a',
-			none,
 			[],
 			[],
 		)
@@ -1268,7 +1385,7 @@ describe('buildLines', () => {
 			],
 		})
 		const byId = new Map(input.messages.map((message) => [message.id, message]))
-		const lines = buildLines(input, byId, 'user-a', none, ['Odile Marlow'], ['Pat Ruiz'])
+		const lines = buildLines(input, byId, 'user-a', ['Odile Marlow'], ['Pat Ruiz'])
 		expect(lines.map((line) => line.party)).toEqual([
 			undefined,
 			undefined,
@@ -1292,7 +1409,6 @@ describe('buildLines', () => {
 			input,
 			new Map(input.messages.map((message) => [message.id, message])),
 			'user-a',
-			none,
 			[],
 			[],
 		)
@@ -1387,12 +1503,11 @@ describe('buildRecords', () => {
 			],
 			[
 				'Standing rule: any refund over $200 needs a manager code.',
+				'This week code is MX-4471.',
 				'Correction: the manager code is MX-4486, not MX-4471.',
 			],
 		])
-		expect(built.stale).toEqual([
-			{ source: 'user-01', sentence: 1, tokens: ['MX-4471'], later: ['user-04'] },
-		])
+		expect(built.amendments).toEqual([{ earlier: 'user-01', later: 'user-04' }])
 		expect(built.orphans).toEqual([])
 		expect(checkLedgerProjection(built, createLedgerDesk())).toEqual([])
 	})
@@ -1486,7 +1601,7 @@ describe('buildRecords', () => {
 		expect(buildRecords(input).records.map((record) => record.members)).toEqual([['tool-a']])
 	})
 
-	it('keeps the old value stale when the correction is supersessions (R2b)', () => {
+	it('preserves earlier text and provenance without restoring a superseded correction (R2b)', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage(
@@ -1504,11 +1619,10 @@ describe('buildRecords', () => {
 			},
 		})
 		const built = buildRecords(input)
-		expect(built.stale).toEqual([
-			{ source: 'user-a', sentence: 0, tokens: ['MX-4471'], later: ['user-b'] },
-		])
+		expect(built.amendments).toEqual([{ earlier: 'user-a', later: 'user-b' }])
 		const texts = built.records.flatMap((record) => record.lines.map((line) => line.text))
-		expect(texts.some((text) => text.includes('MX-4471'))).toBe(false)
+		expect(texts).toContain('Standing rule: refunds need code MX-4471.')
+		expect(texts.some((text) => text.includes('MX-4486'))).toBe(false)
 		expect(texts).toContain('Ask the lead.')
 		expect(checkLedgerProjection(built, input)).toEqual([])
 	})
@@ -1600,7 +1714,7 @@ describe('buildRecords', () => {
 	it('projects nothing from an empty input', () => {
 		expect(buildRecords(buildLedgerInput())).toEqual({
 			records: [],
-			stale: [],
+			amendments: [],
 			orphans: [],
 		})
 	})
@@ -1750,9 +1864,9 @@ describe('selectRecords', () => {
 		expect(selectRecords(built, { owners: [], topics: [] }).map((view) => view.key)).toEqual([
 			'rules',
 		])
-		expect(selectRecords({ records: [], stale: [], orphans: [] }, createLedgerRequest())).toEqual(
-			[],
-		)
+		expect(
+			selectRecords({ records: [], amendments: [], orphans: [] }, createLedgerRequest()),
+		).toEqual([])
 	})
 
 	it('returns copies that share no record, line, or list with the projection', () => {
@@ -1807,7 +1921,7 @@ describe('renderLedgerRecord and renderLedgerPinned', () => {
 
 	it('renders the desk scenario byte for byte', () => {
 		const views = selectRecords(buildRecords(createLedgerDesk()), createLedgerRequest())
-		expect(views.map(renderLedgerRecord).join('\n\n')).toBe(
+		expect(views.map((record) => renderLedgerRecord(record)).join('\n\n')).toBe(
 			[
 				'## Brightwater Studio (account BW-20931)',
 				'- The shift lead is Dana Whitcombe.',
@@ -1816,6 +1930,7 @@ describe('renderLedgerRecord and renderLedgerPinned', () => {
 				'',
 				'## Rules',
 				'- Standing rule: any refund over $200 needs a manager code.',
+				'- This week code is MX-4471.',
 				'- Correction: the manager code is MX-4486, not MX-4471.',
 			].join('\n'),
 		)

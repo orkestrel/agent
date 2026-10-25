@@ -122,7 +122,7 @@ it('AD2 normalizes equal minted histories equally and keeps changed selection pl
 		rendered: ['source:receipt'],
 		omitted: ['message:2'],
 		sentences: [{ source: 'source:receipt', sentence: 0 }],
-		withdrawn: [{ earlier: 'message:2', later: 'source:receipt' }],
+		amendments: [{ earlier: 'message:2', later: 'source:receipt' }],
 	})
 	expect(
 		scanStudyMemorySelection(

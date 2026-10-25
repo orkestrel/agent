@@ -82,7 +82,7 @@ describe('memory declaration and mechanical evidence', () => {
 						sentences: [{ source: 'source', sentence: 0.5 }],
 						omitted: [],
 						trims: 0.5,
-						withdrawn: [],
+						amendments: [],
 					},
 					sources: [],
 				},

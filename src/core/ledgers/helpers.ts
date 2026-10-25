@@ -13,7 +13,8 @@ import type {
 	LedgerProjectionRequest,
 	LedgerRecord,
 	LedgerRegistry,
-	LedgerStaleSentence,
+	LedgerAmendment,
+	LedgerRenderContext,
 	LedgerPlanReceipt,
 	LedgerSource,
 	LedgerTokenSet,
@@ -164,7 +165,7 @@ export function buildLedgerSources(
  * @returns The distinct live message ids
  * @example
  * ```ts
- * collectProjectionIds({ records: [], stale: [], orphans: ['message-1'] }) // Set { 'message-1' }
+ * collectProjectionIds({ records: [], amendments: [], orphans: ['message-1'] }) // Set { 'message-1' }
  * ```
  */
 export function collectProjectionIds(projection: LedgerProjection): ReadonlySet<string> {
@@ -799,8 +800,8 @@ export function matchEntities(
  * argument. A message that names no owner joins where its earlier side of an amendment pair joins,
  * or on the rules record when it is filed as a rule or a correction, and is an orphan otherwise.
  *
- * A sentence an amending message made stale is left out and listed in `stale`. An amending message
- * that is itself replaced keeps that effect, so the old value never revives.
+ * Every live sentence is retained. Accepted direct edges are listed in `amendments`. An amending message
+ * that is itself superseded retains its accepted edge without restoring its text.
  *
  * A sentence that opens with a pronoun takes the party named in the sentence before it. The reading
  * trusts capitals, so a capitalized word that is no person, such as a carrier named mid-sentence,
@@ -808,7 +809,7 @@ export function matchEntities(
  * the follow-up facts the records exist for.
  *
  * @param input - The messages, readings, entities, and classification to project
- * @returns The records with owner records ordered by their first member and the rules record last, the stale sentences, and the live message ids no record placed
+ * @returns The records with owner records ordered by their first member and the rules record last, the accepted amendments, and the live message ids no record placed
  *
  * @example
  * ```ts
@@ -839,8 +840,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 			),
 		].map(([later, pairs]) => [later, pairs.map((pair) => pair.earlier)]),
 	)
-	const stale = collectStale(input, byId, live)
-	const dead = new Set(stale.map((entry) => `${entry.source} ${entry.sentence}`))
+	const amendments = collectAmendments(input, byId, live)
 	const holders = [...input.owners.values()].flat()
 	const system = collectNames(input.system)
 	// The memo belongs to this projection alone: `placeMember` inserts each placement once.
@@ -857,7 +857,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 	const records = [...members]
 		.map(([key, entries]) => {
 			const ids = entries.map((entry) => entry.id)
-			const lines = ids.flatMap((id) => buildLines(input, byId, id, dead, holders, system))
+			const lines = ids.flatMap((id) => buildLines(input, byId, id, holders, system))
 			const owner = key.slice(LEDGER_OWNER_PREFIX.length)
 			const holder = input.owners.get(owner)?.[0]
 			const title =
@@ -885,7 +885,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 				(left.record.key < right.record.key ? -1 : left.record.key > right.record.key ? 1 : 0),
 		)
 		.map(({ record }) => record)
-	return { records, stale, orphans }
+	return { records, amendments, orphans }
 }
 
 /**
@@ -954,6 +954,7 @@ export function selectRecords(
  * The briefing joins rendered records with one blank line.
  *
  * @param record - A record or view with a `title` and `lines`
+ * @param context - Rendering facts for optional accepted amendment annotations
  * @returns `## TITLE` followed by `- LINE` for each line
  *
  * @example
@@ -962,14 +963,25 @@ export function selectRecords(
  * // '## Rules\n- Refunds need a manager.'
  * ```
  */
-export function renderLedgerRecord(record: Pick<LedgerRecord, 'title' | 'lines'>): string {
-	return [`## ${record.title}`, ...record.lines.map((line) => `- ${line.text}`)].join('\n')
+export function renderLedgerRecord(
+	record: Pick<LedgerRecord, 'title' | 'lines'>,
+	context?: LedgerRenderContext,
+): string {
+	return [
+		`## ${record.title}`,
+		...record.lines.flatMap((line) =>
+			[context === undefined ? '' : renderLedgerAnnotation(line, context), `- ${line.text}`].filter(
+				(text) => text !== '',
+			),
+		),
+	].join('\n')
 }
 
 /**
  * Renders one owner record under a `###` heading, which the briefing nests under its one `## Pinned` heading.
  *
  * @param record - An owner record or view with a `title` and `lines`
+ * @param context - Rendering facts for optional accepted amendment annotations
  * @returns `### TITLE` followed by `- LINE` for each line
  *
  * @example
@@ -977,8 +989,80 @@ export function renderLedgerRecord(record: Pick<LedgerRecord, 'title' | 'lines'>
  * renderLedgerPinned({ title: 'Odile Marlow (account OM-30418)', lines: [] }) // '### Odile Marlow (account OM-30418)'
  * ```
  */
-export function renderLedgerPinned(record: Pick<LedgerRecord, 'title' | 'lines'>): string {
-	return `#${renderLedgerRecord(record)}`
+export function renderLedgerPinned(
+	record: Pick<LedgerRecord, 'title' | 'lines'>,
+	context?: LedgerRenderContext,
+): string {
+	return `#${renderLedgerRecord(record, context)}`
+}
+
+/**
+ * Derives complete source identities and first occurrences from the actual briefing lines.
+ * @param messages - Original messages whose indexed sentences establish completeness
+ * @param lines - Retained lines in rendering order after filtering and deduplication
+ * @param amendments - Accepted direct message amendment edges
+ * @returns Immutable rendering facts for this retained population
+ *
+ * @example
+ * ```ts
+ * buildLedgerRenderContext([], [], []).complete.size // 0
+ * ```
+ */
+export function buildLedgerRenderContext(
+	messages: readonly Message[],
+	lines: readonly LedgerLine[],
+	amendments: readonly LedgerAmendment[],
+): LedgerRenderContext {
+	const identities = new Set(lines.map((line) => `${line.source} ${line.sentence}`))
+	return {
+		amendments,
+		complete: new Set(
+			messages
+				.filter((message) => {
+					const sentences = splitSentences(message.content)
+					return (
+						sentences.length > 0 &&
+						sentences.every((_, index) => identities.has(`${message.id} ${index}`))
+					)
+				})
+				.map((message) => message.id),
+		),
+		first: new Map(lines.toReversed().map((line) => [line.source, line])),
+	}
+}
+
+/**
+ * Renders source framing and unresolved amendment scope at a source's first retained line.
+ * @param line - The retained occurrence to annotate
+ * @param context - Actual complete sources, first occurrences, and accepted amendment edges
+ * @returns Source framing and truthful inclusion notes, or empty text for an unrelated or repeated occurrence
+ *
+ * @example
+ * ```ts
+ * renderLedgerAnnotation({ text: 'Unchanged.', source: 'user-1', sentence: 0, topics: [], role: 'user' }, buildLedgerRenderContext([], [], [])) // ''
+ * ```
+ */
+export function renderLedgerAnnotation(line: LedgerLine, context: LedgerRenderContext): string {
+	if (context.first.get(line.source) !== line) return ''
+	const amendments = context.amendments.filter((pair) => pair.earlier === line.source)
+	const endpoint =
+		context.complete.has(line.source) &&
+		context.amendments.some((pair) => pair.later === line.source && context.first.has(pair.earlier))
+	if (amendments.length === 0 && !endpoint) return ''
+	return [
+		`[Source ${line.source}]`,
+		...amendments
+			.filter((pair) => context.complete.has(pair.later))
+			.map(
+				(pair) =>
+					`Accepted later amendment [${pair.later}] is fully included in this briefing. Sentence scope is unresolved.`,
+			),
+		...(amendments.some((pair) => !context.complete.has(pair.later))
+			? [
+					'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+				]
+			: []),
+	].join('\n')
 }
 
 /**
@@ -1251,31 +1335,33 @@ export function placeMember(
 }
 
 /**
- * Collects the sentences that live messages made stale.
+ * Collects accepted direct amendments of live messages.
  *
  * @remarks
- * A sentence of a live message is stale when it shares an id or a number with a message that
- * amends it. An amending message takes effect while it is live, and keeps its effect after another
- * message supersedes it, so the value it replaced never revives. A user or tool message that the
- * input excludes or files quiet never takes effect.
+ * An accepted edge relates an earlier live message to an amender without claiming which sentences
+ * changed. An amender takes effect while live and retains its edge after another message supersedes
+ * it, without restoring the superseded text. An excluded or quiet user or tool message has no effect.
  *
  * @param input - The exclusions and classification to read
  * @param byId - The messages by id
  * @param live - The live message ids from {@link collectLive}
- * @returns The stale sentences in conversation order, each with the tokens it shares
+ * @returns The distinct accepted direct edges in conversation order
  *
  * @example
  * ```ts
- * collectStale(input, byId, ['user-1', 'user-3']) // [{ source: 'user-1', sentence: 1, tokens: ['ESC-2291'], later: ['user-3'] }]
+ * collectAmendments(input, byId, ['user-1', 'user-3']) // [{ earlier: 'user-1', later: 'user-3' }]
  * ```
  */
-export function collectStale(
+export function collectAmendments(
 	input: LedgerProjectionInput,
 	byId: ReadonlyMap<string, Message>,
 	live: readonly string[],
-): readonly LedgerStaleSentence[] {
+): readonly LedgerAmendment[] {
 	const { classification } = input
 	const excluded = new Set(input.exclusions)
+	const living = new Set(live)
+	const ordered = [...new Set(input.messages.map((message) => message.id))]
+	const positions = new Map(ordered.map((id, index) => [id, index]))
 	const effective = new Set([
 		...live,
 		...[...byId.values()]
@@ -1288,53 +1374,34 @@ export function collectStale(
 			)
 			.map((message) => message.id),
 	])
-	return live.flatMap((id) => {
-		const laters = (classification.amendments.get(id) ?? [])
-			.filter((later) => effective.has(later))
-			.flatMap((later) => {
-				const message = byId.get(later)
-				return message === undefined ? [] : [{ id: later, ...extractTokens(message.content) }]
-			})
-		if (laters.length === 0) return []
-		return splitSentences(byId.get(id)?.content ?? '').flatMap((text, sentence) => {
-			const own = extractTokens(text)
-			const tokens = new Set(
-				laters.flatMap((other) => [
-					...[...own.ids].filter((token) => other.ids.has(token)),
-					...[...own.numbers].filter((token) => other.numbers.has(token)).map(String),
-				]),
-			)
-			const later = laters
-				.filter(
-					(other) =>
-						[...own.ids].some((token) => other.ids.has(token)) ||
-						[...own.numbers].some((token) => other.numbers.has(token)),
-				)
-				.map((other) => other.id)
-			return tokens.size > 0 ? [{ source: id, sentence, tokens: [...tokens], later }] : []
-		})
-	})
+	return ordered
+		.filter((id) => living.has(id))
+		.flatMap((earlier) =>
+			[...new Set(classification.amendments.get(earlier) ?? [])]
+				.filter((later) => effective.has(later) && positions.has(later))
+				.sort((a, b) => (positions.get(a) ?? 0) - (positions.get(b) ?? 0))
+				.map((later) => ({ earlier, later })),
+		)
 }
 
 /**
  * Builds the record lines of one message.
  *
  * @remarks
- * Each sentence that is not stale becomes a line. A sentence that opens with a pronoun and follows
+ * Each original indexed sentence becomes a line. A sentence that opens with a pronoun and follows
  * another sentence takes the last name of the sentence before it that is neither an owner name nor
  * a system name, and its line text opens with that party and a colon.
  *
  * @param input - The classification whose topics the lines carry
  * @param byId - The messages by id
  * @param id - The message id
- * @param dead - The stale sentences as `SOURCE SENTENCE` keys
  * @param holders - The owner names, which never serve as a party
  * @param system - The system text's names, which never serve as a party
  * @returns The lines in sentence order; empty when the message is absent
  *
  * @example
  * ```ts
- * buildLines(input, byId, 'user-1', new Set(), [], []).map((line) => line.text)
+ * buildLines(input, byId, 'user-1', [], []).map((line) => line.text)
  * // ['Odile Marlow phoned about BW-5512.', 'Odile Marlow: She wants a refund.']
  * ```
  */
@@ -1342,7 +1409,6 @@ export function buildLines(
 	input: LedgerProjectionInput,
 	byId: ReadonlyMap<string, Message>,
 	id: string,
-	dead: ReadonlySet<string>,
 	holders: readonly string[],
 	system: readonly string[],
 ): readonly LedgerLine[] {
@@ -1351,7 +1417,6 @@ export function buildLines(
 	const sentences = splitSentences(message.content)
 	const topics = input.classification.topics.get(id) ?? []
 	return sentences.flatMap((sentence, at) => {
-		if (dead.has(`${id} ${at}`)) return []
 		const party =
 			/^(?:He|She|They|His|Her|Their)(?![\p{L}\p{N}])/u.test(sentence) && at > 0
 				? collectNames(sentences[at - 1] ?? '')

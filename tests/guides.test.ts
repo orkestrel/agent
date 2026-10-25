@@ -1587,7 +1587,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('drops a stale sentence from the briefing alone and keeps it in recall, the answer note, and the seed tail, as the records claim', async () => {
+		it('preserves amended sentences in the briefing, recall, answer note, and seed tail, as the records claim', async () => {
 			const { result, prompts } = await serveAmendedDesk()
 			expect(result.passes).toHaveLength(2)
 			const first = requireValue(prompts[0], 'Missing first prompt')
@@ -1596,7 +1596,7 @@ await new GuideCommand({
 				'- Refunds for Brightwater Studio need a manager.\n',
 			)
 			for (const prompt of prompts)
-				expect(requireValue(prompt[0], 'Missing system message').content).not.toContain(
+				expect(requireValue(prompt[0], 'Missing system message').content).toContain(
 					'Use code AA-10.',
 				)
 			expect(first.map(({ content }) => content)).toContain(LEDGER_AMENDED_RULE)
@@ -1610,7 +1610,7 @@ await new GuideCommand({
 				)?.content,
 			).toContain(LEDGER_AMENDED_RULE)
 			expect(guideText).toContain(
-				'the projection lists it in its `stale` member and leaves it out of every record and the briefing. The `recall` tool and the answer note keep the stored content of each message they carry, stale sentences included. The tail keeps stored content except for lookup results, which the plan replaces with stubs.',
+				'Accepted message-level amendments preserve every original indexed sentence of live earlier sources; the projection lists distinct direct edges in its `amendments` member. Sentence scope remains unresolved.',
 			)
 		})
 
@@ -2055,7 +2055,6 @@ await new GuideCommand({
 				buildLedgerInput({ messages: [message] }),
 				new Map([[message.id, message]]),
 				message.id,
-				new Set(),
 				[],
 				[],
 			)
@@ -2357,7 +2356,7 @@ await new GuideCommand({
 				expect(briefing).not.toContain(caller)
 			}
 			expect(guideText).toContain(
-				'No age or request count retires a message: it leaves the records only when a later message supersedes it or makes its sentences stale, a later reading of the same lookup replaces it, or a later answer files it quiet.',
+				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later reading of the same lookup replaces it, or a later answer files it quiet.',
 			)
 		})
 
