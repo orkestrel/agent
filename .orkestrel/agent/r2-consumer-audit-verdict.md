@@ -1,5 +1,7 @@
 # R2 consumer review ruling
 
+Resource update: U35 approves the bounded 60-minute CPU completion proposal as recorded in plan.md. This changes execution authority, not the review verdict or any evidence. The original exhausted build charge remains; no model budget or protected custody changes.
+
 Independent Astra review completed in 24.741413575 minutes. Report: `tmp/units/r2-consumer-review-20261026/report.md`. The citation check resolved all 20 citations. Root reproduction: `tmp/units/r2-consumer-review-20261026/reproduce/root-ruling.md`.
 
 | Claim | Root ruling | Required disposition |
