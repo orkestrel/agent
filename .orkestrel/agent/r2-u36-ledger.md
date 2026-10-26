@@ -1,0 +1,29 @@
+# R2 U36 routing and acceptance record
+
+This UTF-8 successor preserves the existing ledger.md bytes. Appending through apply_patch was refused because that file contains invalid UTF-8 at byte127477. No historical ledger or verdict was rewritten. Earlier approvals, charges and findings remain binding.
+
+## Current state, 2026-10-26
+
+Turn12 is terminal; source unaccepted. Codex GPT-6 Astra xhigh/default retained implementation session: thread:delegated-task:command%3Amcp%3Aa6e3bdfb-adb4-4c27-8c95-1098364bfb05%3Adelegate-task%3Ar1r2-screen-design-20261025-r1. Task: node:delegated-task:command%3Amcp%3A21208103-9f5c-4480-b31b-6b57d150df27%3Athread-send%3Ar2-final-cpu-completion-20261026-r1. Root checkpoint d2a0d199428219c8377e5e01a0f3f0f892d10d8e. No pending child.
+
+Entry11:33:11.398Z, end12:23:19.5151046Z;50.135285077 active minutes. Cumulative implementation230.138716487/240.284525462; remainder10.145808975. Zero model calls. Writer observations passed: forced outer timeout and owned-process absence, direct worker Agent identity, public scenario/draft/lookup/source-host refusals, permanent source-hook regression and removal/restoration, scoped statics. Session multi-error branch, distinct buffer/exception paths and independent serial/project gates remain open. Original failed attempts remain failures.
+
+Evidence: tmp/units/r2-fixed-host-build-20261025/final-cpu/report.md, completion.json, verifier-manifest-final.json. Writer sampled93 recorded PIDs absent; root independently queried those PIDs/direct children after return with no rows. Neither census establishes lifetime ancestry.
+
+Fresh reviewer task: node:delegated-task:command%3Amcp%3A21208103-9f5c-4480-b31b-6b57d150df27%3Adelegate-task%3Ar2-final-cpu-review-20261026-r1. Its new session uses the same suffix with thread:delegated-task prefix. Native Codex GPT-6 Astra xhigh/default, Agent workspace; read-only changed-claim inspection and assigned report/custody,20 active minutes including delivery. Checked brief and fixed claims: tmp/units/r2-final-cpu-review-20261026-brief.md and -claims.md. Review prior charge37.819203558/60. Fresh context establishes independence, not a verdict. No executable proof authority.
+
+R2 verifier is queued, not running. Retained native Luna medium/default session: thread:delegated-task:command%3Amcp%3A3c098fe8-39a9-40ae-8b04-edae08cea325%3Adelegate-task%3Ar2-study-finalization-verify-20261025-r2-brief3. Verifier charge17.147/90. Root copied the exact missing sentence-launcher input into H; receipt tmp/units/r2-final-verifier-input-20261026.json. Root/H setup populations are separate. Independent statics must cover the full unaccepted consumer scope. No host/package adoption occurred.
+
+Veneer acknowledged the unchanged S5 physical-identity executable slot: cutoff12:42:30Z, hard return12:43:30Z, no reset, serial/fail-stop/no retries, no Agent/Study access. R2 reviewer/root perform only short read-only decision inspections and administrative writes during that slot. All Agent captured/installed/core/recording and Study source/dependency/root-dist holds persist. Explicit process-backed return is required before R2 execution.
+
+Veneer explicitly returned its slot before the fixed deadline. It reports every command exit0 uncapped, focused2/2, stale62/62 and journey70/70; recorded PIDs/direct children absent with no lifetime ancestry claim. No next execution granted. R2 owns the executable lane again; its review remains active. The verifier brief r2-consumer-u36-verification-20261026-brief.md is prepared and passes the installed path check, but has not been dispatched. Root manifest r2-final-verifier-commands-20261026.json supplies cheap-first statics/setup/file/project commands and exact outputs. The verified immutable sentence input resolves the missing H prerequisite.
+
+The user explicitly permits Fable5.1 as a retained, narrowly briefed advisor and Opus/Sonnet/Haiku5.5 when useful for parallel work. This overrides the local no-Fable-delegation restriction for that advisory purpose only. No Fable or additional Claude task was launched, no existing model/session changed, and no budget or execution-lane expansion was inferred.
+
+Independent reviewer returned FAIL4: claims1–3 confirmed within stated limits, multi-error session proof unresolved, no new reproduced defect or source drift. Report tmp/units/r2-final-cpu-review-20261026/report.md; all12 file:line citations resolve. Charged14.7106 minutes from conservative12:33Z boundary through12:47:42.637Z; review cumulative52.529803558/60. Archived timeout/identity instruments still require promotion before acceptance. Full verification is prepared, unlaunched.
+
+Fable advisory task node:delegated-task:command%3Amcp%3A21208103-9f5c-4480-b31b-6b57d150df27%3Adelegate-task%3Ar2-cleanup-advisor-20261026-r1 started about12:50Z. New retained session has the same suffix with thread:delegated-task prefix, provider claudeAgent/model claude-fable-5-1/options empty. Read-only narrowly supplied cleanup evidence, four-minute cap including delivery, final minute reserved. Conservatively charge the review/advice account; no budget reset, source edit or independent-review authority. Root records its answer. The user's explicit Fable advisory permission supplies the local rule exception.
+
+Veneer owns a separate brief-checked reader-contract slot: executable cutoff12:52:15Z, hard return12:53:00Z, at most3min with45s cleanup; only specified snapshots/whitespace/types/scoped read-only style checks. No R2 execution until explicit return. All Agent/Study holds persist.
+
+The next action is the bounded cleanup decision, then one checked verifier dispatch on frozen inputs within U36. Live runner qualification, fixed population/labels/controls and affordability remain later gates under U34; no benefit or overall completion is claimed.
