@@ -6,7 +6,25 @@ Agent's boost campaign plan: the handoff of 2026-10-24, then goal, exit, rulings
 - The ladder bench's unit files lived under `tmp/units/ladder/`, which git does not track, and retired on 2026-10-23 (U19): the records moved to `.orkestrel/agent/instruments/ladder-records/` (22,244 files) and the witness tests with their imports to `.orkestrel/agent/instruments/ladder-witnesses/` (67 files), both gitignored and kept on disk until the user sweeps them, and the rest was deleted (518,391 files, 56,995,246,526 bytes). A `tmp/units/ladder/PATH` citation in this file reads at the same relative path under `ladder-records/` or `ladder-witnesses/` when the file moved and names a deleted file otherwise; this file carries every ruling, gate and cap the bench held. A record named with a commit reads through `git show COMMIT:PATH`.
 - R is Records and C is Compaction. A cap written `15/20` is 15 model minutes and 20 elapsed minutes.
 
-## Current checkpoint (2026-10-27, source batch refused on Ivo's target)
+## Current checkpoint (2026-10-27, wrap-up release in progress)
+
+The user is wrapping up the campaign (U44, U45). R2 is closed: its instrument is archived in `44cea048`, and the source batch's refusal is recorded. The release runs in this order, one process lane at a time. The shared lane was returned by Veneer at 16:27:03Z. Veneer is doing git-only work on 30 other repos that R2 does not touch.
+
+1. **Strip** (`tmp/units/strip-0032-brief.md`, Astra builder `strip-0032-astra-r1`, report `tmp/units/strip-0032/report.md`): `src/` becomes the published 0.0.31 plus the D1 and D2 fixes. The receipt, lexical/BM25 with D3, recent with pins, and work with names are removed, along with every experiment-only bench study and its code. Gates run on published Study ^0.0.4, with the local Study pin restored.
+2. **Review and gate** the strip: one independent review and one serial gate.
+3. **Agent 0.0.32** per the scaffold publish skill: `wave.ts --visit` (scaffold ^0.0.107 overwrite), bump from the registry (0.0.31 to 0.0.32), `prepublishOnly` green, release commit, push to main, then `window.ts --publish` with the user's OTP and confirm from the registry.
+4. **Study 0.0.5:** runtime dependency `@orkestrel/agent` ^0.0.32; restore any Study pins; visit; bump 0.0.4 to 0.0.5 (it carries the EOF cancellation fix, unpushed commits `5d0954d`, `6ce9cf0`, `7661d47`); `prepublishOnly`; release commit, push, publish with OTP, confirm.
+5. **Agent's devDependency** `@orkestrel/study` moves to ^0.0.5: commit and push, with no Agent release.
+6. **Cleanup:**
+   - Remove the local pins and tarballs and reinstall from the registry.
+   - Clear `tmp/` scratch: `tmp/units`, `tmp/probes` and the isolated host. Keep nothing the records need beyond git.
+   - Remove the R2 study outputs and scheduled tasks.
+   - Close the boost records with a final summary.
+   - Hand the lane back to Veneer with a census.
+
+Not R2's: the Orca worktrees on Agent (locked, belonging to another tool), Supervisor's uncommitted work, and Veneer.
+
+### Prior checkpoint (2026-10-27, source batch refused on Ivo's target)
 
 The U34 source batch stopped with `instrument refused` on the first case (`tmp/units/r2-source-run-20261027/report.md`). Ivo's final screen response called `recall` instead of answering, the screen refuses tools on the final response, and the remaining three cases never ran. Charged about 81 s model and about 151 s elapsed of the source accounts. Awaiting the user's disposition; the lane is back with Veneer.
 
