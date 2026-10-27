@@ -38,6 +38,3 @@ playwright-report/
 
 # Model files
 *.gguf
-
-# Retired series instruments and raw results, kept on disk until the user sweeps them.
-.orkestrel/agent/instruments/
