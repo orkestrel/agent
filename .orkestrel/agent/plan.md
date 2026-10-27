@@ -6,7 +6,37 @@ Agent's boost campaign plan: the handoff of 2026-10-24, then goal, exit, rulings
 - The ladder bench's unit files lived under `tmp/units/ladder/`, which git does not track, and retired on 2026-10-23 (U19): the records moved to `.orkestrel/agent/instruments/ladder-records/` (22,244 files) and the witness tests with their imports to `.orkestrel/agent/instruments/ladder-witnesses/` (67 files), both gitignored and kept on disk until the user sweeps them, and the rest was deleted (518,391 files, 56,995,246,526 bytes). A `tmp/units/ladder/PATH` citation in this file reads at the same relative path under `ladder-records/` or `ladder-witnesses/` when the file moved and names a deleted file otherwise; this file carries every ruling, gate and cap the bench held. A record named with a commit reads through `git show COMMIT:PATH`.
 - R is Records and C is Compaction. A cap written `15/20` is 15 model minutes and 20 elapsed minutes.
 
-## Current checkpoint (2026-10-26, 22:22 UTC)
+## Current checkpoint (2026-10-27, U41 coverage limits accepted)
+
+The user ruled U41 (`.orkestrel/agent/r2-u41-ruling.md`): "Accept the gaps, proceed." The bounded U34 evaluation is admitted with four recorded CPU coverage limits (wrapper buffer exhaustion, post-execution wrapper exception, production outer-cap reachability, the exact 5000-ms reserve edge). Every assertion, gate and allowance stays; a run reaching an unproved path stops and returns for disposition. The goal is unblocked. Next: the priced Ollama 0.40.11 runner qualification from the staged declarations, after notifying the user and confirming the shared execution lane is returned from Veneer; then population, labels, noise and affordability; then the matched evaluation.
+
+### Prior checkpoint (2026-10-27, U40 project verified)
+
+The complete unfiltered H studies project passed uncapped:26 files,237 passed,1 existing win32 locale skip,3133317ms. Preflight/postflight passed and root independently reconciled protected identities, output populations and append-only command logs. All nine R2 screen assertions passed, including off/repeat/sham/on, public identities, both timeout controls and source-hook cleanup. Root receipt: tmp/units/r2-project-completion-20261027-attempt2/root-reconciliation.md. Preserve every earlier failed/capped attempt.
+
+Verifier ordinal13 is terminal with no active run or pending request; recorded owners/direct children absent in the finite terminal census. Delivered verification174.03021666666666/200, remaining25.96978333333334; implementation327.1859940646667/335.284525462 and review72.43630312466668/80 unchanged. R2 returned the shared execution lane to Veneer for its already-authorized work; root uses bounded named-file reads and source records until the next coordinated boundary.
+
+The full-project gate is closed. Overall CPU admission still needs explicit disposition of the named outer-buffer/exception, production-cap and exact reserve-edge proof limits. No new reproduced defect, blanket cleanup guarantee, model benefit or live admission is inferred. Keep accepted D1/D2/D3/Study repairs and U37's aggregation criterion closed. U34 qualification, population/labels/noise/affordability and matched evaluation remain downstream. No source repair or new executable is dispatched by this checkpoint.
+
+Root reconciled the original minimum outer-timeout claim with the separately retained coverage obligations. The minimum is proved and permanent; the separate paths remain unexecuted. Proposed decision: tmp/units/r2-cpu-coverage-decision-20261027.md. Recommend admitting the bounded U34 evaluation with those exact limits, preserving every existing assertion and downstream gate. This is a requested criterion change, not an inferred waiver or CPU acceptance. All role charges and shared-host ownership remain unchanged.
+
+Goal execution is blocked on that criterion decision after the boundary persisted through three goal turns. Independent preparation is complete: the runner qualification declarations are staged and readback-checked under tmp/units/r2-runner-qualification-20261027; the protected isolated host is unchanged. T3 confirms the implementation and verification sessions terminal with no active run or pending request. No further meaningful execution can precede the ruling or a separately authorized completion envelope for the retained proof obligations. The full objective remains incomplete; no model benefit, CPU admission or live admission is claimed.
+
+### Prior checkpoint (2026-10-27, U40 approved)
+
+The user approved the prepared75-minute verification extension and70-minute outer suite cap. Proceed under .orkestrel/agent/r2-u40-ruling.md; no routine reconfirmation. Preserve delivered verification114.07491666666667 and revised ceiling200, implementation327.1859940646667/335.284525462, review72.43630312466668/80. Retained verifier receives one80-minute maximum unit, final5min reserve, complete H studies cap4200s. No source/test/model limit change or separate static/setup repetition.
+
+Veneer explicitly returned the execution/shell lane after its terminal ordinal42 and completed root reads. R2 owns the lane now. Root freezes source and campaign inputs before dispatch; current task/run identity goes in ignored tmp/units/r2-project-completion-20261027-roster.md. CPU acceptance and the evidence-based R2 decision remain the objective; prior capped work is not called complete. Separate proof-limit disposition remains required; no model benefit or live admission is inferred.
+
+### Prior checkpoint (2026-10-27, U39 terminal reconciliation)
+
+R2 repaired controls pass: four comparison arms, public identities, forced/native timeout and sentinel/session cleanup. Independent statics and setup pass. Full H studies capped at2400148ms under2400s,138passing result lines and no final summary. It remains incomplete; no CPU acceptance or live admission. The eight unchanged JSON format members retain U36 evidence alongside the new19TypeScript pass.
+
+Verifier ordinal11 is completed with no active run/pending request. Delivered charges: implementation327.1859940646667/335.284525462; verification114.07491666666667/125; review72.43630312466668/80. No successor dispatched. Concrete PENDING proposal: +75verification minutes only and one70-minute outer full-project cap, preserving every case/native/model limit, complete population and five-minute reserve. Scope: tmp/units/r2-project-completion-20261027-brief.md. Root reconciliation: tmp/units/r2-final-project-u39-20261026/root-reconciliation.md. No approval is inferred from this record.
+
+Accepted D1/D2/D3/Study repairs and U37 aggregation noncoverage stay closed. Separate buffer/exception, production-cap and reserve-edge proof limits require explicit disposition; no blanket cleanup claim. CPU acceptance still precedes U34 qualification, population/labels/noise/affordability and matched evaluation. No quality improvement established. Prioritize types, implementation and tests; defer guides/comments. Shared-host coordination is limited to actual ownership transfers.
+
+### Prior checkpoint (2026-10-26, 22:22 UTC)
 
 Proceed under `.orkestrel/agent/r2-u39-ruling.md`. The user's direction to deliver progress, in response to the concrete30/20/10-minute proposal, authorizes that scope in context. Preserve charges implementation302.679377398, verification65.97845, review64.47936979133334; ceilings335.284525462/125/80. The pending-resource state is superseded, not erased. Do not ask again for the authorized repair or routine steps.
 
