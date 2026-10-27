@@ -1,3 +1,4 @@
+import type { ChildProcess } from 'node:child_process'
 import type { StudySentenceInput, StudySentencePopulation } from '../studies/sentences/types.js'
 import type {
 	StudySentenceFixture,
@@ -21,6 +22,15 @@ import type {
 	MemoryProfileFixture,
 	MemoryReplyFixture,
 	MemoryReplayFixture,
+	MemoryScreenFixture,
+	MemoryScreenFixtureOptions,
+	MemoryScreenLauncherFixture,
+	MemoryScreenGroupFixture,
+	MemorySourceFailureResult,
+	MemoryScreenSessionFixture,
+	MemoryScreenBoundaryFixture,
+	MemoryCleanupFixture,
+	MemoryCleanupOptions,
 	MemoryReplayOptions,
 	MemoryServerFixture,
 	MemoryTrialFixture,
@@ -38,6 +48,7 @@ import type {
 	StudyInstallOptions,
 } from './studies/memory/types.js'
 import type { ScratchInterface } from '@orkestrel/test/server'
+import type { TeardownHandler } from '@orkestrel/test'
 import type {
 	StudyBounds,
 	StudyContext,
@@ -67,8 +78,20 @@ import type {
 	StudyMemoryReceipt,
 	StudyMemoryRequirement,
 	StudyMemoryArm,
+	StudyMemoryScreenRecipe,
+	StudyMemoryScreenAdmission,
 } from '../studies/memory/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import {
+	buildStudyMemoryPreparation,
+	buildStudyMemoryRoles,
+	buildStudyMemoryMatched,
+	readStudyMemoryAdmission,
+} from '../studies/memory/helpers.js'
+import { StudyMemoryScreen } from '../studies/memory/StudyMemoryScreen.js'
+import { StudyMemoryScreenProvider } from '../studies/memory/StudyMemoryScreenProvider.js'
+import { StudyMemoryScreenJudge } from '../studies/memory/StudyMemoryScreenJudge.js'
+import { isStudyMemoryInput, isStudyMemoryScreenRecipe } from '../studies/memory/validators.js'
 import {
 	isRecord,
 	parseJSON,
@@ -78,7 +101,14 @@ import {
 	isString,
 	isNumber,
 } from '@orkestrel/contract'
-import { createRecorder, waitForCondition, waitForAbort } from '@orkestrel/test'
+import {
+	createRecorder,
+	createTeardown,
+	waitForCondition,
+	waitForAbort,
+	waitForEvent,
+} from '@orkestrel/test'
+import { MemoryCleanupAgent } from './studies/memory/fixtures/MemoryCleanupAgent.js'
 import { createLoopback, isRunning, createScratch, destroyScratch } from '@orkestrel/test/server'
 import {
 	parseStudyProfile,
@@ -95,8 +125,16 @@ import {
 	readStudyDeclaration,
 	readStudyExchanges,
 	readStudyResult,
+	readStudyClosure,
 	collectStudyEvidence,
 	encodeStudyJSON,
+	StudyExchangeSink,
+	buildStudyExchangeDeclaration,
+	StudyOllamaTransport,
+	StudyOllamaReplay,
+	readStudyReplayHistory,
+	buildStudyOllamaModels,
+	buildStudyOllamaOptions,
 } from '@orkestrel/study/server'
 import { buildLedgerOptions, createScriptedProvider, ScriptedReads } from './setup.js'
 import {
@@ -111,9 +149,10 @@ import * as agent from '../dist/src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
 import { execFile } from 'node:child_process'
-import { cpSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { cpSync, lstatSync, readFileSync, realpathSync, appendFileSync, readdirSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
-import { readFile } from 'node:fs/promises'
+import { readFile, open } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isStudySentencePopulation } from '../studies/sentences/validators.js'
@@ -1351,6 +1390,629 @@ export function createStudyAdapter() {
 	return { ...fixture, profile }
 }
 
+/** Copies the actual R2 consumer and freezes public cases over a loopback-only serving profile. @param scratch - Exclusive fixture owner. @param url - Ephemeral protocol peer. @param options - Real installed host selection and copied-input observations. @returns Grouped declarations with fixed context and prediction policy. */
+export async function createMemoryScreenFixture(
+	scratch: ScratchInterface,
+	url: string,
+	options: MemoryScreenFixtureOptions = {},
+): Promise<MemoryScreenFixture> {
+	const fixture = createStudyInstallFixture(scratch, url, options.study)
+	if (options.identity === true) {
+		const driver = scratch.read('studies/memory/StudyMemoryDriver.ts')
+		if (driver === undefined || !driver.includes('signal.throwIfAborted()'))
+			throw new Error('Missing actual worker-open observation boundary')
+		const observation = `const selected = identityURL(this.#profile.agent); const namespace = await import(selected.href); if (namespace.Agent !== this.#agent.Agent) throw new Error('Actual admitted Agent namespace differs'); recordIdentity(${JSON.stringify(join(scratch.path, 'agent-identity.jsonl'))}, JSON.stringify({pid:process.pid,parent:process.ppid,at:new Date().toISOString(),path:this.#profile.agent,sha256:hashIdentity('sha256').update(readIdentity(this.#profile.agent)).digest('hex'),namespaceEqual:true,argv:process.argv})+'\\n'); signal.throwIfAborted()`
+		scratch.write(
+			'studies/memory/StudyMemoryDriver.ts',
+			driver.replace('signal.throwIfAborted()', observation) +
+				"\nimport { pathToFileURL as identityURL } from 'node:url'; import { appendFileSync as recordIdentity, readFileSync as readIdentity } from 'node:fs'; import { createHash as hashIdentity } from 'node:crypto';\n",
+		)
+		const adapter = scratch.read('studies/memory/index.ts')
+		if (adapter === undefined) throw new Error('Missing copied adapter')
+		scratch.write(
+			'studies/memory/index.ts',
+			adapter +
+				`\nimport { appendFileSync as recordHost } from 'node:fs'; recordHost(${JSON.stringify(join(scratch.path, 'adapter-hosts.jsonl'))}, JSON.stringify({pid:process.pid,parent:process.ppid,at:new Date().toISOString(),argv:process.argv})+'\\n')\n`,
+		)
+	}
+	cpSync(resolve('studies/r2-request-screen'), scratch.ensure('studies/r2-request-screen'), {
+		recursive: true,
+	})
+	const declaration = await readStudyDeclaration(scratch.path, 'r2-request-screen')
+	const base = parseStudyProfile(
+		parseJSON(scratch.read('studies/memory/profiles/local.json') ?? ''),
+	)
+	const profile = buildStudyMemoryPreparation(
+		{
+			...base,
+			room: { context: 20480, output: 8192, safety: 512, think: false, recap: undefined },
+			settings: { version: 'fixture-1', metadata: { calls: 64, bytes: 1048576, duration: 30000 } },
+		},
+		declaration.scenarios,
+	)
+	scratch.write('studies/memory/profiles/r2-source-04011.json', JSON.stringify(profile))
+	const project = scratch.write(
+		'tsconfig.consumer.json',
+		JSON.stringify({
+			extends: resolve('tsconfig.json'),
+			compilerOptions: {
+				noEmit: false,
+				noEmitOnError: true,
+				allowImportingTsExtensions: false,
+				rootDir: resolve('studies/memory'),
+				outDir: join(scratch.path, 'consumer'),
+				paths: { '@orkestrel/agent': [resolve('dist/src/core/index.d.ts')] },
+			},
+			include: [`${resolve('studies/memory').replaceAll('\\', '/')}/*.ts`],
+		}),
+	)
+	const compiled = await executeStudyProcess(
+		[resolve('node_modules/typescript/bin/tsc'), '--project', project],
+		resolve('.'),
+		90000,
+	)
+	if (compiled.code !== 0) throw new Error(JSON.stringify(compiled))
+	const admission = join(scratch.path, 'consumer/StudyMemoryScreenCommand.js')
+	return {
+		...fixture,
+		admission,
+		profile,
+		definition: declaration.definition,
+		scenarios: declaration.scenarios,
+		rubric: declaration.rubric,
+	}
+}
+
+/** Runs the actual registered source hook against a regular-file scratch parent.
+ * @param scratch - Exclusive owner of the blocking file and child receipts.
+ * @returns The intentionally failed child and its machine-readable collection result.
+ */
+export async function executeMemorySourceFailure(
+	scratch: ScratchInterface,
+): Promise<MemorySourceFailureResult> {
+	const blocked = scratch.write('blocked-parent', 'A real file cannot own source scratch.\n')
+	const report = join(scratch.path, 'hook-report.json')
+	const entry = join(
+		dirname(fileURLToPath(import.meta.resolve('vitest/package.json'))),
+		'vitest.mjs',
+	)
+	const result = await executeStudyProcess(
+		[
+			entry,
+			'run',
+			'--config',
+			'vite.config.ts',
+			'--configLoader',
+			'runner',
+			'--no-cache',
+			'--reporter',
+			'verbose',
+			'--reporter',
+			'json',
+			'--outputFile.json',
+			report,
+			'--project',
+			'studies',
+			'tests/studies/memory/screen.test.ts',
+			'-t',
+			'^prepared R2 source and matched controls',
+		],
+		resolve('.'),
+		20000,
+		{ environment: { ORKESTREL_R2_SOURCE_PARENT: blocked } },
+	)
+	scratch.write('hook.stdout', result.stdout)
+	scratch.write('hook.stderr', result.stderr)
+	return { ...result, report: parseJSON(readFileSync(report, 'utf8')) }
+}
+
+/** Drives the actual root admission module in the same native runtime as Study, before execution. @param fixture - Captured public consumer and CLI. @param input - Exact root selection or rejecting control. @returns Checked fixed argv. */
+export async function admitMemoryScreen(
+	fixture: MemoryScreenFixture,
+	input: unknown,
+): Promise<StudyMemoryScreenRecipe> {
+	const selection = fixture.scratch.write(`selection-${randomUUID()}.json`, JSON.stringify(input))
+	const result = await executeMemoryScreenProcess(
+		fixture,
+		[fixture.admission, fixture.scratch.path, fixture.entry, 'admit', selection],
+		65000,
+	)
+	if (result.code !== 0) throw new Error(result.stderr)
+	const recipe = parseJSON(result.stdout)
+	if (!isStudyMemoryScreenRecipe(recipe))
+		throw new Error('Malformed native screen admission recipe')
+	return recipe
+}
+
+/** Retains each native screen command's actual CPU elapsed time and separate output, including failures. @param fixture - Exclusive captured workspace. @param arguments_ - Native Node arguments with entry first. @param duration - Finite outer process bound. @returns Native settlement after its timing receipt is retained. */
+export async function executeMemoryScreenProcess(
+	fixture: MemoryScreenFixture,
+	arguments_: readonly string[],
+	duration = 60000,
+): Promise<StudyInstallResult> {
+	const started = performance.now()
+	const result = await executeStudyProcess(arguments_, fixture.scratch.path, duration)
+	appendFileSync(
+		resolve('tmp/units/r2-consumer-20261025/host-commands.jsonl'),
+		JSON.stringify({
+			root: fixture.scratch.path,
+			arguments: arguments_,
+			cap: duration,
+			duration: performance.now() - started,
+			result,
+		}) + '\n',
+	)
+	return result
+}
+
+/** Creates a sealed four-case source using the actual native consumer and peer.
+ * @param fixture - Exclusive copied consumer.
+ * @param server - Real loopback peer with the public response queue.
+ * @returns The immutable source and its checked admission.
+ */
+export async function prepareMemoryScreenSource(
+	fixture: MemoryScreenFixture,
+	server: MemoryServerFixture,
+): Promise<MemoryScreenGroupFixture> {
+	const frozen = join(fixture.scratch.path, 'source-closure')
+	const freeze = await executeMemoryScreenProcess(fixture, [
+		fixture.entry,
+		'freeze',
+		'r2-request-screen',
+		'--profile',
+		fixture.profile.name,
+		'--to',
+		frozen,
+	])
+	if (freeze.code !== 0) throw new Error(JSON.stringify(freeze))
+	const output = join(fixture.scratch.path, 'source')
+	const recipe = await admitMemoryScreen(fixture, {
+		closure: frozen,
+		expected: readStudyClosure(frozen).fingerprint,
+		output,
+	})
+	const executed = await executeMemoryScreenProcess(
+		fixture,
+		[fixture.entry, ...recipe.arguments],
+		120000,
+	)
+	if (executed.code !== 0) throw new Error(JSON.stringify(executed))
+	const result = await readStudyResult(output)
+	if (
+		result.status !== 'sealed' ||
+		result.attempts.some((attempt) => attempt.failure !== undefined)
+	)
+		throw new Error('Portable source did not complete and seal')
+	const admission = await readStudyMemoryAdmission({
+		directory: output,
+		...fixture,
+		identity: result.manifest.identity,
+	})
+	return { fixture, server, frozen, output, result, admission }
+}
+
+/** Builds inert protocol replies around actual seed lookup dispatches. @param scenarios - Public seed and target population. @returns The agent-only response queue; the peer supplies its independent classifier protocol. */
+export function buildMemoryScreenResponses(
+	scenarios: readonly StudyScenario[],
+): readonly MemoryWireFixture[] {
+	return scenarios.flatMap((scenario) => {
+		const [seed] = scenario.goals
+		if (seed === undefined || !isStudyMemoryInput(seed.input))
+			throw new Error('Missing public seed input')
+		return [
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Calibration fixture one.' }) },
+			{ path: '/api/chat', body: buildMemoryReply({ content: 'Calibration fixture two.' }) },
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: '',
+					calls: seed.input.records.map((record) => ({
+						function: { name: 'lookup', arguments: { id: record.id } },
+					})),
+				}),
+			},
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({ content: 'Earlier inert draft: pending action awaits evidence.' }),
+			},
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({ content: 'Final inert answer; no external action occurred.' }),
+			},
+		]
+	})
+}
+
+/** Attempts all resources in operation order, preserving failures after cleanup.
+ * @param handlers - Real owned resource releases, in execution order.
+ * @returns Completion after every release has been attempted.
+ */
+export function closeMemoryResources(...handlers: readonly TeardownHandler[]): Promise<void> {
+	const teardown = createTeardown()
+	for (const handler of [...handlers].reverse()) teardown.add(handler)
+	return teardown.destroy()
+}
+
+/** Opens a full-arm recorded session using actual public Agent resources and a disk sink.
+ * @returns A retained descriptor and real resources; close attempts every owned teardown.
+ */
+export async function createMemoryCleanupFixture(
+	options: MemoryCleanupOptions = {},
+): Promise<MemoryCleanupFixture> {
+	const teardown = createTeardown()
+	const scratch = createScratch({
+		parent: resolve('tmp/units/r2-consumer-20261025'),
+		prefix: 'cleanup-',
+	})
+	teardown.add(() => destroyScratch(scratch))
+	try {
+		const server = await createMemoryServer(
+			options.responses ?? [
+				{
+					path: '/api/chat',
+					body: '{"model":"model","done":false,"message":{"role":"assistant","content":"First"}}\n',
+					open: true,
+				},
+			],
+		)
+		teardown.add(() => server.close())
+		const { scenarios } = await readStudyDeclaration(resolve('.'), 'r2-request-screen')
+		const scenario = scenarios[0]
+		if (scenario === undefined) throw new Error('Missing public cleanup scenario')
+		const base = buildMemoryProfile({
+			url: server.url,
+			room: { context: 20480, output: 8192, safety: 512, think: false },
+			settings: { version: 'fixture-1', metadata: { calls: 64, bytes: 1048576, duration: 30000 } },
+		})
+		const prepared = buildStudyMemoryPreparation(base, scenarios)
+		const profile = { ...prepared, settings: { ...base.settings, observe: true, screen: false } }
+		if (profile.record === undefined) throw new Error('Missing cleanup recording policy')
+		const recorded = createMemoryContext(profile)
+		const context = {
+			...recorded,
+			get evidence() {
+				return recorded.evidence
+			},
+			context: {
+				...recorded.context,
+				evidence: {
+					append: async (row: StudyEvidence) => {
+						await recorded.context.evidence.append(row)
+						if (
+							options.boundary === 'eof' &&
+							row.event === 'wire' &&
+							isRecord(row.value) &&
+							row.value.role === 'agent'
+						) {
+							options.entered?.()
+							await options.release
+						}
+					},
+				},
+			},
+		}
+		teardown.add(() => context.close())
+		const path = join(scratch.path, 'exchanges.jsonl')
+		const file = await open(path, 'wx')
+		teardown.add(() => file.close())
+		const exchanges = new StudyExchangeSink({ file, record: profile.record })
+		teardown.add(() => exchanges.close())
+		const trial = { id: 'cleanup', scenario: scenario.id, arm: 'full', repetition: 0 }
+		await exchanges.append(buildStudyExchangeDeclaration(profile, trial, scenario, false))
+		const before = MemoryCleanupAgent.constructed.calls.length
+		const session = await new StudyMemoryDriver({
+			...STUDY_MEMORY_MODULES,
+			agent: { ...agent, Agent: MemoryCleanupAgent },
+			profile,
+			exchanges: {
+				get declaration() {
+					return exchanges.declaration
+				},
+				get next() {
+					return exchanges.next
+				},
+				append: async (row) => {
+					await exchanges.append(row)
+					if (
+						options.boundary === 'admitted' &&
+						row.phase === 'response' &&
+						row.stage === 'execution'
+					) {
+						options.entered?.()
+						await options.release
+					}
+				},
+				close: () => exchanges.close(),
+			},
+		}).open(trial, context.context.signal)
+		teardown.add(() => session.close())
+		const actual = MemoryCleanupAgent.constructed.calls[before]?.[0]
+		if (actual === undefined) throw new Error('Missing actual Agent constructor')
+		return {
+			session,
+			profile,
+			scenario,
+			server,
+			context,
+			agent: actual,
+			file,
+			path,
+			close: () => teardown.destroy(),
+		}
+	} catch (error) {
+		teardown.add(() => {
+			throw error
+		})
+		await teardown.destroy()
+		throw error
+	}
+}
+/** Opens one real recorded R2 case without native process startup. @param responses - Inert protocol replies. @param scenarios - Optional bounded public fixture population. @returns An exclusively owned real session and cleanup. */
+export async function createMemoryScreenSession(
+	responses: readonly MemoryWireFixture[],
+	scenarios?: readonly StudyScenario[],
+): Promise<MemoryScreenSessionFixture> {
+	const population =
+		scenarios ?? (await readStudyDeclaration(resolve('.'), 'r2-request-screen')).scenarios
+	const scenario = population[0]
+	if (scenario === undefined) throw new Error('Missing Ivo fixture')
+	const server = await createMemoryServer(responses)
+	const scratch = createScratch({
+		parent: resolve('tmp/units/r2-consumer-20261025'),
+		prefix: 'session-',
+	})
+	const profile = buildStudyMemoryPreparation(
+		buildMemoryProfile({
+			url: server.url,
+			room: { context: 20480, output: 8192, safety: 512, think: false },
+			settings: { version: 'fixture-1', metadata: { calls: 64, bytes: 1048576, duration: 30000 } },
+		}),
+		population,
+	)
+	const context = createMemoryContext(profile)
+	const record = profile.record
+	if (record === undefined) throw new Error('Missing screen recording')
+	const exchanges = new StudyExchangeSink({
+		file: await open(join(scratch.path, 'exchanges.jsonl'), 'wx'),
+		record,
+	})
+	const trial = { id: 'r1-s1-a1', scenario: scenario.id, arm: 'records', repetition: 0 }
+	try {
+		await exchanges.append(buildStudyExchangeDeclaration(profile, trial, scenario, false))
+		const session = await new StudyMemoryDriver({
+			...STUDY_MEMORY_MODULES,
+			profile,
+			exchanges,
+		}).open(trial, context.context.signal)
+		return {
+			session,
+			profile,
+			scenario,
+			server,
+			context,
+			close: () =>
+				closeMemoryResources(
+					() => session.close(),
+					() => exchanges.close(),
+					() => context.close(),
+					() => server.close(),
+					() => destroyScratch(scratch),
+				),
+		}
+	} catch (error) {
+		await closeMemoryResources(
+			() => {
+				throw error
+			},
+			() => exchanges.close(),
+			() => context.close(),
+			() => server.close(),
+			() => destroyScratch(scratch),
+		)
+		throw error
+	}
+}
+
+/** Replays an actual sealed CPU source through the native collaborator before one real fixture response. @param source - Captured source declarations. @param admission - Strictly derived source receipt. @param responses - Terminal response controls. @returns One fresh replaying session with exclusive cleanup. */
+export async function createMemoryScreenReplay(
+	source: MemoryScreenFixture,
+	admission: StudyMemoryScreenAdmission,
+	responses: readonly MemoryWireFixture[],
+): Promise<MemoryScreenSessionFixture> {
+	const scenario = source.scenarios[0]
+	const reading = admission.trials[0]
+	if (scenario === undefined || reading === undefined) throw new Error('Missing source case')
+	const server = await createMemoryServer(responses)
+	const scratch = createScratch({
+		parent: resolve('tmp/units/r2-consumer-20261025'),
+		prefix: 'replay-control-',
+	})
+	const matched = buildStudyMemoryMatched(source.profile, admission, {
+		name: 'control',
+		work: false,
+		sham: false,
+	})
+	if (matched.provider === undefined || matched.record === undefined)
+		throw new Error('Missing source runtime')
+	const profile = { ...matched, provider: { ...matched.provider, url: server.url } }
+	const context = createMemoryContext(profile)
+	const exchanges = new StudyExchangeSink({
+		file: await open(join(scratch.path, 'exchanges.jsonl'), 'wx'),
+		record: matched.record,
+	})
+	const trial = { id: 'r1-s1-a1', scenario: scenario.id, arm: 'records', repetition: 0 }
+	try {
+		const result = await readStudyResult(admission.directory)
+		if (result.status !== 'sealed') throw new Error('Missing sealed source')
+		const history = await readStudyReplayHistory(
+			{ result: admission.directory, prefix: { [trial.id]: reading.prefix }, offline: false },
+			profile,
+			trial,
+		)
+		const replay = new StudyOllamaReplay({
+			history,
+			prefix: reading.prefix,
+			url: server.url,
+			limit: { calls: 134, bytes: 67108864, duration: 180000 },
+			signal: context.context.signal,
+			fetch: (_role, input, init) => globalThis.fetch(input, init),
+		})
+		try {
+			await exchanges.append(
+				buildStudyExchangeDeclaration(profile, trial, scenario, false, {
+					result: admission.result,
+					seal: admission.seal,
+					identity: result.manifest.identity,
+					file: reading.file,
+					prefix: reading.prefix,
+				}),
+			)
+			const session = await new StudyMemoryDriver({
+				...STUDY_MEMORY_MODULES,
+				profile,
+				exchanges,
+				replay,
+			}).open(trial, context.context.signal)
+			return {
+				session,
+				profile,
+				scenario,
+				server,
+				context,
+				close: () =>
+					closeMemoryResources(
+						() => session.close(),
+						() => replay.close(),
+						() => exchanges.close(),
+						() => context.close(),
+						() => server.close(),
+						() => destroyScratch(scratch),
+					),
+			}
+		} catch (error) {
+			await closeMemoryResources(
+				() => {
+					throw error
+				},
+				() => replay.close(),
+			)
+			throw error
+		}
+	} catch (error) {
+		await closeMemoryResources(
+			() => {
+				throw error
+			},
+			() => exchanges.close(),
+			() => context.close(),
+			() => server.close(),
+			() => destroyScratch(scratch),
+		)
+		throw error
+	}
+}
+
+/** Opens the actual provider and judge against a shared source account for independent ceiling controls. @param responses - Inert provider replies. @returns Native protocol boundaries with one first-refusal owner. */
+export async function createMemoryScreenBoundary(
+	responses: readonly MemoryWireFixture[] = [],
+): Promise<MemoryScreenBoundaryFixture> {
+	const { scenarios } = await readStudyDeclaration(resolve('.'), 'r2-request-screen')
+	const scenario = scenarios[0]
+	const seed = scenario?.goals[0]
+	if (scenario === undefined || seed === undefined || !isStudyMemoryInput(seed.input))
+		throw new Error('Missing public seed')
+	const server = await createMemoryServer(responses)
+	const scratch = createScratch({
+		parent: resolve('tmp/units/r2-consumer-20261025'),
+		prefix: 'boundary-',
+	})
+	const profile = buildStudyMemoryPreparation(
+		buildMemoryProfile({
+			url: server.url,
+			room: { context: 20480, output: 8192, safety: 512, think: false },
+			settings: { version: 'fixture-1', metadata: { calls: 64, bytes: 1048576, duration: 30000 } },
+		}),
+		scenarios,
+	)
+	const context = createMemoryContext(profile)
+	if (profile.record === undefined || profile.provider === undefined)
+		throw new Error('Missing boundary policy')
+	const exchanges = new StudyExchangeSink({
+		file: await open(join(scratch.path, 'exchanges.jsonl'), 'wx'),
+		record: profile.record,
+	})
+	const trial = { id: 'r1-s1-a1', scenario: scenario.id, arm: 'records', repetition: 0 }
+	await exchanges.append(buildStudyExchangeDeclaration(profile, trial, scenario, false))
+	const roles = buildStudyMemoryRoles(profile, 'records')
+	const role = roles.agent
+	const judging = roles.judge
+	if (role === undefined || judging === undefined) throw new Error('Missing roles')
+	const transport = new StudyOllamaTransport({
+		url: server.url,
+		room: profile.room,
+		limit: profile.bounds.request,
+		metadata: { calls: 64, bytes: 1048576, duration: 30000 },
+		models: buildStudyOllamaModels(profile.provider),
+		roles,
+		signal: context.context.signal,
+		observe: true,
+		timing: provider.extractTiming,
+		exchanges,
+	})
+	const screen = new StudyMemoryScreen({ profile, trial, exchanges }, transport)
+	try {
+		transport.prepare({ goal: seed.id, context: context.context, checkpoint: undefined })
+		screen.start({ goal: seed.id, input: seed.input, prior: new Set(), messages: () => [] })
+		await transport.verify()
+		const native = provider.createOllama({
+			...buildStudyOllamaOptions(role),
+			url: server.url,
+			fetch: (input, init) => {
+				screen.reserve('agent', init)
+				return transport.fetch('agent', input, init)
+			},
+		})
+		const judge = provider.createOllamaJudge({
+			model: judging.model,
+			system: 'Return one protocol answer.',
+			options: judging.options,
+			url: server.url,
+			fetch: (input, init) => {
+				screen.reserve('judge', init)
+				return transport.fetch('judge', input, init)
+			},
+		})
+		return {
+			native,
+			screen,
+			provider: new StudyMemoryScreenProvider(native, screen),
+			judge: new StudyMemoryScreenJudge(judge, screen),
+			server,
+			context,
+			close: () =>
+				closeMemoryResources(
+					() => transport.close(),
+					() => exchanges.close(),
+					() => context.close(),
+					() => server.close(),
+					() => destroyScratch(scratch),
+				),
+		}
+	} catch (error) {
+		await closeMemoryResources(
+			() => {
+				throw error
+			},
+			() => transport.close(),
+			() => exchanges.close(),
+			() => context.close(),
+			() => server.close(),
+			() => destroyScratch(scratch),
+		)
+		throw error
+	}
+}
+
 /** Reads every retained worker's resolved Intl options without dropping malformed rows.
  * @param scratch - The fixture that owns the worker journal.
  * @returns Validated worker observations in launch order.
@@ -1636,20 +2298,307 @@ export function captureStudyPackages(
 	return Object.freeze(packages)
 }
 
+/** Writes the reviewed node-only launcher over this fixture's actual copied package roots.
+ * @param fixture - Exclusive copied consumer, never a shared host.
+ * @returns Forced-timeout specimen, original launcher and exact physical receipt.
+ */
+export function createMemoryScreenLauncher(
+	fixture: MemoryScreenFixture,
+): MemoryScreenLauncherFixture {
+	const scratch = fixture.scratch
+	const root = realpathSync(scratch.path)
+	const artifact = scratch.ensure('artifact')
+	cpSync(join(root, 'node_modules/@orkestrel/study'), artifact, { recursive: true })
+	const original =
+		[
+			"// Retains admission/execution in the named absent receipt; capped by the root's remaining",
+			'// elapsed allowance (at most 1200000 ms). Supersedes cleanup/launch.ts by composing the',
+			'// native 60s check, its series+15s execution owner, and a separate final receipt reserve.',
+			"import { spawnSync } from 'node:child_process'",
+			"import { createHash } from 'node:crypto'",
+			"import { lstatSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'",
+			"import { dirname, isAbsolute, join, resolve, sep } from 'node:path'",
+			"import { fileURLToPath } from 'node:url'",
+			'',
+			'function object(value: unknown): value is Record<string, unknown> {',
+			"\treturn value !== null && typeof value === 'object' && !Array.isArray(value)",
+			'}',
+			'',
+			'function digest(path: string): string {',
+			"\treturn createHash('sha256').update(readFileSync(path)).digest('hex')",
+			'}',
+			'',
+			'function verify(path: string, expected: string): void {',
+			"\tif (digest(path) !== expected) throw new Error('Root-approved physical receipt digest differs')",
+			"\tconst receipt: unknown = JSON.parse(readFileSync(path, 'utf8'))",
+			'\tif (',
+			'\t\t!object(receipt) ||',
+			'\t\treceipt.root !== root ||',
+			'\t\treceipt.entry !== entry ||',
+			'\t\treceipt.consumer !== consumer ||',
+			'\t\treceipt.launcher !== digest(fileURLToPath(import.meta.url)) ||',
+			'\t\t!Array.isArray(receipt.roots)',
+			'\t)',
+			"\t\tthrow new Error('Physical receipt selection differs')",
+			"\tif (receipt.roots.length !== required.length) throw new Error('Physical root population differs')",
+			'\tconst seen = new Set<string>()',
+			'\tlet bytes = 0',
+			'\tfor (const selection of receipt.roots) {',
+			'\t\tif (',
+			'\t\t\t!object(selection) ||',
+			"\t\t\ttypeof selection.path !== 'string' ||",
+			'\t\t\t!isAbsolute(selection.path) ||',
+			'\t\t\t!Array.isArray(selection.files)',
+			'\t\t)',
+			"\t\t\tthrow new Error('Malformed physical root')",
+			'\t\tconst selected = selection.path',
+			'\t\tif (!required.includes(selected) || seen.has(selected))',
+			"\t\t\tthrow new Error('Physical root missing, extra or duplicated')",
+			'\t\tseen.add(selected)',
+			'\t\tif (',
+			'\t\t\trealpathSync(selected) !== selected ||',
+			'\t\t\t!(selected === artifact || selected.startsWith(root + sep))',
+			'\t\t)',
+			"\t\t\tthrow new Error('Physical root escaped or redirected')",
+			"\t\tconst pending = ['']",
+			'\t\tconst found = new Map<string, string>()',
+			'\t\tfor (const member of pending) {',
+			'\t\t\tconst absolute = join(selected, member)',
+			'\t\t\tconst stat = lstatSync(absolute)',
+			"\t\t\tif (stat.isSymbolicLink()) throw new Error('Physical receipt contains a link')",
+			'\t\t\tif (stat.isDirectory()) {',
+			'\t\t\t\tpending.push(...readdirSync(absolute).map((name) => join(member, name)))',
+			"\t\t\t\tif (pending.length > 4096) throw new Error('Physical inventory overflow')",
+			'\t\t\t} else {',
+			'\t\t\t\tbytes += stat.size',
+			'\t\t\t\tif (!stat.isFile() || stat.size > 8388608 || bytes > 134217728)',
+			"\t\t\t\t\tthrow new Error('Physical member overflow')",
+			"\t\t\t\tfound.set(member.split(sep).join('/'), `${stat.size}:${digest(absolute)}`)",
+			'\t\t\t}',
+			'\t\t}',
+			'\t\tfor (const member of selection.files) {',
+			'\t\t\tif (',
+			'\t\t\t\t!object(member) ||',
+			"\t\t\t\ttypeof member.path !== 'string' ||",
+			"\t\t\t\ttypeof member.bytes !== 'number' ||",
+			"\t\t\t\ttypeof member.sha256 !== 'string'",
+			'\t\t\t)',
+			"\t\t\t\tthrow new Error('Malformed physical member')",
+			'\t\t\tif (found.get(member.path) !== `${member.bytes}:${member.sha256}`)',
+			'\t\t\t\tthrow new Error(`Physical member drift: ${member.path}`)',
+			'\t\t\tfound.delete(member.path)',
+			'\t\t}',
+			"\t\tif (found.size !== 0) throw new Error('Unrecorded physical members')",
+			'\t}',
+			'}',
+			'',
+			'const directory = dirname(fileURLToPath(import.meta.url))',
+			'const root = realpathSync(directory)',
+			"const artifact = realpathSync(join(root, 'artifact'))",
+			"const entry = join(root, 'node_modules/@orkestrel/study/dist/bin/main.js')",
+			"const consumer = join(root, 'consumer/StudyMemoryScreenCommand.js')",
+			'const packages = [',
+			"\t'agent',",
+			"\t'study',",
+			"\t'abort',",
+			"\t'budget',",
+			"\t'contract',",
+			"\t'ollama',",
+			"\t'timeout',",
+			"\t'tool',",
+			"\t'database',",
+			"\t'emitter',",
+			"\t'queue',",
+			"\t'workflow',",
+			"\t'workspace',",
+			"\t'ndjson',",
+			"\t'indexeddb',",
+			"\t'sqlite',",
+			"\t'process',",
+			']',
+			'const required = [',
+			'\tartifact,',
+			"\tjoin(root, 'consumer'),",
+			"\tjoin(root, 'studies/memory'),",
+			"\tjoin(root, 'studies/r2-request-screen'),",
+			"\tjoin(root, 'node_modules/@orkestrel/agent/dist/src/core'),",
+			"\tjoin(root, 'node_modules/@orkestrel/agent/package.json'),",
+			"\t...packages.map((name) => join(root, 'node_modules/@orkestrel', name)),",
+			']',
+			'const started = performance.now()',
+			'const [operation, selection, expected, approval, output, allowanceText] = process.argv.slice(2)',
+			'const allowance = Number(allowanceText)',
+			'if (',
+			'\tprocess.argv.length !== 8 ||',
+			'\t!Number.isSafeInteger(allowance) ||',
+			'\tallowance <= 0 ||',
+			'\tallowance > 1200000 ||',
+			"\t!['verify', 'admit', 'prepare', 'execute'].includes(operation ?? '') ||",
+			'\tselection === undefined ||',
+			'\texpected === undefined ||',
+			'\tapproval === undefined ||',
+			'\toutput === undefined ||',
+			'\t!isAbsolute(selection) ||',
+			'\t!isAbsolute(output)',
+			')',
+			'\tthrow new Error(',
+			"\t\t'Expected operation canonical-selection selection-sha root-approved-physical-sha absent-receipt remaining-elapsed-ms',",
+			'\t)',
+			'if (realpathSync(selection) !== selection || realpathSync(dirname(output)) !== dirname(output))',
+			"\tthrow new Error('Selection or receipt directory is redirected')",
+			"const physical = join(directory, 'physical.json')",
+			'verify(physical, approval)',
+			"if (digest(selection) !== expected) throw new Error('Root selection digest differs')",
+			"if (operation === 'verify') {",
+			'\twriteFileSync(',
+			'\t\toutput,',
+			'\t\tJSON.stringify({ physical: approval, selection: expected, verified: true }),',
+			"\t\t{ flag: 'wx' },",
+			'\t)',
+			'} else {',
+			'\tif (allowance - (performance.now() - started) < 80000)',
+			"\t\tthrow new Error('Elapsed allowance cannot contain admission and cleanup')",
+			'\tconst checked = spawnSync(',
+			'\t\tprocess.execPath,',
+			"\t\t[consumer, root, entry, operation === 'prepare' ? 'prepare' : 'admit', selection],",
+			"\t\t{ cwd: root, encoding: 'utf8', windowsHide: true, timeout: 65000, maxBuffer: 16777216 },",
+			'\t)',
+			'\twriteFileSync(',
+			'\t\toutput,',
+			'\t\tJSON.stringify({',
+			'\t\t\tphysical: approval,',
+			'\t\t\tselection: expected,',
+			'\t\t\tpid: checked.pid,',
+			'\t\t\tstatus: checked.status,',
+			'\t\t\tsignal: checked.signal,',
+			'\t\t\tstdout: checked.stdout,',
+			'\t\t\tstderr: checked.stderr,',
+			'\t\t\terror: checked.error?.message,',
+			'\t\t\telapsed: performance.now() - started,',
+			'\t\t\tallowance,',
+			'\t\t}),',
+			"\t\t{ flag: 'wx' },",
+			'\t)',
+			'\tif (checked.status !== 0)',
+			"\t\tthrow new Error('Consumer admission refused; retained receipt records failure')",
+			'\tverify(physical, approval)',
+			"\tif (digest(selection) !== expected) throw new Error('Selection changed during admission')",
+			'\tconst recipe: unknown = JSON.parse(checked.stdout)',
+			"\tif (operation === 'execute') {",
+			'\t\tif (',
+			'\t\t\t!object(recipe) ||',
+			'\t\t\trecipe.root !== root ||',
+			'\t\t\trecipe.entry !== entry ||',
+			'\t\t\t!Array.isArray(recipe.arguments) ||',
+			"\t\t\t!recipe.arguments.every((value: unknown) => typeof value === 'string') ||",
+			"\t\t\ttypeof recipe.duration !== 'number' ||",
+			'\t\t\t!Number.isSafeInteger(recipe.duration) ||',
+			'\t\t\trecipe.duration <= 15000 ||',
+			'\t\t\trecipe.duration > 915000',
+			'\t\t)',
+			"\t\t\tthrow new Error('Invalid fixed consumer recipe')",
+			'\t\t// The native CLI owns a separate 60s check, then series + 15s cleanup.',
+			'\t\t// Leave 10s for that supervisor to return, then 5s outside the child timeout',
+			"\t\t// for our own receipt. Neither reserve enlarges the root's remaining allowance.",
+			'\t\tconst duration = 60000 + recipe.duration + 10000',
+			'\t\tconst reserve = 5000',
+			'\t\tif (allowance - (performance.now() - started) < duration + reserve)',
+			"\t\t\tthrow new Error('Elapsed allowance cannot contain native check, execution and cleanup')",
+			'\t\tconst executionStarted = performance.now()',
+			'\t\tconst result = spawnSync(process.execPath, [entry, ...recipe.arguments], {',
+			'\t\t\tcwd: root,',
+			"\t\t\tencoding: 'utf8',",
+			'\t\t\twindowsHide: true,',
+			'\t\t\ttimeout: duration,',
+			'\t\t\tmaxBuffer: 16777216,',
+			'\t\t})',
+			'\t\twriteFileSync(',
+			'\t\t\t`${output}.execution.json`,',
+			'\t\t\tJSON.stringify({',
+			'\t\t\t\tpid: result.pid,',
+			'\t\t\t\tstatus: result.status,',
+			'\t\t\t\tsignal: result.signal,',
+			'\t\t\t\tstdout: result.stdout,',
+			'\t\t\t\tstderr: result.stderr,',
+			'\t\t\t\terror: result.error?.message,',
+			'\t\t\t\tduration,',
+			'\t\t\t\treserve,',
+			'\t\t\t\telapsed: performance.now() - executionStarted,',
+			'\t\t\t\ttotalElapsed: performance.now() - started,',
+			'\t\t\t\tallowance,',
+			'\t\t\t}),',
+			"\t\t\t{ flag: 'wx' },",
+			'\t\t)',
+			'\t\tprocess.exitCode = result.status ?? 1',
+			'\t} else process.stdout.write(checked.stdout)',
+			'}',
+		].join('\n') + '\n'
+	const forced = original.replace('timeout: duration,', 'timeout: 40000,')
+	if (forced === original) throw new Error('Missing reviewed outer-timeout control')
+	const launcher = scratch.write('launch.ts', forced)
+	scratch.write('launch-original.ts.txt', original)
+	const selections = [
+		artifact,
+		join(root, 'consumer'),
+		join(root, 'studies/memory'),
+		join(root, 'studies/r2-request-screen'),
+		join(root, 'node_modules/@orkestrel/agent/dist/src/core'),
+		join(root, 'node_modules/@orkestrel/agent/package.json'),
+		...fixture.packages.map((selection) => selection.target),
+	]
+	const roots = selections.map((path) => {
+		const pending = ['']
+		const files = []
+		for (const member of pending) {
+			const absolute = join(path, member)
+			const stat = lstatSync(absolute)
+			if (stat.isSymbolicLink()) throw new Error('Fixture physical receipt contains a link')
+			if (stat.isDirectory())
+				pending.push(...readdirSync(absolute).map((name) => join(member, name)))
+			else
+				files.push({
+					path: member.replaceAll('\\', '/'),
+					bytes: stat.size,
+					sha256: hashStudyBytes(readFileSync(absolute)),
+				})
+		}
+		return { path, files }
+	})
+	const physical = scratch.write(
+		'physical.json',
+		JSON.stringify({
+			root,
+			entry: fixture.entry,
+			consumer: fixture.admission,
+			launcher: hashStudyBytes(readFileSync(launcher)),
+			roots,
+		}),
+	)
+	const trace = scratch.write(
+		'trace.ts',
+		"import { appendFileSync } from 'node:fs'; appendFileSync(" +
+			JSON.stringify(join(root, 'processes.jsonl')) +
+			",JSON.stringify({pid:process.pid,parent:process.ppid,at:new Date().toISOString(),argv:process.argv})+'\\n')\n",
+	)
+	return { launcher, physical, trace, original }
+}
+
 /** Captures the actual Agent, installed Study and Ollama bytes with authored CPU workloads.
  * @param scratch - Exclusive workspace owner, cleaned by the caller in finally.
  * @param url - Ephemeral native Ollama protocol fixture origin.
+ * @param study - Real already-installed Study package selected for this copied fixture.
  * @returns The installed command and complete copied runtime closure.
  */
 export function createStudyInstallFixture(
 	scratch: ScratchInterface,
 	url: string,
+	study = resolve('node_modules/@orkestrel/study'),
 ): StudyInstallFixture {
 	const packages = captureStudyPackages(
 		scratch,
 		new Map([
 			['@orkestrel/agent', resolve('.')],
-			['@orkestrel/study', resolve('node_modules/@orkestrel/study')],
+			['@orkestrel/study', realpathSync(study)],
 			['@orkestrel/ollama', resolve('node_modules/@orkestrel/ollama')],
 		]),
 	)
@@ -3458,3 +4407,17 @@ export const SENTENCE_BOUNDARY_FIXTURES = Object.freeze([
 		],
 	},
 ])
+
+/** Supplies real child termination orderings for the sentinel lifecycle proof. */
+export const STUDY_SENTINEL_STATES = Object.freeze(['live', 'signaled', 'exited'] as const)
+
+/** Joins the actual sentinel without waiting for an exit event already delivered. @param sentinel - Owned child. */
+export async function destroyStudySentinel(sentinel: ChildProcess): Promise<void> {
+	if (sentinel.exitCode !== null || sentinel.signalCode !== null) return
+	const exited = waitForEvent((handler) => {
+		sentinel.once('exit', handler)
+		return () => sentinel.off('exit', handler)
+	}, 'owned sentinel cleanup')
+	sentinel.kill()
+	await exited
+}

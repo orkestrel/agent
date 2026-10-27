@@ -1,0 +1,85 @@
+{
+	"version": "2-u34",
+	"criteria": [
+		{
+			"id": "r2-ivo-seed",
+			"scenario": "r2-ivo-screen",
+			"goal": "r2-ivo-seed",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		},
+		{
+			"id": "r2-ivo-target",
+			"scenario": "r2-ivo-screen",
+			"goal": "r2-ivo-target",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		},
+		{
+			"id": "r2-nadia-seed",
+			"scenario": "r2-nadia-screen",
+			"goal": "r2-nadia-seed",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		},
+		{
+			"id": "r2-nadia-target",
+			"scenario": "r2-nadia-screen",
+			"goal": "r2-nadia-target",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		},
+		{
+			"id": "r2-mara-seed",
+			"scenario": "r2-mara-screen",
+			"goal": "r2-mara-seed",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		},
+		{
+			"id": "r2-mara-target",
+			"scenario": "r2-mara-screen",
+			"goal": "r2-mara-target",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		},
+		{
+			"id": "r2-tomas-seed",
+			"scenario": "r2-tomas-screen",
+			"goal": "r2-tomas-seed",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		},
+		{
+			"id": "r2-tomas-target",
+			"scenario": "r2-tomas-screen",
+			"goal": "r2-tomas-target",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "operational"
+			}
+		}
+	]
+}

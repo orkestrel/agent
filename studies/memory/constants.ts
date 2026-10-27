@@ -89,3 +89,9 @@ export const STUDY_MEMORY_TOPICS = Object.freeze([
 		criterion: 'Orders, delivery, refunds, ownership and follow-up obligations',
 	}),
 ])
+/** Bounds complete admitted host runtime membership independently of model budgets. */
+export const STUDY_MEMORY_HOST_FILES = 128
+/** Bounds one admitted runtime member. */
+export const STUDY_MEMORY_HOST_FILE_BYTES = 8 * 1024 * 1024
+/** Bounds all admitted host runtime bytes. */
+export const STUDY_MEMORY_HOST_BYTES = 32 * 1024 * 1024

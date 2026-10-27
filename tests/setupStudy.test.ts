@@ -1,3 +1,7 @@
+import { spawn } from 'node:child_process'
+import { createServer } from 'node:http'
+import { setImmediate } from 'node:timers/promises'
+import { createTeardown, waitForEvent } from '@orkestrel/test'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { hashStudyBytes, isStudyCustodyManifest } from '@orkestrel/study/server'
 import { isStudySentenceSettings } from '../studies/sentences/index.js'
@@ -8,6 +12,8 @@ import { describe, expect, it } from 'vitest'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as sentenceRuntime from '../dist/src/core/index.js'
 import {
+	destroyStudySentinel,
+	STUDY_SENTINEL_STATES,
 	buildStudySentenceFixture,
 	buildStudySentenceCalibration,
 	buildStudySentenceAdjudication,
@@ -797,4 +803,78 @@ describe('study install fixtures', () => {
 		expect(fixture.manifest.definition.driver).toBe('tools')
 		expect(fixture.subject).toHaveProperty('Agent')
 	})
+})
+
+it.each(STUDY_SENTINEL_STATES)('drains the real peer after a %s study sentinel', async (state) => {
+	const scratch = createScratch({
+		parent: resolve('tmp/units/r2-consumer-20261025'),
+		prefix: 'sentinel-',
+	})
+	const entry = scratch.write(
+		'sentinel.ts',
+		state === 'exited' ? 'process.exit(0)\n' : 'setInterval(() => {}, 1000)\n',
+	)
+	const peer = createServer()
+	const listening = waitForEvent((handler) => {
+		peer.once('listening', handler)
+		return () => peer.off('listening', handler)
+	}, 'peer listening')
+	peer.listen(0, '127.0.0.1')
+	await listening
+	const sentinel = spawn(process.execPath, [entry], { windowsHide: true, stdio: 'ignore' })
+	await waitForEvent((handler) => {
+		sentinel.once('spawn', handler)
+		return () => sentinel.off('spawn', handler)
+	}, 'sentinel spawned')
+	try {
+		if (state !== 'live') {
+			const exited = waitForEvent((handler) => {
+				sentinel.once('exit', handler)
+				return () => sentinel.off('exit', handler)
+			}, 'sentinel terminated')
+			if (state === 'signaled') sentinel.kill('SIGTERM')
+			await exited
+		}
+		const teardown = createTeardown()
+		teardown.add(
+			() =>
+				new Promise<void>((done, reject) =>
+					peer.close((error) => (error ? reject(error) : done())),
+				),
+		)
+		teardown.add(() => destroyStudySentinel(sentinel))
+		const drained = teardown.destroy().then(
+			() => 'drained',
+			() => 'rejected',
+		)
+		const outcome =
+			state === 'live' ? await drained : await Promise.race([drained, setImmediate('pending')])
+		scratch.write(
+			'observed.json',
+			JSON.stringify({
+				state,
+				pid: sentinel.pid,
+				exitCode: sentinel.exitCode,
+				signalCode: sentinel.signalCode,
+				outcome,
+				peerListening: peer.listening,
+			}),
+		)
+		expect(outcome).toBe('drained')
+		expect(peer.listening).toBe(false)
+		expect(teardown.count).toBe(0)
+	} finally {
+		if (sentinel.exitCode === null && sentinel.signalCode === null) {
+			const exited = waitForEvent((handler) => {
+				sentinel.once('exit', handler)
+				return () => sentinel.off('exit', handler)
+			}, 'owned sentinel final cleanup')
+			sentinel.kill()
+			await exited
+		}
+		if (peer.listening)
+			await new Promise<void>((done, reject) =>
+				peer.close((error) => (error ? reject(error) : done())),
+			)
+	}
 })

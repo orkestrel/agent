@@ -1,5 +1,14 @@
+import type { ChildProcess } from 'node:child_process'
 import type { JSONValue } from '@orkestrel/contract'
-import type { LedgerResult, LedgerInterface, LedgerOptions } from '@orkestrel/agent'
+import type {
+	AgentInterface,
+	LedgerResult,
+	LedgerInterface,
+	LedgerOptions,
+	ProviderInterface,
+	JudgeInterface,
+} from '@orkestrel/agent'
+import type { StudyMemoryScreen } from '../../../studies/memory/StudyMemoryScreen.js'
 import type {
 	StudyAttempt,
 	StudyContext,
@@ -16,10 +25,46 @@ import type {
 	StudySessionInterface,
 	StudyRubric,
 	StudyTrial,
+	StudyScenario,
 } from '@orkestrel/study'
 import type { ScratchInterface } from '@orkestrel/test/server'
-import type { StudyResultReading, StudyExchangeHistory } from '@orkestrel/study/server'
-import type { StudyMemoryDifferential } from '../../../studies/memory/types.js'
+import type { FileHandle } from 'node:fs/promises'
+import type {
+	StudyResultReading,
+	StudyExchangeHistory,
+	StudySealedResult,
+} from '@orkestrel/study/server'
+import type {
+	StudyMemoryDifferential,
+	StudyMemoryScreenAdmission,
+} from '../../../studies/memory/types.js'
+
+/** Owns the shared real resources of the serial forced and native timeout proofs. */
+export interface MemoryScreenTimeoutFixture {
+	readonly scratch: ScratchInterface
+	readonly server: MemoryServerFixture
+	readonly daemon: MemoryDaemonFixture
+	readonly sentinel: ChildProcess
+	readonly launcher: MemoryScreenLauncherFixture
+	readonly frozen: string
+	readonly selection: string
+	readonly options: StudyInstallOptions
+}
+
+/** Shares one checked source and its real peer across the ordered matched-arm tests. */
+export interface MemoryScreenGroupFixture {
+	readonly fixture: MemoryScreenFixture
+	readonly server: MemoryServerFixture
+	readonly frozen: string
+	readonly output: string
+	readonly result: StudySealedResult
+	readonly admission: StudyMemoryScreenAdmission
+}
+
+/** Retains the failed real source-hook child and its collected arm dispositions. */
+export interface MemorySourceFailureResult extends StudyInstallResult {
+	readonly report: unknown
+}
 
 /** Holds a CPU recording and the settings replayed against its sealed history. */
 export interface MemoryRecordingFixture {
@@ -64,6 +109,67 @@ export interface MemoryWorker {
 /** Holds an authored recording fixture and its exact executing profile. */
 export interface MemoryReplayFixture extends StudyInstallFixture {
 	readonly profile: StudyProfile
+}
+
+/** Holds the grouped R2 protocol fixture and its exact public declarations. */
+export interface MemoryScreenFixture extends StudyInstallFixture {
+	readonly admission: string
+	readonly profile: StudyProfile
+	readonly definition: StudyDefinition
+	readonly scenarios: readonly StudyScenario[]
+	readonly rubric: StudyRubric
+}
+
+/** Selects observations applied exclusively to copied fixture inputs before capture. */
+export interface MemoryScreenFixtureOptions {
+	/** Records the actual worker's selected Agent constructor and runtime files. */
+	readonly identity?: boolean
+	/** Selects an already installed real Study package for the mismatched-host control. */
+	readonly study?: string
+}
+
+/** Holds a fixture-local launcher and its physical-input receipt. */
+export interface MemoryScreenLauncherFixture {
+	readonly launcher: string
+	readonly physical: string
+	readonly trace: string
+	readonly original: string
+}
+
+/** Owns a real screen session, recorded exchange sink and loopback peer for focused controls. */
+export interface MemoryScreenSessionFixture {
+	readonly session: StudySessionInterface
+	readonly profile: StudyProfile
+	readonly scenario: StudyScenario
+	readonly server: MemoryServerFixture
+	readonly context: MemoryContextFixture
+	close(): Promise<void>
+}
+
+/** Exposes actual constructor-owned resources and disk descriptor for a real retention failure. */
+export interface MemoryCleanupFixture extends MemoryScreenSessionFixture {
+	readonly agent: AgentInterface
+	readonly file: FileHandle
+	readonly path: string
+}
+
+/** Places a real retention boundary behind an externally released observation gate. */
+export interface MemoryCleanupOptions {
+	readonly responses?: readonly MemoryWireFixture[]
+	readonly boundary?: 'eof' | 'admitted'
+	readonly entered?: () => void
+	readonly release?: Promise<void>
+}
+
+/** Owns real providers and the shared screen counter before any Agent tool dispatch. */
+export interface MemoryScreenBoundaryFixture {
+	readonly native: ProviderInterface
+	readonly screen: StudyMemoryScreen
+	readonly provider: ProviderInterface
+	readonly judge: JudgeInterface
+	readonly server: MemoryServerFixture
+	readonly context: MemoryContextFixture
+	close(): Promise<void>
 }
 
 /** Holds optional recording horizon and execution-owned daemon declarations. */

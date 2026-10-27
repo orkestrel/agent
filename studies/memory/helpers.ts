@@ -1,11 +1,21 @@
 import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerGauge, Message } from '@orkestrel/agent'
-import type { StudyJudgment, StudyProfile, StudyProvider, StudyRoom } from '@orkestrel/study'
+import type {
+	StudyJudgment,
+	StudyProfile,
+	StudyProvider,
+	StudyRoom,
+	StudyScenario,
+	StudyDefinition,
+	StudyIdentity,
+} from '@orkestrel/study'
 import type {
 	StudyGradeReading,
 	StudyGradeTarget,
 	StudyOllamaTransportOptions,
 	StudyReference,
+	StudyClosure,
+	ArtifactFile,
 } from '@orkestrel/study/server'
 import type {
 	StudyMemoryArm,
@@ -23,6 +33,12 @@ import type {
 	StudyMemoryDifferential,
 	StudyMemoryDifferentialOptions,
 	StudyMemorySelection,
+	StudyMemoryScreenTarget,
+	StudyMemoryScreenReading,
+	StudyMemoryScreenAdmission,
+	StudyMemoryScreenTrial,
+	StudyMemoryScreenStep,
+	StudyMemoryScreenTreatment,
 } from './types.js'
 import {
 	isRecord,
@@ -33,16 +49,40 @@ import {
 	attempt,
 	canonicalStringify,
 } from '@orkestrel/contract'
-import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
+import {
+	StudyError,
+	isStudyProvider,
+	isStudyRoom,
+	isStudyProfile,
+	buildStudySchedule,
+	parseStudyProfile,
+} from '@orkestrel/study'
 import {
 	collectStudyEvidence,
 	readStudyExchanges,
 	readStudyExchangeRows,
 	scanStudyDivergence,
+	hashStudyBytes,
+	readStudyResult,
+	readStudyReplayHistory,
+	validateStudyRecordingDeclaration,
+	valueToWire,
+	ArtifactLoader,
+	resolveStudyInstrument,
+	verifyArtifactClosure,
 } from '@orkestrel/study/server'
+import { realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { STUDY_MEMORY_ROW_BYTES, STUDY_MEMORY_MEMBERS, STUDY_MEMORY_EXCERPT } from './constants.js'
+import { join, relative, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import {
+	STUDY_MEMORY_ROW_BYTES,
+	STUDY_MEMORY_MEMBERS,
+	STUDY_MEMORY_EXCERPT,
+	STUDY_MEMORY_HOST_FILES,
+	STUDY_MEMORY_HOST_FILE_BYTES,
+	STUDY_MEMORY_HOST_BYTES,
+} from './constants.js'
 import {
 	isStudyMemoryAssertion,
 	isStudyMemoryOptions,
@@ -50,8 +90,71 @@ import {
 	isStudyMemoryReceipt,
 	isStudyMemoryDeclaration,
 	isStudyMemoryProvenance,
+	isStudyMemoryInput,
 } from './validators.js'
 
+/** Derives the host's complete admitted runtime membership through the public loader.
+ * @param entry - Canonical native CLI entry.
+ * @returns Bounded portable runtime members.
+ */
+export function readStudyMemoryHost(entry: string): readonly ArtifactFile[] {
+	if (realpathSync(entry) !== entry)
+		throw new StudyError('CUSTODY', 'Screen host entry must be canonical')
+	const root = resolveStudyInstrument(entry)
+	const inventory = new ArtifactLoader({
+		entries: [entry],
+		roots: [root],
+		instrument: root,
+	}).inspect()
+	let bytes = 0
+	if (inventory.files.length > STUDY_MEMORY_HOST_FILES)
+		throw new StudyError('CUSTODY', 'Screen host member count exceeded')
+	return inventory.files
+		.map((file) => {
+			bytes += file.size
+			if (file.size > STUDY_MEMORY_HOST_FILE_BYTES || bytes > STUDY_MEMORY_HOST_BYTES)
+				throw new StudyError('CUSTODY', 'Screen host member bytes exceeded')
+			return { ...file, path: relative(root, file.path).split(sep).join('/') }
+		})
+		.sort((left, right) => left.path.localeCompare(right.path))
+}
+
+/** Binds native, retained and declared runtime membership before any Study check.
+ * @param closure - Internally verified retained capture.
+ * @param entry - Root-selected native Study executable.
+ * @throws StudyError - A stale or differently selected host is refused.
+ */
+export function validateStudyMemoryHost(closure: StudyClosure, entry: string): void {
+	const root = resolveStudyInstrument(entry)
+	for (const specifier of ['@orkestrel/study', '@orkestrel/study/server']) {
+		if (resolveStudyInstrument(fileURLToPath(import.meta.resolve(specifier))) !== root)
+			throw new StudyError('CUSTODY', 'Screen native Study differs from selected host')
+	}
+	verifyArtifactClosure(closure.closure, true)
+	const retained = resolveStudyInstrument(closure.entry)
+	if (closure.closure.options.instrument !== retained)
+		throw new StudyError('CUSTODY', 'Screen closure instrument differs from its entry')
+	const prefix = relative(closure.closure.destination, retained).split(sep).join('/') + '/'
+	const declared = closure.closure.members
+		.filter((member) => member.key.startsWith(prefix))
+		.map((member) => ({
+			path: member.key.slice(prefix.length),
+			size: member.size,
+			digest: member.digest,
+		}))
+		.sort((left, right) => left.path.localeCompare(right.path))
+	const expected = canonicalStringify(readStudyMemoryHost(entry))
+	const actual = canonicalStringify(readStudyMemoryHost(closure.entry))
+	const recorded = canonicalStringify(declared)
+	if (
+		expected === undefined ||
+		actual === undefined ||
+		recorded === undefined ||
+		expected !== actual ||
+		actual !== recorded
+	)
+		throw new StudyError('CUSTODY', 'Screen retained Study differs from selected host')
+}
 /** Finds the first parsed request member difference in declared precedence order.
  * @remarks Message content offsets count UTF-16 code units; other differences use canonical JSON.
  * Excerpts retain at most the declared bound around that offset. Provenance belongs only to the
@@ -664,8 +767,430 @@ export function validateStudyMemoryProfile(
 			'Memory requires an exact judge model and digest where one is used',
 		)
 	if (!isStudyRoom(room)) throw new StudyError('CONFIG', 'Memory room declaration is invalid')
+	const settings = isStudyMemoryOptions(profile.settings) ? profile.settings : undefined
+	const screen = settings?.screen
+	if (screen !== undefined && screen !== false) {
+		if (!isStudyProfile(profile))
+			throw new StudyError('CONFIG', 'Screen requires a finite parsed profile')
+		if (
+			arms.some((arm) => arm !== 'records') ||
+			settings?.observe !== true ||
+			profile.record === undefined ||
+			settings.procedure !== undefined ||
+			settings.ledger?.lexical !== false ||
+			settings.ledger.recent !== false ||
+			typeof settings.ledger.work !== 'boolean' ||
+			room.context !== 20480 ||
+			room.output !== 8192 ||
+			room.safety !== 512 ||
+			room.think !== false ||
+			settings.rolling !== undefined ||
+			settings.instructions !== undefined ||
+			settings.lookup?.grammar === true
+		)
+			throw new StudyError(
+				'CONFIG',
+				'Screen requires observed recorded records, fixed policy and explicit isolated Ledger switches',
+			)
+		if (
+			(screen.preparation && settings.ledger.work) ||
+			(screen.sham === true && settings.ledger.work)
+		)
+			throw new StudyError('CONFIG', 'Screen preparation and sham require work false')
+		if (
+			profile.bounds.goal.duration > 180000 ||
+			profile.bounds.trial.duration > 200000 ||
+			profile.bounds.series.duration > (screen.preparation ? 900000 : 225000) ||
+			profile.record.calls > 70 ||
+			profile.record.duration > (screen.preparation ? 200000 : 56250)
+		)
+			throw new StudyError('CONFIG', 'Screen profile exceeds the approved finite envelope')
+		if (
+			profile.record.bytes > 67108864 ||
+			profile.bounds.request.duration > (screen.preparation ? 180000 : 56250) ||
+			profile.bounds.request.calls !== 1 ||
+			profile.bounds.request.tokens > 19968 ||
+			profile.bounds.request.bytes > 1048576 ||
+			profile.bounds.goal.calls > 74 ||
+			profile.bounds.trial.calls > 74 ||
+			profile.bounds.series.calls > 296 ||
+			profile.bounds.goal.tokens > 1477632 ||
+			profile.bounds.trial.tokens > 1477632 ||
+			profile.bounds.series.tokens > 5910528 ||
+			profile.bounds.goal.bytes > 83886080 ||
+			profile.bounds.trial.bytes > 167772160 ||
+			profile.bounds.series.bytes > 1073741824
+		)
+			throw new StudyError(
+				'CONFIG',
+				'Screen profile exceeds the approved request or cumulative inventory',
+			)
+	}
 	if (arms.includes('compaction') && room.recap === undefined)
 		throw new StudyError('CONFIG', 'Memory compaction requires a declared recap allowance')
+}
+
+/** Verifies the final-space sham against the source's exact body identity. @param body - Actual encoded body. @param prompt - Original identified user input. @param digest - Source body digest. @returns True only for the sole permitted terminal space difference; false otherwise. */
+export function matchesStudyMemorySham(body: string, prompt: string, digest: string): boolean {
+	const parsed = parseJSON(body)
+	if (!isRecord(parsed) || !isArray(parsed.messages)) return false
+	const messages = parsed.messages
+	const matches = messages.filter(
+		(message) => isRecord(message) && message.role === 'user' && message.content === `${prompt} `,
+	)
+	if (matches.length !== 1) return false
+	const restored = {
+		...parsed,
+		messages: messages.map((message) =>
+			message === matches[0] && isRecord(message) ? { ...message, content: prompt } : message,
+		),
+	}
+	return hashStudyBytes(JSON.stringify(restored)) === digest
+}
+
+/** Binds a public two-goal scenario to exact canonical bytes. @param scenario - Public declaration. @returns Its immutable screen identity. @throws StudyError - Thrown for a horizon other than seed and target. */
+export function buildStudyMemoryTarget(scenario: StudyScenario): StudyMemoryScreenTarget {
+	const [seed, target] = scenario.goals
+	if (scenario.goals.length !== 2 || seed === undefined || target === undefined)
+		throw new StudyError('CONFIG', 'Screen requires exactly two ordered goals')
+	return {
+		scenario: scenario.id,
+		digest: computeStudyMemoryDigest(scenario),
+		seed: { id: seed.id, digest: computeStudyMemoryDigest(seed) },
+		target: { id: target.id, digest: computeStudyMemoryDigest(target) },
+	}
+}
+
+/** Hashes a serializable consumer identity with the installed canonical encoder. @param value - Declaration or identity. @returns SHA-256 of its canonical JSON. @throws StudyError - Thrown when no JSON value exists. */
+export function computeStudyMemoryDigest(value: unknown): string {
+	const text = canonicalStringify(value)
+	if (text === undefined) throw new StudyError('CONFIG', 'Screen identity is not serializable')
+	return hashStudyBytes(text)
+}
+
+/** Checks the frozen grouped public population before module execution. @param definition - Study declaration. @param scenarios - Ordered public cases. @param profile - Parsed profile. @returns Nothing for an admitted population. */
+export function validateStudyMemoryScreen(
+	definition: StudyDefinition,
+	scenarios: readonly StudyScenario[],
+	profile: StudyProfile,
+): void {
+	const settings = isStudyMemoryOptions(profile.settings) ? profile.settings : undefined
+	const screen = settings?.screen
+	if (screen === undefined || screen === false) return
+	if (
+		definition.name !== 'r2-request-screen' ||
+		definition.purpose !== 'mechanism' ||
+		definition.retries !== 0 ||
+		canonicalStringify(definition.arms) !== '["records"]' ||
+		canonicalStringify(definition.order) !== '[["records"]]' ||
+		canonicalStringify(scenarios.map(buildStudyMemoryTarget)) !== canonicalStringify(screen.targets)
+	)
+		throw new StudyError('CONFIG', 'Screen definition or frozen population differs')
+}
+
+/** Checks complete retained text across Ledger's presentation-only bullet separators. @param messages - Actual emitted request messages. @param content - Exact generated draft or released lookup return. @returns True if one emitted message carries all the text in order; false otherwise. */
+export function matchesStudyMemoryCarriage(
+	messages: ReadonlyArray<Pick<Message, 'content'>>,
+	content: string,
+): boolean {
+	const expected = content.replace(/\s+/g, ' ').trim()
+	return (
+		expected.length > 0 &&
+		messages.some((message) =>
+			message.content
+				.replace(/\r?\n- /g, ' ')
+				.replace(/\s+/g, ' ')
+				.includes(expected),
+		)
+	)
+}
+
+/** Compares the installed host's location-independent code, runtime and fixture identities. Path-bound inventory digests are checked within each closure separately. @param source - Source identities. @param matched - Executing identities. @returns Nothing when portable execution identities agree. */
+export function validateStudyMemoryIdentity(source: StudyIdentity, matched: StudyIdentity): void {
+	if (
+		source.runtime !== matched.runtime ||
+		source.content !== matched.content ||
+		source.fixtures !== matched.fixtures
+	)
+		throw new StudyError('CUSTODY', 'Screen runtime, content or public fixture identity differs')
+}
+
+/** Compares every materialized code and public asset byte except the deliberately changed profile. Call only after the official checks verify both closures. @param source - Checked preparation closure. @param matched - Checked matched closure. @returns Nothing for exact portable membership and bytes. */
+export function validateStudyMemoryClosures(source: StudyClosure, matched: StudyClosure): void {
+	validateStudyMemoryIdentity(source.identity, matched.identity)
+	const inventories = [source, matched].map((closure) => {
+		const profile = relative(
+			closure.closure.destination,
+			join(closure.root, 'studies/memory/profiles', `${closure.profile}.json`),
+		)
+			.split(sep)
+			.join('/')
+		return closure.closure.members
+			.filter((member) => member.key !== profile)
+			.map(({ key, digest, size }) => ({ key, digest, size }))
+			.toSorted((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0))
+	})
+	if (canonicalStringify(inventories[0]) !== canonicalStringify(inventories[1]))
+		throw new StudyError('CUSTODY', 'Screen closed code or public asset bytes differ')
+}
+
+/** Reads sealed preparation with the installed custody readers and derives the sole classification cut. @param input - Expected source declarations and checked runtime identity. @returns Exact source receipt with bounded historical model inventory. @throws StudyError - Thrown before dependent execution on incomplete or changed evidence. */
+export async function readStudyMemoryAdmission(
+	input: StudyMemoryScreenReading,
+): Promise<StudyMemoryScreenAdmission> {
+	validateStudyMemoryProfile(input.profile, ['records'])
+	validateStudyMemoryScreen(input.definition, input.scenarios, input.profile)
+	const settings = isStudyMemoryOptions(input.profile.settings) ? input.profile.settings : undefined
+	if (settings?.screen === undefined || settings.screen === false || !settings.screen.preparation)
+		throw new StudyError('CONFIG', 'Admission requires the original preparation profile')
+	const result = await readStudyResult(input.directory)
+	if (
+		result.status !== 'sealed' ||
+		result.manifest.ancestor !== undefined ||
+		canonicalStringify(result.manifest.definition) !== canonicalStringify(input.definition) ||
+		canonicalStringify(result.manifest.scenarios) !== canonicalStringify(input.scenarios) ||
+		canonicalStringify(result.manifest.identity) !== canonicalStringify(input.identity)
+	)
+		throw new StudyError(
+			'CUSTODY',
+			'Screen source is unsealed, derived, or differs from the checked declarations',
+		)
+	const schedule = buildStudySchedule(input.definition, input.scenarios)
+	if (
+		canonicalStringify(schedule) !== canonicalStringify(result.manifest.schedule) ||
+		result.attempts.length !== schedule.length
+	)
+		throw new StudyError('CUSTODY', 'Screen source trial population differs')
+	const evidence = await collectStudyEvidence(result)
+	const trials: StudyMemoryScreenTrial[] = []
+	for (const [index, trial] of schedule.entries()) {
+		const scenario = input.scenarios[index]
+		const [seed, target] = scenario?.goals ?? []
+		const retained = result.attempts.find((entry) => entry.trial.id === trial.id)
+		const rows = evidence[trial.id]
+		if (
+			scenario === undefined ||
+			seed === undefined ||
+			target === undefined ||
+			!isStudyMemoryInput(seed.input) ||
+			!isStudyMemoryInput(target.input) ||
+			seed.input.records.length !== 2 ||
+			target.input.records.length !== 0 ||
+			target.input.arrivals.length !== 0 ||
+			retained === undefined ||
+			!retained.executed ||
+			retained.failure !== undefined ||
+			retained.observations.length !== 2 ||
+			retained.observations.some(
+				(observation) =>
+					!observation.executed ||
+					observation.failure !== undefined ||
+					observation.product?.partial !== false,
+			) ||
+			rows === undefined
+		)
+			throw new StudyError(
+				'CUSTODY',
+				'Screen source requires every complete isolated two-goal product',
+			)
+		const history = await readStudyExchanges(result, trial.id)
+		validateStudyRecordingDeclaration(history.declaration, input.profile, trial, scenario)
+		if (history.declaration.ancestor !== undefined)
+			throw new StudyError('CUSTODY', 'Screen preparation cannot inherit replay timing')
+		const models = history.exchanges.filter((exchange) => exchange.attempt.stage === 'execution')
+		const finals = models.filter(
+			(exchange) => exchange.attempt.goal === target.id && exchange.attempt.role === 'agent',
+		)
+		const [final] = finals
+		if (finals.length !== 1 || final === undefined || models.at(-1) !== final)
+			throw new StudyError(
+				'CUSTODY',
+				'Screen source must seal exactly one final target agent response',
+			)
+		const steps = models
+			.filter((exchange) => exchange.attempt.ordinal < final.attempt.ordinal)
+			.map((exchange): StudyMemoryScreenStep => {
+				const request = exchange.attempt
+				if (request.role !== 'agent' && request.role !== 'judge')
+					throw new StudyError('CUSTODY', 'Screen source has an unsupported role')
+				const body = parseJSON(Buffer.from(request.body, 'base64').toString('utf8'))
+				if (
+					!isRecord(body) ||
+					!isRecord(body.options) ||
+					body.options.num_predict !== (request.role === 'agent' ? 8192 : 1)
+				)
+					throw new StudyError('CUSTODY', 'Screen source role policy differs')
+				return {
+					ordinal: request.ordinal,
+					goal: request.goal,
+					role: request.role,
+					digest: request.digest,
+				}
+			})
+		const classified = steps.at(-1)
+		if (
+			classified?.goal !== target.id ||
+			classified.role !== 'judge' ||
+			classified.ordinal !== final.attempt.ordinal - 1 ||
+			steps.filter((step) => step.goal === target.id).some((step) => step.role !== 'judge')
+		)
+			throw new StudyError('CUSTODY', 'Screen prefix must end at unchanged target classification')
+		const draft = retained.observations.find((observation) => observation.goal === seed.id)?.product
+			?.value
+		if (!isRecord(draft) || typeof draft.content !== 'string' || draft.content.trim() === '')
+			throw new StudyError('CUSTODY', 'Screen actual seed draft is missing')
+		const lookups = seed.input.records.map((record) => ({
+			id: record.id,
+			content: `${record.id}: ${record.name}\n${record.content}`,
+		}))
+		const body = parseJSON(Buffer.from(final.attempt.body, 'base64').toString('utf8'))
+		if (
+			!isRecord(body) ||
+			!isArray(body.messages) ||
+			!body.messages.every(
+				(message): message is Pick<Message, 'content'> =>
+					isRecord(message) && typeof message.content === 'string',
+			) ||
+			!isRecord(body.options) ||
+			body.options.num_predict !== 8192
+		)
+			throw new StudyError('CUSTODY', 'Screen final source body is malformed')
+		for (const lookup of lookups) {
+			const receipts = rows.filter(
+				(row) =>
+					row.goal === seed.id &&
+					row.event === 'lookup' &&
+					isRecord(row.value) &&
+					row.value.id === lookup.id &&
+					row.value.found === true &&
+					row.value.version === hashStudyBytes(lookup.content) &&
+					typeof row.value.message === 'string',
+			)
+			if (receipts.length === 0 || !matchesStudyMemoryCarriage(body.messages, lookup.content))
+				throw new StudyError(
+					'CUSTODY',
+					'Screen required seed receipt or target version carriage is missing',
+				)
+		}
+		const accounts = rows.filter((row) => row.event === 'screen')
+		const finalAccount = accounts.at(-1)?.value
+		if (
+			accounts.length !== 2 ||
+			!isRecord(finalAccount) ||
+			finalAccount.agent !==
+				models.filter((exchange) => exchange.attempt.role === 'agent').length ||
+			finalAccount.judge !==
+				models.filter((exchange) => exchange.attempt.role === 'judge').length ||
+			typeof finalAccount.agent !== 'number' ||
+			finalAccount.agent > 6 ||
+			typeof finalAccount.judge !== 'number' ||
+			finalAccount.judge > 64 ||
+			finalAccount.tokens !== finalAccount.agent * 8192 + finalAccount.judge ||
+			finalAccount.tokens > 49216 ||
+			typeof finalAccount.tools !== 'number' ||
+			finalAccount.tools > 4 ||
+			typeof finalAccount.rounds !== 'number' ||
+			finalAccount.rounds > 2 ||
+			typeof finalAccount.recalls !== 'number' ||
+			finalAccount.recalls > 2
+		)
+			throw new StudyError(
+				'CUSTODY',
+				'Screen source account is missing or exceeds the approved envelope',
+			)
+		const prefix = final.attempt.ordinal - 1
+		await readStudyReplayHistory(
+			{ result: input.directory, prefix: { [trial.id]: prefix }, offline: false },
+			input.profile,
+			trial,
+		)
+		trials.push({
+			id: trial.id,
+			prefix,
+			file: history.file,
+			steps,
+			final: {
+				ordinal: final.attempt.ordinal,
+				goal: target.id,
+				role: 'agent',
+				digest: final.attempt.digest,
+			},
+			draft: draft.content,
+			lookups,
+		})
+	}
+	return {
+		directory: result.directory,
+		result: result.manifest.id,
+		seal: result.seal.id,
+		identity: computeStudyMemoryDigest(result.manifest.identity),
+		trials,
+	}
+}
+
+/** Builds the finite preparation profile over the unchanged serving policy. @param profile - Fixed runtime and recording metadata. @param scenarios - Frozen public population. @returns A parsed profile with the approved nested ceilings. */
+export function buildStudyMemoryPreparation(
+	profile: StudyProfile,
+	scenarios: readonly StudyScenario[],
+): StudyProfile {
+	const result = parseStudyProfile(
+		valueToWire({
+			...profile,
+			name: 'r2-source-04011',
+			qualification: undefined,
+			record: { bytes: 67108864, calls: 70, duration: 200000 },
+			bounds: {
+				request: { duration: 180000, calls: 1, tokens: 19968, bytes: 1048576 },
+				goal: { duration: 180000, calls: 74, tokens: 1477632, bytes: 83886080 },
+				trial: { duration: 200000, calls: 74, tokens: 1477632, bytes: 167772160 },
+				series: { duration: 900000, calls: 296, tokens: 5910528, bytes: 1073741824 },
+			},
+			settings: {
+				...profile.settings,
+				observe: true,
+				ledger: { lexical: false, recent: false, work: false },
+				screen: { preparation: true, targets: scenarios.map(buildStudyMemoryTarget) },
+			},
+		}),
+	)
+	validateStudyMemoryProfile(result, ['records'])
+	return result
+}
+
+/** Builds one matched profile from its strict source receipt without changing the room or provider. @param profile - Preparation profile. @param admission - Strict sealed source receipt. @param treatment - Frozen work and sham controls. @returns A parsed matched profile with independent replay and live bounds. */
+export function buildStudyMemoryMatched(
+	profile: StudyProfile,
+	admission: StudyMemoryScreenAdmission,
+	treatment: StudyMemoryScreenTreatment,
+): StudyProfile {
+	const settings = isStudyMemoryOptions(profile.settings) ? profile.settings : undefined
+	if (settings?.screen === undefined || settings.screen === false || !settings.screen.preparation)
+		throw new StudyError('CONFIG', 'Matched profile requires preparation settings')
+	const result = parseStudyProfile(
+		valueToWire({
+			...profile,
+			name: treatment.name,
+			record: { bytes: 67108864, calls: 70, duration: 56250 },
+			bounds: {
+				...profile.bounds,
+				request: { ...profile.bounds.request, duration: 56250 },
+				trial: { ...profile.bounds.trial, duration: 180000 },
+				series: { ...profile.bounds.series, duration: 225000 },
+			},
+			settings: {
+				...profile.settings,
+				ledger: { lexical: false, recent: false, work: treatment.work },
+				screen: {
+					preparation: false,
+					targets: settings.screen.targets,
+					sham: treatment.sham,
+					admission,
+				},
+			},
+		}),
+	)
+	validateStudyMemoryProfile(result, ['records'])
+	return result
 }
 
 /** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room. @param arm - The treatment; only compaction declares the summary role and the strict native flags, and only records declares the one-token judge. @returns The agent role, plus the summary role for compaction and the judge role for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */

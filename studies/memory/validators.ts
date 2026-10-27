@@ -14,6 +14,10 @@ import type {
 	StudyMemoryLookupOptions,
 	StudyMemoryInstructionOptions,
 	StudyMemoryProvenance,
+	StudyMemoryScreenOptions,
+	StudyMemoryScreenAdmission,
+	StudyMemoryScreenLaunch,
+	StudyMemoryScreenRecipe,
 } from './types.js'
 import type { AgentStop, LedgerReceipt } from '@orkestrel/agent'
 import {
@@ -32,8 +36,12 @@ import {
 	optionalOf,
 } from '@orkestrel/contract'
 import { isTokenUsage } from '@orkestrel/budget'
-import { isStudyAgentRuntime } from '@orkestrel/study'
-import { isStudyOllamaMetadata, isStudyOllamaStep } from '@orkestrel/study/server'
+import { isStudyAgentRuntime, isStudyDigest } from '@orkestrel/study'
+import {
+	isStudyOllamaMetadata,
+	isStudyOllamaStep,
+	isStudyReplaySelection,
+} from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_ENTRIES,
 	STUDY_MEMORY_TEXT,
@@ -41,6 +49,122 @@ import {
 	STUDY_MEMORY_LOOKUP_KEYS,
 	STUDY_MEMORY_INSTRUCTION_KEYS,
 } from './constants.js'
+
+/** Checks the complete root launch selection without admitting unknown overrides. @param value - Decoded root selection. @returns True for the exact public shape; false otherwise. */
+export function isStudyMemoryScreenLaunch(value: unknown): value is StudyMemoryScreenLaunch {
+	return recordOf(
+		{
+			closure: isString,
+			expected: isStudyDigest,
+			output: isString,
+			source: optionalOf(recordOf({ directory: isString, closure: isString, seal: isStudyDigest })),
+			replay: optionalOf(isStudyReplaySelection),
+		},
+		['source', 'replay'],
+	)(value)
+}
+
+/** Checks the serializable result of the root admission boundary. @param value - Decoded recipe. @returns True for a complete fixed argv and receipt; false otherwise. */
+export function isStudyMemoryScreenRecipe(value: unknown): value is StudyMemoryScreenRecipe {
+	return recordOf(
+		{
+			entry: isString,
+			root: isString,
+			fingerprint: isStudyDigest,
+			duration: (duration): duration is number =>
+				isNonNegativeInteger(duration) && duration > 15000 && duration <= 915000,
+			arguments: arrayOf(isString),
+			admission: optionalOf(isStudyMemoryScreenAdmission),
+		},
+		['admission'],
+	)(value)
+}
+
+/** Checks the bounded strict-source receipt shape without granting execution authority. @param value - Candidate receipt. @returns True if its exact members and bounded population hold; false otherwise. */
+export function isStudyMemoryScreenAdmission(value: unknown): value is StudyMemoryScreenAdmission {
+	return holds(
+		() =>
+			recordOf({
+				directory: isString,
+				result: isString,
+				seal: isStudyDigest,
+				identity: isStudyDigest,
+				trials: arrayOf(
+					recordOf({
+						id: isString,
+						prefix: (number): number is number =>
+							isNonNegativeInteger(number) && number > 0 && Number.isSafeInteger(number),
+						file: recordOf({ path: isString, digest: isStudyDigest, bytes: isNonNegativeInteger }),
+						steps: arrayOf(
+							recordOf({
+								ordinal: isNonNegativeInteger,
+								goal: isString,
+								role: (role) => role === 'agent' || role === 'judge',
+								digest: isStudyDigest,
+							}),
+						),
+						final: recordOf({
+							ordinal: isNonNegativeInteger,
+							goal: isString,
+							role: (role) => role === 'agent',
+							digest: isStudyDigest,
+						}),
+						draft: isString,
+						lookups: arrayOf(recordOf({ id: isString, content: isString })),
+					}),
+				),
+			})(value) &&
+			value.trials.length === 4 &&
+			new Set(value.trials.map((trial) => trial.id)).size === 4 &&
+			value.trials.every(
+				(trial) =>
+					trial.steps.length > 0 &&
+					trial.steps.length < 70 &&
+					trial.prefix === trial.final.ordinal - 1 &&
+					trial.draft.trim().length > 0 &&
+					trial.lookups.length === 2 &&
+					new Set(trial.lookups.map((lookup) => lookup.id)).size === 2 &&
+					trial.steps.every(
+						(step, index) =>
+							step.ordinal <= trial.prefix &&
+							(index === 0 || step.ordinal === (trial.steps[index - 1]?.ordinal ?? 0) + 1),
+					),
+			),
+	)
+}
+
+/** Checks the exact opt-in screen settings and frozen case membership. @param value - Candidate settings. @returns True if preparation and matched settings are internally consistent; false otherwise. */
+export function isStudyMemoryScreenOptions(value: unknown): value is StudyMemoryScreenOptions {
+	return holds(
+		() =>
+			recordOf(
+				{
+					preparation: isBoolean,
+					targets: arrayOf(
+						recordOf({
+							scenario: isString,
+							digest: isStudyDigest,
+							seed: recordOf({ id: isString, digest: isStudyDigest }),
+							target: recordOf({ id: isString, digest: isStudyDigest }),
+						}),
+					),
+					sham: optionalOf(isBoolean),
+					admission: optionalOf(isStudyMemoryScreenAdmission),
+				},
+				['sham', 'admission'],
+			)(value) &&
+			value.targets.length === 4 &&
+			value.targets.every(
+				(target, index) =>
+					target.scenario === `r2-${['ivo', 'nadia', 'mara', 'tomas'][index]}-screen` &&
+					target.seed.id === `r2-${['ivo', 'nadia', 'mara', 'tomas'][index]}-seed` &&
+					target.target.id === `r2-${['ivo', 'nadia', 'mara', 'tomas'][index]}-target`,
+			) &&
+			(value.preparation
+				? value.admission === undefined && value.sham !== true
+				: value.admission !== undefined),
+	)
+}
 
 /** Checks the declared boolean instruction settings. @param value - The instruction group. @returns True if every key is admitted and boolean; false otherwise. */
 export function isStudyMemoryInstructionOptions(
@@ -144,11 +268,14 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'ledger',
 						'lookup',
 						'instructions',
+						'screen',
 					].includes(key),
 			)
 		)
 			return false
 		const { gauge, observe, checkpoints, rolling, metadata, version, procedure, ledger } = value
+		if ('screen' in value && value.screen !== false && !isStudyMemoryScreenOptions(value.screen))
+			return false
 		if ('ledger' in value && !isStudyMemoryLedgerOptions(ledger)) return false
 		if ('lookup' in value && !isStudyMemoryLookupOptions(value.lookup)) return false
 		if ('instructions' in value && !isStudyMemoryInstructionOptions(value.instructions))

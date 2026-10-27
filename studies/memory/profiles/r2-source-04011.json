@@ -1,0 +1,155 @@
+{
+	"name": "r2-source-04011",
+	"agent": "dist/src/core/index.js",
+	"subject": "dist/src/core/index.js",
+	"roots": [
+		".",
+		"node_modules/@orkestrel/agent",
+		"node_modules/@orkestrel/ollama",
+		"node_modules/@orkestrel/study",
+		"node_modules/@orkestrel/abort",
+		"node_modules/@orkestrel/budget",
+		"node_modules/@orkestrel/contract",
+		"node_modules/@orkestrel/database",
+		"node_modules/@orkestrel/emitter",
+		"node_modules/@orkestrel/process",
+		"node_modules/@orkestrel/queue",
+		"node_modules/@orkestrel/timeout",
+		"node_modules/@orkestrel/tool",
+		"node_modules/@orkestrel/workflow",
+		"node_modules/@orkestrel/workspace",
+		"node_modules/@orkestrel/ndjson",
+		"node_modules/@orkestrel/indexeddb",
+		"node_modules/@orkestrel/sqlite"
+	],
+	"bounds": {
+		"request": {
+			"duration": 180000,
+			"calls": 1,
+			"tokens": 19968,
+			"bytes": 1048576
+		},
+		"goal": {
+			"duration": 180000,
+			"calls": 74,
+			"tokens": 1477632,
+			"bytes": 83886080
+		},
+		"trial": {
+			"duration": 200000,
+			"calls": 74,
+			"tokens": 1477632,
+			"bytes": 167772160
+		},
+		"series": {
+			"duration": 900000,
+			"calls": 296,
+			"tokens": 5910528,
+			"bytes": 1073741824
+		}
+	},
+	"room": {
+		"context": 20480,
+		"output": 8192,
+		"safety": 512,
+		"think": false
+	},
+	"provider": {
+		"entry": "node_modules/@orkestrel/ollama/dist/src/core/index.js",
+		"url": "http://127.0.0.1:11435",
+		"model": "qwen3.5:4b-q4_K_M",
+		"judge": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
+		"digest": {
+			"model": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
+			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+		},
+		"daemon": {
+			"executable": "C:\\Users\\mikes\\scoop\\apps\\ollama-full\\0.40.11\\ollama.exe",
+			"digest": "cc00918e2d25577969c929a1004be054781b8bff25819c1be19ca2f7b7bb4012",
+			"version": "0.40.11",
+			"environment": {},
+			"models": [
+				{
+					"name": "qwen3.5:4b-q4_K_M",
+					"digest": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04"
+				},
+				{
+					"name": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
+					"digest": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+				}
+			]
+		}
+	},
+	"settings": {
+		"version": "0.40.11",
+		"metadata": {
+			"calls": 64,
+			"bytes": 1048576,
+			"duration": 30000
+		},
+		"observe": true,
+		"ledger": {
+			"lexical": false,
+			"recent": false,
+			"work": false
+		},
+		"screen": {
+			"preparation": true,
+			"targets": [
+				{
+					"scenario": "r2-ivo-screen",
+					"digest": "ecffbdc6e4fcbc96c032325c102248f82f804fbfd9566bd8b689b158aa5416da",
+					"seed": {
+						"id": "r2-ivo-seed",
+						"digest": "d3f18b9824353741a4b3d901cfb478f2c2e8143a33cf6bdb51f6a67edfe36c93"
+					},
+					"target": {
+						"id": "r2-ivo-target",
+						"digest": "32fdbc8ab2da699d79ef3fdd938ca2981f5f0691b100ada99bff6f4d41cd33eb"
+					}
+				},
+				{
+					"scenario": "r2-nadia-screen",
+					"digest": "213ea66add176bd8c3822561e0a5ceeb41bd33ddb24d26250b53417d725af5b3",
+					"seed": {
+						"id": "r2-nadia-seed",
+						"digest": "abb6604a11b7c9c32598ac2f577c2348f85852ceb59d7a5da79b90ff8a44a50b"
+					},
+					"target": {
+						"id": "r2-nadia-target",
+						"digest": "35aa00f7683bf72bb51a965f3c394d49401aafe41f68ca6060075c7ca94ae2df"
+					}
+				},
+				{
+					"scenario": "r2-mara-screen",
+					"digest": "2e6fbf6168708d13a6e82ec93420af8d8a2d397c898734f6139abae7ead4ad3a",
+					"seed": {
+						"id": "r2-mara-seed",
+						"digest": "a773c3e14c95d48065d0f826c3fcfabcd94dee50ac8675e0b4affa82acd4df7f"
+					},
+					"target": {
+						"id": "r2-mara-target",
+						"digest": "d0beff812ecf0b0395c493b9e9d5a86dbdd2be49b413623a574cb403cfa2e4e8"
+					}
+				},
+				{
+					"scenario": "r2-tomas-screen",
+					"digest": "984831688787de6ebe40c2c91c3e32f751b065c14305cc89431a53a46358ade2",
+					"seed": {
+						"id": "r2-tomas-seed",
+						"digest": "109e02f1161e4d565bf8049459033afdf05695bccfa5254fdd7fe6215fc71884"
+					},
+					"target": {
+						"id": "r2-tomas-target",
+						"digest": "6e114bb407e0a80a10651ec7814e48ae54cb0819c7abe37af50f513a39715cf6"
+					}
+				}
+			]
+		}
+	},
+	"record": {
+		"bytes": 67108864,
+		"calls": 70,
+		"duration": 200000
+	}
+}

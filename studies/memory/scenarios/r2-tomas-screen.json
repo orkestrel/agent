@@ -1,0 +1,57 @@
+{
+	"id": "r2-tomas-screen",
+	"goals": [
+		{
+			"id": "r2-tomas-seed",
+			"input": {
+				"prompt": "This is an isolated development case for Tomas Wren, order BC-7304, account BC-4104, at 2031-02-05. This trial has no previous shift, handoff, message, or action history. Only the released sources and lookup records exist; do not invent other cases or prior commitments. Prepare a draft work note in at most 180 words. Use the headings Proposed action, Owner, Blocker, and Evidence status. Name one next feasible action, its responsible owner, and the evidence or approval still needed. Include the relevant amount and its status. Distinguish a written draft or authorization from an externally initiated or completed action. Do not name this request or another goal ID in the note. Before writing the draft, call lookup with id order:BC-7304 and lookup with id customer:BC-4104. Use both actual lookup replies and the released sources. Then write the draft; do not claim that a lookup or a written note completed any external action.",
+				"arrivals": [
+					{
+						"id": "endurance-desk",
+						"content": "You are the support operator for Beacon Cooperative. Maintain one continuous work history and answer the current desk request. Treat external source messages and actual lookup receipts as evidence. Distinguish approval, draft preparation, initiation, and completion. Preserve unfinished obligations and revise your earlier work when facts change. Do not invent tool receipts, sent messages, completed refunds, shipments, deliveries, or closed cases. Available read-only lookup tools are lookup with an id of order:<order id> and lookup with an id of customer:<account id>. They reveal the version released by the current source boundary. Your written packet is a draft unless an external source confirms the action."
+					},
+					{
+						"id": "endurance-day:2031-02-05",
+						"content": "Current workday: 2031-02-05."
+					},
+					{
+						"id": "ev-source-4-1",
+						"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.1] Tomas Wren, Eastmere greenhouse: The circulation pump stops after about twenty minutes. It restarts after cooling. We bought it five months ago and need a dependable repair before planting resumes. I have not opened the housing because the warranty sticker says doing so can affect coverage. The controller displays code T4. Please tell me what evidence your service team needs before I ship a wet pump. A quick replacement would help, but I am not asking you to assume that a symptom proves a manufacturing defect."
+					},
+					{
+						"id": "ev-source-4-2",
+						"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.2] Warranty desk WD-7304: This pump has a twelve-month parts warranty. Coverage requires a serial photograph and a technician's fault classification. The customer's code report is useful diagnostic evidence but not the classification. A blocked inlet is maintained at the customer's expense; an internal thermal-switch defect is covered. The paid invoice is $460.00 plus 5% tax, total $483.00. A warranty replacement is no charge and does not refund the paid invoice. Shipping instructions require a drain-and-pack declaration before a collection can be booked."
+					},
+					{
+						"id": "ev-source-4-3",
+						"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.3] Technical service TS-7304: Ask for the inlet-screen photograph and the serial sticker, and ask whether the pump sits on the supplied mounting feet. Do not direct Tomas to defeat the thermal cutoff. Technician Elin Park will review the images. Until their classification arrives, quote no diagnosis as confirmed. The customer can suspend use and isolate power. If the packet proposes collection, describe it as conditional on the drain-and-pack declaration, and name the missing declaration as the next action."
+					},
+					{
+						"id": "ev-source-4-4",
+						"content": "[2031-02-05; Tomas Wren; BC-7304; document 4.4] Operations authorization OA-7304: A loan pump may be reserved for Eastmere through shift 9. The reservation costs Beacon $35.00 internally and must not appear as a customer repair charge. Sending the loan requires confirmation that its connector matches the greenhouse's plumbing. No connector dimensions are in the order record yet. Carry that compatibility check separately from the warranty claim. A promise of a loan shipment would be premature even if the original pump is eventually covered."
+					}
+				],
+				"records": [
+					{
+						"id": "order:BC-7304",
+						"name": "Tomas Wren",
+						"content": "Order BC-7304; owner Tomas Wren; pump $483.00 settled; warranty diagnosis pending; loan connector unknown; no collection booking."
+					},
+					{
+						"id": "customer:BC-4104",
+						"name": "Tomas Wren",
+						"content": "Account BC-4104; owner Tomas Wren; order BC-7304; authorized correspondence follows the account-contact notice in this case. Active email tomas.wren@bc-4104.example."
+					}
+				]
+			}
+		},
+		{
+			"id": "r2-tomas-target",
+			"input": {
+				"prompt": "Continue only this isolated development case for Tomas Wren, order BC-7304, account BC-4104, at 2031-02-05. The sole earlier work item is r2-tomas-seed. No new source, lookup version, receipt, or external action has arrived since that draft. Use the unchanged source evidence and lookup receipts already released in this trial. Do not call a tool in this reply. In at most 250 words, use the headings Earlier draft, Current evidence, and Next action. Compare with your draft r2-tomas-seed if its actual wording is available. If it is unavailable, state that limitation explicitly and answer from the released external evidence; do not reconstruct or invent prior wording. Any attributed earlier claim must agree with the actual draft and remain labeled as a draft. Reconcile any earlier mistake against the released evidence rather than preserving it for consistency. State the correct financial position, immediate owner, blocker, and next feasible action. Keep the case open where evidence is pending. A draft, authorization, reservation, or intention is not proof of submission, refund posting, collection, shipment, delivery, diagnosis, or closure.",
+				"arrivals": [],
+				"records": []
+			}
+		}
+	]
+}

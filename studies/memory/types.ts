@@ -5,15 +5,24 @@ import type {
 	LedgerGauge,
 	LedgerReceipt,
 	LedgerOptions,
+	Message,
 	createConversationManager,
 	createLedger,
 } from '@orkestrel/agent'
 import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/ollama'
-import type { StudyAgentRuntime, StudyProfile } from '@orkestrel/study'
+import type {
+	StudyAgentRuntime,
+	StudyProfile,
+	StudyTrial,
+	StudyScenario,
+	StudyDefinition,
+	StudyIdentity,
+} from '@orkestrel/study'
 import type {
 	StudyExchangeSinkInterface,
 	StudyOllamaMetadata,
 	StudyOllamaReplayInterface,
+	StudyOllamaReplaySelection,
 	StudyOllamaStep,
 	StudyExchangeDivergence,
 	StudyResultReading,
@@ -22,6 +31,8 @@ import type {
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
+	/** Admits the finite R2 preparation or one-response comparison; omission and false allocate nothing. */
+	readonly screen?: false | StudyMemoryScreenOptions
 	/** Forwards declared default-off Ledger treatments on the records arm only. */
 	readonly ledger?: StudyMemoryLedgerOptions
 	/** Configures the lookup tool on every memory arm. */
@@ -199,6 +210,8 @@ export type StudyMemoryArm = 'records' | 'compaction' | 'full'
  * `ledger` and `classifier` are present exactly for the records arm; no other arm requires them.
  */
 export interface StudyMemorySessionOptions {
+	/** Binds an enabled screen to its scheduled trial. */
+	readonly trial?: StudyTrial
 	readonly agent: StudyMemoryRuntime
 	readonly ledger: StudyMemoryLedger | undefined
 	readonly provider: StudyMemoryProvider
@@ -208,6 +221,126 @@ export interface StudyMemorySessionOptions {
 	readonly signal: AbortSignal
 	readonly exchanges?: StudyExchangeSinkInterface | undefined
 	readonly replay?: StudyOllamaReplayInterface | undefined
+}
+
+/** Binds one public goal to its exact canonical declaration. */
+export interface StudyMemoryScreenGoal {
+	readonly id: string
+	readonly digest: string
+}
+
+/** Freezes an isolated seed and terminal target in the grouped population. */
+export interface StudyMemoryScreenTarget {
+	readonly scenario: string
+	readonly digest: string
+	readonly seed: StudyMemoryScreenGoal
+	readonly target: StudyMemoryScreenGoal
+}
+
+/** Selects the U34 resource account without changing provider policy. */
+export interface StudyMemoryScreenOptions {
+	readonly preparation: boolean
+	readonly targets: readonly StudyMemoryScreenTarget[]
+	/** Appends one terminal space to the identified final provider input if true. Default: false. */
+	readonly sham?: boolean
+	/** Binds matched execution to a strict source reading; absent during preparation. */
+	readonly admission?: StudyMemoryScreenAdmission
+}
+
+/** Retains the exact model-request identity permitted inside the replay prefix. */
+export interface StudyMemoryScreenStep {
+	readonly ordinal: number
+	readonly goal: string
+	readonly role: 'agent' | 'judge'
+	readonly digest: string
+}
+
+/** Binds a required receipt to its public snapshot and actual tool message. */
+export interface StudyMemoryScreenLookup {
+	readonly id: string
+	readonly content: string
+}
+
+/** Binds the source trial's classification cut and independently retained evidence. */
+export interface StudyMemoryScreenTrial {
+	readonly id: string
+	readonly prefix: number
+	readonly file: { readonly path: string; readonly digest: string; readonly bytes: number }
+	readonly steps: readonly StudyMemoryScreenStep[]
+	readonly final: StudyMemoryScreenStep
+	readonly draft: string
+	readonly lookups: readonly StudyMemoryScreenLookup[]
+}
+
+/** Retains a strict source receipt; a receipt alone grants no CLI execution permission. */
+export interface StudyMemoryScreenAdmission {
+	readonly directory: string
+	readonly result: string
+	readonly seal: string
+	readonly identity: string
+	readonly trials: readonly StudyMemoryScreenTrial[]
+}
+
+/** Supplies frozen public declarations to the pre-daemon admission reader. */
+export interface StudyMemoryScreenReading {
+	readonly directory: string
+	readonly definition: StudyDefinition
+	readonly scenarios: readonly StudyScenario[]
+	readonly profile: StudyProfile
+	readonly identity: StudyIdentity
+}
+
+/** Declares the exact root-owned selection checked before daemon startup. */
+export interface StudyMemoryScreenLaunch {
+	readonly closure: string
+	readonly expected: string
+	readonly output: string
+	/** Holds the sealed preparation and its immutable source closure for matched work. */
+	readonly source?: { readonly directory: string; readonly closure: string; readonly seal: string }
+	/** Holds the exact proposed CLI selection; absence is required for preparation. */
+	readonly replay?: StudyOllamaReplaySelection
+}
+
+/** Returns the only CLI arguments admitted by the root consumer boundary. */
+export interface StudyMemoryScreenRecipe {
+	readonly entry: string
+	readonly root: string
+	readonly arguments: readonly string[]
+	readonly fingerprint: string
+	/** Bounds the native command, including the installed host's 15-second cleanup allowance. */
+	readonly duration: number
+	readonly admission: StudyMemoryScreenAdmission | undefined
+}
+
+/** Returns the strict preparation receipt and all four fixed matched profiles before any arm runs. */
+export interface StudyMemoryScreenPopulation {
+	readonly admission: StudyMemoryScreenAdmission
+	readonly profiles: readonly StudyProfile[]
+}
+
+/** Selects the public matched profile without adding provider options. */
+export interface StudyMemoryScreenTreatment {
+	readonly name: string
+	readonly work: boolean
+	readonly sham: boolean
+}
+
+/** Holds the monotone account retained after every attempted boundary. */
+export interface StudyMemoryScreenAccount {
+	readonly agent: number
+	readonly judge: number
+	readonly tokens: number
+	readonly rounds: number
+	readonly tools: number
+	readonly recalls: number
+}
+
+/** Holds the immutable identity snapshot of an executing screen goal. */
+export interface StudyMemoryScreenActivity {
+	readonly goal: string
+	readonly input: StudyMemoryInput
+	readonly prior: ReadonlySet<string>
+	readonly messages: () => readonly Message[]
 }
 
 /** Holds mechanical predicates over retained observations. */

@@ -1,5 +1,8 @@
 import type { MemoryTrialFixture } from './types.js'
 import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import { createTool } from '@orkestrel/tool'
+import { readStudyExchangeRows } from '@orkestrel/study/server'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
@@ -11,6 +14,8 @@ import {
 } from '../../../studies/memory/index.js'
 import {
 	buildMemoryEdge,
+	createMemoryCleanupFixture,
+	createMemoryLedgerFixture,
 	buildMemorySelectionResult,
 	STUDY_MEMORY_SELECTION_MESSAGES,
 	STUDY_MEMORY_PASSIVITY_CASES,
@@ -63,6 +68,187 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
+	it('publishes the same close promise before a real tool abort listener reenters', async () => {
+		const entered = Promise.withResolvers<void>()
+		let reentrant: Promise<void> | undefined
+		const fixture = await createMemoryCleanupFixture({
+			responses: [
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'park', arguments: {} } }],
+					}),
+				},
+			],
+		})
+		fixture.agent.context.tools.add(
+			createTool({
+				name: 'park',
+				description: 'Wait for the actual caller cancellation.',
+				parameters: { type: 'object', properties: {} },
+				execute: (_args, context) => {
+					const waiting = Promise.withResolvers<string>()
+					context.signal.addEventListener(
+						'abort',
+						() => {
+							reentrant = fixture.session.close()
+							waiting.resolve('Cancelled')
+						},
+						{ once: true },
+					)
+					entered.resolve()
+					return waiting.promise
+				},
+			}),
+		)
+		try {
+			const goal = fixture.scenario.goals[0]
+			if (goal === undefined) throw new Error('Missing cleanup goal')
+			const running = fixture.session.execute(goal, fixture.context.context).then(
+				() => 'fulfilled',
+				() => 'rejected',
+			)
+			await entered.promise
+			const closing = fixture.session.close()
+			expect(reentrant).toBe(closing)
+			await closing
+			expect(await running).toBe('rejected')
+			expect(fixture.agent.context.tools.count).toBe(0)
+			expect(fixture.server.requests.filter((row) => row.path === '/api/chat')).toHaveLength(1)
+		} finally {
+			await fixture.close()
+		}
+	})
+	it.each(['eof', 'admitted'] as const)(
+		'joins real session close at %s without inventing another terminal',
+		async (boundary) => {
+			const entered = Promise.withResolvers<void>()
+			const release = Promise.withResolvers<void>()
+			const body =
+				'{"model":"model","message":{"role":"assistant","content":"Known terminal."},"done":true,"done_reason":"stop","prompt_eval_count":7,"eval_count":2}\n'
+			const fixture = await createMemoryCleanupFixture({
+				boundary,
+				entered: entered.resolve,
+				release: release.promise,
+				responses: [{ path: '/api/chat', body }],
+			})
+			try {
+				const goal = fixture.scenario.goals[0]
+				if (goal === undefined) throw new Error('Missing cleanup goal')
+				const running = fixture.session.execute(goal, fixture.context.context).then(
+					() => 'fulfilled',
+					() => 'rejected',
+				)
+				await entered.promise
+				const closing = fixture.session.close()
+				let closed = false
+				void closing.then(() => {
+					closed = true
+				})
+				await readFile(fixture.path)
+				expect(closed).toBe(false)
+				release.resolve()
+				await closing
+				const outcome = await running
+				const rows = readStudyExchangeRows(await readFile(fixture.path), false)
+				const terminals = rows.filter(
+					(row) =>
+						(row.phase === 'response' || row.phase === 'failure') && row.stage === 'execution',
+				)
+				expect(terminals).toHaveLength(1)
+				expect(terminals[0]).toMatchObject(
+					boundary === 'eof'
+						? {
+								phase: 'failure',
+								reason: 'Memory session closed',
+								response: { body: Buffer.from(body).toString('base64') },
+							}
+						: { phase: 'response', body: Buffer.from(body).toString('base64') },
+				)
+				expect({ boundary, outcome }).not.toEqual({ boundary: 'eof', outcome: 'fulfilled' })
+				expect(
+					fixture.context.evidence
+						.filter((row) => row.event === 'result')
+						.every((row) => isRecord(row.value) && row.value.partial === true),
+				).toBe(true)
+				const wire = fixture.context.evidence.filter(
+					(row) => row.event === 'wire' && isRecord(row.value) && row.value.role === 'agent',
+				)
+				expect(wire).toHaveLength(1)
+				expect(wire[0]?.value).toMatchObject({ prompt: 7, completion: 2 })
+				expect(fixture.server.requests.filter((row) => row.path === '/api/chat')).toHaveLength(1)
+				expect(fixture.agent.context.tools.count).toBe(0)
+			} finally {
+				release.resolve()
+				await fixture.close()
+			}
+		},
+		5000,
+	)
+	it('releases the real selected records manager after idle session close', async () => {
+		const fixture = await createMemoryLedgerFixture({ ledger: { recent: true } })
+		const tools = fixture.ledger.agent.context.tools
+		try {
+			expect(tools.count).toBeGreaterThan(0)
+			expect(tools.emitter.destroyed).toBe(false)
+			const closing = fixture.session.close()
+			expect(fixture.session.close()).toBe(closing)
+			await closing
+			expect({ count: tools.count, destroyed: tools.emitter.destroyed }).toEqual({
+				count: 0,
+				destroyed: true,
+			})
+			expect(fixture.server.requests).toHaveLength(0)
+		} finally {
+			tools.destroy()
+			await fixture.close()
+		}
+	})
+	it('destroys every real session resource after an EBADF retention failure', async () => {
+		const fixture = await createMemoryCleanupFixture()
+		try {
+			const goal = fixture.scenario.goals[0]
+			if (goal === undefined) throw new Error('Missing cleanup goal')
+			const running = fixture.session.execute(goal, fixture.context.context)
+			const settled = running.then(
+				() => 'fulfilled',
+				() => 'rejected',
+			)
+			await waitForCondition(
+				'real recorded agent dispatch',
+				() => fixture.server.requests.some((request) => request.path === '/api/chat'),
+				{ budget: 3000 },
+			)
+			const tools = fixture.agent.context.tools
+			const conversation = fixture.agent.context.conversations.active
+			if (conversation === undefined) throw new Error('Missing actual conversation')
+			expect(tools.count).toBeGreaterThan(0)
+			await fixture.file.close()
+			const closing = fixture.session.close()
+			expect(fixture.session.close()).toBe(closing)
+			const failure = await closing.then(
+				() => undefined,
+				(error: unknown) => error,
+			)
+			expect(failure).toMatchObject({ code: 'EBADF' })
+			expect(await settled).toBe('rejected')
+			await expect(fixture.close()).rejects.toBeInstanceOf(AggregateError)
+			expect(tools.count).toBe(0)
+			expect(tools.emitter.destroyed).toBe(true)
+			expect(fixture.agent.emitter.destroyed).toBe(true)
+			expect(conversation.emitter.destroyed).toBe(true)
+			await expect(fixture.session.close()).rejects.toBe(failure)
+			await expect(fixture.session.execute(goal, fixture.context.context)).rejects.toThrow(
+				/closed/i,
+			)
+			expect(
+				fixture.server.requests.filter((request) => request.path === '/api/chat'),
+			).toHaveLength(1)
+		} finally {
+			await fixture.close()
+		}
+	})
 	it('bounds metadata independently while preserving a one-call model allowance', async () => {
 		const server = await createMemoryServer()
 		try {

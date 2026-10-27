@@ -66,6 +66,7 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 				'Memory records require the admitted Ledger and judge factories',
 			)
 		return new StudyMemorySession({
+			trial,
 			agent: this.#agent,
 			ledger: records ? this.#ledger : undefined,
 			provider: this.#provider,
