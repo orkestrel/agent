@@ -6,7 +6,11 @@ Agent's boost campaign plan: the handoff of 2026-10-24, then goal, exit, rulings
 - The ladder bench's unit files lived under `tmp/units/ladder/`, which git does not track, and retired on 2026-10-23 (U19): the records moved to `.orkestrel/agent/instruments/ladder-records/` (22,244 files) and the witness tests with their imports to `.orkestrel/agent/instruments/ladder-witnesses/` (67 files), both gitignored and kept on disk until the user sweeps them, and the rest was deleted (518,391 files, 56,995,246,526 bytes). A `tmp/units/ladder/PATH` citation in this file reads at the same relative path under `ladder-records/` or `ladder-witnesses/` when the file moved and names a deleted file otherwise; this file carries every ruling, gate and cap the bench held. A record named with a commit reads through `git show COMMIT:PATH`.
 - R is Records and C is Compaction. A cap written `15/20` is 15 model minutes and 20 elapsed minutes.
 
-## Current checkpoint (2026-10-27, runner qualified on 0.40.11)
+## Current checkpoint (2026-10-27, source batch refused on Ivo's target)
+
+The U34 source batch stopped with `instrument refused` on the first case (`tmp/units/r2-source-run-20261027/report.md`). Ivo's final screen response called `recall` instead of answering, the screen refuses tools on the final response, and the remaining three cases never ran. Charged about 81 s model and about 151 s elapsed of the source accounts. Awaiting the user's disposition; the lane is back with Veneer.
+
+### Prior checkpoint (2026-10-27, runner qualified on 0.40.11)
 
 U42 (`.orkestrel/agent/r2-u42-ruling.md`) gave the screen its own 3 model / 11 elapsed minute allowance. The 0.40.11 runner qualification passed (`tmp/units/r2-runner-qualification-20261027/report.md`): two cold trials sealed with "runner ready" and both lookups found, the offline replay matches live on every non-maintenance request, charged 191 s elapsed and 43 s model. Protocol only: no R2-profile, population or quality result. The shared lane went back to Veneer after the run. Next: population, labels, noise and affordability admission for the four R2 source cases, then the matched evaluation, each needing the lane again.
 
