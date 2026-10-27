@@ -6,13 +6,7 @@ import type {
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { ToolContext, ToolManagerInterface } from '@orkestrel/tool'
-import type {
-	StudyContext,
-	StudyEvidence,
-	StudyGoal,
-	StudyProduct,
-	StudySessionInterface,
-} from '@orkestrel/study'
+import type { StudyContext, StudyGoal, StudyProduct, StudySessionInterface } from '@orkestrel/study'
 import type { StudyOllamaActivity } from '@orkestrel/study/server'
 import type {
 	StudyMemoryInput,
@@ -20,7 +14,6 @@ import type {
 	StudyMemoryProvenanceSource,
 	StudyMemorySessionOptions,
 	StudyMemoryObservation,
-	StudyMemoryArrival,
 } from './types.js'
 import { createBudget } from '@orkestrel/budget'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
@@ -33,55 +26,35 @@ import {
 	buildStudyAgentReadings,
 	buildStudyOllamaModels,
 	buildStudyOllamaOptions,
-	hashStudyBytes,
 } from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_JUDGE,
 	STUDY_MEMORY_METADATA,
 	STUDY_MEMORY_SUMMARY,
 	STUDY_MEMORY_SYSTEM,
-	STUDY_MEMORY_STANDING,
-	STUDY_MEMORY_LOOKUP,
-	STUDY_MEMORY_GRAMMAR,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
-	STUDY_MEMORY_WORKLOAD_BYTES,
 } from './constants.js'
 import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
-	buildStudyMemoryReceipts,
-	buildStudyMemoryResult,
-	buildStudyMemoryEvidence,
-	measureStudyMemoryEvidence,
 	readStudyMemoryCompaction,
 	resolveStudyMemoryObservation,
-	validateStudyMemoryProfile,
 } from './helpers.js'
 import { isStudyMemoryInput, isStudyMemoryOptions } from './validators.js'
-import { StudyMemoryScreen } from './StudyMemoryScreen.js'
-import { StudyMemoryScreenProvider } from './StudyMemoryScreenProvider.js'
-import { StudyMemoryScreenJudge } from './StudyMemoryScreenJudge.js'
 
 /** Preserves actual Agent, Ledger and conversation state across a trial's goals. */
 export class StudyMemorySession implements StudySessionInterface {
 	readonly #options: StudyMemorySessionOptions
 	readonly #transport: StudyOllamaTransport
-	readonly #screen: StudyMemoryScreen | undefined
 	readonly #trace: StudyAgentTrace
 	readonly #tools: ToolManagerInterface
 	readonly #observation: StudyMemoryObservation
-	readonly #goals: readonly string[] | undefined
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
 	readonly #arrivals = new Set<string>()
-	readonly #messages: StudyMemoryArrival[] = []
-	#names: ReadonlyMap<string, string> = new Map()
-	readonly #sizes: number[] = []
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
-	readonly #lookups = new WeakMap<object, Readonly<Record<string, unknown>>>()
-	readonly #calls = new WeakMap<object, string>()
 	// Message ids this consumer added or named, joined to their origin; the summary instruction is fixed.
 	readonly #explicit = new Map<string, StudyMemoryProvenance>([
 		['summary-instruction', { origin: 'instructions', source: 'summary' }],
@@ -94,7 +67,6 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
 	constructor(options: StudyMemorySessionOptions) {
-		validateStudyMemoryProfile(options.profile, [options.arm])
 		const compaction =
 			options.arm === 'compaction' ? readStudyMemoryCompaction(options.profile) : undefined
 		const gauge = compaction?.gauge
@@ -108,38 +80,17 @@ export class StudyMemorySession implements StudySessionInterface {
 		const roles = buildStudyMemoryRoles(options.profile, options.arm)
 		const policy = roles.agent
 		if (policy === undefined) throw new StudyError('CONFIG', 'Memory agent role is required')
-		const settings = isStudyMemoryOptions(options.profile.settings)
-			? options.profile.settings
-			: undefined
-		const recorded = options.profile.record !== undefined
-		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
-			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
-		const declaration = options.exchanges?.declaration
-		if (
-			recorded &&
-			(declaration === undefined ||
-				settings?.version === undefined ||
-				settings.metadata === undefined)
-		)
-			throw new StudyError('CONFIG', 'Memory recording requires declarations and an exchange sink')
-		this.#goals = declaration === undefined ? undefined : [...declaration.goals]
 		this.#transport = new StudyOllamaTransport({
 			url: provider.url,
 			room,
 			limit: options.profile.bounds.request,
-			metadata: settings?.metadata ?? STUDY_MEMORY_METADATA,
+			metadata: STUDY_MEMORY_METADATA,
 			models: buildStudyOllamaModels(provider),
 			roles,
 			signal: options.signal,
 			observe: this.#observation.observe,
 			timing: options.provider.extractTiming,
-			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),
-			...(options.replay === undefined ? {} : { fetch: options.replay.fetch }),
 		})
-		this.#screen =
-			settings?.screen === undefined || settings.screen === false
-				? undefined
-				: new StudyMemoryScreen(options, this.#transport)
 		this.#trace = new StudyAgentTrace({
 			runtime: options.agent,
 			latch: this.#transport,
@@ -152,18 +103,14 @@ export class StudyMemorySession implements StudySessionInterface {
 				...buildStudyOllamaOptions(policy),
 				url: provider.url,
 				timeout: options.profile.bounds.request.duration,
-				fetch: (input, init) => {
-					this.#screen?.reserve('agent', init)
-					return this.#transport.fetch('agent', input, init, this.#trace.canonical('agent'))
-				},
+				fetch: (input, init) =>
+					this.#transport.fetch('agent', input, init, this.#trace.canonical('agent')),
 			}),
 			runtime: options.agent,
 			gauge,
 			enforced: gauge !== undefined,
 			record: (reading, request) => this.#trace.record(reading, request),
 		})
-		const selected =
-			this.#screen === undefined ? observer : new StudyMemoryScreenProvider(observer, this.#screen)
 		const recap = compaction === undefined ? undefined : roles.summary
 		if (compaction !== undefined && recap === undefined)
 			throw new StudyError('CONFIG', 'Memory compaction requires a summary role')
@@ -188,10 +135,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					})
 		const lookup = createTool({
 			name: 'lookup',
-			description:
-				settings?.lookup?.grammar === true
-					? `${STUDY_MEMORY_LOOKUP}. ${STUDY_MEMORY_GRAMMAR}`
-					: STUDY_MEMORY_LOOKUP,
+			description: 'Reads the latest released public reference snapshot by id',
 			parameters: {
 				type: 'object',
 				properties: { id: { type: 'string' } },
@@ -213,22 +157,12 @@ export class StudyMemorySession implements StudySessionInterface {
 					url: provider.url,
 					timeout: options.profile.bounds.request.duration,
 					options: role.options,
-					fetch: (input, init) => {
-						this.#screen?.reserve('judge', init)
-						return this.#transport.fetch('judge', input, init)
-					},
+					fetch: (input, init) => this.#transport.fetch('judge', input, init),
 				}),
 				this.#transport,
 			)
-			this.#ledger = options.ledger.createLedger(selected, {
-				...settings?.ledger,
-				names: (message) => this.#names.get(message.id),
-				pins: (message) =>
-					this.#messages.some(
-						(arrival) =>
-							arrival.message === message.id && STUDY_MEMORY_STANDING.includes(arrival.id),
-					),
-				judge: this.#screen === undefined ? judge : new StudyMemoryScreenJudge(judge, this.#screen),
+			this.#ledger = options.ledger.createLedger(observer, {
+				judge,
 				system: STUDY_MEMORY_SYSTEM,
 				topics: STUDY_MEMORY_TOPICS,
 				questions: options.ledger.LEDGER_QUESTIONS,
@@ -257,9 +191,6 @@ export class StudyMemorySession implements StudySessionInterface {
 			})
 			this.#agent = this.#ledger.agent
 			this.#conversation = this.#ledger.conversation
-			this.#agent.emitter.on('tool', (call) => {
-				if (call.name === 'lookup') this.#calls.set(call.arguments, call.id)
-			})
 		} else {
 			this.#ledger = undefined
 			const conversations = options.agent.createConversationManager()
@@ -314,11 +245,7 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Cancels native work and drains the actual agent before releasing managers. @returns Completion after session cleanup. */
 	close(): Promise<void> {
-		if (this.#closing === undefined) {
-			const closing = Promise.withResolvers<void>()
-			this.#closing = closing.promise
-			void this.#dispose().then(closing.resolve, closing.reject)
-		}
+		this.#closing ??= this.#dispose()
 		return this.#closing
 	}
 
@@ -335,15 +262,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#input = undefined
 		this.#live.add(activity)
 		try {
-			this.#screen?.start({
-				goal,
-				input,
-				prior: new Set(this.#conversation.messages().map((message) => message.id)),
-				messages: () => this.#conversation.messages(),
-			})
-			const settings = this.#options.profile.settings
-			const standing = isStudyMemoryOptions(settings) && settings.instructions?.standing === true
-			if (this.#goals === undefined || this.#goals[0] === goal) await this.#transport.verify()
+			await this.#transport.verify()
 			for (const record of input.records) {
 				this.#records.set(record.id, Object.freeze({ ...record }))
 			}
@@ -351,23 +270,10 @@ export class StudyMemorySession implements StudySessionInterface {
 				if (this.#arrivals.has(arrival.id))
 					throw new StudyError('CONFIG', 'Source arrival was replayed within a trial')
 				this.#arrivals.add(arrival.id)
-				if (standing && STUDY_MEMORY_STANDING.includes(arrival.id)) {
-					this.#agent.context.instructions.add({
-						name: arrival.id,
-						content: `[Source ${arrival.id}] ${arrival.content}`,
-					})
-					await context.evidence.append({
-						event: 'arrival',
-						goal,
-						value: { id: arrival.id, instruction: arrival.id },
-					})
-					continue
-				}
 				const message = this.#conversation.add({
 					role: 'user',
 					content: `[Source ${arrival.id}] ${arrival.content}`,
 				})
-				this.#messages.push({ id: arrival.id, message: message.id })
 				if (this.#observation.observe)
 					this.#explicit.set(message.id, { origin: 'arrival', source: arrival.id })
 				await context.evidence.append({
@@ -376,12 +282,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					value: { id: arrival.id, message: message.id },
 				})
 			}
-			const signal = AbortSignal.any([
-				this.#options.signal,
-				context.signal,
-				context.meter.signal,
-				...(this.#screen === undefined ? [] : [this.#screen.signal]),
-			])
+			const signal = AbortSignal.any([this.#options.signal, context.signal, context.meter.signal])
 			if (this.#ledger === undefined) {
 				const prompt = this.#conversation.add({ role: 'user', content: input.prompt })
 				if (this.#observation.observe) {
@@ -389,29 +290,10 @@ export class StudyMemorySession implements StudySessionInterface {
 					this.#explicit.set(prompt.id, { origin: 'input', source: goal })
 				}
 			}
-			const sections = this.#ledger === undefined ? [] : this.#conversation.snapshot().sections
 			const result: unknown =
 				this.#ledger === undefined
 					? await this.#agent.generate({ signal })
 					: await this.#ledger.respond(input.prompt, signal)
-			if (this.#ledger !== undefined) {
-				const captured = buildStudyMemoryResult(result)
-				this.#names = new Map([...this.#names, [captured.request, goal]])
-				const snapshot = {
-					sections: [...sections, ...this.#conversation.snapshot().sections],
-					messages: this.#conversation.messages().map((message) => message.id),
-				}
-				for (const receipt of buildStudyMemoryReceipts(captured, this.#messages, snapshot)) {
-					const value = buildStudyMemoryEvidence(goal, receipt)
-					const bytes = measureStudyMemoryEvidence(goal, value)
-					if (
-						this.#sizes.reduce((total, size) => total + size, bytes) > STUDY_MEMORY_WORKLOAD_BYTES
-					)
-						throw new StudyError('CAPACITY', 'Memory selection workload exceeds the byte bound')
-					this.#sizes.push(bytes)
-					this.#trace.append('selection', value)
-				}
-			}
 			this.#transport.check()
 			signal.throwIfAborted()
 			if (
@@ -423,7 +305,6 @@ export class StudyMemorySession implements StudySessionInterface {
 			)
 				throw new StudyError('FAULT', 'Agent returned malformed content or partial state')
 			const product = { value: { content: result.content }, partial: result.partial }
-			this.#screen?.finish(product)
 			await context.evidence.append({
 				event: 'result',
 				goal,
@@ -438,40 +319,18 @@ export class StudyMemorySession implements StudySessionInterface {
 			})
 			this.#transport.check()
 			signal.throwIfAborted()
-			if (this.#goals === undefined || this.#goals.at(-1) === goal) await this.#transport.verify()
+			await this.#transport.verify()
 			return product
 		} catch (error) {
 			throw this.#trace.translate(error)
 		} finally {
 			try {
-				if (this.#screen !== undefined)
-					await context.evidence.append({
-						event: 'screen',
-						goal,
-						value: { ...this.#screen.account, historical: { ...this.#screen.historical } },
-					})
-				await this.#trace.flush({
-					append: (row) => context.evidence.append(this.#joinLookup(row)),
-				})
+				await this.#trace.flush(context.evidence)
 			} finally {
 				this.#live.delete(activity)
-				this.#screen?.clear()
 				this.#transport.clear()
 			}
 		}
-	}
-
-	#joinLookup(row: StudyEvidence): StudyEvidence {
-		if (row.event !== 'lookup' || !isObject(row.value)) return row
-		const args = this.#lookups.get(row.value)
-		const call = args === undefined ? undefined : this.#calls.get(args)
-		const message =
-			call === undefined
-				? undefined
-				: this.#conversation
-						.messages()
-						.find((entry) => entry.role === 'tool' && entry.call === call)
-		return message === undefined ? row : { ...row, value: { ...row.value, message: message.id } }
 	}
 
 	#provenance(): StudyMemoryProvenanceSource {
@@ -479,11 +338,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			explicit: this.#explicit,
 			sections: new Set(this.#conversation.sections.map((section) => section.id)),
 			members: new Set(this.#conversation.messages().map((message) => message.id)),
-			composed:
-				this.#options.arm === 'records' ||
-				this.#agent.context.instructions
-					.instructions()
-					.some((instruction) => STUDY_MEMORY_STANDING.includes(instruction.name)),
+			composed: this.#options.arm === 'records',
 		}
 	}
 
@@ -532,15 +387,8 @@ export class StudyMemorySession implements StudySessionInterface {
 				const record = this.#records.get(args.id)
 				const value =
 					record === undefined ? 'No record' : `${record.id}: ${record.name}\n${record.content}`
-				this.#screen?.lookup(args.id, record === undefined ? undefined : value)
 				sizes.push(encoder.encode(JSON.stringify(value)).byteLength)
-				const evidence = {
-					id: args.id,
-					found: record !== undefined,
-					...(this.#screen === undefined ? {} : { version: hashStudyBytes(value) }),
-				}
-				if (this.#ledger !== undefined) this.#lookups.set(evidence, args)
-				this.#trace.append('lookup', evidence)
+				this.#trace.append('lookup', { id: args.id, found: record !== undefined })
 				signal.throwIfAborted()
 				return value
 			} finally {
@@ -560,28 +408,11 @@ export class StudyMemorySession implements StudySessionInterface {
 	}
 
 	async #dispose(): Promise<void> {
-		const failures: unknown[] = []
-		try {
-			this.#agent.abort(new StudyError('FAULT', 'Memory session closed'))
-		} catch (error) {
-			failures.push(error)
-		}
-		try {
-			await this.#transport.close()
-		} catch (error) {
-			failures.push(error)
-		}
+		this.#agent.abort(new StudyError('FAULT', 'Memory session closed'))
+		await this.#transport.close()
 		await Promise.allSettled([...this.#flights])
-		const tools = new Set([this.#tools, this.#agent.context.tools])
-		for (const resource of [...tools, this.#agent.emitter, this.#conversation.emitter]) {
-			try {
-				resource.destroy()
-			} catch (error) {
-				failures.push(error)
-			}
-		}
-		if (failures.length === 1) throw failures[0]
-		if (failures.length > 1)
-			throw new AggregateError(failures, 'Memory session cleanup failed', { cause: failures[0] })
+		this.#tools.destroy()
+		this.#agent.emitter.destroy()
+		this.#conversation.emitter.destroy()
 	}
 }

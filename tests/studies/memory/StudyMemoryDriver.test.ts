@@ -19,23 +19,6 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
-	it('refuses recording without version and metadata settings', () => {
-		const base = buildMemoryProfile({ url: 'http://127.0.0.1:1' })
-		for (const settings of [
-			undefined,
-			{},
-			{ version: 'fixture-1' },
-			{ metadata: { calls: 8, bytes: 65536, duration: 2000 } },
-		]) {
-			expect(
-				() =>
-					new StudyMemoryDriver({
-						...STUDY_MEMORY_MODULES,
-						profile: { ...base, record: { bytes: 1048576, calls: 256, duration: 30000 }, settings },
-					}),
-			).toThrow(expect.objectContaining({ code: 'CONFIG' }))
-		}
-	})
 	it('constructs from the selected runtime without reading the subject and needs Ledger and judge factories only for records', async () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })

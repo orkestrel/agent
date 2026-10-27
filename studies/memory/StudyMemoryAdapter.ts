@@ -11,7 +11,6 @@ import {
 	readStudyMemoryCompaction,
 	readStudyMemoryGrade,
 	validateStudyMemoryProfile,
-	validateStudyMemoryScreen,
 } from './helpers.js'
 import { StudyMemoryDriver } from './StudyMemoryDriver.js'
 import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from './validators.js'
@@ -27,7 +26,6 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 				'Memory declaration requires the shared memory driver and supported arms',
 			)
 		validateStudyMemoryProfile(input.profile, arms)
-		validateStudyMemoryScreen(input.definition, input.scenarios, input.profile)
 		if (arms.includes('compaction')) readStudyMemoryCompaction(input.profile)
 		if (input.definition.purpose === 'quality' && input.profile.qualification === undefined)
 			throw new StudyError('CONFIG', 'Memory quality requires a sealed capacity qualification')

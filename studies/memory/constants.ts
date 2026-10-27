@@ -1,54 +1,4 @@
 import type { StudyOllamaMetadata } from '@orkestrel/study/server'
-import type {
-	StudyMemoryLedgerOptions,
-	StudyMemoryLookupOptions,
-	StudyMemoryInstructionOptions,
-	StudyMemoryMember,
-} from './types.js'
-
-/** Lists the admitted default-off Ledger switches. */
-export const STUDY_MEMORY_LEDGER_KEYS: ReadonlyArray<keyof StudyMemoryLedgerOptions> =
-	Object.freeze(['lexical', 'recent', 'work'])
-
-/** Lists the admitted boolean lookup treatments. */
-export const STUDY_MEMORY_LOOKUP_KEYS: ReadonlyArray<keyof StudyMemoryLookupOptions> =
-	Object.freeze(['grammar'])
-
-/** Lists the admitted boolean instruction treatments. */
-export const STUDY_MEMORY_INSTRUCTION_KEYS: ReadonlyArray<keyof StudyMemoryInstructionOptions> =
-	Object.freeze(['standing'])
-
-/** Preserves the lookup description used without the grammar treatment. */
-export const STUDY_MEMORY_LOOKUP = 'Reads the latest released public reference snapshot by id'
-
-/** States the exact public lookup id grammar without naming a released record. */
-export const STUDY_MEMORY_GRAMMAR =
-	'Pass an id of order:<order id> for an order or customer:<account id> for a customer account.'
-
-/**
- * Names the public desk policy, grant obligation, and case register held across shifts.
- * @remarks
- * The day stamp is excluded because the census found stale dates matching the opening stamp.
- * The opening case sources are excluded because off-focus handoffs retained that case.
- */
-export const STUDY_MEMORY_STANDING: readonly string[] = Object.freeze([
-	'endurance-desk',
-	'ev-opening',
-	'ev-register',
-])
-
-/** Orders parsed request differences before the remaining native flags. */
-export const STUDY_MEMORY_MEMBERS: readonly StudyMemoryMember[] = Object.freeze([
-	'model',
-	'messages',
-	'tools',
-	'options',
-	'prompt',
-	'flags',
-])
-
-/** Bounds each request-difference excerpt in UTF-16 code units. */
-export const STUDY_MEMORY_EXCERPT = 256
 
 /** Bounds trial-wide metadata independently of model calls, tokens and bytes. */
 export const STUDY_MEMORY_METADATA: StudyOllamaMetadata = Object.freeze({
@@ -61,10 +11,6 @@ export const STUDY_MEMORY_METADATA: StudyOllamaMetadata = Object.freeze({
 export const STUDY_MEMORY_TEXT = 16384
 /** Bounds arrivals and reference records in one public goal. */
 export const STUDY_MEMORY_ENTRIES = 64
-/** Bounds one compact UTF-8 selection envelope including its newline. */
-export const STUDY_MEMORY_ROW_BYTES = 262144
-/** Bounds added selection envelopes over the declared 96-goal workload. */
-export const STUDY_MEMORY_WORKLOAD_BYTES = 50331648
 /** Pins the prospective desk instructions independently of held-out labels. */
 export const STUDY_MEMORY_SYSTEM =
 	'You operate a support desk. Preserve source attribution, corrections, obligations and handoffs. Use lookup when reference records are needed. Answer the current request from the available conversation and references.'
@@ -89,9 +35,3 @@ export const STUDY_MEMORY_TOPICS = Object.freeze([
 		criterion: 'Orders, delivery, refunds, ownership and follow-up obligations',
 	}),
 ])
-/** Bounds complete admitted host runtime membership independently of model budgets. */
-export const STUDY_MEMORY_HOST_FILES = 128
-/** Bounds one admitted runtime member. */
-export const STUDY_MEMORY_HOST_FILE_BYTES = 8 * 1024 * 1024
-/** Bounds all admitted host runtime bytes. */
-export const STUDY_MEMORY_HOST_BYTES = 32 * 1024 * 1024
