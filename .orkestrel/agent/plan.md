@@ -6,7 +6,14 @@ Closed 2026-10-27. Read this file first when resuming Agent work; it is the only
 
 The boost campaign tried to improve Agent's memory (the Ledger briefing and compaction) on the endurance study. No experiment showed a measured benefit, so only the defects it exposed shipped (user rulings U44, U45).
 
-Agent 0.0.32 is published (release commit `785d7eec`). Against 0.0.31 it changes:
+Published on 2026-10-27, all gated on portable Node 22.18 and registry-confirmed:
+
+- `@orkestrel/agent` 0.0.32 (release commit `785d7eec`): the changes below.
+- `@orkestrel/ollama` 0.0.26 and `@orkestrel/toolbox` 0.0.21: re-pinned to Agent ^0.0.32. Ollama's live `test:service` gate ran on a dedicated 0.40.11 daemon on 11435.
+- `@orkestrel/study` 0.0.5 (EOF cancellation fix, Agent ^0.0.32), then 0.0.6 (Ollama ^0.0.26).
+- Agent's devDependencies: Study ^0.0.6 and Ollama ^0.0.26, so a single Agent copy installs.
+
+Against 0.0.31, Agent 0.0.32 changes:
 
 - **D1:** the Ledger keeps every live sentence. An accepted correction no longer withdraws sentences that merely share an id with it. Each amendment renders as a deterministic, repeatable numbered reference with an annotation. New: `collectAmendments`, `LedgerAmendment`, `LedgerRenderContext`, `buildLedgerRenderContext`, `renderLedgerAnnotation`. Removed: `collectStale`, `LedgerStaleSentence`. `LedgerProjection.stale` became `amendments`.
 - **D2:** `selectRecords` renders owner records with the same ordered member ids once, with titles joined by `; `.
@@ -32,11 +39,8 @@ Strip commits: `eaee19c1` (Study ^0.0.4), `7869a1be` (bench), `6c6c06fd` (produc
 
 ## Open items
 
-1. **Study 0.0.5** (in progress at closing): runtime dependency on `@orkestrel/agent` ^0.0.32, its EOF cancellation fix, and scaffold 0.0.107. Then visit, gate, push and publish with the user's OTP.
-2. **After Study 0.0.5 publishes:** Agent's devDependency `@orkestrel/study` goes to ^0.0.5. Commit and push; no Agent release.
-3. **Optional, needs a new plan and the user's model budget:** measure 0.0.32's D1 and D2 effect on the endurance study before proposing any new experiment.
-4. **Not Agent's:** Supervisor's `>=22.20.0` engines floor (user excluded it); Veneer's S5 registry refresh.
-
+1. **Optional, needs a new plan and the user's model budget:** measure 0.0.32's D1 and D2 effect on the endurance study before proposing any new experiment.
+2. **Not Agent's:** Supervisor still requires `@orkestrel/agent` ^0.0.31 and keeps its `>=22.20.0` engines floor; the user excluded it, and it carries 196 uncommitted changes. Veneer's S5 registry refresh is Veneer's.
 ## Rules for future Agent work
 
 - **Law:** read `../scaffold/AGENTS.md` and what it points to (`.agents/orchestration.md`, `.claude/rules/`, the dispatch skill) and follow it. Every subagent prompt carries the user's sentence: "Make sure you thoroughly read the AGENTS.md in the neighboring scaffold folder along with the files that it points to especially the rules/agents/skills and follow them strictly, especially in regards to repo structure."
