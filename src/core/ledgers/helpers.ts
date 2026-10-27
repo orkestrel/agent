@@ -850,7 +850,7 @@ export function renderLedgerAnnotation(line: LedgerLine, context: LedgerRenderCo
 		context.references.get(line.source) === undefined ||
 		included.some((pair) => context.references.get(pair.later) === undefined)
 	)
-		throw new LedgerError('REQUEST', 'Ledger rendering requires retained source references')
+		throw new LedgerError('REFERENCE', 'Ledger rendering requires retained source references')
 	return [
 		`[Ledger source ${context.references.get(line.source)}]`,
 		...included.map(

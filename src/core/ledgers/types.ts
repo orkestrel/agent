@@ -828,6 +828,8 @@ export type LedgerErrorCode =
 	| 'LOOKUP'
 	/** Reports a supplied gauge outside its bounds, or a calibration call that reports no prompt usage, or a prompt usage of 0 or less. */
 	| 'GAUGE'
+	/** Reports a render context that holds no reference for a source it annotates. */
+	| 'REFERENCE'
 
 /** Carries the lowercase words and non-opening capitalized names of a message. */
 export interface LedgerWordSet {

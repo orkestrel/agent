@@ -1061,6 +1061,9 @@ describe('amendment rendering', () => {
 		expect(() => renderLedgerAnnotation(earlier, { ...context, references: new Map() })).toThrow(
 			'retained source references',
 		)
+		expect(() => renderLedgerAnnotation(earlier, { ...context, references: new Map() })).toThrow(
+			expect.objectContaining({ code: 'REFERENCE' }),
+		)
 		expect(() =>
 			renderLedgerAnnotation(earlier, { ...context, references: new Map([['earlier', '1']]) }),
 		).toThrow('retained source references')
