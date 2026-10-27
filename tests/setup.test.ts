@@ -2075,6 +2075,7 @@ describe('shared agent builders', () => {
 		expect(foreign.aborted).toBe(false)
 		expect(foreign.reason).toBeUndefined()
 		expect(foreign instanceof AbortSignal).toBe(false)
+		expect('aborted' in foreign).toBe(false)
 		expect(() => foreign.throwIfAborted()).not.toThrow()
 		expect(() => AbortSignal.any([foreign])).toThrow(TypeError)
 		expect(AbortSignal.any([new AbortController().signal]).aborted).toBe(false)

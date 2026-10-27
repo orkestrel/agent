@@ -4958,12 +4958,13 @@ export function createBoundedRelay(upstream: ProviderInterface, limit: number): 
 
 /**
  * Creates an inert object shaped like an `AbortSignal` from another realm.
- * `AbortSignal.any` checks its brand and refuses it with a `TypeError`.
+ * `AbortSignal.any` refuses it with a `TypeError` on every supported Node: it fails Node 24's brand
+ * check, and its readable `aborted` member is hidden from the `in` test Node 22's validator applies.
  *
  * @returns A never-aborted signal-shaped object
  */
 export function createForeignSignal(): AbortSignal {
-	return {
+	const shaped: AbortSignal = {
 		aborted: false,
 		reason: undefined,
 		onabort: null,
@@ -4972,6 +4973,7 @@ export function createForeignSignal(): AbortSignal {
 		removeEventListener: () => undefined,
 		dispatchEvent: () => false,
 	}
+	return new Proxy(shaped, { has: (target, key) => key !== 'aborted' && key in target })
 }
 /**
  * Builds options for the guide desk with no lookups unless supplied.
