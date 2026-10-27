@@ -1,9 +1,0 @@
-# U43 and U44: wrap-up rulings (2026-10-27)
-
-**U43.** After the U34 source batch was refused on Ivo's target (`tmp/units/r2-source-run-20261027/report.md`), the user chose "Fix instrument, rerun". Stop offering tools on the final screen step so the model must answer, and isolate cases so one refusal cannot stop the others. That takes a small code change with a CPU proof, review and gate, about 30 implementation and 30 verification minutes, plus about 150 s more elapsed time for the source batch. The user then asked to wrap up the session, so U43 is the first step of the next R2 session. Nothing about it is implemented yet.
-
-**U44.** The user asked to tie everything off on main ("everything on main, reconcile all copies to work"). They chose "Release both":
-- Study 0.0.5 carries its fixes to published 0.0.4: cancellation during EOF finalization, and custody after an abandoned recorded stream.
-- Agent 0.0.32 then depends on Study ^0.0.5 and carries its Ledger fixes to published 0.0.31: D3 case-scoped lexical discovery, D2 equal-member owner collapse, D1 repeatable amendment references, and removal of the inert owner-link treatment.
-
-Each is gated on Node 24 and 22.18 in a clean clone, pushed to main, and published with the user's OTP. Then the local pins are restored, installs come from the registry, and the scratch is cleaned. The user also chose "Leave them alone" for the roughly 30 other repos carrying an uncommitted scaffold ^0.0.107 upgrade from another session, for Supervisor (196 changes) and for the live Veneer session. Those are listed in the handoff and left untouched.

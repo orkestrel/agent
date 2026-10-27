@@ -1,5 +1,0 @@
-# U42: a separate allowance for the Ollama 0.40.11 runner screen
-
-On 2026-10-27, after Veneer returned the shared lane, the user approved a separate allowance for the 0.40.11 runner qualification screen: "Approve 3 model / 11 elapsed." It covers the staged protocol-only screen under `tmp/units/r2-runner-qualification-20261027/`: two cold trials on port 11435 from the receipted 0.40.11 executable (SHA-256 `cc00918e2d25577969c929a1004be054781b8bff25819c1be19ca2f7b7bb4012`), with 180000 model ms, 660000 elapsed ms and 64 calls, no retries, stopping at the first cap or failure. Every attempt, startup and cleanup is charged.
-
-The allowance sits outside R2's U34 evaluation budget and does not touch R2's unallocated 100000 ms, U24 or U28. It still needs the screen's own admitted manifest first: the staged declarations materialized into the fresh isolated host, a native freeze and check with typed fingerprints, absent declared outputs, and confirmed metering of the full envelope before the daemon starts. A pass qualifies only this lookup and replay protocol at 14,336 context and 2,048 output tokens. It gives no R2-profile performance, population or quality result.
