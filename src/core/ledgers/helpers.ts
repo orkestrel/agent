@@ -1,9 +1,8 @@
 import type { Message } from '../types.js'
 import type {
 	GaugeCall,
+	LedgerAmendment,
 	LedgerCategory,
-	LedgerCorpus,
-	LedgerLexicon,
 	LedgerLine,
 	LedgerLookupReading,
 	LedgerLookupState,
@@ -13,151 +12,18 @@ import type {
 	LedgerProjectionRequest,
 	LedgerRecord,
 	LedgerRegistry,
-	LedgerAmendment,
 	LedgerRenderContext,
-	LedgerPlanReceipt,
-	LedgerSource,
 	LedgerTokenSet,
 	LedgerTopic,
 	LedgerWordSet,
-	LedgerWork,
 } from './types.js'
 import type { ToolCall } from '@orkestrel/tool'
 import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { hasCalls, renderJSON } from '../helpers.js'
+import { renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
-import {
-	LEDGER_BM25_B,
-	LEDGER_BM25_K1,
-	LEDGER_WORD_PATTERN,
-	LEDGER_OWNER_PREFIX,
-	LEDGER_RULES_KEY,
-	PLACED_CATEGORIES,
-} from './constants.js'
+import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 import { LedgerError } from './errors.js'
-
-/**
- * Filters discovery sources by the request's named owners and the owners of its keyed units.
- * @param units - Scored units, with group 4 marking discovery and other groups establishing the case
- * @param records - Every projected record, including owner records outside the selected view
- * @param owners - The owner ids named by the request
- * @returns The eligible units in input order; keyed units and ownerless sources stay eligible,
- * and a request with no keyed unit or named owner keeps discovery open
- * @example
- * ```ts
- * filterLedgerDiscovery([{ source: 'note', group: 4 }], [], []) // [{ source: 'note', group: 4 }]
- * ```
- */
-export function filterLedgerDiscovery<
-	T extends { readonly source: string; readonly group: number },
->(units: readonly T[], records: readonly LedgerRecord[], owners: readonly string[]): readonly T[] {
-	const keyed = new Set(units.filter((unit) => unit.group !== 4).map((unit) => unit.source))
-	if (keyed.size === 0 && owners.length === 0) return units
-	const owned = records.filter((record) => record.key.startsWith(LEDGER_OWNER_PREFIX))
-	const scope = new Set([
-		...owners.map((owner) => `${LEDGER_OWNER_PREFIX}${owner}`),
-		...owned
-			.filter((record) => record.members.some((source) => keyed.has(source)))
-			.map((record) => record.key),
-	])
-	return units.filter((unit) => {
-		if (unit.group !== 4) return true
-		const holders = owned.filter((record) => record.members.includes(unit.source))
-		return holders.length === 0 || holders.some((record) => scope.has(record.key))
-	})
-}
-
-/**
- * Collects each request's last nonempty call-free assistant reply before the next request.
- * @param messages - The history in conversation order
- * @param requests - The identities of requests entered through the ledger
- * @returns The request and reply pairs in conversation order, skipping requests without a reply
- * @example
- * ```ts
- * collectLedgerWork([
- * 	{ id: 'request', role: 'user', content: 'Draft the review.' },
- * 	{ id: 'reply', role: 'assistant', content: 'Review draft.' },
- * ], new Set(['request'])) // [{ request: ..., reply: ... }]
- * ```
- */
-export function collectLedgerWork(
-	messages: readonly Message[],
-	requests: ReadonlySet<string>,
-): readonly LedgerWork[] {
-	return messages.flatMap((request, position) => {
-		if (!requests.has(request.id)) return []
-		const following = messages.slice(position + 1)
-		const next = following.findIndex((message) => requests.has(message.id))
-		const reply = following
-			.slice(0, next < 0 ? following.length : next)
-			.findLast(
-				(message) =>
-					message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== '',
-			)
-		return reply === undefined ? [] : [{ request, reply }]
-	})
-}
-
-/**
- * Renders one named earlier reply without changing its content.
- * @param name - The consumer's work name
- * @param work - The earlier request and reply
- * @returns The name in brackets followed by the exact reply content
- * @example
- * ```ts
- * renderLedgerWork('W-1', work) // '[W-1] Review draft.'
- * ```
- */
-export function renderLedgerWork(name: string, work: LedgerWork): string {
-	return `[${name}] ${work.reply.content}`
-}
-
-/**
- * Builds source carriage from emitted messages and established composition facts.
- * @param emitted - The messages adopted after filtering
- * @param stored - The conversation's stored tail messages
- * @param sections - The compacted section ids
- * @param plan - The successful plan facts, absent for a fallback
- * @returns The distinct tail, rendered, and omitted sources with their strongest carriage
- * @example
- * ```ts
- * buildLedgerSources([], [], [], undefined) // []
- * ```
- */
-export function buildLedgerSources(
-	emitted: readonly Message[],
-	stored: readonly Message[],
-	sections: readonly string[],
-	plan: LedgerPlanReceipt | undefined,
-): readonly LedgerSource[] {
-	const originals = new Map(stored.map((message) => [message.id, message.content]))
-	const messages = new Map(emitted.map((message) => [message.id, message.content]))
-	const recaps = new Set(sections)
-	const rendered = new Set(plan?.rendered)
-	const omitted = new Set(plan?.omitted)
-	const population = [
-		...new Set([
-			...emitted.map((message) => message.id),
-			...(plan?.rendered ?? []),
-			...(plan?.omitted ?? []),
-		]),
-	]
-	return population.map((source) => ({
-		source,
-		carriage: recaps.has(source)
-			? 'recap'
-			: messages.has(source) &&
-				  originals.has(source) &&
-				  originals.get(source) === messages.get(source)
-				? 'verbatim'
-				: rendered.has(source)
-					? 'record'
-					: omitted.has(source)
-						? 'absent'
-						: undefined,
-	}))
-}
 
 /**
  * Collects the live message ids placed in records or left without a record.
@@ -267,7 +133,7 @@ export function renderCauseChain(error: unknown): string {
  */
 export function extractWords(message: Message): LedgerWordSet {
 	return {
-		words: new Set(message.content.toLowerCase().match(LEDGER_WORD_PATTERN) ?? []),
+		words: new Set(message.content.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []),
 		names: new Set(
 			[...message.content.matchAll(/(?<![\p{L}\p{N}'-])\p{Lu}\p{Ll}+(?![\p{L}\p{N}-])/gu)]
 				.filter((match) => {
@@ -277,73 +143,6 @@ export function extractWords(message: Message): LedgerWordSet {
 				.map((match) => match[0].toLowerCase()),
 		),
 	}
-}
-
-/**
- * Counts lowercase word occurrences without changing their boundaries.
- * @param message - The message to analyze
- * @returns Frequencies and their sum
- * @example countLedgerWords({ id: 'a', role: 'user', content: 'Amber amber' }).length // 2
- */
-export function countLedgerWords(message: Message): LedgerLexicon {
-	const words = message.content.toLowerCase().match(LEDGER_WORD_PATTERN) ?? []
-	return {
-		frequencies: new Map(
-			[...Map.groupBy(words, (word) => word)].map(([word, matches]) => [word, matches.length]),
-		),
-		length: words.length,
-	}
-}
-
-/**
- * Computes document frequencies and mean occurrence length.
- * @param texts - Every call-free message's lexicon
- * @returns Corpus statistics; an empty corpus has count and average zero
- * @example computeLedgerCorpus([]).count // 0
- */
-export function computeLedgerCorpus(texts: readonly LedgerLexicon[]): LedgerCorpus {
-	return {
-		count: texts.length,
-		frequencies: new Map(
-			[
-				...Map.groupBy(
-					texts.flatMap((text) => [...text.frequencies.keys()]),
-					(word) => word,
-				),
-			].map(([word, matches]) => [word, matches.length]),
-		),
-		average:
-			texts.length === 0 ? 0 : texts.reduce((sum, text) => sum + text.length, 0) / texts.length,
-	}
-}
-
-/**
- * Computes BM25 for distinct query words against one corpus member.
- * @param text - The member's occurrence counts
- * @param query - Distinct words from extractWords
- * @param corpus - Statistics over the same corpus
- * @returns The score, or zero for no overlap or an empty query/corpus
- * @example computeLedgerScore(text, new Set(), corpus) // 0
- */
-export function computeLedgerScore(
-	text: LedgerLexicon,
-	query: ReadonlySet<string>,
-	corpus: LedgerCorpus,
-): number {
-	if (query.size === 0 || corpus.count === 0 || corpus.average === 0) return 0
-	return [...query].reduce((sum, word) => {
-		const frequency = text.frequencies.get(word) ?? 0
-		if (frequency === 0) return sum
-		const documents = corpus.frequencies.get(word) ?? 0
-		return (
-			sum +
-			(Math.log(1 + (corpus.count - documents + 0.5) / (documents + 0.5)) *
-				frequency *
-				(LEDGER_BM25_K1 + 1)) /
-				(frequency +
-					LEDGER_BM25_K1 * (1 - LEDGER_BM25_B + (LEDGER_BM25_B * text.length) / corpus.average))
-		)
-	}, 0)
 }
 
 /**
@@ -386,12 +185,12 @@ export function findLedgerCall(group: readonly Message[], message: Message): Too
 /**
  * Ranks a briefing source for removal before the next prompt.
  *
- * @param group - The planning group: 1 for a topic match, 2 for an off-topic rule or correction, 3 for a name match, or 4 for lexical discovery
+ * @param group - The planning group: 1 for a topic match, 2 for an off-topic rule or correction, or 3 for a name match
  * @param unsettled - If `true`, the source is a user message without a decisive category; if `false`, it is another source
  * @param category - The source's recorded category, or undefined when undecided
- * @returns The ascending removal rank: lexical discovery, name matches, unsettled sources, off-topic corrections, off-topic rules, then topic matches
+ * @returns The ascending removal rank: name matches, unsettled sources, off-topic corrections, off-topic rules, then topic matches
  * @remarks
- * The planner removes lower ranks first. Equal ranks -1, 0, 1, and 4 remove lower scores first;
+ * The planner removes lower ranks first. Equal ranks 0, 1, and 4 remove lower scores first;
  * every equal rank then removes later conversation positions first.
  * @example
  * ```ts
@@ -403,17 +202,7 @@ export function rankLedgerCut(
 	unsettled: boolean,
 	category: LedgerCategory | undefined,
 ): number {
-	return group === 4
-		? -1
-		: group === 3
-			? 0
-			: unsettled
-				? 1
-				: group === 2
-					? category === 'rule'
-						? 3
-						: 2
-					: 4
+	return group === 3 ? 0 : unsettled ? 1 : group === 2 ? (category === 'rule' ? 3 : 2) : 4
 }
 
 /**
@@ -637,16 +426,16 @@ export function identifyLookup(
 }
 
 /**
- * Links each eligible lookup argument id to its owner.
+ * Links each id-shaped lookup argument to its owner.
  *
  * @remarks
  * An owner argument links to itself. Any other id-shaped argument links to the single owner id its
  * reading's text names. An empty reading links nothing, and a later reading overwrites an earlier
- * link of the same argument. Only a complete normalized argument that is itself an id participates.
+ * link of the same argument.
  *
  * @param readings - The lookup readings in conversation order
  * @param owners - The owners keyed by id
- * @returns The owner id of each linked argument id; a non-owner id whose text names no owner or several is absent
+ * @returns The owner id of each linked argument id; an argument whose text names no owner or several is absent
  *
  * @example
  * ```ts
@@ -999,7 +788,7 @@ export function renderLedgerPinned(
 /**
  * Derives complete source identities, first occurrences, and local references from the actual briefing lines.
  * @param messages - Original messages whose indexed sentences establish completeness
- * @param lines - Retained lines in rendering order after filtering and deduplication
+ * @param lines - Retained lines in rendering order after deduplication and trimming
  * @param amendments - Accepted direct message amendment edges
  * @returns Immutable rendering facts for this retained population
  *
@@ -1042,6 +831,7 @@ export function buildLedgerRenderContext(
  * @param line - The retained occurrence to annotate
  * @param context - Actual complete sources, first occurrences, local references, and accepted amendment edges
  * @returns Source framing and truthful inclusion notes, or empty text for an unrelated or repeated occurrence
+ * @throws {LedgerError} Thrown when the context holds no reference for the annotated source or a fully included amender (code `'REQUEST'`)
  *
  * @example
  * ```ts
@@ -1103,13 +893,11 @@ export function splitTopic(topic: string): readonly string[] {
  *
  * @remarks
  * The cut keeps at least one entry. When it leaves entries out, its last line reads
- * `N items not shown; name a narrower topic to narrow the recall` when ranked and
- * `N older items not shown; name a narrower topic to narrow the recall` otherwise.
- * {@link matchesCutLine} recognizes the form written for the same `ranked` value.
+ * `N older items not shown; name a narrower topic to narrow the recall`, which
+ * {@link matchesCutLine} recognizes.
  *
  * @param entries - The entries in the order they are kept
  * @param room - The estimate units the joined entries can take
- * @param ranked - If `true`, omits age wording; if `false`, says older. Default: false
  * @returns The kept entries followed by the cut line when any were left out, joined by newlines
  *
  * @example
@@ -1117,7 +905,7 @@ export function splitTopic(topic: string): readonly string[] {
  * cutListing(['first entry', 'second entry'], 1) // 'first entry\n1 older item not shown; name a narrower topic to narrow the recall'
  * ```
  */
-export function cutListing(entries: readonly string[], room: number, ranked = false): string {
+export function cutListing(entries: readonly string[], room: number): string {
 	// The cut keeps at least one entry, and stops at the first entry whose addition passes the room.
 	const stop = [...entries.keys()].findIndex(
 		(at) =>
@@ -1136,26 +924,25 @@ export function cutListing(entries: readonly string[], room: number, ranked = fa
 		...kept,
 		...(left > 0
 			? [
-					`${left} ${ranked ? '' : 'older '}item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
+					`${left} older item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
 				]
 			: []),
 	].join('\n')
 }
 
 /**
- * Checks whether a line is the cut line {@link cutListing} writes for the same ranking option.
+ * Checks whether a line is the cut line {@link cutListing} writes.
  *
  * @param line - The line to check
- * @param ranked - If `true`, recognizes neutral wording; if `false`, recognizes older wording. Default: false
- * @returns True if the line is a cut line for the ranking option; false otherwise
+ * @returns True if the line is a cut line; false otherwise
  *
  * @example
  * ```ts
  * matchesCutLine('2 older items not shown; name a narrower topic to narrow the recall') // true
  * ```
  */
-export function matchesCutLine(line: string, ranked = false): boolean {
-	return (ranked ? /^\d+ items? not shown; / : /^\d+ older items? not shown; /).test(line)
+export function matchesCutLine(line: string): boolean {
+	return /^\d+ older items? not shown; /.test(line)
 }
 
 /**

@@ -1,17 +1,5 @@
 import type { LedgerCategory, LedgerNote, LedgerQuestion, LedgerShare } from './types.js'
 
-/** Matches the Unicode words used by both ledger analyzers. */
-export const LEDGER_WORD_PATTERN = /[\p{L}\p{N}]+/gu
-
-/** Sets the BM25 term-frequency saturation coefficient. */
-export const LEDGER_BM25_K1 = 1.2
-
-/** Sets the BM25 length-normalization coefficient. */
-export const LEDGER_BM25_B = 0.75
-
-/** Sets the inclusive lexical discovery floor. */
-export const LEDGER_BM25_FLOOR = Math.log(2)
-
 /**
  * Lists the categories the ledger files a message under, in the order the category question
  * names them — the one list the {@link LedgerCategory} union derives from.
@@ -99,13 +87,6 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 	closure:
 		'recall is closed for the rest of this request; give your final answer from what you have',
 })
-
-/** Heads the briefing section carrying the agent's named earlier replies. */
-export const LEDGER_WORK_HEADING = '## Earlier work'
-
-/** Labels earlier replies as the agent's drafts rather than evidence of an action. */
-export const LEDGER_WORK_NOTE =
-	'Your own earlier replies, named as the request names them. A reply is your draft, not evidence that an action happened.'
 
 /**
  * Supplies the default prompt and tail shares.

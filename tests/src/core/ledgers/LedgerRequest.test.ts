@@ -1,36 +1,9 @@
-import type { ClassifierReading, LedgerPlan, Selection } from '@src/core'
+import type { ClassifierReading, Selection } from '@src/core'
 import { createConversation, DEFAULT_RECALL_LIMIT, LEDGER_NOTES, LedgerRequest } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { computeLedgerErrorCode, LEDGER_EMPTY_PLAN, LEDGER_EMPTY_RECEIPT } from '../../../setup.js'
+import { computeLedgerErrorCode } from '../../../setup.js'
 
 describe('LedgerRequest', () => {
-	it('C1 isolates request and pass histories while C5 keeps pass-local call joins', () => {
-		const first = new LedgerRequest('First.')
-		const second = new LedgerRequest('Second.')
-		const selection: Selection = { messages: [], judgments: [] }
-		first.open(0)
-		first.observe({ estimate: 3, tools: 0 }, 0)
-		first.adopt(selection, 1, LEDGER_EMPTY_RECEIPT)
-		first.observe({ estimate: 7, tools: 2 }, 1)
-		first.spend({ prompt: 11, completion: 2, total: 13 })
-		first.adopt(selection, 2, { ...LEDGER_EMPTY_RECEIPT, tail: ['fold'], turn: 1 })
-		first.open(2)
-		first.adopt(selection, 2, { ...LEDGER_EMPTY_RECEIPT, tail: ['answer'] })
-		first.observe({ estimate: 13, tools: 0 }, 2)
-		expect(
-			first.receipts.map((receipt) => receipt.selections.map((adoption) => adoption.tail)),
-		).toEqual([[[], ['fold']], [['answer']]])
-		expect(first.receipts.map((receipt) => receipt.calls)).toEqual([
-			[
-				{ estimate: 3, tools: 0, selection: undefined },
-				{ estimate: 7, tools: 2, prompt: 11, completion: 2, selection: 0 },
-			],
-			[{ estimate: 13, tools: 0, selection: 0 }],
-		])
-		expect(second.receipts).toEqual([])
-		second.open(0)
-		expect(second.receipts).toEqual([{ selections: [], calls: [] }])
-	})
 	it('refuses a recall limit that is not a nonnegative safe integer and accepts its boundaries', () => {
 		for (const limit of [-1, 0.5, Number.NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
 			expect(computeLedgerErrorCode(() => new LedgerRequest('Check.', limit))).toBe('LIMIT')
@@ -56,7 +29,7 @@ describe('LedgerRequest', () => {
 		expect(request.boundary).toBeUndefined()
 		request.open(2)
 		const selection: Selection = { messages: [], judgments: ['first'] }
-		request.adopt(selection, 3, LEDGER_EMPTY_RECEIPT)
+		request.adopt(selection, 3)
 		request.open(5)
 		expect(request.boundary).toBe(5)
 		expect(request.selection).toBeUndefined()
@@ -70,12 +43,12 @@ describe('LedgerRequest', () => {
 			judgments: ['first'],
 			usage: { prompt: 5, completion: 1, total: 6 },
 		}
-		request.adopt(first, 1, LEDGER_EMPTY_RECEIPT)
+		request.adopt(first, 1)
 		expect(request.selection).toBeUndefined()
 		request.open(2)
-		request.adopt(first, 3, LEDGER_EMPTY_RECEIPT)
+		request.adopt(first, 3)
 		const second: Selection = { messages: [], judgments: [] }
-		request.adopt(second, 4, LEDGER_EMPTY_RECEIPT)
+		request.adopt(second, 4)
 		expect(request.selection).toBe(second)
 		expect(request.boundary).toBe(4)
 		expect(request.usage).toEqual({ prompt: 5, completion: 1, total: 6 })
@@ -147,16 +120,11 @@ describe('LedgerRequest', () => {
 			duration: 3,
 		}
 		const second: ClassifierReading = { key: 'two', phase: 'topic', outcome: 'cached' }
-		const plan: LedgerPlan = {
-			messages: [],
-			judgments: ['one'],
-			briefing: '## Rules',
-			receipt: LEDGER_EMPTY_PLAN,
-		}
+		const plan: Selection = { messages: [], judgments: ['one'], briefing: '## Rules' }
 		request.file([first], plan)
 		request.file([second])
 		expect(request.readings).toEqual([first, second])
-		expect(request.plan).toEqual(plan)
+		expect(request.plan).toBe(plan)
 	})
 
 	it('admits a call once by tool name and canonical arguments', () => {

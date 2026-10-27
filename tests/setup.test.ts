@@ -1,11 +1,5 @@
 import {
 	buildLedgerTailScenario,
-	observeLedgerTail,
-	observeLedgerWork,
-	serializeLedgerRequests,
-	buildLedgerTranscriptFixture,
-	LEDGER_TRANSCRIPT_EXPECTED,
-	LEDGER_WORK_FIXTURE,
 	MEASURE_CALLS,
 	MEASURE_CIRCULAR,
 	MESSAGE_MEASURE_CASES,
@@ -198,64 +192,6 @@ import { rawShape, stringShape } from '@orkestrel/contract'
 const messages: readonly Message[] = [{ id: 'm1', role: 'user', content: 'go' }]
 
 describe('agent scenario infrastructure', () => {
-	it('normalizes declared transcript identities against fixed expected request bytes', () => {
-		const fixture = buildLedgerTranscriptFixture()
-		expect(serializeLedgerRequests(fixture.ledger, fixture.calls, fixture.judges)).toBe(
-			JSON.stringify(LEDGER_TRANSCRIPT_EXPECTED),
-		)
-		expect(fixture.ledger.conversation.judgments.judgments()).toEqual([])
-	})
-	it('preserves changed provider content that equals a message identity', () => {
-		const baseline = buildLedgerTranscriptFixture()
-		const changed = buildLedgerTranscriptFixture({ content: '@message:2' })
-		expect(serializeLedgerRequests(changed.ledger, changed.calls, changed.judges)).not.toBe(
-			serializeLedgerRequests(baseline.ledger, baseline.calls, baseline.judges),
-		)
-	})
-	it('preserves changed judge state that equals a message identity', () => {
-		const baseline = buildLedgerTranscriptFixture()
-		const changed = buildLedgerTranscriptFixture({ state: '@message:2' })
-		expect(serializeLedgerRequests(changed.ledger, changed.calls, changed.judges)).not.toBe(
-			serializeLedgerRequests(baseline.ledger, baseline.calls, baseline.judges),
-		)
-	})
-	it('preserves changed judge question text that equals a message identity', () => {
-		const baseline = buildLedgerTranscriptFixture()
-		const changed = buildLedgerTranscriptFixture({ instructions: '@message:2' })
-		expect(serializeLedgerRequests(changed.ledger, changed.calls, changed.judges)).not.toBe(
-			serializeLedgerRequests(baseline.ledger, baseline.calls, baseline.judges),
-		)
-	})
-	it('distinguishes literal normalization tokens from fixed system text', () => {
-		const baseline = buildLedgerTranscriptFixture()
-		const collision = buildLedgerTranscriptFixture({ system: '@message:1' })
-		expect(serializeLedgerRequests(collision.ledger, collision.calls, collision.judges)).not.toBe(
-			serializeLedgerRequests(baseline.ledger, baseline.calls, baseline.judges),
-		)
-	})
-	it('records the named-work fixture and preserves every non-identity request byte', async () => {
-		const observed = await observeLedgerWork()
-		expect(observed.results).toHaveLength(2)
-		expect(observed.calls).toHaveLength(2)
-		expect(observed.judges.length).toBeGreaterThan(0)
-		expect(observed.results[0]?.content).toBe(LEDGER_WORK_FIXTURE.reply)
-		expect(observed.transcript).toBe((await observeLedgerWork()).transcript)
-		expect(serializeLedgerRequests(observed.ledger, observed.calls, observed.judges)).toBe(
-			observed.transcript,
-		)
-		expect(serializeLedgerRequests(observed.ledger, [], observed.judges)).not.toBe(
-			observed.transcript,
-		)
-	})
-	it('records the tail fixture request prefix and stable request identities', async () => {
-		const observed = await observeLedgerTail({}, 1)
-		expect(observed.results).toHaveLength(1)
-		expect(observed.calls).toHaveLength(2)
-		expect(observed.seed).toHaveLength(3)
-		expect(observed.transcript).toContain('@message:0')
-		expect(observed.transcript).not.toContain(observed.seed[0]?.id)
-		expect(observed.transcript).toBe((await observeLedgerTail({}, 1)).transcript)
-	})
 	it('builds authority and message fixtures and totals recorded usage', () => {
 		expect(createAuthorityContext('read', { path: 'note' })).toEqual({
 			call: { id: 'c1', name: 'read', arguments: { path: 'note' } },

@@ -1,14 +1,7 @@
 import type { Selection } from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
 import type { Message } from '../types.js'
-import type {
-	ClassifierReading,
-	GaugeCall,
-	LedgerPlan,
-	LedgerReceipt,
-	LedgerRequestInterface,
-	LedgerSelectionReceipt,
-} from './types.js'
+import type { ClassifierReading, GaugeCall, LedgerRequestInterface } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { canonicalStringify } from '@orkestrel/contract'
 import { isNonNegativeSafeInteger } from '../validators.js'
@@ -40,7 +33,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	readonly #content: string
 	readonly #limit: number
 	#message: Message | undefined
-	#plan: LedgerPlan | undefined
+	#plan: Selection | undefined
 	#passes: readonly LedgerPass[] = []
 	#readings: readonly ClassifierReading[] = []
 	#admitted: ReadonlySet<string> = new Set()
@@ -76,7 +69,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	 *
 	 * @returns The planned selection, or undefined before one
 	 */
-	get plan(): LedgerPlan | undefined {
+	get plan(): Selection | undefined {
 		return this.#plan
 	}
 
@@ -125,14 +118,6 @@ export class LedgerRequest implements LedgerRequestInterface {
 		return this.#readings
 	}
 
-	/**
-	 * Returns the evidence of every pass opened by this request.
-	 * @returns The pass receipts in opening order
-	 */
-	get receipts(): readonly LedgerReceipt[] {
-		return this.#passes.map((pass) => pass.receipt)
-	}
-
 	enter(conversation: ConversationInterface): Message {
 		if (this.#message !== undefined) return this.#message
 		this.#message = conversation.add({ role: 'user', content: this.#content })
@@ -143,8 +128,8 @@ export class LedgerRequest implements LedgerRequestInterface {
 		this.#passes = [...this.#passes, new LedgerPass(boundary)]
 	}
 
-	adopt(selection: Selection, boundary: number, receipt: LedgerSelectionReceipt): void {
-		this.#passes.at(-1)?.adopt(selection, boundary, receipt)
+	adopt(selection: Selection, boundary: number): void {
+		this.#passes.at(-1)?.adopt(selection, boundary)
 	}
 
 	observe(call: GaugeCall, position: number): void {
@@ -166,9 +151,9 @@ export class LedgerRequest implements LedgerRequestInterface {
 		pass.think(computeThinking(message, completion))
 	}
 
-	file(readings: readonly ClassifierReading[], plan?: LedgerPlan): void {
+	file(readings: readonly ClassifierReading[], plan?: Selection): void {
 		this.#readings = [...this.#readings, ...readings]
-		if (plan !== undefined) this.#plan = structuredClone(plan)
+		if (plan !== undefined) this.#plan = plan
 	}
 
 	admit(name: string, args: Readonly<Record<string, unknown>>): void {

@@ -230,34 +230,6 @@ export interface LedgerGauge {
 export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
 
 /**
- * Decides whether the recent tail holds a history message's whole exchange regardless of age.
- * @param message - A message before the request; a lookup result arrives as its stub with its id kept
- * @returns True if the exchange stays held; false otherwise
- * @example
- * ```ts
- * const pins: LedgerPinHandler = (message) => message.content.startsWith('Standing protocol:')
- * ```
- */
-export type LedgerPinHandler = (message: Message) => boolean
-
-/** Pairs an earlier request with its last nonempty call-free assistant reply before the next request. */
-export interface LedgerWork {
-	readonly request: Message
-	readonly reply: Message
-}
-
-/**
- * Names an earlier request for matching against the current request's id tokens.
- * @param request - An earlier request message with an eligible reply
- * @returns The work name, or undefined to leave the request unnamed
- * @example
- * ```ts
- * const names: LedgerNameHandler = (request) => requests.get(request.id)
- * ```
- */
-export type LedgerNameHandler = (request: Message) => string | undefined
-
-/**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
  * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall,
  * and agent bounds.
@@ -273,10 +245,6 @@ export type LedgerNameHandler = (request: Message) => string | undefined
  * `'CAPACITY'` otherwise. The plan budgets
  * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
  * Recall closes when `remainder - predict < 2 * reserve`.
- * `recent` selects history before the current request; its optional `pins` handler holds matching
- * whole exchanges and is inert while `recent` is off. `work` carries named earlier replies;
- * its optional `names` handler names earlier requests and is inert while `work` is off.
- * Omission of either handler selects no pins or names, respectively. Both switches default off.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
@@ -296,46 +264,16 @@ export interface LedgerOptions {
 	readonly think?: boolean
 	readonly gauge?: LedgerGauge
 	readonly lookups?: readonly LedgerLookup[]
-	/**
-	 * Selects BM25 lexical discovery and ranked recall.
-	 * If `true`, admits unkeyed units whose BM25 score reaches the discovery floor, renders them after
-	 * every keyed unit in descending score order, cuts them before any keyed unit in ascending score
-	 * order, and ranks recall keyed-first then by BM25; keyed units keep their existing order and cut
-	 * keys. An owner-held discovery source must share an owner with the request or a keyed unit;
-	 * when neither a keyed unit nor a named owner exists, discovery stays open. The same check applies
-	 * to carried amendment sources. If `false`, retains existing selection.
-	 * Default: false.
-	 */
-	readonly lexical?: boolean
-	/**
-	 * Selects a recent tail. If `true`, holds exchanges selected by `pins` and fills the tail allowance
-	 * with the newest unheld whole exchanges before this request; if `false`, selects only the seed
-	 * before the first request. Held exchanges can exceed the allowance and force briefing cuts.
-	 * Default: false.
-	 */
-	readonly recent?: boolean
-	/** Holds a history message's exchange while `recent` is true; omission holds no exchange. */
-	readonly pins?: LedgerPinHandler
-	/**
-	 * Selects named earlier replies for the briefing. If `true`, carries replies outside the tail
-	 * whose name shares an id token with this request, labelled as the agent's own drafts and cut
-	 * before other briefing content; if `false`, leaves earlier replies out of the briefing.
-	 * Replies remain chatter and never become sources. Default: false.
-	 */
-	readonly work?: boolean
-	/** Names earlier requests while `work` is true; omission names no request. */
-	readonly names?: LedgerNameHandler
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly agent?: LedgerAgentOptions
 }
 
 /**
- * Carries the reply, passes, filing readings, and evidence of a resolved request.
+ * Carries the outcome of one request a ledger served: the agent result of its reply and every pass
+ * it took.
  *
  * @remarks
- * `request` identifies the message `enter` appended. `receipts` aligns with `passes`,
- * including a recovered failed first pass. Receipts enter no provider request.
  * `passes` holds the first pass and, when the ledger ran one, the answer pass. `content` and
  * `partial` are the last pass's, `usage` sums the passes' usage, and `thinking` joins the passes'
  * reasoning; each optional member is present when any pass reported it. `stop` is the last pass's
@@ -344,97 +282,8 @@ export interface LedgerOptions {
  * its physical wire calls.
  */
 export interface LedgerResult extends AgentResult {
-	readonly request: string
 	readonly passes: readonly AgentResult[]
 	readonly readings: readonly ClassifierReading[]
-	readonly receipts: readonly LedgerReceipt[]
-}
-
-/** Names how composition carries a selected source's content. */
-export type LedgerCarriage = 'verbatim' | 'record' | 'recap' | 'absent'
-
-/** Identifies a source sentence the briefing compositor emitted. */
-export interface LedgerSentence {
-	readonly source: string
-	readonly sentence: number
-}
-
-/** Identifies an accepted direct message amendment whose sentence scope remains unresolved. */
-export interface LedgerAmendment {
-	readonly earlier: string
-	readonly later: string
-}
-
-/**
- * Supplies accepted amendments and completely included sources for one briefing rendering.
- *
- * @remarks
- * `first` identifies each source's first retained line object in actual emission order. Build this
- * context from the same line objects passed to the renderers after filtering, deduplication, and
- * trimming; recompute it when the retained population changes. `references` assigns each distinct
- * retained source its decimal display reference in first-occurrence order, starting at 1. These
- * briefing-local references can change after trimming; audit receipts retain original source IDs.
- */
-export interface LedgerRenderContext {
-	readonly amendments: readonly LedgerAmendment[]
-	readonly complete: ReadonlySet<string>
-	readonly first: ReadonlyMap<string, LedgerLine>
-	readonly references: ReadonlyMap<string, string>
-}
-
-/** Records a selected source's established content carriage. */
-export interface LedgerSource {
-	readonly source: string
-	/** Holds undefined when none of the declared composition facts applies. */
-	readonly carriage: LedgerCarriage | undefined
-}
-
-/** Preserves the projection and composition facts of one successful plan. */
-export interface LedgerPlanReceipt {
-	readonly owners: readonly string[]
-	readonly filed: readonly string[]
-	readonly rendered: readonly string[]
-	readonly sentences: readonly LedgerSentence[]
-	readonly omitted: readonly string[]
-	readonly trims: number
-	readonly amendments: readonly LedgerAmendment[]
-}
-
-/** Holds a successful selection with its request-owned planning evidence. */
-export interface LedgerPlan extends Selection {
-	readonly receipt: LedgerPlanReceipt
-}
-
-/**
- * Preserves one adopted selection after all message filtering.
- * @remarks
- * `turn` is undefined at entry, otherwise the open turn's index. `prior` contains
- * only earlier respond-request ids present in `tail`. `plan` is undefined on a
- * fallback or an adoption without a successful ledger plan.
- */
-export interface LedgerSelectionReceipt {
-	readonly turn: number | undefined
-	readonly tail: readonly string[]
-	readonly prior: readonly string[]
-	readonly plan: LedgerPlanReceipt | undefined
-	readonly sources: readonly LedgerSource[]
-}
-
-/**
- * Preserves one gauge observation and its selection at measurement time.
- * @remarks
- * Position is the Agent turn index, not proof of a provider dispatch. `selection`
- * indexes this pass's selections at the turn event; it is undefined before adoption.
- * Inherited estimate and optional prompt are the existing gauge values, not summed usage.
- */
-export interface LedgerCall extends GaugeCall {
-	readonly selection: number | undefined
-}
-
-/** Preserves the adopted selections and gauge observations of one pass. */
-export interface LedgerReceipt {
-	readonly selections: readonly LedgerSelectionReceipt[]
-	readonly calls: readonly LedgerCall[]
 }
 
 /**
@@ -453,7 +302,7 @@ export interface LedgerRequestInterface {
 	/** Holds the request message, or undefined until `enter` appends it. */
 	readonly message: Message | undefined
 	/** Holds the selection the request's last successful plan produced, or undefined before one. */
-	readonly plan: LedgerPlan | undefined
+	readonly plan: Selection | undefined
 	/** Holds the selection the current pass's run adopted last, or undefined before one. */
 	readonly selection: Selection | undefined
 	/** Holds the conversation length at the current pass's start or at its last adopted selection, or undefined before a pass. */
@@ -464,8 +313,6 @@ export interface LedgerRequestInterface {
 	readonly calls: readonly GaugeCall[]
 	/** Holds the filing readings of every planning selection the request made, in asking order. */
 	readonly readings: readonly ClassifierReading[]
-	/** Holds the adopted selections and gauge observations of every pass in order. */
-	readonly receipts: readonly LedgerReceipt[]
 	/**
 	 * Appends the request's content to a conversation as a user message, once, and holds it as `message`.
 	 *
@@ -484,9 +331,8 @@ export interface LedgerRequestInterface {
 	 *
 	 * @param selection - The selection the run built its prompt from
 	 * @param boundary - The conversation length when the run adopted it
-	 * @param receipt - The filtered selection's composition evidence
 	 */
-	adopt(selection: Selection, boundary: number, receipt: LedgerSelectionReceipt): void
+	adopt(selection: Selection, boundary: number): void
 	/**
 	 * Starts a gauge call in the current pass, making that pass's call in flight final.
 	 *
@@ -517,7 +363,7 @@ export interface LedgerRequestInterface {
 	 * @param readings - The selection's filing readings, in asking order
 	 * @param plan - The planned selection, or undefined when planning failed
 	 */
-	file(readings: readonly ClassifierReading[], plan?: LedgerPlan): void
+	file(readings: readonly ClassifierReading[], plan?: Selection): void
 	/**
 	 * Admits one tool call of the request, compared by tool name and canonical arguments.
 	 *
@@ -670,6 +516,30 @@ export interface LedgerRecord {
 	readonly title: string
 	readonly members: readonly string[]
 	readonly lines: readonly LedgerLine[]
+}
+
+/** Identifies an accepted direct message amendment whose sentence scope remains unresolved. */
+export interface LedgerAmendment {
+	readonly earlier: string
+	readonly later: string
+}
+
+/**
+ * Supplies accepted amendments and completely included sources for one briefing rendering.
+ *
+ * @remarks
+ * `first` identifies each source's first retained line object in actual emission order. Build this
+ * context from the same line objects passed to the renderers after deduplication and trimming;
+ * recompute it when the retained population changes. `references` assigns each distinct retained
+ * source its decimal display reference in first-occurrence order, starting at 1. These
+ * briefing-local references can change after trimming; the projection, recall, and storage retain
+ * original source IDs.
+ */
+export interface LedgerRenderContext {
+	readonly amendments: readonly LedgerAmendment[]
+	readonly complete: ReadonlySet<string>
+	readonly first: ReadonlyMap<string, LedgerLine>
+	readonly references: ReadonlyMap<string, string>
 }
 
 /**
@@ -937,21 +807,8 @@ export interface GaugeInterface extends LedgerGauge {
 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void
 }
 
-/** Names a topic, rule, name, or lexical planning group. */
-export type LedgerPlanningGroup = 1 | 2 | 3 | 4
-
-/** Carries occurrence counts from the ledger's word matches. */
-export interface LedgerLexicon {
-	readonly frequencies: ReadonlyMap<string, number>
-	readonly length: number
-}
-
-/** Carries statistics over every call-free message. */
-export interface LedgerCorpus {
-	readonly count: number
-	readonly frequencies: ReadonlyMap<string, number>
-	readonly average: number
-}
+/** Names a briefing source's planning group: a topic match, an off-topic rule or correction, or a name match. */
+export type LedgerPlanningGroup = 1 | 2 | 3
 
 /** Names the machine-readable conditions a `LedgerError` error reports. */
 export type LedgerErrorCode =

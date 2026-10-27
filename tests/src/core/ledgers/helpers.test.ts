@@ -6,13 +6,9 @@ import type {
 	LedgerRecord,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
-import { createConversation } from '@src/core'
-import * as lexical from '../../../../src/core/ledgers/helpers.js'
 import {
 	buildRecallMessage,
-	buildLedgerSources,
 	collectProjectionIds,
-	collectLedgerWork,
 	extractWords,
 	renderCauseChain,
 	renderTopicNames,
@@ -32,7 +28,6 @@ import {
 	rankLedgerCut,
 	cutListing,
 	extractTokens,
-	filterLedgerDiscovery,
 	fitSlope,
 	identifyLookup,
 	linkOwners,
@@ -42,7 +37,6 @@ import {
 	placeMember,
 	renderLedgerPinned,
 	renderLedgerRecord,
-	renderLedgerWork,
 	renderLookupCall,
 	renderStub,
 	selectRecords,
@@ -50,13 +44,12 @@ import {
 	splitSentences,
 	splitTopic,
 } from '../../../../src/core/ledgers/helpers.js'
-import { captureError, requireValue } from '@orkestrel/test'
+import { captureError } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildGaugeCall,
 	measureRoom,
 	LEDGER_EMPTY_FOUND,
-	LEDGER_CARRIAGE_PLAN,
 	buildLedgerInput,
 	buildLedgerMessage,
 	buildLedgerReading,
@@ -66,201 +59,12 @@ import {
 	LEDGER_DESK_OWNERS,
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
-	LEDGER_LINK_FIXTURE,
-	LEDGER_LINK_REFUSALS,
-	LEDGER_LEXICAL_NUMBERS,
-	LEDGER_LEXICAL_RANKS,
-	LEDGER_LEXICAL_ENTRIES,
-	LEDGER_CUT_MATCHES,
-	LEDGER_WORK_FIXTURE,
-	LEDGER_DISCOVERY_UNITS,
-	LEDGER_DISCOVERY_RECORDS,
 	LEDGER_OWNER_PROJECTION,
 	buildLedgerLine,
 	replaceLedgerRecord,
 } from '../../../setup.js'
 
-describe('filterLedgerDiscovery', () => {
-	it('T3-5 preserves open cases keyed units orphans rules shared owners and input order', () => {
-		const units = LEDGER_DISCOVERY_UNITS
-		const records = LEDGER_DISCOVERY_RECORDS
-		const before = JSON.stringify({ units, records })
-		const selected = filterLedgerDiscovery(units, records, [])
-		expect(selected.map((unit) => unit.source)).toEqual([
-			'orphan',
-			'keyed',
-			'same',
-			'rule',
-			'shared',
-			'keyed-rule',
-			'keyed-name',
-		])
-		expect(selected[0]).toBe(units[0])
-		const discovery = units.filter((unit) => unit.group === 4)
-		expect(filterLedgerDiscovery(discovery, records, [])).toEqual(discovery)
-		expect(
-			filterLedgerDiscovery(discovery, records, ['FOREIGN']).map((unit) => unit.source),
-		).toEqual(['orphan', 'foreign', 'rule', 'shared'])
-		expect(
-			filterLedgerDiscovery([{ source: 'unknown-keyed', group: 3 }, ...discovery], records, []).map(
-				(unit) => unit.source,
-			),
-		).toEqual(['unknown-keyed', 'orphan', 'rule'])
-		expect(filterLedgerDiscovery([], records, ['SAME'])).toEqual([])
-		expect(filterLedgerDiscovery(units, [], ['SAME'])).toEqual(units)
-		expect(JSON.stringify({ units, records })).toBe(before)
-	})
-})
-
-describe('earlier work', () => {
-	it('R2 collects final answer replies and skips call-only blank and reply-less requests', () => {
-		const fixture = LEDGER_WORK_FIXTURE
-		const pairs = collectLedgerWork(fixture.history, new Set(fixture.requests))
-		expect(pairs.map((work) => [work.request.id, work.reply.id])).toEqual([
-			['first', 'final'],
-			['third', 'partial'],
-		])
-		expect(pairs[0]?.request).toBe(fixture.history.find((message) => message.id === 'first'))
-		expect(pairs[0]?.reply).toBe(fixture.history.find((message) => message.id === 'final'))
-		expect(collectLedgerWork([], new Set(fixture.requests))).toEqual([])
-		expect(collectLedgerWork(fixture.history, new Set())).toEqual([])
-	})
-	it('R2 renders the work name and exact reply whitespace', () => {
-		const fixture = LEDGER_WORK_FIXTURE
-		const partial = requireValue(collectLedgerWork(fixture.history, new Set(fixture.requests))[1])
-		expect(renderLedgerWork('W-2', partial)).toBe('[W-2]   Partial draft.\r\n')
-	})
-})
-
-describe('lexical scoring', () => {
-	it('L-5 cuts ranked whole entries with a neutral recognized suffix', () => {
-		const entries = LEDGER_LEXICAL_ENTRIES
-		expect(cutListing(entries, 0, true)).toBe(
-			'amber root\namendment\n2 items not shown; name a narrower topic to narrow the recall',
-		)
-		expect(cutListing(entries, 0)).toBe(
-			'amber root\namendment\n2 older items not shown; name a narrower topic to narrow the recall',
-		)
-		expect(
-			matchesCutLine('2 items not shown; name a narrower topic to narrow the recall', true),
-		).toBe(true)
-		expect(
-			matchesCutLine('1 item not shown; name a narrower topic to narrow the recall', true),
-		).toBe(true)
-		expect(matchesCutLine('The 1 item not shown; text')).toBe(false)
-	})
-	it('L-1 returns the hand-computed 88/73 ln(2) score', () => {
-		expect(lexical).toHaveProperty('computeLedgerScore')
-		const texts = LEDGER_LEXICAL_NUMBERS.texts.map((content) =>
-			lexical.countLedgerWords(buildLedgerMessage(content, 'user', content)),
-		)
-		const corpus = lexical.computeLedgerCorpus(texts)
-		expect(corpus).toEqual({
-			count: 2,
-			average: 2,
-			frequencies: new Map([
-				['amber', 1],
-				['blue', 2],
-			]),
-		})
-		expect(
-			lexical.computeLedgerScore(
-				texts[0] ?? { length: 0, frequencies: new Map() },
-				new Set(['amber']),
-				corpus,
-			),
-		).toBeCloseTo(LEDGER_LEXICAL_NUMBERS.expected, 14)
-	})
-
-	it('L-2 counts repeated Unicode matches and distinct query terms', () => {
-		expect(lexical).toHaveProperty('countLedgerWords')
-		const message = buildLedgerMessage('unicode', 'user', LEDGER_LEXICAL_NUMBERS.unicode)
-		const text = lexical.countLedgerWords(message)
-		expect(text).toEqual({
-			length: 5,
-			frequencies: new Map([
-				['élodie', 2],
-				['42', 2],
-				['blue', 1],
-			]),
-		})
-		expect([...extractWords(message).words]).toEqual([...text.frequencies.keys()])
-		const corpus = lexical.computeLedgerCorpus([
-			text,
-			lexical.countLedgerWords(buildLedgerMessage('other', 'user', 'blue')),
-		])
-		const query = extractWords(buildLedgerMessage('query', 'user', 'Élodie élodie 42 42')).words
-		expect(lexical.computeLedgerScore(text, query, corpus)).toBeCloseTo(
-			LEDGER_LEXICAL_NUMBERS.unicodeScore,
-			14,
-		)
-		expect(lexical.countLedgerWords(message)).toEqual(text)
-	})
-
-	it('L-3 returns zero before empty divisions and for no overlap', () => {
-		expect(lexical).toHaveProperty('computeLedgerCorpus')
-		const empty = lexical.countLedgerWords(buildLedgerMessage('empty', 'user', '...'))
-		const text = lexical.countLedgerWords(buildLedgerMessage('text', 'user', 'amber'))
-		expect(lexical.computeLedgerCorpus([])).toEqual({
-			count: 0,
-			average: 0,
-			frequencies: new Map(),
-		})
-		expect(lexical.computeLedgerScore(text, new Set(), lexical.computeLedgerCorpus([text]))).toBe(0)
-		expect(
-			lexical.computeLedgerScore(text, new Set(['amber']), lexical.computeLedgerCorpus([])),
-		).toBe(0)
-		expect(
-			lexical.computeLedgerScore(empty, new Set(['amber']), lexical.computeLedgerCorpus([empty])),
-		).toBe(0)
-		expect(
-			lexical.computeLedgerScore(text, new Set(['blue']), lexical.computeLedgerCorpus([text])),
-		).toBe(0)
-	})
-})
-
 describe('extracted ledger leaves', () => {
-	it('C3 joins carriage by composition precedence and leaves a tail stub unlabelled', () => {
-		const stored = ['recap', 'whole', 'partial', 'cut', 'stub'].map((id) =>
-			buildLedgerMessage(id, 'user', `${id} original`),
-		)
-		const emitted = stored.map((message) =>
-			['partial', 'cut', 'stub'].includes(message.id)
-				? { ...message, content: 'changed' }
-				: message,
-		)
-		expect(buildLedgerSources(emitted, stored, ['recap'], LEDGER_CARRIAGE_PLAN)).toEqual([
-			{ source: 'recap', carriage: 'recap' },
-			{ source: 'whole', carriage: 'verbatim' },
-			{ source: 'partial', carriage: 'record' },
-			{ source: 'cut', carriage: 'absent' },
-			{ source: 'stub', carriage: undefined },
-			{ source: 'record', carriage: 'record' },
-			{ source: 'absent', carriage: 'absent' },
-		])
-		expect(buildLedgerSources([], [], [], undefined)).toEqual([])
-	})
-
-	it('C3 reads recap carriage from a real compacted conversation fallback', async () => {
-		const conversation = createConversation({
-			summarize: async () => 'The refund needs approval.',
-			keep: 0,
-		})
-		conversation.add([
-			{ role: 'user', content: 'Refund 42.' },
-			{ role: 'assistant', content: 'Recorded.' },
-			{ role: 'user', content: 'Next.' },
-		])
-		const section = await conversation.compact()
-		expect(section).toBeDefined()
-		const sources = buildLedgerSources(
-			conversation.view(),
-			conversation.messages(),
-			conversation.sections.map((entry) => entry.id),
-			undefined,
-		)
-		expect(sources.find((source) => source.source === section?.id)?.carriage).toBe('recap')
-	})
 	it('collects placed and orphan ids without duplicates', () => {
 		expect([
 			...collectProjectionIds({
@@ -352,10 +156,6 @@ describe('extracted ledger leaves', () => {
 })
 
 describe('rankLedgerCut', () => {
-	it('L-4 cuts discovery before every existing priority rank', () => {
-		for (const row of LEDGER_LEXICAL_RANKS)
-			expect(rankLedgerCut(row.group, row.unsettled, row.category)).toBe(row.expected)
-	})
 	it('ranks name matches before unsettled sources, off-topic corrections, rules, and on-topic sources', () => {
 		expect(rankLedgerCut(3, true, 'rule')).toBe(0)
 		expect(rankLedgerCut(1, true, 'fact')).toBe(1)
@@ -624,59 +424,6 @@ describe('renderLookupCall', () => {
 
 describe('linkOwners', () => {
 	const owners = new Map(Object.entries(LEDGER_DESK_OWNERS))
-
-	it('links a bare id and refuses the same id in a prefixed subject', () => {
-		const fixture = LEDGER_LINK_FIXTURE
-		for (const subject of [fixture.id.toLowerCase(), fixture.subject]) {
-			const reading = buildLedgerReading(
-				'lookup',
-				'lookup',
-				{ id: subject },
-				fixture.lookup,
-				fixture.result,
-			)
-			const registry = collectRegistry([reading])
-			expect([...registry.ids]).toEqual(['BC-7301', 'BW-20931'])
-			expect([...matchEntities(registry, fixture.fact, true)]).toEqual(['BC-7301'])
-			expect([...linkOwners([reading], owners)]).toEqual(
-				subject === fixture.subject ? [] : [['BC-7301', 'BW-20931']],
-			)
-		}
-		const self = buildLedgerReading(
-			'self',
-			'lookup',
-			{ id: 'account:bw-20931' },
-			'No owner named.',
-			fixture.result,
-		)
-		expect([...linkOwners([self], owners)]).toEqual([])
-		expect(normalizeArgument(fixture.subject)).toBe('ORDER:BC-7301')
-		expect([...extractTokens(fixture.subject).ids]).toEqual(['BC-7301'])
-	})
-
-	it('refuses mixed subjects and readings without exactly one known owner', () => {
-		const fixture = LEDGER_LINK_FIXTURE
-		const valid = buildLedgerReading(
-			'valid',
-			'lookup',
-			{ id: fixture.id },
-			fixture.lookup,
-			fixture.result,
-		)
-		expect([...linkOwners([valid], owners)]).toEqual([['BC-7301', 'BW-20931']])
-		for (const control of LEDGER_LINK_REFUSALS) {
-			const reading = buildLedgerReading(
-				'control',
-				'lookup',
-				{ id: control.subject },
-				control.text,
-				fixture.result,
-			)
-			expect([...linkOwners([reading], owners)], `${control.subject}: ${control.text}`).toEqual([])
-		}
-		const empty = buildLedgerReading('empty', 'lookup', { id: fixture.subject }, fixture.lookup)
-		expect([...linkOwners([empty], owners)]).toEqual([])
-	})
 
 	it('links an owner argument to itself and another id to the one owner its text names', () => {
 		const links = linkOwners(
@@ -1489,55 +1236,6 @@ describe('buildLines', () => {
 })
 
 describe('buildRecords', () => {
-	it('places a later fact through a bare lookup id and refuses a prefixed lookup id', () => {
-		const fixture = LEDGER_LINK_FIXTURE
-		const reading = buildLedgerReading(
-			'lookup',
-			'lookup',
-			{ id: fixture.subject },
-			fixture.lookup,
-			fixture.result,
-		)
-		const input = buildLedgerInput({
-			owners: LEDGER_DESK_OWNERS,
-			messages: [buildLedgerMessage('arrival', 'user', fixture.fact)],
-			readings: [reading],
-			entities: { arrival: [...matchEntities(collectRegistry([reading]), fixture.fact, true)] },
-			classification: { categories: { arrival: 'fact' } },
-		})
-		for (const subject of [fixture.subject, fixture.id]) {
-			const projection = buildRecords({
-				...input,
-				readings: [{ ...reading, arguments: { id: subject } }],
-			})
-			expect(
-				projection.records.map((record) => ({
-					key: record.key,
-					members: record.members,
-					texts: record.lines.map((line) => line.text),
-				})),
-			).toEqual(
-				subject === fixture.id
-					? [{ key: 'owner:BW-20931', members: ['arrival'], texts: [fixture.fact] }]
-					: [],
-			)
-			expect(projection.orphans).toEqual(subject === fixture.id ? [] : ['arrival'])
-			const ambiguous = {
-				...reading,
-				arguments: { id: subject },
-				text: 'Accounts BW-20931 and OM-30418.',
-			}
-			const cross = buildRecords({ ...input, readings: [ambiguous] })
-			expect(cross.records).toEqual([])
-			expect(cross.orphans).toEqual(['arrival'])
-			const self = buildRecords({
-				...input,
-				readings: [{ ...reading, arguments: { id: 'account:BW-20931' } }],
-				entities: new Map([['arrival', ['BW-20931']]]),
-			})
-			expect(self.records.map((record) => record.key)).toEqual(['owner:BW-20931'])
-		}
-	})
 	it('retains successful readings whose bigint arguments have no lookup identity', () => {
 		const text = 'Account BW-20931 (Brightwater Studio): balance $10.00.'
 		const input = buildLedgerInput({
@@ -1795,7 +1493,7 @@ describe('buildRecords', () => {
 describe('selectRecords', () => {
 	const built = buildRecords(createLedgerDesk())
 
-	it('T2-1 collapses equal-member owners under joined titles before the rules record', () => {
+	it('collapses equal-member owners under joined titles before the rules record', () => {
 		const projection = LEDGER_OWNER_PROJECTION
 		const before = JSON.stringify(projection)
 		const views = selectRecords(projection, { owners: ['BW-5512', 'BW-20931'], topics: [] })
@@ -1812,7 +1510,7 @@ describe('selectRecords', () => {
 		expect(views[0]?.lines[0]).not.toBe(projection.records[0]?.lines[0])
 	})
 
-	it('T2-2 keeps same-name owners separate when one member or its order differs', () => {
+	it('keeps same-name owners separate when one member or its order differs', () => {
 		const projection = replaceLedgerRecord(LEDGER_OWNER_PROJECTION, 'owner:BW-5512', (record) => ({
 			...record,
 			members: [...record.members, 'only-order'],
@@ -1833,7 +1531,7 @@ describe('selectRecords', () => {
 		])
 	})
 
-	it('T2-3 keeps the first requested owner key and joins titles in request order', () => {
+	it('keeps the first requested owner key and joins titles in request order', () => {
 		const views = selectRecords(LEDGER_OWNER_PROJECTION, {
 			owners: ['BW-20931', 'missing', 'BW-5512', 'BW-20931'],
 			topics: [],
@@ -2034,12 +1732,6 @@ describe('splitTopic', () => {
 })
 
 describe('cutListing and matchesCutLine', () => {
-	it.each(LEDGER_CUT_MATCHES)(
-		'F-8 recognizes $line with ranked=$ranked as $matched',
-		({ line, ranked, matched }) => {
-			expect(matchesCutLine(line, ranked)).toBe(matched)
-		},
-	)
 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
 
 	it('keeps every item that fits and adds no cut line', () => {
@@ -2065,7 +1757,7 @@ describe('cutListing and matchesCutLine', () => {
 
 	it('matches the cut line it writes and no other line', () => {
 		const cut = cutListing(items, 0).split('\n')
-		expect(cut.map((line) => matchesCutLine(line))).toEqual([false, true])
+		expect(cut.map(matchesCutLine)).toEqual([false, true])
 		expect(matchesCutLine('1 older item not shown; add a topic')).toBe(true)
 		expect(matchesCutLine('3 older items not shown; ')).toBe(true)
 		expect(matchesCutLine('older items not shown; ')).toBe(false)

@@ -1364,8 +1364,6 @@ await new GuideCommand({
 
 			expect(gauge.overhead).toBe(120)
 			expect(first.content).toBe('Order BW-5512 qualifies for a $148.50 refund.')
-			expect(first.receipts.length === first.passes.length).toBe(true)
-			expect(first.receipts[0]?.calls[0]?.prompt).toBeUndefined()
 			expect(first.passes).toHaveLength(1)
 			expect(second.content).toBe('Yes. Refunds over $100 need a manager.')
 			expect(briefings).toEqual([
@@ -1464,7 +1462,7 @@ await new GuideCommand({
 					(1 + LEDGER_SCALE_DRIFT),
 			)
 			expect(guideText).toContain(
-				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share while `recent` is off',
+				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
 			)
 		})
 
@@ -2289,7 +2287,7 @@ await new GuideCommand({
 			])
 			expect(requireValue(system, 'Missing system message').content).toContain(later)
 			expect(guideText).toContain(
-				'With `recent` omitted or false, only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the briefing or the `recall` tool.',
+				'Only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the briefing or the `recall` tool.',
 			)
 		})
 
@@ -2395,19 +2393,12 @@ await new GuideCommand({
 				judgments: [],
 				usage: { prompt: 30, completion: 2, total: 32 },
 			}
-			request.adopt(selection, conversation.count, {
-				turn: undefined,
-				tail: [message.id],
-				prior: [],
-				plan: undefined,
-				sources: [{ source: message.id, carriage: 'verbatim' }],
-			})
+			request.adopt(selection, conversation.count)
 			request.observe({ estimate: 40, tools: 2 }, conversation.count)
 			request.spend({ prompt: 52, completion: 8, total: 60 })
 			expect(request.selection).toBe(selection)
 			expect(request.usage).toEqual({ prompt: 82, completion: 10, total: 92 })
 			expect(request.calls).toEqual([{ estimate: 40, tools: 2, prompt: 52, completion: 8 }])
-			expect(request.receipts[0]?.calls[0]?.selection).toBe(0)
 
 			request.admit('lookup_order', { id: 'BW-5512' })
 			expect(() => request.admit('lookup_order', { id: 'BW-5512' })).toThrow(LEDGER_NOTES.repeat)
