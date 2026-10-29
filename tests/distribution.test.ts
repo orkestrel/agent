@@ -9,7 +9,15 @@ import type { TestContext } from 'vitest'
 import { attempt, isArray, isRecord, isString } from '@orkestrel/contract'
 import { createScratch, destroyScratch, removeTree } from '@orkestrel/test/server'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,7 +29,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // compiler majors this toolchain supports, and its in-process API is not. It is
 // resolved from the workspace under proof, so a consumer of the packed artifact is
 // checked by the same compiler that workspace's own `check` script runs.
-const TSC = createRequire(join(ROOT, 'package.json')).resolve('typescript/bin/tsc')
+const TSC = join(
+	dirname(createRequire(join(ROOT, 'package.json')).resolve('typescript/package.json')),
+	'bin/tsc',
+)
 // `prepublishOnly` runs this proof as `npm run test:distribution -- --mode release`.
 // Release is the publish gate, so evidence it cannot obtain fails there and skips
 // everywhere else: a gate that passes on missing evidence proves nothing.
@@ -897,6 +908,73 @@ describe('installed package consumer', () => {
 		const faces = stage.entries.filter((entry) => entry.browser)
 		expect(faces.map((entry) => entry.subpath)).toStrictEqual([])
 	})
+})
+
+it('recognizes branded errors across distinct installed copies and module formats', (context) => {
+	const stage = requireStage(context)
+	const copy = join(stage.consumer, 'node_modules/@orkestrel/agent-copy')
+	cpSync(stage.installed, copy, { recursive: true })
+	const driver = join(stage.consumer, 'error-guards.mjs')
+	writeFile(
+		driver,
+		`import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
+import { join } from 'node:path'
+const require = createRequire(import.meta.url)
+const roots = process.argv.slice(2)
+const copies = await Promise.all(roots.flatMap((root) => [
+	import(pathToFileURL(join(root, 'dist/src/core/index.js')).href),
+	Promise.resolve(require(join(root, 'dist/src/core/index.cjs'))),
+]))
+const cases = [
+	['JudgeAbortError', [{ model: 'judge', answers: {} }]],
+	['ProviderAbortError', [{ content: '' }]],
+	['ProviderError', ['HTTP', 'failure', { status: 503 }]],
+	['JudgeError', ['QUESTION', 'failure']],
+	['ConversationError', ['KEEP', 'failure', { context: {} }]],
+	['AgentJobError', ['failure', { content: '', partial: true }]],
+	['AgentError', ['LIMIT', 'failure', { context: {} }]],
+	['LedgerError', ['GAUGE', 'failure']],
+]
+for (const [name, args] of cases) {
+	assert.equal(new Set(copies.map((copy) => copy[name])).size, copies.length)
+	for (const source of copies) {
+		const Constructor = source[name]
+		const error = new Constructor(...args)
+		const brand = Symbol.for('@orkestrel/agent.' + name)
+		const descriptor = Object.getOwnPropertyDescriptor(error, brand)
+		assert.equal(descriptor.value, error)
+		assert.equal(descriptor.enumerable, false)
+		assert.equal(descriptor.writable, false)
+		const child = new (class extends Constructor {
+			constructor() { super(...args); this.name = 'ChildFailure' }
+		})()
+		for (const target of copies) {
+			const guard = target['is' + name]
+			assert.equal(guard(error), true)
+			assert.equal(guard(child), true)
+			assert.equal(guard(Object.assign(new Error('look-alike'), { code: error.code })), false)
+			assert.equal(guard(new Proxy(error, {})), false)
+			const plain = {}
+			Object.defineProperty(plain, brand, { value: plain })
+			assert.equal(guard(plain), false)
+			const invalid = new Constructor(...args)
+			Object.defineProperty(invalid, 'code', { value: 'INVALID' })
+			assert.equal(guard(invalid), false)
+			if ('context' in error) {
+				for (const context of [new (class {})(), () => undefined]) {
+					assert.equal(guard(new Constructor(args[0], args[1], { context })), true)
+				}
+			}
+		}
+	}
+}
+`,
+	)
+	const result = runNode([driver, stage.installed, copy], stage.consumer)
+	expect(readOutput(result)).toBe('')
+	expect(result.status).toBe(0)
 })
 
 for (const entry of STAGE?.entries ?? []) {

@@ -425,7 +425,7 @@ describe('inferStop', () => {
 	it('names no layer for a reason that is not a budget error and a turn the model did not truncate', () => {
 		const allowance = createTokenBudget({ id: 'meter', max: 2 })
 		const budget = createTokenBudget({ id: 'budget', max: 100 })
-		const turn = createAgentTurn({ ending: 'cancel', partial: true, interrupted: true })
+		const turn = createAgentTurn({ outcome: 'cancel', partial: true, interrupted: true })
 		expect(inferStop(undefined, allowance, budget, 'ollama', turn)).toBeUndefined()
 		expect(
 			inferStop(new DOMException('cancelled', 'AbortError'), allowance, budget, 'ollama', turn),
@@ -437,7 +437,7 @@ describe('inferStop', () => {
 		allowance.start()
 		allowance.consume({ prompt: 0, completion: 3, total: 3 })
 		const budget = createTokenBudget({ id: 'budget', max: 100 })
-		const turn = createAgentTurn({ ending: 'cancel', estimate: 3, interrupted: true })
+		const turn = createAgentTurn({ outcome: 'cancel', estimate: 3, interrupted: true })
 		expect(inferStop(allowance.signal.reason, allowance, budget, 'ollama', turn)).toEqual({
 			layer: 'meter',
 			id: 'meter',
@@ -570,7 +570,7 @@ describe('inferStop', () => {
 		const budget = createTokenBudget({ id: 'budget', max: 1 })
 		budget.start()
 		budget.consume({ prompt: 0, completion: 1, total: 1 })
-		const stopped = createAgentTurn({ ending: 'cancel', partial: true, estimate: undefined })
+		const stopped = createAgentTurn({ outcome: 'cancel', partial: true, estimate: undefined })
 		const stop = inferStop(budget.signal.reason, undefined, budget, 'ollama', stopped)
 		expect(stop).toEqual({ layer: 'budget', id: 'budget', max: 1, consumed: 1 })
 		expect(Object.keys(stop ?? {})).toEqual(['layer', 'id', 'max', 'consumed'])
@@ -732,7 +732,7 @@ describe('measureMessage', () => {
 			expect(measure).toEqual(expected)
 			// The components sum to the legacy estimator's known reading, never to a mirrored call.
 			expect(
-				measure.content + measure.framing + measure.calls + measure.thinking + measure.images,
+				measure.content + measure.uniform + measure.calls + measure.thinking + measure.images,
 			).toBe(total)
 			expect(estimateMessages([message])).toBe(total)
 		},
@@ -744,11 +744,11 @@ describe('measureMessage', () => {
 		expect(Object.keys(measureMessage(first.message)).sort()).toEqual([
 			'calls',
 			'content',
-			'framing',
 			'id',
 			'images',
 			'role',
 			'thinking',
+			'uniform',
 		])
 	})
 
@@ -785,7 +785,7 @@ describe('measureRequest', () => {
 					(sum, message) =>
 						sum +
 						message.content +
-						message.framing +
+						message.uniform +
 						message.calls +
 						message.thinking +
 						message.images,

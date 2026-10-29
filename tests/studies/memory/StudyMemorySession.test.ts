@@ -1,4 +1,4 @@
-import type { MemoryTrialFixture } from './types.js'
+import type { MemoryTrialFixture } from '../../setupStudy.js'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'

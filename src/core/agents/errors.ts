@@ -1,13 +1,20 @@
 import type { AgentErrorCode, AgentResult } from './types.js'
 import type { CodedErrorOptions } from '../types.js'
-import { isInstance } from '@orkestrel/contract'
+import {
+	INTRINSICS,
+	holds,
+	isObject,
+	isFunction,
+	isNumber,
+	isString,
+	isBoolean,
+} from '@orkestrel/contract'
 
 // A real error type, not a sentinel. An agent job treats a partial result
 // (a job committed early from an abort / budget / timeout) as a failure by default — the
 // queue / runner handler throws this so the Queue's retries + a Runner's fail-fast
 // engage. It carries the partial AgentResult so a caller (or a `retries: 0` enqueue that
-// rejects with it) can still inspect what accumulated. The guard narrows with
-// `instanceof`, mirroring `ProviderAbortError` and `isProviderAbortError` in `providers/errors.ts`.
+// rejects with it) can still inspect what accumulated.
 
 /**
  * Reports an {@link AgentInterface} run that ended {@link AgentResult.partial} under a
@@ -35,12 +42,13 @@ export class AgentJobError extends Error {
 	constructor(message: string, partial: AgentResult) {
 		super(message)
 		this.name = 'AgentJobError'
+		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.AgentJobError'), { value: this })
 		this.partial = partial
 	}
 }
 
 /**
- * Narrows an unknown caught value to an {@link AgentJobError} through `instanceof`, so a
+ * Narrows an unknown caught value to an {@link AgentJobError} through its identity brand and declared members, so a
  * `catch` can recover its `partial` result.
  *
  * @param value - The value to test (typically a `catch` binding or a rejected enqueue)
@@ -56,7 +64,62 @@ export class AgentJobError extends Error {
  * ```
  */
 export function isAgentJobError(value: unknown): value is AgentJobError {
-	return isInstance(value, AgentJobError)
+	return holds(() => {
+		if (
+			!(
+				value instanceof Error &&
+				INTRINSICS.prototype(value) !== Error.prototype &&
+				INTRINSICS.describe(value, Symbol.for('@orkestrel/agent.AgentJobError'))?.value === value
+			)
+		)
+			return false
+		const code = INTRINSICS.reflect.read(value, 'code')
+		if (!(code === 'PARTIAL')) return false
+		const partial = INTRINSICS.reflect.read(value, 'partial')
+		if (!(isObject(partial) || isFunction(partial))) return false
+		const usage = INTRINSICS.reflect.read(partial, 'usage')
+		const stop = INTRINSICS.reflect.read(partial, 'stop')
+		if (stop !== undefined) {
+			if (!(isObject(stop) || isFunction(stop))) return false
+			const layer = INTRINSICS.reflect.read(stop, 'layer')
+			const spent = INTRINSICS.reflect.read(stop, 'usage')
+			if (
+				!isString(INTRINSICS.reflect.read(stop, 'id')) ||
+				!(
+					INTRINSICS.reflect.read(stop, 'estimate') === undefined ||
+					isNumber(INTRINSICS.reflect.read(stop, 'estimate'))
+				) ||
+				!(
+					spent === undefined ||
+					((isObject(spent) || isFunction(spent)) &&
+						['prompt', 'completion', 'total'].every((key) =>
+							isNumber(INTRINSICS.reflect.read(spent, key)),
+						))
+				)
+			)
+				return false
+			if (
+				layer !== 'model' &&
+				!(
+					(layer === 'meter' || layer === 'budget') &&
+					isNumber(INTRINSICS.reflect.read(stop, 'max')) &&
+					isNumber(INTRINSICS.reflect.read(stop, 'consumed'))
+				)
+			)
+				return false
+		}
+		return (
+			isString(INTRINSICS.reflect.read(partial, 'content')) &&
+			(INTRINSICS.reflect.read(partial, 'thinking') === undefined ||
+				isString(INTRINSICS.reflect.read(partial, 'thinking'))) &&
+			isBoolean(INTRINSICS.reflect.read(partial, 'partial')) &&
+			(usage === undefined ||
+				((isObject(usage) || isFunction(usage)) &&
+					['prompt', 'completion', 'total'].every((key) =>
+						isNumber(INTRINSICS.reflect.read(usage, key)),
+					)))
+		)
+	})
 }
 
 // A real error type, not a sentinel. A run that would share an accounting instance with a live
@@ -99,13 +162,14 @@ export class AgentError extends Error {
 	constructor(code: AgentErrorCode, message: string, options?: CodedErrorOptions) {
 		super(message, options?.cause === undefined ? undefined : { cause: options.cause })
 		this.name = 'AgentError'
+		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.AgentError'), { value: this })
 		this.code = code
 		this.context = options?.context
 	}
 }
 
 /**
- * Narrows an unknown caught value to an {@link AgentError} through `instanceof`, so a `catch`
+ * Narrows an unknown caught value to an {@link AgentError} through its identity brand and declared members, so a `catch`
  * can branch on its `code`.
  *
  * @param value - The value to test (typically a `catch` binding)
@@ -121,5 +185,19 @@ export class AgentError extends Error {
  * ```
  */
 export function isAgentError(value: unknown): value is AgentError {
-	return isInstance(value, AgentError)
+	return holds(() => {
+		if (
+			!(
+				value instanceof Error &&
+				INTRINSICS.prototype(value) !== Error.prototype &&
+				INTRINSICS.describe(value, Symbol.for('@orkestrel/agent.AgentError'))?.value === value
+			)
+		)
+			return false
+		const code = INTRINSICS.reflect.read(value, 'code')
+		if (!(code === 'CONCURRENCY' || code === 'LIMIT' || code === 'REGISTRY' || code === 'WINDOW'))
+			return false
+		const context = INTRINSICS.reflect.read(value, 'context')
+		return context === undefined || isObject(context) || isFunction(context)
+	})
 }

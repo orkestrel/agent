@@ -4032,7 +4032,7 @@ describe('Agent — limit exhaustion', () => {
 describe('Agent — mid-stream budget enforcement + reconcile', () => {
 	it('a mid-stream estimated charge crossing the budget aborts the run (partial, abort event)', async () => {
 		const budget = createTokenBudget({ max: 5, scope: 'completion' })
-		// 10 five-char deltas -- cumulative estimateTokens (ceil(len/4)) crosses 5 well before
+		// 10 five-char deltas -- rolling estimateTokens (ceil(len/4)) crosses 5 well before
 		// the turn completes, so the trip lands MID-STREAM, not at the final usage reconcile.
 		const deltas = Array.from({ length: 10 }, () => 'abcde')
 		const provider = createScriptedProvider(

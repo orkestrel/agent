@@ -740,7 +740,7 @@ export interface GaugeCall {
  * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
  * Measured use is `prompt + completion - (thinking ?? 0)` for `'none'`, and `prompt + completion`
  * otherwise; absent completion counts as 0. Without prompt usage, use is `overhead + scale * estimate`.
- * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall framing at the marginal
+ * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall uniform at the marginal
  * rate to the largest observed reply's `completion - (thinking ?? 0)` for every policy.
  * Without a positive reply observation, it prices the longest reply text at that rate. Recall room is
  * `max(0, (remainder - predict - reserve) / 2 / rate)`; recall closes at `remainder - predict < 2 * reserve`.
@@ -808,7 +808,7 @@ export interface GaugeInterface extends LedgerGauge {
 }
 
 /** Names a briefing source's planning group: a topic match, an off-topic rule or correction, or a name match. */
-export type LedgerPlanningGroup = 1 | 2 | 3
+export type LedgerPlanGroup = 1 | 2 | 3
 
 /** Names the machine-readable conditions a `LedgerError` error reports. */
 export type LedgerErrorCode =

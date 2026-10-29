@@ -1,3 +1,4 @@
+import { createRecordedStudyContext } from '../../setupStudy.js'
 import type { StudyEvidence } from '@orkestrel/study'
 import { createRecorder } from '@orkestrel/test'
 import { createScratch } from '@orkestrel/test/server'
@@ -39,15 +40,7 @@ it('rejects malformed runtimes and unsupported arms, serializes a real session a
 		)
 		const session = await driver.open(trial, meter.control.signal)
 		const rows = createRecorder<readonly [StudyEvidence]>()
-		const context = {
-			signal: meter.control.signal,
-			meter: meter.meter,
-			evidence: {
-				append: async (row: StudyEvidence) => {
-					rows.handler(row)
-				},
-			},
-		}
+		const context = createRecordedStudyContext(meter, rows)
 		const running = session.execute(goal, context)
 		await expect(session.execute(goal, context)).rejects.toThrow('already executing')
 		expect((await running).partial).toBe(false)

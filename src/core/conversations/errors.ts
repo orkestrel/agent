@@ -1,6 +1,6 @@
 import type { ConversationErrorCode } from './types.js'
 import type { CodedErrorOptions } from '../types.js'
-import { isInstance } from '@orkestrel/contract'
+import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
 
 /**
  * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with, a
@@ -39,13 +39,14 @@ export class ConversationError extends Error {
 	constructor(code: ConversationErrorCode, message: string, options?: CodedErrorOptions) {
 		super(message, options?.cause === undefined ? undefined : { cause: options.cause })
 		this.name = 'ConversationError'
+		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.ConversationError'), { value: this })
 		this.code = code
 		this.context = options?.context
 	}
 }
 
 /**
- * Narrows an unknown caught value to a {@link ConversationError} through `instanceof`, so a
+ * Narrows an unknown caught value to a {@link ConversationError} through its identity brand and declared members, so a
  * `catch` can branch on its `code`.
  *
  * @param value - The value to test (typically a `catch` binding)
@@ -61,5 +62,20 @@ export class ConversationError extends Error {
  * ```
  */
 export function isConversationError(value: unknown): value is ConversationError {
-	return isInstance(value, ConversationError)
+	return holds(() => {
+		if (
+			!(
+				value instanceof Error &&
+				INTRINSICS.prototype(value) !== Error.prototype &&
+				INTRINSICS.describe(value, Symbol.for('@orkestrel/agent.ConversationError'))?.value ===
+					value
+			)
+		)
+			return false
+		const code = INTRINSICS.reflect.read(value, 'code')
+		if (!(code === 'SUMMARIZER' || code === 'SECTIONS' || code === 'JUDGMENT' || code === 'KEEP'))
+			return false
+		const context = INTRINSICS.reflect.read(value, 'context')
+		return context === undefined || isObject(context) || isFunction(context)
+	})
 }

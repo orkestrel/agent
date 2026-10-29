@@ -6,7 +6,7 @@ import type {
 	LedgerLine,
 	LedgerLookupReading,
 	LedgerLookupState,
-	LedgerPlanningGroup,
+	LedgerPlanGroup,
 	LedgerProjection,
 	LedgerProjectionInput,
 	LedgerProjectionRequest,
@@ -198,7 +198,7 @@ export function findLedgerCall(group: readonly Message[], message: Message): Too
  * ```
  */
 export function rankLedgerCut(
-	group: LedgerPlanningGroup,
+	group: LedgerPlanGroup,
 	unsettled: boolean,
 	category: LedgerCategory | undefined,
 ): number {

@@ -178,7 +178,7 @@ describe('readText — bounded decoded text', () => {
 		const complete = new RecordedBody([bytes.subarray(0, 2), bytes.subarray(2)])
 		expect(await readText(complete.stream)).toEqual({ text: '🌍', complete: true })
 		const partial = new RecordedBody([bytes])
-		expect(await readText(partial.stream, 2)).toEqual({ text: '�', complete: false })
+		expect(await readText(partial.stream, 2)).toEqual({ text: '\uFFFD', complete: false })
 	})
 	it('preserves read failures and releases the text reader lock', async () => {
 		const signal = new AbortController().signal
@@ -278,7 +278,7 @@ describe('readChunks — streamed decoded text', () => {
 		const body = new RecordedBody([new Uint8Array([0xe2])])
 		const chunks: string[] = []
 		for await (const chunk of readChunks(body.stream, signal)) chunks.push(chunk)
-		expect(chunks).toEqual(['�'])
+		expect(chunks).toEqual(['\uFFFD'])
 		expect(body.stream.locked).toBe(false)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})

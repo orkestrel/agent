@@ -1,9 +1,5 @@
 import type { InstructionEventName } from '../../../../setup.js'
-import type {
-	ContextSectionFormat,
-	InstructionInterface,
-	InstructionManagerEventMap,
-} from '@src/core'
+import type { InstructionInterface, InstructionManagerEventMap } from '@src/core'
 import { InstructionManager, renderSection } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createRecorder, createRecorders } from '@orkestrel/test'
@@ -114,11 +110,9 @@ describe('InstructionManager — build contract', () => {
 
 describe('InstructionManager — manager-options format override', () => {
 	it('open / render consult the options override when set, else built-in', () => {
-		const format: ContextSectionFormat<InstructionInterface> = {
-			open: '<<rules>>',
-			render: (one) => `- ${one.content}`,
-		}
-		const manager = new InstructionManager({ format })
+		const manager = new InstructionManager({
+			format: { open: '<<rules>>', render: (one) => `- ${one.content}` },
+		})
 		const one = manager.add({ name: 'tone', content: 'Be terse.' })
 
 		// The override wins over the built-in for BOTH the header and the per-item render.

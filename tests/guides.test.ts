@@ -6,16 +6,13 @@ import type {
 	AgentEventMap,
 	AgentJobInput,
 	JudgeAnswer,
-	JudgeInterface,
 	JudgeRequest,
 	JudgeResult,
-	LedgerLookup,
 	LedgerLine,
 	Message,
 	MessageInput,
 	ProviderDelta,
 	ProviderIncrement,
-	ProviderInterface,
 	ProviderOptions,
 	ProviderParserInterface,
 	ProviderRequest,
@@ -62,6 +59,16 @@ await new GuideCommand({
 	const { isFiniteNumber, isRecord, isString, parseJSON, parseJSONAs } =
 		await import('@orkestrel/contract')
 	const { computeSymbolKey, findMissingSymbols } = await import('@orkestrel/guide')
+	// The setup module resolves only under the runner, so it loads inside this callback.
+	const {
+		selectGuideUserTurns,
+		selectGuideRequest,
+		selectGuideView,
+		createGuideScriptProvider,
+		createGuideLedgerJudge,
+		createGuideOrderLookup,
+		createMeasuredGuideProvider,
+	} = await import('./setup.js')
 	const { captureError, createRecorder, requireValue, waitForCondition } =
 		await import('@orkestrel/test')
 	const { createAbort } = await import('@orkestrel/abort')
@@ -609,19 +616,14 @@ await new GuideCommand({
 		})
 
 		it('selects through the agent default and a mode’s override as the selection fence claims', async () => {
+			// The fence names its selection handlers as the guide does.
+			const userTurns = selectGuideUserTurns
+			const requestOnly = selectGuideRequest
 			const provider = createScriptedProvider(
 				[{ content: 'Which line is wrong?' }, { content: 'Refunded.' }],
 				{ recorded: true, repeat: false },
 			)
 			// The agent default keeps the user turns; the focus mode keeps the request alone.
-			const userTurns: SelectionHandler = async (conversation) => ({
-				messages: conversation.view().filter((message) => message.role === 'user'),
-				judgments: [],
-			})
-			const requestOnly: SelectionHandler = async (_conversation, request) => ({
-				messages: [request],
-				judgments: [],
-			})
 
 			const agent = createAgent(provider, {
 				system: 'You triage billing tickets.',
@@ -1136,7 +1138,7 @@ await new GuideCommand({
 			const POLICIES: Readonly<Record<string, SelectionHandler>> = {
 				recent: recent.handler,
 				// No selection under the judging default: a pass-through handler returns view().
-				none: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+				none: selectGuideView,
 			}
 			const modes = new Map(
 				MODES.map(({ policy, ...data }): [string, ScopeInterface] => {
@@ -1301,49 +1303,9 @@ await new GuideCommand({
 				{ content: 'Yes. Refunds over $100 need a manager.' },
 			]
 			const replies = script.values()
-			const provider: ProviderInterface = {
-				id: 'scripted',
-				name: 'scripted',
-				generate: async () => replies.next().value ?? { content: '' },
-				async *stream(messages) {
-					prompts.handler([...messages])
-					const reply = replies.next().value ?? { content: '' }
-					if (reply.content !== '') yield { channel: 'content', text: reply.content }
-					return reply
-				},
-			}
-			const judge: JudgeInterface = {
-				id: 'scripted',
-				name: 'scripted',
-				model: 'scripted',
-				ask: async (request) => ({
-					model: 'scripted',
-					answers: Object.fromEntries(
-						Object.entries(request.questions).map(([id, question]): [string, JudgeAnswer] => [
-							id,
-							question.form === 'choice'
-								? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
-								: { form: 'noul', noul: 0.1 },
-						]),
-					),
-				}),
-			}
-			const lookup: LedgerLookup = {
-				tool: {
-					name: 'lookup_order',
-					description: 'Read an order by its id.',
-					parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-					execute: (args) =>
-						`Order ${String(args.id)} for account BW-20931: Brightwater Studio. Refund due $148.50.`,
-				},
-				read: (args, text) =>
-					text.startsWith('No order')
-						? undefined
-						: {
-								ids: [String(args.id)],
-								owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
-							},
-			}
+			const provider = createGuideScriptProvider(replies, prompts)
+			const judge = createGuideLedgerJudge()
+			const lookup = createGuideOrderLookup()
 			const system = 'You staff the Larkspur support desk. Today is 2026-10-09.'
 			const ledger = createLedger(provider, {
 				judge,
@@ -3019,18 +2981,7 @@ await new GuideCommand({
 				['budget only', solo, undefined],
 				['shared allowance', shared, shared],
 			] as const) {
-				const provider: ProviderInterface = {
-					id: 'scripted',
-					name: 'scripted',
-					generate: async () => ({ content: 'x'.repeat(40), usage }),
-					async *stream() {
-						for (const text of ['x'.repeat(20), 'x'.repeat(20)]) {
-							yield { channel: 'content', text }
-							readings.handler(label, budget.consumed)
-						}
-						return { content: 'x'.repeat(40), usage }
-					},
-				}
+				const provider = createMeasuredGuideProvider(usage, budget, readings, label)
 				const agent = createAgent(provider, {
 					budget,
 					...(allowance === undefined ? {} : { allowance }),

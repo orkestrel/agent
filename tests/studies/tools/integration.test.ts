@@ -1,3 +1,4 @@
+import { createTraceStudyContext } from '../../setupStudy.js'
 import type { StudyEvidence } from '@orkestrel/study'
 import { cloneJSONValue, parseJSON } from '@orkestrel/contract'
 import { createScratch } from '@orkestrel/test/server'
@@ -247,15 +248,7 @@ it('keeps a cancelled workload inside its goal and serves the next goal of the s
 		})
 		const session = await driver.open(trial, meter.control.signal)
 		const rows: StudyEvidence[] = []
-		const context = {
-			signal: meter.control.signal,
-			meter: meter.meter,
-			evidence: {
-				append: async (row: StudyEvidence) => {
-					rows.push(row)
-				},
-			},
-		}
+		const context = createTraceStudyContext(meter, rows)
 		try {
 			// The declared goal cancels its own workload and returns the partial product.
 			await expect(session.execute(cancel, context)).resolves.toMatchObject({ partial: true })

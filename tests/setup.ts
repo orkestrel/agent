@@ -1,3 +1,162 @@
+/** Builds the default fact answer for a ledger protocol response. */
+export function buildLedgerFactAnswer(): unknown {
+	return {
+		type: 'choice',
+		probabilities: {
+			fact: 1,
+			rule: 0,
+			correction: 0,
+			request: 0,
+			opinion: 0,
+			chatter: 0,
+			distractor: 0,
+		},
+	}
+}
+
+/** Admits a request to the unprotected relay fixture. */
+export function admitRelayRequest(): boolean {
+	return true
+}
+
+/** Checks the bearer credential used by relay authorization proofs. */
+export function admitsRelayCredential(request: Request): boolean {
+	return request.headers.get('authorization') === 'Bearer accepted'
+}
+
+/** Records durable reads while forwarding writes to the real store. */
+export function createObservedConversationStore(
+	memory: ConversationStoreInterface,
+	reads: RecorderInterface<readonly [id: string]>,
+): ConversationStoreInterface {
+	return {
+		get(id) {
+			reads.handler(id)
+			return memory.get(id)
+		},
+		set: (snapshot) => memory.set(snapshot),
+		delete: (id) => memory.delete(id),
+	}
+}
+
+/** Supplies a foreign snapshot for the store identity refusal. */
+export function createForeignConversationStore(): ConversationStoreInterface {
+	return {
+		get: async () => ({
+			id: 'b',
+			sections: [],
+			messages: [{ id: 'stored', role: 'user', content: 'stored turn' }],
+		}),
+		set: async () => undefined,
+		delete: async () => undefined,
+	}
+}
+
+/** Creates a lookup with no extracted ledger record. */
+export function createEmptyLedgerLookup(): LedgerLookup {
+	return {
+		tool: createTool({ name: 'lookup', execute: () => 'found' }),
+		read: () => undefined,
+	}
+}
+
+/** Supplies the documented guide scenario fixture. */
+export const selectGuideUserTurns: SelectionHandler = async (conversation) => ({
+	messages: conversation.view().filter((message) => message.role === 'user'),
+	judgments: [],
+})
+
+/** Supplies the documented guide scenario fixture. */
+export const selectGuideRequest: SelectionHandler = async (_conversation, request) => ({
+	messages: [request],
+	judgments: [],
+})
+
+/** Supplies the documented guide scenario fixture. */
+export const selectGuideView: SelectionHandler = async (conversation) => ({
+	messages: conversation.view(),
+	judgments: [],
+})
+
+/** Supplies the documented guide scenario fixture. */
+export function createGuideScriptProvider(
+	replies: Iterator<ProviderResult>,
+	prompts: RecorderInterface<readonly [readonly Message[]]>,
+): ProviderInterface {
+	return {
+		id: 'scripted',
+		name: 'scripted',
+		generate: async () => replies.next().value ?? { content: '' },
+		async *stream(messages) {
+			prompts.handler([...messages])
+			const reply = replies.next().value ?? { content: '' }
+			if (reply.content !== '') yield { channel: 'content', text: reply.content }
+			return reply
+		},
+	}
+}
+
+/** Supplies the documented guide scenario fixture. */
+export function createGuideLedgerJudge(): JudgeInterface {
+	return {
+		id: 'scripted',
+		name: 'scripted',
+		model: 'scripted',
+		ask: async (request) => ({
+			model: 'scripted',
+			answers: Object.fromEntries(
+				Object.entries(request.questions).map(([id, question]): [string, JudgeAnswer] => [
+					id,
+					question.form === 'choice'
+						? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
+						: { form: 'noul', noul: 0.1 },
+				]),
+			),
+		}),
+	}
+}
+
+/** Supplies the documented guide scenario fixture. */
+export function createGuideOrderLookup(): LedgerLookup {
+	return {
+		tool: {
+			name: 'lookup_order',
+			description: 'Read an order by its id.',
+			parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+			execute: (args) =>
+				`Order ${String(args.id)} for account BW-20931: Brightwater Studio. Refund due $148.50.`,
+		},
+		read: (args, text) =>
+			text.startsWith('No order')
+				? undefined
+				: {
+						ids: [String(args.id)],
+						owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+					},
+	}
+}
+
+/** Supplies the documented guide scenario fixture. */
+export function createMeasuredGuideProvider(
+	usage: TokenUsage,
+	budget: BudgetInterface<TokenUsage>,
+	readings: RecorderInterface<readonly [label: string, consumed: number]>,
+	label: string,
+): ProviderInterface {
+	return {
+		id: 'scripted',
+		name: 'scripted',
+		generate: async () => ({ content: 'x'.repeat(40), usage }),
+		async *stream() {
+			for (const text of ['x'.repeat(20), 'x'.repeat(20)]) {
+				yield { channel: 'content', text }
+				readings.handler(label, budget.consumed)
+			}
+			return { content: 'x'.repeat(40), usage }
+		},
+	}
+}
+
 import type {
 	LedgerLookup,
 	LedgerTopic,
@@ -198,14 +357,14 @@ export function measureMessages(request: ProviderRequest): number {
 	return estimateMessages(request.messages)
 }
 
-/** Supplies the five-character user message the request estimate and measure cases share: content 2 and framing 4. */
+/** Supplies the five-character user message the request estimate and measure cases share: content 2 and uniform 4. */
 export const REQUEST_HELLO: Message = Object.freeze<Message>({
 	id: 'm',
 	role: 'user',
 	content: 'hello',
 })
 
-/** Supplies the forty-character user message the request estimate and measure cases share: content 10 and framing 4. */
+/** Supplies the forty-character user message the request estimate and measure cases share: content 10 and uniform 4. */
 export const REQUEST_LONG: Message = Object.freeze<Message>({
 	id: 'n',
 	role: 'user',
@@ -278,7 +437,7 @@ export const REQUEST_ESTIMATE_CASES: ReadonlyArray<{
 	},
 ])
 
-/** Supplies an object that holds itself, which JSON cannot render, so every measure of it costs the framing alone. */
+/** Supplies an object that holds itself, which JSON cannot render, so every measure of it costs the uniform alone. */
 export const MEASURE_CIRCULAR: Record<string, unknown> = { type: 'object' }
 MEASURE_CIRCULAR.self = MEASURE_CIRCULAR
 
@@ -288,9 +447,9 @@ export const MEASURE_CALLS: readonly ToolCall[] = Object.freeze<readonly ToolCal
 ])
 
 /**
- * Supplies message measures counted by hand: content is `ceil(length / 4)` over UTF-16 length, framing
+ * Supplies message measures counted by hand: content is `ceil(length / 4)` over UTF-16 length, uniform
  * is 4, an image is 512, and calls cost the ceiling of their JSON length over 4 — the `add` call below
- * renders to 41 characters, so 11 — or the framing 4 when JSON cannot carry them. `total` is the
+ * renders to 41 characters, so 11 — or the uniform 4 when JSON cannot carry them. `total` is the
  * legacy `estimateMessages` reading of the message alone.
  */
 export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
@@ -302,43 +461,43 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 	{
 		label: 'an empty message',
 		message: { id: 'e', role: 'user', content: '' },
-		expected: { id: 'e', role: 'user', content: 0, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'e', role: 'user', content: 0, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 4,
 	},
 	{
 		label: 'content on a four-character boundary',
 		message: { id: 'b4', role: 'user', content: 'a'.repeat(4) },
-		expected: { id: 'b4', role: 'user', content: 1, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'b4', role: 'user', content: 1, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 5,
 	},
 	{
 		label: 'content rounded up from five characters',
 		message: { id: 'b5', role: 'user', content: 'hello' },
-		expected: { id: 'b5', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'b5', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 6,
 	},
 	{
 		label: 'content on an eight-character boundary',
 		message: { id: 'b8', role: 'user', content: 'a'.repeat(8) },
-		expected: { id: 'b8', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'b8', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 6,
 	},
 	{
 		label: 'content rounded up from nine characters',
 		message: { id: 'b9', role: 'user', content: 'a'.repeat(9) },
-		expected: { id: 'b9', role: 'user', content: 3, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'b9', role: 'user', content: 3, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 7,
 	},
 	{
 		label: 'accented text counted by UTF-16 length',
 		message: { id: 'ac', role: 'user', content: 'naïve café' },
-		expected: { id: 'ac', role: 'user', content: 3, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'ac', role: 'user', content: 3, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 7,
 	},
 	{
 		label: 'surrogate pairs counted as two units each',
 		message: { id: 'sp', role: 'user', content: '\u{1F600}\u{1F600}' },
-		expected: { id: 'sp', role: 'user', content: 1, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'sp', role: 'user', content: 1, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 5,
 	},
 	{
@@ -353,7 +512,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 			id: 'th',
 			role: 'assistant',
 			content: 2,
-			framing: 4,
+			uniform: 4,
 			calls: 0,
 			thinking: 8,
 			images: 0,
@@ -367,7 +526,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 			id: 'et',
 			role: 'assistant',
 			content: 0,
-			framing: 4,
+			uniform: 4,
 			calls: 0,
 			thinking: 0,
 			images: 0,
@@ -381,7 +540,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 			id: 'ca',
 			role: 'assistant',
 			content: 0,
-			framing: 4,
+			uniform: 4,
 			calls: 11,
 			thinking: 0,
 			images: 0,
@@ -395,7 +554,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 			id: 'ec',
 			role: 'assistant',
 			content: 0,
-			framing: 4,
+			uniform: 4,
 			calls: 0,
 			thinking: 0,
 			images: 0,
@@ -414,7 +573,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 			id: 'uc',
 			role: 'assistant',
 			content: 0,
-			framing: 4,
+			uniform: 4,
 			calls: 4,
 			thinking: 0,
 			images: 0,
@@ -428,7 +587,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 			id: 'im',
 			role: 'user',
 			content: 0,
-			framing: 4,
+			uniform: 4,
 			calls: 0,
 			thinking: 0,
 			images: 1536,
@@ -438,7 +597,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 	{
 		label: 'an empty images list',
 		message: { id: 'ei', role: 'user', content: '', images: [] },
-		expected: { id: 'ei', role: 'user', content: 0, framing: 4, calls: 0, thinking: 0, images: 0 },
+		expected: { id: 'ei', role: 'user', content: 0, uniform: 4, calls: 0, thinking: 0, images: 0 },
 		total: 4,
 	},
 	{
@@ -455,7 +614,7 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 			id: 'all',
 			role: 'assistant',
 			content: 2,
-			framing: 4,
+			uniform: 4,
 			calls: 11,
 			thinking: 3,
 			images: 1024,
@@ -467,8 +626,8 @@ export const MESSAGE_MEASURE_CASES: ReadonlyArray<{
 /**
  * Supplies request measures counted by hand from the same character counts as
  * {@link REQUEST_ESTIMATE_CASES}: `hello` is content 2 and `a` repeated 40 is content 10, each with
- * framing 4; `[{"name":"lookup"}]` is 5, the `add` definition 18, `{"type":"object"}` 5 and the schema with
- * a required list 9. A tool list or schema JSON cannot carry costs the framing 4. `total` is the legacy
+ * uniform 4; `[{"name":"lookup"}]` is 5, the `add` definition 18, `{"type":"object"}` 5 and the schema with
+ * a required list 9. A tool list or schema JSON cannot carry costs the uniform 4. `total` is the legacy
  * `estimateRequest` reading of the request.
  */
 export const REQUEST_MEASURE_CASES: ReadonlyArray<{
@@ -488,7 +647,7 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		request: { messages: [REQUEST_HELLO] },
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 0,
 			schema: 0,
@@ -500,8 +659,8 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		request: { messages: [REQUEST_HELLO, REQUEST_LONG] },
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
-				{ id: 'n', role: 'user', content: 10, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'n', role: 'user', content: 10, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 0,
 			schema: 0,
@@ -513,7 +672,7 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		request: { messages: [REQUEST_HELLO], tools: [], options: { think: true, schema: {} } },
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 0,
 			schema: 0,
@@ -525,7 +684,7 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		request: { messages: [REQUEST_HELLO], tools: [{ name: 'lookup' }] },
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 5,
 			schema: 0,
@@ -540,7 +699,7 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		},
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 0,
 			schema: 9,
@@ -556,7 +715,7 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		},
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 18,
 			schema: 5,
@@ -571,7 +730,7 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		},
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 4,
 			schema: 0,
@@ -583,7 +742,7 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		request: { messages: [REQUEST_HELLO], options: { schema: MEASURE_CIRCULAR } },
 		expected: {
 			messages: [
-				{ id: 'm', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'm', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 0,
 			schema: 4,
@@ -601,9 +760,9 @@ export const REQUEST_MEASURE_CASES: ReadonlyArray<{
 		},
 		expected: {
 			messages: [
-				{ id: 'd', role: 'user', content: 1, framing: 4, calls: 0, thinking: 0, images: 0 },
-				{ id: 'x', role: 'assistant', content: 0, framing: 4, calls: 0, thinking: 0, images: 0 },
-				{ id: 'd', role: 'tool', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'd', role: 'user', content: 1, uniform: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'x', role: 'assistant', content: 0, uniform: 4, calls: 0, thinking: 0, images: 0 },
+				{ id: 'd', role: 'tool', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
 			],
 			tools: 0,
 			schema: 0,
@@ -1511,7 +1670,8 @@ export function createHostileSerializer(): Readonly<Record<string, unknown>> {
 		{ x: 1 },
 		{
 			get(target, key) {
-				return key === 'toJSON' ? () => 1n : Reflect.get(target, key)
+				if (key === 'toJSON') return () => 1n
+				return Reflect.get(target, key)
 			},
 		},
 	)
@@ -1816,7 +1976,7 @@ export function createAgentTurn(overrides?: Partial<AgentTurn>): AgentTurn {
 		usage: undefined,
 		spent: undefined,
 		messages: [],
-		ending: 'answer',
+		outcome: 'answer',
 		partial: false,
 		futile: false,
 		estimate: 0,
@@ -1945,8 +2105,8 @@ export function createLoopTool(): ToolInterface {
  * The default ceiling is generous, so a case that proves metering never trips the budget.
  *
  * @param recorder - The recorder that receives each consumed usage
- * @param max - The cumulative ceiling. Default: 1_000_000
- * @returns A cumulative budget over {@link TokenUsage} whose consumer records before it charges
+ * @param max - The rolling ceiling. Default: 1_000_000
+ * @returns A rolling budget over {@link TokenUsage} whose consumer records before it charges
  */
 export function createRecordedBudget(
 	recorder: RecorderInterface<[TokenUsage]>,
@@ -4266,18 +4426,7 @@ export function buildClassifierOptions(
  */
 export async function buildLedgerResponse(
 	request: Request,
-	answer: (key: string, question: unknown) => unknown = () => ({
-		type: 'choice',
-		probabilities: {
-			fact: 1,
-			rule: 0,
-			correction: 0,
-			request: 0,
-			opinion: 0,
-			chatter: 0,
-			distractor: 0,
-		},
-	}),
+	answer: (key: string, question: unknown) => unknown = buildLedgerFactAnswer,
 	usage = { input_tokens: 50, output_tokens: 1 },
 ): Promise<Response> {
 	const body: unknown = await request.json()
@@ -4927,7 +5076,7 @@ export interface RelayHopOptions {
 export function createRelayHop(options: RelayHopOptions): RelayProvider {
 	const handler = createRelay({
 		provider: options.provider,
-		authorize: options.authorize ?? (() => true),
+		authorize: options.authorize ?? admitRelayRequest,
 		...(options.limit === undefined ? {} : { limit: options.limit }),
 	})
 	return new RelayProvider({
@@ -4964,16 +5113,18 @@ export function createBoundedRelay(upstream: ProviderInterface, limit: number): 
  * @returns A never-aborted signal-shaped object
  */
 export function createForeignSignal(): AbortSignal {
-	const shaped: AbortSignal = {
-		aborted: false,
-		reason: undefined,
-		onabort: null,
-		throwIfAborted: () => undefined,
-		addEventListener: () => undefined,
-		removeEventListener: () => undefined,
-		dispatchEvent: () => false,
-	}
-	return new Proxy(shaped, { has: (target, key) => key !== 'aborted' && key in target })
+	return new Proxy<AbortSignal>(
+		{
+			aborted: false,
+			reason: undefined,
+			onabort: null,
+			throwIfAborted: () => undefined,
+			addEventListener: () => undefined,
+			removeEventListener: () => undefined,
+			dispatchEvent: () => false,
+		},
+		{ has: (target, key) => key !== 'aborted' && key in target },
+	)
 }
 /**
  * Builds options for the guide desk with no lookups unless supplied.

@@ -3,7 +3,11 @@ import { Classifier, Gauge, Ledger, createLedger } from '@src/core'
 import { captureError } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { buildLedgerOptions, createScriptedProvider } from '../../../setup.js'
+import {
+	buildLedgerOptions,
+	createEmptyLedgerLookup,
+	createScriptedProvider,
+} from '../../../setup.js'
 
 describe('createLedger', () => {
 	it('exports the entity, classifier, gauge, and factory through the core barrel', () => {
@@ -99,10 +103,7 @@ describe('createLedger', () => {
 				],
 			}),
 		).toThrow(expect.objectContaining({ code: 'TOPIC' }))
-		const lookup = {
-			tool: createTool({ name: 'lookup', execute: () => 'found' }),
-			read: () => undefined,
-		}
+		const lookup = createEmptyLedgerLookup()
 		expect(() =>
 			createLedger(createScriptedProvider([]), { ...options, lookups: [lookup, lookup] }),
 		).toThrow(expect.objectContaining({ code: 'LOOKUP' }))

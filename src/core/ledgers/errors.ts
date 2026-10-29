@@ -1,5 +1,5 @@
 import type { LedgerErrorCode } from './types.js'
-import { isInstance } from '@orkestrel/contract'
+import { INTRINSICS, holds } from '@orkestrel/contract'
 
 /**
  * Reports an invalid ledger configuration, failed calibration, or unowned request selection,
@@ -25,12 +25,13 @@ export class LedgerError extends Error {
 	constructor(code: LedgerErrorCode, message: string) {
 		super(message)
 		this.name = 'LedgerError'
+		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.LedgerError'), { value: this })
 		this.code = code
 	}
 }
 
 /**
- * Narrows an unknown caught value to a {@link LedgerError} through `instanceof`, so a `catch` can
+ * Narrows an unknown caught value to a {@link LedgerError} through its identity brand and declared members, so a `catch` can
  * branch on its `code`.
  *
  * @param value - The value to test (typically a `catch` binding)
@@ -42,5 +43,30 @@ export class LedgerError extends Error {
  * ```
  */
 export function isLedgerError(value: unknown): value is LedgerError {
-	return isInstance(value, LedgerError)
+	return holds(() => {
+		if (
+			!(
+				value instanceof Error &&
+				INTRINSICS.prototype(value) !== Error.prototype &&
+				INTRINSICS.describe(value, Symbol.for('@orkestrel/agent.LedgerError'))?.value === value
+			)
+		)
+			return false
+		const code = INTRINSICS.reflect.read(value, 'code')
+		if (
+			!(
+				code === 'REQUEST' ||
+				code === 'THRESHOLD' ||
+				code === 'SHARE' ||
+				code === 'CAPACITY' ||
+				code === 'LIMIT' ||
+				code === 'TOPIC' ||
+				code === 'LOOKUP' ||
+				code === 'GAUGE' ||
+				code === 'REFERENCE'
+			)
+		)
+			return false
+		return true
+	})
 }

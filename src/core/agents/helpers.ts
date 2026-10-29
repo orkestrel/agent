@@ -272,7 +272,7 @@ export function estimateMessages(messages: readonly Message[]): number {
 	return messages.reduce((sum, message) => {
 		const measure = measureMessage(message)
 		return (
-			sum + measure.content + measure.framing + measure.calls + measure.thinking + measure.images
+			sum + measure.content + measure.uniform + measure.calls + measure.thinking + measure.images
 		)
 	}, 0)
 }
@@ -284,7 +284,7 @@ export function estimateMessages(messages: readonly Message[]): number {
  * @remarks
  * The result is a structural estimate, not a tokenizer allocation. `id` and `role` are joins back to
  * the message, not token components, and a provider's template effects and the estimation error are
- * not individually attributed. `content` is `ceil(length / 4)`, `framing` is
+ * not individually attributed. `content` is `ceil(length / 4)`, `uniform` is
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, `calls` is the estimate of the JSON-rendered
  * calls (`0` when the message carries none, the framing overhead when they cannot be rendered),
  * `thinking` is the estimate of the thinking (`0` when absent), and `images` is the attached image
@@ -296,7 +296,7 @@ export function estimateMessages(messages: readonly Message[]): number {
  * @example
  * ```ts
  * measureMessage({ id: '1', role: 'user', content: 'hello' })
- * // { id: '1', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 }
+ * // { id: '1', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 }
  * ```
  */
 export function measureMessage(message: Message): MessageMeasure {
@@ -306,7 +306,7 @@ export function measureMessage(message: Message): MessageMeasure {
 		id: message.id,
 		role: message.role,
 		content: estimateTokens(message.content),
-		framing: MESSAGE_TOKEN_OVERHEAD,
+		uniform: MESSAGE_TOKEN_OVERHEAD,
 		calls,
 		thinking: message.thinking === undefined ? 0 : estimateTokens(message.thinking),
 		images: (message.images?.length ?? 0) * IMAGE_TOKEN_ESTIMATE,
@@ -341,7 +341,7 @@ export function estimateRequest(request: ProviderRequest): number {
 	const measure = measureRequest(request)
 	return measure.messages.reduce(
 		(sum, message) =>
-			sum + message.content + message.framing + message.calls + message.thinking + message.images,
+			sum + message.content + message.uniform + message.calls + message.thinking + message.images,
 		measure.tools + measure.schema,
 	)
 }
@@ -365,7 +365,7 @@ export function estimateRequest(request: ProviderRequest): number {
  * @example
  * ```ts
  * measureRequest({ messages: [{ id: '1', role: 'user', content: 'hello' }] })
- * // { messages: [{ id: '1', role: 'user', content: 2, framing: 4, calls: 0, thinking: 0, images: 0 }], tools: 0, schema: 0 }
+ * // { messages: [{ id: '1', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 }], tools: 0, schema: 0 }
  * ```
  */
 export function measureRequest(request: ProviderRequest): RequestMeasure {

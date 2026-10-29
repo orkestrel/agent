@@ -1,4 +1,5 @@
 import {
+	admitsRelayCredential,
 	buildLedgerTailScenario,
 	MEASURE_CALLS,
 	MEASURE_CIRCULAR,
@@ -405,7 +406,7 @@ describe('hand-counted measure fixtures', () => {
 			])
 			expect([
 				entry.label,
-				expected.content + expected.framing + expected.calls + expected.thinking + expected.images,
+				expected.content + expected.uniform + expected.calls + expected.thinking + expected.images,
 			]).toEqual([entry.label, total])
 		}
 		// Every component the estimator prices appears in at least one fixture, so no weight goes unpinned.
@@ -428,7 +429,7 @@ describe('hand-counted measure fixtures', () => {
 					(sum, measure) =>
 						sum +
 						measure.content +
-						measure.framing +
+						measure.uniform +
 						measure.calls +
 						measure.thinking +
 						measure.images,
@@ -443,13 +444,13 @@ describe('hand-counted measure fixtures', () => {
 
 describe('shared request and measure fixtures', () => {
 	it('price at the hand counts their tables rest on', () => {
-		// `hello` is 5 characters, so content 2 with framing 4; 40 characters is content 10 with framing 4.
+		// `hello` is 5 characters, so content 2 with uniform 4; 40 characters is content 10 with uniform 4.
 		expect(estimateRequest({ messages: [REQUEST_HELLO] })).toBe(6)
 		expect(estimateRequest({ messages: [REQUEST_LONG] })).toBe(14)
 		// The advertised `add` definition costs 18 beside no messages.
 		expect(estimateRequest({ messages: [], tools: [REQUEST_ADD] })).toBe(18)
 		expect([REQUEST_HELLO.id, REQUEST_LONG.id, REQUEST_ADD.name]).toEqual(['m', 'n', 'add'])
-		// One `add` call renders to 41 characters, so 11, beside framing 4.
+		// One `add` call renders to 41 characters, so 11, beside uniform 4.
 		expect(
 			estimateRequest({
 				messages: [{ id: 'x', role: 'assistant', content: '', calls: MEASURE_CALLS }],
@@ -701,7 +702,7 @@ describe('agent data builders', () => {
 			usage: undefined,
 			spent: undefined,
 			messages: [],
-			ending: 'answer',
+			outcome: 'answer',
 			partial: false,
 			futile: false,
 			estimate: 0,
@@ -715,7 +716,7 @@ describe('agent data builders', () => {
 			true,
 			false,
 		])
-		expect(truncated.ending).toBe('answer')
+		expect(truncated.outcome).toBe('answer')
 	})
 
 	it('builds an agent job from the default provider and seed turn plus named overrides', () => {
@@ -2238,8 +2239,7 @@ describe('createRelayHop', () => {
 
 	it('carries the supplied headers to the authorization hook', async () => {
 		const upstream = createScriptedProvider([{ content: 'admitted' }])
-		const authorize = (request: Request): boolean =>
-			request.headers.get('authorization') === 'Bearer accepted'
+		const authorize = admitsRelayCredential
 		const refused = createRelayHop({
 			provider: upstream,
 			authorize,

@@ -1,3 +1,4 @@
+import { createRecordedStudyContext, createQuietStudyContext } from '../../setupStudy.js'
 import type { StudyEvidence, StudyGoal } from '@orkestrel/study'
 import { isObject } from '@orkestrel/contract'
 import { createRecorder } from '@orkestrel/test'
@@ -52,11 +53,7 @@ it('keeps a fault raised in one goal out of the next goal of the same session an
 			directory: scratch.ensure('work'),
 		})
 		const session = await driver.open(trial, meter.control.signal)
-		const context = {
-			signal: meter.control.signal,
-			meter: meter.meter,
-			evidence: { append: async () => undefined },
-		}
+		const context = createQuietStudyContext(meter)
 		try {
 			await expect(session.execute(save, context)).rejects.toThrow('listener fault')
 			// The next goal's product carries nothing of the first goal's fault.
@@ -88,15 +85,7 @@ it('retains each goal trace only under its own goal when a session serves severa
 		})
 		const session = await driver.open(trial, meter.control.signal)
 		const rows = createRecorder<readonly [StudyEvidence]>()
-		const context = {
-			signal: meter.control.signal,
-			meter: meter.meter,
-			evidence: {
-				append: async (row: StudyEvidence) => {
-					rows.handler(row)
-				},
-			},
-		}
+		const context = createRecordedStudyContext(meter, rows)
 		try {
 			for (const goal of goals) await session.execute(goal, context)
 			// One dispatched call per goal: a trace carried across goals would repeat the first goal's row.

@@ -404,7 +404,7 @@ export class Agent implements AgentInterface {
 		// appends a `cancel` record, which ends the loop; a genuine error throws. The section before
 		// the provider call adds no `await` on the default path, so the provider's `stream()` is
 		// entered in `agent.stream()`'s own call.
-		while (turns.length < limit && (turns.at(-1)?.ending ?? 'tools') === 'tools') {
+		while (turns.length < limit && (turns.at(-1)?.outcome ?? 'tools') === 'tools') {
 			const index = turns.length
 			const base = turns.at(-1)?.messages ?? entry.messages
 			const futile = turns.at(-1)?.futile ?? false
@@ -415,7 +415,7 @@ export class Agent implements AgentInterface {
 				usage: undefined,
 				spent: undefined,
 				messages: base,
-				ending: 'cancel',
+				outcome: 'cancel',
 				partial: true,
 				futile,
 				estimate: undefined,
@@ -484,7 +484,7 @@ export class Agent implements AgentInterface {
 			const provided = yield* this.#provide(admitted.dispatch, abort.signal, streamed, meter)
 			const settled = this.#reconcile(provided, abort, streamed, admitted, meter, budget, allowance)
 			if (!provided.success) {
-				turns.push({ ...settled, ending: 'cancel', partial: true })
+				turns.push({ ...settled, outcome: 'cancel', partial: true })
 				continue
 			}
 			const result = provided.value
@@ -502,7 +502,7 @@ export class Agent implements AgentInterface {
 				const admittedCalls = filterAllowList(names, result.tools, (call) => call.name)
 				const authorization = this.#authorize(result.tools, admittedCalls)
 				if (abort.signal.aborted) {
-					turns.push({ ...settled, ending: 'cancel', partial: true })
+					turns.push({ ...settled, outcome: 'cancel', partial: true })
 					continue
 				}
 				const assistant = this.#context.messages.add({
@@ -536,7 +536,7 @@ export class Agent implements AgentInterface {
 				turns.push({
 					...settled,
 					messages: [...admitted.messages, assistant, ...replies],
-					ending: 'tools',
+					outcome: 'tools',
 					partial: true,
 				})
 				continue
@@ -546,7 +546,7 @@ export class Agent implements AgentInterface {
 			turns.push({
 				...settled,
 				content: result.content,
-				ending: 'answer',
+				outcome: 'answer',
 				partial: abort.signal.aborted,
 				truncated: result.truncated === true,
 			})
@@ -555,7 +555,7 @@ export class Agent implements AgentInterface {
 		const thinkings = turns.flatMap((turn) => (turn.thinking === undefined ? [] : [turn.thinking]))
 		return {
 			content:
-				final?.ending === 'answer' ? final.content : turns.map((turn) => turn.content).join(''),
+				final?.outcome === 'answer' ? final.content : turns.map((turn) => turn.content).join(''),
 			thinking: thinkings.length === 0 ? undefined : thinkings.join('\n\n'),
 			// Every turn's usage, then the entry selection's, then each rebuild's, in turn order.
 			usage: [
@@ -569,7 +569,7 @@ export class Agent implements AgentInterface {
 			partial: final?.partial ?? cancelled,
 			// Every allowed turn requested tools; a cancel during the last one is an `abort`, never an
 			// `exhaust`, so the signal is read here.
-			exhausted: final?.ending === 'tools' && !abort.signal.aborted,
+			exhausted: final?.outcome === 'tools' && !abort.signal.aborted,
 			stop: inferStop(abort.signal.reason, allowance, budget, this.#provider.id, final),
 		}
 	}

@@ -548,7 +548,7 @@ describe('study install fixtures', () => {
 				...STUDY_MEMORY_OBSERVED_KEYS[event],
 			])
 		}
-		const message = { content: 2, framing: 4, calls: 0, thinking: 1, images: 512 }
+		const message = { content: 2, uniform: 4, calls: 0, thinking: 1, images: 512 }
 		expect(readMemoryParts({ messages: [message, message], tools: 5, schema: 9 })).toEqual({
 			count: 2,
 			tools: 5,

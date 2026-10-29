@@ -4,7 +4,16 @@ import type {
 	ProviderErrorOptions,
 	ProviderResult,
 } from './types.js'
-import { isInstance } from '@orkestrel/contract'
+import {
+	INTRINSICS,
+	holds,
+	isObject,
+	isFunction,
+	isNumber,
+	isString,
+	isBoolean,
+	arrayOf,
+} from '@orkestrel/contract'
 
 /**
  * Reports a provider stream cancelled mid-flight by its bound signal — thrown by the
@@ -27,12 +36,13 @@ export class ProviderAbortError extends Error {
 	constructor(partial: ProviderResult, options?: ErrorOptions) {
 		super('provider stream aborted', options)
 		this.name = 'ProviderAbortError'
+		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.ProviderAbortError'), { value: this })
 		this.partial = partial
 	}
 }
 
 /**
- * Narrows an unknown caught value to a {@link ProviderAbortError} through `instanceof`, so a
+ * Narrows an unknown caught value to a {@link ProviderAbortError} through its identity brand and declared members, so a
  * `catch` can recover its `partial` result.
  *
  * @param value - The value to test (typically a `catch` binding)
@@ -48,7 +58,44 @@ export class ProviderAbortError extends Error {
  * ```
  */
 export function isProviderAbortError(value: unknown): value is ProviderAbortError {
-	return isInstance(value, ProviderAbortError)
+	return holds(() => {
+		if (
+			!(
+				value instanceof Error &&
+				INTRINSICS.prototype(value) !== Error.prototype &&
+				INTRINSICS.describe(value, Symbol.for('@orkestrel/agent.ProviderAbortError'))?.value ===
+					value
+			)
+		)
+			return false
+		const code = INTRINSICS.reflect.read(value, 'code')
+		if (!(code === 'ABORT')) return false
+		const partial = INTRINSICS.reflect.read(value, 'partial')
+		if (!(isObject(partial) || isFunction(partial))) return false
+		const usage = INTRINSICS.reflect.read(partial, 'usage')
+		const tools = INTRINSICS.reflect.read(partial, 'tools')
+		return (
+			isString(INTRINSICS.reflect.read(partial, 'content')) &&
+			(INTRINSICS.reflect.read(partial, 'thinking') === undefined ||
+				isString(INTRINSICS.reflect.read(partial, 'thinking'))) &&
+			(INTRINSICS.reflect.read(partial, 'truncated') === undefined ||
+				isBoolean(INTRINSICS.reflect.read(partial, 'truncated'))) &&
+			(usage === undefined ||
+				((isObject(usage) || isFunction(usage)) &&
+					['prompt', 'completion', 'total'].every((key) =>
+						isNumber(INTRINSICS.reflect.read(usage, key)),
+					))) &&
+			(tools === undefined ||
+				arrayOf(
+					(tool: unknown) =>
+						(isObject(tool) || isFunction(tool)) &&
+						isString(INTRINSICS.reflect.read(tool, 'id')) &&
+						isString(INTRINSICS.reflect.read(tool, 'name')) &&
+						(isObject(INTRINSICS.reflect.read(tool, 'arguments')) ||
+							isFunction(INTRINSICS.reflect.read(tool, 'arguments'))),
+				)(tools))
+		)
+	})
 }
 
 /**
@@ -69,13 +116,14 @@ export class ProviderError extends Error {
 	constructor(code: ProviderErrorCode, message: string, options?: ProviderErrorOptions) {
 		super(message, options)
 		this.name = 'ProviderError'
+		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.ProviderError'), { value: this })
 		this.code = code
 		this.status = options?.status
 	}
 }
 
 /**
- * Narrows a caught value to the provider failure class through `instanceof`.
+ * Narrows a caught value to the provider failure class through its identity brand and declared members.
  *
  * @param value - The caught value
  * @returns True if the value is a provider failure; false otherwise
@@ -85,7 +133,20 @@ export class ProviderError extends Error {
  * ```
  */
 export function isProviderError(value: unknown): value is ProviderError {
-	return isInstance(value, ProviderError)
+	return holds(() => {
+		if (
+			!(
+				value instanceof Error &&
+				INTRINSICS.prototype(value) !== Error.prototype &&
+				INTRINSICS.describe(value, Symbol.for('@orkestrel/agent.ProviderError'))?.value === value
+			)
+		)
+			return false
+		const code = INTRINSICS.reflect.read(value, 'code')
+		if (!(code === 'HTTP' || code === 'PROTOCOL' || code === 'PROVIDER')) return false
+		const status = INTRINSICS.reflect.read(value, 'status')
+		return status === undefined || isNumber(status)
+	})
 }
 
 /**
@@ -106,13 +167,14 @@ export class JudgeError extends Error {
 	constructor(code: JudgeErrorCode, message: string, options?: ProviderErrorOptions) {
 		super(message, options)
 		this.name = 'JudgeError'
+		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.JudgeError'), { value: this })
 		this.code = code
 		this.status = options?.status
 	}
 }
 
 /**
- * Narrows a caught value to the judge failure class through `instanceof`.
+ * Narrows a caught value to the judge failure class through its identity brand and declared members.
  *
  * @param value - The caught value
  * @returns True if the value is a {@link JudgeError}; false otherwise
@@ -122,5 +184,18 @@ export class JudgeError extends Error {
  * ```
  */
 export function isJudgeError(value: unknown): value is JudgeError {
-	return isInstance(value, JudgeError)
+	return holds(() => {
+		if (
+			!(
+				value instanceof Error &&
+				INTRINSICS.prototype(value) !== Error.prototype &&
+				INTRINSICS.describe(value, Symbol.for('@orkestrel/agent.JudgeError'))?.value === value
+			)
+		)
+			return false
+		const code = INTRINSICS.reflect.read(value, 'code')
+		if (!(code === 'HTTP' || code === 'PROTOCOL' || code === 'QUESTION')) return false
+		const status = INTRINSICS.reflect.read(value, 'status')
+		return status === undefined || isNumber(status)
+	})
 }

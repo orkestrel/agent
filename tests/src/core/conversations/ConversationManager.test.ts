@@ -1,4 +1,4 @@
-import type { ConversationEventMap, ConversationStoreInterface } from '@src/core'
+import type { ConversationEventMap } from '@src/core'
 import {
 	Conversation,
 	ConversationManager,
@@ -12,6 +12,8 @@ import { createRecorder, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	compactSeedTurns,
+	createObservedConversationStore,
+	createForeignConversationStore,
 	createStubSummarizer,
 	JUDGMENT_RECORD,
 	JUDGMENT_SNAPSHOT,
@@ -435,14 +437,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 			messages: [{ id: 'stored', role: 'user', content: 'stored turn' }],
 		})
 		const reads = createRecorder<readonly [id: string]>()
-		const store: ConversationStoreInterface = {
-			get(id) {
-				reads.handler(id)
-				return memory.get(id)
-			},
-			set: (snapshot) => memory.set(snapshot),
-			delete: (id) => memory.delete(id),
-		}
+		const store = createObservedConversationStore(memory, reads)
 		const manager = new ConversationManager({ summarize: createStubSummarizer().summarize, store })
 		manager.add({ id: 'a' }) // auto-active
 		const b = manager.add({ id: 'b' })
@@ -491,15 +486,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 	})
 
 	it('open(id) resolves undefined for a stored snapshot that names another id', async () => {
-		const foreign: ConversationStoreInterface = {
-			get: async () => ({
-				id: 'b',
-				sections: [],
-				messages: [{ id: 'stored', role: 'user', content: 'stored turn' }],
-			}),
-			set: async () => undefined,
-			delete: async () => undefined,
-		}
+		const foreign = createForeignConversationStore()
 		const manager = new ConversationManager({ store: foreign })
 		const b = manager.add({ id: 'b' })
 

@@ -148,7 +148,7 @@ export interface AgentTurn {
 	readonly usage: TokenUsage | undefined
 	readonly spent: TokenUsage | undefined
 	readonly messages: readonly Message[]
-	readonly ending: 'answer' | 'tools' | 'cancel'
+	readonly outcome: 'answer' | 'tools' | 'cancel'
 	readonly partial: boolean
 	readonly futile: boolean
 	readonly estimate: number | undefined
@@ -940,7 +940,7 @@ export type AgentErrorCode = 'CONCURRENCY' | 'LIMIT' | 'REGISTRY' | 'WINDOW'
  *
  * @remarks
  * The structural estimate is not a tokenizer allocation. `id` and `role` are joins back to the
- * message, not token components. A message's estimate is the sum of `content`, `framing`, `calls`,
+ * message, not token components. A message's estimate is the sum of `content`, `uniform`, `calls`,
  * `thinking`, and `images`; no total is stored. A provider's template effects and the estimation
  * error are not individually attributed.
  */
@@ -949,9 +949,9 @@ export interface MessageMeasure {
 	readonly role: MessageRole
 	/** Holds the `ceil(length / 4)` estimate of the message `content`. */
 	readonly content: number
-	/** Holds the fixed per-message framing overhead. */
-	readonly framing: number
-	/** Holds the estimate of the JSON-rendered `calls`, or the framing overhead when they cannot be rendered; `0` when the message carries none. */
+	/** Holds the fixed per-message uniform overhead. */
+	readonly uniform: number
+	/** Holds the estimate of the JSON-rendered `calls`, or the uniform overhead when they cannot be rendered; `0` when the message carries none. */
 	readonly calls: number
 	/** Holds the estimate of the message `thinking`; `0` when absent. */
 	readonly thinking: number
