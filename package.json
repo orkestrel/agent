@@ -94,7 +94,7 @@
 		"@orkestrel/ollama": "^0.0.27",
 		"@orkestrel/probe": "^0.0.26",
 		"@orkestrel/router": "^0.0.18",
-		"@orkestrel/scaffold": "^0.0.113",
+		"@orkestrel/scaffold": "^0.0.114",
 		"@orkestrel/server": "^0.0.24",
 		"@orkestrel/study": "^0.0.7",
 		"@orkestrel/test": "^0.0.31",
