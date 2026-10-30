@@ -27,7 +27,7 @@ import {
 	StudyToolsDriver,
 } from '../../../studies/tools/index.js'
 import {
-	buildStudyGrading,
+	buildStudyAssessment,
 	createStudyMeterFixture,
 	loadStudyToolsFixture,
 } from '../../setupStudy.js'
@@ -118,12 +118,12 @@ it('executes all declared tools goals through the actual built Agent and retains
 				(judgment) => judgment.verdict === 'achieved' && judgment.references.length === 1,
 			),
 		).toBe(true)
-		const grading = {
-			...buildStudyGrading(fixture.manifest.schedule, judgments),
+		const assessment = {
+			...buildStudyAssessment(fixture.manifest.schedule, judgments),
 			result: result.seal.id,
 			rubric: hashStudyBytes(encodeStudyJSON(fixture.rubric)),
 		}
-		expect(computeStudyScores(result.manifest, fixture.rubric, grading)).toEqual([
+		expect(computeStudyScores(result.manifest, fixture.rubric, assessment)).toEqual([
 			{
 				arm: 'agent',
 				total: 22,

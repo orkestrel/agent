@@ -2,7 +2,7 @@ import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerGauge, Message } from '@orkestrel/agent'
 import type { StudyJudgment, StudyProfile, StudyProvider, StudyRoom } from '@orkestrel/study'
 import type {
-	StudyGradeReading,
+	StudyGradeVerdict,
 	StudyGradeTarget,
 	StudyOllamaTransportOptions,
 	StudyReference,
@@ -148,7 +148,7 @@ export function buildStudyMemoryRoles(
 }
 
 /** Reads one declared target against the memory mechanism predicates while leaving meaning for blind labels. @param target - The declared pair with its retained attempt and evidence rows. @returns The attributable mechanical reading citing the retained attempt and zero-based evidence rows. */
-export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeReading {
+export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeVerdict {
 	const { criterion, attempt, evidence } = target
 	const observation = attempt?.observations.find((entry) => entry.goal === criterion.goal)
 	const assertion = criterion.assertion

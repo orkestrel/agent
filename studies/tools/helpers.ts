@@ -1,5 +1,5 @@
 import type { StudyEvidence, StudyRubric } from '@orkestrel/study'
-import type { StudyGradeReading, StudyGradeTarget } from '@orkestrel/study/server'
+import type { StudyGradeVerdict, StudyGradeTarget } from '@orkestrel/study/server'
 import type { StudyToolsAssertion, StudyToolsFile, StudyToolsReading } from './types.js'
 import { isObject, isRecord } from '@orkestrel/contract'
 import { lstat, readFile, realpath } from 'node:fs/promises'
@@ -167,7 +167,7 @@ export function readStudyToolsPredicate(
  * readStudyToolsGrade(target)
  * ```
  */
-export function readStudyToolsGrade(target: StudyGradeTarget): StudyGradeReading {
+export function readStudyToolsGrade(target: StudyGradeTarget): StudyGradeVerdict {
 	const { criterion, evidence } = target
 	if (!isStudyToolsAssertion(criterion.assertion))
 		throw new StudyError('CONFIG', 'Unsupported tools assertion')

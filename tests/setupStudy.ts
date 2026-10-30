@@ -1,10 +1,10 @@
 import type { ScratchInterface } from '@orkestrel/test/server'
 import type {
+	StudyAssessment,
 	StudyBounds,
 	StudyContext,
 	StudyCriterion,
 	StudyDefinition,
-	StudyGrading,
 	StudyJudgment,
 	StudyManifest,
 	StudyScenario,
@@ -1267,11 +1267,11 @@ export async function loadStudyToolsFixture(): Promise<StudyToolsFixture> {
 	return { manifest, rubric, profile, agent, subject: agent }
 }
 
-/** Returns independently attributed grading over the supplied scheduled attempts. */
-export function buildStudyGrading(
+/** Returns an independently attributed assessment over the supplied scheduled attempts. */
+export function buildStudyAssessment(
 	schedule: readonly StudyTrial[],
 	judgments: readonly StudyJudgment[] = [],
-): StudyGrading {
+): StudyAssessment {
 	return {
 		result: 'a'.repeat(64),
 		rubric: 'b'.repeat(64),

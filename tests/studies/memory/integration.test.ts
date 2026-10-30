@@ -1,7 +1,7 @@
 import { isArray, isRecord, parseJSON } from '@orkestrel/contract'
 import {
 	isStudyJudgment,
-	parseStudyGrading,
+	parseStudyAssessment,
 	parseStudyProfile,
 	parseStudyRubric,
 	isStudyError,
@@ -277,14 +277,16 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 				const grade = parseJSON(graded.stdout)
 				if (
 					!isRecord(grade) ||
-					typeof grade.grading !== 'string' ||
+					typeof grade.assessment !== 'string' ||
 					!isArray(grade.next) ||
 					!grade.next.every((token): token is string => typeof token === 'string')
 				)
-					throw new Error('Missing immutable grading and report arguments')
-				expect(grade.next).toEqual(['report', output, '--grading', grade.grading])
-				const grading = parseStudyGrading(
-					parseJSON(await readFile(join(output, 'grades', grade.grading, 'grading.json'), 'utf8')),
+					throw new Error('Missing immutable assessment and report arguments')
+				expect(grade.next).toEqual(['report', output, '--assessment', grade.assessment])
+				const assessment = parseStudyAssessment(
+					parseJSON(
+						await readFile(join(output, 'grades', grade.assessment, 'grading.json'), 'utf8'),
+					),
 				)
 				const rubric = parseStudyRubric(
 					parseJSON(scratch.read(`studies/${target}/rubric.json`) ?? ''),
@@ -294,12 +296,12 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 						.filter((criterion) => criterion.scenario === trial.scenario)
 						.map((criterion) => `${trial.id}/${criterion.id}`),
 				)
-				expect(grading.attempts).toEqual(result.manifest.schedule.map((trial) => trial.id))
+				expect(assessment.attempts).toEqual(result.manifest.schedule.map((trial) => trial.id))
 				expect(
-					grading.judgments.map((judgment) => `${judgment.trial}/${judgment.criterion}`),
+					assessment.judgments.map((judgment) => `${judgment.trial}/${judgment.criterion}`),
 				).toEqual(denominator)
-				expect(grading.judgments.every(isStudyJudgment)).toBe(true)
-				const semantic = grading.judgments.filter(
+				expect(assessment.judgments.every(isStudyJudgment)).toBe(true)
+				const semantic = assessment.judgments.filter(
 					(judgment) =>
 						rubric.criteria.find((entry) => entry.id === judgment.criterion)?.method === 'semantic',
 				)
@@ -310,7 +312,7 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 						references: judgment.references,
 					})),
 				).toEqual(semantic.map(() => ({ verdict: 'unknown', method: 'human', references: [] })))
-				const mechanical = grading.judgments.filter(
+				const mechanical = assessment.judgments.filter(
 					(judgment) =>
 						rubric.criteria.find((entry) => entry.id === judgment.criterion)?.method !== 'semantic',
 				)
@@ -364,8 +366,8 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 					throw new Error('Missing whole-horizon report')
 				expect(report).toMatchObject({
 					command: 'report',
-					grading: grade.grading,
-					labeling: { status: 'absent' },
+					assessment: grade.assessment,
+					labels: { status: 'absent' },
 				})
 				expect(report.report.operations).toMatchObject({
 					trials: { scheduled: 6, terminal: 6 },

@@ -9,7 +9,7 @@ import {
 	MemoryServer,
 	buildCustodyManifest,
 	buildMemoryGradingFixture,
-	buildStudyGrading,
+	buildStudyAssessment,
 	captureStudyPackages,
 	createStudyMeterFixture,
 	buildMemoryEdge,
@@ -84,7 +84,7 @@ describe('study declaration fixtures', () => {
 		expect(isStudyCustodyManifest(rebuilt)).toBe(true)
 		expect(rebuilt.identity.provider).toBe('e'.repeat(64))
 		expect(rebuilt.schedule).toEqual(first.schedule)
-		expect(buildStudyGrading(first.schedule).attempts).toEqual(
+		expect(buildStudyAssessment(first.schedule).attempts).toEqual(
 			first.schedule.map((item) => item.id),
 		)
 		const grading = buildMemoryGradingFixture()
