@@ -34,7 +34,8 @@ Re-pins follow the release order of `tenets.md` § Release.
 | Dependency: every unit designs against the names Agent 0.0.34 publishes; the fleet wave pushes Agent's `main` after the registry serves 0.0.34 | blocks S1 | O8 |
 | User decision Q1 (the noun) | blocks rc-u7 only if the user overrules O4 | § Open decisions |
 | User decision Q4 (GPU allowance) | blocks rc-a9 and every later GPU unit | O5 |
-| Next | After Agent 0.0.34 is served and pushed, write the rc-p1, rc-u1, rc-u2, and rc-a8 briefs and start S1 | O5 |
+| First-wave briefs: rc-p1, rc-u1, rc-u2, and rc-a8 written and conformance-checked; each acceptance command awaits its baseline run on the destination tree | done 2026-10-31 | `ledger.md` |
+| Next | After Agent 0.0.34 is served and pushed, run each first-wave acceptance command on the destination tree for its baseline, then launch rc-p1, then rc-u1, rc-u2, and rc-a8 in parallel with one runner lane | O5 |
 
 ## Open decisions
 
@@ -116,7 +117,7 @@ Every unit starts after Agent 0.0.34 is published and pushed and designs against
 | Id | Step | Class | Size | Role | Owned files | Depends on | Key acceptance line |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | rc-p1 | S1 | throwaway probe | S | `builder` writes, `verifier` runs | throwaway probes in the probe directory of `.agents/orchestration.md` § tmp layout, never committed | 0.0.34 | (a) literal census over the public `studies/endurance/sources/runtime/evaluation.json` with a known-content control; (b) pair questions per correction at growing conversation lengths with an inert stub judge, control: a conversation with no correction counts 0. Probe (c) is dropped (F3). |
-| rc-u1 | S2 | fix | M | `builder` | `src/core/conversations/{types,Conversation}.ts`, their tests, `tests/src/core/agents/Agent.test.ts` | 0.0.34 | gate row rc-u1; mutation on the blank check |
+| rc-u1 | S2 | fix | M | `builder` | `src/core/conversations/{types,helpers,errors,Conversation}.ts`, their tests, `tests/src/core/agents/Agent.test.ts`, one data export in `tests/setup.ts`, and the `guides/agent.md` rows naming `ConversationErrorCode`, `ConversationError`, and the conversation helpers | 0.0.34 | gate row rc-u1; mutation on the blank check |
 | rc-u2 | S2 | fix (vocabulary) | M | `builder` | `src/core/{types,helpers}.ts`, `src/core/ledgers/{types,helpers,Ledger,Classifier}.ts`, their tests, the `guides/agent.md` rows naming the two symbols | 0.0.34 | identical briefing bytes on a fixture; no `extractTokens` or `LedgerTokenSet` in `src`, `tests`, or `guides`; `test:guides` green |
 | rc-u5 | S2 | fix | S | `builder` | `src/core/ledgers/Ledger.ts` (`#plan` steps), `tests/src/core/ledgers/Ledger.test.ts` | rc-u2 | test first: the fixture fails on 0.0.34 (F2); then the oldest non-decisive owner lines drop first and decisive lines last |
 | rc-u4 | S3 | capability | M | `astra` | `src/core/ledgers/{types,Ledger,validators,errors}.ts`, their tests | rc-u2 | replay equivalence; `failures` control; `CONCURRENCY` during `respond`; unknown id refused; pending results flushed; no calibration when the snapshot carries a gauge |
@@ -127,7 +128,7 @@ Every unit starts after Agent 0.0.34 is published and pushed and designs against
 | rc-u8 | S5 | capability | M | `builder` | `src/core/contexts/stores/{MemoryMemoStore,DatabaseMemoStore}.ts`, the store factories, their tests | rc-u7 | one store contract test over both stores; mutation |
 | rc-u9 | S5 | capability and fix | M | `opus` | `src/core/contexts/AgentContext.ts`, `src/core/agents/{types,Agent}.ts`, `src/core/ledgers/{types,Ledger}.ts`, their tests | rc-u7, rc-u6 | head order; scope lists filter; empty managers render no header; head pricing with a reverted-pricing control |
 | rc-s1 | S5 | consumer | S per change | `builder` | `studies/memory/*`; a `studies/context/` mechanism study modeled on `studies/tools` | each unit that changes the public surface | `test:studies` green; the authority repeat rule lands here |
-| rc-a8 | S6 | measurement | M (studies only) | `builder`, `checker` | `studies/memory/{helpers,types,constants}.ts`, their tests | none | each instrument mapped to `@orkestrel/study` first; four instruments, each with a negative control that fails |
+| rc-a8 | S6 | measurement | M (studies only) | `builder`, `checker` | `studies/memory/{helpers,types,constants,validators}.ts`, `tests/studies/memory/{helpers,validators}.test.ts`, `tests/setupStudy.ts` | none | each instrument mapped to `@orkestrel/study` first; four instruments, each with a negative control that fails |
 | rc-a9 | S6 | GPU recording | run | Orchestrator | gitignored study output | rc-u4, rc-a8, rc-s1 checkpoint seeding, Q4 | the recording seals; snapshots validate; replay of goal k+1 from snapshot k matches live bytes on non-maintenance requests; the three single-request probes answered |
 | rc-e1 | S7 | experiment | M | `builder`; GPU by the Orchestrator | `src/core/conversations/{types,helpers,Conversation}.ts`, their tests, the study profile | rc-u1, rc-u2, rc-p1 (a) | gate row rc-e1 |
 | rc-a6 | S7 | experiment | M | `astra` | `src/core/ledgers/{types,Ledger}.ts`, their tests; on promotion `src/core/contexts/{types,AgentContext}.ts` | rc-u4, rc-a9 probes pass | gate row rc-a6 |

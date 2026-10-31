@@ -22,3 +22,5 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-10-31 | rc-w: draft of these records | `opus` | every file in this folder |
 | 2026-10-31 | rc-c: conformance check of these records (one blocking finding, the repository URLs; one minor) | `checker` | `plan.md` § Repositories; `designs/records.md` |
 | 2026-10-31 | rc-v: coverage review of these records (one blocking finding, the release cycle that a second Agent release for `ask` resolves; fifteen minor) | `reviewer` | `plan.md`; `designs/records.md`; `designs/compaction.md`; `designs/context.md`; `designs/measurement.md` |
+| 2026-10-31 | rc-briefs: first-wave briefs for rc-p1, rc-u1, rc-u2, and rc-a8 (the drafting lane ran one no-op shell command against its brief; it read and changed nothing) | `opus` | `plan.md` § State and § Sequence (rc-u1 and rc-a8 owned files) |
+| 2026-10-31 | rc-briefs check: conformance of the four briefs against the dispatch skill | `checker` | `plan.md` § Sequence |
