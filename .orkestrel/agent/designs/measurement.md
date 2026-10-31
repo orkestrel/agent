@@ -24,6 +24,11 @@ Every medium unit then gets one independent review, per the size gate of `@orkes
 
 Probe (c), the `encode` read for `Message.id`, is dropped: F3 settles it.
 
+Readings (rc-p1, 2026-10-31, on `63e4bf81`'s source tree with rc-a14 in flight; both controls passed, and each probe's mutation failed a control and restored green):
+
+- (a) The 96 goals of `studies/memory/scenarios/endurance.json` add 224 messages and fold twice under the `keep: 2` simulation, at `ev-09-1` and `ev-18-1`, in both fold modes (plain: 165 messages folded; rolling: 166). Per fold, the slice holds 133 and 138 distinct ids, of which 1 recurs within the next 3 goals and 3 and 1 within the next 8 (mean 1 and 2), and 88 and 78 distinct numbers (79 rolling), of which 1 recurs within 3 goals and 10 and 6 within 8. The anchor line of every slice id absent from the summary costs 374.5 tokens on average and 386 at most, 9.1% and 9.4% of the 4096-token recap allowance. Coverage: arrivals and prompts only, so the live arm, which also holds replies, tool messages, and lookup records, folds earlier and more often. Control 1 compares the scenario with the runtime corpus through `studies/memory/provenance/endurance.json` `substitutions`: the projection rewrites the lookup sentence of the 24 packet goals (`ev-NN-2`) to the single `lookup` tool, and all 24 request substitutions are used once.
+- (b) After one correction naming `BC-7301`, the `study` variant (`STUDY_MEMORY_TOPICS`) asks one amends question per earlier message: 8, 16, 32, 64, and 128 at lengths 8 to 128, so the count grows linearly (16 times over 16 times the length). The `entities` variant (no topics; ids only) asks 6, 9, 9, 9, and 16. With no correction both variants ask 0.
+
 ## Bench
 
 `rc-a3` benches per-request `select` CPU at 100, 200, 400, 800, and 1600 messages, with a scripted provider and a judge that is never reached, seeding long conversations through rc-u4's hydrate path.
@@ -171,7 +176,7 @@ Fixes found while a step runs queue their request and micro rungs into this orde
 | rc-a15 funded from the larger-model checks | that row spends only per promoted experiment; three promotions leave 100 minutes | the Orchestrator re-reads the row after the first screens; O25 keeps it a reserve that tops up no screen |
 | the approval binding check (a tool replaced during an ask) | no consumer replaces tools mid-run | drop it in review when `tools.tool(name)` identity is unstable across `remove` and `add` |
 | `AUTHORITY_NAME_LIMIT` and its encoding leaf | a fleet helper might already encode and cap an identifier | resolved 2026-10-31: `preview` in `@orkestrel/contract` encodes and caps the name, so neither is declared (`designs/authority.md` § Shapes) |
-| `correction.limit` with no default | rc-p1 (b)'s growth curve may argue for a default | read the pair count at the longest length against the shortest; when growth is far beyond linear, propose a default in rc-u6's review |
+| `correction.limit` with no default | rc-p1 (b)'s growth curve may argue for a default | read 2026-10-31: the `study` variant grows linearly (128 questions at 128 messages against 8 at 8), not far beyond linear, so no default is proposed; rc-u6's review weighs the absolute count, one question per earlier message under the study topics (§ Probes, Readings) |
 | whole-set memo store | the per-revision store has a real write-cost argument | time `set` over growing memo sets in rc-u8 (D14) |
 | memos before workspace in the head | workload-dependent, no reading | pin by test; read invalidation counts on the mechanism study |
 | four instruments suffice | rule retention and stage attribution may join when rc-e1 promotes | rule retention joins when rc-e1 promotes; stage attribution only when a unit's gate names it |
