@@ -6,7 +6,7 @@ import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
 import { JudgeError } from './errors.js'
 import { copyJSON } from '../cloners.js'
 import { JudgeAbortError } from '../errors.js'
-import { buildJudgeResult, buildProviderHeaders, readFailure, readText } from './helpers.js'
+import { buildJudgeResult, buildProviderHeaders, readFailure, readBodyText } from './helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
 /**
@@ -156,7 +156,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 			if (response.body === null) {
 				throw new JudgeError('PROTOCOL', 'judge error: no response body')
 			}
-			const text = await readText(response.body, undefined, combined)
+			const text = await readBodyText(response.body, undefined, combined)
 			combined.throwIfAborted()
 			const value = parseJSON(text.text)
 			if (value === undefined) throw new JudgeError('PROTOCOL', 'judge error: invalid JSON body')

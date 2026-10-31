@@ -142,7 +142,7 @@ export async function readFailure(
 		signal.throwIfAborted()
 		return { message: `${prefix} ${status}`, status }
 	}
-	return readText(body, MAX_ERROR_BODY_LENGTH, signal).then(
+	return readBodyText(body, MAX_ERROR_BODY_LENGTH, signal).then(
 		(read) => {
 			signal.throwIfAborted()
 			return { message: `${prefix} ${status}${read.text === '' ? '' : ` - ${read.text}`}`, status }
@@ -170,13 +170,13 @@ export async function readFailure(
  * @returns The decoded prefix and whether EOF occurred within the byte budget
  * @example
  * ```ts
- * import { readText } from '@orkestrel/agent'
+ * import { readBodyText } from '@orkestrel/agent'
  *
  * const body = new Response('answer').body
- * if (body !== null) await readText(body, 3) // { text: 'ans', complete: false }
+ * if (body !== null) await readBodyText(body, 3) // { text: 'ans', complete: false }
  * ```
  */
-export async function readText(
+export async function readBodyText(
 	body: ReadableStream<Uint8Array>,
 	limit?: number,
 	signal?: AbortSignal,

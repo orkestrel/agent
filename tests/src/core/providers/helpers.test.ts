@@ -14,7 +14,7 @@ import {
 	isJudgeError,
 	buildProviderHeaders,
 	releaseReader,
-	readText,
+	readBodyText,
 	readChunks,
 	requestToRelay,
 } from '@src/core'
@@ -75,31 +75,34 @@ describe('buildProviderResult — the assembled provider turn', () => {
 	})
 })
 
-describe('readText — bounded decoded text', () => {
+describe('readBodyText — bounded decoded text', () => {
 	it('reports incompletion for exactly the byte limit followed by EOF', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('abc')])
-		expect(await readText(body.stream, 3)).toEqual({ text: 'abc', complete: false })
+		expect(await readBodyText(body.stream, 3)).toEqual({ text: 'abc', complete: false })
 		expect(body.stream.locked).toBe(false)
 	})
 	it('stops at an exact limit without waiting for another chunk', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('abc')], false)
 		const abort = new AbortController()
-		expect(await readText(body.stream, 3, abort.signal)).toEqual({ text: 'abc', complete: false })
+		expect(await readBodyText(body.stream, 3, abort.signal)).toEqual({
+			text: 'abc',
+			complete: false,
+		})
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
 	}, 400)
 	it('reports incompletion for an empty body with a zero-byte limit', async () => {
 		const body = new RecordedBody([])
-		expect(await readText(body.stream, 0)).toEqual({ text: '', complete: false })
+		expect(await readBodyText(body.stream, 0)).toEqual({ text: '', complete: false })
 	})
 	it('reports completion for limit minus one followed by EOF', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('ab')])
-		expect(await readText(body.stream, 3)).toEqual({ text: 'ab', complete: true })
+		expect(await readBodyText(body.stream, 3)).toEqual({ text: 'ab', complete: true })
 	})
 	it('leaves an empty chunk unread after an exact limit', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('abc'), new Uint8Array(0)])
-		expect(await readText(body.stream, 3)).toEqual({ text: 'abc', complete: false })
+		expect(await readBodyText(body.stream, 3)).toEqual({ text: 'abc', complete: false })
 		expect(body.count).toBe(1)
 	})
 	it('reports incompletion for limit plus one with one overshoot chunk', async () => {
@@ -107,7 +110,7 @@ describe('readText — bounded decoded text', () => {
 			new TextEncoder().encode('abcd'),
 			new TextEncoder().encode('unread'),
 		])
-		expect(await readText(body.stream, 3)).toEqual({ text: 'abc', complete: false })
+		expect(await readBodyText(body.stream, 3)).toEqual({ text: 'abc', complete: false })
 		expect(body.count).toBe(1)
 		expect(body.bytes).toBe(4)
 		expect(body.cancelled).toBe(true)
@@ -115,8 +118,11 @@ describe('readText — bounded decoded text', () => {
 	it('measures byte-order mark (BOM)-prefixed completion from bytes despite identical decoded text', async () => {
 		const complete = new RecordedBody([new TextEncoder().encode('{"messages":[]}')])
 		const overflow = new RecordedBody([new TextEncoder().encode('\uFEFF{"messages":[]}  ')])
-		expect(await readText(complete.stream, 18)).toEqual({ text: '{"messages":[]}', complete: true })
-		expect(await readText(overflow.stream, 18)).toEqual({
+		expect(await readBodyText(complete.stream, 18)).toEqual({
+			text: '{"messages":[]}',
+			complete: true,
+		})
+		expect(await readBodyText(overflow.stream, 18)).toEqual({
 			text: '{"messages":[]}',
 			complete: false,
 		})
@@ -124,7 +130,7 @@ describe('readText — bounded decoded text', () => {
 	it('cancels a pending text read on abort and returns the decoded prefix', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('prefix')], false)
 		const abort = new AbortController()
-		const result = readText(body.stream, undefined, abort.signal)
+		const result = readBodyText(body.stream, undefined, abort.signal)
 		await body.pending
 		abort.abort(new Error('text cancelled'))
 		expect(body.cancelled).toBe(true)
@@ -137,7 +143,7 @@ describe('readText — bounded decoded text', () => {
 		const body = new RecordedBody([new TextEncoder().encode('unread')], false)
 		const abort = new AbortController()
 		abort.abort()
-		expect(await readText(body.stream, 3, abort.signal)).toEqual({ text: '', complete: false })
+		expect(await readBodyText(body.stream, 3, abort.signal)).toEqual({ text: '', complete: false })
 		expect(body.count).toBe(0)
 		expect(body.cancelled).toBe(true)
 		expect(body.reason).toBe(abort.signal.reason)
@@ -152,7 +158,7 @@ describe('readText — bounded decoded text', () => {
 			undefined,
 			new Error('cancel failed'),
 		)
-		expect(await readText(body.stream, 3, signal)).toEqual({ text: 'abc', complete: false })
+		expect(await readBodyText(body.stream, 3, signal)).toEqual({ text: 'abc', complete: false })
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
@@ -160,7 +166,7 @@ describe('readText — bounded decoded text', () => {
 	it('reads a bounded byte prefix even when a chunk exceeds the limit', async () => {
 		const signal = new AbortController().signal
 		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
-		expect(await readText(body.stream, 3, signal)).toEqual({ text: 'abc', complete: false })
+		expect(await readBodyText(body.stream, 3, signal)).toEqual({ text: 'abc', complete: false })
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
@@ -168,7 +174,7 @@ describe('readText — bounded decoded text', () => {
 	it('stops without reading for a zero-byte limit', async () => {
 		const signal = new AbortController().signal
 		const body = new RecordedBody([new TextEncoder().encode('abcdef')])
-		expect(await readText(body.stream, 0, signal)).toEqual({ text: '', complete: false })
+		expect(await readBodyText(body.stream, 0, signal)).toEqual({ text: '', complete: false })
 		expect(body.bytes).toBe(0)
 		expect(body.cancelled).toBe(true)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
@@ -176,37 +182,37 @@ describe('readText — bounded decoded text', () => {
 	it('decodes a multibyte prefix and flushes an incomplete final character', async () => {
 		const bytes = new TextEncoder().encode('🌍')
 		const complete = new RecordedBody([bytes.subarray(0, 2), bytes.subarray(2)])
-		expect(await readText(complete.stream)).toEqual({ text: '🌍', complete: true })
+		expect(await readBodyText(complete.stream)).toEqual({ text: '🌍', complete: true })
 		const partial = new RecordedBody([bytes])
-		expect(await readText(partial.stream, 2)).toEqual({ text: '\uFFFD', complete: false })
+		expect(await readBodyText(partial.stream, 2)).toEqual({ text: '\uFFFD', complete: false })
 	})
 	it('preserves read failures and releases the text reader lock', async () => {
 		const signal = new AbortController().signal
 		const error = new Error('read failed')
 		const text = new RecordedBody([], true, error)
-		await expect(readText(text.stream, undefined, signal)).rejects.toBe(error)
+		await expect(readBodyText(text.stream, undefined, signal)).rejects.toBe(error)
 		expect(text.stream.locked).toBe(false)
 		expect(getEventListeners(signal, 'abort')).toEqual([])
 	})
 	it('reads an empty body as empty text', async () => {
-		expect(await readText(new RecordedBody([]).stream)).toEqual({ text: '', complete: true })
+		expect(await readBodyText(new RecordedBody([]).stream)).toEqual({ text: '', complete: true })
 	})
 	it('reads no chunk for a NaN limit', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('abc')])
-		expect(await readText(body.stream, NaN)).toEqual({ text: '', complete: false })
+		expect(await readBodyText(body.stream, NaN)).toEqual({ text: '', complete: false })
 		expect(body.count).toBe(0)
 		expect(body.cancelled).toBe(true)
 		expect(body.stream.locked).toBe(false)
 	})
 	it('reads fifty thousand one-byte chunks to completion', async () => {
 		const body = new RecordedBody(Array.from({ length: 50_000 }, () => new Uint8Array([97])))
-		expect(await readText(body.stream)).toEqual({ text: 'a'.repeat(50_000), complete: true })
+		expect(await readBodyText(body.stream)).toEqual({ text: 'a'.repeat(50_000), complete: true })
 		expect(body.count).toBe(50_000)
 	})
 	it('counts the byte limit across chunks and keeps a split character whole', async () => {
 		const bytes = new TextEncoder().encode('é!')
 		const body = new RecordedBody([bytes.subarray(0, 1), bytes.subarray(1, 2), bytes.subarray(2)])
-		expect(await readText(body.stream, 3)).toEqual({ text: 'é!', complete: false })
+		expect(await readBodyText(body.stream, 3)).toEqual({ text: 'é!', complete: false })
 		expect(body.count).toBe(3)
 	})
 })

@@ -15,7 +15,7 @@ import {
 	UNAUTHORIZED_RELAY_STATUS,
 	UPSTREAM_RELAY_STATUS,
 } from './constants.js'
-import { readText } from './helpers.js'
+import { readBodyText } from './helpers.js'
 import { providerRequestContract } from './contracts.js'
 import { RelayStream } from './RelayStream.js'
 import { RelayProvider } from './RelayProvider.js'
@@ -71,9 +71,11 @@ export function createRelay(options: RelayOptions): RelayHandler {
 			return new Response(undefined, { status: UNAUTHORIZED_RELAY_STATUS })
 		}
 		if (request.body === null) return new Response(undefined, { status: INVALID_RELAY_STATUS })
-		const read = await readText(request.body, limit ?? DEFAULT_RELAY_LIMIT, request.signal).catch(
-			() => undefined,
-		)
+		const read = await readBodyText(
+			request.body,
+			limit ?? DEFAULT_RELAY_LIMIT,
+			request.signal,
+		).catch(() => undefined)
 		if (read === undefined) {
 			return new Response(undefined, {
 				status: request.signal.aborted ? OVERSIZED_RELAY_STATUS : INVALID_RELAY_STATUS,
