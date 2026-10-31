@@ -1,6 +1,6 @@
 # Compaction design
 
-Compaction stays the common long-conversation strategy. This design covers its one fix, the shared literal vocabulary, the anchor capability, rule retention, recall, repeat loops, and the deferred items. Source locations name a symbol and its file as of `1e82d145`.
+Compaction stays the common long-conversation strategy. This design covers the recap role, its one fix, the shared literal vocabulary, the anchor capability, rule retention, recall, repeat loops, and the deferred items. Source locations name a symbol and its file as of `1e82d145`.
 
 ## Plug-in surface
 
@@ -20,6 +20,15 @@ Compaction and the ledger share exactly two seams: `extractLiterals` and `Litera
 | masking old tool results | deferred | D2 |
 | recall over folded originals | study-only experiment, after rc-e1 | rc-a5 |
 | repeated identical lookups | an authority rule in the Study arm; no core switch | rc-s1; D5 |
+
+## Recap role
+
+The recap stays `assistant` (`buildRecapMessage` in `src/core/conversations/helpers.ts`, as of `2da6d0b6`), and rc-u10 leaves the compaction arm's bytes unchanged (`designs/layout.md` § Final layout).
+
+- A summarizer-written recap is model-written text, so it sits at model level, never at user or host level (C25; O11).
+- The fixed `[Summary of earlier messages] ` prefix orients a small reader.
+- An `assistant` recap after the `user` context message keeps the roles alternating.
+- No reading favors a `user` recap; it waits for D37.
 
 ## Blank-digest refusal
 
@@ -100,10 +109,10 @@ export interface ConversationOptions {
 The plain agent loop lacks the ledger's repeat stop, and the compaction arm recorded identical-lookup loops (`research/evidence.md` § Prior-campaign readings, repeat loops).
 
 - Add no `AgentOptions.distinct` and no core repeat-stop switch.
-- In the Study compaction arm, rc-s1 adds an authority rule whose matcher holds a per-run `Set` of tool name and canonical arguments, reset on the agent's `start` event, with a static `reason` that orients the model: the earlier result is in the conversation; answer from it or call something else.
-- `AuthorityContext` carries the call, and `AuthorityRule.reason` carries the text (`src/core/agents/types.ts`), so the rule needs no core change.
+- In the Study compaction arm, rc-s1 adds an authority rule whose matcher holds a per-run `Set` of tool name and canonical arguments, reset on the agent's `start` event, with `verdict: 'deny'` and a static `reason` that names the next step: the earlier result is in the conversation; answer from it or call something else.
+- `AuthorityContext` carries the call, and `AuthorityRule.reason` carries the text (`src/core/agents/types.ts`), so the rule needs no core change beyond rc-a14's `verdict` (`designs/authority.md` § Shapes). A `deny` reason reaches the model through the one render form of `designs/authority.md` § Denial notes.
 - The ledger already owns a repeat stop (`LedgerRequest.admit`); a loop switch would be a second implementation of one concept.
-- Whether this arm becomes the compaction baseline is the user's decision (Q2). A core stop reopens on D5.
+- This arm is the compaction baseline (Q2). A core stop reopens on D5, in the shape of a denial bound (`designs/authority.md` § Deferred).
 
 ## Deferred
 

@@ -14,14 +14,21 @@ Every brief and every unit of this campaign follows these directives. Each line 
 
 - Judge every study, report, and screen by the evaluation canon: paired arms from a reset, failure classes frozen before execution, headline denominators over every declared goal, one trajectory read as a point observation, predicates for checkable facts and a model judge blind to arm for the rest (`1e82d145:.orkestrel/plan.md` § Evaluation canon).
 - Tune on public development text only; read the evaluation oracle one time, aggregate-only, after freezing, and never tune on its atom text (U5: `152ac3c3:.orkestrel/agent/plan.md` § Rulings in force).
+- Build for the smallest local models: read every gate on the smallest model the Study carries, and fail a change that only a larger model tolerates; run no hosted provider (Q5: `plan.md` § Decisions).
 - Never read `.env*`, `.npmrc`, `auth.json`, keys, tokens, or `studies/endurance/sources/private/` (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work).
+
+## Trust
+
+- Put only host-authored text in the `system` message: the system text, instructions with loaded skill bodies, the skill index, and host-registered tool definitions; never text a user wrote, a tool returned, a judge or summarizer produced, or a model wrote, a model-written memo included (O11: `plan.md` § Rulings).
+- Hold every security protection in a deterministic check in the loop, never in the model obeying text (O14: `plan.md` § Rulings; `designs/authority.md` § Principle).
+- Write model-facing denial text as fixed, runtime-written notes that state the status first, name one next step, and echo no arguments (O14: `plan.md` § Rulings; C38 to C40: `research/evidence.md` § External claims).
 
 ## Host
 
 - Never contact the user's Ollama daemon on port 11434; set `OLLAMA_HOST` to `http://127.0.0.1:1` as its own statement before every node or npm command (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work; `1e82d145:.orkestrel/plan.md` § Standing readings, row Ollama guard).
 - Run GPU work only as the Orchestrator, on the dedicated daemon on port 11435, after notifying the user and screening the most recent stable Ollama release, because a different runner opens a separate lineage (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work; `152ac3c3:.orkestrel/agent/plan.md` § Standing rules).
 - Keep one process-running lane on the host, the Orchestrator included; read-only lanes use file tools and run no shell command (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work).
-- Run Node 22.18.x through 24.x only, and gate every release on Node 22.18.0 (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work; `1e82d145:.orkestrel/plan.md` § Rulings in force, row Node floor gate).
+- Run every check, gate, probe, and study run on the latest Node 22 release, and on the latest Node 24 release only for a package whose manifest requires 24; the declared floor stays `engines` `>=22.18.0` (O18, superseding the 22.18.0 release gate of `1e82d145:.orkestrel/plan.md` § Rulings in force, row Node floor gate).
 - Add no native code: no FFI, Node-API addon, or compiled helper (U22: `152ac3c3:.orkestrel/agent/plan.md` § Rulings in force).
 
 ## Git and release

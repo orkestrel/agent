@@ -1,6 +1,6 @@
 # Context design
 
-`AgentContext` gains two libraries, memos and skills, that reach the prompt as short indexes with bodies loaded on demand. This design covers their shapes, managers, stores, tools, the context wiring, the ledger wiring, and the Authority shape that waits for its consumer. Source locations name a symbol and its file as of `1e82d145`. The noun `Memo` is the default under O4 and Q1.
+`AgentContext` gains two libraries, memos and skills, that reach the prompt as short indexes with bodies loaded on demand. This design covers their shapes, managers, stores, tools, the context wiring, and the ledger wiring. Source locations name a symbol and its file as of `1e82d145`. The noun is `Memo` (Q1).
 
 ## Vocabulary
 
@@ -48,8 +48,9 @@ export interface ScopeFilter {
 
 - `AgentOptions` forwards `skills` and `memos` the way it forwards `instructions` and `workspaces`.
 - The context stays event-free.
-- Order the head from stable to volatile: `system`, instructions, skills index, memos index, workspace text, then the briefing. When rc-a6 promotes, the briefing leaves the head and `Selection.briefing` is deleted (`designs/records.md` § Briefing placement).
-- Pin memos-before-workspace with a test; a memo write invalidates the cached workspace text after it, and the other order invalidates memos on every file write. A reading of invalidation counts on the `studies/context` mechanism study can reopen the order.
+- Order the head from stable to volatile (rc-u9 head order): the `system` message holds the system text, the instructions with loaded skill bodies, and the skills index; one `user` context message after it holds the memos index, then the workspace text (`designs/layout.md` § Final layout). The skills index is host text, so it stays in `system`; memo text can be model-written, so it never enters `system` (O11).
+- rc-u10 moves the workspace text out of `system` and the records out of the head, and deletes `Selection.briefing` (`designs/layout.md` § Shapes); rc-u9 adds the skills and memos sections on that layout.
+- Pin memos-before-workspace in the context message with a test; a memo write invalidates the cached workspace text after it, and the other order invalidates memos on every file write. A reading of invalidation counts on the `studies/context` mechanism study can reopen the order.
 - Each section uses the `renderSection(open, items, render, close)` cascade; each manager carries its own `open`, `render`, and `close` with a `ContextSectionFormat<T>` override, as `InstructionManager` does. An empty manager renders no header.
 - An index line renders as `- name: description` through one shared `renderIndexEntry` in `src/core/contexts/helpers.ts`. The default headers are `## Skills` and `## Memos`.
 - Memo and skill index sizes are the host's scope choice, never a shared ceiling; the window stays the only context stop (`tenets.md` § Scope).
@@ -213,7 +214,7 @@ Loading a skill adds instruction `skill:<name>` with the skill's content to the 
 - The ledger never files the body as a `fact`, because the body is not a tool result; successful tool results file as `fact` (`Ledger#assign` in `src/core/ledgers/Ledger.ts`).
 - Host-authored directives do not arrive as tool results, which carry no authority by default (C25).
 - The instruction inherits scope and `priority`; unloading is `instructions.remove('skill:<name>')`.
-- Each load changes the head one time, one prefix miss per load, accepted and measured: rc-s1's `studies/context` study counts loads per run, and rc-a9's skill-load probe reads `cached` around a load (`designs/measurement.md` § Recording). Loaded bodies move to the late `system` slot only on D4.
+- Each load changes the head one time, one prefix miss per load, accepted and measured: rc-s1's `studies/context` study counts loads per run, and rc-a9's skill-load probe reads `cached` around a load (`designs/measurement.md` § Recording). Loaded bodies leave the head only on D4, and never into a late `system` message.
 - A host scope with an explicit `instructions` allow-list filters a loaded `skill:<name>` instruction; rc-d1 documents this, and no code works around it.
 
 ### Skill and instruction
@@ -222,7 +223,7 @@ An instruction is always on, host-authored, and rendered on every build. A skill
 
 ## Tools
 
-The tools live in `@orkestrel/toolbox` (rc-t1), which owns ready-made tools over other packages' managers (`createWorkspaceTool`, `createDescribeTool`).
+The tools live in `@orkestrel/toolbox` (rc-t1), which owns ready-made tools over other packages' managers (`createWorkspaceTool`, `createDescribeTool`). They wait for the toolbox wave (D20); this campaign ships the managers with `studies/context` as their only consumer (Q3).
 
 | Factory | Tool | Returns |
 | --- | --- | --- |
@@ -233,57 +234,22 @@ The tools live in `@orkestrel/toolbox` (rc-t1), which owns ready-made tools over
 
 - A tool acknowledges or returns state, never both, so each library has two tools.
 - Each tool's argument shape is declared with `@orkestrel/contract`, as the toolbox's existing tools declare theirs.
+- Tool definitions carry host text only: no factory interpolates memo names, descriptions, or other stored text into a `description`, because the tools block renders inside the `system` turn (O11; `designs/layout.md` § Boundary). rc-t1's brief states this constraint.
 - Each description leads with a worked example and the reply shape. Each refusal names the key path, the expected shape, and the valid names, with an untrusted identifier JSON-encoded and length-capped.
-- Authority gates the tools by name with the shipped rules, for example `match: ({ call }) => call.name === 'remember'`.
+- Authority gates the tools by name with rules, for example `{ match: ({ call }) => call.name === 'remember', zone: 'memo', verdict: 'ask' }` (`designs/authority.md` § Shapes).
 - The `studies/context` mechanism study, modeled on `studies/tools`, proves the managers inside Agent first: a scripted memo write, revision, and read across two conversations; a skill load adds the instruction; scope lists filter (rc-s1). The release order carries Agent, then Toolbox (`tenets.md` § Release).
-- Model-written memos can carry injected text across conversations, so `remember` ships with Authority `ask` in one wave (O2).
+- Model-written memos can carry injected text across conversations, so `remember` never ships without Authority `ask`, which ships first, in Agent 0.0.35 as rc-a14 (O2). A memo's text reaches the model in the `user` context message, never in `system` (O11).
+- When D20 opens, the tools' gate adds a run on the smallest local model: from each description alone, the model calls each tool with valid arguments and reads each refusal into a valid retry (Q5).
 
 ## Authority
 
-The shipped model stays: ordered first-match rules, a fallback, and synchronous `evaluate` (`Authority` in `src/core/agents/Authority.ts`). Ordering modes and approver identity are product policy. `rc-a14` adds `ask` in the toolbox wave (D6):
-
-```ts
-export type AuthorityVerdict = 'allow' | 'ask' | 'deny' // replaces `allowed: boolean`; no shim
-
-export interface AuthorityRule {
-	readonly match: (context: AuthorityContext) => boolean
-	readonly zone: string
-	readonly verdict?: AuthorityVerdict
-	readonly reason?: string
-}
-
-export interface AuthorityDecision {
-	readonly zone: string
-	readonly verdict: AuthorityVerdict
-	readonly reason?: string
-}
-
-export type AuthorityHandler = (context: AuthorityContext, decision: AuthorityDecision, signal: AbortSignal) => Promise<boolean>
-
-export interface AuthorityOptions {
-	readonly rules?: readonly AuthorityRule[]
-	readonly fallback?: AuthorityDecision
-	readonly ask?: AuthorityHandler // absent: an `ask` verdict denies
-}
-```
-
-- A matched rule with no `verdict` allows, as a rule with no `allowed` allows in 0.0.34.
-- `evaluate` stays synchronous; only the handler is async, and only for `ask` verdicts.
-- A union replaces two booleans, so no decision is both allowed and asked.
-- `allowed` is replaced with no shim; Ollama, Toolbox, and Study re-pin in one wave.
-
-The four orderings are rc-a14's acceptance tests:
-
-1. An abort while a handler is pending: the call never executes, and the turn settles as a cancel.
-2. A handler that throws, or resolves after the abort: deny.
-3. Several `ask` calls in one turn: resolve in call order, each raced against the signal, before the pre-dispatch abort guard.
-4. An approval permits execution and does not promise that the call executes exactly one time.
+`designs/authority.md` holds Authority `ask` and the `consequential` floor (rc-a14).
 
 ## Instructions, scope, and workspace
 
 - Instructions: no model change. Precedence is `priority`, then insertion order, and a same-name `add` supersedes, which already implements later-supersedes-earlier (C25). Path-activated instructions wait for D7.
 - Scope: two added allow-lists, `skills` and `memos`. Scope still filters no messages; message inclusion stays the conversation's job through compaction or the selection's job through the ledger.
-- Workspace: unchanged and the only document channel. Skills reuse its immutable `FileInterface` and `FileInput` values. Skill and memo stores never live in the active workspace, because `build` renders every active file into the system message. Index mode waits for D8.
+- Workspace: unchanged and the only document channel. Skills reuse its immutable `FileInterface` and `FileInput` values. Skill and memo stores never live in the active workspace, because `build` renders every active text file into the context message. Index mode waits for D8.
 
 ## Ledger wiring
 
@@ -294,7 +260,8 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on' |
 ```
 
 - One memo set can serve many ledgers and agents; cross-conversation memory depends on that.
-- `Ledger#trim` prices the built head, not `[options.system, briefing]` (`designs/records.md` § Head pricing). Acceptance: with an instruction on the ledger's agent long enough to push the head past the cap when only `system` and the briefing are priced, the planned system message stays at or under the plan cap; with pricing reverted to `options.system`, the same fixture exceeds it.
+- `Ledger#trim` prices the built head plus the request copy, not `[options.system, briefing]`, and the calibration pass sends the same head (`designs/records.md` § Head pricing). Acceptance: with an instruction on the ledger's agent long enough to push the head past the cap when only `system` and the records are priced, the planned request stays at or under the plan cap; with pricing reverted to `options.system`, the same fixture exceeds it.
+- The canary of `designs/layout.md` § Canary gains memo and skill sentinels: the skill description appears in `system`, and the memo sentinels appear in the context message only.
 - The ledger still plugs in through `select`.
 
 ## Refused

@@ -2,23 +2,24 @@
 
 ## Goal and exit criterion
 
-Make `@orkestrel/agent`'s two long-conversation strategies durable and honest, and give `AgentContext` memos and skills in the package's own vocabulary, adding nothing the evidence does not carry.
+Make `@orkestrel/agent`'s two long-conversation strategies durable and honest, give `AgentContext` memos and skills in the package's own vocabulary, gate tool calls with deterministic checks in the loop, and keep the `system` message host-authored, adding nothing the evidence does not carry.
 
-- Fixes: blank-recap refusal, owner-trim order, ledger head pricing, literal vocabulary.
-- Capabilities: ledger snapshot and hydrate, correction cap, memo and skill managers wired into the context and the ledger's agent options.
-- Experiments, each promoted or deleted on its written gate: anchored recaps, briefing at the foot, moving tail, pair narrowing.
-- Exit: every unit accepted cheap-first; every experiment switch either promoted (switch deleted, behavior always on) or deleted with its bench; Agent 0.0.35 published with the guide corrected; Agent 0.0.36 published with Authority `ask` in the toolbox wave; no `src/` line whose justification is "an experiment might test it".
+- Fixes: blank-recap refusal, owner-trim order, ledger head pricing, literal vocabulary, the host-authored `system` message (records in the request turn, workspace text in a context message), and the layout vocabulary its reading keeps.
+- Capabilities: ledger snapshot and hydrate, correction cap, memo and skill managers wired into the context and the ledger's agent options, Authority `ask` with the `consequential` floor.
+- Experiments, each promoted or deleted on its written gate: anchored recaps, moving tail, pair narrowing.
+- Measurement: every gate reads on the smallest local model the Study carries, because the smallest models are the most sensitive to these changes and Agent must be usable by them without workarounds (Q5).
+- Exit: every unit accepted cheap-first; every experiment switch either promoted (switch deleted, behavior always on) or deleted with its bench; on every path Agent emits exactly one `system` message, built from host inlets only, proven by the canary test; Agent 0.0.35 published with the guide corrected; no `src/` line whose justification is "an experiment might test it".
 
-The campaign builds no second log, no CRDT, no frontmatter parser, no default literal extractor, and no core repeat-stop switch.
+The campaign builds no second log, no CRDT, no frontmatter parser, no default literal extractor, no core repeat-stop switch, and no guard model.
 
 ## Repositories
 
 | Package | URL | Work |
 | --- | --- | --- |
-| `@orkestrel/agent` | https://github.com/orkestrel/agent | every unit except rc-t1 |
-| `@orkestrel/toolbox` | https://github.com/orkestrel/toolbox | rc-t1 |
-| `@orkestrel/ollama` | https://github.com/orkestrel/ollama | re-pin only |
-| `@orkestrel/study` | https://github.com/orkestrel/study | re-pin only |
+| `@orkestrel/agent` | https://github.com/orkestrel/agent | every unit |
+| `@orkestrel/toolbox` | https://github.com/orkestrel/toolbox | re-pin only (F6); its memo and skill tools wait for D20 |
+| `@orkestrel/ollama` | https://github.com/orkestrel/ollama | re-pin plus two test files: `tests/service/authority.test.ts` (`allowed` to `verdict`, F7) and `tests/src/core/integration.test.ts` (workspace text in the context message) |
+| `@orkestrel/study` | https://github.com/orkestrel/study | re-pin only; its two-parameter `deny` listener typechecks against the widened tuple |
 
 Re-pins follow the release order of `tenets.md` § Release.
 
@@ -31,23 +32,28 @@ Re-pins follow the release order of `tenets.md` § Release.
 | Reconciliation: one read-only consultation the user named | done 2026-10-31 | this plan; `ledger.md` |
 | Orchestrator rulings O1 to O8 and verified facts F1 to F3 | done 2026-10-31 | § Rulings |
 | Records: this folder's first commit, in the window the fleet wave named on 2026-10-31 | done 2026-10-31 | O8 |
-| Dependency: every unit designs against the names Agent 0.0.34 publishes; the fleet wave pushes Agent's `main` after the registry serves 0.0.34 | blocks S1 | O8 |
-| User decision Q1 (the noun) | blocks rc-u7 only if the user overrules O4 | § Open decisions |
-| User decision Q4 (GPU allowance) | blocks rc-a9 and every later GPU unit | O5 |
+| Dependency: every unit designs against the names Agent 0.0.34 publishes; the fleet wave pushes Agent's `main` after the registry serves 0.0.34 | done 2026-10-31: the registry serves 0.0.34, `main` pushed through `fe5a1703`; the release commits change no `src/`, `tests/src/`, `tests/setup.ts`, `studies/`, or `guides/agent.md` line, so every citation as of `2da6d0b6` holds | O8 |
+| User decisions Q1 to Q5 | ruled 2026-10-31 | § Decisions |
 | First-wave briefs: rc-p1, rc-u1, rc-u2, and rc-a8 written and conformance-checked; each acceptance command awaits its baseline run on the destination tree | done 2026-10-31 | `ledger.md` |
-| Next | After Agent 0.0.34 is served and pushed, run each first-wave acceptance command on the destination tree for its baseline, then launch rc-p1, then rc-u1, rc-u2, and rc-a8 in parallel with one runner lane | O5 |
+| Next-wave briefs: rc-u5 and rc-u7 written and conformance-checked; each cited line is re-read after the units ahead of it in § Parallelism land, and each acceptance command awaits its baseline run | done 2026-10-31 | `ledger.md` |
+| Security round: a trust-surface map, three research lanes, two blind design proposals, and one read-only consultation the user named | done 2026-10-31 | `ledger.md`; `designs/authority.md` |
+| Layout round: a prompt-layout census, two research lanes, two blind design proposals, verification of claims C32 to C47, and one read-only consultation that merged the sequence | done 2026-10-31 | `ledger.md`; `designs/layout.md`; `research/evidence.md` |
+| Orchestrator rulings O11 to O17 and verified facts F4 to F9; O2 restated and O10 amended on the user's rulings of 2026-10-31 | done 2026-10-31 | § Rulings |
+| User decisions Q6 (the `consequential` floor) and the Node line (O18) | ruled 2026-10-31 | § Decisions; O18 |
+| Next | Run each first-wave acceptance command on Node 22 against `fe5a1703` for its baseline, then launch rc-p1, then rc-u1, rc-u2, and rc-a8 in parallel with one runner lane | O5, O18 |
 
-## Open decisions
+## Decisions
 
-Each decision is the user's. A recommendation names the default the plan runs on until the user rules.
+Each decision is the user's. The user ruled Q1 to Q6 on 2026-10-31.
 
-| Id | Decision | Recommendation |
+| Id | Decision | Ruling |
 | --- | --- | --- |
-| Q1 | The noun: `Memo` or another word (`Fact` collides with the `fact` category, `Note` with `LedgerNote`) | `Memo` (O4) |
-| Q2 | Whether the Study compaction arm with the authority repeat rule becomes the compaction baseline | yes: every experiment's off arm runs on 0.0.34, and the 0.0.30 c1 arm is not comparable |
-| Q3 | Whether the memo and skill managers ship in Agent 0.0.35 with the `studies/context` mechanism study as their only consumer, the toolbox tools following | yes |
-| Q4 | The GPU allowance in model minutes for rc-a9 and rc-a10, and whether the recording extends to goal 77 (needed only by rc-a7 and rc-a11) | none; the campaign stops before rc-a9 (O5) |
-| Q5 | Whether a hosted-provider consumer is planned | none; a hosted consumer raises rc-a6 from marginal to material (`designs/records.md` § Render path) |
+| Q1 | The noun: `Memo` or another word (`Fact` collides with the `fact` category, `Note` with `LedgerNote`) | `Memo` |
+| Q2 | Whether the Study compaction arm with the authority repeat rule becomes the compaction baseline | yes; every experiment's off arm runs on 0.0.34, and the 0.0.30 c1 arm is not comparable |
+| Q3 | Whether the memo and skill managers ship in Agent 0.0.35 with the `studies/context` mechanism study as their only consumer, the toolbox tools following | yes; the toolbox tools wait for D20. Authority `ask` ships in 0.0.35 as rc-a14 under the user's ruling of 2026-10-31 (O2) |
+| Q4 | The GPU allowance in model minutes, and whether the recording extends to goal 77 | left to the Orchestrator: 600 model minutes split per step, and the recording extends to goal 77 (O9, O17, `designs/measurement.md` § GPU allowance) |
+| Q5 | Whether a hosted-provider consumer is planned | no; Agent is built for the smallest local models, which expose a design flaw where a larger model works around it (O10, `designs/measurement.md` § Models) |
+| Q6 | Whether Agent 0.0.35 may stop a `consequential` tool from running in an application with no approver | yes ("approved on `consequential`"): no fleet tool sets the annotation (F6), and Agent ships no compatibility shim (`@orkestrel/scaffold` `AGENTS.md`, no compatibility shims; `designs/authority.md` § Default authority and the consequential floor) |
 
 ## Rulings
 
@@ -56,17 +62,33 @@ Each decision is the user's. A recommendation names the default the plan runs on
 - F1. The Ollama judge sends one request per question: the `OllamaJudge` remarks in `@orkestrel/ollama` 0.0.27 read "Each question uses a separate non-streaming generate request." Grouping a message's asks saves zero wire calls, so the grouped-asks experiment (the subjective proposal's E3) is refused.
 - F2. The owner-record trim drops the most recent lines first: `Ledger#plan` builds owner-record steps from `record.lines` in conversation order, and each `Ledger#trim` step replaces the keyed record's lines with `record.lines.slice(0, -1)` (`src/core/ledgers/Ledger.ts`, as of `1e82d145`). The rules record survives only because `selectRecords` moves on-topic rules lines ahead of off-topic ones. rc-u5 is a fix, test first.
 - F3. `Message.id` never reaches the Ollama wire: `mapMessages` in `@orkestrel/ollama` 0.0.27 sends `role`, `content`, `tool_calls`, and `images` only. The system-message id that `AgentContext#build` mints on every call leaves Ollama prefix reuse intact. Probe rc-p1 (c) is dropped, and D17 closes.
+- F4. `@orkestrel/tool` declares `ToolAnnotations { pure?, untrusted?, consequential? }`: `untrusted` "Reports that the tool's value can carry content the tool did not author"; `consequential` "Reports that running the tool has a consequence a caller must confirm" (`ToolAnnotations` in `@orkestrel/tool`, https://github.com/orkestrel/tool).
+- F5. `@orkestrel/mcp` maps `consequential` to MCP `destructiveHint` and to WebMCP `consequentialHint` (`toolAnnotationsToMCP` in `src/core/helpers.ts` and the browser mapping in `src/browser/helpers.ts`, https://github.com/orkestrel/mcp).
+- F6. No `@orkestrel/toolbox` source sets `untrusted` or `consequential` (https://github.com/orkestrel/toolbox).
+- F7. `@orkestrel/ollama`'s `tests/service/authority.test.ts` builds decisions with `allowed`, so its re-pin migrates that file (https://github.com/orkestrel/ollama).
+- F8. `ToolManager#execute` in `@orkestrel/tool` starts a batch with `Promise.all`, so rc-a14 rebuilds the allowed map in call order.
+- F9. `raceSignal` exists (`src/core/conversations/helpers.ts`, as of `2da6d0b6`): it removes its abort listener on settle and absorbs a late rejection, so the ask pass uses it and adds no abort helper. `@orkestrel/scaffold` `.claude/rules/patterns.md` § Event maps forbids a generic status event, so decisions publish as `allow`, `ask`, and `deny`.
 
 ### Orchestrator rulings
 
 - O1. Adopt the consultation's decision, reconciliation, records, compaction, memos and skills, context and machinery, measurement, sequence, and deferrals, with F1 to F3 applied. The `designs/` files hold that substance.
-- O2. Authority `ask` ships in the same wave as the toolbox `remember` tool, never before it (D6).
+- O2 (restated 2026-10-31). `remember` never ships without `ask`, and `ask` ships first, in Agent 0.0.35 as rc-a14; D6 closes. The user ruled on 2026-10-31: "we still need to address Authority and ask ... security really has become an issue with models and I want to make sure we have that integrated and ready to work as soon as possible and working well."
 - O3. When the objective bench returns, route the `astra` units to it from the next dispatch on. Until then the `astra` units run on the subjective lane's engine, and each carrying commit records the substitution.
-- O4. The noun defaults to `Memo`. The user can rule otherwise before rc-u7 starts.
-- O5. Stop line: after Agent 0.0.34 is served and pushed, the campaign runs every CPU-only unit (S1 through S5, plus rc-a3 and rc-a8) without further user input. It stops and reports before rc-a9, because the GPU allowance in model minutes is the user's decision (Q4).
+- O4. The noun is `Memo` (Q1).
+- O5. Stop line: after Agent 0.0.34 is served and pushed, the campaign runs every unit from S1 through S8 without further user input, each GPU step inside its cap (O9). It stops and reports before publishing Agent 0.0.35, because the user owns every publication and every push (`tenets.md` § Release). It also stops and reports when the GPU allowance is spent.
 - O6. Estimate: no measurement of these units exists. The closest is the prior campaign's R2 CPU proof, which ran 327 of 335 implementation minutes for one medium unit (`152ac3c3:.orkestrel/agent/r2-u41-ruling.md`). Each unit brief states its own estimate and stop cost.
 - O7. The closed fleet records `.orkestrel/plan.md`, `.orkestrel/ledger.md`, `.orkestrel/release.md`, and `.orkestrel/scaffold/release-audit-verdict.md` record closed campaigns (fleet 2026-10-17, Mechanisms, Recording, the 2026-10-24 release, the boost campaign), and the fleet wave confirmed on 2026-10-30 that it reads none of them. The records commit deletes them per `.claude/rules/campaign.md` § Hand off and close; git history keeps them.
 - O8. These records are committed by explicit pathspecs in the window the fleet wave named on 2026-10-31, leaving the wave's uncommitted tarball pins in `package.json` and `package-lock.json` out of the commit. Nothing in this campaign pushes Agent's `main` before the fleet wave pushes it after Agent 0.0.34 is served.
+- O9. GPU allowance (Q4): 600 model minutes, the summed `total_duration` of every agent and judge call, split into the per-step caps of `designs/measurement.md` § GPU allowance. A cap stop is a budget stop, never a quality verdict (`tenets.md` § Scope). The recording extends to goal 49 on both arms and to goal 77 on the records arm.
+- O10 (amended 2026-10-31). Subject model (Q5): every GPU gate reads on Qwen 3.5 2B, the smallest model with prior readings; the records judge stays Mica v0.1 4B; an experiment that promotes passes one non-inferiority pair on Qwen 3.5 4B (`designs/measurement.md` § Models). The user confirmed the 2B subject on 2026-10-31: "Sounds good, we can start with the 2b model."
+- O11. The `system` message carries host-authored text only: nothing a user wrote, a tool returned, a judge or summarizer produced, or a model wrote, a model-written memo included. Agent's inlets to it are the system text, instructions with loaded skill bodies, the skill index, and host-registered tool definitions; the tools block renders inside the `system` turn (`designs/layout.md` § Boundary). The user ruled on 2026-10-31: "we need to be careful and make sure that nothing gets into it from the user like we found that it has, and also after it we need to make sure that we have the proper order of text that goes to the agent from the context and in ways that the agent can digest it effectively."
+- O12. The layout move, rc-u10, is a fix with no switch. Its cost is read one time, by rc-a10 for rc-u10 against a Study transport rewrite that rebuilds the 0.0.34 placement; that arm is study-only and deleted after the screen, and no screen returns records to `system` in what Agent ships.
+- O13. The Study pins the effective sampling values on every role; a value change is D38 (`designs/layout.md` § Sampling).
+- O14. Adopt the security consultation, with F4 to F9 and C32 to C41 applied; `designs/authority.md` holds that substance. Its ruling that lookup readings stay in the `system` message and its form of D25 are superseded by O11 and O15.
+- O15. Adopt the layout consultation, with C42 to C47 applied; `designs/layout.md` holds that substance, and § Sequence holds its merged unit table.
+- O16. `AuthorityInterface.ask` is optional, and the `Authority` class always implements it. A later move to a required `ask` is breaking; the reverse is not.
+- O17. The GPU allowance stays 600 model minutes, split again per `designs/measurement.md` § GPU allowance: rc-a6's 90 minutes fund rc-a16 (15), rc-a10 for rc-u10 (45), and its contingency (30); rc-a15 takes 10 from the larger-model checks, which keep 100.
+- O18. Node line (the user, 2026-10-31: "Let's have everything run on the latest 22 version going forward unless the package requires 24."): every check, gate, probe, and study run of this campaign runs on the latest Node 22 release, and on the latest Node 24 release only for a package whose manifest requires 24. The declared support floor stays `engines` `>=22.18.0`.
 
 ## Deferred
 
@@ -77,9 +99,8 @@ Each item reopens on its trigger and on nothing else.
 | D1 | Cache-safe summarizer prefix | the summary prompt share reaches 5% of the run prompt with 0 cached on rc-a9, or a hosted consumer appears | `designs/compaction.md` |
 | D2 | Masking old tool results | a census shows tool messages over 30% of folded estimate tokens | `designs/compaction.md` |
 | D3 | Verbatim rule pins across folds | rule retention falls under 0.8 after three folds on the rc-a8 rule-retention instrument, which joins rc-a8 when rc-e1 promotes | `designs/compaction.md` |
-| D4 | Loaded skill bodies in the late `system` slot | rc-a6 promotes and a `studies/context` reading shows at least one skill load per 10 turns | `designs/context.md` |
-| D5 | Core repeat stop (`distinct`) | the authority rule with a static reason fails to stop repeats in the Study arm | `designs/compaction.md` |
-| D6 | Authority `ask` | ships in rc-a14 with rc-t1's `remember` tool, never before (O2) | `designs/context.md` |
+| D4 | Loaded skill bodies outside the head, never in a late `system` message | a `studies/context` reading shows at least one skill load per 10 turns | `designs/context.md` |
+| D5 | Core repeat stop as a denial bound (`AgentOptions.denials`): at the cap the next turn advertises no tools and the run ends in an answer | the authority rule with a static reason fails to stop repeats in the Study arm | `designs/authority.md` § Deferred |
 | D7 | Path-activated instructions | a consumer whose rules depend on active-workspace paths | `designs/context.md` |
 | D8 | Workspace index mode | a reading shows workspace text over half the head | `designs/context.md` |
 | D9 | `SKILL.md` parsing | `@orkestrel/markdown` gains a frontmatter parse and a consumer loads skills from files | `designs/context.md` |
@@ -91,26 +112,45 @@ Each item reopens on its trigger and on nothing else.
 | D15 | Recall listing assistant replies | rc-a7 carriage reads under 0.8 for products older than the window | `designs/records.md` |
 | D16 | Fork timelines as a public helper | a subagent consumer needs fork at the parent's frontier | `designs/records.md` |
 | D17 | Stable built system-message id | closed by F3; reopens only for a provider that serializes `Message.id` | `designs/records.md` |
-| D18 | Briefing headings (`## Pinned` to `## Records`) | bundled with the next experiment that changes briefing bytes, never alone | `designs/records.md` |
-| D19 | Endurance effect of the 0.0.32 ledger fixes | folds into each experiment's own off arm on 0.0.34 | `designs/measurement.md` |
+| D19 | Endurance effect of the 0.0.32 ledger fixes | each experiment's off arm on 0.0.34 reads it; reopens on its own only when no experiment runs an off arm | `designs/measurement.md` § Screens |
+| D20 | Toolbox memo and skill tools (rc-t1), their descriptions carrying host text only | the user opens the toolbox wave (Q3) | `designs/context.md` § Tools |
+| D21 | Durable approval: pause, persist, and resume on a decision | an application's approver latency outlives the process or the run `timeout` | `designs/authority.md` § Deferred |
+| D22 | Control-string neutralization in tool and user content, in `@orkestrel/ollama` | rc-a15's marker probe shows a content marker parsed as a special token | `designs/authority.md` § Deferred |
+| D23 | `untrusted` on `AuthorityContext`, derived per built request | a fleet tool declares `untrusted` (rc-t1's `memo` at D20), or a host rule must branch on ingestion | `designs/authority.md` § Deferred |
+| D24 | The advertised `tool` on `AuthorityContext` | a registry-held authority's rule must read an annotation and cannot close over the job's tools | `designs/authority.md` § Deferred |
+| D25 | Untrusted ledger lookups: an `untrusted` lookup's reading is never lifted into the records block, and its tail message keeps its body in the `tool` role | a ledger consumer annotates a lookup `untrusted` | `designs/authority.md` § Deferred |
+| D26 | `authority` on `LedgerAgentOptions` | a ledger consumer registers a `consequential` lookup that must be approved | `designs/authority.md` § Deferred |
+| D27 | Approver text to the model | an application's approver must send its own words | `designs/authority.md` § Deferred |
+| D28 | Run or agent identity in `AuthorityContext` | concurrent runs on one agent, or a shared registry authority, need per-run routing | `designs/authority.md` § Deferred |
+| D29 | Approval with edited arguments, evaluated again before dispatch | an application approves a call with changed arguments | `designs/authority.md` § Deferred |
+| D30 | An ask deadline apart from the run `timeout` | a consumer needs one | `designs/authority.md` § Deferred |
+| D31 | Data labels, delimiters, and spotlighting | a 2B to 4B reading shows lower injection success without utility loss | `designs/authority.md` § Deferred |
+| D32 | Memos and workspace in the request turn | a `studies/context` reading shows memo writes or file edits changing the context message on most requests | `designs/layout.md` § Deferred |
+| D33 | Refusing a `system` message in a selection or the conversation tail | a host or job seed stores one, a host targets a template that refuses a `system` turn that is not first, or the search of the user's applications before the 0.0.35 notes finds a `role: 'system'` add | `designs/layout.md` § Deferred |
+| D34 | Records as a separate `user` message before the request | rc-a16's R arm or the screen's `separate` arm passes where the merged turn failed, or rc-a9's render probe M3 reads a delta at or under 0 | `designs/layout.md` § Deferred |
+| D35 | The call head on owner-record lines from a lookup | rc-a16 or the screen shows the 2B attributing a lookup fact to a person | `designs/layout.md` § Deferred |
+| D36 | Digest and cue as one `user` message | an answer-pass reading shows the 2B answering the digest instead of the request | `designs/layout.md` § Deferred |
+| D37 | The compaction recap in the `user` role | the D3 instrument shows rules lost through recaps while instruction rules hold | `designs/compaction.md` § Recap role |
+| D38 | A sampling change for literal copying | rc-a9's M2 probe shows the penalty acts at `temperature` 0 and carriage reads under 0.8 | `designs/layout.md` § Sampling |
+
+Closed and retired: D6 (Authority `ask`) closed into rc-a14, Agent 0.0.35 (O2, `designs/authority.md`); D18 (briefing headings, `## Pinned` to `## Records`) closed into rc-u10 (`designs/layout.md` § Literal strings).
 
 ## Sequence
 
-Every unit starts after Agent 0.0.34 is published and pushed and designs against its names. Size `S` is small, `M` is medium; `run` is a GPU run. Each medium unit gets one independent review. "Gate row" points at `designs/measurement.md` § Gates.
+Every unit starts after Agent 0.0.34 is published and pushed and designs against its names. Size `S` is small, `M` is medium; `run` is a GPU run. Each medium unit gets one independent review. "Gate row" points at `designs/measurement.md` § Gates. A unit that adds, renames, or removes a barrel export owns that symbol's `guides/agent.md` rows, because `test:guides` asserts that the guide documents every barrel export (`tests/guides.test.ts`); rc-d1 owns the guide's prose and the strategy-choice table.
 
 ### Phases
 
 | Phase | Step | Units |
 | --- | --- | --- |
 | S1 | probes | rc-p1 |
-| S2 | fixes | rc-u1, rc-u2, rc-u5 |
+| S2 | fixes and the trust boundary | rc-u1, rc-u2, rc-a8, rc-u5, rc-a14, rc-u10 |
 | S3 | durability | rc-u4, rc-a3, rc-a3b |
 | S4 | write cost | rc-u6 |
 | S5 | libraries and consumers | rc-u7, rc-u8, rc-u9, rc-s1 |
-| S6 | measurement | rc-a8, rc-a9 |
-| S7 | experiments and screens | rc-e1, rc-a6, rc-a7, rc-a11, rc-a5, rc-a10 |
+| S6 | measurement | rc-a15, rc-a9 |
+| S7 | experiments, the layout reading, and screens | rc-a16, rc-u11, rc-e1, rc-a7, rc-a11, rc-a5, rc-a10 |
 | S8 | document, then Agent 0.0.35 | rc-d1 |
-| S9 | toolbox wave, then Agent 0.0.36 | rc-t1, rc-a14 |
 
 ### Units
 
@@ -119,40 +159,58 @@ Every unit starts after Agent 0.0.34 is published and pushed and designs against
 | rc-p1 | S1 | throwaway probe | S | `builder` writes, `verifier` runs | throwaway probes in the probe directory of `.agents/orchestration.md` § tmp layout, never committed | 0.0.34 | (a) literal census over the public `studies/endurance/sources/runtime/evaluation.json` with a known-content control; (b) pair questions per correction at growing conversation lengths with an inert stub judge, control: a conversation with no correction counts 0. Probe (c) is dropped (F3). |
 | rc-u1 | S2 | fix | M | `builder` | `src/core/conversations/{types,helpers,errors,Conversation}.ts`, their tests, `tests/src/core/agents/Agent.test.ts`, one data export in `tests/setup.ts`, and the `guides/agent.md` rows naming `ConversationErrorCode`, `ConversationError`, and the conversation helpers | 0.0.34 | gate row rc-u1; mutation on the blank check |
 | rc-u2 | S2 | fix (vocabulary) | M | `builder` | `src/core/{types,helpers}.ts`, `src/core/ledgers/{types,helpers,Ledger,Classifier}.ts`, their tests, the `guides/agent.md` rows naming the two symbols | 0.0.34 | identical briefing bytes on a fixture; no `extractTokens` or `LedgerTokenSet` in `src`, `tests`, or `guides`; `test:guides` green |
-| rc-u5 | S2 | fix | S | `builder` | `src/core/ledgers/Ledger.ts` (`#plan` steps), `tests/src/core/ledgers/Ledger.test.ts` | rc-u2 | test first: the fixture fails on 0.0.34 (F2); then the oldest non-decisive owner lines drop first and decisive lines last |
-| rc-u4 | S3 | capability | M | `astra` | `src/core/ledgers/{types,Ledger,validators,errors}.ts`, their tests | rc-u2 | replay equivalence; `failures` control; `CONCURRENCY` during `respond`; unknown id refused; pending results flushed; no calibration when the snapshot carries a gauge |
+| rc-u5 | S2 | fix | S | `builder` | `src/core/ledgers/Ledger.ts` (`#plan` and `#trim` steps), `tests/src/core/ledgers/Ledger.test.ts`, the ledger trim fixtures in `tests/setup.ts` (`LEDGER_OWNER_RENDER_CASES`, `LEDGER_PRESERVATION_FIXTURE`, and one added trim-order fixture) | rc-u2; one writer on `tests/setup.ts` with rc-a14 | test first: the fixture fails on 0.0.34 (F2); then the oldest non-decisive owner lines drop first and decisive lines last |
+| rc-a14 | S2, after rc-u1 | capability (closes D6) and fix (`consequential` conformance); breaking for a host whose `consequential` tool had no approver (Q6) | M | `opus`, because the unit authors unescaped-input proofs (`.agents/orchestration.md` § Routing) | `src/core/agents/{types,constants,helpers,validators,Authority,Agent,index}.ts`; `tests/src/core/agents/{Authority,Agent,helpers,validators}.test.ts`; the `tests/setup.ts` regions `AGENT_EVENTS`, `createAuthorityContext`, and one approver recorder, with their `tests/setup.test.ts` rows; the event-map and `deny` cases in `tests/guides.test.ts`; the `guides/agent.md` rows and fences for every Authority symbol, `AuthorityNote`, `AUTHORITY_NOTES`, `isAuthorityDecision`, `denyCall`, and the event table; `studies/tools/{types,validators,parsers,StudyToolsSession}.ts`, `studies/tools/scenarios/*.json`, and `tests/studies/tools/*.test.ts` | rc-u1; one writer on `tests/setup.ts` with rc-u5 | gate row rc-a14, staged: Stage A (`ask`) then Stage B (floor) |
+| rc-u10 | S2, after rc-u2, rc-u5, and rc-a14 | fix (O11); breaking: `Selection.briefing` removed, workspace text leaves `system`, `## Pinned` renamed | M | `opus` | `src/core/contexts/{types,constants,AgentContext}.ts`; `src/core/ledgers/{types,helpers,Ledger}.ts`; `tests/src/core/contexts/AgentContext.test.ts`; `tests/src/core/ledgers/{Ledger,helpers,LedgerRequest}.test.ts`; the `briefing` and recorded-request cases in `tests/src/core/agents/Agent.test.ts` and `tests/guides.test.ts`; the `tests/setup.ts` regions `RECORDED_REQUEST`, the ledger render and trim fixtures, and every region naming `briefing` or `## Workspace`, with their `tests/setup.test.ts` rows; the `guides/agent.md` rows, fences, and prose for `Selection`, `AgentContextInterface.build`, `ScopeFilter.files`, `WORKSPACE_SECTION_HEADER`, `renderStub`, `renderLedgerAnnotation`, and `LedgerOptions`, and every passage that names `briefing` or places workspace text in the system message | rc-u2, rc-u5 (`Ledger.ts`); rc-u1, rc-a14 (`Agent.test.ts`, `tests/setup.ts`, `guides/agent.md`) | gate row rc-u10; the canary fails first on the unchanged tree (`designs/layout.md` § Canary) |
+| rc-u4 | S3 | capability | M | `astra` | `src/core/ledgers/{types,Ledger,validators,errors}.ts`, their tests | rc-u2, rc-u10 | replay equivalence on selection messages only; `failures` control; `CONCURRENCY` during `respond`; unknown id refused; pending results flushed; no calibration when the snapshot carries a gauge |
 | rc-a3 | S3 | measurement | S | `builder` writes, `verifier` runs | a throwaway bench in the probe directory, never committed | rc-u4 | thresholds stated before the run; host load reported |
 | rc-a3b | S3 | fix (conditional) | S | `builder` | `src/core/ledgers/Ledger.ts`, its tests | the rc-a3 gate | at least a 50% CPU cut at 1600 messages; replay stays byte-identical |
 | rc-u6 | S4 | capability (resource bound) | M | `builder` | `src/core/ledgers/{types,Classifier,Ledger}.ts`, `tests/src/core/ledgers/Classifier.test.ts` | rc-p1 (b), rc-u5 | pair questions at most `2 × limit`; identical classification when `limit` reaches the eligible count; `LedgerError('LIMIT')` on a bad value |
-| rc-u7 | S5 | capability | M | `opus` | `src/core/contexts/{types,constants,helpers,validators,factories,index}.ts`, `src/core/contexts/memos/MemoManager.ts`, `src/core/contexts/skills/SkillManager.ts`, their tests | rc-u2 (Q1 blocks only if the user overrules O4) | gate row rc-u7; `scaffold surface` confirms the `Memo` and `Skill` names are free |
-| rc-u8 | S5 | capability | M | `builder` | `src/core/contexts/stores/{MemoryMemoStore,DatabaseMemoStore}.ts`, the store factories, their tests | rc-u7 | one store contract test over both stores; mutation |
-| rc-u9 | S5 | capability and fix | M | `opus` | `src/core/contexts/AgentContext.ts`, `src/core/agents/{types,Agent}.ts`, `src/core/ledgers/{types,Ledger}.ts`, their tests | rc-u7, rc-u6 | head order; scope lists filter; empty managers render no header; head pricing with a reverted-pricing control |
-| rc-s1 | S5 | consumer | S per change | `builder` | `studies/memory/*`; a `studies/context/` mechanism study modeled on `studies/tools` | each unit that changes the public surface | `test:studies` green; the authority repeat rule lands here |
-| rc-a8 | S6 | measurement | M (studies only) | `builder`, `checker` | `studies/memory/{helpers,types,constants,validators}.ts`, `tests/studies/memory/{helpers,validators}.test.ts`, `tests/setupStudy.ts` | none | each instrument mapped to `@orkestrel/study` first; four instruments, each with a negative control that fails |
-| rc-a9 | S6 | GPU recording | run | Orchestrator | gitignored study output | rc-u4, rc-a8, rc-s1 checkpoint seeding, Q4 | the recording seals; snapshots validate; replay of goal k+1 from snapshot k matches live bytes on non-maintenance requests; the three single-request probes answered |
+| rc-u7 | S5 | capability | M | `opus` | `src/core/contexts/{types,constants,helpers,validators,factories,index}.ts`, `src/core/contexts/memos/MemoManager.ts`, `src/core/contexts/skills/SkillManager.ts`, their tests, the memo and skill event tables in `tests/setup.ts`, one flagship-fence case in `tests/guides.test.ts`, and the `guides/agent.md` rows, fence, and method tables for the added symbols | rc-u2, rc-u10 | gate row rc-u7; `scaffold surface` confirms the `Memo` and `Skill` names are free |
+| rc-u8 | S5 | capability | M | `builder` | `src/core/contexts/stores/{MemoryMemoStore,DatabaseMemoStore}.ts`, the memo store interface in `src/core/contexts/types.ts`, the store factories in `src/core/contexts/factories.ts`, their tests, and their `guides/agent.md` rows | rc-u7 | one store contract test over both stores; mutation |
+| rc-u9 | S5 | capability and fix | M | `opus` | `src/core/contexts/AgentContext.ts`, `src/core/contexts/scopes/Scope.ts` (the `skills` and `memos` allow-lists), `src/core/agents/{types,Agent}.ts`, `src/core/ledgers/{types,Ledger}.ts`, their tests, and their `guides/agent.md` rows | rc-u7, rc-u6, rc-u10, rc-a14 | head order: the skills index in `system`, the memos index then the workspace text in the context message; scope lists filter; empty managers render no header; pricing reads `context.build({ messages: [], judgments: [] })` plus the request copy, with a reverted-pricing control; the calibration pass sends the same head; the canary adds memo and skill sentinels |
+| rc-s1 | S5 | consumer | S per change | `builder` | `studies/memory/*` (`STUDY_MEMORY_SAMPLING` in `constants.ts`, `buildStudyMemoryRoles` in `helpers.ts`, `profiles/q2.json`, and the run-record fields), `tests/studies/memory/*`, and a `studies/context/` mechanism study modeled on `studies/tools` | rc-a14 and rc-u10 for its first change, the one rc-a9 and rc-a15 read (the `q2` profile, `STUDY_MEMORY_SAMPLING`, the repeat rule, and checkpoint seeding); after that, one change follows each later unit that changes the public surface, once that unit is accepted | `test:studies` green; the authority repeat rule lands here with `verdict: 'deny'` and a reason naming the next step; the roles test asserts every role sends every pinned sampling key, and a missing key fails (O13); a `q2` profile pins the subject model's digest (O10) |
+| rc-a8 | S2 | measurement | M (studies only) | `builder`, `checker` | `studies/memory/{helpers,types,constants,validators}.ts`, `tests/studies/memory/{helpers,validators}.test.ts`, `tests/setupStudy.ts` | none | each instrument mapped to `@orkestrel/study` first; four instruments, each with a negative control that fails |
+| rc-a15 | S6, in the rc-a9 probe window, first on the GPU | measurement of a fix (security); no switch in `src/` | run | `builder` writes a throwaway probe; the Orchestrator runs it | the probe in the probe directory, never committed; a gitignored run record | rc-a14 (notes frozen); rc-s1's first change (the `q2` digest) | gate row rc-a15; the marker probe decides D22 |
+| rc-a9 | S6 | GPU recording | run | Orchestrator; a `builder` writes the probes | gitignored study output | rc-u4, rc-a8, rc-s1's first change, rc-u10 | the probes answered inside their cap (co-residency, skill load, render M3, sampling M1 and M2); the run record holds its fields; the recording seals; snapshots validate; replay of goal k+1 from snapshot k matches live bytes on non-maintenance requests |
+| rc-a16 | S7, the first GPU step after the rc-a9 recording | measurement, single request | run | `builder` writes the probe; the Orchestrator runs it | the probe directory; a gitignored run record | the rc-a9 recording, rc-u10, rc-s1 | gate row rc-a16; the probe is deleted after its reading |
+| rc-u11 | S7, after rc-a16 and rc-u9, before rc-a7 | fix (vocabulary) | S | `builder` | `src/core/ledgers/{constants,helpers,Ledger}.ts`; `tests/src/core/ledgers/{helpers,Ledger}.test.ts`; `LEDGER_OWNER_RENDER_CASES` and `LEDGER_PRESERVATION_FIXTURE` in `tests/setup.ts`; the `guides/agent.md` rows for `LEDGER_NOTES`, `renderLedgerAnnotation`, `renderLedgerRecord`, and `renderLedgerPinned` | the rc-a16 reading; rc-u9 on `Ledger.ts` | gate row rc-u11; only the strings rc-a16 kept ship |
 | rc-e1 | S7 | experiment | M | `builder`; GPU by the Orchestrator | `src/core/conversations/{types,helpers,Conversation}.ts`, their tests, the study profile | rc-u1, rc-u2, rc-p1 (a) | gate row rc-e1 |
-| rc-a6 | S7 | experiment | M | `astra` | `src/core/ledgers/{types,Ledger}.ts`, their tests; on promotion `src/core/contexts/{types,AgentContext}.ts` | rc-u4, rc-a9 probes pass | gate row rc-a6 |
-| rc-a7 | S7 | experiment | M | `astra` | `src/core/ledgers/{types,Ledger}.ts` (`#selectTail`), their tests | rc-a6, rc-a9 extended to goal 49, Q4 | gate row rc-a7 |
+| rc-a7 | S7 | experiment | M | `astra` | `src/core/ledgers/{types,Ledger}.ts` (`#selectTail`), their tests | rc-u10, rc-u11, rc-a9 extended to goal 49 | gate row rc-a7 |
 | rc-a11 | S7 | experiment | M | `astra` | `src/core/ledgers/{Classifier,types}.ts`, their tests | rc-u6, rc-a9 extended to goal 77 | gate row rc-a11 |
 | rc-a5 | S7 | experiment (study-only) | S | `builder` | `studies/memory/` wiring only | rc-e1 reading, rc-a9 | gate row rc-a5 |
 | rc-a10 | S7 | GPU screens | run | Orchestrator | gitignored study output | rc-a9, the unit under test | arms off, repeat, sham, and on at strata 17, 49, and 77; no tools on the final step; judge exchanges replayed |
-| rc-d1 | S8 | documentation | M | `opus` | `guides/agent.md`, `guides/README.md`, TSDoc of touched `types.ts` files | every Agent unit from rc-p1 through rc-a10 accepted | `test:guides` green; the two guide drifts corrected; "the ledger is the records strategy" stated one time; a strategy-choice table |
-| rc-t1 | S9 | capability (consumer) | M (toolbox) | `opus` | `@orkestrel/toolbox` tool files, per its layout | Agent 0.0.35 | tools drive real managers; `skill` adds instruction `skill:<name>` and returns a bare acknowledgement; `skill_file` refuses an unknown path with the valid list |
-| rc-a14 | S9 | capability | M | `astra` | `src/core/agents/{types,Authority,Agent}.ts`, their tests, the `guides/agent.md` Authority rows, `studies/tools` | rc-t1 design, same wave (O2) | the four orderings of `designs/context.md` § Authority; `allowed` replaced; ships as Agent 0.0.36; Ollama, Toolbox, and Study re-pinned |
+| rc-a10 for rc-u10 | S7, after rc-u11 | GPU screen of a fix; study-only | run | `builder` writes a Study transport rewrite; the Orchestrator runs it | the `studies/memory/` transport rewrite and its test, deleted after the screen | rc-a9, rc-u10, rc-u11 | gate row rc-a10 for rc-u10; the `separate` contingency runs only on a failed gate |
+| rc-d1 | S8 | documentation | M | `opus` | `guides/agent.md`, `guides/README.md`, TSDoc of touched `types.ts` files | every Agent unit from rc-p1 through rc-a10 accepted | `test:guides` green; the two guide drifts corrected; "the ledger is the records strategy" stated one time; a strategy-choice table; the layout table of `designs/layout.md` § Final layout, the host inlets to `system`, the context message, the request turn, `Conversation.reference()` placed in a `user` message, and the stored-`system` note (D33); the Authority prose of `designs/authority.md` § Guide |
+
+### Retired ids
+
+| Id | Was | Retired | Reason |
+| --- | --- | --- | --- |
+| rc-a6 | experiment: the briefing as a trailing `system` message behind a switch | 2026-10-31 | O11 keeps records out of every `system` message; rc-u10 moves them into the request turn as a fix with no switch (O12, O15). Its gate row and GPU row are struck, and its 90 GPU minutes are split again (O17). |
 
 ### Stop line
 
-After Agent 0.0.34 is served and pushed, run S1 through S5 with rc-a3 and rc-a8 without further user input. Stop and report before rc-a9 (O5).
+After Agent 0.0.34 is served and pushed, run S1 through S8 without further user input, each GPU step inside its cap. Stop and report before publishing Agent 0.0.35, or when the GPU allowance is spent (O5, O9).
 
 ### Parallelism
 
 - Run rc-u1, rc-u2, and rc-a8 as parallel in-process lanes under the `orkestrel-parallel` skill: their files are disjoint, and one runner lane owns every check.
-- Serialize every unit that writes `src/core/ledgers/Ledger.ts`, in phase order: rc-u2, rc-u5, rc-u4, rc-a3b (when its gate passes), rc-u6, rc-u9, rc-a6, rc-a7.
-- Serialize rc-u7, rc-u8, and rc-u9.
+- Run rc-a14 after rc-u1 is accepted, beside rc-u2 and rc-a8, with one runner lane.
+- Serialize the writers of each shared file in this order:
+  - `tests/setup.ts`: rc-u1, then rc-a14 and rc-u5 one writer at a time by readiness, then rc-u10, rc-u7, and rc-u11.
+  - `src/core/ledgers/Ledger.ts`: rc-u2, rc-u5, rc-u10, rc-u4, rc-a3b (when its gate passes), rc-u6, rc-u9, rc-u11, rc-a7.
+  - `src/core/contexts/*`: rc-u10, rc-u7, rc-u8, rc-u9.
+  - `src/core/agents/*`: rc-a14, then rc-u9; rc-u10 writes only `tests/src/core/agents/Agent.test.ts` there, after rc-a14.
+  - `src/core/conversations/*`: rc-u1, then rc-e1.
+  - `studies/memory/*`: rc-a8, then rc-s1, then the rc-a10 transport rewrite for rc-u10 and rc-a5, one writer at a time.
+  - `guides/agent.md`: each unit writes the rows of its own symbols in the order of these chains; rc-d1 owns the prose.
 - Run GPU work only as the Orchestrator, never beside a builder's checks, with one compaction experiment on the GPU at a time.
 
 ### Release
 
 - Strip or promote every experiment switch before 0.0.35; no switch ships while its verdict is open.
 - Publish Agent 0.0.35 after rc-d1, then re-pin and publish in the order of `tenets.md` § Release.
-- Then the toolbox wave: rc-a14 with its guide rows publishes as Agent 0.0.36, then `@orkestrel/ollama` and `@orkestrel/toolbox` (with rc-t1's tools) re-pin and publish, then `@orkestrel/study`, then Agent's devDependencies.
+- Migrate the consumers in one release unit of size S: a `builder` writes it, and the Orchestrator runs the live cases on the dedicated daemon (`tenets.md` § Host). Ollama takes the pin, `tests/service/authority.test.ts` (F7), and `tests/src/core/integration.test.ts` (the context message instead of `system`); Toolbox and Study take the pin only. Acceptance: each package's typecheck, and Ollama's live authority and integration cases.
+- Name the breaking changes in the 0.0.35 release notes: `Selection.briefing` removed; workspace text leaves `system`; `## Pinned` renamed `## Records`; `allowed` replaced by `verdict`; the `consequential` floor; the `deny` tuple widened.
+- The toolbox wave carries rc-t1 only and waits for D20.

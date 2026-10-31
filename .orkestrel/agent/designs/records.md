@@ -1,6 +1,6 @@
 # Records design
 
-The ledger is the records strategy. This design covers its source of truth, its durability, its write cost, its render path, and its two fixes. Source locations name a symbol and its file as of `1e82d145`. Measurements point at `research/evidence.md`; gates point at `designs/measurement.md` § Gates; deferrals point at `plan.md` § Deferred.
+The ledger is the records strategy. This design covers its source of truth, its durability, its write cost, its render path, and its two fixes. Source locations name a symbol and its file as of `1e82d145` unless a line names `2da6d0b6`. Measurements point at `research/evidence.md`; gates point at `designs/measurement.md` § Gates; deferrals point at `plan.md` § Deferred.
 
 ## Source of truth
 
@@ -115,7 +115,7 @@ Refused (F1): the Ollama judge sends one request per question, so grouping a mes
 
 - `Classifier` calls `assign` for every message. For each tool message, `Ledger#assign` calls `Ledger#readLookups`, which walks every tool group and runs the application's `read` handler on each lookup result again.
 - The `entities` callback rebuilds the registry from `Ledger#readLookups` on every call, and the pair loop calls it per earlier non-quiet message per correction. The loop walks every correction on every `respond`, even when every answer is cached.
-- Per request that is O(c·n·(n + t)) for t tool messages. `Ledger#plan` then renders the briefing again per trim step, O(L·B) for L lines and briefing size B.
+- Per request that is O(c·n·(n + t)) for t tool messages. `Ledger#plan` then renders the records block again per trim step, O(L·B) for L lines and block size B.
 - `rc-a3` benches `select` CPU against conversation length before anything changes. `rc-a3b` memoizes `Ledger#readLookups`, the registry, and the projection, keyed by message count plus failure count, only when the rc-a3 gate passes (D12).
 - Refused: memoizing the instruction sort, a micro-optimization with no measurement.
 
@@ -123,36 +123,39 @@ Refused (F1): the Ollama judge sends one request per question, so grouping a mes
 
 ### Layout
 
-The built system message holds, in order, the system text, the instructions, the workspace text, and the briefing as its last part (`AgentContext#build` in `src/core/contexts/AgentContext.ts`). The tail follows: the seed exchanges before the first request, then the current request (`Ledger#selectTail` in `src/core/ledgers/Ledger.ts`). The briefing changes on every request, so the reusable prefix across requests ends at the system text.
+As of `2da6d0b6`, the built system message holds, in order, the system text, the instructions, the workspace text, and the rendered records (the briefing) as its last part (`AgentContext#build` in `src/core/contexts/AgentContext.ts`). The tail follows: the seed exchanges before the first request, then the current request (`Ledger#selectTail` in `src/core/ledgers/Ledger.ts`). The records change on every request, so the reusable prefix across requests ends at the system text, and a lookup reading and a user's rule sentence reach the `system` message.
 
-The target layout, ordered from stable to volatile:
+`rc-u10` moves the records out of the `system` message into a built copy of the request turn (O11, O12; `designs/layout.md`). The target layout, ordered from stable to volatile:
 
 ```text
-tools | system text, instructions, skills index, memos index, workspace text   (changes only on edit)
-      | recent exchanges: requests, final replies, stubbed tool turns          (append-only; drained in batches)
-      | briefing                                                               (per request)
-      | request
-      | this run's turns                                                       (append-only within a run)
+tools, system | system text, instructions with loaded skill bodies, skills index   (changes only on edit)
+user context  | memos index, workspace text                                         (changes on a memo write or a file edit)
+tail          | recent exchanges: requests, final replies, stubbed tool turns       (append-only; drained in batches)
+request       | ## Records, ## Rules, then ## Request and the user's words          (per request)
+run           | this run's turns                                                    (append-only within a run)
 ```
 
-### Briefing placement
+### Records in the request turn
 
-`rc-a6` moves the briefing out of the head into `Selection.messages` as a trailing `system` message. `Selection` is free-form and the roles include `system`, so the ledger can do this without a context change.
+`rc-u10` is a fix with no switch (O12). `Ledger#plan` returns the selection messages with the request copy `${records}\n\n## Request\n${content}` as the last element, and the answer pass reuses that copy (`designs/layout.md` § Request turn).
 
-- Arithmetic on the Study profile (`research/evidence.md` § Prior-campaign readings, Study pair): the plan budget is ((20480 − 512) − 8192) × 1 − 926 ≈ 10850, divided by 1.06 ≈ 10236 tokens, and the tail cap is 0.35 × 10236 ≈ 3583 tokens. Moving the briefing saves at most the seed tail per request, up to about 35% of first-turn prefill.
-- At an unmeasured local prefill rate of 2000 tokens per second, that is about 3% of the Study pair's records wall. On a hosted API with a tenfold cached-read discount it is material (C28; Q5).
-- Every local saving assumes the agent model's cache slot survives the judge calls between requests. rc-a9 opens with a co-residency probe and a late-`system` template probe before rc-a6 builds.
-- Template fallback: when the chat template refuses a late `system` message, prefix the briefing to the final user turn as built, leaving the stored request unchanged and accepting user-level authority for the briefing text (C25).
-- On promotion, delete `Selection.briefing` and its consumers in the same change, with no shim. On failure, delete the switch and its tests.
-- The briefing heading rename waits for this experiment (D18).
+- The stored request stays unchanged; `Ledger#renderTailStub` already sends a rewritten copy of a stored `tool` message, so a built copy follows existing practice.
+- `Selection.briefing` and its consumers are deleted in the same change, with no shim (`designs/layout.md` § Shapes).
+- `## Pinned` becomes `## Records`, and the shown stub names `## Records`, closing D18 (`designs/layout.md` § Literal strings).
+- The request turn needs no late `system` message, which Qwen 3.5's own chat template refuses (C42).
+- Arithmetic on the Study profile (`research/evidence.md` § Prior-campaign readings, Study pair): the plan budget is ((20480 − 512) − 8192) × 1 − 926 ≈ 10850, divided by 1.06 ≈ 10236 tokens, and the tail cap is 0.35 × 10236 ≈ 3583 tokens. Moving the records out of the head lengthens the reusable prefix by at most the seed tail per request, up to about 35% of first-turn prefill.
+- At an unmeasured local prefill rate of 2000 tokens per second, that is about 3% of the Study pair's records wall. Cached share is reported on the move's screen and never gates it.
+- Every local saving assumes the agent model's cache slot survives the judge calls between requests; rc-a9's co-residency probe reads it.
+- The ruling's cost is read one time, by rc-a16 and rc-a10 for rc-u10 (`designs/layout.md` § Layout readings).
+- rc-a6, the trailing-`system` experiment, is retired (`plan.md` § Sequence, Retired ids).
 
 ### Moving tail
 
-`rc-a7` replaces the frozen seed tail with the most recent completed request exchanges, after rc-a6.
+`rc-a7` replaces the frozen seed tail with the most recent completed request exchanges, after rc-u10 and rc-u11.
 
 - An exchange is a request and its final reply, never notes, calls, or tool messages. Before the first request completes, the seed serves.
 - The tail fills to the tail share; when the next exchange would pass that share, the tail drains to half. Draining in batches keeps the tail's leading bytes identical between drains, so a prefix cache survives between drains. A tail that slides by one exchange would invalidate the prefix on every request.
-- The cache claim depends on rc-a6: while the briefing precedes the tail, draining buys no prefix reuse.
+- The cache claim depends on rc-u10: while the records precede the tail inside the `system` message, draining buys no prefix reuse.
 - A default-off switch on `LedgerOptions` gates the tail while the experiment runs; rc-a7's brief names it, and either verdict deletes it.
 - The frozen-tail census motivates the change (`research/evidence.md` § Prior-campaign readings). The prior campaign's R1 moving tail could act but was stripped with no quality grade (`7ada8b77:.orkestrel/agent/plan.md` § Removed experiments).
 - Recall listing assistant replies is the fallback (D15).
@@ -165,7 +168,7 @@ tools | system text, instructions, skills index, memos index, workspace text   (
 
 ### Head pricing
 
-`Ledger#trim` prices `[options.system, briefing]` alone. After `LedgerAgentOptions` forwards instructions, skills, memos, and workspaces, the head grows by text the plan does not count. `rc-u9` prices the system message that `this.#agent.context.build({ messages: [], judgments: [], briefing })` returns, in the same unit as the widening, so no release misprices (`designs/context.md` § Ledger wiring). Until rc-u9 is accepted, nothing outside tests wires libraries into a ledger.
+As of `2da6d0b6`, `Ledger#trim` prices `[options.system, briefing]` alone. rc-u10 prices the tail plus the request copy that carries the records. After `LedgerAgentOptions` forwards instructions, skills, memos, and workspaces, the head grows by text the plan does not count. `rc-u9` prices the head that `this.#agent.context.build({ messages: [], judgments: [] })` returns plus the request copy, and the calibration pass sends the same head, in the same unit as the widening, so no release misprices (`designs/context.md` § Ledger wiring). Until rc-u9 is accepted, nothing outside tests wires libraries into a ledger.
 
 ## Persistence
 
