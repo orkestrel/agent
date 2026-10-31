@@ -4250,9 +4250,9 @@ export const LEDGER_PRESERVATION_FIXTURE = Object.freeze({
 		'For BW-20931 revoke Ada permission. Ben remains permitted to collect the package after the clerk checks the signed receipt and confirms the scheduled pickup time with the account holder.',
 	cases: Object.freeze([
 		{ capacity: 60, sentences: 0 },
-		{ capacity: 77, sentences: 1 },
-		{ capacity: 84, sentences: 2 },
-		{ capacity: 94, sentences: 3 },
+		{ capacity: 76, sentences: 1 },
+		{ capacity: 85, sentences: 2 },
+		{ capacity: 131, sentences: 3 },
 		{ capacity: 141, sentences: 4 },
 	]),
 })
@@ -4302,12 +4302,33 @@ export const LEDGER_OWNER_RENDER_CASES = Object.freeze([
 			'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
 	},
 	{
-		title: 'trims the merged owner record by one final line',
+		title: 'trims the merged owner record by its oldest line',
 		capacity: 80,
 		system:
-			'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.',
+			'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
 	},
 ])
+
+/** Supplies the owner-record trim order: a seed reading, three user texts in conversation order, and whether each cut keeps the newer fact beside the correction. */
+export const LEDGER_TRIM_ORDER_FIXTURE = Object.freeze({
+	seed: 'Account BW-20931: Brightwater Studio.',
+	older: 'Brightwater Studio ordered 12 lanterns.',
+	correction: 'Brightwater Studio moved the pickup to Monday.',
+	newer: 'Brightwater Studio paid in full.',
+	request: 'Check Brightwater Studio.',
+	cuts: Object.freeze([
+		{ title: 'keeps the correction and the newer fact', kept: true },
+		{ title: 'keeps the correction alone', kept: false },
+	]),
+})
+
+/** Supplies the ruled-line trim order: a seed reading, two corrections in one owner record in conversation order, and the request. */
+export const LEDGER_TRIM_RULED_FIXTURE = Object.freeze({
+	seed: 'Account BW-20931: Brightwater Studio.',
+	first: 'Brightwater Studio moved the pickup to Monday.',
+	second: 'Brightwater Studio moved the pickup to Tuesday.',
+	request: 'Check Brightwater Studio.',
+})
 
 /** Holds the cutoffs shared by fictional ledger scenarios. */
 export const LEDGER_DESK_THRESHOLDS: LedgerThreshold = Object.freeze({
@@ -4845,8 +4866,8 @@ export const LEDGER_BRIEFING_MARKERS = Object.freeze([
 	'Keep the loading dock at warehouse 42 clear.',
 	'The Northgate courier brings refund forms on 2026-10-12.',
 	'Refunds over $100 need a manager.',
-	'Refund due $148.50.',
 	'Order BW-5512 for account BW-20931: Brightwater Studio.',
+	'Refund due $148.50.',
 ])
 
 /**

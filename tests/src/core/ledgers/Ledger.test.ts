@@ -1,6 +1,7 @@
 import type { MessageInput, Selection, ThinkingReplay } from '@src/core'
 import {
 	LEDGER_NOTES,
+	LEDGER_SCALE_DRIFT,
 	Ledger,
 	createLedger,
 	createScope,
@@ -26,6 +27,8 @@ import {
 	LEDGER_OWNER_FIXTURE,
 	LEDGER_OWNER_RENDER_CASES,
 	LEDGER_PRESERVATION_FIXTURE,
+	LEDGER_TRIM_ORDER_FIXTURE,
+	LEDGER_TRIM_RULED_FIXTURE,
 	RecordedTransport,
 	RecordingJudge,
 	ScriptedReads,
@@ -91,27 +94,27 @@ describe('Ledger', () => {
 			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
 			await ledger.respond('Check Brightwater Studio.')
 			const text = requireValue(provider.calls[0]?.messages[0]?.content)
-			expect(text.includes('[Ledger source 1]')).toBe(sentences > 0)
+			expect(text.includes('[Ledger source 1]')).toBe(sentences > 2)
 			expect(text.includes(earlier.id)).toBe(false)
-			expect(text.includes('Account BW-20931: Brightwater Studio.')).toBe(sentences > 0)
-			expect(text.includes('Ben may collect BW-20931.')).toBe(sentences > 1)
-			expect(text.includes('For BW-20931 revoke Ada permission.')).toBe(sentences > 2)
+			expect(text.includes('Account BW-20931: Brightwater Studio.')).toBe(sentences === 4)
+			expect(text.includes('Ben may collect BW-20931.')).toBe(sentences > 2)
+			expect(text.includes('For BW-20931 revoke Ada permission.')).toBe(sentences > 1)
 			expect(text.includes('confirms the scheduled pickup time with the account holder.')).toBe(
-				sentences === 4,
+				sentences > 0,
 			)
-			expect(text.split('Sentence scope is unresolved.')).toHaveLength(sentences === 0 ? 1 : 2)
+			expect(text.split('Sentence scope is unresolved.')).toHaveLength(sentences > 2 ? 2 : 1)
 			expect(
 				text.includes(
 					'Accepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.',
 				),
-			).toBe(sentences === 4)
-			expect(text.includes('[Ledger source 2]')).toBe(sentences === 4)
+			).toBe(sentences > 2)
+			expect(text.includes('[Ledger source 2]')).toBe(sentences > 2)
 			expect(text.includes(later.id)).toBe(false)
 			expect(
 				text.includes(
 					'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
 				),
-			).toBe(sentences > 0 && sentences < 4)
+			).toBe(false)
 			expect(ledger.conversation.message(earlier.id)?.content).toBe(fixture.earlier)
 			expect(ledger.conversation.message(later.id)?.content).toBe(fixture.later)
 		},
@@ -2711,6 +2714,95 @@ describe('Ledger', () => {
 		expect(estimateMessages(call.messages)).toBeLessThanOrEqual(260 / 1.06)
 		expect(call.messages.filter((message) => message.role === 'tool')).toHaveLength(0)
 		expect(call.messages.filter((message) => message.calls !== undefined)).toHaveLength(0)
+	})
+
+	it.each(LEDGER_TRIM_ORDER_FIXTURE.cuts)(
+		'trims an owner record oldest first and $title',
+		async ({ kept: keepsNewer }) => {
+			const fixture = LEDGER_TRIM_ORDER_FIXTURE
+			const expected = `Serve the desk.\n\n## Pinned\n### Brightwater Studio (account BW-20931)\n${[fixture.correction, ...(keepsNewer ? [fixture.newer] : [])].map((line) => `- ${line}`).join('\n')}`
+			const capacity =
+				Math.ceil(
+					(estimateMessages([{ id: 'system', role: 'system', content: expected }]) +
+						estimateMessages([{ id: 'request', role: 'user', content: fixture.request }])) *
+						(1 + LEDGER_SCALE_DRIFT),
+				) + 1
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 } }),
+			)
+			ledger.conversation.add(buildLedgerExchange(fixture.seed))
+			const older = ledger.conversation.add({ role: 'user', content: fixture.older })
+			const correction = ledger.conversation.add({ role: 'user', content: fixture.correction })
+			const newer = ledger.conversation.add({ role: 'user', content: fixture.newer })
+			for (const message of [older, correction, newer])
+				ledger.conversation.judgments.add(
+					buildLedgerJudgment(message, {
+						answer: {
+							form: 'choice',
+							probabilities: {
+								fact: message === correction ? 0 : 1,
+								rule: 0,
+								correction: message === correction ? 1 : 0,
+								request: 0,
+								opinion: 0,
+								chatter: 0,
+								distractor: 0,
+							},
+						},
+					}),
+				)
+			await ledger.respond(fixture.request)
+			const text = requireValue(provider.calls[0]?.messages[0]?.content)
+			expect(text).toBe(expected)
+			expect(text).not.toContain(fixture.seed)
+			expect(text.includes(fixture.newer)).toBe(keepsNewer)
+		},
+	)
+
+	it('trims ruled lines inside one owner record oldest first', async () => {
+		const fixture = LEDGER_TRIM_RULED_FIXTURE
+		const expected = `Serve the desk.
+
+## Pinned
+### Brightwater Studio (account BW-20931)
+- ${fixture.second}`
+		const capacity =
+			Math.ceil(
+				(estimateMessages([{ id: 'system', role: 'system', content: expected }]) +
+					estimateMessages([{ id: 'request', role: 'user', content: fixture.request }])) *
+					(1 + LEDGER_SCALE_DRIFT),
+			) + 1
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 } }),
+		)
+		ledger.conversation.add(buildLedgerExchange(fixture.seed))
+		const first = ledger.conversation.add({ role: 'user', content: fixture.first })
+		const second = ledger.conversation.add({ role: 'user', content: fixture.second })
+		for (const message of [first, second])
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(message, {
+					answer: {
+						form: 'choice',
+						probabilities: {
+							fact: 0,
+							rule: 0,
+							correction: 1,
+							request: 0,
+							opinion: 0,
+							chatter: 0,
+							distractor: 0,
+						},
+					},
+				}),
+			)
+		await ledger.respond(fixture.request)
+		const text = requireValue(provider.calls[0]?.messages[0]?.content)
+		expect(text).toBe(expected)
+		expect(text).not.toContain(fixture.first)
 	})
 
 	it('uses the measured default turn limit and the default recall limit', async () => {

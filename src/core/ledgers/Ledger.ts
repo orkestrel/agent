@@ -611,6 +611,12 @@ export class Ledger implements LedgerInterface {
 		return (this.#gauge?.scale ?? 1) * estimateMessages(messages)
 	}
 
+	#ruled(source: string, role: Message['role']): boolean {
+		const category = this.#classifier.category(source)
+		const unsettled = role === 'user' && !this.#classifier.decisive(source)
+		return !unsettled && (category === 'rule' || category === 'correction')
+	}
+
 	#plan(request: Message): Pick<Selection, 'messages' | 'briefing'> {
 		const { input, projection } = this.#project()
 		const registry = collectRegistry(input.readings)
@@ -682,7 +688,7 @@ export class Ledger implements LedgerInterface {
 				...(input.entities.get(message.id) ?? []),
 				...this.#classifier.topics(message.id),
 			])
-			const ruled = !unsettled && (category === 'rule' || category === 'correction')
+			const ruled = this.#ruled(message.id, message.role)
 			const group = [...topics].some((topic) => near.has(topic))
 				? 1
 				: ruled
@@ -725,15 +731,22 @@ export class Ledger implements LedgerInterface {
 		const steps = [
 			...(rules?.lines
 				.filter((line) => !line.topics.some((topic) => near.has(topic)))
-				.map(() => ({ key: rules.key, source: undefined })) ?? []),
-			...cuts.map((unit) => ({ key: undefined, source: unit.source })),
+				.reverse()
+				.map((line) => ({ key: rules.key, source: undefined, line })) ?? []),
+			...cuts.map((unit) => ({ key: undefined, source: unit.source, line: undefined })),
 			...(rules?.lines
 				.filter((line) => line.topics.some((topic) => near.has(topic)))
-				.map(() => ({ key: rules.key, source: undefined })) ?? []),
+				.reverse()
+				.map((line) => ({ key: rules.key, source: undefined, line })) ?? []),
 			...records
 				.filter((record) => record.key !== LEDGER_RULES_KEY)
-				.flatMap((record) => record.lines.map(() => ({ key: record.key, source: undefined })))
-				.reverse(),
+				.reverse()
+				.flatMap((record) =>
+					[
+						...record.lines.filter((line) => !this.#ruled(line.source, line.role)),
+						...record.lines.filter((line) => this.#ruled(line.source, line.role)),
+					].map((line) => ({ key: record.key, source: undefined, line })),
+				),
 		]
 		const mapped = ordered.map((unit) => ({
 			source: unit.source,
@@ -769,11 +782,15 @@ export class Ledger implements LedgerInterface {
 		}
 	}
 
-	// Renders the briefing for each cut in step order (each step drops the last line of the record
-	// it keys or the source it names) and returns the first cut whose system message fits `cap`; the
-	// cut after every step is returned unchecked. No cut renders after the one returned.
+	// Renders the briefing for each cut in step order (each step drops the line it names from the
+	// record it keys, or the source it names) and returns the first cut whose system message fits
+	// `cap`; the cut after every step is returned unchecked. No cut renders after the one returned.
 	#trim(
-		steps: ReadonlyArray<{ readonly key: string | undefined; readonly source: string | undefined }>,
+		steps: ReadonlyArray<{
+			readonly key: string | undefined
+			readonly source: string | undefined
+			readonly line: LedgerLine | undefined
+		}>,
 		records: readonly LedgerRecord[],
 		mapped: ReadonlyArray<{ readonly source: string; readonly record: LedgerRecord }>,
 		included: ReadonlySet<string>,
@@ -798,7 +815,9 @@ export class Ledger implements LedgerInterface {
 				return {
 					briefing: undefined,
 					records: cut.records.map((record) =>
-						record.key === step.key ? { ...record, lines: record.lines.slice(0, -1) } : record,
+						record.key === step.key
+							? { ...record, lines: record.lines.filter((line) => line !== step.line) }
+							: record,
 					),
 					included: new Set([...cut.included].filter((source) => source !== step.source)),
 				}
