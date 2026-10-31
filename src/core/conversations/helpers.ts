@@ -207,6 +207,31 @@ export function requireKeep(keep: number): number {
 }
 
 /**
+ * Returns a summarizer digest after checking it carries non-whitespace text, or throws a coded error.
+ *
+ * @remarks
+ * A digest whose trimmed text is empty would commit a section that recaps nothing, so it is
+ * refused. Any digest with a non-whitespace character passes unchanged, surrounding whitespace
+ * included.
+ *
+ * @param summary - The summarizer digest to check
+ * @returns The digest unchanged
+ * @throws ConversationError Thrown when the trimmed digest is empty (code `'SUMMARY'`)
+ *
+ * @example
+ * ```ts
+ * requireSummary('recap') // 'recap'
+ * requireSummary('  \n') // throws ConversationError ('SUMMARY')
+ * ```
+ */
+export function requireSummary(summary: string): string {
+	if (summary.trim() === '') {
+		throw new ConversationError('SUMMARY', 'a summarizer digest must carry non-whitespace text')
+	}
+	return summary
+}
+
+/**
  * Settles with a promise, or rejects with the reason of a signal that aborts first, so a caller
  * is released at once even when the work behind the promise ignores the signal.
  *

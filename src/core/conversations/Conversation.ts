@@ -23,6 +23,7 @@ import {
 	requireKeep,
 	requireRolling,
 	requireSectionsCap,
+	requireSummary,
 } from './helpers.js'
 import { JudgmentManager } from './JudgmentManager.js'
 
@@ -53,7 +54,8 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   the section, or `undefined` when nothing folds. A {@link ConversationError} is thrown when no
  *   `#summarize` was supplied. Calls run one at a time, a fold commits only when its messages are
  *   still the live entries after the summarizer settles, and `options.signal` rejects the call
- *   with its reason at once and commits nothing after the abort.
+ *   with its reason at once and commits nothing after the abort. A digest whose trimmed text is
+ *   empty rejects with code `'SUMMARY'` and commits nothing.
  * - **Rolling.** With `rolling`, a fold makes one summarizer call over the framed recaps of all
  *   prior sections then the slice, and replaces those sections with one that retains their
  *   originals then the slice. It emits `compact` once and never `collapse`, commits nothing when
@@ -301,6 +303,7 @@ export class Conversation implements ConversationInterface {
 		const request = [...prior.map((one) => buildRecapMessage(one)), ...stripThinking(slice, 'none')]
 		const summary = await raceSignal(summarize(request, signal), signal)
 		signal?.throwIfAborted()
+		requireSummary(summary)
 		// A `remove` or `clear` while the summarizer ran changed what this fold covers, so commit
 		// nothing rather than fold messages the caller dropped back into a section.
 		if (!slice.every((message) => this.#messages.get(message.id) === message)) return undefined
@@ -332,6 +335,7 @@ export class Conversation implements ConversationInterface {
 				signal,
 			)
 			signal?.throwIfAborted()
+			requireSummary(digest)
 			// Only a fold changes `#sections`, and folds run one at a time, so the head holds here;
 			// the check keeps a merge from ever replacing sections it did not summarize.
 			if (!folded.every((one, index) => this.#sections[index] === one)) return undefined

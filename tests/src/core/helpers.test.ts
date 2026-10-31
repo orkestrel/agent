@@ -3,6 +3,7 @@ import type { ToolCall } from '@orkestrel/tool'
 import {
 	collectExchanges,
 	collectToolGroups,
+	extractLiterals,
 	filterAllowList,
 	hasCalls,
 	joinThinking,
@@ -458,5 +459,22 @@ describe('matchesJudgment', () => {
 				JUDGMENT_INPUT.model,
 			),
 		).toBe(false)
+	})
+})
+
+describe('extractLiterals', () => {
+	it('reads the uppercased ids that hold a digit', () => {
+		const literals = extractLiterals('Order bw-5512 and esc-2291, not well-known or MX-ABC.')
+		expect([...literals.ids]).toEqual(['BW-5512', 'ESC-2291'])
+	})
+
+	it('reads the numbers outside ids with grouping commas removed', () => {
+		const literals = extractLiterals('Refund 1,200.50 for BW-5512 after 3 days, not v2.')
+		expect([...literals.numbers]).toEqual([1200.5, 3])
+	})
+
+	it('reads nothing from an empty text', () => {
+		const literals = extractLiterals('')
+		expect(literals.ids.size + literals.numbers.size).toBe(0)
 	})
 })

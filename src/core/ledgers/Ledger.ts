@@ -32,6 +32,7 @@ import { createConversationManager } from '../conversations/factories.js'
 import {
 	collectExchanges,
 	collectToolGroups,
+	extractLiterals,
 	hasCalls,
 	stripThinking,
 	sumUsage,
@@ -62,7 +63,6 @@ import {
 	collectNames,
 	collectRegistry,
 	cutListing,
-	extractTokens,
 	linkOwners,
 	matchEntities,
 	rankLedgerCut,
@@ -475,7 +475,7 @@ export class Ledger implements LedgerInterface {
 												...result.ids,
 												...Object.values(call.arguments)
 													.filter(isString)
-													.flatMap((value) => [...extractTokens(value).ids]),
+													.flatMap((value) => [...extractLiterals(value).ids]),
 											]),
 										],
 									},
@@ -673,8 +673,8 @@ export class Ledger implements LedgerInterface {
 				(message.role !== 'tool' && tailIds.has(message.id))
 			)
 				return []
-			const tokens = extractTokens(message.content)
-			if (message.role === 'user' && tokens.ids.size + tokens.numbers.size + names.size === 0)
+			const literals = extractLiterals(message.content)
+			if (message.role === 'user' && literals.ids.size + literals.numbers.size + names.size === 0)
 				return []
 			const category = this.#classifier.category(message.id)
 			const unsettled = message.role === 'user' && !this.#classifier.decisive(message.id)
@@ -1073,7 +1073,7 @@ export class Ledger implements LedgerInterface {
 			const matched = new Set([
 				...[...registry.ids].filter(
 					(id) =>
-						extractTokens(part).ids.has(id) ||
+						extractLiterals(part).ids.has(id) ||
 						words.every((word) =>
 							`${id} ${(registry.owners.get(id) ?? []).join(' ')}`.toLowerCase().includes(word),
 						),

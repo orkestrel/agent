@@ -27,7 +27,6 @@ import {
 	findLedgerCall,
 	rankLedgerCut,
 	cutListing,
-	extractTokens,
 	fitSlope,
 	identifyLookup,
 	linkOwners,
@@ -278,23 +277,6 @@ describe('splitSentences', () => {
 
 	it('keeps a sentence whose next word is lowercase', () => {
 		expect(splitSentences('Call me at 5 p.m. tomorrow.')).toEqual(['Call me at 5 p.m. tomorrow.'])
-	})
-})
-
-describe('extractTokens', () => {
-	it('reads the uppercased ids that hold a digit', () => {
-		const tokens = extractTokens('Order bw-5512 and esc-2291, not well-known or MX-ABC.')
-		expect([...tokens.ids]).toEqual(['BW-5512', 'ESC-2291'])
-	})
-
-	it('reads the numbers outside ids with grouping commas removed', () => {
-		const tokens = extractTokens('Refund 1,200.50 for BW-5512 after 3 days, not v2.')
-		expect([...tokens.numbers]).toEqual([1200.5, 3])
-	})
-
-	it('reads nothing from an empty text', () => {
-		const tokens = extractTokens('')
-		expect(tokens.ids.size + tokens.numbers.size).toBe(0)
 	})
 })
 

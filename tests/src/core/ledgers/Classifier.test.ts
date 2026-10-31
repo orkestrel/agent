@@ -8,7 +8,8 @@ import {
 	DETERMINISTIC_JUDGE_ERROR,
 	LEDGER_QUESTIONS,
 } from '../../../../src/core/ledgers/constants.js'
-import { extractTokens, matchEntities } from '../../../../src/core/ledgers/helpers.js'
+import { extractLiterals } from '../../../../src/core/helpers.js'
+import { matchEntities } from '../../../../src/core/ledgers/helpers.js'
 import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildLedgerMessage,
@@ -86,7 +87,7 @@ describe('Classifier', () => {
 					conversation,
 					judge,
 					assign: (message) => (message.role === 'assistant' ? 'fact' : undefined),
-					entities: (text) => extractTokens(text).ids,
+					entities: (text) => extractLiterals(text).ids,
 				}),
 			)
 			const result = await classifier.classify(new Set(), new AbortController().signal)
@@ -208,7 +209,7 @@ describe('Classifier', () => {
 					{ name: 'warehouse', criterion: 'Warehouse work', requested: false },
 				],
 				assign: (message) => (message.role === 'tool' ? 'fact' : undefined),
-				entities: (text) => extractTokens(text).ids,
+				entities: (text) => extractLiterals(text).ids,
 			}),
 		)
 		const result = await classifier.classify(new Set(['m4']), new AbortController().signal)

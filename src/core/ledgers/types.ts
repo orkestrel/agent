@@ -457,18 +457,6 @@ export interface LedgerInterface {
 }
 
 /**
- * Carries the id-shaped tokens and the numbers of a text.
- *
- * @remarks
- * `ids` holds the uppercased hyphenated tokens that contain a digit. `numbers` holds the numbers
- * outside those ids, with grouping commas removed.
- */
-export interface LedgerTokenSet {
-	readonly ids: ReadonlySet<string>
-	readonly numbers: ReadonlySet<number>
-}
-
-/**
  * Carries the ledger's filing of its conversation's messages, keyed by message id.
  *
  * @remarks

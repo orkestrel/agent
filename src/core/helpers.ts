@@ -1,4 +1,4 @@
-import type { JudgeQuestion, Judgment, Message, ThinkingReplay } from './types.js'
+import type { JudgeQuestion, Judgment, LiteralSet, Message, ThinkingReplay } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { attempt, isFiniteNumber } from '@orkestrel/contract'
 
@@ -393,4 +393,33 @@ export function matchesJudgment(
 		judgment.sources.every((id, index) => id === sources[index]) &&
 		JSON.stringify(judgment.question) === JSON.stringify(question)
 	)
+}
+
+/**
+ * Reads the ids and the numbers of a text.
+ *
+ * @param text - The text to read
+ * @returns The uppercased hyphenated ids that hold a digit, and the numbers outside those ids with grouping commas removed
+ *
+ * @example
+ * ```ts
+ * const literals = extractLiterals('Order bw-5512 totals 1,200.50')
+ * // literals.ids is Set { 'BW-5512' }, literals.numbers is Set { 1200.5 }
+ * ```
+ */
+export function extractLiterals(text: string): LiteralSet {
+	const idShape = /\b[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+\b/g
+	const ids = new Set(
+		[...text.matchAll(idShape)].flatMap(([token]) =>
+			/\d/.test(token) ? [token.toUpperCase()] : [],
+		),
+	)
+	const rest = text.replace(idShape, (token) => (/\d/.test(token) ? ' ' : token))
+	const numbers = new Set(
+		[...rest.matchAll(/(?<![\w.])\d[\d,]*(?:\.\d+)?/g)].flatMap(([token]) => {
+			const value = Number(token.replace(/,/g, ''))
+			return Number.isFinite(value) ? [value] : []
+		}),
+	)
+	return { ids, numbers }
 }

@@ -215,3 +215,15 @@ export interface CodedErrorOptions {
 	readonly cause?: unknown
 	readonly context?: Readonly<Record<string, unknown>>
 }
+
+/**
+ * Holds the ids and numbers one text carries.
+ *
+ * @remarks
+ * `ids` holds the uppercased hyphenated runs that contain a digit. `numbers` holds the numbers
+ * outside those ids, with grouping commas removed.
+ */
+export interface LiteralSet {
+	readonly ids: ReadonlySet<string>
+	readonly numbers: ReadonlySet<number>
+}

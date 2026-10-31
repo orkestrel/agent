@@ -9,10 +9,12 @@ import {
 	requireKeep,
 	requireRolling,
 	requireSectionsCap,
+	requireSummary,
 } from '@src/core'
 import { waitForDelay } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
+	BLANK_DIGESTS,
 	CONVERSATION_SECTION,
 	INVALID_JUDGMENTS,
 	JUDGMENT_INPUT,
@@ -145,6 +147,18 @@ describe('requireKeep', () => {
 		expect(() => requireKeep(keep)).toThrow(
 			expect.objectContaining({ code: 'KEEP', context: { keep } }),
 		)
+	})
+})
+
+describe('requireSummary', () => {
+	it('returns a digest with non-whitespace text unchanged', () => {
+		expect(requireSummary('recap')).toBe('recap')
+		expect(requireSummary(' recap ')).toBe(' recap ')
+	})
+
+	it.each(BLANK_DIGESTS)('throws the SUMMARY code for the blank digest %j', (digest) => {
+		expect(() => requireSummary(digest)).toThrow(ConversationError)
+		expect(() => requireSummary(digest)).toThrow(expect.objectContaining({ code: 'SUMMARY' }))
 	})
 })
 

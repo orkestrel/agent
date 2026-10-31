@@ -5257,3 +5257,6 @@ export const LEDGER_FAILURE_MESSAGES: readonly [string, string, string] = Object
 	'Keep the loading dock at warehouse 42 clear.',
 	'The Northgate courier arrives on Tuesday.',
 ])
+
+/** Supplies summarizer digests whose trimmed text is empty, which a compaction refuses. */
+export const BLANK_DIGESTS = Object.freeze(['', ' ', '  \n', '\t\n '])

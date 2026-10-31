@@ -12,7 +12,7 @@ import type {
 import type { TokenUsage } from '@orkestrel/budget'
 import { errorToMessage, isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
 import { isJudgeAbortError } from '../errors.js'
-import { matchesJudgment, renderJSON, sumUsage } from '../helpers.js'
+import { extractLiterals, matchesJudgment, renderJSON, sumUsage } from '../helpers.js'
 import { isJudgeError } from '../providers/errors.js'
 import {
 	DECISIVE_CATEGORIES,
@@ -20,7 +20,7 @@ import {
 	LEDGER_CATEGORIES,
 	QUIET_CATEGORIES,
 } from './constants.js'
-import { extractTokens, renderCauseChain } from './helpers.js'
+import { renderCauseChain } from './helpers.js'
 
 /**
  * Files messages through the conversation's judgment manager and reads their categories and corrections.
@@ -166,8 +166,8 @@ export class Classifier implements ClassifierInterface {
 					this.#options.thresholds[head]
 			)
 				return []
-			const own = extractTokens(before.content)
-			const other = extractTokens(after.content)
+			const own = extractLiterals(before.content)
+			const other = extractLiterals(after.content)
 			return head === 'amends' &&
 				![...own.ids].some((id) => other.ids.has(id)) &&
 				![...own.numbers].some((number) => other.numbers.has(number))

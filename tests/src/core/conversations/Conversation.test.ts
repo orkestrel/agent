@@ -10,6 +10,7 @@ import {
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
+	BLANK_DIGESTS,
 	createRecapSummarizer,
 	createStubSummarizer,
 	createToolCall,
@@ -1158,6 +1159,107 @@ describe('Conversation — sections cap', () => {
 		conversation.add({ role: 'assistant', content: 'round-4' })
 		await conversation.compact()
 		expect(conversation.sections).toHaveLength(2)
+	})
+})
+
+describe('Conversation — a blank digest is refused (SUMMARY)', () => {
+	it('rejects a blank fold digest, keeping the live tail, the sections, and the events', async () => {
+		const conversation = new Conversation({
+			summarize: async () => '  \n',
+		})
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+
+		const error = await conversation.compact().then(
+			() => undefined,
+			(reason: unknown) => reason,
+		)
+
+		expect(isConversationError(error)).toBe(true)
+		expect(isConversationError(error) ? error.code : undefined).toBe('SUMMARY')
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['u1', 'a1', 'u2'])
+		expect(conversation.sections).toEqual([])
+		expect(events.compact.calls).toEqual([])
+		expect(events.collapse.calls).toEqual([])
+	})
+
+	it.each(BLANK_DIGESTS)('rejects the blank fold digest %j', async (digest) => {
+		const conversation = new Conversation({
+			summarize: async () => digest,
+		})
+		conversation.add({ role: 'assistant', content: 'a1' })
+
+		await expect(conversation.compact()).rejects.toThrow(
+			expect.objectContaining({ code: 'SUMMARY' }),
+		)
+		expect(conversation.sections).toEqual([])
+	})
+
+	it('rejects a blank rolling digest, keeping the prior section and its slice live', async () => {
+		const digests = new ScriptedReads<string>(['first recap', '  \n'], 'unused')
+		const conversation = new Conversation({
+			rolling: true,
+			summarize: async () => digests.read(),
+		})
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+		const first = requireValue(await conversation.compact())
+		conversation.add([
+			{ role: 'assistant', content: 'a2' },
+			{ role: 'user', content: 'u3' },
+		])
+
+		await expect(conversation.compact()).rejects.toThrow(
+			expect.objectContaining({ code: 'SUMMARY' }),
+		)
+
+		expect(conversation.sections).toEqual([first])
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['u2', 'a2', 'u3'])
+	})
+
+	it('keeps the appended section when a blank digest refuses the overflow merge', async () => {
+		const digests = new ScriptedReads<string>(['one', 'two', 'three', '  \n', 'merged'], 'merged')
+		const conversation = new Conversation({
+			summarize: async () => digests.read(),
+			sections: 2,
+		})
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
+
+		conversation.add({ role: 'assistant', content: 'round-1' })
+		const first = requireValue(await conversation.compact())
+		conversation.add({ role: 'assistant', content: 'round-2' })
+		const second = requireValue(await conversation.compact())
+
+		conversation.add({ role: 'assistant', content: 'round-3' })
+		await expect(conversation.compact()).rejects.toThrow(
+			expect.objectContaining({ code: 'SUMMARY' }),
+		)
+
+		expect(conversation.sections).toHaveLength(3)
+		expect(events.compact.calls).toEqual([[first], [second]])
+		expect(events.collapse.calls).toEqual([])
+
+		// The next compact with a non-blank digest merges back to the cap.
+		conversation.add({ role: 'assistant', content: 'round-4' })
+		await conversation.compact()
+		expect(conversation.sections).toHaveLength(2)
+	})
+
+	it('narrows a constructed SUMMARY error with isConversationError', () => {
+		expect(isConversationError(new ConversationError('SUMMARY', 'x'))).toBe(true)
 	})
 })
 

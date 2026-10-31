@@ -16,8 +16,9 @@ import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkes
  * any `sections` cap combined with `rolling`.
  * `'JUDGMENT'`: a judgment or judge request that JSON cannot carry, or whose copy fails its guard.
  * `'KEEP'`: a `keep` that is not a nonnegative safe integer.
+ * `'SUMMARY'`: a summarizer digest whose trimmed text is empty.
  */
-export type ConversationErrorCode = 'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT' | 'KEEP'
+export type ConversationErrorCode = 'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT' | 'KEEP' | 'SUMMARY'
 
 /** Stores judgments by caller key and resolves requests by reusing matching records. */
 export interface JudgmentManagerInterface {
@@ -139,6 +140,10 @@ export interface MessageManagerInterface {
  * `undefined` when that call supplied none. A summarizer must stop its work when it aborts. One
  * that ignores it still cannot hold the caller: `compact()` races the summarizer against the
  * signal, rejects with the abort reason, and discards a digest that arrives later.
+ *
+ * A digest whose trimmed text is empty rejects the `compact()` call with code `'SUMMARY'`: a
+ * refused fold commits nothing and emits nothing, and a refused overflow merge leaves the
+ * appended section, as a throwing merge does.
  *
  * @param messages - The folded messages to digest into a summary
  * @param signal - The cancellation signal of the `compact()` call, or `undefined` when it supplied none
@@ -439,6 +444,10 @@ export interface ConversationInterface {
 	 * emitted, and the error propagates; the next successful `compact()` merges the section count
 	 * back to `cap`.
 	 *
+	 * A digest whose trimmed text is empty rejects with code `'SUMMARY'`: a refused fold commits
+	 * nothing and emits nothing, and a refused overflow merge leaves the appended section, as a
+	 * throwing merge does.
+	 *
 	 * Calls run one at a time: a call made while another is in flight waits for it, then computes
 	 * its own fold from the live tail it finds. A fold commits only when every folded message is
 	 * still the same live entry after the summarizer settles, and a merge commits only when the
@@ -464,7 +473,8 @@ export interface ConversationInterface {
 	 * @throws ConversationError Thrown when no summarizer was supplied (code `'SUMMARIZER'`), when the
 	 * effective sections cap does not satisfy `>= 1` or combines with `rolling` (code `'SECTIONS'`,
 	 * including `NaN`), or when
-	 * the effective `keep` is not a nonnegative safe integer (code `'KEEP'`)
+	 * the effective `keep` is not a nonnegative safe integer (code `'KEEP'`), or when a summarizer
+	 * digest has empty trimmed text (code `'SUMMARY'`)
 	 */
 	compact(options?: CompactOptions): Promise<Section | undefined>
 	/**

@@ -13,14 +13,13 @@ import type {
 	LedgerRecord,
 	LedgerRegistry,
 	LedgerRenderContext,
-	LedgerTokenSet,
 	LedgerTopic,
 	LedgerWordSet,
 } from './types.js'
 import type { ToolCall } from '@orkestrel/tool'
 import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { renderJSON } from '../helpers.js'
+import { extractLiterals, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
 import { LedgerError } from './errors.js'
@@ -280,35 +279,6 @@ export function splitSentences(text: string): readonly string[] {
 }
 
 /**
- * Reads the id-shaped tokens and the numbers of a text.
- *
- * @param text - The text to read
- * @returns The uppercased hyphenated ids that hold a digit, and the numbers outside those ids with grouping commas removed
- *
- * @example
- * ```ts
- * const tokens = extractTokens('Order bw-5512 totals 1,200.50')
- * // tokens.ids is Set { 'BW-5512' }, tokens.numbers is Set { 1200.5 }
- * ```
- */
-export function extractTokens(text: string): LedgerTokenSet {
-	const idShape = /\b[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+\b/g
-	const ids = new Set(
-		[...text.matchAll(idShape)].flatMap(([token]) =>
-			/\d/.test(token) ? [token.toUpperCase()] : [],
-		),
-	)
-	const rest = text.replace(idShape, (token) => (/\d/.test(token) ? ' ' : token))
-	const numbers = new Set(
-		[...rest.matchAll(/(?<![\w.])\d[\d,]*(?:\.\d+)?/g)].flatMap(([token]) => {
-			const value = Number(token.replace(/,/g, ''))
-			return Number.isFinite(value) ? [value] : []
-		}),
-	)
-	return { ids, numbers }
-}
-
-/**
  * Collects the capitalized name runs of a text, leaving out the run that opens each sentence.
  *
  * @remarks
@@ -454,12 +424,12 @@ export function linkOwners(
 	return new Map(
 		[...readings].flatMap((reading) => {
 			if (reading.result === undefined) return []
-			const named = [...extractTokens(reading.text).ids].filter((id) => owners.has(id))
+			const named = [...extractLiterals(reading.text).ids].filter((id) => owners.has(id))
 			const [only] = named
 			return Object.values(reading.arguments)
 				.filter(isString)
 				.map((value) => normalizeArgument(value))
-				.filter((subject) => extractTokens(subject).ids.has(subject))
+				.filter((subject) => extractLiterals(subject).ids.has(subject))
 				.flatMap((subject) => {
 					if (owners.has(subject)) return [[subject, subject] as const]
 					return named.length === 1 && only !== undefined ? [[subject, only] as const] : []
@@ -544,7 +514,7 @@ export function matchEntities(
 	text: string,
 	partial: boolean,
 ): ReadonlySet<string> {
-	const tokens = extractTokens(text).ids
+	const ids = extractLiterals(text).ids
 	// `Array.from` visits a hole in an owner's names as an undefined name, as iteration does; `map` skips it.
 	const aliases = Map.groupBy(
 		[...registry.owners].flatMap(([id, names]) => Array.from(names, (name) => ({ name, id }))),
@@ -556,7 +526,7 @@ export function matchEntities(
 		(word) => word,
 	)
 	return new Set([
-		...[...registry.ids].filter((id) => tokens.has(id)),
+		...[...registry.ids].filter((id) => ids.has(id)),
 		...[...aliases].flatMap(([name, entries]) => {
 			const words = partial
 				? name

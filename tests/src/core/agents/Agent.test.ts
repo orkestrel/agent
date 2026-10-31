@@ -4431,6 +4431,87 @@ describe('Agent — strict compaction', () => {
 	})
 })
 
+// ── Blank compaction digest — a summarizer that returns only whitespace is refused by the
+// conversation with a SUMMARY ConversationError; the automatic path keeps its lenient and strict
+// behavior (fault then continue, or fault then rethrow).
+describe('Agent — blank compaction digest', () => {
+	it('lenient: fires fault with a SUMMARY error, folds no section, and settles the final answer', async () => {
+		const conversations = createConversationManager({
+			summarize: async () => '  \n',
+			keep: 0,
+		})
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'Earlier question.' },
+			{ role: 'assistant', content: 'Earlier answer.' },
+		])
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: createBudget({ max: 12, consumer: measureMessages }),
+			limit: 5,
+		})
+		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
+			'fault',
+			'error',
+			'finish',
+		])
+		agent.context.messages.add({ role: 'user', content: 'go' })
+
+		const result = await agent.generate()
+
+		expect(result.content).toBe('the answer is 42')
+		expect(conversation.sections).toEqual([])
+		expect(events.error.calls).toEqual([])
+		expect(events.fault.calls.length).toBeGreaterThan(0)
+		for (const [fault] of events.fault.calls) {
+			expect(fault).toEqual(expect.objectContaining({ name: 'ConversationError', code: 'SUMMARY' }))
+		}
+	})
+
+	it('strict: fires fault then error with the SUMMARY error, rejects the run, and never finishes', async () => {
+		const conversations = createConversationManager({
+			summarize: async () => '  \n',
+			keep: 0,
+		})
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'Earlier question.' },
+			{ role: 'assistant', content: 'Earlier answer.' },
+		])
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: createBudget({ max: 12, consumer: measureMessages }),
+			limit: 5,
+			strict: true,
+		})
+		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
+			'fault',
+			'error',
+			'finish',
+		])
+		agent.context.messages.add({ role: 'user', content: 'go' })
+
+		const error = await agent.generate().then(
+			() => undefined,
+			(reason: unknown) => reason,
+		)
+
+		expect(error).toEqual(expect.objectContaining({ name: 'ConversationError', code: 'SUMMARY' }))
+		expect(agent.status).toBe('error')
+		expect(events.fault.calls).toEqual([[error]])
+		expect(events.error.calls).toEqual([[error]])
+		expect(events.finish.calls).toEqual([])
+	})
+})
+
 // ── Strict window admission — with `strict: true` a request that is still over the window after
 // the admission step (a fold that left it over, a futile fold, or a conversation that can't fold) is
 // refused with an AgentError coded WINDOW before any provider call. The window `max` is 10 and the
