@@ -16,22 +16,26 @@ import {
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import {
+	CANARY_BUILD_SOURCES,
+	CANARY_SENTINELS,
 	createRecordingSelection,
 	createStubSummarizer,
 	rejectSelection,
 	resolveSectionOpen,
 	resolveSectionRender,
+	seedCanaryContext,
 	seedInstructionContext,
 	seedWorkspaceContext,
 	SELECTION_USAGE,
 } from '../../../setup.js'
 import { requireValue } from '@orkestrel/test'
 
-// AgentContext assembles a turn's provider input — the leading system block (the prompt
-// + the scoped instructions, each under its manager's description, then the ACTIVE
-// workspace's text files) then the scoped conversation (with the active workspace's image
-// files' data attached to the last user message). The active workspace is the SOLE
-// document/image context. Tools are advertised STRUCTURALLY (through definitions()), never
+// AgentContext assembles a turn's provider input — the leading system message (the prompt
+// + the scoped instructions, each under its manager's description), then one user context
+// message holding the ACTIVE workspace's text files, then the scoped conversation (with the
+// active workspace's image files' data attached to the last user message). The active
+// workspace is the SOLE document/image context. Tools are advertised STRUCTURALLY (through
+// definitions()), never
 // serialized into the prompt, so build() must never carry tool content — real
 // behavior, no mocks.
 
@@ -400,8 +404,9 @@ describe('AgentContext — context managers', () => {
 })
 
 // The ACTIVE workspace is the SOLE document/image context, rendered BY CARRIER:
-// The text files of the active workspace fold into a `## Workspace` system section (fenced), its
-// IMAGE files' base64 data attaches to the last user message. It is ACTIVE-ONLY (never the
+// The text files of the active workspace fold into a `## Workspace` section (fenced) in one `user`
+// context message after the system message, its IMAGE files' base64 data attaches to the last user
+// message of the conversation. It is ACTIVE-ONLY (never the
 // other workspaces), scope-filtered by `scope.files`, and renders NOTHING when no workspace is
 // active. `context.workspaces` is ALWAYS present and supplied structurally through options
 // Real behavior, no mocks; a real Workspace + WorkspaceManager, no provider needed.
@@ -452,33 +457,36 @@ describe('AgentContext — workspaces accessor & construction', () => {
 })
 
 describe('AgentContext — workspaces render by carrier', () => {
-	it('folds the ACTIVE workspace’s TEXT files into a `## Workspace` system section (fenced)', () => {
+	it('folds the ACTIVE workspace’s TEXT files into a `## Workspace` section (fenced) in a user context message', () => {
 		const context = new AgentContext({ system: 'sys' })
 		const workspace = context.workspaces.add()
 		workspace.write('src/config.ts', 'export const PORT = 8123')
 		context.messages.add({ role: 'user', content: 'hi' })
 
 		const built = context.build()
-		const block = requireValue(built[0]).content
+		const block = requireValue(built[1]).content
 
 		// The dedicated workspace section header + the fenced reference block: `File: <path>` then a
 		// ```<language> fence (inferred typescript), verbatim.
 		expect(block).toContain(WORKSPACE_SECTION_HEADER)
 		expect(block).toContain('File: src/config.ts\n```typescript\nexport const PORT = 8123\n```')
-		// Rendered into the system block, not a separate message.
-		expect(built.filter((message) => message.role === 'system')).toHaveLength(1)
+		// Rendered into its own user message after the system message, never into the system message.
+		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'user'])
+		expect(requireValue(built[0]).content).toBe('sys')
 	})
 
-	it('renders the workspace section AFTER the instructions section', () => {
+	it('renders the workspace section in the context message AFTER the system message holding the instructions', () => {
 		const context = new AgentContext()
 		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		const workspace = context.workspaces.add()
 		workspace.write('notes.txt', 'WORKSPACE TEXT')
 
-		const block = requireValue(context.build()[0]).content
+		const [system, message] = context.build()
 
-		// instructions → workspace (the in-prompt text content grouped after the instructions).
-		expect(block.indexOf('## Instructions')).toBeLessThan(block.indexOf(WORKSPACE_SECTION_HEADER))
+		// instructions → workspace (the instructions in the system message, the workspace text after).
+		expect(system?.content).toBe('## Instructions\n\nBe terse.')
+		expect(message?.role).toBe('user')
+		expect(message?.content.startsWith(WORKSPACE_SECTION_HEADER)).toBe(true)
 	})
 
 	it('attaches the ACTIVE workspace’s IMAGE files’ base64 data to the LAST user message', () => {
@@ -503,9 +511,9 @@ describe('AgentContext — workspaces render by carrier', () => {
 		const lastUser = built.filter((message) => message.role === 'user').at(-1)
 		expect(lastUser?.content).toBe('last')
 		expect(lastUser?.images).toEqual(['ICONB64'])
-		// The base64 never appears in the system block (an image file emits NO text marker — it is
-		// not rendered into the `## Workspace` text section, only attached).
-		expect(requireValue(built[0]).images ?? []).not.toContain('ICONB64')
+		// The base64 rides no earlier message (an image file emits NO text marker — it is not
+		// rendered into the `## Workspace` text section, only attached).
+		expect(built.slice(0, -1).flatMap((message) => message.images ?? [])).toEqual([])
 	})
 
 	it('attaches MULTIPLE workspace image files’ data to the last user turn, in order', () => {
@@ -523,7 +531,7 @@ describe('AgentContext — workspaces render by carrier', () => {
 		expect(built.at(-1)?.images).toEqual(['AIMG', 'BIMG'])
 	})
 
-	it('renders a TEXT file in the system block AND attaches an IMAGE file from the same active workspace', () => {
+	it('renders a TEXT file in the context message AND attaches an IMAGE file from the same active workspace', () => {
 		const context = new AgentContext({ system: 'sys' })
 		// One active workspace holding BOTH a text file (added through write) and an image file (seeded,
 		// because write() only ever mints text files).
@@ -534,8 +542,9 @@ describe('AgentContext — workspaces render by carrier', () => {
 
 		const built = context.build()
 
-		// Text file → fenced system section; image file → last user message.
-		expect(requireValue(built[0]).content).toContain('File: a.ts\n```typescript\nconst z = 9\n```')
+		// Text file → fenced section in the context message; image file → last user message.
+		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'user'])
+		expect(requireValue(built[1]).content).toContain('File: a.ts\n```typescript\nconst z = 9\n```')
 		expect(built.at(-1)?.images).toEqual(['IMGB'])
 	})
 
@@ -559,14 +568,14 @@ describe('AgentContext — workspaces render by carrier', () => {
 		expect(after).not.toContain('ACTIVE CONTENT')
 	})
 
-	it('renders a system block from the active workspace ALONE (no prompt, no instructions)', () => {
+	it('renders only the context message from the active workspace ALONE (no prompt, no instructions)', () => {
 		const context = new AgentContext()
 		context.workspaces.add().write('only.txt', 'lonely')
 
 		const built = context.build()
 
 		expect(built).toHaveLength(1)
-		expect(requireValue(built[0]).role).toBe('system')
+		expect(requireValue(built[0]).role).toBe('user')
 		expect(requireValue(built[0]).content).toBe(
 			`${WORKSPACE_SECTION_HEADER}\n\nFile: only.txt\n\`\`\`text\nlonely\n\`\`\``,
 		)
@@ -591,7 +600,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		const context = seedWorkspaceContext()
 
 		const built = context.build()
-		const block = requireValue(built[0]).content
+		const block = requireValue(built[1]).content
 
 		expect(block).toContain('KEPT FILE')
 		expect(block).toContain('DROPPED FILE')
@@ -604,7 +613,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		context.apply(new Scope({ name: 'narrowed', files: ['keep.txt', 'keep.png'] }))
 
 		const built = context.build()
-		const block = requireValue(built[0]).content
+		const block = requireValue(built[1]).content
 
 		expect(block).toContain('KEPT FILE')
 		expect(block).not.toContain('DROPPED FILE')
@@ -617,11 +626,13 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		context.apply(new Scope({ name: 'no-files', files: [] }))
 
 		const built = context.build()
-		const block = requireValue(built[0]).content
+		const text = built.map((message) => message.content).join('\n')
 
-		expect(block).not.toContain(WORKSPACE_SECTION_HEADER)
-		expect(block).not.toContain('KEPT FILE')
-		expect(block).not.toContain('DROPPED FILE')
+		// No context message: the system message, then the conversation.
+		expect(built.map((message) => message.role)).toEqual(['system', 'user'])
+		expect(text).not.toContain(WORKSPACE_SECTION_HEADER)
+		expect(text).not.toContain('KEPT FILE')
+		expect(text).not.toContain('DROPPED FILE')
 		// No image file attaches either.
 		expect(built.at(-1)?.images).toBeUndefined()
 	})
@@ -633,7 +644,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 		context.apply(parent.narrow({ files: ['drop.txt', 'keep.png'] }))
 
 		const built = context.build()
-		const block = requireValue(built[0]).content
+		const block = requireValue(built[1]).content
 
 		expect(block).toContain('DROPPED FILE')
 		expect(block).not.toContain('KEPT FILE')
@@ -642,7 +653,7 @@ describe('AgentContext — workspaces scope.files filtering', () => {
 })
 
 describe('AgentContext — image data attachment (active workspace)', () => {
-	it('attaches the active workspace’s image data to the LAST user message (not the system block)', () => {
+	it('attaches the active workspace’s image data to the LAST user message (not the context message)', () => {
 		const context = seedWorkspaceContext()
 		context.messages.add([
 			{ role: 'user', content: 'first user' },
@@ -656,8 +667,14 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		const lastUser = users.at(-1)
 		expect(lastUser?.content).toBe('last user')
 		expect(lastUser?.images).toEqual(['KEEPIMG', 'DROPIMG'])
-		// The earlier user messages carry no images.
-		expect(users[0]?.images).toBeUndefined()
+		// The context message and the earlier conversation user messages carry no images.
+		expect(users.map((message) => message.content)).toEqual([
+			requireValue(built[1]).content,
+			'hi',
+			'first user',
+			'last user',
+		])
+		expect(users.slice(0, -1).every((message) => message.images === undefined)).toBe(true)
 	})
 
 	it("merges a message's own images then the workspace image data on the last user message", () => {
@@ -912,14 +929,14 @@ describe('AgentContext — format cascade: the built-in regression guard', () =>
 	})
 })
 
-// The CANONICAL build() shape — the exact top-level Message[] is `[system-block,
-// ...conversation]` and NOTHING else: one assembled system message (the prompt + the
-// instructions section + the active workspace's text section, `\n\n`-separated), then the
-// scope-filtered conversation in insertion order. The cascade tests preceding pin per-section
+// The CANONICAL build() shape — the exact top-level Message[] is `[system, context,
+// ...conversation]` and NOTHING else: one system message (the prompt + the instructions section,
+// `\n\n`-separated), one `user` context message holding the active workspace's text section, then
+// the scope-filtered conversation in insertion order. The cascade tests preceding pin per-section
 // formatting; this pins the WHOLE array's structure verbatim so the canonical order +
 // concatenation can't silently drift — real behavior.
 describe('AgentContext — the canonical built array (order + exact concatenation)', () => {
-	it('builds EXACTLY [system-block, ...conversation] — the system content is prompt + instructions + workspace', () => {
+	it('builds EXACTLY [system, context, ...conversation] — prompt + instructions, then the workspace', () => {
 		const context = new AgentContext({ system: 'You are concise.' })
 		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.workspaces.add().write('notes.md', '# Notes')
@@ -931,24 +948,26 @@ describe('AgentContext — the canonical built array (order + exact concatenatio
 
 		const built = context.build()
 
-		// The array is the assembled system block followed by the conversation, in order —
+		// The array is the system message, the context message, then the conversation, in order —
 		// exactly one leading system message, then each turn's id/role/content verbatim.
-		expect(built).toHaveLength(4)
-		expect(requireValue(built[0]).role).toBe('system')
-		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'user'])
+		expect(built).toHaveLength(5)
+		expect(built.map((message) => message.role)).toEqual([
+			'system',
+			'user',
+			'user',
+			'assistant',
+			'user',
+		])
 		expect(
 			built
-				.slice(1)
+				.slice(2)
 				.map((message) => ({ id: message.id, role: message.role, content: message.content })),
 		).toEqual(turns.map((turn) => ({ id: turn.id, role: turn.role, content: turn.content })))
-		// The system block content is the prompt + the instructions section + the workspace section,
-		// in the canonical order, blank-line separated — the precise concatenation, byte-for-byte.
-		expect(requireValue(built[0]).content).toBe(
-			[
-				'You are concise.',
-				'## Instructions\n\nBe terse.',
-				`${WORKSPACE_SECTION_HEADER}\n\nFile: notes.md\n\`\`\`markdown\n# Notes\n\`\`\``,
-			].join('\n\n'),
+		// The system content is the prompt + the instructions section, blank-line separated, and the
+		// context content is the workspace section — the precise concatenation, byte-for-byte.
+		expect(requireValue(built[0]).content).toBe('You are concise.\n\n## Instructions\n\nBe terse.')
+		expect(requireValue(built[1]).content).toBe(
+			`${WORKSPACE_SECTION_HEADER}\n\nFile: notes.md\n\`\`\`markdown\n# Notes\n\`\`\``,
 		)
 	})
 
@@ -1382,96 +1401,205 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 })
 
 describe('AgentContext — build(selection) folds the selected messages in place of view()', () => {
-	it('keeps the system block and attaches images to the last user message of the selection', () => {
+	it('keeps the system and context messages and attaches images to the last user message of the selection', () => {
 		const context = seedWorkspaceContext()
 		const [first] = context.messages.messages()
 		context.messages.add([
 			{ role: 'assistant', content: 'Which file?' },
 			{ role: 'user', content: 'The kept one.' },
 		])
+		const plain = context.build()
 
 		const built = context.build({ messages: [requireValue(first)], judgments: [] })
 
-		expect(built).toHaveLength(2)
-		expect(built[0]).toEqual({ ...requireValue(context.build()[0]), id: requireValue(built[0]).id })
-		expect(built[1]).toEqual({ ...requireValue(first), images: ['KEEPIMG', 'DROPIMG'] })
-		expect(context.build().at(-1)).toEqual(
+		expect(built).toHaveLength(3)
+		expect(built[0]).toEqual({ ...requireValue(plain[0]), id: requireValue(built[0]).id })
+		expect(built[1]).toEqual({ ...requireValue(plain[1]), id: requireValue(built[1]).id })
+		expect(built[2]).toEqual({ ...requireValue(first), images: ['KEEPIMG', 'DROPIMG'] })
+		expect(plain.at(-1)).toEqual(
 			expect.objectContaining({ content: 'The kept one.', images: ['KEEPIMG', 'DROPIMG'] }),
 		)
 	})
 
-	it('folds an empty selection to the system block alone', () => {
+	it('folds an empty selection to the system and context messages alone', () => {
 		const context = seedWorkspaceContext()
 
 		const built = context.build({ messages: [], judgments: [] })
 
-		expect(built.map((message) => message.role)).toEqual(['system'])
+		expect(built.map((message) => message.role)).toEqual(['system', 'user'])
+		expect(built[1]?.content).toContain('KEPT FILE')
 	})
 
-	it('appends the briefing as the last system part after the workspace section', () => {
+	it('sends a request copy last, after the context message, exactly as the selection carries it', () => {
 		const context = seedWorkspaceContext()
-		const plain = requireValue(context.build({ messages: [], judgments: [] })[0])
+		const request = requireValue(context.messages.messages()[0])
+		const copy = {
+			...request,
+			content: `Plan: refund invoice 42.\n\n## Request\n${request.content}`,
+		}
 
-		const built = context.build({
-			messages: [],
-			judgments: [],
-			briefing: 'Plan: refund invoice 42.',
-		})
+		const built = context.build({ messages: [copy], judgments: [] })
 
-		expect(built).toHaveLength(1)
-		expect(built[0]?.content).toBe(`${String(plain.content)}\n\nPlan: refund invoice 42.`)
+		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'user'])
+		expect(built[0]?.content).toBe('sys')
+		expect(built[1]?.content).not.toContain('Plan: refund invoice 42.')
+		expect(built[2]).toEqual({ ...copy, images: ['KEEPIMG', 'DROPIMG'] })
+		expect(context.messages.messages()[0]?.content).toBe('hi')
 	})
 
-	it('yields one system message holding exactly a lone briefing', () => {
-		const context = new AgentContext()
-
-		const built = context.build({ messages: [], judgments: [], briefing: 'Only this.' })
-
-		expect(built).toHaveLength(1)
-		expect(built[0]).toEqual({
-			id: requireValue(built[0]).id,
-			role: 'system',
-			content: 'Only this.',
-		})
-	})
-
-	it('adds no briefing for a faulted selection, an empty briefing, or an absent briefing', () => {
+	it('builds the same messages for a faulted selection, a plain selection, and no selection', () => {
 		const context = seedWorkspaceContext()
-		const expected = requireValue(context.build({ messages: [], judgments: [] })[0]).content
+		const expected = context.build().map(({ id, ...body }) => body)
 		const selections: readonly Selection[] = [
-			{ messages: [], judgments: [], briefing: 'Void plan.', fault: new Error('gave up') },
-			{ messages: [], judgments: [], briefing: '' },
-			{ messages: [], judgments: [] },
+			{ messages: context.messages.messages(), judgments: [], fault: new Error('gave up') },
+			{ messages: context.messages.messages(), judgments: [] },
 		]
 
 		for (const selection of selections) {
-			expect(context.build(selection)[0]?.content).toBe(expected)
+			expect(context.build(selection).map(({ id, ...body }) => body)).toEqual(expected)
 		}
-		expect(context.build()[0]?.content).toBe(expected)
+		expect(expected.map((message) => message.role)).toEqual(['system', 'user', 'user'])
 	})
 
-	it('keeps the briefing when the scope filters instructions', () => {
+	it('keeps the system text alone when the scope filters instructions', () => {
 		const context = new AgentContext({ system: 'Be brief.' })
+		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.apply(new Scope({ name: 'narrow', instructions: [] }))
 
-		const built = context.build({ messages: [], judgments: [], briefing: 'Plan.' })
+		const built = context.build({ messages: [], judgments: [] })
 
-		expect(built[0]?.content).toBe('Be brief.\n\nPlan.')
+		expect(built.map(({ id, ...body }) => body)).toEqual([{ role: 'system', content: 'Be brief.' }])
 	})
 
-	it('drops the briefing from the view-change fault', async () => {
+	it('drops the request copy from the view-change fault', async () => {
 		const context = new AgentContext({
 			select: async (conversation) => {
 				const view = conversation.view()
 				conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
-				return { messages: view, judgments: [], briefing: 'Stale plan.' }
+				return {
+					messages: view.map((message) => ({
+						...message,
+						content: `Stale plan.\n\n## Request\n${message.content}`,
+					})),
+					judgments: [],
+				}
 			},
 		})
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 
 		const selected = requireValue(await context.select(request, new AbortController().signal))
 
-		expect(selected.briefing).toBeUndefined()
+		expect(selected.messages).toEqual(requireValue(context.conversations.active).view())
+		expect(selected.messages.some((message) => message.content.includes('Stale plan.'))).toBe(false)
 		expect(selected.fault).toBeInstanceOf(Error)
+	})
+})
+
+describe('AgentContext — the system boundary canary', () => {
+	it.each(CANARY_BUILD_SOURCES)(
+		'builds with the %s sentinel and keeps it out of every system message',
+		async (source) => {
+			const built = (await seedCanaryContext()).build()
+			const sentinel = CANARY_SENTINELS[source]
+
+			// The sentinel reaches the build, so its absence from `system` is not vacuous.
+			expect(built.some((message) => message.content.includes(sentinel))).toBe(true)
+			expect(
+				built
+					.filter((message) => message.role === 'system')
+					.some((message) => message.content.includes(sentinel)),
+			).toBe(false)
+		},
+	)
+
+	it('holds the system-text and instruction sentinels in one system message, at index 0', async () => {
+		const built = (await seedCanaryContext()).build()
+
+		expect(built.filter((message) => message.role === 'system')).toHaveLength(1)
+		expect(built[0]?.role).toBe('system')
+		expect(built[0]?.content).toContain(CANARY_SENTINELS.system)
+		expect(built[0]?.content).toContain(CANARY_SENTINELS.instruction)
+	})
+
+	it('returns the system message, then one context message, then the tail', () => {
+		const context = new AgentContext({ system: 'sys' })
+		context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		const workspace = context.workspaces.add({
+			seed: [createFile({ path: 'scan.png', content: createBinaryContent('SCAN', 'image/png') })],
+		})
+		workspace.write('notes.txt', 'NOTES')
+		context.messages.add([
+			{ role: 'user', content: 'first' },
+			{ role: 'assistant', content: 'reply' },
+			{ role: 'user', content: 'last' },
+		])
+
+		const built = context.build()
+
+		expect(built.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys\n\n## Instructions\n\nBe terse.' },
+			{ role: 'user', content: '## Workspace\n\nFile: notes.txt\n```text\nNOTES\n```' },
+			{ role: 'user', content: 'first' },
+			{ role: 'assistant', content: 'reply' },
+			{ role: 'user', content: 'last', images: ['SCAN'] },
+		])
+		// The context message carries a minted id and is never stored.
+		const [system, message] = built
+		expect(message?.id.length).toBeGreaterThan(0)
+		expect(message?.id).not.toBe(system?.id)
+		expect(context.conversations.active?.messages().some((one) => one.id === message?.id)).toBe(
+			false,
+		)
+		expect(context.build()[1]?.id).not.toBe(message?.id)
+	})
+
+	it('attaches the workspace images to the last tail user message, never to the context message', () => {
+		const built = seedWorkspaceContext().build()
+
+		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'user'])
+		expect(built[1]?.content).toContain('KEPT FILE')
+		expect(built[1]).not.toHaveProperty('images')
+		expect(built.at(-1)?.content).toBe('hi')
+		expect(built.at(-1)?.images).toEqual(['KEEPIMG', 'DROPIMG'])
+	})
+
+	it('sends no context message when the workspace holds no text file', () => {
+		const context = new AgentContext({ system: 'sys' })
+		context.workspaces.add({
+			seed: [createFile({ path: 'scan.png', content: createBinaryContent('SCAN', 'image/png') })],
+		})
+		context.messages.add({ role: 'user', content: 'hi' })
+
+		const built = context.build()
+
+		expect(built.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys' },
+			{ role: 'user', content: 'hi', images: ['SCAN'] },
+		])
+	})
+
+	it('leaves the context message without images when the tail holds no user message', () => {
+		const context = new AgentContext({ system: 'sys' })
+		const workspace = context.workspaces.add({
+			seed: [createFile({ path: 'scan.png', content: createBinaryContent('SCAN', 'image/png') })],
+		})
+		workspace.write('notes.txt', 'NOTES')
+		context.messages.add({ role: 'assistant', content: 'no user here' })
+
+		const built = context.build()
+
+		expect(built.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys' },
+			{ role: 'user', content: '## Workspace\n\nFile: notes.txt\n```text\nNOTES\n```' },
+			{ role: 'assistant', content: 'no user here' },
+		])
+	})
+
+	it('returns the tail alone for empty inputs', () => {
+		const context = new AgentContext()
+		const stored = context.messages.add({ role: 'user', content: 'hi' })
+
+		expect(context.build()).toStrictEqual([stored])
+		expect(context.build({ messages: [stored], judgments: [] })).toStrictEqual([stored])
 	})
 })

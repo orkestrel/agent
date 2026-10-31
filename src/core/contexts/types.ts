@@ -219,7 +219,7 @@ export interface ContextSectionFormat<T> {
  * the listed keys pass. It is the shape both a {@link ScopeInput} and `Scope.narrow`
  * accept (a `name`-less narrowing config). `files` filters the active workspace's rendered
  * files (by `path`) in {@link AgentContextInterface.build} — both the text files folded into
- * the system block and the image files attached to the last user message.
+ * the context message and the image files attached to the last user message.
  */
 export interface ScopeFilter {
 	/** Lists the allowed instruction names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
@@ -233,7 +233,7 @@ export interface ScopeFilter {
 	/**
 	 * Lists the allowed active-workspace file paths matched against the `path` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
 	 * the filter {@link AgentContextInterface.build} applies to the active workspace's
-	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} before rendering them (text → the system block, image →
+	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} before rendering them (text → the context message, image →
 	 * the last user message).
 	 */
 	readonly files?: readonly string[]
@@ -255,7 +255,7 @@ export interface ScopeFilter {
  * ```
  */
 export interface Selection {
-	/** Lists the messages `build` folds in place of `view()`, in prompt order. */
+	/** Lists the messages `build` folds in place of `view()`, in prompt order: conversation parts only. */
 	readonly messages: readonly Message[]
 	/** Lists the keys of the judgments the selection rests on, reused or recorded. */
 	readonly judgments: readonly string[]
@@ -263,8 +263,6 @@ export interface Selection {
 	readonly usage?: TokenUsage
 	/** Holds the error a handler gave up on; `messages` is then `view()`. */
 	readonly fault?: Error
-	/** Holds the text `build` appends as the last part of the system message. */
-	readonly briefing?: string
 }
 
 /**
@@ -448,8 +446,9 @@ export interface AgentContextOptions {
 	/**
 	 * Reuses a pre-built {@link WorkspaceManagerInterface}; a fresh empty one is created when
 	 * omitted (so `context.workspaces` is always present). `build()` renders the active workspace's
-	 * files by carrier — text files into the system block (fenced), image files attached to the last
-	 * user message. The registry is structural; change its active workspace through
+	 * files by carrier — text files into the `user` context message after the system message
+	 * (fenced), image files attached to the last user message. The registry is structural; change
+	 * its active workspace through
 	 * `workspaces.switch(id)`. The active workspace is the sole document/image context.
 	 */
 	readonly workspaces?: WorkspaceManagerInterface
@@ -484,10 +483,11 @@ export interface AgentContextOptions {
  * (`instructions` / `workspaces` / `conversations`), `messages` (the active
  * conversation's live tail, satisfying {@link MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
- * scoped instructions into one leading `system` message (under the manager's `open`,
- * each item through its `render`) — plus the active workspace's scope-filtered text files
- * (rendered as fenced reference blocks) — and appends the active conversation's `view()`, attaching
- * the active workspace's scope-filtered image files' `base64` payload to the last user message. The
+ * system prompt and the scoped instructions into one leading `system` message (under the
+ * manager's `open`, each item through its `render`), renders the active workspace's scope-filtered
+ * text files (fenced reference blocks) into one `user` context message after it, and appends the
+ * active conversation's `view()`, attaching the active workspace's scope-filtered image files'
+ * `base64` payload to the last user message. The
  * active workspace is the sole document/image context. Tools are advertised to the provider
  * structurally (through `tools.definitions()`, scope-filtered by the loop), not serialized into
  * the prompt, so they never appear in the output of the `build()` method. The context managers are observable
@@ -498,7 +498,7 @@ export interface AgentContextInterface {
 	readonly instructions: InstructionManagerInterface
 	/**
 	 * Holds the {@link WorkspaceManagerInterface} whose active workspace `build()` renders by carrier —
-	 * its text files folded into the system block (fenced reference blocks) and its image files'
+	 * its text files folded into the `user` context message (fenced reference blocks) and its image files'
 	 * `base64` payload attached to the last user message. The active workspace is the sole
 	 * document/image context. Always present (a fresh empty manager when none was supplied).
 	 * `build()` reads its `active` (and the active workspace's `files()`) fresh each call. With no
@@ -572,15 +572,16 @@ export interface AgentContextInterface {
 	select(request: Message, signal: AbortSignal): Promise<Selection> | undefined
 	/**
 	 * Builds the provider input for the next turn: a leading `system` message folding the
-	 * prompt, the scope-filtered instructions (each section's header and each item's rendering
-	 * resolved through the format cascade), and the active workspace's scope-filtered
-	 * (`scope.files`) text files as fenced reference blocks in a `## Workspace` section, then
-	 * the active conversation's `view()`, or the selection's `messages` when a selection is
-	 * passed, with the active workspace's image files' `base64` payload attached to the last user
-	 * message. With no override set, each section renders on its manager's built-in framing. The
-	 * `system` message is prepended only when some part of it exists, the workspace render covers
-	 * the active workspace alone, tools are advertised structurally rather than in the prompt, and
-	 * the input is built fresh on each call.
+	 * prompt and the scope-filtered instructions (each section's header and each item's rendering
+	 * resolved through the format cascade), then one `user` context message holding the active
+	 * workspace's scope-filtered (`scope.files`) text files as fenced reference blocks in a
+	 * `## Workspace` section, then the active conversation's `view()`, or the selection's
+	 * `messages` when a selection is passed, with the active workspace's image files' `base64`
+	 * payload attached to the last user message. With no override set, each section renders on its
+	 * manager's built-in framing. The `system` message is prepended only when some part of it
+	 * exists, the context message only when the workspace section renders, the workspace render
+	 * covers the active workspace alone, tools are advertised structurally rather than in the
+	 * prompt, and the input is built fresh on each call.
 	 *
 	 * @remarks
 	 * **The active workspace (rendered by carrier) — the sole document/image context.** When
@@ -588,10 +589,11 @@ export interface AgentContextInterface {
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} are filtered by
 	 * `scope.files` (a three-way allow-list; `undefined` ⇒ all active files), then split by
 	 * carrier: text files ({@link import('@orkestrel/workspace').isTextContent}) render into a dedicated
-	 * `## Workspace` section in the system block — each a fenced
+	 * `## Workspace` section in the context message — a `user` message with a minted id that
+	 * follows the system message and is never stored — each a fenced
 	 * `` File: <path>\n```<language>\n<text>\n``` `` block whose fence is one backtick longer than
-	 * the longest backtick run in the text, and never shorter than three — placed immediately after
-	 * the instructions section; binary files whose MIME starts with `image/` have their `base64` payload
+	 * the longest backtick run in the text, and never shorter than three; binary files whose MIME
+	 * starts with `image/` have their `base64` payload
 	 * attached to the last user message (a vision provider reads images off a user turn).
 	 * Active-only — never the other registered workspaces; with no active workspace nothing is
 	 * rendered for workspaces.
@@ -614,13 +616,15 @@ export interface AgentContextInterface {
 	 * workspace image data attaches to the last user message.
 	 *
 	 * **A selection.** Given a {@link Selection}, the build folds `selection.messages` in place of
-	 * `view()` and attaches the image data to the last user message of that array, and appends a
-	 * non-empty `selection.briefing` as the last system part when the selection has no `fault`; the
-	 * rest of the system block is unchanged.
+	 * `view()` and attaches the image data to the last user message of that array; the system and
+	 * context messages are unchanged. The `system` message holds host-authored text alone, so a
+	 * handler that adds text for the model, such as a ledger's records, writes it into a message of
+	 * `selection.messages`.
 	 *
 	 * @param selection - The selection whose `messages` replace `view()`; omitted ⇒ `view()`
-	 * @returns The scoped conversation, prefixed by the assembled `system` message when any
-	 *   of (the prompt, the scoped instructions, the active workspace's text files) is non-empty
+	 * @returns The scoped conversation, prefixed by the context message when the active workspace's
+	 *   scoped text files are non-empty, and before it by the assembled `system` message when the
+	 *   prompt or the scoped instructions are non-empty
 	 */
 	build(selection?: Selection): readonly Message[]
 }

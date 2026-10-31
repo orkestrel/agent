@@ -108,7 +108,7 @@ export function attachImages(message: Message, payloads: readonly string[]): Mes
  * Pure and total: the conversation and its messages are never mutated, and the returned array
  * replaces exactly the one target message with the copy {@link attachImages} builds. Empty
  * data returns the conversation unchanged; a conversation with no user message returns it
- * unchanged too (there is nowhere to attach, and the images already rode the system block). A hole
+ * unchanged too (there is nowhere to attach, so the images are left out). A hole
  * in a sparse conversation is not a user message.
  *
  * @param conversation - The messages to attach into (left unchanged)

@@ -17,7 +17,7 @@ export const LEDGER_CATEGORIES = Object.freeze([
 /** Lists the categories whose messages the projection leaves out as quiet. */
 export const QUIET_CATEGORIES: readonly LedgerCategory[] = Object.freeze(['chatter', 'distractor'])
 
-/** Lists the categories whose messages state what the desk acts on, which the briefing renders. */
+/** Lists the categories whose messages state what the desk acts on, which the records render. */
 export const DECISIVE_CATEGORIES: readonly LedgerCategory[] = Object.freeze([
 	'fact',
 	'rule',

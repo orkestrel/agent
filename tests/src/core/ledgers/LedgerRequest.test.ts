@@ -120,7 +120,7 @@ describe('LedgerRequest', () => {
 			duration: 3,
 		}
 		const second: ClassifierReading = { key: 'two', phase: 'topic', outcome: 'cached' }
-		const plan: Selection = { messages: [], judgments: ['one'], briefing: '## Rules' }
+		const plan: Selection = { messages: [], judgments: ['one'] }
 		request.file([first], plan)
 		request.file([second])
 		expect(request.readings).toEqual([first, second])

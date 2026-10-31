@@ -78,9 +78,11 @@ import {
 	createStubSummarizer,
 	createToolCall,
 	createLoopTool,
+	RECORDED_COMPACTION_REQUEST,
 	RECORDED_REQUEST,
 	rejectSelection,
 	type ScriptedTurn,
+	seedCompactionArm,
 	seedFramedAgent,
 	SELECTION_FAULT_CASES,
 	SELECTION_USAGE,
@@ -446,11 +448,12 @@ describe('Agent — single turn', () => {
 	})
 })
 
-describe('Agent — the provider request matches the recorded request', () => {
+describe('Agent — the recorded request per layout arm', () => {
 	it('sends the recorded messages for a framed, scoped, workspace-backed conversation', async () => {
-		// RECORDED_REQUEST is a recorded value, never derived from the source under test, so a change
-		// to context assembly that moves one prompt byte fails here. The minted message ids differ on
-		// every run, so they are checked for presence and compared no further.
+		// RECORDED_REQUEST is written by hand from the request layout, never derived from the source
+		// under test, so a change to context assembly that moves one prompt byte fails here. The
+		// minted message ids differ on every run, so they are checked for presence and compared no
+		// further.
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		await seedFramedAgent(provider).generate()
 
@@ -459,6 +462,17 @@ describe('Agent — the provider request matches the recorded request', () => {
 		const bodies = sent.map(({ id, ...body }) => body)
 		expect(bodies).toStrictEqual(RECORDED_REQUEST)
 		expect(JSON.stringify(bodies)).toBe(JSON.stringify(RECORDED_REQUEST))
+	})
+
+	it('sends the recorded 0.0.34 messages for the compaction arm', async () => {
+		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
+		await (await seedCompactionArm(provider)).generate()
+
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.every((message) => message.id.length > 0)).toBe(true)
+		const bodies = sent.map(({ id, ...body }) => body)
+		expect(bodies).toStrictEqual(RECORDED_COMPACTION_REQUEST)
+		expect(JSON.stringify(bodies)).toBe(JSON.stringify(RECORDED_COMPACTION_REQUEST))
 	})
 })
 
@@ -4991,9 +5005,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 	})
 
 	it('advertises the same definitions on every turn with a subset selection as without a handler', async () => {
-		expectTypeOf<keyof Selection>().toEqualTypeOf<
-			'messages' | 'judgments' | 'usage' | 'fault' | 'briefing'
-		>()
+		expectTypeOf<keyof Selection>().toEqualTypeOf<'messages' | 'judgments' | 'usage' | 'fault'>()
 		const subset = createRecordingSelection({ keep: (message) => message.role === 'user' })
 		const advertised = await Promise.all(
 			[undefined, subset.handler].map(async (select) => {
@@ -5190,13 +5202,18 @@ describe('Agent — the select event follows each select-site build', () => {
 		expect(selected.calls[0]?.[0]).toBe(selection.selections[0])
 	})
 
-	it('sends a system message ending in the briefing and emits the selection unchanged', async () => {
+	it('sends the system text alone ahead of the selection messages and emits the selection unchanged', async () => {
 		const selected = createRecorder<AgentEventMap['select']>()
-		const briefing = 'Plan: refund invoice 42.'
 		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			system: 'Be brief.',
-			select: async (conversation) => ({ messages: conversation.view(), judgments: [], briefing }),
+			select: async (conversation) => ({
+				messages: conversation.view().map((message) => ({
+					...message,
+					content: `Plan: refund invoice 42.\n\n## Request\n${message.content}`,
+				})),
+				judgments: [],
+			}),
 			on: { select: selected.handler },
 		})
 		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
@@ -5204,9 +5221,11 @@ describe('Agent — the select event follows each select-site build', () => {
 		await agent.generate()
 
 		const sent = provider.calls[0]?.messages
-		expect(sent?.[0]?.role).toBe('system')
-		expect(sent?.[0]?.content).toBe('Be brief.\n\nPlan: refund invoice 42.')
-		expect(selected.calls[0]?.[0].briefing).toBe(briefing)
+		expect(sent?.map(({ role, content }) => [role, content])).toEqual([
+			['system', 'Be brief.'],
+			['user', 'Plan: refund invoice 42.\n\n## Request\nInvoice 42.'],
+		])
+		expect(selected.calls[0]?.[0].messages).toEqual(sent?.slice(1))
 	})
 
 	it('fires again after each compaction rebuild with the request captured at entry', async () => {

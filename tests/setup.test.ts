@@ -15,8 +15,8 @@ import {
 	LEDGER_ORDER_LOOKUP,
 	fileLedgerCorrection,
 	planLedgerDelivery,
-	LEDGER_BRIEFING_MARKERS,
-	briefLedgerDesk,
+	LEDGER_RECORD_MARKERS,
+	collectLedgerMarkers,
 	serveAmendedDesk,
 	classifyLedgerCorrection,
 	exerciseThinkingReplay,
@@ -58,7 +58,23 @@ import {
 	createFailingScheduler,
 } from './setup.js'
 import {
+	CANARY_BUILD_SOURCES,
+	CANARY_LEDGER_SOURCES,
+	CANARY_SENTINELS,
+	RECORDED_ANSWER_REQUEST,
+	RECORDED_COMPACTION_REQUEST,
+	RECORDED_FIRST_REQUEST,
+	RECORDED_LATE_REQUEST,
+	createCanaryJudge,
+	extractLedgerRecords,
+	seedCanaryContext,
+	seedCompactionArm,
+	serveCanaryDesk,
+	serveRecordsDesk,
+} from './setup.js'
+import {
 	Classifier,
+	isLedgerError,
 	LedgerError,
 	LEDGER_QUESTIONS,
 	buildRecords,
@@ -1064,9 +1080,12 @@ describe('seedWorkspaceContext', () => {
 			'drop.png',
 		])
 		const built = context.build()
-		// The text files render into the system block; the image data attaches to the last user turn.
-		expect(requireValue(built[0]).content).toContain('KEPT FILE')
-		expect(requireValue(built[0]).content).toContain('DROPPED FILE')
+		// The text files render into the user context message after the system message; the image
+		// data attaches to the last user turn.
+		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'user'])
+		expect(requireValue(built[0]).content).toBe('sys')
+		expect(requireValue(built[1]).content).toContain('KEPT FILE')
+		expect(requireValue(built[1]).content).toContain('DROPPED FILE')
 		expect(built.at(-1)?.content).toBe('hi')
 		expect(built.at(-1)?.images).toEqual(['KEEPIMG', 'DROPIMG'])
 	})
@@ -1111,9 +1130,136 @@ describe('seedFramedAgent', () => {
 		expect(context.build().map((message) => message.role)).toEqual([
 			'system',
 			'user',
+			'user',
 			'assistant',
 			'user',
 		])
+	})
+})
+
+describe('system boundary canary fixtures', () => {
+	it('supplies one distinct sentinel per source, none inside another, and source lists drawn from it', () => {
+		const sentinels = Object.values(CANARY_SENTINELS)
+
+		expect(new Set(sentinels).size).toBe(sentinels.length)
+		expect(
+			sentinels.every((one) => sentinels.every((other) => one === other || !one.includes(other))),
+		).toBe(true)
+		expect(Object.keys(CANARY_SENTINELS)).toEqual(expect.arrayContaining([...CANARY_BUILD_SOURCES]))
+		expect(Object.keys(CANARY_SENTINELS)).toEqual(
+			expect.arrayContaining([...CANARY_LEDGER_SOURCES]),
+		)
+		expect(CANARY_BUILD_SOURCES).not.toContain('system')
+		expect(CANARY_LEDGER_SOURCES).not.toContain('system')
+	})
+
+	it('creates a judge that answers as the phrase judge and carries the sentinel in model and refusals', async () => {
+		const result = await createCanaryJudge(['Keep the loading']).ask(
+			{
+				state: 'Keep the loading dock clear.',
+				questions: { category: LEDGER_QUESTIONS.category, '["amends"]': LEDGER_QUESTIONS.amends },
+			},
+			new AbortController().signal,
+		)
+
+		expect(result).toEqual({
+			model: CANARY_SENTINELS.judge,
+			answers: { category: { form: 'choice', probabilities: { rule: 1 } } },
+			refusals: { '["amends"]': { missing: [CANARY_SENTINELS.judge] } },
+		})
+	})
+
+	it('seeds a compacted context carrying the build-path sentinels', async () => {
+		const context = await seedCanaryContext()
+		const conversation = requireValue(context.conversations.active)
+
+		expect(context.system).toContain(CANARY_SENTINELS.system)
+		expect(context.instructions.instruction('desk')?.content).toContain(
+			CANARY_SENTINELS.instruction,
+		)
+		expect(context.workspaces.active?.files().map((file) => file.path)).toEqual([
+			'scan.png',
+			'notes.txt',
+		])
+		expect(conversation.sections.map((section) => section.summary)).toEqual([
+			CANARY_SENTINELS.summary,
+		])
+		expect(conversation.messages().map((message) => message.content)).toEqual([
+			`Ask ${CANARY_SENTINELS.user} now.`,
+			`Check ${CANARY_SENTINELS.assistant} first.`,
+			`Found ${CANARY_SENTINELS.tool} only.`,
+			'Reply now.',
+		])
+	})
+
+	it('serves the canary desk on its first pass, answer pass, late request, and direct run', async () => {
+		const desk = await serveCanaryDesk()
+		const fault = desk.selections.at(-1)?.fault
+
+		expect(desk.calls).toHaveLength(5)
+		expect(isLedgerError(fault) && fault.code === 'REQUEST').toBe(true)
+		expect(desk.judgments.length).toBeGreaterThan(0)
+	})
+
+	it('serves the records desk on two requests and keeps both stored requests', async () => {
+		const desk = await serveRecordsDesk()
+
+		expect(desk.calls).toHaveLength(3)
+		expect(desk.selections).toHaveLength(3)
+		expect(
+			desk.messages
+				.filter((message) => message.content.startsWith('Check Brightwater Studio'))
+				.map((message) => message.content),
+		).toEqual(['Check Brightwater Studio.', 'Check Brightwater Studio again.'])
+	})
+
+	it('seeds the compaction arm with a desk instruction and one compacted section', async () => {
+		const agent = await seedCompactionArm(createScriptedProvider([{ content: 'x' }]))
+		const conversation = requireValue(agent.context.conversations.active)
+
+		expect(agent.context.system).toBeUndefined()
+		expect(agent.context.instructions.instructions().map((one) => one.name)).toEqual(['desk'])
+		expect(conversation.sections.map((section) => section.summary)).toEqual(['recap of 2'])
+		expect(conversation.messages().map((message) => message.content)).toEqual([
+			'Order 2 shipped.',
+			'Noted.',
+			'Which orders shipped?',
+		])
+	})
+
+	it('pins each recorded arm with one system message first and a user message last', () => {
+		for (const recorded of [
+			RECORDED_FIRST_REQUEST,
+			RECORDED_ANSWER_REQUEST,
+			RECORDED_LATE_REQUEST,
+			RECORDED_COMPACTION_REQUEST,
+		]) {
+			expect(recorded.filter((message) => message.role === 'system')).toHaveLength(1)
+			expect(recorded[0]?.role).toBe('system')
+			expect(recorded.at(-1)?.role).toBe('user')
+		}
+		expect(RECORDED_ANSWER_REQUEST[1]).toEqual(RECORDED_FIRST_REQUEST.at(-1))
+		expect(RECORDED_LATE_REQUEST.slice(0, -1)).toEqual(RECORDED_FIRST_REQUEST.slice(0, -1))
+	})
+
+	it('reads the records of the last request copy and empty text when no copy carries any', () => {
+		const copy: Message = {
+			id: 'copy',
+			role: 'user',
+			content: '## Records\n- Refund issued.\n\n## Request\nCheck BW-5512.',
+		}
+		const cue: Message = { id: 'cue', role: 'user', content: 'Answer now.' }
+		const system: Message = { id: 'system', role: 'system', content: 'a\n\n## Request\nb' }
+
+		expect(extractLedgerRecords([system, copy, cue])).toBe('## Records\n- Refund issued.')
+		expect(extractLedgerRecords([system, cue])).toBe('')
+		expect(extractLedgerRecords([])).toBe('')
+		expect(
+			extractLedgerRecords([
+				copy,
+				{ ...copy, id: 'late', content: 'Later.\n\n## Request\nAgain.' },
+			]),
+		).toBe('Later.')
 	})
 })
 
@@ -1952,15 +2098,15 @@ describe('guide scenario fixtures', () => {
 		)
 	})
 	it('returns the retained desk fragments at the supplied capacity', async () => {
-		expect(await briefLedgerDesk(200)).toEqual(LEDGER_BRIEFING_MARKERS)
-		expect(await briefLedgerDesk(59)).toEqual(LEDGER_BRIEFING_MARKERS.slice(4))
+		expect(await collectLedgerMarkers(200)).toEqual(LEDGER_RECORD_MARKERS)
+		expect(await collectLedgerMarkers(59)).toEqual(LEDGER_RECORD_MARKERS.slice(4))
 	})
 	it('returns an amended desk result and its actual recorded prompts', async () => {
 		const served = await serveAmendedDesk()
 		expect(served.result.passes).toHaveLength(2)
 		expect(served.result.content).toBe('Use code AA-12.')
 		expect(served.prompts).toHaveLength(4)
-		expect(served.prompts[0]?.[0]?.content).toContain(
+		expect(extractLedgerRecords(served.prompts[0] ?? [])).toContain(
 			'Refunds for Brightwater Studio need a manager.',
 		)
 	})
@@ -2047,7 +2193,7 @@ describe('buildLedgerTailScenario', () => {
 				id: 'result',
 				role: 'tool',
 				call: 'c1',
-				content: 'lookup_order {"id":"BW-5512"}: result shown under Pinned in the system message',
+				content: 'lookup_order {"id":"BW-5512"}: result shown under Records below',
 			},
 		])
 		expect(second).toEqual(first)

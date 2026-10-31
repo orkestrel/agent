@@ -85,7 +85,7 @@ describe('createAgent', () => {
 
 		expect(agent.context.workspaces).toBe(workspaces)
 		const built = agent.context.build()
-		expect(built[0]?.role).toBe('system')
+		expect(built.map((message) => message.role)).toEqual(['user'])
 		expect(built[0]?.content).toContain('const x = 1')
 	})
 

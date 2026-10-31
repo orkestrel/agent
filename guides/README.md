@@ -15,9 +15,9 @@ The `Agent` class is the conversation loop, the `AgentProvider` class the host-i
 engine a concrete provider extends, the `AgentJudge` class the engine a judge wire extends with the
 `SystemOneJudge` class as its System One wire, and the `RelayProvider` and `RelayStream` classes
 the browser end and the server end of the relay hop the `createRelay` function mounts.
-The `Ledger` class serves one conversation through a briefing it projects from what a judge
-filed, the `Classifier` class files messages through that judge, and the `Gauge` class prices
-the prompt.
+The `Ledger` class serves one conversation through records it projects from what a judge
+filed and writes into a copy of each request turn, the `Classifier` class files messages
+through that judge, and the `Gauge` class prices the prompt.
 
 The `providers`, `conversations`, `contexts`, `agents`, and `ledgers` modules under `src/core` are
 one layer concept, the conversation runtime, so `agent.md` is the one guide over all of them. The root files of

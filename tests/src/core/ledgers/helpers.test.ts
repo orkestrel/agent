@@ -8,6 +8,7 @@ import type {
 import type { Message } from '@src/core'
 import {
 	buildRecallMessage,
+	buildRequestMessage,
 	collectProjectionIds,
 	extractWords,
 	renderCauseChain,
@@ -100,6 +101,26 @@ describe('extracted ledger leaves', () => {
 				content: '',
 				calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic } }],
 			})
+	})
+
+	it('builds a request copy carrying the records ahead of the request and keeps the request', () => {
+		const request: Message = {
+			id: 'request',
+			role: 'user',
+			content: 'Check BW-5512.',
+			images: ['U0NBTg=='],
+		}
+		const copy = buildRequestMessage(request, '## Records\n- Refund issued.')
+
+		expect(copy).toEqual({
+			id: 'request',
+			role: 'user',
+			content: '## Records\n- Refund issued.\n\n## Request\nCheck BW-5512.',
+			images: ['U0NBTg=='],
+		})
+		expect(copy).not.toBe(request)
+		expect(request.content).toBe('Check BW-5512.')
+		expect(buildRequestMessage(request, '')).toBe(request)
 	})
 
 	it('renders topic names in order without reading criteria', () => {
@@ -1000,7 +1021,7 @@ describe('amendment rendering', () => {
 		expect(context.references.has('omitted')).toBe(false)
 		expect(context.first.get('first')).toBe(first)
 		expect(renderLedgerAnnotation(first, context)).toBe(
-			'[Ledger source 2]\nAccepted later amendment [Ledger source 3] is fully included in this briefing. Sentence scope is unresolved.',
+			'[Ledger source 2]\nAccepted later amendment [Ledger source 3] is fully included in these records. Sentence scope is unresolved.',
 		)
 		expect(renderLedgerAnnotation(second, context)).toBe('[Ledger source 3]')
 		expect(renderLedgerAnnotation(repeated, context)).toBe('')
@@ -1020,7 +1041,7 @@ describe('amendment rendering', () => {
 			['second', '2'],
 		])
 		expect(renderLedgerRecord({ title: 'Rules', lines: [first, second] }, trimmed)).toBe(
-			'## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\n- Equal.\n[Ledger source 2]\n- Equal.',
+			'## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\n- Equal.\n[Ledger source 2]\n- Equal.',
 		)
 	})
 
@@ -1065,14 +1086,14 @@ describe('amendment rendering', () => {
 		const complete = buildLedgerRenderContext(messages, [earlier, later, end], amendments)
 		expect([...complete.complete]).toEqual(['later'])
 		expect(renderLedgerAnnotation(earlier, complete)).toBe(
-			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.',
+			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
 		)
 		expect(renderLedgerAnnotation(later, complete)).toBe('[Ledger source 2]')
 		expect(renderLedgerAnnotation(end, complete)).toBe('')
 		const partial = buildLedgerRenderContext(messages, [earlier, later, later], amendments)
 		expect([...partial.complete]).toEqual([])
 		expect(renderLedgerAnnotation(earlier, partial)).toBe(
-			'[Ledger source 1]\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+			'[Ledger source 1]\nAccepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
 		)
 		expect(renderLedgerAnnotation(later, partial)).toBe('')
 		const absent = buildLedgerRenderContext(messages, [earlier], amendments)
@@ -1098,7 +1119,7 @@ describe('amendment rendering', () => {
 		const trimmed = buildLedgerRenderContext(messages, [original, correction], amendments)
 		const rendered = renderLedgerRecord({ title: 'Rules', lines: [original, correction] }, trimmed)
 		expect(rendered).toContain(
-			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\nAccepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.\n- Original.',
+			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\nAccepted later amendment text is not fully included in these records. Sentence scope is unresolved.\n- Original.',
 		)
 		expect(rendered).toContain('[Ledger source 2]\n- Correction.')
 		expect(rendered).not.toContain('hidden-owner-secret')
@@ -1761,7 +1782,7 @@ describe('renderStub', () => {
 			'lookup_order {"id":" BW-5512 "}: no record',
 		)
 		expect(renderStub('lookup_order', args, 'shown')).toBe(
-			'lookup_order {"id":" BW-5512 "}: result shown under Pinned in the system message',
+			'lookup_order {"id":" BW-5512 "}: result shown under Records below',
 		)
 		expect(renderStub('lookup_order', args, 'hidden')).toBe(
 			'lookup_order {"id":" BW-5512 "}: result not shown; call recall with BW-5512',

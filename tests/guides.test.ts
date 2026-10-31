@@ -146,8 +146,9 @@ await new GuideCommand({
 		LEDGER_ORDER_LOOKUP,
 		fileLedgerCorrection,
 		planLedgerDelivery,
-		LEDGER_BRIEFING_MARKERS,
-		briefLedgerDesk,
+		LEDGER_RECORD_MARKERS,
+		collectLedgerMarkers,
+		extractLedgerRecords,
 		LEDGER_AMENDED_RULE,
 		LEDGER_AMENDED_STATEMENT,
 		LEDGER_AMENDED_CORRECTION,
@@ -1323,8 +1324,10 @@ await new GuideCommand({
 				capacity: 32_768,
 				lookups: [lookup],
 			})
-			const briefings: Array<string | undefined> = []
-			ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing))
+			const copies: Array<string | undefined> = []
+			ledger.agent.emitter.on('select', (selection) =>
+				copies.push(selection.messages.at(-1)?.content),
+			)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
 
 			const gauge = await ledger.calibrate(AbortSignal.timeout(30_000))
@@ -1335,14 +1338,14 @@ await new GuideCommand({
 			expect(first.content).toBe('Order BW-5512 qualifies for a $148.50 refund.')
 			expect(first.passes).toHaveLength(1)
 			expect(second.content).toBe('Yes. Refunds over $100 need a manager.')
-			expect(briefings).toEqual([
-				'## Rules\n- Refunds over $100 need a manager.',
-				'## Pinned\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.',
+			expect(copies).toEqual([
+				'## Rules\n- Refunds over $100 need a manager.\n\n## Request\nCan Brightwater Studio get a refund on order BW-5512?',
+				'## Records\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nDoes the Brightwater Studio refund need a manager?',
 			])
 			// Every scripted reply was taken: two calibration calls and three turns.
 			expect(replies.next()).toEqual({ done: true, value: undefined })
-			// The second prompt is the system text and its briefing, the seed tail, and the request: the
-			// first request and its reply never reach it.
+			// The second prompt is the system text alone, the seed tail, and the request copy carrying
+			// the records: the first request and its reply never reach it.
 			expect(prompts.count).toBe(3)
 			expect(
 				requireValue(prompts.calls[2]?.[0], 'Missing prompt').map(({ role, content }) => [
@@ -1350,9 +1353,9 @@ await new GuideCommand({
 					content,
 				]),
 			).toEqual([
-				['system', `${system}\n\n${briefings[1]}`],
+				['system', system],
 				['user', 'Refunds over $100 need a manager.'],
-				['user', 'Does the Brightwater Studio refund need a manager?'],
+				['user', copies[1]],
 			])
 			expect(guideText).toContain('const replies = script.values()')
 			expect(guideText).toContain("generate: async () => replies.next().value ?? { content: '' },")
@@ -1364,10 +1367,13 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain("second.content // 'Yes. Refunds over $100 need a manager.'")
 			expect(guideText).toContain(
-				"briefings[0] // '## Rules\\n- Refunds over $100 need a manager.' — no lookup has named an owner yet",
+				"ledger.agent.emitter.on('select', (selection) => copies.push(selection.messages.at(-1)?.content))",
 			)
 			expect(guideText).toContain(
-				"// '## Pinned\\n### Brightwater Studio (account BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.'",
+				"// '## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nCan Brightwater Studio get a refund on order BW-5512?' — no lookup has named an owner yet",
+			)
+			expect(guideText).toContain(
+				"// '## Records\\n### Brightwater Studio (account BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?'",
 			)
 		})
 
@@ -1505,11 +1511,11 @@ await new GuideCommand({
 
 		it('drops off-topic rules, then outside sources, then on-topic rules, then owner lines, as the plan claims', async () => {
 			// Each capacity sits inside the band where exactly one more step of the order has run.
-			expect(await briefLedgerDesk(200)).toEqual(LEDGER_BRIEFING_MARKERS)
-			expect(await briefLedgerDesk(95)).toEqual(LEDGER_BRIEFING_MARKERS.slice(1))
-			expect(await briefLedgerDesk(82)).toEqual(LEDGER_BRIEFING_MARKERS.slice(2))
-			expect(await briefLedgerDesk(68)).toEqual(LEDGER_BRIEFING_MARKERS.slice(3))
-			expect(await briefLedgerDesk(59)).toEqual(LEDGER_BRIEFING_MARKERS.slice(4))
+			expect(await collectLedgerMarkers(200)).toEqual(LEDGER_RECORD_MARKERS)
+			expect(await collectLedgerMarkers(98)).toEqual(LEDGER_RECORD_MARKERS.slice(1))
+			expect(await collectLedgerMarkers(85)).toEqual(LEDGER_RECORD_MARKERS.slice(2))
+			expect(await collectLedgerMarkers(71)).toEqual(LEDGER_RECORD_MARKERS.slice(3))
+			expect(await collectLedgerMarkers(57)).toEqual(LEDGER_RECORD_MARKERS.slice(4))
 			expect(guideText).toContain(
 				"the ledger drops the rules off the request's topics, then the sources outside the selected records, then the rules on its topics, then the owner lines",
 			)
@@ -1556,18 +1562,16 @@ await new GuideCommand({
 			)
 		})
 
-		it('preserves amended sentences in the briefing, recall, answer note, and seed tail, as the records claim', async () => {
+		it('preserves amended sentences in the records, recall, answer note, and seed tail, as the records claim', async () => {
 			const { result, prompts } = await serveAmendedDesk()
 			expect(result.passes).toHaveLength(2)
 			const first = requireValue(prompts[0], 'Missing first prompt')
 
-			expect(requireValue(first[0], 'Missing system message').content).toContain(
+			expect(extractLedgerRecords(first)).toContain(
 				'- Refunds for Brightwater Studio need a manager.\n',
 			)
 			for (const prompt of prompts)
-				expect(requireValue(prompt[0], 'Missing system message').content).toContain(
-					'Use code AA-10.',
-				)
+				expect(extractLedgerRecords(prompt)).toContain('Use code AA-10.')
 			expect(first.map(({ content }) => content)).toContain(LEDGER_AMENDED_RULE)
 			expect(
 				requireValue(prompts[1], 'Missing desk recall').findLast(({ role }) => role === 'tool')
@@ -1780,7 +1784,7 @@ await new GuideCommand({
 			expect(isLedgerError(direct.fault)).toBe(true)
 			expect(direct.fault).toMatchObject({ code: 'REQUEST' })
 			expect(faults.calls.flat()).toEqual([direct.fault])
-			expect(direct.briefing).toBeUndefined()
+			expect(extractLedgerRecords(direct.messages)).toBe('')
 			expect(
 				requireValue(provider.calls[2], 'Missing direct run')
 					.messages.slice(1)
@@ -1802,10 +1806,10 @@ await new GuideCommand({
 			expect(faults.calls.flat()).toEqual([direct.fault, measured.fault])
 			expect(asks.calls).toEqual(asked)
 			expect(guideText).toContain(
-				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no briefing.',
+				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no records.',
 			)
 			expect(guideText).toContain(
-				"An active `respond` call owns a run whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so the agent emits `fault` and builds the prompt from the whole conversation view with no briefing, and the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
+				"An active `respond` call owns a run whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so the agent emits `fault` and builds the prompt from the whole conversation view with no records, and the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
 			)
 		})
 
@@ -1859,10 +1863,10 @@ await new GuideCommand({
 			)
 		})
 
-		it('fits a short-id lookup at the tail boundary when its shown stub is longer, as the plan claims', async () => {
+		it('fits a short-id lookup at the tail boundary priced at its longer hidden stub, as the plan claims', async () => {
 			const { request, seed, boundaries } = buildLedgerTailScenario()
 			const [hidden, shown] = boundaries
-			expect(estimateMessages([shown])).toBeGreaterThan(estimateMessages([hidden]))
+			expect(estimateMessages([hidden])).toBeGreaterThan(estimateMessages([shown]))
 			for (const boundary of boundaries) {
 				const allowance = estimateMessages([...seed, boundary, request]) + 0.25
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
@@ -1882,14 +1886,16 @@ await new GuideCommand({
 				])
 				await ledger.respond(request.content)
 				const sent = requireValue(provider.calls[0]).messages
-				expect(sent[0]?.content).toContain('Order BW-5512 belongs to Brightwater Studio.')
-				expect(estimateMessages(sent.slice(1))).toBeLessThanOrEqual(allowance)
+				expect(extractLedgerRecords(sent)).toContain('Order BW-5512 belongs to Brightwater Studio.')
+				// The tail share prices the stored request; the request copy carries the records beside it.
+				expect(estimateMessages([...sent.slice(1, -1), request])).toBeLessThanOrEqual(allowance)
+				// Only the allowance that fits the hidden form keeps the exchange, whose stub then shows.
 				expect(
 					sent.filter((message) => message.role === 'tool').map((message) => message.content),
-				).toEqual(boundary === shown ? [shown.content] : [])
+				).toEqual(boundary === hidden ? [shown.content] : [])
 			}
 			expect(guideText).toContain(
-				'The plan prices each lookup stub in the tail at the longer of its `shown` and `hidden` forms, so a tail that fits the plan still fits after the briefing decides which results it shows.',
+				'The plan prices each lookup stub in the tail at the longer of its `shown` and `hidden` forms, so a tail that fits the plan still fits after the records decide which results they show.',
 			)
 		})
 
@@ -1928,12 +1934,12 @@ await new GuideCommand({
 			const [owned, concurrent] = selections.calls.map(([selection]) => selection)
 			expect(selections.calls).toHaveLength(2)
 			expect(requireValue(concurrent, 'Missing concurrent selection').fault).toBeUndefined()
-			expect(requireValue(concurrent, 'Missing concurrent selection').briefing).toBe(
-				requireValue(owned, 'Missing owned selection').briefing,
+			expect(requireValue(concurrent, 'Missing concurrent selection').messages.at(-1)).toEqual(
+				requireValue(owned, 'Missing owned selection').messages.at(-1),
 			)
-			expect(requireValue(concurrent, 'Missing concurrent selection').briefing).toContain(
-				'Refunds over $100 need a manager.',
-			)
+			expect(
+				extractLedgerRecords(requireValue(concurrent, 'Missing concurrent selection').messages),
+			).toContain('Refunds over $100 need a manager.')
 			expect(guideText).toContain(
 				"The ledger tells its runs apart by the newest message alone, so a direct run started while a `respond` call is active and that call's request or one of the ledger's notes is the newest message gets a planned selection, as the call's own run does.",
 			)
@@ -2014,7 +2020,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('numbers briefing-local display references while preserving source identities', () => {
+		it('numbers display references local to the records while preserving source identities', () => {
 			const first: LedgerLine = {
 				text: 'Keep the receipt.',
 				source: 'stored-source-id',
@@ -2026,7 +2032,7 @@ await new GuideCommand({
 			expect(display.references.get('stored-source-id')).toBe('1')
 			expect(first.source).toBe('stored-source-id')
 			expect(guideText).toContain(
-				'References are local to one briefing and are recomputed after each trim; omitted sources do not shift them.',
+				'References are local to one rendering of the records and are recomputed after each trim; omitted sources do not shift them.',
 			)
 		})
 
@@ -2102,12 +2108,11 @@ await new GuideCommand({
 			expect(barrel.identifyLookup('lookup_order', { id: 'bw-5512' })).toBe(
 				barrel.identifyLookup('lookup_order', { id: 'BW-5512' }),
 			)
-			const briefing = requireValue(
-				provider.calls.at(-1)?.messages[0],
-				'Missing system message',
-			).content
-			expect(briefing).toContain('- Order BW-5512 for account BW-20931: Brightwater Studio.')
-			expect(briefing).not.toContain('Order bw-5512')
+			const records = extractLedgerRecords(
+				requireValue(provider.calls.at(-1), 'Missing last call').messages,
+			)
+			expect(records).toContain('- Order BW-5512 for account BW-20931: Brightwater Studio.')
+			expect(records).not.toContain('Order bw-5512')
 			expect(guideText).toContain(
 				"For a lookup, the repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which reading replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second reading replaces the first in the records.",
 			)
@@ -2152,7 +2157,7 @@ await new GuideCommand({
 			expect(estimateMessages(first)).toBeGreaterThan(capacity)
 			expect(second.findLast(({ role }) => role === 'tool')?.content).toBe(reading)
 			expect(guideText).toContain(
-				"The budget bounds only the briefing and the tail of a request's first call. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The budget bounds only the records and the tail of a request's first call: the plan prices the system message, the tail, and the copy of the request turn with the records it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 			expect(guideText).toContain(
 				"A request, a lookup result, the pass's own turns, the answer note, or the whole view a faulted selection builds from reaches the provider whole when it's larger than the room the `capacity` option leaves, and the provider's own context limit decides what happens to it.",
@@ -2228,11 +2233,11 @@ await new GuideCommand({
 			)
 			expect(estimateMessages(direct)).toBeGreaterThan(budget)
 			expect(guideText).toContain(
-				"The budget bounds only the briefing and the tail of a request's first call. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The budget bounds only the records and the tail of a request's first call: the plan prices the system message, the tail, and the copy of the request turn with the records it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 		})
 
-		it('tails only the seed and briefs a message added after the first request, as the seed-tail limit claims', async () => {
+		it('tails only the seed and records a message added after the first request, as the seed-tail limit claims', async () => {
 			const later = 'The Northgate courier brings refund forms on 2026-10-12.'
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
@@ -2249,14 +2254,16 @@ await new GuideCommand({
 
 			await ledger.respond('When do the refund forms arrive?')
 
-			const [system, ...tail] = requireValue(provider.calls[1], 'Missing second request').messages
-			expect(tail.map(({ content }) => content)).toEqual([
+			const sent = requireValue(provider.calls[1], 'Missing second request').messages
+			const records = extractLedgerRecords(sent)
+			expect(sent.map(({ content }) => content)).toEqual([
+				'Serve the desk.',
 				'Refunds over $100 need a manager.',
-				'When do the refund forms arrive?',
+				`${records}\n\n## Request\nWhen do the refund forms arrive?`,
 			])
-			expect(requireValue(system, 'Missing system message').content).toContain(later)
+			expect(records).toContain(later)
 			expect(guideText).toContain(
-				'Only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the briefing or the `recall` tool.',
+				'Only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the records or the `recall` tool.',
 			)
 		})
 
@@ -2317,8 +2324,10 @@ await new GuideCommand({
 					],
 				}),
 			)
-			const briefings: string[] = []
-			ledger.agent.emitter.on('select', (selection) => briefings.push(selection.briefing ?? ''))
+			const texts: string[] = []
+			ledger.agent.emitter.on('select', (selection) =>
+				texts.push(extractLedgerRecords(selection.messages)),
+			)
 			ledger.conversation.add([
 				{ role: 'user', content: rule },
 				{ role: 'user', content: caller },
@@ -2330,15 +2339,15 @@ await new GuideCommand({
 			for (const amount of LEDGER_REFUND_AMOUNTS)
 				await ledger.respond(`Does the $${amount} Brightwater Studio refund need a manager?`)
 
-			const [, second, ...later] = briefings
-			expect(briefings).toHaveLength(5)
-			for (const briefing of briefings) expect(briefing).toContain(rule)
+			const [, second, ...later] = texts
+			expect(texts).toHaveLength(5)
+			for (const records of texts) expect(records).toContain(rule)
 			expect(second).toContain('- Refund due $148.50.')
 			expect(second).toContain(caller)
-			for (const briefing of later) {
-				expect(briefing).toContain('- Refund due $90.00.')
-				expect(briefing).not.toContain('$148.50')
-				expect(briefing).not.toContain(caller)
+			for (const records of later) {
+				expect(records).toContain('- Refund due $90.00.')
+				expect(records).not.toContain('$148.50')
+				expect(records).not.toContain(caller)
 			}
 			expect(guideText).toContain(
 				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later reading of the same lookup replaces it, or a later answer files it quiet.',
@@ -2494,17 +2503,20 @@ await new GuideCommand({
 			const picked = b.search('database')
 			const block = b.reference({ label: 'planning', messages: picked })
 			agent.context.workspaces.add().write(`conversation:${b.id}.md`, block)
-			const system = requireValue(agent.context.build()[0], 'Missing system message').content
+			const built = agent.context.build()
+			const reference = requireValue(built[0], 'Missing context message').content
 
 			expect(picked.map(({ content }) => content)).toEqual([
 				'Which database fits the export?',
 				'We chose Postgres as the database.',
 			])
-			expect(system).toContain(
+			// No system text and no instructions, and the active conversation 'auth' is empty: the context message alone, with none of planning's turns merged in.
+			expect(built.map(({ role }) => role)).toEqual(['user'])
+			expect(reference).toContain(
 				'[Reference — conversation "planning" — NOT part of this conversation]',
 			)
-			expect(system).toContain('- assistant: We chose Postgres as the database.')
-			expect(system).not.toContain('Book the venue.')
+			expect(reference).toContain('- assistant: We chose Postgres as the database.')
+			expect(reference).not.toContain('Book the venue.')
 		})
 
 		it('renders the switched workspace in the next build as the workspace-switch fence claims', async () => {
@@ -2520,9 +2532,10 @@ await new GuideCommand({
 			const other = agent.context.workspaces.add()
 			other.write('notes.txt', 'different context')
 			agent.context.workspaces.switch(other.id)
-			const switched = requireValue(agent.context.build()[0], 'Missing system message').content
+			const switched = requireValue(agent.context.build()[0], 'Missing context message').content
 			agent.context.apply(createScope({ name: 'cfg', files: ['src/config.ts'] }))
 
+			expect(provider.calls[0]?.messages.map(({ role }) => role)).toEqual(['user', 'user'])
 			expect(provider.calls[0]?.messages[0]?.content).toContain('File: src/config.ts')
 			expect(switched).toContain('File: notes.txt')
 			expect(switched).not.toContain('src/config.ts')

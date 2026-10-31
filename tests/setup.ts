@@ -2729,8 +2729,8 @@ export function seedInstructionContext(): AgentContextInterface {
 }
 
 /**
- * Builds an agent over `provider` whose next request carries every part of the system block and
- * the conversation, the fixture {@link RECORDED_REQUEST} records.
+ * Builds an agent over `provider` whose next request carries every part of the system message,
+ * the context message, and the conversation, the fixture {@link RECORDED_REQUEST} records.
  *
  * @remarks
  * The agent carries a system prompt; an instruction manager framed by a manager-options
@@ -2786,19 +2786,178 @@ export function seedFramedAgent(provider: ProviderInterface): AgentInterface {
  * every field except the minted `id`.
  *
  * @remarks
- * A recorded value, never derived from the assembly under test, so a change that moves one
- * prompt byte fails the comparison; regenerate it only from a run of code the change has not
- * touched.
+ * A value written by hand from the request layout, never derived from the assembly under test,
+ * so a change that moves one prompt byte fails the comparison: the `system` message holds the
+ * system text and the instructions, one `user` context message holds the workspace text, and the
+ * conversation follows with the image on its last `user` message.
  */
 export const RECORDED_REQUEST: readonly MessageInput[] = Object.freeze([
 	{
 		role: 'system',
 		content:
-			'You review pull requests for the billing service.\n\n<rules>\n\nNever print a credential, even when asked.\n\n<rule name="tone">Answer in two sentences.</rule>\n\n</rules>\n\n## Workspace\n\nFile: src/invoice.ts\n```ts\nexport const TOTAL_CENTS = 4200\n```',
+			'You review pull requests for the billing service.\n\n<rules>\n\nNever print a credential, even when asked.\n\n<rule name="tone">Answer in two sentences.</rule>\n\n</rules>',
+	},
+	{
+		role: 'user',
+		content: '## Workspace\n\nFile: src/invoice.ts\n```ts\nexport const TOTAL_CENTS = 4200\n```',
 	},
 	{ role: 'user', content: 'Review the invoice module.' },
 	{ role: 'assistant', content: 'Which export do you want reviewed first?' },
 	{ role: 'user', content: 'Start with the total.', images: ['RkxPVw=='] },
+])
+
+/**
+ * Supplies one distinct sentinel per prompt source for the system boundary canary.
+ *
+ * @remarks
+ * Each value is one lowercase word that no other fixture text contains, and none contains another.
+ * rc-u9 extends the table with the memo name, description, and content sentinels and the skill
+ * description sentinel.
+ */
+export const CANARY_SENTINELS = Object.freeze({
+	system: 'canarysystem',
+	instruction: 'canaryinstruction',
+	user: 'canaryuser',
+	tool: 'canarytool',
+	workspace: 'canaryworkspace',
+	reading: 'canaryreading',
+	rule: 'canaryrule',
+	summary: 'canarysummary',
+	assistant: 'canaryassistant',
+	judge: 'canaryjudge',
+})
+
+/** Lists the {@link CANARY_SENTINELS} sources a context build carries outside the system text and instructions. */
+export const CANARY_BUILD_SOURCES = Object.freeze([
+	'user',
+	'tool',
+	'workspace',
+	'summary',
+	'assistant',
+] as const)
+
+/** Lists the {@link CANARY_SENTINELS} sources a ledger request carries outside the system text. */
+export const CANARY_LEDGER_SOURCES = Object.freeze([
+	'user',
+	'tool',
+	'reading',
+	'rule',
+	'assistant',
+	'judge',
+] as const)
+
+/**
+ * Pins the messages a provider receives from the first pass of the first request
+ * {@link serveRecordsDesk} serves, every field except the stored `id`.
+ *
+ * @remarks
+ * Written by hand from the request layout: the `system` message holds the system text alone, the
+ * seed lookups follow as tail stubs, and the last `user` message is the built copy of the request,
+ * the records, then `## Request`, then the prompt.
+ */
+export const RECORDED_FIRST_REQUEST: readonly MessageInput[] = Object.freeze([
+	{ role: 'system', content: 'Serve the desk.' },
+	{
+		role: 'assistant',
+		content: '',
+		calls: [{ id: 'owner-0', name: 'lookup', arguments: { id: 'order:BW-5512' } }],
+	},
+	{
+		role: 'tool',
+		call: 'owner-0',
+		content: 'lookup {"id":"order:BW-5512"}: result shown under Records below',
+	},
+	{
+		role: 'assistant',
+		content: '',
+		calls: [{ id: 'owner-1', name: 'lookup', arguments: { id: 'customer:BW-20931' } }],
+	},
+	{
+		role: 'tool',
+		call: 'owner-1',
+		content: 'lookup {"id":"customer:BW-20931"}: result shown under Records below',
+	},
+	{
+		role: 'user',
+		content:
+			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
+	},
+])
+
+/**
+ * Pins the messages a provider receives from the answer pass of the first request
+ * {@link serveRecordsDesk} serves, every field except the stored `id`.
+ *
+ * @remarks
+ * Written by hand from the request layout: the answer pass keeps the `system` message and the
+ * request copy of the first pass, drops the tool stubs and the call messages, and ends in the cue.
+ */
+export const RECORDED_ANSWER_REQUEST: readonly MessageInput[] = Object.freeze([
+	{ role: 'system', content: 'Serve the desk.' },
+	{
+		role: 'user',
+		content:
+			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
+	},
+	{
+		role: 'user',
+		content:
+			'[Desk] Give your complete answer now as your final message, from what you already have.',
+	},
+])
+
+/**
+ * Pins the messages a provider receives from the first pass of the second request
+ * {@link serveRecordsDesk} serves, every field except the stored `id`.
+ *
+ * @remarks
+ * Written by hand from the request layout: a late request sends the same seed tail and writes the
+ * same records into the copy of its own request turn.
+ */
+export const RECORDED_LATE_REQUEST: readonly MessageInput[] = Object.freeze([
+	{ role: 'system', content: 'Serve the desk.' },
+	{
+		role: 'assistant',
+		content: '',
+		calls: [{ id: 'owner-0', name: 'lookup', arguments: { id: 'order:BW-5512' } }],
+	},
+	{
+		role: 'tool',
+		call: 'owner-0',
+		content: 'lookup {"id":"order:BW-5512"}: result shown under Records below',
+	},
+	{
+		role: 'assistant',
+		content: '',
+		calls: [{ id: 'owner-1', name: 'lookup', arguments: { id: 'customer:BW-20931' } }],
+	},
+	{
+		role: 'tool',
+		call: 'owner-1',
+		content: 'lookup {"id":"customer:BW-20931"}: result shown under Records below',
+	},
+	{
+		role: 'user',
+		content:
+			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio again.',
+	},
+])
+
+/**
+ * Pins the messages a provider receives from the agent {@link seedCompactionArm} builds, every
+ * field except the minted or stored `id`.
+ *
+ * @remarks
+ * Written by hand from the 0.0.34 layout, which the compaction arm keeps: the `system` message
+ * holds the `desk` instruction under `## Instructions`, the compacted section follows as one
+ * `assistant` recap, and the live tail ends in the request.
+ */
+export const RECORDED_COMPACTION_REQUEST: readonly MessageInput[] = Object.freeze([
+	{ role: 'system', content: '## Instructions\n\nServe the desk.' },
+	{ role: 'assistant', content: '[Summary of earlier messages] recap of 2' },
+	{ role: 'user', content: 'Order 2 shipped.' },
+	{ role: 'assistant', content: 'Noted.' },
+	{ role: 'user', content: 'Which orders shipped?' },
 ])
 
 /** Carries the manager-options `open` override that {@link resolveSectionOpen} reads, when one applies. */
@@ -4250,10 +4409,10 @@ export const LEDGER_PRESERVATION_FIXTURE = Object.freeze({
 		'For BW-20931 revoke Ada permission. Ben remains permitted to collect the package after the clerk checks the signed receipt and confirms the scheduled pickup time with the account holder.',
 	cases: Object.freeze([
 		{ capacity: 60, sentences: 0 },
-		{ capacity: 76, sentences: 1 },
-		{ capacity: 85, sentences: 2 },
-		{ capacity: 131, sentences: 3 },
-		{ capacity: 141, sentences: 4 },
+		{ capacity: 78, sentences: 1 },
+		{ capacity: 88, sentences: 2 },
+		{ capacity: 134, sentences: 3 },
+		{ capacity: 145, sentences: 4 },
 	]),
 })
 
@@ -4293,19 +4452,19 @@ export const LEDGER_OWNER_FIXTURE = Object.freeze({
 	request: 'Check Brightwater Studio.',
 })
 
-/** Supplies full and single-cut provider bytes for the equal-member owner view. */
+/** Supplies the full and single-cut records of the equal-member owner view. */
 export const LEDGER_OWNER_RENDER_CASES = Object.freeze([
 	{
 		title: 'renders equal-member owners once under both titles',
 		capacity: 4096,
-		system:
-			'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
+		records:
+			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
 	},
 	{
 		title: 'trims the merged owner record by its oldest line',
 		capacity: 80,
-		system:
-			'Serve the desk.\n\n## Pinned\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
+		records:
+			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
 	},
 ])
 
@@ -4861,8 +5020,8 @@ export async function planLedgerDelivery(
 		content,
 	])
 }
-/** Lists briefing fragments in their removal order. */
-export const LEDGER_BRIEFING_MARKERS = Object.freeze([
+/** Lists the record fragments of the {@link collectLedgerMarkers} desk in their removal order. */
+export const LEDGER_RECORD_MARKERS = Object.freeze([
 	'Keep the loading dock at warehouse 42 clear.',
 	'The Northgate courier brings refund forms on 2026-10-12.',
 	'Refunds over $100 need a manager.',
@@ -4871,11 +5030,11 @@ export const LEDGER_BRIEFING_MARKERS = Object.freeze([
 ])
 
 /**
- * Builds a desk briefing at a supplied capacity.
+ * Collects the record fragments a desk request copy retains at a supplied capacity.
  * @param capacity - The context capacity
- * @returns The retained briefing fragments in removal order
+ * @returns The retained record fragments in removal order
  */
-export async function briefLedgerDesk(capacity: number): Promise<readonly string[]> {
+export async function collectLedgerMarkers(capacity: number): Promise<readonly string[]> {
 	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 	const ledger = createLedger(
 		provider,
@@ -4903,8 +5062,10 @@ export async function briefLedgerDesk(capacity: number): Promise<readonly string
 		},
 	])
 	await ledger.respond('Does the Brightwater Studio refund need a manager?')
-	const system = requireValue(provider.calls[0]?.messages[0], 'Missing system message').content
-	return LEDGER_BRIEFING_MARKERS.filter((marker) => system.includes(marker))
+	const records = extractLedgerRecords(
+		requireValue(provider.calls[0], 'Missing first call').messages,
+	)
+	return LEDGER_RECORD_MARKERS.filter((marker) => records.includes(marker))
 }
 /** Supplies the original amended rule. */
 export const LEDGER_AMENDED_RULE = 'Refunds for Brightwater Studio need a manager. Use code AA-10.'
@@ -5313,3 +5474,284 @@ export const LEDGER_FAILURE_MESSAGES: readonly [string, string, string] = Object
 
 /** Supplies summarizer digests whose trimmed text is empty, which a compaction refuses. */
 export const BLANK_DIGESTS = Object.freeze(['', ' ', '  \n', '\t\n '])
+
+/**
+ * Creates a phrase judge whose every returned string field carries the judge canary sentinel.
+ *
+ * @remarks
+ * It answers as {@link createPhraseJudge} does, returns the `judge` member of
+ * {@link CANARY_SENTINELS} as the result's `model`, and refuses each `noul` question the phrase
+ * judge answers below 0.5 with that sentinel as its one `missing` key, which the classifier reads
+ * as the same no.
+ *
+ * @param rules - Text fragments filed as rules
+ * @returns The canary judge
+ */
+export function createCanaryJudge(rules: readonly string[]): JudgeInterface {
+	const phrase = createPhraseJudge(rules)
+	return {
+		id: 'canary',
+		name: 'canary',
+		model: 'canary',
+		ask: async (request, signal) => {
+			const result = await phrase.ask(request, signal)
+			const refused = new Set(
+				Object.entries(result.answers).flatMap(([id, answer]) =>
+					answer.form === 'noul' && answer.noul < 0.5 ? [id] : [],
+				),
+			)
+			return {
+				model: CANARY_SENTINELS.judge,
+				answers: Object.fromEntries(
+					Object.entries(result.answers).filter(([id]) => !refused.has(id)),
+				),
+				...(refused.size === 0
+					? {}
+					: {
+							refusals: Object.fromEntries(
+								[...refused].map((id) => [id, { missing: [CANARY_SENTINELS.judge] }]),
+							),
+						}),
+			}
+		},
+	}
+}
+
+/**
+ * Builds an {@link AgentContextInterface} that carries every build-path sentinel of
+ * {@link CANARY_SENTINELS}.
+ *
+ * @remarks
+ * The system text and the `desk` instruction carry their sentinels. The active workspace holds one
+ * text file carrying the workspace sentinel and one image. The conversation's first exchange folds
+ * into a section whose summary is the summary sentinel, and the live tail holds the user, assistant,
+ * and tool sentinels and ends in a `user` message.
+ *
+ * @returns The seeded context after its compaction
+ */
+export async function seedCanaryContext(): Promise<AgentContextInterface> {
+	const conversations = createConversationManager({
+		summarize: async () => CANARY_SENTINELS.summary,
+		keep: 4,
+	})
+	const context = new AgentContext({
+		system: `Serve the ${CANARY_SENTINELS.system} desk.`,
+		conversations,
+	})
+	context.instructions.add({
+		name: 'desk',
+		content: `Follow the ${CANARY_SENTINELS.instruction} rule.`,
+	})
+	const workspace = context.workspaces.add({
+		seed: [createFile({ path: 'scan.png', content: createBinaryContent('U0NBTg==', 'image/png') })],
+	})
+	workspace.write('notes.txt', `Read ${CANARY_SENTINELS.workspace} first.`)
+	context.messages.add([
+		{ role: 'user', content: 'Open the desk.' },
+		{ role: 'assistant', content: 'The desk is open.' },
+		{ role: 'user', content: `Ask ${CANARY_SENTINELS.user} now.` },
+		{
+			role: 'assistant',
+			content: `Check ${CANARY_SENTINELS.assistant} first.`,
+			calls: [{ id: 'canary', name: 'add', arguments: {} }],
+		},
+		{ role: 'tool', call: 'canary', content: `Found ${CANARY_SENTINELS.tool} only.` },
+		{ role: 'user', content: 'Reply now.' },
+	])
+	await requireValue(context.conversations.active, 'Missing active conversation').compact()
+	return context
+}
+
+/** Carries what {@link serveCanaryDesk} sent and recorded. */
+export interface CanaryDesk {
+	/** Lists each provider call's messages: the first pass's two calls, the answer pass, the late request, then the direct run. */
+	readonly calls: ReadonlyArray<readonly Message[]>
+	/** Lists every selection the ledger's agent emitted, in order. */
+	readonly selections: readonly Selection[]
+	/** Lists the judgment records the canary judge's results produced. */
+	readonly judgments: readonly Judgment[]
+}
+
+/**
+ * Serves a ledger desk that plants every ledger-path sentinel of {@link CANARY_SENTINELS} on each
+ * path a ledger sends.
+ *
+ * @remarks
+ * The seed holds a rule carrying the rule sentinel and a lookup reading, filed onto its owner,
+ * carrying the reading sentinel; the system text carries the system sentinel and the judge is
+ * {@link createCanaryJudge}. The first request carries the user sentinel, and its first pass calls
+ * a note lookup whose result carries the tool sentinel, under content carrying the assistant
+ * sentinel, then ends empty, so an answer pass runs. A late request follows, then a direct
+ * `agent.generate()` with a user message newest, whose selection faults with code `'REQUEST'`.
+ *
+ * @returns The provider calls, the selections, and the judgment records
+ */
+export async function serveCanaryDesk(): Promise<CanaryDesk> {
+	const provider = createScriptedProvider(
+		[
+			{
+				content: `Checking ${CANARY_SENTINELS.assistant}.`,
+				tools: [{ id: 'note', name: 'lookup_note', arguments: { topic: 'dock' } }],
+			},
+			{ content: '' },
+			{ content: 'Done.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildGuideLedgerOptions({
+			judge: createCanaryJudge(['Keep the loading']),
+			system: `Serve the ${CANARY_SENTINELS.system} desk.`,
+			capacity: 4096,
+			share: { prompt: 1, tail: 0.001 },
+			lookups: [
+				LEDGER_ORDER_LOOKUP,
+				{
+					tool: {
+						name: 'lookup_note',
+						description: 'Read a desk note.',
+						parameters: { type: 'object' },
+						execute: () => `Found ${CANARY_SENTINELS.tool} only.`,
+					},
+					read: () => undefined,
+				},
+			],
+		}),
+	)
+	const selections = createRecorder<readonly [selection: Selection]>()
+	ledger.agent.emitter.on('select', selections.handler)
+	ledger.conversation.add([
+		{
+			role: 'user',
+			content: `Keep the loading dock at warehouse 42 clear for ${CANARY_SENTINELS.rule}.`,
+		},
+		{
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+		},
+		{
+			role: 'tool',
+			call: 'seed',
+			content: `Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50 to ${CANARY_SENTINELS.reading}.`,
+		},
+	])
+	await ledger.respond(
+		`Does the Brightwater Studio refund need a manager for ${CANARY_SENTINELS.user}?`,
+	)
+	await ledger.respond('Is the Brightwater Studio order still open?')
+	ledger.conversation.add({ role: 'user', content: 'One more thing.' })
+	await ledger.agent.generate()
+	return {
+		calls: provider.calls.map((call) => call.messages),
+		selections: selections.calls.map(([selection]) => selection),
+		judgments: ledger.conversation.judgments.judgments(),
+	}
+}
+
+/** Carries what {@link serveRecordsDesk} sent and stored. */
+export interface RecordsDesk {
+	/** Lists each provider call's messages: the first request's first pass and answer pass, then the second request's first pass. */
+	readonly calls: ReadonlyArray<readonly Message[]>
+	/** Lists every selection the ledger's agent emitted, in order. */
+	readonly selections: readonly Selection[]
+	/** Lists the conversation's stored messages after both requests. */
+	readonly messages: readonly Message[]
+}
+
+/**
+ * Serves two requests over the {@link LEDGER_OWNER_FIXTURE} readings, the scenario
+ * {@link RECORDED_FIRST_REQUEST}, {@link RECORDED_ANSWER_REQUEST}, and {@link RECORDED_LATE_REQUEST}
+ * record.
+ *
+ * @remarks
+ * The seed lookups fit the tail. The first request's first pass ends empty, so an answer pass
+ * runs, and the second request asks again for the same owner.
+ *
+ * @returns The provider calls, the selections, and the stored messages
+ */
+export async function serveRecordsDesk(): Promise<RecordsDesk> {
+	const fixture = LEDGER_OWNER_FIXTURE
+	const provider = createScriptedProvider([{ content: '' }, { content: 'Done.' }], {
+		recorded: true,
+	})
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			judge: createPhraseJudge([]),
+			topics: [],
+			share: { prompt: 1, tail: 0.35 },
+			lookups: [
+				{
+					tool: createTool({ name: 'lookup', execute: () => '' }),
+					read: (values) => ({
+						ids: [],
+						owners: fixture.owners.filter((owner) => owner.id === values.id),
+					}),
+				},
+			],
+		}),
+	)
+	const selections = createRecorder<readonly [selection: Selection]>()
+	ledger.agent.emitter.on('select', selections.handler)
+	for (const [at, content] of fixture.readings.entries())
+		ledger.conversation.add(
+			buildLedgerExchange(content, `owner-${at}`, { id: fixture.owners[at]?.id }),
+		)
+	await ledger.respond(fixture.request)
+	await ledger.respond('Check Brightwater Studio again.')
+	return {
+		calls: provider.calls.map((call) => call.messages),
+		selections: selections.calls.map(([selection]) => selection),
+		messages: ledger.conversation.messages(),
+	}
+}
+
+/**
+ * Builds an agent over `provider` wired as the Study's compaction arm, the fixture
+ * {@link RECORDED_COMPACTION_REQUEST} records.
+ *
+ * @remarks
+ * The agent carries no system text, a `desk` instruction, and a window; its conversation keeps 2
+ * messages, summarizes through {@link createStubSummarizer}, and is compacted once, so its oldest
+ * exchange folds into one section.
+ *
+ * @param provider - The provider the agent sends its request to
+ * @returns The compacted agent, ready for one `generate` call
+ */
+export async function seedCompactionArm(provider: ProviderInterface): Promise<AgentInterface> {
+	const conversations = createConversationManager()
+	const conversation = conversations.add({ keep: 2, summarize: createStubSummarizer().summarize })
+	const agent = createAgent(provider, {
+		conversations,
+		window: createBudget<ProviderRequest>({ max: 32_768, consumer: estimateRequest }),
+	})
+	agent.context.instructions.add({ name: 'desk', content: 'Serve the desk.' })
+	conversation.add([
+		{ role: 'user', content: 'Order 1 shipped.' },
+		{ role: 'assistant', content: 'Noted.' },
+		{ role: 'user', content: 'Order 2 shipped.' },
+		{ role: 'assistant', content: 'Noted.' },
+		{ role: 'user', content: 'Which orders shipped?' },
+	])
+	await conversation.compact()
+	return agent
+}
+
+/**
+ * Extracts the records a ledger wrote into the request copy among `messages`.
+ *
+ * @remarks
+ * The request copy is the last `user` message whose content carries a `## Request` heading: the
+ * records, a blank line, the heading, then the prompt. Messages without one carry no records.
+ *
+ * @param messages - The messages of one provider call or one selection
+ * @returns The records ahead of the `## Request` heading, or empty text when no copy carries any
+ */
+export function extractLedgerRecords(messages: readonly Message[]): string {
+	const copy = messages.findLast(
+		(message) => message.role === 'user' && message.content.includes('\n\n## Request\n'),
+	)
+	return copy === undefined ? '' : copy.content.slice(0, copy.content.indexOf('\n\n## Request\n'))
+}

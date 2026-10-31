@@ -81,7 +81,7 @@ export interface LedgerTopic {
  *
  * @remarks
  * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
- * before the briefing and the tail take the rest. `tail` is a share of what remains for messages.
+ * before the records and the tail take the rest. `tail` is a share of what remains for messages.
  * Each share must be finite, greater than 0, and at most 1.
  */
 export interface LedgerShare {
@@ -236,7 +236,7 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
- * sentence included; the briefing follows it in the system message. `topics` lists the desk
+ * sentence included, and the whole of the system message; the records go into a copy of each request turn. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, the ledger calibrates before its first pass. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
@@ -403,7 +403,7 @@ export interface LedgerRequestInterface {
  *
  * @remarks
  * The ledger files every message of its conversation through the injected judge, projects the
- * owner records and the rules record from that filing, and sends a briefing and a tail that fit
+ * owner records and the rules record from that filing, and sends a tail and a copy of the request turn carrying the records that fit
  * its capacity. It owns its agent: applying a scope that carries `select` displaces the ledger's
  * selection handler.
  */
@@ -513,14 +513,14 @@ export interface LedgerAmendment {
 }
 
 /**
- * Supplies accepted amendments and completely included sources for one briefing rendering.
+ * Supplies accepted amendments and completely included sources for one rendering of the records.
  *
  * @remarks
  * `first` identifies each source's first retained line object in actual emission order. Build this
  * context from the same line objects passed to the renderers after deduplication and trimming;
  * recompute it when the retained population changes. `references` assigns each distinct retained
  * source its decimal display reference in first-occurrence order, starting at 1. These
- * briefing-local references can change after trimming; the projection, recall, and storage retain
+ * records-local references can change after trimming; the projection, recall, and storage retain
  * original source IDs.
  */
 export interface LedgerRenderContext {
@@ -795,7 +795,7 @@ export interface GaugeInterface extends LedgerGauge {
 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void
 }
 
-/** Names a briefing source's planning group: a topic match, an off-topic rule or correction, or a name match. */
+/** Names the planning group of a source the records render: a topic match, an off-topic rule or correction, or a name match. */
 export type LedgerPlanGroup = 1 | 2 | 3
 
 /** Names the machine-readable conditions a `LedgerError` error reports. */

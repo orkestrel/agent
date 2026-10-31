@@ -54,6 +54,7 @@ import {
 	buildLines,
 	buildLedgerRenderContext,
 	buildRecallMessage,
+	buildRequestMessage,
 	collectProjectionIds,
 	extractWords,
 	renderTopicNames,
@@ -82,7 +83,7 @@ import {
 import { isFraction, isPositiveSafeInteger } from './validators.js'
 
 /**
- * Serves one conversation through classified records, a bounded briefing, and a final answer pass.
+ * Serves one conversation through classified records, a bounded copy of each request turn that carries them, and a final answer pass.
  * @example
  * ```ts
  * const ledger = new Ledger(provider, options)
@@ -563,11 +564,7 @@ export class Ledger implements LedgerInterface {
 			)
 		const plan = request.plan
 		if (this.#annotations.has(message.id) && plan !== undefined)
-			return {
-				messages: [...plan.messages, ...this.#collectAfter(selected)],
-				judgments: [],
-				...(plan.briefing === undefined ? {} : { briefing: plan.briefing }),
-			}
+			return { messages: [...plan.messages, ...this.#collectAfter(selected)], judgments: [] }
 		return await this.#classifier.classify(this.#requests, signal).then(
 			(classified) => this.#file(classified, request, selected, message),
 			(error: unknown) => this.#refuse(error, { judgments: [] }),
@@ -617,7 +614,7 @@ export class Ledger implements LedgerInterface {
 		return !unsettled && (category === 'rule' || category === 'correction')
 	}
 
-	#plan(request: Message): Pick<Selection, 'messages' | 'briefing'> {
+	#plan(request: Message): Pick<Selection, 'messages'> {
 		const { input, projection } = this.#project()
 		const registry = collectRegistry(input.readings)
 		const links = linkOwners(input.readings, registry.owners)
@@ -638,7 +635,6 @@ export class Ledger implements LedgerInterface {
 			) /
 			(1 + LEDGER_SCALE_DRIFT)
 		const tail = this.#selectTail(request, total * this.#share.tail, input)
-		const cap = total - this.#price(stripThinking(tail, this.#replay))
 		const tailIds = new Set(tail.map((message) => message.id))
 		const scoped = records.some((record) => record.key !== LEDGER_RULES_KEY)
 		const held = new Set([
@@ -757,10 +753,11 @@ export class Ledger implements LedgerInterface {
 			records,
 			mapped,
 			new Set(ordered.map((unit) => unit.source)),
-			cap,
+			request,
+			tail,
+			total,
 			projection.amendments,
 		)
-		const briefing = trimmed.briefing
 		const shown = new Set([
 			...trimmed.included,
 			...records.flatMap((record) =>
@@ -775,16 +772,21 @@ export class Ledger implements LedgerInterface {
 			),
 		])
 		return {
-			messages: tail.map((message) =>
-				message.role === 'tool' ? this.#renderTailStub(message, shown) : message,
-			),
-			...(briefing === '' ? {} : { briefing }),
+			messages: [
+				...tail
+					.slice(0, -1)
+					.map((message) =>
+						message.role === 'tool' ? this.#renderTailStub(message, shown) : message,
+					),
+				buildRequestMessage(request, trimmed.rendered),
+			],
 		}
 	}
 
-	// Renders the briefing for each cut in step order (each step drops the line it names from the
-	// record it keys, or the source it names) and returns the first cut whose system message fits
-	// `cap`; the cut after every step is returned unchecked. No cut renders after the one returned.
+	// Renders the records for each cut in step order (each step drops the line it names from the
+	// record it keys, or the source it names) and returns the first cut whose system text, tail, and
+	// request copy fit `total`; the cut after every step is returned unchecked. No cut renders after
+	// the one returned.
 	#trim(
 		steps: ReadonlyArray<{
 			readonly key: string | undefined
@@ -794,26 +796,31 @@ export class Ledger implements LedgerInterface {
 		records: readonly LedgerRecord[],
 		mapped: ReadonlyArray<{ readonly source: string; readonly record: LedgerRecord }>,
 		included: ReadonlySet<string>,
-		cap: number,
+		request: Message,
+		tail: readonly Message[],
+		total: number,
 		amendments: readonly LedgerAmendment[],
 	): {
-		readonly briefing: string
+		readonly rendered: string
 		readonly records: readonly LedgerRecord[]
 		readonly included: ReadonlySet<string>
 	} {
 		const trimmed = steps.reduce<{
-			readonly briefing: string | undefined
+			readonly rendered: string | undefined
 			readonly records: readonly LedgerRecord[]
 			readonly included: ReadonlySet<string>
 		}>(
 			(cut, step) => {
-				if (cut.briefing !== undefined) return cut
-				const briefing = this.#render(cut.records, mapped, cut.included, amendments)
-				const content = [this.#options.system, briefing].filter((part) => part !== '').join('\n\n')
-				if (this.#price([{ id: 'system', role: 'system', content }]) <= cap)
-					return { ...cut, briefing }
+				if (cut.rendered !== undefined) return cut
+				const rendered = this.#render(cut.records, mapped, cut.included, amendments)
+				const copy = buildRequestMessage(request, rendered)
+				const head: Message = { id: 'system', role: 'system', content: this.#options.system }
+				if (
+					this.#price([head, ...stripThinking([...tail.slice(0, -1), copy], this.#replay)]) <= total
+				)
+					return { ...cut, rendered }
 				return {
-					briefing: undefined,
+					rendered: undefined,
 					records: cut.records.map((record) =>
 						record.key === step.key
 							? { ...record, lines: record.lines.filter((line) => line !== step.line) }
@@ -822,13 +829,13 @@ export class Ledger implements LedgerInterface {
 					included: new Set([...cut.included].filter((source) => source !== step.source)),
 				}
 			},
-			{ briefing: undefined, records, included },
+			{ rendered: undefined, records, included },
 		)
 		return {
 			records: trimmed.records,
 			included: trimmed.included,
-			briefing:
-				trimmed.briefing ?? this.#render(trimmed.records, mapped, trimmed.included, amendments),
+			rendered:
+				trimmed.rendered ?? this.#render(trimmed.records, mapped, trimmed.included, amendments),
 		}
 	}
 
@@ -892,7 +899,7 @@ export class Ledger implements LedgerInterface {
 		const ownerRecords = records.filter(
 			(candidate) => candidate.key !== LEDGER_RULES_KEY && candidate.lines.length > 0,
 		)
-		// The context reads the lines in the order the briefing emits them, so each source's first
+		// The context reads the lines in the order the records emit them, so each source's first
 		// retained line carries its annotation and its reference.
 		const context = buildLedgerRenderContext(
 			this.#conversation.messages(),
@@ -920,7 +927,7 @@ export class Ledger implements LedgerInterface {
 		const rules = rendered.filter((one) => one.rules).flatMap((one) => one.texts)
 		const body = [owners, pinned.join('\n')].filter((text) => text !== '').join('\n\n')
 		return [
-			body === '' ? '' : `## Pinned\n${body}`,
+			body === '' ? '' : `## Records\n${body}`,
 			record === undefined
 				? rules.length === 0
 					? ''

@@ -27,8 +27,9 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  * observable context managers (instructions / workspaces), the
  * {@link ConversationManagerInterface} message source whose active conversation is `messages`, the
  * {@link ToolManagerInterface} registry, and an active {@link ScopeInterface} changed through
- * {@link AgentContextInterface.apply}. `build()` folds the scoped managers and the active
- * workspace into one system block, then the conversation, and never reads `tools`.
+ * {@link AgentContextInterface.apply}. `build()` folds the system prompt and the scoped instructions
+ * into one system message, the active workspace's text into one `user` context message after it,
+ * then the conversation, and never reads `tools`.
  *
  * @remarks
  * - **Composition.** `system` is the optional system prompt; `instructions` / `tools` /
@@ -51,9 +52,10 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   multi-conversation pattern); switch between runs, not during a run, and use separate agents for
  *   concurrent threads.
  * - **`build()` — the scoped assembly + the format cascade.** It folds, in order,
- *   the system prompt then the scope-filtered instructions → the active workspace's text files
- *   (each as a block: the section's `open` text, each item's rendering, then any `close` text)
- *   into one leading `system` message (prepended only when at least one part exists), then
+ *   the system prompt then the scope-filtered instructions (a block: the section's `open` text,
+ *   each item's rendering, then any `close` text) into one leading `system` message (prepended
+ *   only when at least one part exists), then the active workspace's text files into one `user`
+ *   context message (present only when the workspace section renders), then
  *   appends the active conversation's `view()` (the conversation owns message inclusion through
  *   compaction — the scope does not filter the conversation). The instruction manager resolves
  *   each `open` / item / `close` most-specific-first: `open` = manager-options-override >
@@ -67,9 +69,11 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   manager or the stored messages.
  * - **The active workspace, rendered by carrier — the sole document/image context.**
  *   `workspaces.active` (when set) has its {@link import('@orkestrel/workspace').FileInterface} values scope-filtered by `scope.files`,
- *   then split: text files fold into a dedicated `## Workspace` system section (fenced reference
- *   blocks — placed right after the instructions section), and image files' `base64` payload attaches
- *   to the last user message. Active-only — never the other registered workspaces; with no active
+ *   then split: text files fold into a dedicated `## Workspace` section (fenced reference blocks)
+ *   in the context message — a `user` message with a minted id, never stored — and image files'
+ *   `base64` payload attaches to the last user message of the conversation, never to the context
+ *   message. The `system` message holds host-authored text alone: the system prompt and the
+ *   instructions. Active-only — never the other registered workspaces; with no active
  *   workspace nothing renders for workspaces. `build()` owns this render (a `Workspace` /
  *   `WorkspaceManager` stays file-focused).
  * - **Tools are structural, not in the prompt.** The registry is advertised to the provider
@@ -90,7 +94,7 @@ export class AgentContext implements AgentContextInterface {
 	readonly #system: string | undefined
 	readonly #instructions: InstructionManagerInterface
 	// The workspace registry whose active workspace `build()` renders by carrier (text files →
-	// the system block, image files → the last user message). Always present (a fresh empty
+	// the context message, image files → the last user message). Always present (a fresh empty
 	// manager when none was supplied). The registry is structural; switch its active workspace
 	// through `workspaces.switch(id)`. `build()` reads `active` / its `files()` fresh each call.
 	readonly #workspaces: WorkspaceManagerInterface
@@ -208,8 +212,6 @@ export class AgentContext implements AgentContextInterface {
 			(file) => renderFencedFile(file.path, file.language, file.text),
 			undefined,
 		)
-		if (documented !== undefined) parts.push(documented)
-
 		// The active conversation's `view()` is authoritative (the per-section
 		// summaries + the live tail) — the conversation owns message inclusion through compaction, so the
 		// scope does not filter the conversation here (scope filters only the preceding instructions /
@@ -218,24 +220,18 @@ export class AgentContext implements AgentContextInterface {
 		const conversation = selection?.messages ?? this.#ensureConversation().view()
 		// A vision provider reads image payloads from a user turn.
 		const tail = attachUserImages(conversation, collectImageData(files))
+		const context: readonly Message[] =
+			documented === undefined
+				? []
+				: [{ id: crypto.randomUUID(), role: 'user', content: documented }]
 
-		// A faulted selection's messages are `view()`, so the plan its briefing rested on is void.
-		if (
-			selection !== undefined &&
-			selection.fault === undefined &&
-			selection.briefing !== undefined &&
-			selection.briefing !== ''
-		) {
-			parts.push(selection.briefing)
-		}
-
-		if (parts.length === 0) return tail
+		if (parts.length === 0) return [...context, ...tail]
 		const system: Message = {
 			id: crypto.randomUUID(),
 			role: 'system',
 			content: parts.join('\n\n'),
 		}
-		return [system, ...tail]
+		return [system, ...context, ...tail]
 	}
 
 	// Another run can append to the conversation while the handler awaits, so the view's ids are

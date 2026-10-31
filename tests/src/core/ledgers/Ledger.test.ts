@@ -23,12 +23,17 @@ import {
 	buildLedgerPairJudgment,
 	buildLedgerTopicJudgment,
 	buildUncalibratedOptions,
+	CANARY_LEDGER_SOURCES,
+	CANARY_SENTINELS,
 	LEDGER_HANDLE,
 	LEDGER_OWNER_FIXTURE,
 	LEDGER_OWNER_RENDER_CASES,
 	LEDGER_PRESERVATION_FIXTURE,
 	LEDGER_TRIM_ORDER_FIXTURE,
 	LEDGER_TRIM_RULED_FIXTURE,
+	RECORDED_ANSWER_REQUEST,
+	RECORDED_FIRST_REQUEST,
+	RECORDED_LATE_REQUEST,
 	RecordedTransport,
 	RecordingJudge,
 	ScriptedReads,
@@ -36,7 +41,10 @@ import {
 	createForeignSignal,
 	createPhraseJudge,
 	createScriptedProvider,
+	extractLedgerRecords,
 	readCallRequest,
+	serveCanaryDesk,
+	serveRecordsDesk,
 	summarizeReadings,
 } from '../../../setup.js'
 
@@ -72,10 +80,12 @@ describe('Ledger', () => {
 		)
 		await ledger.respond(fixture.request)
 		const [selection] = await selected
-		const system = requireValue(provider.calls[0]?.messages[0]).content
-		expect(system).toBe(row.system)
-		expect(system.match(/^### /gm)).toHaveLength(1)
-		expect(`Serve the desk.\n\n${selection.briefing ?? ''}`).toBe(row.system)
+		const sent = requireValue(provider.calls[0]).messages
+		const records = extractLedgerRecords(sent)
+		expect(sent[0]?.content).toBe('Serve the desk.')
+		expect(records).toBe(row.records)
+		expect(records.match(/^### /gm)).toHaveLength(1)
+		expect(extractLedgerRecords(selection.messages)).toBe(row.records)
 	})
 
 	it.each(LEDGER_PRESERVATION_FIXTURE.cases)(
@@ -93,7 +103,7 @@ describe('Ledger', () => {
 			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
 			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
 			await ledger.respond('Check Brightwater Studio.')
-			const text = requireValue(provider.calls[0]?.messages[0]?.content)
+			const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 			expect(text.includes('[Ledger source 1]')).toBe(sentences > 2)
 			expect(text.includes(earlier.id)).toBe(false)
 			expect(text.includes('Account BW-20931: Brightwater Studio.')).toBe(sentences === 4)
@@ -105,14 +115,14 @@ describe('Ledger', () => {
 			expect(text.split('Sentence scope is unresolved.')).toHaveLength(sentences > 2 ? 2 : 1)
 			expect(
 				text.includes(
-					'Accepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.',
+					'Accepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
 				),
 			).toBe(sentences > 2)
 			expect(text.includes('[Ledger source 2]')).toBe(sentences > 2)
 			expect(text.includes(later.id)).toBe(false)
 			expect(
 				text.includes(
-					'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+					'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
 				),
 			).toBe(false)
 			expect(ledger.conversation.message(earlier.id)?.content).toBe(fixture.earlier)
@@ -120,7 +130,7 @@ describe('Ledger', () => {
 		},
 	)
 
-	it('reconstructs identical raw provider briefing bytes when only internal message ids differ', async () => {
+	it('reconstructs identical raw provider record bytes when only internal message ids differ', async () => {
 		const encoder = new OllamaProvider({ model: 'replay', url: 'http://127.0.0.1:1' })
 		const [one, two] = await Promise.all(
 			[0, 1].map(async () => {
@@ -149,7 +159,7 @@ describe('Ledger', () => {
 				)
 				return {
 					identity: earlier.id,
-					text: requireValue(call.messages[0]?.content),
+					text: extractLedgerRecords(call.messages),
 					body: JSON.stringify(encoder.encode(readCallRequest(call))),
 				}
 			}),
@@ -159,11 +169,11 @@ describe('Ledger', () => {
 		expect(one?.body).toBe(two?.body)
 		expect(one?.text).toContain('[Ledger source 1]')
 		expect(one?.text).toContain(
-			'Accepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.',
+			'Accepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
 		)
 	})
 
-	it('retains amended earlier text and withholds a superseded amender from the briefing', async () => {
+	it('retains amended earlier text and withholds a superseded amender from the records', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, buildLedgerOptions())
 		const earlier = ledger.conversation.add({
@@ -190,10 +200,10 @@ describe('Ledger', () => {
 		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', first, second, 1))
 		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', first, second, 1))
 		await ledger.respond('Check codes.')
-		const text = requireValue(provider.calls[0]?.messages[0]?.content)
+		const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 		expect(text).toContain('- Code MX-4471.\n- Code MX-4471 remains pending.')
 		expect(text).toContain(
-			'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+			'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
 		)
 		expect(text).not.toContain(first.id)
 		expect(text).not.toContain(first.content)
@@ -404,8 +414,8 @@ describe('Ledger', () => {
 		])
 		await ledger.respond('Check Brightwater Studio.')
 		const sent = requireValue(provider.calls[0]).messages
-		expect(sent[0]?.content).toContain('balance of $20.')
-		expect(sent[0]?.content).not.toContain('balance of $30.')
+		expect(extractLedgerRecords(sent)).toContain('balance of $20.')
+		expect(extractLedgerRecords(sent)).not.toContain('balance of $30.')
 		expect(sent.find((message) => message.call === 'c1')?.content).toContain(
 			'lookup {"id":"BW-5512"}',
 		)
@@ -583,7 +593,6 @@ describe('Ledger', () => {
 			expect(ledger.gauge).toEqual(
 				phase === 'first pass' ? { scale: 1, overhead: 0 } : { scale: 10 / 14, overhead: 10 },
 			)
-			expect(selections.at(-1)?.briefing).toBe(selections[0]?.briefing)
 			expect(selections.at(-1)?.messages.slice(0, selections[0]?.messages.length)).toEqual(
 				selections[0]?.messages,
 			)
@@ -634,7 +643,7 @@ describe('Ledger', () => {
 		ledger.agent.emitter.on('select', selections.handler)
 		const request = ledger.conversation.add({ role: 'user', content: 'Direct request.' })
 		await ledger.agent.generate()
-		// One faulted selection with no briefing, built from a view that carries the direct request.
+		// One faulted selection, built from a view that carries the direct request.
 		expect(selections.calls).toEqual([
 			[{ judgments: [], messages: expect.arrayContaining([request]), fault: expect.any(Error) }],
 		])
@@ -707,7 +716,9 @@ describe('Ledger', () => {
 		).toBe(
 			`${LEDGER_NOTES.results}\n${source.content}\n${first.content}\n${second.content}\n${last.content}`,
 		)
-		expect(provider.calls[1]?.messages[0]?.content).not.toContain(source.content)
+		expect(extractLedgerRecords(requireValue(provider.calls[1]).messages)).not.toContain(
+			source.content,
+		)
 	})
 
 	it('recalls both seed readings of one lookup and lists each once in the answer note', async () => {
@@ -745,7 +756,9 @@ describe('Ledger', () => {
 		expect(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe(`${line}\n${line}`)
-		expect(provider.calls[0]?.messages[0]?.content.split('Refund is $140.')).toHaveLength(2)
+		expect(
+			extractLedgerRecords(requireValue(provider.calls[0]).messages).split('Refund is $140.'),
+		).toHaveLength(2)
 		expect(
 			provider.calls[2]?.messages.find((message) =>
 				message.content.startsWith(LEDGER_NOTES.results),
@@ -832,7 +845,7 @@ describe('Ledger', () => {
 				.find((message) => message.role === 'tool' && message.call === 'topic')?.content,
 		).not.toContain(LEDGER_NOTES.results)
 		for (const call of provider.calls)
-			expect(call.messages[0]?.content).not.toContain(LEDGER_NOTES.results)
+			expect(extractLedgerRecords(call.messages)).not.toContain(LEDGER_NOTES.results)
 	})
 
 	it('recalls the Halvorsen shipment owner history carried by the v7 00061 answer note', async () => {
@@ -1147,9 +1160,9 @@ describe('Ledger', () => {
 		expect(prompts[1]).toEqual(prompts[0])
 	})
 
-	it('strips tail thinking before capping a non-empty owner briefing', async () => {
+	it('strips tail thinking before capping non-empty owner records', async () => {
 		const options = buildLedgerOptions()
-		const systems: string[] = []
+		const texts: string[] = []
 		for (const thinking of [undefined, 'a'.repeat(20000)]) {
 			const provider = createScriptedProvider([{ content: 'Done.' }], {
 				recorded: true,
@@ -1169,11 +1182,11 @@ describe('Ledger', () => {
 			const messages = requireValue(provider.calls[0]).messages
 			expect(messages.some((message) => message.content === 'Earlier reply.')).toBe(true)
 			expect(messages.some((message) => 'thinking' in message)).toBe(false)
-			const system = requireValue(messages.find((message) => message.role === 'system')).content
-			expect(system).toContain('Refund is $148.50.')
-			systems.push(system)
+			const records = extractLedgerRecords(messages)
+			expect(records).toContain('Refund is $148.50.')
+			texts.push(records)
 		}
-		expect(systems[1]).toBe(systems[0])
+		expect(texts[1]).toBe(texts[0])
 	})
 
 	it('reads thinking at recall and respond before sizing results and observing the reply reserve', async () => {
@@ -1388,11 +1401,10 @@ describe('Ledger', () => {
 		})
 		expect(result.passes).toHaveLength(1)
 		const first = requireValue(provider.calls[0])
-		expect(first.messages[0]?.content).toContain(
-			'## Pinned\n### Brightwater Studio (account BW-20931)',
-		)
+		const records = extractLedgerRecords(first.messages)
+		expect(records).toContain('## Records\n### Brightwater Studio (account BW-20931)')
 		expect(first.messages.find((message) => message.role === 'tool')?.content).toContain(
-			'result shown under Pinned',
+			'result shown under Records below',
 		)
 		expect(first.messages.map((message) => message.content).join('\n')).toContain(
 			'obsolete assistant answer',
@@ -1400,8 +1412,8 @@ describe('Ledger', () => {
 		expect(first.messages.find((message) => message.calls?.length)?.content).toBe(
 			'Reading the seed account.',
 		)
-		expect(first.messages[0]?.content).toContain('- Account BW-20931: Brightwater Studio.')
-		expect(first.messages[0]?.content).not.toContain('lookup {"id":"BW-20931"}:')
+		expect(records).toContain('- Account BW-20931: Brightwater Studio.')
+		expect(records).not.toContain('lookup {"id":"BW-20931"}:')
 		expect(first.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
 		await ledger.respond('Check the desk again.')
 		const second = requireValue(provider.calls[1])
@@ -1510,7 +1522,9 @@ describe('Ledger', () => {
 					`${LEDGER_NOTES.results}\nAccount BW-20931: Brightwater Studio. Refund is $148.50.`,
 			),
 		).toBe(true)
-		expect(selections[1]?.briefing).toBe(selections[0]?.briefing)
+		expect(extractLedgerRecords(selections[1]?.messages ?? [])).toBe(
+			extractLedgerRecords(selections[0]?.messages ?? []),
+		)
 		expect(selections[1]?.judgments).toEqual([])
 		const entered = requireValue(selections[0])
 		const requestAt = ledger.conversation
@@ -1631,9 +1645,9 @@ describe('Ledger', () => {
 		expect(selection.fault).toBeUndefined()
 		const sent = requireValue(provider.calls[0]).messages
 		expect(sent.find((message) => message.call === 'seed')?.content).toBe(
-			'lookup: result shown under Pinned in the system message',
+			'lookup: result shown under Records below',
 		)
-		expect(sent[0]?.content).toContain('- Account BW-20931: Brightwater Studio.')
+		expect(extractLedgerRecords(sent)).toContain('- Account BW-20931: Brightwater Studio.')
 	})
 
 	it('closes recall on the first call at a zero recall limit', async () => {
@@ -2118,10 +2132,10 @@ describe('Ledger', () => {
 			}),
 		)
 		await ledger.respond('Check Brightwater Studio.')
-		const briefing = requireValue(provider.calls[2]?.messages[0]?.content)
-		expect(briefing).toContain('Refund is $148.50.')
-		expect(briefing).not.toContain('unreadable')
-		expect(briefing).not.toContain('FX-111 failed')
+		const records = extractLedgerRecords(requireValue(provider.calls[2]).messages)
+		expect(records).toContain('Refund is $148.50.')
+		expect(records).not.toContain('unreadable')
+		expect(records).not.toContain('FX-111 failed')
 		const pairs = judge.requests
 			.map((request) => request.state)
 			.filter(isString)
@@ -2272,7 +2286,7 @@ describe('Ledger', () => {
 		expect(states).not.toContain(`user: ${LEDGER_NOTES.cue}`)
 	})
 
-	it('preserves amended sentences in briefing and recall while whole-message replacement remains independent', async () => {
+	it('preserves amended sentences in the records and recall while whole-message replacement remains independent', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
@@ -2325,11 +2339,11 @@ describe('Ledger', () => {
 		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', retired, correction, 1))
 		const result = await ledger.respond('Review the desk.')
 		expect(result.passes).toHaveLength(2)
-		expect(provider.calls[0]?.messages[0]?.content).toContain(
-			`## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\n- Refunds over $200 require approval.`,
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toContain(
+			`## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\n- Refunds over $200 require approval.`,
 		)
 		for (const call of provider.calls)
-			expect(call.messages[0]?.content).toContain('Use code MX-4471.')
+			expect(extractLedgerRecords(call.messages)).toContain('Use code MX-4471.')
 		expect(provider.calls[0]?.messages.find((message) => message.id === old.id)?.content).toBe(
 			old.content,
 		)
@@ -2343,7 +2357,9 @@ describe('Ledger', () => {
 		).toBe(
 			`${LEDGER_NOTES.results}\n${correction.content}\n${harmless.content}\n${retired.content}\n${old.content}`,
 		)
-		expect(provider.calls[0]?.messages[0]?.content).not.toContain(retired.content)
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).not.toContain(
+			retired.content,
+		)
 		expect(ledger.conversation.message(old.id)?.content).toContain('Use code MX-4471.')
 	})
 
@@ -2389,10 +2405,10 @@ describe('Ledger', () => {
 				}),
 			)
 		await ledger.respond('Review the desk.')
-		const briefing = requireValue(provider.calls[0]?.messages[0]?.content)
-		expect(briefing).toContain('## Pinned\nFor Brightwater, the corrected limit is $160.')
-		expect(briefing).toContain('## Rules\n- Desk rule: keep 2 receipts.')
-		expect(briefing).not.toContain('require approval for $150')
+		const records = extractLedgerRecords(requireValue(provider.calls[0]).messages)
+		expect(records).toContain('## Records\nFor Brightwater, the corrected limit is $160.')
+		expect(records).toContain('## Rules\n- Desk rule: keep 2 receipts.')
+		expect(records).not.toContain('require approval for $150')
 	})
 
 	it('orders group three by score regardless of whether a source is decisive', async () => {
@@ -2421,11 +2437,12 @@ describe('Ledger', () => {
 			}),
 		)
 		await ledger.respond('Check Mira special delivery receipt.')
-		const briefing = requireValue(provider.calls[0]?.messages[0]?.content)
-		expect(briefing).toContain(`## Pinned\n${loose.content}\n${decisive.content}`)
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toContain(
+			`## Records\n${loose.content}\n${decisive.content}`,
+		)
 	})
 
-	it('renders projected amendments in the briefing and stored sources with amendments in recall', async () => {
+	it('renders projected amendments in the records and stored sources with amendments in recall', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
@@ -2487,15 +2504,16 @@ describe('Ledger', () => {
 				)
 		}
 		await ledger.respond('Check Mira receipt.')
-		const expected = `[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in this briefing. Sentence scope is unresolved.\n${source.content}\n[Ledger source 2]\n${correction.content}`
-		expect(provider.calls[0]?.messages[0]?.content).toContain(expected)
+		const expected = `[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\n${source.content}\n[Ledger source 2]\n${correction.content}`
+		const records = extractLedgerRecords(requireValue(provider.calls[0]).messages)
+		expect(records).toContain(expected)
 		expect(
 			provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe(`${source.content}\n${correction.content}`)
 		expect(
 			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe(`${correction.content}\n${source.content}`)
-		expect(provider.calls[0]?.messages[0]?.content).not.toContain('[amended by')
+		expect(records).not.toContain('[amended by')
 		ledger.conversation.judgments.add(
 			buildLedgerJudgment(source, {
 				answer: { form: 'choice', probabilities: { rule: 1 } },
@@ -2508,11 +2526,11 @@ describe('Ledger', () => {
 		await ledger.respond('Inspect the full seed.')
 		const [selection] = await selected
 		expect(selection.messages.some((message) => message.id === retired.id)).toBe(false)
-		expect(selection.briefing).toContain('For Mira, keep the receipt.')
-		expect(selection.briefing).not.toContain(correction.content)
+		expect(extractLedgerRecords(selection.messages)).toContain('For Mira, keep the receipt.')
+		expect(extractLedgerRecords(selection.messages)).not.toContain(correction.content)
 	})
 
-	it('leaves a live owner-record amendment out of the briefing when a decisive rule unit has an amendment', async () => {
+	it('leaves a live owner-record amendment out of the records when a decisive rule unit has an amendment', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, { ...options, share: { tail: 0.001 } })
@@ -2553,8 +2571,10 @@ describe('Ledger', () => {
 		)
 		await ledger.respond('Inspect the full seed.')
 		const [selection] = await selected
-		expect(selection.briefing).toContain('Brightwater Studio: keep the receipt.')
-		expect(selection.briefing).not.toContain('AA-11')
+		expect(extractLedgerRecords(selection.messages)).toContain(
+			'Brightwater Studio: keep the receipt.',
+		)
+		expect(extractLedgerRecords(selection.messages)).not.toContain('AA-11')
 	})
 
 	it('drops an empty seed assistant whose calls were all dropped but keeps an empty assistant without calls', async () => {
@@ -2615,7 +2635,9 @@ describe('Ledger', () => {
 			{ role: 'user', content: 'For Brightwater, keep receipt 42.' },
 		])
 		await ledger.respond('Check Brightwater.')
-		expect(provider.calls[0]?.messages[0]?.content).toContain('- For Brightwater, keep receipt 42.')
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toContain(
+			'- For Brightwater, keep receipt 42.',
+		)
 		for (const at of [1, 2])
 			expect(
 				provider.calls[at]?.messages.findLast((message) => message.role === 'tool')?.content,
@@ -2709,8 +2731,10 @@ describe('Ledger', () => {
 		])
 		await ledger.respond('Check Brightwater Studio.')
 		const call = requireValue(provider.calls[0])
-		expect(call.messages[0]?.content).toContain('Refund is $148.50.')
-		expect(call.messages[0]?.content).not.toContain('Keep the loading area clear. '.repeat(20))
+		expect(extractLedgerRecords(call.messages)).toContain('Refund is $148.50.')
+		expect(extractLedgerRecords(call.messages)).not.toContain(
+			'Keep the loading area clear. '.repeat(20),
+		)
 		expect(estimateMessages(call.messages)).toBeLessThanOrEqual(260 / 1.06)
 		expect(call.messages.filter((message) => message.role === 'tool')).toHaveLength(0)
 		expect(call.messages.filter((message) => message.calls !== undefined)).toHaveLength(0)
@@ -2720,11 +2744,17 @@ describe('Ledger', () => {
 		'trims an owner record oldest first and $title',
 		async ({ kept: keepsNewer }) => {
 			const fixture = LEDGER_TRIM_ORDER_FIXTURE
-			const expected = `Serve the desk.\n\n## Pinned\n### Brightwater Studio (account BW-20931)\n${[fixture.correction, ...(keepsNewer ? [fixture.newer] : [])].map((line) => `- ${line}`).join('\n')}`
+			const expected = `## Records\n### Brightwater Studio (account BW-20931)\n${[fixture.correction, ...(keepsNewer ? [fixture.newer] : [])].map((line) => `- ${line}`).join('\n')}`
 			const capacity =
 				Math.ceil(
-					(estimateMessages([{ id: 'system', role: 'system', content: expected }]) +
-						estimateMessages([{ id: 'request', role: 'user', content: fixture.request }])) *
+					estimateMessages([
+						{ id: 'system', role: 'system', content: 'Serve the desk.' },
+						{
+							id: 'request',
+							role: 'user',
+							content: `${expected}\n\n## Request\n${fixture.request}`,
+						},
+					]) *
 						(1 + LEDGER_SCALE_DRIFT),
 				) + 1
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
@@ -2754,7 +2784,7 @@ describe('Ledger', () => {
 					}),
 				)
 			await ledger.respond(fixture.request)
-			const text = requireValue(provider.calls[0]?.messages[0]?.content)
+			const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 			expect(text).toBe(expected)
 			expect(text).not.toContain(fixture.seed)
 			expect(text.includes(fixture.newer)).toBe(keepsNewer)
@@ -2763,15 +2793,15 @@ describe('Ledger', () => {
 
 	it('trims ruled lines inside one owner record oldest first', async () => {
 		const fixture = LEDGER_TRIM_RULED_FIXTURE
-		const expected = `Serve the desk.
-
-## Pinned
+		const expected = `## Records
 ### Brightwater Studio (account BW-20931)
 - ${fixture.second}`
 		const capacity =
 			Math.ceil(
-				(estimateMessages([{ id: 'system', role: 'system', content: expected }]) +
-					estimateMessages([{ id: 'request', role: 'user', content: fixture.request }])) *
+				estimateMessages([
+					{ id: 'system', role: 'system', content: 'Serve the desk.' },
+					{ id: 'request', role: 'user', content: `${expected}\n\n## Request\n${fixture.request}` },
+				]) *
 					(1 + LEDGER_SCALE_DRIFT),
 			) + 1
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
@@ -2800,7 +2830,7 @@ describe('Ledger', () => {
 				}),
 			)
 		await ledger.respond(fixture.request)
-		const text = requireValue(provider.calls[0]?.messages[0]?.content)
+		const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 		expect(text).toBe(expected)
 		expect(text).not.toContain(fixture.first)
 	})
@@ -2908,6 +2938,169 @@ describe('Ledger', () => {
 			`${LEDGER_NOTES.results}\nAccount BW-20931: Brightwater Studio. Refund is $140.\nNo record`,
 		)
 		await ledger.respond('Check Brightwater Studio again.')
-		expect(provider.calls[4]?.messages[0]?.content).not.toContain('Refund is $140.')
+		expect(extractLedgerRecords(requireValue(provider.calls[4]).messages)).not.toContain(
+			'Refund is $140.',
+		)
+	})
+})
+
+describe('Ledger — the system boundary canary', () => {
+	it.each(CANARY_LEDGER_SOURCES)(
+		'keeps the %s sentinel out of every system message on every ledger path',
+		async (source) => {
+			const desk = await serveCanaryDesk()
+
+			expect(
+				desk.calls
+					.flat()
+					.filter((message) => message.role === 'system')
+					.map((message) => message.content)
+					.join('\n'),
+			).not.toContain(CANARY_SENTINELS[source])
+		},
+	)
+
+	it('sends every ledger-path sentinel but the judge sentinel, which the judgment records hold', async () => {
+		const desk = await serveCanaryDesk()
+		const text = desk.calls
+			.flat()
+			.map((message) => message.content)
+			.join('\n')
+
+		// Each sentinel reaches a provider call, so its absence from `system` is not vacuous; the
+		// judge's strings never reach a prompt, and its refusals reach the judgment records.
+		for (const source of CANARY_LEDGER_SOURCES.filter((one) => one !== 'judge'))
+			expect(text).toContain(CANARY_SENTINELS[source])
+		expect(text).not.toContain(CANARY_SENTINELS.judge)
+		expect(
+			desk.judgments.some((judgment) => judgment.refusal?.missing.includes(CANARY_SENTINELS.judge)),
+		).toBe(true)
+	})
+
+	it('sends exactly one system message, at index 0, on every call of every ledger path', async () => {
+		const desk = await serveCanaryDesk()
+		const fault = desk.selections.at(-1)?.fault
+
+		// Two first-pass calls, the answer pass, the late request, then the faulted direct run.
+		expect(desk.calls).toHaveLength(5)
+		expect(isLedgerError(fault) && fault.code === 'REQUEST').toBe(true)
+		for (const messages of desk.calls) {
+			expect(messages.filter((message) => message.role === 'system')).toHaveLength(1)
+			expect(messages[0]?.role).toBe('system')
+			expect(messages[0]?.content).toContain(CANARY_SENTINELS.system)
+		}
+	})
+})
+
+describe('Ledger — the recorded request per records-arm pass', () => {
+	it('sends the recorded first pass of a request', async () => {
+		const desk = await serveRecordsDesk()
+
+		expect(desk.calls).toHaveLength(3)
+		expect(desk.calls[0]?.map(({ id, ...body }) => body)).toStrictEqual(RECORDED_FIRST_REQUEST)
+	})
+
+	it('sends the recorded answer pass of a request', async () => {
+		const desk = await serveRecordsDesk()
+
+		expect(desk.calls[1]?.map(({ id, ...body }) => body)).toStrictEqual(RECORDED_ANSWER_REQUEST)
+	})
+
+	it('sends the recorded first pass of a late request', async () => {
+		const desk = await serveRecordsDesk()
+
+		expect(desk.calls[2]?.map(({ id, ...body }) => body)).toStrictEqual(RECORDED_LATE_REQUEST)
+	})
+
+	it('selection bytes: keeps every selection message but the request copy and the shown stub at its 0.0.34 bytes', async () => {
+		const provider = createScriptedProvider([{ content: 'Approved.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.conversation.add([
+			{ role: 'user', content: 'Brightwater Studio called.' },
+			{ role: 'assistant', content: 'An obsolete assistant answer.' },
+			{
+				role: 'assistant',
+				content: 'Reading the seed account.',
+				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+			},
+			{
+				role: 'tool',
+				call: 'seed',
+				content: 'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+			},
+		])
+		const selected = waitForEvent<readonly [selection: Selection]>(
+			(listener) => ledger.agent.emitter.once('select', listener),
+			'the planned selection',
+		)
+
+		await ledger.respond('Check Brightwater Studio.')
+		const [selection] = await selected
+
+		expect(selection.messages.map((message) => message.role)).toEqual([
+			'user',
+			'assistant',
+			'assistant',
+			'tool',
+			'user',
+		])
+		expect(
+			selection.messages
+				.slice(0, -1)
+				.filter((message) => message.role !== 'tool')
+				.map(({ id, ...body }) => body),
+		).toStrictEqual([
+			{ role: 'user', content: 'Brightwater Studio called.' },
+			{ role: 'assistant', content: 'An obsolete assistant answer.' },
+			{
+				role: 'assistant',
+				content: 'Reading the seed account.',
+				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+			},
+		])
+	})
+})
+
+describe('Ledger — the request copy', () => {
+	it('writes the records into a copy of the request turn, last in the selection, and leaves the stored request unchanged', async () => {
+		const desk = await serveRecordsDesk()
+		const stored = requireValue(
+			desk.messages.find((message) => message.content === 'Check Brightwater Studio.'),
+		)
+		const copy = requireValue(desk.selections[0]?.messages.at(-1))
+		const [records, ...prompt] = copy.content.split('\n\n## Request\n')
+
+		expect(prompt).toEqual([stored.content])
+		expect(records?.startsWith('## Records\n### Brightwater Studio')).toBe(true)
+		expect(copy).toStrictEqual({
+			...stored,
+			content: `${records ?? ''}\n\n## Request\n${stored.content}`,
+		})
+		expect(desk.calls[0]?.at(-1)).toStrictEqual(copy)
+	})
+
+	it('sends the prompt verbatim when nothing renders', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+
+		await ledger.respond('Hello there.')
+
+		expect(requireValue(provider.calls[0]).messages.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'Serve the desk.' },
+			{ role: 'user', content: 'Hello there.' },
+		])
+	})
+
+	it('reuses the first pass copy in the answer pass and drops tool and call messages', async () => {
+		const desk = await serveRecordsDesk()
+		const copy = requireValue(desk.selections[0]?.messages.at(-1))
+		const answer = requireValue(desk.selections[1])
+
+		expect(copy.content).toContain('\n\n## Request\nCheck Brightwater Studio.')
+		expect(desk.selections[0]?.messages.some((message) => message.role === 'tool')).toBe(true)
+		expect(answer.messages[0]).toStrictEqual(copy)
+		expect(
+			answer.messages.some((message) => message.role === 'tool' || message.calls !== undefined),
+		).toBe(false)
 	})
 })

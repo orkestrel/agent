@@ -85,6 +85,22 @@ export function buildRecallMessage(topic: string): Message {
 }
 
 /**
+ * Builds the copy of a request turn that carries the rendered records ahead of the request.
+ * @param request - The stored request message
+ * @param records - The rendered records, or empty text when nothing renders
+ * @returns The request with its content set to the records, a `## Request` heading, and the request content, or the request itself when the records are empty
+ * @example
+ * ```ts
+ * buildRequestMessage({ id: 'request', role: 'user', content: 'Check BW-5512.' }, '## Records\n- Refund issued.').content
+ * // '## Records\n- Refund issued.\n\n## Request\nCheck BW-5512.'
+ * ```
+ */
+export function buildRequestMessage(request: Message, records: string): Message {
+	if (records === '') return request
+	return { ...request, content: `${records}\n\n## Request\n${request.content}` }
+}
+
+/**
  * Renders topic names as a comma-separated list in their supplied order.
  * @param topics - The configured desk topics
  * @returns The topic names joined by a comma and a space
@@ -182,7 +198,7 @@ export function findLedgerCall(group: readonly Message[], message: Message): Too
 }
 
 /**
- * Ranks a briefing source for removal before the next prompt.
+ * Ranks a source the records render for removal before the next prompt.
  *
  * @param group - The planning group: 1 for a topic match, 2 for an off-topic rule or correction, or 3 for a name match
  * @param unsettled - If `true`, the source is a user message without a decisive category; if `false`, it is another source
@@ -710,7 +726,7 @@ export function selectRecords(
  * Renders one record as a heading and one list item per line.
  *
  * @remarks
- * The briefing joins rendered records with one blank line.
+ * The ledger joins rendered records with one blank line.
  *
  * @param record - A record or view with a `title` and `lines`
  * @param context - Rendering facts for optional accepted amendment annotations
@@ -737,7 +753,7 @@ export function renderLedgerRecord(
 }
 
 /**
- * Renders one owner record under a `###` heading, which the briefing nests under its one `## Pinned` heading.
+ * Renders one owner record under a `###` heading, which the records nest under their one `## Records` heading.
  *
  * @param record - An owner record or view with a `title` and `lines`
  * @param context - Rendering facts for optional accepted amendment annotations
@@ -756,7 +772,7 @@ export function renderLedgerPinned(
 }
 
 /**
- * Derives complete source identities, first occurrences, and local references from the actual briefing lines.
+ * Derives complete source identities, first occurrences, and local references from the actual lines of the records.
  * @param messages - Original messages whose indexed sentences establish completeness
  * @param lines - Retained lines in rendering order after deduplication and trimming
  * @param amendments - Accepted direct message amendment edges
@@ -825,11 +841,11 @@ export function renderLedgerAnnotation(line: LedgerLine, context: LedgerRenderCo
 		`[Ledger source ${context.references.get(line.source)}]`,
 		...included.map(
 			(pair) =>
-				`Accepted later amendment [Ledger source ${context.references.get(pair.later)}] is fully included in this briefing. Sentence scope is unresolved.`,
+				`Accepted later amendment [Ledger source ${context.references.get(pair.later)}] is fully included in these records. Sentence scope is unresolved.`,
 		),
 		...(amendments.some((pair) => !context.complete.has(pair.later))
 			? [
-					'Accepted later amendment text is not fully included in this briefing. Sentence scope is unresolved.',
+					'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
 				]
 			: []),
 	].join('\n')
@@ -920,7 +936,7 @@ export function matchesCutLine(line: string): boolean {
  *
  * @param name - The lookup tool name
  * @param args - The arguments the call carried; arguments JSON cannot carry leave the call as its bare tool name, per {@link renderLookupCall}
- * @param state - What became of the result: `failed`, `empty`, `shown` in the briefing, or `hidden` from it
+ * @param state - What became of the result: `failed`, `empty`, `shown` in the records, or `hidden` from them
  * @returns The stub text, which carries the call and its state
  *
  * @example
@@ -937,7 +953,7 @@ export function renderStub(
 	const head = renderLookupCall(name, args)
 	if (state === 'failed') return `${head}: failed`
 	if (state === 'empty') return `${head}: no record`
-	if (state === 'shown') return `${head}: result shown under Pinned in the system message`
+	if (state === 'shown') return `${head}: result shown under Records below`
 	const id = Object.values(args).find(isString)
 	return `${head}: result not shown; call recall with ${(id ?? '').trim() || 'its id'}`
 }
