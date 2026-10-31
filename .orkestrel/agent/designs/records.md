@@ -168,7 +168,7 @@ run           | this run's turns                                                
 
 ### Head pricing
 
-As of `2da6d0b6`, `Ledger#trim` prices `[options.system, briefing]` alone. rc-u10 prices the tail plus the request copy that carries the records. After `LedgerAgentOptions` forwards instructions, skills, memos, and workspaces, the head grows by text the plan does not count. `rc-u9` prices the head that `this.#agent.context.build({ messages: [], judgments: [] })` returns plus the request copy, and the calibration pass sends the same head, in the same unit as the widening, so no release misprices (`designs/context.md` § Ledger wiring). Until rc-u9 is accepted, nothing outside tests wires libraries into a ledger.
+As of `2da6d0b6`, `Ledger#trim` prices `[options.system, briefing]` alone. rc-u10 prices the system text, the tail, and the request copy that carries the records. After `LedgerAgentOptions` forwards instructions, skills, memos, and workspaces, the head grows by text the plan does not count. `rc-u9` prices the head that `this.#agent.context.build({ messages: [], judgments: [] })` returns plus the request copy, and the calibration pass sends the same head, in the same unit as the widening, so no release misprices (`designs/context.md` § Ledger wiring). Until rc-u9 is accepted, nothing outside tests wires libraries into a ledger.
 
 ## Persistence
 

@@ -85,7 +85,7 @@ The loop decides one tools turn after `Agent#reconcile` and the scope allow-list
    - `verdict === 'deny'` emits `deny(call, decision.reason, decision)`, and the model reads `decision.reason ?? AUTHORITY_NOTES.denied`. `verdict === 'allow'` emits `allow(call, decision)`. `verdict === 'ask'` queues the call with the registered instance `tools.tool(call.name)` returns.
    - Only `verdict === 'allow'` enters the allowed map; the loop never tests `verdict !== 'deny'`.
 2. Ask pass (`Agent#approve`), entered only when the queue holds a call and the signal is not aborted. For each queued call, in order:
-   - Emit `ask(call, decision)`, then `await raceSignal(answer, abort.signal)`, where `answer` is the handler call (an absent `ask` property resolves `false`) mapped through success and failure arms. `raceSignal` (`src/core/conversations/helpers.ts`) removes its abort listener on settle and absorbs a late rejection, so the pass adds no abort helper (F9).
+   - Emit `ask(call, decision)`, then `await raceSignal(answer, abort.signal)`, where `answer` is the handler call (an absent `ask` property counts as unanswered: the loop writes the `unanswered` note) mapped through success and failure arms. `raceSignal` (`src/core/conversations/helpers.ts`) removes its abort listener on settle and absorbs a late rejection, so the pass adds no abort helper (F9).
    - A rejected race, or a signal aborted after settle, returns with no further event.
    - Approved with the registered instance unchanged: `allow(call, decision)`. Approved but replaced during the ask: `deny(call, undefined, decision)` with the `unanswered` note.
    - A resolved value other than `true`: `deny(call, undefined, decision)` with the `refused` note.

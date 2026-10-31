@@ -39,7 +39,7 @@ rc-u10 writes the records into a built copy of the request turn: `${records}\n\n
 - One turn holds the records and the request: both renderers fold consecutive tool results into one user turn instead of emitting adjacent user turns (C43), and a separate records message would be the only adjacent `user` pair Agent emits on purpose. The separate message is rc-a16's remedy arm and the screen's contingency (D34).
 - Images attach to the last `user` message (`attachUserImages` in `src/core/contexts/helpers.ts`), which is this turn.
 - `LEDGER_NOTES.cue` names "the request", and the heading is `## Request`: one term in one place.
-- Trim prices the tail plus the request copy.
+- Trim prices the system text, the tail, and the request copy.
 
 ## Context message
 
