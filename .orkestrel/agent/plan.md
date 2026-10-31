@@ -19,7 +19,7 @@ The campaign builds no second log, no CRDT, no frontmatter parser, no default li
 | `@orkestrel/agent` | https://github.com/orkestrel/agent | every unit |
 | `@orkestrel/toolbox` | https://github.com/orkestrel/toolbox | re-pin only (F6); its memo and skill tools wait for D20 |
 | `@orkestrel/ollama` | https://github.com/orkestrel/ollama | re-pin plus two test files: `tests/service/authority.test.ts` (`allowed` to `verdict`, F7) and `tests/src/core/integration.test.ts` (workspace text in the context message) |
-| `@orkestrel/study` | https://github.com/orkestrel/study | rc-st1 and, when rc-a9's reading needs it, rc-st2, released as Study 0.0.8, which the user publishes (Q7); then the re-pin, under which its two-parameter `deny` listener typechecks against the widened tuple |
+| `@orkestrel/study` | https://github.com/orkestrel/study | rc-st1 and, when rc-a9's reading needs it, rc-st2, released as Study 0.0.9, which the user publishes (Q7); then the re-pin, under which its two-parameter `deny` listener typechecks against the widened tuple |
 
 Re-pins follow the release order of `tenets.md` § Release.
 
@@ -43,13 +43,13 @@ Re-pins follow the release order of `tenets.md` § Release.
 | User decisions Q6 (the `consequential` floor) and the Node line (O18) | ruled 2026-10-31 | § Decisions; O18 |
 | Run-operations round: a Study run-operations map, one research lane, verification of claims C48 to C51, two blind design proposals, and one read-only consultation the user named, on the user's ruling of 2026-10-31 | done 2026-10-31 | `ledger.md`; `designs/runs.md`; `research/evidence.md` |
 | Orchestrator rulings O19 to O25 | done 2026-10-31 | § Rulings |
-| User decisions Q7 to Q10 | open; the plan runs on each recommendation until the user rules | § Decisions |
+| User decisions Q7 to Q10 | ruled 2026-10-31: the campaign's Study release is 0.0.9 (0.0.8 shipped with the fleet re-pin), Q8 and Q9 approved, Q10 no | § Decisions |
 | Orchestrator item: whether the larger-model checks' profile supplies a 4B `gauge`, because a snapshot gauge suppresses calibration | open; rule before the first larger-model check | `designs/runs.md` § Segment plan; `designs/records.md` § Hydrate semantics |
 | Next | Run each first-wave acceptance command on Node 22 against `fe5a1703` for its baseline, then launch rc-p1, then rc-u1, rc-u2, and rc-a8 in parallel with one runner lane | O5, O18 |
 
 ## Decisions
 
-Each decision is the user's. The user ruled Q1 to Q6 on 2026-10-31. Q7 to Q10 are open, and the plan runs on each recommendation until the user rules.
+Each decision is the user's. The user ruled Q1 to Q10 on 2026-10-31.
 
 | Id | Decision | Ruling |
 | --- | --- | --- |
@@ -59,10 +59,10 @@ Each decision is the user's. The user ruled Q1 to Q6 on 2026-10-31. Q7 to Q10 ar
 | Q4 | The GPU allowance in model minutes, and whether the recording extends to goal 77 | left to the Orchestrator: 600 model minutes split per step, and the recording extends to goal 77 (O9, O17, `designs/measurement.md` § GPU allowance) |
 | Q5 | Whether a hosted-provider consumer is planned | no; Agent is built for the smallest local models, which expose a design flaw where a larger model works around it (O10, `designs/measurement.md` § Models) |
 | Q6 | Whether Agent 0.0.35 may stop a `consequential` tool from running in an application with no approver | yes ("approved on `consequential`"): no fleet tool sets the annotation (F6), and Agent ships no compatibility shim (`@orkestrel/scaffold` `AGENTS.md`, no compatibility shims; `designs/authority.md` § Default authority and the consequential floor) |
-| Q7 | Whether a Study release, 0.0.8, carries rc-st1 and, when rc-a9's reading needs it, rc-st2, published between the rc-a9 lineage and the first records screen when rc-st2 is needed, else at the post-0.0.35 re-pin wave | open; recommendation: yes. Until the release, rc-p3 serves and its removal records the deviation (`designs/runs.md` § Progress) |
-| Q8 | Whether each GPU lineage freezes its Node 22 patch: the most recent Node 22 release is read at each lineage start and held to the lineage's last replay, amending O18 for the window | open; recommendation: yes, because positional replay refuses any other Node release, a patch included (`designs/runs.md` § Replay and pins) |
-| Q9 | Whether each GPU lineage freezes its Ollama version: the most recent stable release is screened at a lineage start, and every arm of a gate runs under one daemon pin that the profile `daemon` member makes Study verify | open; recommendation: yes (`designs/runs.md` § Replay and pins) |
-| Q10 | Whether one CPU test lane may run beside a GPU segment | open; recommendation: no by default (D47); if granted, only for gates that read tokens and labels, never rc-a3 or rc-a11, after rc-p4 reads within 5% of quiet |
+| Q7 | Whether a Study release, 0.0.9, carries rc-st1 and, when rc-a9's reading needs it, rc-st2, published between the rc-a9 lineage and the first records screen when rc-st2 is needed, else at the post-0.0.35 re-pin wave | yes ("work on the release as needed"): the release is Study 0.0.9, because Study 0.0.8 shipped with the fleet re-pin on 2026-10-31. Until the release, rc-p3 serves and its removal records the deviation (`designs/runs.md` § Progress) |
+| Q8 | Whether each GPU lineage freezes its Node 22 patch: the most recent Node 22 release is read at each lineage start and held to the lineage's last replay, amending O18 for the window | yes (approved), because positional replay refuses any other Node release, a patch included (`designs/runs.md` § Replay and pins) |
+| Q9 | Whether each GPU lineage freezes its Ollama version: the most recent stable release is screened at a lineage start, and every arm of a gate runs under one daemon pin that the profile `daemon` member makes Study verify | yes (approved) (`designs/runs.md` § Replay and pins) |
+| Q10 | Whether one CPU test lane may run beside a GPU segment | no (D47; the user ruled as recommended); if granted, only for gates that read tokens and labels, never rc-a3 or rc-a11, after rc-p4 reads within 5% of quiet |
 
 ## Rulings
 
@@ -175,7 +175,7 @@ Every unit starts after Agent 0.0.34 is published and pushed and designs against
 | S4 | write cost | rc-u6 |
 | S5 | libraries, consumers, and run machinery | rc-u7, rc-u8, rc-u9, rc-s1, rc-p2, rc-a17; rc-st1 in Study, written beside S3 to S5 |
 | S6 | measurement | rc-p3, rc-a15, rc-p4 (only on Q10's grant), rc-a9; rc-st2 in Study, only on its condition |
-| S7 | experiments, the layout reading, and screens | rc-a16, rc-u11, rc-e1, rc-a7, rc-a11, rc-a5, rc-a10; rc-s1 re-pin, only when Study 0.0.8 lands mid-campaign (Q7) |
+| S7 | experiments, the layout reading, and screens | rc-a16, rc-u11, rc-e1, rc-a7, rc-a11, rc-a5, rc-a10; rc-s1 re-pin, only when Study 0.0.9 lands mid-campaign (Q7) |
 | S8 | document, then Agent 0.0.35 | rc-d1 |
 
 ### Units
@@ -213,7 +213,7 @@ Every unit starts after Agent 0.0.34 is published and pushed and designs against
 | rc-a5 | S7 | experiment (study-only) | S | `builder` | `studies/memory/` wiring only | rc-e1 reading, rc-a9 | gate row rc-a5 |
 | rc-a10 | S7 | GPU screens | run | Orchestrator | gitignored study output | rc-a9, the unit under test, the step's rc-s1 per-step change | arms off, repeat, sham, and on, one execution per arm per segment, each screen seeded from end-of-goal checkpoints where `designs/runs.md` § Segment plan names (rc-u10 from goal 1, rc-e1 after the goal before the first fold, rc-a7 after goal 37, rc-a11 after goals 48 and 76, rc-a5 after goal 48) with no goal re-run, the readings at the onset and burst strata 17, 49, and 77, the `on` arm's first segment first where `designs/runs.md` § Segment plan names it; no tools on the final step; the judge live on one daemon pin until rc-st2; curtailment only on the rc-a11 and rc-e1 count clauses (`designs/runs.md` § Stops) |
 | rc-a10 for rc-u10 | S7, after rc-u11 | GPU screen of a fix; study-only | run | `builder` writes a Study transport rewrite; the Orchestrator runs it | the `studies/memory/` transport rewrite and its test, deleted after the screen | rc-a9, rc-u10, rc-u11, the step's rc-s1 per-step change | gate row rc-a10 for rc-u10; the `separate` contingency runs only on a failed gate |
-| rc-s1 re-pin | S7, after the user publishes Study 0.0.8 and before the first records screen, only when the mid-campaign release lands (Q7) | consumer (dependency move) | S | `builder` | Agent's `package.json` and `package-lock.json` (the `@orkestrel/study` range); the rc-p3 probe, deleted | the user's Study 0.0.8 publication of rc-st1 and rc-st2 | Agent's `@orkestrel/study` range reads 0.0.8 and `test:studies` is green; the change changes the build and opens a lineage (`designs/runs.md` § Replay and pins); rc-p3 is deleted in the same change |
+| rc-s1 re-pin | S7, after the user publishes Study 0.0.9 and before the first records screen, only when the mid-campaign release lands (Q7) | consumer (dependency move) | S | `builder` | Agent's `package.json` and `package-lock.json` (the `@orkestrel/study` range); the rc-p3 probe, deleted | the user's Study 0.0.9 publication of rc-st1 and rc-st2 | Agent's `@orkestrel/study` range reads 0.0.8 and `test:studies` is green; the change changes the build and opens a lineage (`designs/runs.md` § Replay and pins); rc-p3 is deleted in the same change |
 | rc-d1 | S8 | documentation | M | `opus` | `guides/agent.md`, `guides/README.md`, TSDoc of touched `types.ts` files | every Agent unit from rc-p1 through rc-a10 accepted | `test:guides` green; the two guide drifts corrected; "the ledger is the records strategy" stated one time; a strategy-choice table; the layout table of `designs/layout.md` § Final layout, the host inlets to `system`, the context message, the request turn, `Conversation.reference()` placed in a `user` message, and the stored-`system` note (D33); the Authority prose of `designs/authority.md` § Guide |
 
 ### Retired ids
@@ -247,7 +247,7 @@ After Agent 0.0.34 is served and pushed, run S1 through S8 without further user 
 
 - Strip or promote every experiment switch before 0.0.35; no switch ships while its verdict is open.
 - Publish Agent 0.0.35 after rc-d1, then re-pin and publish in the order of `tenets.md` § Release.
-- Study 0.0.8 carries rc-st1 and, when its condition fires, rc-st2; the user publishes it between the rc-a9 lineage and the first records screen when rc-st2 is needed, and the rc-s1 re-pin change of § Units moves Agent to it, else at the post-0.0.35 re-pin wave (Q7).
+- Study 0.0.9 carries rc-st1 and, when its condition fires, rc-st2; the user publishes it between the rc-a9 lineage and the first records screen when rc-st2 is needed, and the rc-s1 re-pin change of § Units moves Agent to it, else at the post-0.0.35 re-pin wave (Q7).
 - Migrate the consumers in one release unit of size S: a `builder` writes it, and the Orchestrator runs the live cases on the dedicated daemon (`tenets.md` § Host). Ollama takes the pin, `tests/service/authority.test.ts` (F7), and `tests/src/core/integration.test.ts` (the context message instead of `system`); Toolbox and Study take the pin only. Acceptance: each package's typecheck, and Ollama's live authority and integration cases.
 - Name the breaking changes in the 0.0.35 release notes: `Selection.briefing` removed; workspace text leaves `system`; `## Pinned` renamed `## Records`; `allowed` replaced by `verdict`; the `consequential` floor; the `deny` tuple widened.
 - The toolbox wave carries rc-t1 only and waits for D20.
