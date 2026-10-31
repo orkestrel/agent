@@ -9,7 +9,12 @@ import {
 	renderSection,
 } from '@src/core'
 import { captureError } from '@orkestrel/test'
-import { createBinaryContent, createFile, createTextContent, isText } from '@orkestrel/workspace'
+import {
+	createBinaryContent,
+	createFile,
+	createTextContent,
+	isTextContent,
+} from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
 import { createToolCall } from '../../../setup.js'
 
@@ -33,7 +38,7 @@ describe('renderFencedFile', () => {
 			path: 'x.ts',
 			content: createTextContent('const y = 2', 'typescript'),
 		})
-		if (!isText(file.content)) throw new Error('expected a text file')
+		if (!isTextContent(file.content)) throw new Error('expected a text file')
 		expect(renderFencedFile(file.path, file.content.language, file.content.text)).toBe(
 			'File: x.ts\n```typescript\nconst y = 2\n```',
 		)

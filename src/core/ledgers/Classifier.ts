@@ -10,8 +10,7 @@ import type {
 	LedgerTopic,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import { isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
-import { errorToMessage } from '@orkestrel/workflow'
+import { errorToMessage, isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
 import { isJudgeAbortError } from '../errors.js'
 import { matchesJudgment, renderJSON, sumUsage } from '../helpers.js'
 import { isJudgeError } from '../providers/errors.js'

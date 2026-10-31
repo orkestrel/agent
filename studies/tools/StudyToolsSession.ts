@@ -12,9 +12,8 @@ import type {
 	StudyToolsOperation,
 	StudyToolsSessionOptions,
 } from './types.js'
-import { isObject } from '@orkestrel/contract'
+import { errorToMessage, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
-import { errorToMessage } from '@orkestrel/workflow'
 import { open, realpath, rm } from 'node:fs/promises'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { StudyError, failStudyTicket } from '@orkestrel/study'

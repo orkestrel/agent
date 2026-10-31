@@ -15,7 +15,7 @@ import type { Message } from '../types.js'
 import type { ToolManagerInterface } from '@orkestrel/tool'
 import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
 import { ToolManager } from '@orkestrel/tool'
-import { isText, WorkspaceManager } from '@orkestrel/workspace'
+import { isTextContent, WorkspaceManager } from '@orkestrel/workspace'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { ConversationManager } from '../conversations/index.js'
 import { filterAllowList } from '../helpers.js'
@@ -198,7 +198,7 @@ export class AgentContext implements AgentContextInterface {
 			(one) => one.path,
 		)
 		const workspaceTexts = files.flatMap((file) =>
-			isText(file.content)
+			isTextContent(file.content)
 				? [{ path: file.path, language: file.content.language, text: file.content.text }]
 				: [],
 		)

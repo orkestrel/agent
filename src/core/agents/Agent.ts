@@ -24,10 +24,9 @@ import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
 import { createTokenMeter } from '@orkestrel/budget'
-import { attempt } from '@orkestrel/contract'
+import { attempt, errorToMessage } from '@orkestrel/contract'
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
-import { errorToMessage } from '@orkestrel/workflow'
 import { AgentContext } from '../contexts/index.js'
 import { DEFAULT_AGENT_LIMIT } from './constants.js'
 import { AgentError } from './errors.js'
@@ -842,7 +841,7 @@ export class Agent implements AgentInterface {
 		// the model still receives a denial it can react to, exactly like an explicit `deny`.
 		const evaluated = attempt(() => authority.evaluate({ call }))
 		if (!evaluated.success) {
-			// The declared `@orkestrel/workflow` normalizer, so a fail-closed denial carries a
+			// The declared `@orkestrel/contract` normalizer, so a fail-closed denial carries a
 			// non-empty explanation the model can read: an `Error` with an empty `message`
 			// normalizes to real text, and a throw whose stringification itself fails is caught
 			// rather than escaping the gate and rejecting the run.

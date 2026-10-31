@@ -587,7 +587,7 @@ export interface AgentContextInterface {
 	 * `workspaces.active` is set, its
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} are filtered by
 	 * `scope.files` (a three-way allow-list; `undefined` ⇒ all active files), then split by
-	 * carrier: text files ({@link import('@orkestrel/workspace').isText}) render into a dedicated
+	 * carrier: text files ({@link import('@orkestrel/workspace').isTextContent}) render into a dedicated
 	 * `## Workspace` section in the system block — each a fenced
 	 * `` File: <path>\n```<language>\n<text>\n``` `` block whose fence is one backtick longer than
 	 * the longest backtick run in the text, and never shorter than three — placed immediately after
