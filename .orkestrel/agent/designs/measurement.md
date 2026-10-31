@@ -1,6 +1,6 @@
 # Measurement design
 
-This file is the home of every unit's gate, every instrument, and every GPU step. `tenets.md` § Evaluation owns the evaluation canon; `research/evidence.md` owns the readings.
+This file is the home of every unit's gate, every instrument, and every GPU step's cap and order. `designs/runs.md` owns how a GPU step runs; `tenets.md` § Evaluation owns the evaluation canon; `research/evidence.md` owns the readings.
 
 ## Cheap-first order
 
@@ -58,31 +58,33 @@ The user builds Agent for the smallest local models, because they are the most s
 
 ## GPU allowance
 
-The allowance is 600 model minutes: the summed Ollama `total_duration` of every agent and judge call (O9). The basis is the c1 cost at 4B, 109 records minutes and 53 compaction minutes over 96 goals (`research/evidence.md` § Prior-campaign readings, c1 costs), with judge exchanges replayed wherever a screen allows. The split follows O17: rc-a6's 90 minutes fund rc-a16, rc-a10 for rc-u10, and its contingency; rc-a15's 10 come from the larger-model checks.
+The allowance is 600 model minutes: the summed Ollama `total_duration` of every agent and judge call (O9). The basis is the c1 cost at 4B, 109 records minutes and 53 compaction minutes over 96 goals (`research/evidence.md` § Prior-campaign readings, c1 costs), with the judge live on one daemon pin within a screen until rc-st2 serves judge requests by key (`designs/runs.md` § Replay and pins). The split follows O17: rc-a6's 90 minutes fund rc-a16, rc-a10 for rc-u10, and its contingency; rc-a15's 10 come from the larger-model checks.
 
 | Step | Cap in model minutes | Work |
 | --- | --- | --- |
-| rc-a9 probes | 10 | co-residency, skill load, render M3, sampling M1 and M2 |
-| rc-a9 recording | 60 | goals 1 to 24, both arms |
+| rc-a9 probes | 10 | co-residency, skill load, render M3, sampling M1 and M2; rc-p4 at 3 only when the user grants Q10 |
+| rc-a9 recording | 60 | goals 1 to 24, both arms, one arm per segment |
 | rc-a15 | 10 | denial-note arms and the marker probe |
 | rc-a16 | 15 | single-request layout arms |
 | rc-a10 for rc-e1 | 30 | 8 goals, arms off, repeat, and on |
-| rc-a10 for rc-u10 | 45 | 24 goals, arms `system`, `repeat`, `sham`, and `on`, judge replayed |
+| rc-a10 for rc-u10 | 45 | 24 goals, arms `system`, `repeat`, `sham`, and `on`, judge live on one pin until rc-st2 |
 | rc-a10 contingency `separate` | 30 | only on a failed rc-u10 gate |
-| recording extension | 100 | goals 25 to 49 on both arms, 50 to 77 on the records arm |
-| rc-a10 for rc-a7 | 60 | 16 goals seeded at goal 38, four arms, judge replayed |
+| recording extension | 100 | goals 25 to 49 on both arms, 50 to 77 on the records arm, seeded after goal 24 |
+| rc-a10 for rc-a7 | 60 | 16 goals from goal 38, seeded after goal 37, four arms, judge live on one pin until rc-st2 |
 | rc-a10 for rc-a11 | 100 | four arms at bursts 49 and 77, live judge |
 | rc-a5 | 40 | late strata, compaction arm |
 | larger-model checks | 100 | one off and on pair per promoted experiment |
 
-- Each step writes its cap into its run record before it starts, stops at the cap, and reports its spend beside its result.
+- Each step writes its cap into its run record before it starts, enforces it by projection before each segment launches, and reports its spend beside its result (O19; `designs/runs.md` § Segment plan holds each step's segments and seeds).
+- A screen whose projection exceeds its cap with a live judge follows O25 (`designs/runs.md` § Segment plan); the contingency and larger-model rows top up no screen.
 - An unspent cap carries to no other step, the contingency's included.
+- A request or micro rung of a fix draws on the cap of the step whose segment surfaced the failure. It is projected before launch like a segment and runs one arm per execution. Its reading is written before launch (micro: the failing class's per-goal count on `on` against `off`). Its seeded declarations and profiles are deleted when the fix unit is accepted. When that step's remaining cap cannot fund the rung, the rung waits for the step's screen (`designs/runs.md` § Fixes while a step runs).
 - A cap stop is a budget stop, never a quality verdict (`tenets.md` § Scope).
 - When the total reaches 600 model minutes, GPU work stops and the campaign reports (O5).
 
 ## Recording
 
-`rc-a9` is a GPU run by the Orchestrator under `tenets.md` § Host, inside § GPU allowance.
+`rc-a9` is a GPU run by the Orchestrator under `tenets.md` § Host, inside § GPU allowance. `designs/runs.md` owns how it runs: one arm per sealed segment from a frozen closure (§ Run shape there), its segments (§ Segment plan), what its first segments measure (§ First readings), its progress readings, and its stops.
 
 1. rc-a15 runs first under its own cap; then the single-request probes run inside the rc-a9 probe cap:
    - Co-residency: one agent request, one judge call, a second agent request; read whether the agent's cache survives.
@@ -90,24 +92,26 @@ The allowance is 600 model minutes: the summed Ollama `total_duration` of every 
    - Render M3: `[system, A, B]` against `[system, A + '\n\n' + B]` at `num_predict` 1, each behind a unique random system prefix; read the `prompt_eval_count` delta. A delta at or under 0 stops the recording and opens D34.
    - Sampling M1 and M2: three desk requests under arms `omitted`, `pinned`, and `zero`. M1 reads `omitted` against `pinned`; a difference stops the recording until the Orchestrator rules the value. M2 reads `pinned` against `zero` and reports whether the penalty acts at `temperature` 0 (D38).
    - F3 removed the system-id probe; the late-`system` template probe is retired with rc-a6.
-2. Records and compaction arms of the endurance workload record goals 1 to 24, with request-body recording on and a ledger snapshot after each goal.
-3. For rc-a7 and rc-a11, the recording extends to goal 49 on both arms and to goal 77 on the records arm.
+2. Records and compaction arms of the endurance workload record goals 1 to 24, one arm per segment, with request-body recording on and an end-of-goal checkpoint after every goal (rc-a17).
+3. For rc-a7 and rc-a11, the recording extends to goal 49 on both arms and to goal 77 on the records arm, seeded after goal 24 with no goal re-run.
 
-Every GPU step writes a run record before it starts, holding the daemon version, `/api/show` `parameters` and `details` per digest, each role's `options` as sent, `think`, the step's cap, and the probe verdicts (`designs/layout.md` § Sampling).
+Every GPU step writes a run record before it starts, holding the daemon version, `/api/show` `parameters` and `details` per digest, each role's `options` as sent, `think`, the Node runtime, the closure fingerprint, the seed's result and seal, each segment's projection and `record` allowances, the step's cap, and the probe verdicts (`designs/layout.md` § Sampling).
 
-Acceptance: the recording seals; the snapshots validate; replay of goal k+1 from snapshot k matches live bytes on non-maintenance requests; every probe answered; the run record holds its fields; the report names the furthest goal each arm reached.
+Acceptance: every segment seals; the checkpoints validate; rc-a17's seed test runs over each sealed segment, and a session seeded after goal k builds goal k+1's first request byte-identical to the recorded request on non-maintenance requests; every probe answered; the run record holds its fields; the report names the furthest goal each arm reached.
+
+Removal: rc-a9's and the extension's per-step declarations, slices, and seeded profiles are deleted after the last screen that seeds from their seals.
 
 ## Screens
 
-`rc-a10` screens each unit under test on the rc-a9 recording.
+`rc-a10` screens each unit under test on the rc-a9 recording. `designs/runs.md` owns how a screen runs: its segments and arm order (§ Segment plan), its stops and curtailment (§ Stops), the fixes checked while it runs, and its judge and pins (§ Replay and pins).
 
-- Seed at strata 17, 49, and 77, chosen at onset and burst points.
-- Run arms off, repeat, sham, and on.
+- Seed each screen from end-of-goal checkpoints where `designs/runs.md` § Segment plan names: rc-u10 from goal 1, rc-e1 after the goal before the first fold, rc-a7 after goal 37, rc-a11 after goals 48 and 76, rc-a5 after goal 48; the readings fall at the onset and burst strata 17, 49, and 77.
+- Run arms off, repeat, sham, and on, one execution per arm per segment, in the order `designs/runs.md` § Segment plan names.
 - Offer no tools on the final step, the repair the prior R2 screen needed (`152ac3c3:.orkestrel/agent/r2-u43-u44-ruling.md`).
-- Replay judge exchanges from the recording: live judging does not reproduce across runner versions (`research/evidence.md` § Prior-campaign readings, live judge reproducibility).
+- Run the judge live on one daemon pin within a screen until rc-st2 serves judge requests by key (`designs/runs.md` § Replay and pins).
 - Noise N = 2·max(r, s), with r = |off-repeat − off| and s = |sham − off| (`152ac3c3:.orkestrel/agent/plan.md` § Levels and gates, row Noise `N`). r and s come from the repeat and sham arms of the first screen; nothing promotes before they exist.
 - No experiment promotes on mechanical metrics alone: mechanical scores do not track semantic labels (`research/evidence.md` § Prior-campaign readings, mechanical against semantic). Cache share or retention never promotes by itself.
-- Each experiment's off arm runs on 0.0.34 and doubles as the endurance baseline for the 0.0.32 ledger fixes in its segment (D19).
+- Each experiment's off arm runs on 0.0.34 and doubles as the endurance baseline for the 0.0.32 ledger fixes over the goals it runs (D19).
 - The screen of rc-u10 reads a fix, not an experiment: its comparison arm is `system`, a Study transport rewrite deleted after the screen, and no switch exists to revert (O12; `designs/layout.md` § Layout readings).
 
 ## Gates
@@ -127,9 +131,9 @@ Acceptance: the recording seals; the snapshots validate; replay of goal k+1 from
 | rc-a15 | rc-a14's byte assertions freeze the notes | single requests over paired seeds, arms `off`, `repeat`, `bare`, `denied`, `refused`, and `unanswered` (`designs/authority.md` § Denial-text reading) | each note's re-call and completion-claim counts reach at most `off` plus N, with N = 2·\|repeat − off\|; a lower `prompt_eval_count` on the marker arm reopens D22 | a failing note's constant reverts to the 0.0.34 wording; when `bare` passes where the three notes fail, the notes drop their next-step clause; delete the probe either way |
 | rc-a16 | rc-u10's hand-written recorded bytes per arm | every recorded first-pass request under arms A0, S, A1, A2, A3, and R (`designs/layout.md` § Layout readings) | rc-u10 holds when A1 ≥ A0 − N on use and A1 ≤ A0 + N on re-acquisition, with N = 2·\|S − A0\|; otherwise R is read and D34 opens; A2's strings ship in rc-u11 when A2 reads within N of A1 on both readings; A3's lead lines ship only when A3 beats A2 by more than N on one reading | delete the probe after its reading |
 | rc-u11 | a byte fixture per string rc-a16 kept; annotation cases included, not included, mixed, and endpoint; when A2's strings ship, no `[Desk]` or `Ledger source` in `src`, `tests`, or `guides`; a mutation on the annotation join; `test:guides` green | none; rc-a16 decides its strings | fix (vocabulary) | none |
-| rc-a10 for rc-u10 | the transport rewrite's test: the `system` arm appends the records block to `system` after `\n\n` and strips it from the request copy | 24 goals, arms `system`, `repeat`, `sham`, and `on`, judge replayed; contingency arm `separate` only on a failed gate | `on` passes at work criteria ≥ `system` − N with no critical class added, with N = 2·max(\|repeat − system\|, \|sham − system\|); cached share is reported and never gates; on a failed gate the `separate` arm runs, and D34 opens when it passes where `on` failed; both failing is reported as the measured cost of the ruling | delete the transport rewrite and its test; no switch exists to revert |
+| rc-a10 for rc-u10 | the transport rewrite's test: the `system` arm appends the records block to `system` after `\n\n` and strips it from the request copy | 24 goals, arms `system`, `repeat`, `sham`, and `on`, the judge live on one daemon pin until rc-st2 serves judge requests by key (`designs/runs.md` § Replay and pins); contingency arm `separate` only on a failed gate | `on` passes at work criteria ≥ `system` − N with no critical class added, with N = 2·max(\|repeat − system\|, \|sham − system\|); cached share is reported and never gates; on a failed gate the `separate` arm runs, and D34 opens when it passes where `on` failed; both failing is reported as the measured cost of the ruling | delete the transport rewrite and its test; no switch exists to revert |
 | rc-e1 | L0: rc-p1 (a) shows at least one recurring id per fold on average, and the anchor line costs at most 5% of the 4096-token recap allowance; L1: off and on are byte-identical until the first fold, and on adds exactly the anchors | L2 micro: 8 goals seeded from a compaction checkpoint before the goal-17 lookup window, arms off, repeat, and on | a predicate scores a product that carries the correct folded account id; on minus off reaches N, and on adds no critical violation | delete the option, the render branch, its constant, and its tests |
-| rc-a7 | carriage reaches 0.8 for products inside the window on the rc-a9 replay; control: the seed-only tail | 16 goals seeded at goal 38 | work criteria improve beyond N, no critical violation added, cached share within 0.1 of the `on` arm of rc-a10 for rc-u10 | strip the switch, the branch, and its tests |
+| rc-a7 | carriage reaches 0.8 for products inside the window on the hydrate rung over rc-a9's end-of-goal checkpoints (seat checkpoint k under rc-a7, build request k+1); control: the seed-only tail | 16 goals from goal 38, seeded after goal 37 | work criteria improve beyond N, no critical violation added, cached share within 0.1 of the `on` arm of rc-a10 for rc-u10 | strip the switch, the branch, and its tests |
 | rc-a11 | a recording stub judge sees fewer pair asks with identical correction state | rc-a9 extended to goal 77 | at least 50% fewer burst calls and time beyond noise, zero false retirement at burst 49 and then 77 | delete the switch, the id-share eligibility branch in `Classifier`, and their tests |
 | rc-a5 | none | late strata after rc-e1's reading | closures without evidence plus fabricated completions fall beyond N; re-acquisition stays at or under 2 times off | revert the study wiring |
 
@@ -139,11 +143,14 @@ rc-a6 is retired (`plan.md` § Sequence, Retired ids); its gate row and its GPU 
 
 All GPU work runs as the Orchestrator, after the CPU units it depends on, inside § GPU allowance:
 
-1. rc-a15, then the rc-a9 single-request probes, then the micro recording.
-2. rc-a16 on the recorded first-pass requests.
-3. rc-a10 for rc-e1, and rc-a10 for rc-u10 after rc-u11 is accepted, with its contingency only on a failed gate.
-4. The extension to goals 49 and 77, only for rc-a7 and rc-a11.
-5. The larger-model check of each experiment that promotes.
+1. rc-a15, then the rc-a9 single-request probes.
+2. The rc-a9 records segments for goals 1–2 and 3–8, with rc-p4 after the first segment only when the user grants Q10, whose reading projects every later segment (`designs/runs.md` § First readings), then the remaining rc-a9 segments.
+3. rc-a16 on the recorded first-pass requests.
+4. The extension to goals 49 and 77, for rc-a7 and rc-a11, after the seeds validate, beside the S7 writers.
+5. The screens in the order of `plan.md` § Sequence: rc-a10 for rc-e1, and rc-a10 for rc-u10 after rc-u11 is accepted, with its contingency only on a failed gate; then the screens that read the extension.
+6. The larger-model check of each experiment that promotes.
+
+Fixes found while a step runs queue their request and micro rungs into this order (`designs/runs.md` § Fixes while a step runs).
 
 ## Uncertainty
 
@@ -161,7 +168,7 @@ All GPU work runs as the Orchestrator, after the CPU units it depends on, inside
 | deferring `untrusted` taint (D23) | the floor covers only annotated tools, and a rule that separates untrusted input from consequential action needs the flag | land D23 in the same wave as rc-t1's `memo` tool; before that, count how often the floor asks on `studies/tools` |
 | three denial notes in the "did not run" form with "Do not call it again" | rests on one 0.5B rollout set over 24 tasks (C39), one fabrication study (C40), and practitioner reports; the form also changes the scope text, which rc-a15 reads only when its cap allows a `scope` arm | rc-a15 |
 | one merged security unit | a larger diff for one review | staged acceptance: a Stage A failure stops rc-a14, and Stage B dispatches apart |
-| rc-a15 funded from the larger-model checks | that row spends only per promoted experiment; three promotions leave 100 minutes | the Orchestrator can re-split after the first screens |
+| rc-a15 funded from the larger-model checks | that row spends only per promoted experiment; three promotions leave 100 minutes | the Orchestrator re-reads the row after the first screens; O25 keeps it a reserve that tops up no screen |
 | the approval binding check (a tool replaced during an ask) | no consumer replaces tools mid-run | drop it in review when `tools.tool(name)` identity is unstable across `remove` and `add` |
 | `AUTHORITY_NAME_LIMIT` and its encoding leaf | a fleet helper might already encode and cap an identifier | rc-a14's builder checks `@orkestrel/contract` and `@orkestrel/toolbox` first |
 | `correction.limit` with no default | rc-p1 (b)'s growth curve may argue for a default | read the pair count at the longest length against the shortest; when growth is far beyond linear, propose a default in rc-u6's review |
@@ -169,6 +176,14 @@ All GPU work runs as the Orchestrator, after the CPU units it depends on, inside
 | memos before workspace in the head | workload-dependent, no reading | pin by test; read invalidation counts on the mechanism study |
 | four instruments suffice | rule retention and stage attribution may join when rc-e1 promotes | rule retention joins when rc-e1 promotes; stage attribution only when a unit's gate names it |
 | the smallest model as the subject | without the repeat rule, the compaction arm at 2B stopped at goal 15, so an arm may never reach a late stratum | rc-a9 reports the furthest goal each arm reaches; a stratum the off arm never reaches is reported unreached, and the gate reads at the strata the arms reached |
-| objective bench availability | every `astra` unit runs on the subjective lane's engine until the objective bench returns (O3) | a liveness probe of the objective bench before dispatching the first `astra` unit |
+| objective bench routing | each `astra` unit runs on the subjective lane's engine when the roster lists no objective bench (O3) | a liveness probe of the objective bench before dispatching the first `astra` unit |
+| segments of 15 model minutes finish in about 20 minutes of wall | the wall-to-model ratio and the cold start are 4B readings of the prior campaign; a burst segment can stretch | rc-a9's first two segments; size by measured wall, not model time, when the ratio moves |
+| the step cap by projection, with no in-process guard | fail-fast acts at segment granularity, so a loop inside a segment wastes up to one segment | the D39 trigger on the boundary reads |
+| rc-st2 decided by the judge-state share | the share counts judge states without tool-result text, not actual body matches across arms | the first records screen's `on` segment counts body-hash matches against `off`'s seal |
+| no seal lost on a between-request stop | the Study guide states it (`@orkestrel/study` `guides/study.md` § Execution and evidence); a scope refusal before dispatch and a kill are unread | rc-p2 |
+| checkpoints after every goal | custody bytes grow with the square of the goal count, and the read cost is unmeasured | rc-a9 reports checkpoint bytes per goal; rc-st1's acceptance reads a 77-goal result |
+| evidence rows visible to a second process before the sink syncs | unknown; without it the reader lags to trial end for evidence while `exchanges.jsonl` still shows progress | rc-p2 |
+| the empty-streak alert at a streak of 3 | assumes a baseline rate at or under 0.1 and independent goals, which C48 argues against | rc-a9's records and compaction arms supply the baseline rates before any screen |
+| cutting goals per arm when a screen exceeds its cap | a shorter slice might not reach a stratum | the report names the stratum reached, as the row on the smallest model as the subject allows |
 
 The consultations' trim-order and grouped-asks uncertainties are closed by F2 and F1, and the optional-`ask` uncertainty by O16 (`plan.md` § Rulings).

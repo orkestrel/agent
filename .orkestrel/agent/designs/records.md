@@ -18,7 +18,7 @@ Store nothing that can be derived. The source of truth is three logs:
 
 ## Ledger snapshot
 
-`rc-u4` adds a snapshot and a hydrate path. The first consumer is the Study's checkpoint seeding (rc-s1, rc-a9).
+`rc-u4` adds a snapshot and a hydrate path. The first consumer is the Study's checkpoint seeding (rc-a17, rc-a9; `designs/runs.md` § Checkpoints).
 
 ```ts
 /** Holds the JSON-serializable state a ledger resumes from: its conversation and the message ids it marked. */

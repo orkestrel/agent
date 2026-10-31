@@ -4,7 +4,7 @@ The external claims and prior-campaign readings the designs cite. A design cites
 
 ## External claims
 
-An independent verifier re-fetched each claim from its primary source: C01 to C31 on 2026-10-30 (17 confirmed, 14 partly confirmed) and C32 to C47 on 2026-10-31 (14 confirmed, 2 partly confirmed); none was refuted. A partly confirmed claim appears as corrected; use no other wording of it. A claim names its source by kind; the URL names the publisher.
+An independent verifier re-fetched each claim from its primary source: C01 to C31 on 2026-10-30 (17 confirmed, 14 partly confirmed), C32 to C47 on 2026-10-31 (14 confirmed, 2 partly confirmed), and C48 to C51 on 2026-10-31 (3 confirmed, 1 partly confirmed); none was refuted. A partly confirmed claim appears as corrected; use no other wording of it. A claim names its source by kind; the URL names the publisher.
 
 | Id | Verdict | Claim | Source |
 | --- | --- | --- | --- |
@@ -55,6 +55,10 @@ An independent verifier re-fetched each claim from its primary source: C01 to C3
 | C45 | confirmed | Ollama applies a model's stored parameters as defaults for any sampling option a chat request omits, and request options override them. Read from `main` with no tag pinned, through a summarizing fetch; the chat documentation does not state the precedence. | https://raw.githubusercontent.com/ollama/ollama/main/server/routes.go |
 | C46 | confirmed | An informal, undated test of a 3B coder model on Ollama (50 runs per slot) followed a marker instruction 64% of the time in the user message, 8% in the system message, and 2% in a tool description, while two hosted models followed it every time in all three. | https://dev.to/rajkundalia/where-you-put-the-instruction-matters-more-than-what-it-says-2o9 |
 | C47 | confirmed | With contexts up to 4096 tokens on 2.7B and 7B models, the gold document placed nearest the question scored highest and the middle lowest (Llama2-7B with 18 distracting documents: 0.378 near, 0.235 far, 0.180 middle). | https://arxiv.org/html/2401.14887 |
+| C48 | confirmed | Models dropped an average 39% from single-turn to multi-turn across six generation tasks, in simulated conversations that reveal a fully specified instruction in shards over turns; most of the drop is higher unreliability, not lower aptitude, and the paper states that models that take a wrong turn get lost and do not recover. That goals in one conversation are not exchangeable is an inference from it; the paper tests degradation within one conversation, not goal order. | https://arxiv.org/abs/2505.06120 |
+| C49 | partly | 1,000 temperature-0 completions of one prompt on Qwen3-235B-A22B-Instruct-2507 gave 80 unique outputs (the most common 78 times), and batch-invariant kernels gave 1, because the server's load, and with it the batch size, varies. The cost was read on a different setup, Qwen3-8B with 1,000 sequences of 90 to 110 output tokens: deterministic vLLM took about 2.1 times the 26 s default unoptimized (55 s) and about 1.6 times after an attention-kernel improvement (42 s). | https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/ |
+| C50 | confirmed | llama.cpp's server README states that, depending on the backend, `cache_prompt` logits are "not guaranteed" bit-for-bit identical across batch sizes (prompt processing against token generation), so enabling it can give nondeterministic results; the `/completion` `seed` option defaults to -1, a random seed. | https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/server/README.md |
+| C51 | confirmed | A paired anytime-valid mixture-betting e-process over replayed frozen Qwen2.5 traces crossed no comparison at alpha 0.05 across four slices (GSM8K, BBH, ARC, CoLA); the largest final e-value was 3.675 against a threshold of 20, in a slice resting on 3 discordant prompts of 120. Single-author paper. | https://icml.cc/virtual/2026/80034 |
 
 ## DeltaDB
 
@@ -77,9 +81,11 @@ Each reading is one trajectory unless the row says otherwise; its paired differe
 | Reading | Value | Citation |
 | --- | --- | --- |
 | c1 results | 96-goal comparison, thinking off, Qwen 3.5 4B with Agent 0.0.30: records 213/402 facts, 109/304 work, 109/350 obligations, 10 critical violations; compaction 43/402, 29/304, 34/350, 42 critical (15 fabricated completions, 25 closures without source evidence). Compaction facts fell from 26% to 0% across four-shift intervals; records from 62% to 43%. | `692e551:RESULTS.md` |
+| c1 reserve replies | "half of the replies hit the reserve" in c1, so a reply cut at the output reserve is common and alone is no failure signal | `692e551:RESULTS.md` (line 94) |
 | c1 costs | thinking off, Qwen 3.5 4B: records 209 agent calls, 438376/48790 tokens, 2626 judge calls, 109 minutes with 63 of them judge; compaction 129 calls, 230104/37552 tokens, summaries 99609/26991, 53 minutes | `692e551:RESULTS.md` |
 | Study pair | profile: context 20480, output 8192, safety 512; records 209 agent calls, 729 judge calls, 6303563 ms; qualifying compaction (rolling): 120 agent calls, 10 nonempty summaries, gauge scale 0.978, overhead about 926.49, prompt room 11776, recap allowance 4096. The two references come from different builds, so their difference is not a controlled strategy effect. | `692e551:ANALYSIS.md` |
 | judge bursts | goals 49, 53, and 77 hold 410 of 729 judge calls and 240908 of 335490 judge prompt tokens | `692e551:ANALYSIS.md` |
+| goal call bound | the endurance capacity run completed 48 records goals; goal 49 exhausted the 128-call goal bound (3 metadata and 125 judge calls), and the compaction arm never ran | `692e551:ANALYSIS.md` |
 | frozen tail census | the records tail is the eight opening arrivals of `ev-01-1` for all 96 goals; 95 of 96 tasks refer to prior products not carried; 21 of 24 handoffs off focus | `152ac3c3:.orkestrel/agent/boosts.md`; `692e551:ANALYSIS.md` |
 | recap literals | all ten qualifying compaction recaps omitted account ids | `692e551:ANALYSIS.md` |
 | empty recaps | the early rolling run left 8 of 12 recaps empty | `692e551:ANALYSIS.md` |
