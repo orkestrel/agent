@@ -15,14 +15,14 @@ import {
 describe('prospective public endurance declarations', () => {
 	it('preserves the complete pinned public goal and source population at their original boundaries', async () => {
 		// This public archive is retained by root as an explicit durable test dependency.
-		const path = 'studies/endurance/sources/runtime/evaluation.json'
+		const path = 'studies/memory/sources/evaluation.json'
 		expect((await stat(path)).size).toBe(149851)
 		const bytes = await readFile(path)
 		expect(createHash('sha256').update(bytes).digest('hex')).toBe(
 			'e8b4143efbbc9251166852c2d993f6b1f0b3f44eaa181f0973c27878109a47f5',
 		)
 		const source = parseJSON(bytes.toString('utf8'))
-		const provenance = parseJSON(await readFile('studies/endurance/provenance.json', 'utf8'))
+		const provenance = parseJSON(await readFile('studies/memory/provenance/endurance.json', 'utf8'))
 		if (
 			!isRecord(source) ||
 			!Array.isArray(source.goals) ||
@@ -140,9 +140,7 @@ describe('prospective public endurance declarations', () => {
 	})
 
 	it('exposes every public lookup update exactly once at its first eligible goal and refuses future snapshots', async () => {
-		const source = parseJSON(
-			await readFile('studies/endurance/sources/runtime/evaluation.json', 'utf8'),
-		)
+		const source = parseJSON(await readFile('studies/memory/sources/evaluation.json', 'utf8'))
 		if (!isRecord(source) || !Array.isArray(source.lookups) || !Array.isArray(source.goals))
 			throw new Error('Invalid lookup archive')
 		const fixture = await loadMemoryInputs(
@@ -253,7 +251,7 @@ describe('prospective public endurance declarations', () => {
 			name: 'q4',
 			agent: 'dist/src/core/index.js',
 			subject: 'dist/src/core/index.js',
-			qualification: 'tmp/studies/endurance-capacity-2',
+			qualification: 'tmp/studies/qualification',
 			provider: {
 				entry: 'node_modules/@orkestrel/ollama/dist/src/core/index.js',
 				url: 'http://127.0.0.1:11435',
