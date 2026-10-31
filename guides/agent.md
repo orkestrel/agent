@@ -695,7 +695,7 @@ The wire is strictly narrower than the domain on purpose. `providerRequestContra
 
 The root holds the package's shared vocabulary: the message and judge value types, the role list, the judge abort error, the message and tool-call wire shapes with the message contract, and the cloner, helpers, and guards that more than one module reads.
 
-Each module section lists its exports by kind file, and a `Shape` cell reads by table. On a constant it holds the declared type. On a type it holds an interface's data members as bare names in braces, `?` marking an optional member and `plus` introducing its call-signature members, with an extended interface's name before `plus`, or a type alias's own type literal with a union's arms escaped as `\|`. On a shape it holds the projected record's members in the same notation, on a contract the domain type the contract narrows to, and on a guard the type the guard narrows to. Each guard reads an `unknown`, returns `false` off-shape, and never throws, and an error guard stays in its module's Errors table beside the error it narrows.
+Each module section lists its exports by kind file. Each guard reads an `unknown`, returns `false` off-shape, and never throws, and an error guard stays in its module's Errors table beside the error it narrows.
 
 #### Types
 
