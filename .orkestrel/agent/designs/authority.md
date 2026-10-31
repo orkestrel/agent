@@ -69,10 +69,10 @@ export interface AuthorityNote {
 - `ask` is optional on `AuthorityInterface`, and the `Authority` class always implements it (O16). Absence is the safe state, and a 0.0.34 structural authority migrates with the `verdict` rename alone. A later move to a required `ask` is breaking; the reverse is not.
 - `AuthorityHandler` returns `boolean | Promise<boolean>`; `Authority#ask` returns `Promise<boolean>` and rejects with a coded `AgentError` when no handler is set (rc-a14 names the code), so it is a boundary, not a forward, and an agent with no approver reads the `unanswered` note.
 - `AuthorityContext` stays `{ call }`: no fleet tool sets `untrusted` or `consequential` (F6), and the floor reads the advertised definition in the loop, so no rule needs the tool (D23, D24).
-- Declare `AUTHORITY_NOTES: AuthorityNote` and `AUTHORITY_NAME_LIMIT` in `src/core/agents/constants.ts`, and `isAuthorityDecision` in `src/core/agents/validators.ts`, which rc-a14 creates with its barrel row.
+- Declare `AUTHORITY_NOTES: AuthorityNote` in `src/core/agents/constants.ts`, and `isAuthorityDecision` in `src/core/agents/validators.ts`, which rc-a14 creates with its barrel row.
 - `denyCall(call, reason)` in `src/core/agents/helpers.ts` keeps its name and gains the render form of § Denial notes. One pure leaf, `resolveDecision(decision, definition)` in `src/core/agents/helpers.ts`, applies the floor.
 - `AgentOptions` gains nothing. `Agent` holds `options.authority ?? new Authority()`.
-- Before writing the name-encoding leaf, rc-a14's builder checks `@orkestrel/contract` and `@orkestrel/toolbox` for a helper that already encodes and caps an identifier.
+- The name encoder is `preview` from `@orkestrel/contract`, which renders a string as its `JSON.stringify` text and clips it at `PREVIEW_LIMIT` (64) with a trailing `…`, never splitting a surrogate pair; no `AUTHORITY_NAME_LIMIT` and no encoding leaf are declared. A clipped name ends in `…` with no closing quote. `@orkestrel/toolbox` holds no candidate, because it depends on `@orkestrel/agent` and Agent cannot import from it (Orchestrator ruling, 2026-10-31).
 
 ## Loop placement
 
@@ -119,7 +119,7 @@ rc-a14 holds each ordering with one test:
 
 ## Denial notes
 
-Every denial goes through one render form in `denyCall`: `${JSON.stringify(name capped at AUTHORITY_NAME_LIMIT)} did not run: ${reason}`. The name is model-supplied, so it is JSON-encoded and length-capped. The status comes first and the next step last; no argument is echoed, and no host error text reaches the tool message.
+Every denial goes through one render form in `denyCall`: `${preview(name)} did not run: ${reason}`. The name is model-supplied, so it is JSON-encoded and length-capped by `preview` (§ Shapes). The status comes first and the next step last; no argument is echoed, and no host error text reaches the tool message.
 
 | Outcome | Tool message the model reads | Events |
 | --- | --- | --- |

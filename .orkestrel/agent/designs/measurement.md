@@ -170,7 +170,7 @@ Fixes found while a step runs queue their request and micro rungs into this orde
 | one merged security unit | a larger diff for one review | staged acceptance: a Stage A failure stops rc-a14, and Stage B dispatches apart |
 | rc-a15 funded from the larger-model checks | that row spends only per promoted experiment; three promotions leave 100 minutes | the Orchestrator re-reads the row after the first screens; O25 keeps it a reserve that tops up no screen |
 | the approval binding check (a tool replaced during an ask) | no consumer replaces tools mid-run | drop it in review when `tools.tool(name)` identity is unstable across `remove` and `add` |
-| `AUTHORITY_NAME_LIMIT` and its encoding leaf | a fleet helper might already encode and cap an identifier | rc-a14's builder checks `@orkestrel/contract` and `@orkestrel/toolbox` first |
+| `AUTHORITY_NAME_LIMIT` and its encoding leaf | a fleet helper might already encode and cap an identifier | resolved 2026-10-31: `preview` in `@orkestrel/contract` encodes and caps the name, so neither is declared (`designs/authority.md` § Shapes) |
 | `correction.limit` with no default | rc-p1 (b)'s growth curve may argue for a default | read the pair count at the longest length against the shortest; when growth is far beyond linear, propose a default in rc-u6's review |
 | whole-set memo store | the per-revision store has a real write-cost argument | time `set` over growing memo sets in rc-u8 (D14) |
 | memos before workspace in the head | workload-dependent, no reading | pin by test; read invalidation counts on the mechanism study |
