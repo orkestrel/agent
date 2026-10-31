@@ -1,9 +1,16 @@
 import type { JSONValue } from '@orkestrel/contract'
 import type { LedgerGauge, Message } from '@orkestrel/agent'
-import type { StudyJudgment, StudyProfile, StudyProvider, StudyRoom } from '@orkestrel/study'
+import type {
+	StudyEvidence,
+	StudyJudgment,
+	StudyProfile,
+	StudyProvider,
+	StudyRoom,
+} from '@orkestrel/study'
 import type {
 	StudyGradeVerdict,
 	StudyGradeTarget,
+	StudyOllamaRole,
 	StudyOllamaTransportOptions,
 	StudyReference,
 } from '@orkestrel/study/server'
@@ -12,11 +19,14 @@ import type {
 	StudyMemoryCompaction,
 	StudyMemoryObservation,
 	StudyMemoryProvenance,
+	StudyMemoryCarriageInput,
 	StudyMemoryProvenanceSource,
+	StudyMemoryRetentionInput,
+	StudyMemoryTally,
 } from './types.js'
 import { isRecord } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
-import { isStudyMemoryAssertion, isStudyMemoryOptions } from './validators.js'
+import { isStudyMemoryAssertion, isStudyMemoryOptions, isStudyMemoryWire } from './validators.js'
 
 /** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
 export function readStudyMemoryGauge(settings: unknown): LedgerGauge {
@@ -208,4 +218,69 @@ export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeVerdic
 					: 'Retained observable mechanism evidence',
 		references,
 	}
+}
+
+/** Derives a share from a tally. @param tally - Found and counted literals. @returns `found / total`, or `undefined` when nothing was counted. */
+export function computeStudyMemoryShare(tally: StudyMemoryTally): number | undefined {
+	return tally.total === 0 ? undefined : tally.found / tally.total
+}
+
+/** Reads literal retention: the history ids that recur in later requests, and how many of them the post-fold view still carries. @param input - Folded slice, later texts, post-fold view and literal reader. @returns The tally over the recurring ids. */
+export function computeStudyMemoryRetention(input: StudyMemoryRetentionInput): StudyMemoryTally {
+	const later = new Set<string>()
+	for (const text of input.later) for (const id of input.literals(text)) later.add(id)
+	const view = new Set<string>()
+	for (const text of input.view) for (const id of input.literals(text)) view.add(id)
+	const recurring = new Set<string>()
+	for (const text of input.history)
+		for (const id of input.literals(text)) if (later.has(id)) recurring.add(id)
+	const found = [...recurring].filter((id) => view.has(id)).length
+	return { found, total: recurring.size }
+}
+
+/** Reads carriage: the ids of a referenced prior product that the built prompt carries. @param input - Product text, prompt texts and literal reader. @returns The tally over the product ids. */
+export function computeStudyMemoryCarriage(input: StudyMemoryCarriageInput): StudyMemoryTally {
+	const prompt = new Set<string>()
+	for (const text of input.prompt) for (const id of input.literals(text)) prompt.add(id)
+	const product = input.literals(input.product)
+	const found = [...product].filter((id) => prompt.has(id)).length
+	return { found, total: product.size }
+}
+
+/**
+ * Reads the cache share of each model request of one role.
+ *
+ * @remarks Open semantics: whether the daemon's `prompt_eval_count` includes the cached tokens is unresolved; the share is defined as `cached / prompt` as reported.
+ * @param evidence - Study evidence rows.
+ * @param role - Study role whose `wire` rows are read.
+ * @returns One entry per matching `wire` row in row order: `cached / prompt`, or `undefined` when either count is unreported or `prompt` is not above 0.
+ */
+export function computeStudyMemoryCacheShares(
+	evidence: readonly StudyEvidence[],
+	role: StudyOllamaRole,
+): ReadonlyArray<number | undefined> {
+	const shares: Array<number | undefined> = []
+	for (const row of evidence) {
+		if (row.event !== 'wire' || !isStudyMemoryWire(row.value) || row.value.role !== role) continue
+		const counts = row.value.timing?.counts
+		shares.push(
+			counts !== undefined && counts.prompt !== null && counts.cached !== null && counts.prompt > 0
+				? counts.cached / counts.prompt
+				: undefined,
+		)
+	}
+	return shares
+}
+
+/** Counts re-acquisitions per goal. @param evidence - Study evidence rows. @param events - Event names that count. @returns One entry per goal in first-seen row order with the count of its rows whose event is listed; a goal with none reads 0. */
+export function computeStudyMemoryReacquisition(
+	evidence: readonly StudyEvidence[],
+	events: readonly string[],
+): ReadonlyMap<string, number> {
+	const counts = new Map<string, number>()
+	for (const row of evidence) {
+		const held = counts.get(row.goal) ?? 0
+		counts.set(row.goal, events.includes(row.event) ? held + 1 : held)
+	}
+	return counts
 }

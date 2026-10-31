@@ -4,12 +4,18 @@ import { describe, expect, it } from 'vitest'
 import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
+	computeStudyMemoryCacheShares,
+	computeStudyMemoryCarriage,
+	computeStudyMemoryReacquisition,
+	computeStudyMemoryRetention,
+	computeStudyMemoryShare,
 	readStudyMemoryCompaction,
 	readStudyMemoryGrade,
 	readStudyMemoryGauge,
 	readStudyMemoryJudge,
 	readStudyMemoryProvenance,
 	readStudyMemoryRecap,
+	STUDY_MEMORY_LOOKUPS,
 	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
 } from '../../../studies/memory/index.js'
@@ -17,6 +23,11 @@ import {
 	buildMemoryCriterion,
 	buildMemoryGradingFixture,
 	buildMemoryProfile,
+	MEMORY_CARRIAGE,
+	MEMORY_EVIDENCE,
+	MEMORY_LITERALS,
+	MEMORY_RETENTION,
+	MEMORY_WIRE_ROWS,
 	omitMemoryAuxiliaries,
 	readMemoryOrigins,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
@@ -374,5 +385,60 @@ describe('memory mechanical grading over the shared traversal', () => {
 			reason: 'Requires an independent blind semantic label',
 			references: [],
 		})
+	})
+})
+
+function literals(text: string): ReadonlySet<string> {
+	return MEMORY_LITERALS.get(text) ?? new Set()
+}
+
+describe('memory measurement instruments', () => {
+	it('reads literal retention over the recurring ids and fails the recap-only control', () => {
+		const { history, later, anchored, recap } = MEMORY_RETENTION
+		expect(computeStudyMemoryRetention({ history, later, view: anchored, literals })).toEqual({
+			found: 2,
+			total: 2,
+		})
+		const control = computeStudyMemoryRetention({ history, later, view: recap, literals })
+		expect(control.found).toBe(0)
+		expect(control.found).toBeLessThan(2)
+		// CC-303 sits in history and view but never recurs, so it adds nothing to the population.
+		expect(computeStudyMemoryRetention({ history, later, view: anchored, literals }).total).toBe(2)
+	})
+
+	it('reads carriage over the product ids and fails the seed-only control', () => {
+		const { product, carried, seed } = MEMORY_CARRIAGE
+		expect(computeStudyMemoryCarriage({ product, prompt: carried, literals })).toEqual({
+			found: 2,
+			total: 2,
+		})
+		expect(computeStudyMemoryCarriage({ product, prompt: seed, literals })).toEqual({
+			found: 0,
+			total: 2,
+		})
+	})
+
+	it('reads the cache share per agent wire row and never reports an unread count as zero', () => {
+		expect(computeStudyMemoryCacheShares(MEMORY_WIRE_ROWS.stable, 'agent')).toEqual([0.9, 0.9])
+		expect(computeStudyMemoryCacheShares(MEMORY_WIRE_ROWS.changed, 'agent')).toEqual([0])
+		expect(computeStudyMemoryCacheShares(MEMORY_WIRE_ROWS.judge, 'agent')).toEqual([])
+		expect(computeStudyMemoryCacheShares(MEMORY_WIRE_ROWS.absent, 'agent')).toEqual([
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+		])
+	})
+
+	it('counts lookups per goal and reads zero for a goal that holds none', () => {
+		const counts = computeStudyMemoryReacquisition(MEMORY_EVIDENCE, STUDY_MEMORY_LOOKUPS)
+		expect(counts.get('g1')).toBe(2)
+		expect(counts.get('g2')).toBe(0)
+		expect([...counts.keys()]).toEqual(['g1', 'g2'])
+	})
+
+	it('derives a share from a tally and reads undefined for an empty population', () => {
+		expect(computeStudyMemoryShare({ found: 1, total: 4 })).toBe(0.25)
+		expect(computeStudyMemoryShare({ found: 0, total: 0 })).toBeUndefined()
 	})
 })

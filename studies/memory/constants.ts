@@ -35,3 +35,5 @@ export const STUDY_MEMORY_TOPICS = Object.freeze([
 		criterion: 'Orders, delivery, refunds, ownership and follow-up obligations',
 	}),
 ])
+/** Names the evidence events a re-acquisition counts, written by the session's lookup tool. */
+export const STUDY_MEMORY_LOOKUPS: readonly string[] = Object.freeze(['lookup'])

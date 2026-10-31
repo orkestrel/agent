@@ -7,6 +7,7 @@ import type {
 	StudyMemoryOptions,
 	StudyMemoryProvider,
 	StudyMemoryRuntime,
+	StudyMemoryWire,
 } from './types.js'
 import { holds, isArray, isBoolean, isFiniteNumber, isObject, isRecord } from '@orkestrel/contract'
 import { isStudyAgentRuntime } from '@orkestrel/study'
@@ -155,6 +156,20 @@ export function isStudyMemoryAssertion(value: unknown): value is StudyMemoryAsse
 		return (
 			(value.observation === 'arrival' || value.observation === 'lookup') &&
 			typeof value.id === 'string'
+		)
+	})
+}
+
+/** Checks the members of a Study `wire` value the cache instrument reads. @param value - Evidence value of a `wire` row. @returns Whether `role` is a string and any present timing holds `prompt` and `cached` counts that are each a finite number or `null`. */
+export function isStudyMemoryWire(value: unknown): value is StudyMemoryWire {
+	return holds(() => {
+		if (!isRecord(value) || typeof value.role !== 'string') return false
+		const timing = value.timing
+		if (timing === undefined || timing === null) return true
+		if (!isRecord(timing) || !isRecord(timing.counts)) return false
+		const { prompt, cached } = timing.counts
+		return (
+			(prompt === null || isFiniteNumber(prompt)) && (cached === null || isFiniteNumber(cached))
 		)
 	})
 }

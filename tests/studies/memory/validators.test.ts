@@ -8,6 +8,7 @@ import {
 	isStudyMemoryOptions,
 	isStudyMemoryProvider,
 	isStudyMemoryRuntime,
+	isStudyMemoryWire,
 } from '../../../studies/memory/index.js'
 import { STUDY_MEMORY_MODULES } from '../../setupStudy.js'
 
@@ -174,5 +175,31 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(isStudyMemoryArm('unsupported')).toBe(false)
 		expect(isStudyMemoryAssertion({ observation: 'result', partial: false })).toBe(true)
 		expect(isStudyMemoryAssertion({ observation: 'result', partial: 'false' })).toBe(false)
+	})
+})
+
+describe('memory wire guard', () => {
+	it('accepts wire values with or without timing and null counts', () => {
+		expect(isStudyMemoryWire({ role: 'agent' })).toBe(true)
+		expect(isStudyMemoryWire({ role: 'agent', timing: null })).toBe(true)
+		expect(
+			isStudyMemoryWire({ role: 'agent', timing: { counts: { prompt: 10, cached: 5 } } }),
+		).toBe(true)
+		expect(
+			isStudyMemoryWire({ role: 'agent', timing: { counts: { prompt: null, cached: null } } }),
+		).toBe(true)
+	})
+
+	it('refuses a non-record, a bad role, a bad counts member and a non-finite count', () => {
+		expect(isStudyMemoryWire('wire')).toBe(false)
+		expect(isStudyMemoryWire({})).toBe(false)
+		expect(isStudyMemoryWire({ role: 1 })).toBe(false)
+		expect(isStudyMemoryWire({ role: 'agent', timing: { counts: 'none' } })).toBe(false)
+		expect(
+			isStudyMemoryWire({ role: 'agent', timing: { counts: { prompt: Infinity, cached: 0 } } }),
+		).toBe(false)
+		expect(
+			isStudyMemoryWire({ role: 'agent', timing: { counts: { prompt: 1, cached: 'x' } } }),
+		).toBe(false)
 	})
 })

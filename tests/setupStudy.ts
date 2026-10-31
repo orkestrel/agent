@@ -1654,3 +1654,89 @@ export function createQuietStudyContext(fixture: StudyMeterFixture): StudyContex
 		evidence: { append: async () => undefined },
 	}
 }
+
+/** Maps each memory instrument fixture text to the ids it carries; the cases read it through a callback. */
+export const MEMORY_LITERALS: ReadonlyMap<string, ReadonlySet<string>> = Object.freeze(
+	new Map<string, ReadonlySet<string>>([
+		['refund AA-101 approved', new Set(['AA-101'])],
+		['handoff BB-202 to Dana', new Set(['BB-202'])],
+		['closed CC-303', new Set(['CC-303'])],
+		['AA-101 asked again', new Set(['AA-101'])],
+		['status of BB-202', new Set(['BB-202'])],
+		['kept AA-101 BB-202 CC-303', new Set(['AA-101', 'BB-202', 'CC-303'])],
+		['recap of refunds and handoffs', new Set()],
+		['product cites AA-101 and BB-202', new Set(['AA-101', 'BB-202'])],
+		['prompt carries AA-101 and BB-202', new Set(['AA-101', 'BB-202'])],
+		['seed question only', new Set()],
+	]),
+)
+
+/** Holds the retention fixture: the folded slice and the later requests, with an anchored view and a recap-only control view. */
+export const MEMORY_RETENTION = Object.freeze({
+	history: Object.freeze(['refund AA-101 approved', 'handoff BB-202 to Dana', 'closed CC-303']),
+	later: Object.freeze(['AA-101 asked again', 'status of BB-202']),
+	anchored: Object.freeze(['kept AA-101 BB-202 CC-303']),
+	recap: Object.freeze(['recap of refunds and handoffs']),
+})
+
+/** Holds the carriage fixture: the referenced product with a prompt that carries it and a seed-only control prompt. */
+export const MEMORY_CARRIAGE = Object.freeze({
+	product: 'product cites AA-101 and BB-202',
+	carried: Object.freeze(['prompt carries AA-101 and BB-202']),
+	seed: Object.freeze(['seed question only']),
+})
+
+/** Holds the wire evidence fixtures; a `null` timing mirrors an unobserved terminal timing. */
+export const MEMORY_WIRE_ROWS = Object.freeze({
+	stable: Object.freeze<StudyEvidence[]>([
+		{
+			event: 'wire',
+			goal: 'g1',
+			value: { role: 'agent', timing: { counts: { prompt: 1000, cached: 900 } } },
+		},
+		{
+			event: 'wire',
+			goal: 'g1',
+			value: { role: 'agent', timing: { counts: { prompt: 1000, cached: 900 } } },
+		},
+	]),
+	changed: Object.freeze<StudyEvidence[]>([
+		{
+			event: 'wire',
+			goal: 'g1',
+			value: { role: 'agent', timing: { counts: { prompt: 1000, cached: 0 } } },
+		},
+	]),
+	judge: Object.freeze<StudyEvidence[]>([
+		{
+			event: 'wire',
+			goal: 'g1',
+			value: { role: 'judge', timing: { counts: { prompt: 1000, cached: 900 } } },
+		},
+	]),
+	absent: Object.freeze<StudyEvidence[]>([
+		{ event: 'wire', goal: 'g1', value: { role: 'agent' } },
+		{ event: 'wire', goal: 'g1', value: { role: 'agent', timing: null } },
+		{
+			event: 'wire',
+			goal: 'g1',
+			value: { role: 'agent', timing: { counts: { prompt: 1000, cached: null } } },
+		},
+		{
+			event: 'wire',
+			goal: 'g1',
+			value: { role: 'agent', timing: { counts: { prompt: 0, cached: 0 } } },
+		},
+	]),
+})
+
+/** Holds the re-acquisition evidence: `g1` looks up twice, and `g2` holds only other rows. */
+export const MEMORY_EVIDENCE: readonly StudyEvidence[] = Object.freeze([
+	{ event: 'arrival', goal: 'g1', value: { id: 'one' } },
+	{ event: 'lookup', goal: 'g1', value: { id: 'one', found: true } },
+	{ event: 'lookup', goal: 'g1', value: { id: 'two', found: false } },
+	{ event: 'arrival', goal: 'g2', value: { id: 'one' } },
+	{ event: 'result', goal: 'g2', value: { partial: false } },
+	{ event: 'wire', goal: 'g2', value: { role: 'agent' } },
+	{ event: 'summary', goal: 'g2', value: {} },
+])

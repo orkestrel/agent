@@ -135,3 +135,45 @@ export type StudyMemoryAssertion =
 	| { readonly observation: 'lookup'; readonly id: string }
 	| { readonly observation: 'summary' }
 	| { readonly observation: 'operational' }
+
+/** Reads the ids one text carries; the study wiring passes `(text) => extractLiterals(text).ids`. */
+export type StudyMemoryLiteralHandler = (text: string) => ReadonlySet<string>
+
+/** Holds how many of the counted literals a reading found, out of how many it counted; the share is derived, never stored. */
+export interface StudyMemoryTally {
+	readonly found: number
+	readonly total: number
+}
+
+/** Holds one literal-retention reading: the folded slice, the later requests the reading covers, and the post-fold view. */
+export interface StudyMemoryRetentionInput {
+	/** Texts of the folded slice. */
+	readonly history: readonly string[]
+	/** Texts of the requests after the boundary the reading covers (the next 3, then the next 8, as two readings). */
+	readonly later: readonly string[]
+	/** Texts of the post-fold view. */
+	readonly view: readonly string[]
+	/** Reads the ids one text carries. */
+	readonly literals: StudyMemoryLiteralHandler
+}
+
+/** Holds one carriage reading: the referenced prior product and the built prompt. */
+export interface StudyMemoryCarriageInput {
+	/** Text of the referenced prior product. */
+	readonly product: string
+	/** Message texts of the built prompt. */
+	readonly prompt: readonly string[]
+	/** Reads the ids one text carries. */
+	readonly literals: StudyMemoryLiteralHandler
+}
+
+/** Holds the counts of a Study `wire` timing the cache instrument reads; `null` mirrors `buildStudyOllamaTiming`, which reports an unreported count as `null`. */
+export interface StudyMemoryTiming {
+	readonly counts: { readonly prompt: number | null; readonly cached: number | null }
+}
+
+/** Holds the members of a Study `wire` value the cache instrument reads; `timing` is `null` when `buildStudyOllamaTiming` observed no terminal timing. */
+export interface StudyMemoryWire {
+	readonly role: string
+	readonly timing?: StudyMemoryTiming | null | undefined
+}
