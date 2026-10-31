@@ -31,6 +31,7 @@ import type { ToolDefinition } from '@orkestrel/tool'
 import { Channel, createAgent, estimateRequest, ProviderAbortError } from '@src/core'
 import { createRecorder } from '@orkestrel/test'
 import {
+	createApprover,
 	createAuthorityContext,
 	createMessage,
 	computeUsageTotal,
@@ -197,6 +198,20 @@ describe('agent scenario infrastructure', () => {
 		expect(createAuthorityContext('read', { path: 'note' })).toEqual({
 			call: { id: 'c1', name: 'read', arguments: { path: 'note' } },
 		})
+		const deferred = Promise.resolve(true)
+		const approver = createApprover([true, deferred])
+		const context = createAuthorityContext('write')
+		const decision = { zone: 'sensitive', verdict: 'ask' } as const
+		const signal = new AbortController().signal
+		expect(approver.ask(context, decision, signal)).toBe(true)
+		expect(approver.ask(context, decision, signal)).toBe(deferred)
+		expect(approver.ask(context, decision, signal)).toBe(false)
+		expect(approver.calls).toEqual([
+			[context, decision, signal],
+			[context, decision, signal],
+			[context, decision, signal],
+		])
+		expect(approver.calls[0]?.[2]).toBe(signal)
 		expect(createMessage('hello')).toEqual({ id: 'm', role: 'user', content: 'hello' })
 		expect(
 			computeUsageTotal(

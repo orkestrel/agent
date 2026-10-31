@@ -233,13 +233,23 @@ export type AgentEventMap = {
 	 * calibrated without a failure.
 	 */
 	readonly usage: readonly [usage: TokenUsage, estimate: number]
+	/** Reports a call cleared for dispatch: a policy allow, or an asked call the approver approved. */
+	readonly allow: readonly [call: ToolCall, decision: AuthorityDecision]
+	/** Reports a call handed to the approver; `allow`, `deny`, or `abort` follows. */
+	readonly ask: readonly [call: ToolCall, decision: AuthorityDecision]
 	/**
-	 * Reports a call denied by scope or authority, before dispatch.
+	 * Reports a call denied by scope or authority, before dispatch; `decision` is absent for a scope
+	 * miss, a no-advertisement drop, an evaluate throw, or an invalid decision.
 	 * A turn advertising no tools drops each call with `no tool is advertised in the active scope`.
 	 * Otherwise a call excluded by the tool allow-list carries `<tool name> is not in the active scope` and
-	 * produces a denial tool result and message. Authority evaluates only admitted calls.
+	 * produces a denial tool result and message. Authority evaluates only admitted calls. `reason` is
+	 * the rule's `deny` reason, the thrown error's text, `invalid decision`, or `undefined`.
 	 */
-	readonly deny: readonly [call: ToolCall, reason: string | undefined]
+	readonly deny: readonly [
+		call: ToolCall,
+		reason: string | undefined,
+		decision: AuthorityDecision | undefined,
+	]
 	/** Reports the run settled successfully (a natural finish or a cancel's partial) — the {@link AgentResult}. */
 	readonly finish: readonly [result: AgentResult]
 	/** Reports the run settled with a genuine (non-cancel) error — the thrown value (always `unknown`). */
@@ -380,6 +390,9 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  *   the loop calls its `yield` method between turns, so the host regains control between expensive provider calls.
  * - `signal` — an optional external `AbortSignal` whose abort cancels the turn (a
  *   partial result).
+ * - `authority` — an optional {@link AuthorityInterface} that decides each scope-admitted call;
+ *   omitted ⇒ a default `Authority` that allows an unannotated call and asks for a
+ *   `consequential` one, which no approver answers, so it is denied.
  * - `conversations` — an optional {@link ConversationManagerInterface} forwarded to the agent's
  *   context as the message source (so `context.messages` is its active conversation's live tail);
  *   omitted ⇒ a fresh registry holding one default conversation. Auto-compaction (`window`) folds
@@ -471,8 +484,11 @@ export interface AgentOptions {
 	 * Holds an optional policy gate consulted after scope admits a tool call — a denied call is
 	 * fed back to the model as a denial {@link ToolResult} (a `tool` chunk + a tool
 	 * message) rather than executed (no tool execution), so the model receives the
-	 * denial and can react; an allowed call dispatches normally. Omitted ⇒ every admitted call
-	 * dispatches through the registry.
+	 * denial and can react; an allowed call dispatches normally, and an asked call dispatches only
+	 * when the authority's `ask` approves it. The loop raises an `allow` for a tool whose advertised
+	 * definition is annotated `consequential` to an `ask`, with or without this option. Omitted ⇒ a
+	 * default `Authority` with no rules and no approver: an unannotated call dispatches with an
+	 * `allow` in zone `'default'`, and a `consequential` call is denied as unanswered.
 	 */
 	readonly authority?: AuthorityInterface
 	/**
@@ -682,18 +698,22 @@ export interface AuthorityContext {
 	readonly call: ToolCall
 }
 
+/** Names an authority's verdict on one tool call. */
+export type AuthorityVerdict = 'allow' | 'ask' | 'deny'
+
 /**
  * Holds the authority verdict on one tool call.
  *
  * @remarks
  * `zone` is a project-defined classification (for example `'default'` / `'sensitive'` /
- * `'restricted'`) carried for routing + observability; `allowed` is the gate decision
- * (a denied call is fed back to the model, never executed); `reason` is an optional
- * human-readable explanation surfaced in the denial {@link ToolResult}.
+ * `'restricted'`) carried for routing + observability; `verdict` is the gate decision: `allow`
+ * dispatches the call, `ask` hands it to the approver, and `deny` feeds a denial back to the
+ * model without running it. `reason` is an optional explanation: a `deny` reason reaches the
+ * model in the denial {@link ToolResult}; an `ask` reason reaches the approver and the events.
  */
 export interface AuthorityDecision {
 	readonly zone: string
-	readonly allowed: boolean
+	readonly verdict: AuthorityVerdict
 	readonly reason?: string
 }
 
@@ -702,52 +722,81 @@ export interface AuthorityDecision {
  *
  * @remarks
  * The first rule whose `match` returns true decides; if none match, the authority's
- * `fallback` decides. A matched rule allows by default and denies only when its
- * `allowed` is explicitly `false`. `zone` classifies the matched call; `reason` is the
- * optional explanation carried into the {@link AuthorityDecision} (and, on a denial,
- * into the denial {@link ToolResult}).
+ * `fallback` decides. A matched rule with no `verdict` allows. `zone` classifies the matched
+ * call; `reason` is the optional explanation carried into the {@link AuthorityDecision}.
  */
 export interface AuthorityRule {
 	readonly match: (context: AuthorityContext) => boolean
 	readonly zone: string
-	readonly allowed?: boolean
+	readonly verdict?: AuthorityVerdict
 	readonly reason?: string
 }
 
+/** Answers one `ask`; only a resolved `true` approves. */
+export type AuthorityHandler = (
+	context: AuthorityContext,
+	decision: AuthorityDecision,
+	signal: AbortSignal,
+) => boolean | Promise<boolean>
+
 /**
- * Configures `createAuthority` — the ordered rules and the no-match fallback.
+ * Configures `createAuthority` — the ordered rules, the no-match fallback, and the approver.
  *
  * @remarks
  * `rules` are evaluated in order, first match wins (see {@link AuthorityRule}).
  * `fallback` is the {@link AuthorityDecision} returned when no rule matches.
- * Default: `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }` (allow-unmatched — a
- * rules list of denials acts as a denylist). Set `fallback` to an `allowed: false`
+ * Default: `{ zone: DEFAULT_AUTHORITY_ZONE, verdict: 'allow' }` (allow-unmatched — a
+ * rules list of denials acts as a denylist). Set `fallback` to a `verdict: 'deny'`
  * decision to flip the gate to deny-by-default (an allowlist — only matched rules
- * that allow get through).
+ * that allow get through). `ask` is the {@link AuthorityHandler} that answers each `ask`
+ * verdict; absent, every ask is refused as unanswered.
  */
 export interface AuthorityOptions {
 	readonly rules?: readonly AuthorityRule[]
 	readonly fallback?: AuthorityDecision
+	readonly ask?: AuthorityHandler
 }
 
 /**
  * Gates each tool call before it runs — the synchronous policy that turns one
- * {@link AuthorityContext} into an {@link AuthorityDecision}.
+ * {@link AuthorityContext} into an {@link AuthorityDecision}, and the optional approver that
+ * answers an `ask` verdict.
  *
  * @remarks
  * Ordered first-match-wins over the configured rules, falling back to the configured
  * default when none match (see {@link AuthorityOptions}). `evaluate` is synchronous and
- * returns the verdict directly. Event-free — no Emitter, no events.
+ * returns the verdict directly; only `ask` is async. An authority with no `ask` member reads
+ * every asked call as unanswered. Event-free — no Emitter, no events.
  */
 export interface AuthorityInterface {
 	/**
 	 * Evaluates one tool call against the ordered rules — returns the first matching rule's
-	 * verdict, which allows unless `allowed: false`, or the fallback when none match.
+	 * verdict, which allows when the rule names none, or the fallback when none match.
 	 *
 	 * @param context - The call under consideration (see {@link AuthorityContext})
 	 * @returns The first matching rule's verdict, or the fallback when none match
 	 */
 	evaluate(context: AuthorityContext): AuthorityDecision
+	/**
+	 * Resolves `true` to approve one asked call; absent, every ask reads as unanswered.
+	 *
+	 * @param context - The asked call (see {@link AuthorityContext})
+	 * @param decision - The `ask` decision the loop holds for the call
+	 * @param signal - The run's signal; its abort cancels the ask
+	 * @returns True if the call is approved; false otherwise
+	 */
+	ask?(
+		context: AuthorityContext,
+		decision: AuthorityDecision,
+		signal: AbortSignal,
+	): Promise<boolean>
+}
+
+/** Holds the model-facing texts the loop writes into a denial result. */
+export interface AuthorityNote {
+	readonly denied: string
+	readonly refused: string
+	readonly unanswered: string
 }
 
 /**
@@ -932,8 +981,8 @@ export interface AgentRunnerOptions {
 	readonly timeout?: number
 }
 
-/** Names the machine-readable agent concurrency, limit, registry, and window failures. */
-export type AgentErrorCode = 'CONCURRENCY' | 'LIMIT' | 'REGISTRY' | 'WINDOW'
+/** Names the machine-readable agent approver, concurrency, limit, registry, and window failures. */
+export type AgentErrorCode = 'APPROVER' | 'CONCURRENCY' | 'LIMIT' | 'REGISTRY' | 'WINDOW'
 
 /**
  * Holds the disjoint estimate components of one message, in heuristic estimate units.

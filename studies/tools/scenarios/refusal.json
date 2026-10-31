@@ -6,6 +6,7 @@
 			"input": {
 				"prompt": "Request the path outside the admitted scratch directory.",
 				"admitted": true,
+				"approval": "approve",
 				"files": ["note.txt"],
 				"responses": [
 					{

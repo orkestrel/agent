@@ -93,6 +93,75 @@
 			"method": "trace",
 			"critical": false,
 			"assertion": { "observation": "result", "partial": false, "content": "stored note.txt" }
+		},
+		{
+			"id": "approval-refuse-file",
+			"scenario": "approval",
+			"goal": "refuse",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "file", "path": "note.txt", "exists": false }
+		},
+		{
+			"id": "approval-refuse-denial",
+			"scenario": "approval",
+			"goal": "refuse",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "denial", "name": "write" }
+		},
+		{
+			"id": "approval-pending-file",
+			"scenario": "approval",
+			"goal": "pending",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "file", "path": "note.txt", "exists": false }
+		},
+		{
+			"id": "approval-pending-result",
+			"scenario": "approval",
+			"goal": "pending",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": true }
+		},
+		{
+			"id": "approval-unanswered-file",
+			"scenario": "approval",
+			"goal": "unanswered",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "file", "path": "note.txt", "exists": false }
+		},
+		{
+			"id": "approval-unanswered-denial",
+			"scenario": "approval",
+			"goal": "unanswered",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "denial", "name": "write" }
+		},
+		{
+			"id": "approval-approve-file",
+			"scenario": "approval",
+			"goal": "approve",
+			"method": "state",
+			"critical": true,
+			"assertion": {
+				"observation": "file",
+				"path": "note.txt",
+				"exists": true,
+				"content": "approved"
+			}
+		},
+		{
+			"id": "approval-approve-tool",
+			"scenario": "approval",
+			"goal": "approve",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "tool", "name": "write", "success": true }
 		}
 	]
 }

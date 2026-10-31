@@ -106,15 +106,15 @@ export function createChannel<T>(): ChannelInterface<T> {
  *
  * @remarks
  * `rules` are evaluated in order — the first whose `match` is true decides (a matched
- * rule allows unless its `allowed` is explicitly `false`). When no rule matches, the
- * `fallback` decides. Default: `{ zone: DEFAULT_AUTHORITY_ZONE, allowed: true }`
- * (allow-unmatched — a rules list of denials acts as a denylist). Pass an
- * `allowed: false` `fallback` to flip the gate to deny-by-default (an allowlist). Wire
- * the result into `createAgent` through `AgentOptions.authority`: a denied call is fed back
- * to the model as a denial `ToolResult` (not executed), so the model
- * can react. Synchronous — `evaluate` returns the verdict directly.
+ * rule with no `verdict` allows). When no rule matches, the `fallback` decides. Default:
+ * `{ zone: DEFAULT_AUTHORITY_ZONE, verdict: 'allow' }` (allow-unmatched — a rules list of
+ * denials acts as a denylist). Pass a `verdict: 'deny'` `fallback` to flip the gate to
+ * deny-by-default (an allowlist). `ask` answers each `ask` verdict; with none, every ask is
+ * refused as unanswered. Wire the result into `createAgent` through `AgentOptions.authority`:
+ * a denied call is fed back to the model as a denial `ToolResult` (not executed), so the model
+ * can react. Synchronous — `evaluate` returns the verdict directly; only `ask` is async.
  *
- * @param options - Optional `rules` (ordered) and `fallback` (see {@link AuthorityOptions})
+ * @param options - Optional `rules` (ordered), `fallback`, and `ask` (see {@link AuthorityOptions})
  * @returns A working {@link AuthorityInterface}
  *
  * @example
@@ -123,7 +123,7 @@ export function createChannel<T>(): ChannelInterface<T> {
  *
  * // Deny the `delete` tool, allow everything else.
  * const authority = createAuthority({
- * 	rules: [{ match: (c) => c.call.name === 'delete', zone: 'restricted', allowed: false }],
+ * 	rules: [{ match: (c) => c.call.name === 'delete', zone: 'restricted', verdict: 'deny' }],
  * })
  * const agent = createAgent(provider, { tools, authority })
  * ```

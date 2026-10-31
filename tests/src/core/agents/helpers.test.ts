@@ -15,6 +15,8 @@ import {
 import {
 	agentResultToJSON,
 	assembleResult,
+	AUTHORITY_NOTES,
+	SCOPE_NOTE,
 	chargeUsage,
 	denyCall,
 	estimateMessages,
@@ -31,6 +33,7 @@ import {
 	settleAgentJob,
 	requireEntry,
 	requireLimit,
+	resolveDecision,
 	extractQueueOptions,
 	tokenUsageToJSON,
 } from '@src/core'
@@ -949,17 +952,145 @@ describe('denyCall — the synthesized denial result', () => {
 			success: false,
 			id: '1',
 			name: 'drop',
-			error: 'denied: read-only mode',
+			error: '"drop" did not run: read-only mode',
 		})
 	})
 
-	it('falls back to the generic denial when no reason was given', () => {
+	it('falls back to the denied note when no reason was given', () => {
 		expect(denyCall(createToolCall({ id: '2', name: 'drop' }), undefined)).toEqual({
 			success: false,
 			id: '2',
 			name: 'drop',
-			error: 'denied by authority',
+			error:
+				'"drop" did not run: it is not allowed. Do not call it again; answer with what you have.',
 		})
+	})
+
+	it.each([
+		[
+			AUTHORITY_NOTES.denied,
+			'"write" did not run: it is not allowed. Do not call it again; answer with what you have.',
+		],
+		[
+			AUTHORITY_NOTES.refused,
+			'"write" did not run: the user refused it. Do not call it again; continue without it.',
+		],
+		[
+			AUTHORITY_NOTES.unanswered,
+			'"write" did not run: it needs approval and none was given. Do not call it again; tell the user it needs approval.',
+		],
+		[
+			SCOPE_NOTE,
+			'"write" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.',
+		],
+	])('renders the note %s byte for byte', (note, error) => {
+		expect(denyCall(createToolCall({ name: 'write' }), note)).toMatchObject({
+			success: false,
+			name: 'write',
+			error,
+		})
+	})
+
+	it('JSON-escapes a name holding a quote', () => {
+		expect(denyCall(createToolCall({ name: 'a"b' }), 'no')).toMatchObject({
+			error: '"a\\"b" did not run: no',
+		})
+	})
+
+	it('caps a name over 64 characters with a trailing ellipsis', () => {
+		expect(denyCall(createToolCall({ name: 'n'.repeat(100) }), 'no')).toMatchObject({
+			error: `"${'n'.repeat(63)}… did not run: no`,
+		})
+	})
+
+	it('keeps a 62-character name whole and quoted', () => {
+		const name = 'n'.repeat(62)
+		expect(denyCall(createToolCall({ name }), 'no')).toMatchObject({
+			error: `"${name}" did not run: no`,
+		})
+	})
+})
+
+describe('resolveDecision — the consequential floor', () => {
+	const consequential = { name: 'write', annotations: { consequential: true } }
+	it.each([
+		{
+			label: 'allow on consequential asks',
+			verdict: 'allow',
+			definition: consequential,
+			expected: 'ask',
+		},
+		{
+			label: 'deny on consequential stays',
+			verdict: 'deny',
+			definition: consequential,
+			expected: 'deny',
+		},
+		{
+			label: 'ask on consequential stays',
+			verdict: 'ask',
+			definition: consequential,
+			expected: 'ask',
+		},
+		{
+			label: 'allow, no annotations',
+			verdict: 'allow',
+			definition: { name: 'write' },
+			expected: 'allow',
+		},
+		{
+			label: 'allow, consequential false',
+			verdict: 'allow',
+			definition: { name: 'write', annotations: { consequential: false } },
+			expected: 'allow',
+		},
+		{
+			label: 'allow, pure only',
+			verdict: 'allow',
+			definition: { name: 'write', annotations: { pure: true } },
+			expected: 'allow',
+		},
+		{
+			label: 'allow, no definition',
+			verdict: 'allow',
+			definition: undefined,
+			expected: 'allow',
+		},
+		{
+			label: 'deny, no definition',
+			verdict: 'deny',
+			definition: undefined,
+			expected: 'deny',
+		},
+		{
+			label: 'ask, no definition',
+			verdict: 'ask',
+			definition: undefined,
+			expected: 'ask',
+		},
+	] as const)('$label', ({ verdict, definition, expected }) => {
+		const decision = { zone: 'z', verdict, reason: 'why' }
+		expect(resolveDecision(decision, definition)).toEqual({
+			zone: 'z',
+			verdict: expected,
+			reason: 'why',
+		})
+	})
+
+	it('returns a fresh decision and leaves the input unchanged', () => {
+		const decision = { zone: 'z', verdict: 'allow' } as const
+		const resolved = resolveDecision(decision, consequential)
+		expect(resolved).not.toBe(decision)
+		expect(decision).toEqual({ zone: 'z', verdict: 'allow' })
+		expect(resolveDecision(decision, undefined)).not.toBe(decision)
+	})
+
+	it('never loosens a verdict for any definition', () => {
+		const definitions = [consequential, { name: 'write' }, undefined]
+		for (const definition of definitions) {
+			expect(resolveDecision({ zone: 'z', verdict: 'deny' }, definition).verdict).toBe('deny')
+			expect(resolveDecision({ zone: 'z', verdict: 'ask' }, definition).verdict).toBe('ask')
+		}
 	})
 })
 

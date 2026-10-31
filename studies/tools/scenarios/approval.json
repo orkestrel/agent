@@ -1,0 +1,91 @@
+{
+	"id": "approval",
+	"goals": [
+		{
+			"id": "refuse",
+			"input": {
+				"prompt": "Request a consequential write the declared approver refuses.",
+				"admitted": true,
+				"approval": "refuse",
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "refused",
+								"name": "write",
+								"arguments": { "path": "note.txt", "content": "refused" }
+							}
+						]
+					},
+					{ "content": "The write was refused.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "pending",
+			"input": {
+				"prompt": "Request a consequential write whose approval is cancelled before an answer.",
+				"admitted": true,
+				"approval": "pending",
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "pending",
+								"name": "write",
+								"arguments": { "path": "note.txt", "content": "pending" }
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"id": "unanswered",
+			"input": {
+				"prompt": "Request a consequential write with no declared approval.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "unanswered",
+								"name": "write",
+								"arguments": { "path": "note.txt", "content": "unanswered" }
+							}
+						]
+					},
+					{ "content": "The write needs approval.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "approve",
+			"input": {
+				"prompt": "Request a consequential write the declared approver approves.",
+				"admitted": true,
+				"approval": "approve",
+				"files": ["note.txt"],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "approved",
+								"name": "write",
+								"arguments": { "path": "note.txt", "content": "approved" }
+							}
+						]
+					},
+					{ "content": "Approved.", "calls": [] }
+				]
+			}
+		}
+	]
+}

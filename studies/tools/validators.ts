@@ -114,11 +114,15 @@ export function isStudyToolsInput(value: unknown): value is StudyToolsInput {
 	return holds(
 		() =>
 			isRecord(value) &&
-			matchesStudyKeys(value, ['prompt', 'responses', 'files', 'admitted']) &&
+			matchesStudyKeys(value, ['prompt', 'responses', 'files', 'admitted'], ['approval']) &&
 			typeof value.prompt === 'string' &&
 			value.prompt.trim().length > 0 &&
 			new TextEncoder().encode(value.prompt).byteLength <= STUDY_TOOLS_TEXT &&
 			typeof value.admitted === 'boolean' &&
+			(!('approval' in value) ||
+				value.approval === 'approve' ||
+				value.approval === 'refuse' ||
+				value.approval === 'pending') &&
 			isArray(value.responses) &&
 			value.responses.length > 0 &&
 			value.responses.length <= STUDY_TOOLS_RESPONSES &&

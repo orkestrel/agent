@@ -51,6 +51,7 @@ export class StudyToolsSession implements StudySessionInterface {
 			createTool({
 				name: 'write',
 				description: 'Creates one new bounded scratch text file',
+				annotations: { consequential: true },
 				execute: (args, context) => this.#write(args, context),
 			}),
 			createTool({
@@ -66,9 +67,10 @@ export class StudyToolsSession implements StudySessionInterface {
 			authority: {
 				evaluate: () => ({
 					zone: 'study',
-					allowed: this.#current()?.input.admitted ?? false,
+					verdict: (this.#current()?.input.admitted ?? false) ? 'allow' : 'deny',
 					reason: 'Declared workload tool admission refused',
 				}),
+				ask: (_context, _decision, signal) => this.#approve(signal),
 			},
 			on: {
 				tool: (call, result) =>
@@ -264,6 +266,22 @@ export class StudyToolsSession implements StudySessionInterface {
 			failStudyTicket(ticket, error, 'tool')
 			throw error
 		}
+	}
+
+	// Answers an asked call from the live goal's declared approval. `pending` cancels the goal's
+	// workload and answers only after the run's signal aborts, so the Agent's race settles first.
+	// An undeclared approval rejects, which the Agent reads as an unanswered ask.
+	#approve(signal: AbortSignal): Promise<boolean> {
+		const workload = this.#current()
+		const approval = workload?.input.approval
+		if (approval === 'approve') return Promise.resolve(true)
+		if (approval === 'refuse') return Promise.resolve(false)
+		if (workload === undefined || approval === undefined)
+			return Promise.reject(new StudyToolsRefusal('Undeclared workload approval refused'))
+		const answer = Promise.withResolvers<boolean>()
+		signal.addEventListener('abort', () => answer.resolve(false), { once: true })
+		workload.controller.abort()
+		return answer.promise
 	}
 
 	// The session refuses a second goal while one is live, so the registry holds at most one workload.

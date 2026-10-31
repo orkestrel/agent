@@ -8,6 +8,7 @@ import type {
 	AgentStatus,
 	AgentStreamInterface,
 	AgentTurn,
+	AuthorityDecision,
 	AuthorityInterface,
 	AgentRunResult,
 } from './types.js'
@@ -19,17 +20,25 @@ import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, MeterInterface, TokenUsage } from '@orkestrel/budget'
 import type { Result } from '@orkestrel/contract'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import type { ToolCall, ToolManagerInterface, ToolResult } from '@orkestrel/tool'
+import type {
+	ToolCall,
+	ToolDefinition,
+	ToolInterface,
+	ToolManagerInterface,
+	ToolResult,
+} from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
 import { createTokenMeter } from '@orkestrel/budget'
-import { attempt, errorToMessage } from '@orkestrel/contract'
+import { attempt, errorToMessage, failure, isObject, success } from '@orkestrel/contract'
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
 import { AgentContext } from '../contexts/index.js'
-import { DEFAULT_AGENT_LIMIT } from './constants.js'
+import { raceSignal } from '../conversations/index.js'
+import { AUTHORITY_NOTES, DEFAULT_AGENT_LIMIT, SCOPE_NOTE } from './constants.js'
 import { AgentError } from './errors.js'
+import { Authority } from './Authority.js'
 import { Channel } from './Channel.js'
 import {
 	assembleResult,
@@ -40,7 +49,9 @@ import {
 	renderToolValue,
 	requireBudget,
 	requireLimit,
+	resolveDecision,
 } from './helpers.js'
+import { isAuthorityDecision } from './validators.js'
 import { filterAllowList, sanitizeUsage, stripThinking, sumUsage } from '../helpers.js'
 import { isProviderAbortError } from '../providers/index.js'
 
@@ -78,7 +89,7 @@ import { isProviderAbortError } from '../providers/index.js'
  *   iteration is capped at `limit`.
  * - **Two observation surfaces.** The pull {@link AgentChunk} stream carries per-token
  *   deltas (+ usage/tool chunks); the push {@link emitter} ({@link AgentEventMap}) carries
- *   lifecycle + usage/tool/deny moments for fire-and-forget observers. Every event is
+ *   lifecycle + usage/tool/allow/ask/deny moments for fire-and-forget observers. Every event is
  *   emitted directly, after the relevant state transition / settle; the emitter isolates a
  *   listener throw and routes it to its `error` handler (the `error` option), so a buggy
  *   observer can never escape into / reorder / corrupt the settle-once loop — observation is
@@ -104,7 +115,7 @@ export class Agent implements AgentInterface {
 	readonly #allowance: BudgetInterface<TokenUsage> | undefined
 	readonly #scheduler: SchedulerInterface | undefined
 	readonly #signal: AbortSignal | undefined
-	readonly #authority: AuthorityInterface | undefined
+	readonly #authority: AuthorityInterface
 	// The context budget that admits each provider request — its `consumer` is a token estimator
 	// over the complete `ProviderRequest`, its `max` the context window. `#admit` re-measures the
 	// exact request (replay-filtered messages, advertised tools, per-call options) against it before
@@ -153,7 +164,7 @@ export class Agent implements AgentInterface {
 		this.#allowance = options?.allowance
 		this.#scheduler = options?.scheduler
 		this.#signal = options?.signal
-		this.#authority = options?.authority
+		this.#authority = options?.authority ?? new Authority()
 		this.#window = options?.window
 		this.#strict = options?.strict ?? false
 		this.#emitter = new Emitter<AgentEventMap>(options)
@@ -495,11 +506,15 @@ export class Agent implements AgentInterface {
 			}
 			if (definitions === undefined) {
 				for (const call of result.tools ?? []) {
-					this.#emitter.emit('deny', call, 'no tool is advertised in the active scope')
+					this.#emitter.emit('deny', call, 'no tool is advertised in the active scope', undefined)
 				}
 			} else if (result.tools !== undefined && result.tools.length > 0) {
 				const admittedCalls = filterAllowList(names, result.tools, (call) => call.name)
-				const authorization = this.#authorize(result.tools, admittedCalls)
+				const authorization = this.#authorize(tools, result.tools, admittedCalls, advertised)
+				// The ask pass runs only for an asked call, so a turn with no `ask` verdict adds no `await`.
+				if (authorization.asked.length > 0 && !abort.signal.aborted) {
+					await this.#approve(tools, authorization, abort.signal)
+				}
 				if (abort.signal.aborted) {
 					turns.push({ ...settled, outcome: 'cancel', partial: true })
 					continue
@@ -802,62 +817,154 @@ export class Agent implements AgentInterface {
 		return { messages: this.#context.build(), usage: undefined }
 	}
 
-	// Evaluate policy and emit denials before the run's final pre-dispatch abort guard:
-	// policy callbacks and denial listeners can cancel the run synchronously.
-	#authorize(calls: readonly ToolCall[], admitted: readonly ToolCall[]) {
+	// Evaluate policy and emit each verdict before the run's final pre-dispatch abort guard, in call
+	// order with no `await`: policy callbacks and decision listeners can cancel the run synchronously.
+	// Only an `allow` verdict enters the allowed map; an asked call is queued with the instance the
+	// registry holds for its name, so an approval of a tool replaced during the ask is refused.
+	#authorize(
+		tools: ToolManagerInterface,
+		calls: readonly ToolCall[],
+		admitted: readonly ToolCall[],
+		advertised: readonly ToolDefinition[],
+	) {
+		const allowed = new Map<number, ToolCall>()
+		const denials = new Map<number, ToolResult>()
+		const asked: Array<{
+			readonly index: number
+			readonly call: ToolCall
+			readonly decision: AuthorityDecision
+			readonly tool: ToolInterface | undefined
+		}> = []
 		// `entries()` visits a hole as `undefined`, as a `for…of` over the calls does.
-		const decisions = [...calls.entries()].map(([index, call]) => ({
-			index,
-			call,
-			denial: this.#decide(call, admitted),
-		}))
-		return {
-			allowed: new Map(
-				decisions.flatMap((one) =>
-					one.denial === undefined ? [[one.index, one.call] as const] : [],
-				),
-			),
-			denials: new Map(
-				decisions.flatMap((one) =>
-					one.denial === undefined ? [] : [[one.index, one.denial] as const],
-				),
-			),
+		for (const [index, call] of calls.entries()) {
+			const decided = this.#decide(call, admitted, advertised)
+			if (!decided.success) {
+				denials.set(index, decided.error)
+				continue
+			}
+			const decision = decided.value
+			if (decision.verdict === 'allow') {
+				allowed.set(index, call)
+				this.#emitter.emit('allow', call, decision)
+			} else if (decision.verdict === 'ask') {
+				asked.push({ index, call, decision, tool: tools.tool(call.name) })
+			} else {
+				denials.set(index, denyCall(call, decision.reason))
+				this.#emitter.emit('deny', call, decision.reason, decision)
+			}
 		}
+		return { allowed, denials, asked }
 	}
 
-	// Decides one call — scope, then authority — and emits `deny` with the reason of a denial.
-	#decide(call: ToolCall, admitted: readonly ToolCall[]): ToolResult | undefined {
+	// Decides one call — scope, then authority, then the `consequential` floor. A scope miss, an
+	// evaluate throw, and an invalid decision emit `deny` with no decision and fail with the denial;
+	// otherwise the owned copy of the decision, raised by the advertised definition, succeeds.
+	#decide(
+		call: ToolCall,
+		admitted: readonly ToolCall[],
+		advertised: readonly ToolDefinition[],
+	): Result<AuthorityDecision, ToolResult> {
 		if (!admitted.includes(call)) {
-			const reason = `${call.name} is not in the active scope`
-			const denial = denyCall(call, reason)
-			this.#emitter.emit('deny', call, reason)
-			return denial
+			const denial = denyCall(call, SCOPE_NOTE)
+			this.#emitter.emit('deny', call, `${call.name} is not in the active scope`, undefined)
+			return failure(denial)
 		}
 		const authority = this.#authority
-		if (authority === undefined) return undefined
-		// A security gate must fail closed: if a policy `evaluate` throws, the call is not
-		// cleared, so it must not run. Synthesize a denial (carrying the error's message)
-		// instead of letting the throw reject the whole run — the tool stays unexecuted and
-		// the model still receives a denial it can react to, exactly like an explicit `deny`.
-		const evaluated = attempt(() => authority.evaluate({ call }))
+		// A security gate must fail closed: if a policy `evaluate` throws, or a member read of its
+		// decision throws, the call is not cleared, so it must not run. Synthesize a denial instead of
+		// letting the throw reject the whole run — the tool stays unexecuted and the model still
+		// receives a denial it can react to, exactly like an explicit `deny`.
+		const evaluated = attempt(() => {
+			const decision = authority.evaluate({ call })
+			if (!isObject(decision)) return undefined
+			// The decision is foreign: read each member once into an owned copy, then validate the copy.
+			const { zone, verdict, reason } = decision
+			const copy = { zone, verdict, ...(reason === undefined ? {} : { reason }) }
+			if (!isAuthorityDecision(copy)) return undefined
+			// The floor reads this turn's advertised definition, so a structural authority cannot skip it.
+			const definition = advertised.find((advertisement) => advertisement.name === call.name)
+			return resolveDecision(copy, definition)
+		})
 		if (!evaluated.success) {
-			// The declared `@orkestrel/contract` normalizer, so a fail-closed denial carries a
-			// non-empty explanation the model can read: an `Error` with an empty `message`
-			// normalizes to real text, and a throw whose stringification itself fails is caught
-			// rather than escaping the gate and rejecting the run.
-			const reason = errorToMessage(evaluated.error)
-			const denial = denyCall(call, reason)
-			this.#emitter.emit('deny', call, reason)
-			return denial
+			// The declared `@orkestrel/contract` normalizer, so the `deny` event carries a non-empty
+			// explanation: an `Error` with an empty `message` normalizes to real text, and a throw whose
+			// stringification itself fails is caught rather than escaping the gate and rejecting the
+			// run. The model reads the `denied` note, never the error text.
+			const denial = denyCall(call, undefined)
+			this.#emitter.emit('deny', call, errorToMessage(evaluated.error), undefined)
+			return failure(denial)
 		}
-		if (evaluated.value.allowed) return undefined
-		const denial = denyCall(call, evaluated.value.reason)
-		this.#emitter.emit('deny', call, evaluated.value.reason)
-		return denial
+		if (evaluated.value === undefined) {
+			const denial = denyCall(call, undefined)
+			this.#emitter.emit('deny', call, 'invalid decision', undefined)
+			return failure(denial)
+		}
+		return success(evaluated.value)
+	}
+
+	// Hands each asked call to the approver in call order, entering handler k+1 only after handler k
+	// settles, and races each answer against the run signal. An abort returns at once, so the pending
+	// call emits nothing further and no later handler is entered; `raceSignal` absorbs a late settle.
+	// An approval of a tool the registry replaced during the ask is denied as unanswered.
+	async #approve(
+		tools: ToolManagerInterface,
+		authorization: {
+			readonly allowed: Map<number, ToolCall>
+			readonly denials: Map<number, ToolResult>
+			readonly asked: ReadonlyArray<{
+				readonly index: number
+				readonly call: ToolCall
+				readonly decision: AuthorityDecision
+				readonly tool: ToolInterface | undefined
+			}>
+		},
+		signal: AbortSignal,
+	): Promise<void> {
+		const authority = this.#authority
+		for (const { index, call, decision, tool } of authorization.asked) {
+			if (signal.aborted) return
+			this.#emitter.emit('ask', call, decision)
+			// An `ask` listener can cancel the run before the handler is entered.
+			if (signal.aborted) return
+			// The approver is foreign: the executor reads it and enters it, so a throwing `ask` getter
+			// and a synchronous handler throw both become a rejection, which the failure arm reads as
+			// unanswered. An absent approver leaves the ask unanswered with no reason.
+			const answer = new Promise<{
+				readonly approved: boolean
+				readonly reason: string | undefined
+				readonly note: string
+			}>((resolve) => {
+				const ask = authority.ask
+				resolve(
+					ask === undefined
+						? { approved: false, reason: undefined, note: AUTHORITY_NOTES.unanswered }
+						: Promise.resolve(ask.call(authority, { call }, decision, signal)).then((value) => ({
+								approved: value === true,
+								reason: undefined,
+								note: value === true ? AUTHORITY_NOTES.unanswered : AUTHORITY_NOTES.refused,
+							})),
+				)
+			}).catch((error: unknown) => ({
+				approved: false,
+				reason: errorToMessage(error),
+				note: AUTHORITY_NOTES.unanswered,
+			}))
+			const outcome = await raceSignal(answer, signal).catch(() => undefined)
+			if (outcome === undefined || signal.aborted) return
+			if (outcome.approved && tools.tool(call.name) === tool) {
+				authorization.allowed.set(index, call)
+				this.#emitter.emit('allow', call, decision)
+			} else {
+				authorization.denials.set(index, denyCall(call, outcome.note))
+				this.#emitter.emit('deny', call, outcome.reason, decision)
+			}
+		}
 	}
 
 	// Carry cancellation into entered handlers, then merge executed results and denials
-	// in call order. An all-denied turn costs no tool run.
+	// in call order. An all-denied turn costs no tool run. The allowed calls are rebuilt in call
+	// order, because approved calls join the map after the synchronous pass and `execute` starts
+	// its batch in entry order.
 	async #dispatch(
 		tools: ToolManagerInterface,
 		calls: readonly ToolCall[],
@@ -868,11 +975,13 @@ export class Agent implements AgentInterface {
 		},
 	): Promise<readonly ToolResult[]> {
 		const { allowed, denials } = authorization
-		const executed = allowed.size > 0 ? await tools.execute([...allowed.values()], { signal }) : []
+		const entries = [...allowed].sort(([left], [right]) => left - right)
+		const batch = entries.map(([, call]) => call)
+		const executed = batch.length > 0 ? await tools.execute(batch, { signal }) : []
 		// Denials and executed results never share an index.
 		const results = new Map<number, ToolResult>([
 			...denials,
-			...[...allowed.keys()].flatMap((index, offset) => {
+			...entries.flatMap(([index], offset) => {
 				const result = executed[offset]
 				return result === undefined ? [] : [[index, result] as const]
 			}),

@@ -6,6 +6,7 @@
 			"input": {
 				"prompt": "Create the scratch note.",
 				"admitted": true,
+				"approval": "approve",
 				"files": ["note.txt"],
 				"responses": [
 					{

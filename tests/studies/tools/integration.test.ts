@@ -73,7 +73,7 @@ it('executes all declared tools goals through the actual built Agent and retains
 			store,
 			signal: parent.signal,
 		}).execute()
-		expect(attempts).toHaveLength(10)
+		expect(attempts).toHaveLength(12)
 		expect(attempts.every((attempt) => attempt.failure === undefined)).toBe(true)
 		expect(
 			attempts
@@ -111,7 +111,7 @@ it('executes all declared tools goals through the actual built Agent and retains
 			attempts: result.attempts,
 			evidence: await collectStudyEvidence(result),
 		})
-		expect(judgments).toHaveLength(22)
+		expect(judgments).toHaveLength(38)
 		expect(judgments.every((judgment) => isStudyJudgment(judgment))).toBe(true)
 		expect(
 			judgments.every(
@@ -126,8 +126,8 @@ it('executes all declared tools goals through the actual built Agent and retains
 		expect(computeStudyScores(result.manifest, fixture.rubric, assessment)).toEqual([
 			{
 				arm: 'agent',
-				total: 22,
-				achieved: 22,
+				total: 38,
+				achieved: 38,
 				unsuccessful: 0,
 				unknown: 0,
 				critical: 0,

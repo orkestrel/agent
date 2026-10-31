@@ -171,6 +171,8 @@ import type {
 	AgentRegistryInterface,
 	AgentTurn,
 	AuthorityContext,
+	AuthorityDecision,
+	AuthorityHandler,
 	ChannelInterface,
 } from '@src/core'
 import type {
@@ -310,6 +312,8 @@ export const AGENT_EVENTS = Object.freeze([
 	'turn',
 	'tool',
 	'usage',
+	'allow',
+	'ask',
 	'deny',
 	'finish',
 	'error',
@@ -1039,6 +1043,34 @@ export function createAuthorityContext(
 ): AuthorityContext {
 	const call: ToolCall = { id: 'c1', name, arguments: args }
 	return { call }
+}
+
+/**
+ * Creates an approver that records each `(context, decision, signal)` it is asked and answers the
+ * nth ask with the nth scripted value or deferred promise, and `false` past the script's end.
+ *
+ * @param answers - The scripted answers, oldest ask first
+ * @returns The handler to pass as an authority's `ask` and the asks it recorded, oldest first
+ */
+export function createApprover(answers: ReadonlyArray<boolean | Promise<boolean>> = []): {
+	readonly ask: AuthorityHandler
+	readonly calls: ReadonlyArray<
+		readonly [context: AuthorityContext, decision: AuthorityDecision, signal: AbortSignal]
+	>
+} {
+	const recorder =
+		createRecorder<
+			readonly [context: AuthorityContext, decision: AuthorityDecision, signal: AbortSignal]
+		>()
+	return {
+		get calls() {
+			return recorder.calls
+		},
+		ask(context, decision, signal) {
+			recorder.handler(context, decision, signal)
+			return answers[recorder.count - 1] ?? false
+		},
+	}
 }
 
 /** Builds a user message for estimation. */

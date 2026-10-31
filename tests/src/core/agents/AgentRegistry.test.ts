@@ -235,7 +235,9 @@ describe('AgentRegistry — build (rehydration)', () => {
 			},
 			authorities: {
 				deny: createAuthority({
-					rules: [{ match: (c) => c.call.name === 'add', zone: 'r', allowed: false, reason: 'no' }],
+					rules: [
+						{ match: (c) => c.call.name === 'add', zone: 'r', verdict: 'deny', reason: 'no' },
+					],
 				}),
 			},
 		})

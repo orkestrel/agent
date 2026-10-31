@@ -430,7 +430,9 @@ await new GuideCommand({
 		it('enforces the scope dispatch and answer-only behavior the guide states', async () => {
 			expect(guideText).toContain('A scoped-out tool is neither described nor callable.')
 			expect(guideText).toContain('no tool is advertised in the active scope')
-			expect(guideText).toContain('denied: TOOL is not in the active scope')
+			expect(guideText).toContain(
+				'`"TOOL" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.`',
+			)
 			expect(guideText).toContain(
 				'A scope change through the `context.apply` method applies at each later site that reads the scope.',
 			)
@@ -480,7 +482,10 @@ await new GuideCommand({
 				provider.calls[1]?.messages
 					.filter((message) => message.role === 'tool')
 					.map((message) => message.content),
-			).toEqual(['denied: delete is not in the active scope', 'search'])
+			).toEqual([
+				'"delete" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.',
+				'search',
+			])
 			expect(agent.context.messages.messages().at(-1)).not.toHaveProperty('calls')
 		})
 
@@ -785,6 +790,8 @@ await new GuideCommand({
 				| 'turn'
 				| 'tool'
 				| 'usage'
+				| 'allow'
+				| 'ask'
 				| 'deny'
 				| 'finish'
 				| 'error'

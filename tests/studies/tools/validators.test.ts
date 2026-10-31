@@ -68,6 +68,27 @@ it('validates actual admitted constructors and bounds every declared workload wi
 			extra: true,
 		}),
 	).toBe(false)
+	// The optional approval admits only the three declared answers.
+	for (const approval of ['approve', 'refuse', 'pending'])
+		expect(
+			isStudyToolsInput({
+				prompt: 'x',
+				admitted: true,
+				approval,
+				files: [],
+				responses: [{ content: 'x', calls: [] }],
+			}),
+		).toBe(true)
+	for (const approval of ['allow', '', true, null, undefined])
+		expect(
+			isStudyToolsInput({
+				prompt: 'x',
+				admitted: true,
+				approval,
+				files: [],
+				responses: [{ content: 'x', calls: [] }],
+			}),
+		).toBe(false)
 	expect(
 		isStudyToolsInput({
 			prompt: 'x',

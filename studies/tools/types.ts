@@ -34,12 +34,25 @@ export interface StudyToolsAgentInterface {
 	abort(reason?: unknown): void
 }
 
-/** Holds public mechanism input without any criterion or expected outcome. */
+/**
+ * Names the declared answer a goal gives an asked call.
+ * @remarks
+ * `approve` approves the call, `refuse` refuses it, and `pending` cancels the goal's workload
+ * and answers only after the run's signal aborts.
+ */
+export type StudyToolsApproval = 'approve' | 'refuse' | 'pending'
+
+/**
+ * Holds public mechanism input without any criterion or expected outcome.
+ * @remarks
+ * `approval` answers every asked call of the goal; absent, an asked call is unanswered.
+ */
 export interface StudyToolsInput {
 	readonly prompt: string
 	readonly responses: readonly StudyAgentResponse[]
 	readonly files: readonly string[]
 	readonly admitted: boolean
+	readonly approval?: StudyToolsApproval
 }
 
 /** Holds the values one goal's workload is created from. */

@@ -69,7 +69,7 @@ it('retains every declared criterion as unknown when the adapter receives no exe
 		attempts: [],
 		evidence: {},
 	})
-	expect(judgments).toHaveLength(22)
+	expect(judgments).toHaveLength(38)
 	expect(
 		judgments.every(
 			(judgment) => judgment.verdict === 'unknown' && judgment.references.length === 0,

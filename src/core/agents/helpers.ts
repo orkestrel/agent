@@ -8,13 +8,14 @@ import type {
 	AgentRunResult,
 	AgentStop,
 	AgentTurn,
+	AuthorityDecision,
 	MessageMeasure,
 	RequestMeasure,
 } from './types.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
 import type { QueueContext, QueueOptions } from '@orkestrel/queue'
-import type { ToolCall, ToolResult } from '@orkestrel/tool'
+import type { ToolCall, ToolDefinition, ToolResult } from '@orkestrel/tool'
 import { isBudget, isBudgetError } from '@orkestrel/budget'
 import {
 	attempt,
@@ -26,7 +27,7 @@ import {
 	parseJSONValue,
 	preview,
 } from '@orkestrel/contract'
-import { IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
+import { AUTHORITY_NOTES, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentError, AgentJobError } from './errors.js'
 import { hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
@@ -476,22 +477,24 @@ export function assembleResult(outcome: AgentRunResult): AgentResult {
 }
 
 /**
- * Synthesizes the denial {@link ToolResult} an authority-blocked call is fed back with — the
- * call's `id` / `name` keyed back, carrying a denial `error` instead of a value.
+ * Synthesizes the denial {@link ToolResult} a blocked call is fed back with — the call's `id` /
+ * `name` keyed back, carrying a denial `error` instead of a value.
  *
  * @remarks
- * Pure and total. The rule's `reason` is rendered as `denied: <reason>` when one was given,
- * else the generic `denied by authority`. There is no `value`, so the agent loop feeds it back
- * exactly like a tool error and the model can react to it.
+ * Pure and total. The `error` is `<name> did not run: <reason>`, where the model-supplied name
+ * is JSON-encoded and capped at `PREVIEW_LIMIT` characters by
+ * {@link import('@orkestrel/contract').preview}, and an absent `reason` reads the `denied` note
+ * of {@link AUTHORITY_NOTES}. There is no `value`, so the agent loop feeds it back exactly like
+ * a tool error and the model can react to it.
  *
  * @param call - The denied {@link ToolCall}
- * @param reason - The rule's explanation, or `undefined` for the generic denial
+ * @param reason - A rule's `deny` reason or a note, or `undefined` for the `denied` note
  * @returns The failure-arm {@link ToolResult}
  *
  * @example
  * ```ts
  * denyCall({ id: '1', name: 'drop', arguments: {} }, 'read-only mode')
- * // { success: false, id: '1', name: 'drop', error: 'denied: read-only mode' }
+ * // { success: false, id: '1', name: 'drop', error: '"drop" did not run: read-only mode' }
  * ```
  */
 export function denyCall(call: ToolCall, reason: string | undefined): ToolResult {
@@ -499,8 +502,35 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
 		success: false,
 		id: call.id,
 		name: call.name,
-		error: reason !== undefined ? `denied: ${reason}` : 'denied by authority',
+		error: `${preview(call.name)} did not run: ${reason ?? AUTHORITY_NOTES.denied}`,
 	}
+}
+
+/**
+ * Applies the `consequential` floor to one {@link AuthorityDecision} — an `allow` for a tool
+ * whose advertised definition is annotated `consequential` becomes an `ask`.
+ *
+ * @remarks
+ * Pure and total, and monotone: it raises `allow` to `ask` and never loosens a verdict, so an
+ * `ask` and a `deny` return with the same verdict. The result is always a fresh decision.
+ * An unannotated or absent definition leaves the verdict unchanged.
+ *
+ * @param decision - The authority's decision on one call
+ * @param definition - The advertised definition named by the call, or `undefined` when none is
+ * @returns A fresh decision carrying the raised or unchanged verdict
+ *
+ * @example
+ * ```ts
+ * const definition = { name: 'write', description: 'Write a file', annotations: { consequential: true } }
+ * resolveDecision({ zone: 'default', verdict: 'allow' }, definition) // { zone: 'default', verdict: 'ask' }
+ * ```
+ */
+export function resolveDecision(
+	decision: AuthorityDecision,
+	definition: ToolDefinition | undefined,
+): AuthorityDecision {
+	const raised = decision.verdict === 'allow' && definition?.annotations?.consequential === true
+	return { ...decision, verdict: raised ? 'ask' : decision.verdict }
 }
 
 /**

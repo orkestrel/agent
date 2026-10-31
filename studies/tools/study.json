@@ -5,7 +5,7 @@
 	"purpose": "mechanism",
 	"driver": "tools",
 	"arms": ["agent"],
-	"scenarios": ["write", "refusal", "admission", "cancellation", "continuation"],
+	"scenarios": ["write", "refusal", "admission", "cancellation", "continuation", "approval"],
 	"order": [["agent"], ["agent"]],
 	"retries": 0,
 	"rubric": "rubric.json"
