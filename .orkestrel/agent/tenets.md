@@ -15,7 +15,7 @@ Every brief and every unit of this campaign follows these directives. Each line 
 - Judge every study, report, and screen by the evaluation canon: paired arms from a reset, failure classes frozen before execution, headline denominators over every declared goal, one trajectory read as a point observation, predicates for checkable facts and a model judge blind to arm for the rest (`1e82d145:.orkestrel/plan.md` § Evaluation canon).
 - Tune on public development text only; read the evaluation oracle one time, aggregate-only, after freezing, and never tune on its atom text (U5: `152ac3c3:.orkestrel/agent/plan.md` § Rulings in force).
 - Build for the smallest local models: read every gate on the smallest model the Study carries, and fail a change that only a larger model tolerates; run no hosted provider (Q5: `plan.md` § Decisions).
-- Never read `.env*`, `.npmrc`, `auth.json`, keys, tokens, or `studies/endurance/sources/private/` (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work).
+- Never read `.env*`, `.npmrc`, `auth.json`, keys, tokens, or the endurance answer key, at any commit or in any untracked copy: git history holds the key at rc-u12's parent commit under `studies/endurance/sources/private/`, and its untracked copy lives under `tmp/studies/private/endurance/`; never open, list, copy, or search either, and name the subfolders a search reads so no glob reaches them (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work; O27: `plan.md` § Rulings).
 
 ## Trust
 

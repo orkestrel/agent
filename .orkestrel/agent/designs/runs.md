@@ -1,6 +1,6 @@
 # Run operations design
 
-Every GPU step runs as a chain of short, sealed, one-arm segments, and every decision other than a Study ceiling is taken at a segment boundary. This design covers the run shape, the segment plan per GPU step, what rc-a9's first segments measure, the progress readings, the stops, the fixes checked while a step runs, replay and the per-lineage pins, the run-operation units, and their deferrals (O19 to O25). `designs/measurement.md` owns each step's cap, gate, and place in the GPU order; `plan.md` § Sequence owns each unit's row. Study citations name a section of `guides/study.md` in `@orkestrel/study` 0.0.7 (see the [Study repository](https://github.com/orkestrel/study)) or a Study symbol; Agent source names a symbol and its file as of `2bb8c5be`. Deferrals point at `plan.md` § Deferred.
+Every GPU step runs as a chain of short, sealed, one-arm segments, and every decision other than a Study ceiling is taken at a segment boundary. This design covers the run shape, the segment plan per GPU step, what rc-a9's first segments measure, the progress readings, the stops, the fixes checked while a step runs, replay and the per-lineage pins, the run-operation units, and their deferrals (O19 to O25, O30). `designs/measurement.md` owns each step's cap, gate, and place in the GPU order; `plan.md` § Sequence owns each unit's row. Study citations name a section of `guides/study.md` in `@orkestrel/study` 0.0.7 (see the [Study repository](https://github.com/orkestrel/study)) or a Study symbol; Agent source names a symbol and its file as of `2bb8c5be`. Deferrals point at `plan.md` § Deferred.
 
 ## Ruling
 
@@ -17,12 +17,31 @@ The user ruled on 2026-10-31:
 - Run every GPU execution as one arm and one segment of goals (O19).
 - Execute each segment from a `study freeze` closure, so a writer's edit cannot change a live segment (`guides/study.md` § Native command).
 - Declare on every segment's profile: `settings.observe: true`; `record` with `bytes`, `calls`, and `duration` at twice the segment's projection; `provider.daemon` pinning the executable digest, the version, and the model digests; purpose `mechanism`; and `bounds.goal.calls` at 512 (O24).
-- Start a lineage's first segment at goal 1 and every later segment from an end-of-goal checkpoint a sealed earlier segment staged (rc-a17).
-- Checkpoint after every goal on the staging segments, rc-a9 and the extension; a screen reads only its seed, and a screen segment checkpoints only the goal its arm's next segment seeds from. rc-a17 raises the memory validator's 12-id checkpoint cap to the scenario horizon, and rc-s1's per-step change for rc-a9 writes the every-goal staging profile (`plan.md` § Sequence, row rc-s1).
-- Across a gate's arms, the closure fingerprint means the Study content identity (`StudyIdentity` content: packages, dist, and source code; fixture JSON excluded) and the runtime identity. Each arm's declaration, rubric, and seeded profile bytes differ by design and are recorded per segment in the run record. The rc-u10 screen's transport rewrite ships in the same build for all four arms, and declaration JSON selects it.
+- Start a lineage's first segment at goal 1 and every later segment by `--seed` from the end-of-goal `checkpoint` row a sealed earlier segment retained (rc-st3 reads the row; rc-a17 writes it and hydrates from it).
+- Checkpoint after every goal on the staging segments, rc-a9 and the extension; a screen reads only its seed, and a screen segment checkpoints only the goal its arm's next segment seeds from. rc-a17 raises the memory validator's 12-id checkpoint cap to the scenario horizon and writes the every-goal `settings.checkpoints` list into `studies/memory/profiles/q2.json`; rc-s1's first change sets no checkpoint list beyond the current cap (`plan.md` § Sequence, rows rc-s1 and rc-a17).
+- Freeze one closure per lineage per arm profile, `study freeze endurance --profile <arm profile> --to tmp/studies/closures/<lineage>/<arm>`, and run every segment of that arm in that lineage from it: freeze binds identity, bounds, and definition, and selection is an execute-time choice (O30). A fix between segments opens another lineage with its own closures.
+- Run a segment from the consumer root as `study execute endurance --profile <arm profile> --closure tmp/studies/closures/<lineage>/<arm> --trial <records or compaction trial> --goals <first>..<last> [--seed <result>:<trial>:<goal>] --out tmp/studies/<stem>`; `--closure` and `--out` resolve inside the working directory, both under `tmp/`.
+- Generate no segment input (O26, O29): the endurance declaration, its scenarios, its rubric, and every arm profile are tracked, and a segment differs from another only in its flags. An arm is a declaration trial plus a tracked single-word profile: `off` is `q2`, `repeat` is `q2` with another sampling seed, `sham` carries the perturbation, `rewrite` carries the rc-u10 screen's transport rewrite, and each experiment's `on` profile sets its switch; each is deleted with its experiment's removal row.
+- Name by stem only what lives under `tmp/studies/`: a segment's result `tmp/studies/<step>-<arm>-<first>-<last>/`, a lineage's closure per arm profile `tmp/studies/closures/<lineage>/<arm>/`, and a step's run records `tmp/studies/runs/<step>/`.
+- Across a gate's arms, the closure fingerprint means the Study content identity (`StudyIdentity` content: packages, dist, and source code; fixture JSON excluded) and the runtime identity. Each arm's profile bytes and each segment's selection differ by design; the run record holds the profile per segment, and the result manifest holds the selection. The rc-u10 screen's transport rewrite ships in the same build for all four arms, and the `rewrite` profile selects it.
 - Size the first segment of rc-a9's lineage at 2 goals and the second at 6. A screen lineage's first segment is its `on` arm's first segment of § Segment plan, projected from the last sealed segment before it; its measured rates re-project the rest of the screen. Project every later segment from the last sealed segment's measured per-role milliseconds and calls per goal, keep it at 15 model minutes or less, and launch it only when its projection fits the step's remaining cap.
 - Run each segment as a tracked background command whose completion notifies the session; detach no segment and schedule no wake for one (`@orkestrel/scaffold` `.agents/orchestration.md` § Pace).
 - Take every decision other than a Study ceiling at a segment boundary, by launching or not launching the next segment: stop, fix, curtail, continue, or re-project.
+
+### Segment selection
+
+Study 0.0.9 adds three selectors to `study check` and `study execute` through rc-st3 (O30), each recorded in the result manifest and verified by custody:
+
+| Selector | Meaning | Custody and identity |
+| --- | --- | --- |
+| `--trial <name>` | run one trial of the built schedule, named as `--prefix` keys name trials | the manifest's `schedule` holds that trial alone; `computeStudyScores` reads the manifest schedule, so attempts and scores cover it |
+| `--goals <first>..<last>` | project every selected scenario to the goals from `first` to `last` inclusive, by goal id | the manifest's `scenarios` carry the projected goals; a `selection` record beside the full-scenario fixture digest names the source scenario, the range, and the trial; `grade` projects the rubric to the manifest's goals before scoring and retains the projected rubric as the grading's own; the report lists criteria outside the range under `unselected`, never `unexecuted` |
+| `--seed <result>:<trial>:<goal>` | open the trial from the `checkpoint` evidence row that sealed result retained for that trial and goal | Study verifies the seal, reads the row, records the source result id, seal, trial, goal, and row digest in the manifest, and hands the row's value to the driver at `open`; a missing row, an unsealed source, or a differing seal refuses `CUSTODY` before any request |
+
+- `computeStudyScores` requires the manifest schedule to equal the declared population and refuses a rubric that omits goals or names goals outside it, so a goal range needs the schedule projection and the rubric projection inside Study (`computeStudyScores` in `@orkestrel/study` `src/core/helpers.ts`).
+- A projected rubric carries its own digest, so a segment's grading is keyed to that projection and never to the tracked rubric's digest; the report names the selection so a reader can tell the two apart.
+- Study refuses a closure run under a profile other than the one it froze (`StudyCommand#closure` in `@orkestrel/study`, "Study closure selectors differ from the checked selection", https://github.com/orkestrel/study at `e319242`), so every arm runs from the closure its lineage froze for that arm's profile (§ Run shape).
+- When Study 0.0.9 is not published, with the rc-s1 re-pin landed, before rc-a9's first segment, D49 opens with its copying cost stated, and rc-a9 waits rather than generating files into the tracked tree.
 
 ### Why segments
 
@@ -37,22 +56,10 @@ The user ruled on 2026-10-31:
 - As of `2bb8c5be`, the memory session attaches its checkpoint to a goal's first observed dispatch, at goal start (`StudyMemorySession` in `studies/memory/StudyMemorySession.ts`), and nothing reads one back.
 - rc-a17 appends the `checkpoint` row after the goal's `result` row, when no request is in flight, so `snapshot()` cannot refuse with `'CONCURRENCY'`. The state after goal 24 is the state at the start of goal 25: the extension seeds after goal 24 and re-runs no goal.
 - A snapshot carries its judgments (`designs/records.md` § Ledger snapshot), so a seeded arm asks no judge question from before its seed again; the minutes a seed saves are its skipped goals' agent calls plus their judge calls.
-- A seed refuses before any request when the sealed result's seal differs, the trial or the row is absent, or the executing slice's goals are not the recorded scenario's goals after the seed.
+- Study refuses a seed with `CUSTODY` before any request when the source result is unsealed, its seal differs, or the row is missing (§ Segment selection). The memory session hydrates from the row's value that Study hands over at `open`, and no seed setting exists in the profile's `settings` (rc-a17).
 
 ```ts
 // studies/memory/types.ts
-/** Opens each trial from the end state a sealed observed result retained after one goal. */
-export interface StudyMemorySeed {
-	/** The sealed result directory, relative to the workspace root. */
-	readonly result: string
-	/** The seal id the result must carry; another seal refuses before any request. */
-	readonly seal: string
-	/** The recorded trial whose checkpoint opens every trial of this execution. */
-	readonly trial: string
-	/** The goal whose end state opens the trial; the executing slice starts at the goal after it. */
-	readonly after: string
-}
-
 /** Holds one goal's end state as the `checkpoint` evidence row; the arm's strategy names which state member is present. */
 export interface StudyMemoryCheckpoint {
 	readonly ledger?: LedgerSnapshot
@@ -61,7 +68,7 @@ export interface StudyMemoryCheckpoint {
 	readonly arrivals: readonly string[]
 }
 
-// StudyMemoryOptions gains seed?: StudyMemorySeed; the checkpoint cap rises from 12 to the scenario horizon.
+// The session's open hydrates from the StudyMemoryCheckpoint value Study hands over (rc-st3); the checkpoint cap rises from 12 to the scenario horizon.
 ```
 
 ## Segment plan
@@ -79,13 +86,13 @@ The caps are O17's and sum to 600 model minutes (`designs/measurement.md` § GPU
 | rc-a10 for rc-a7 | 60 | 16 records goals per arm, 4 arms | two segments per arm (38–45, 46–53), seeded after goal 37; `on` first | 62 to 89; fits only at or under 0.455, or with keyed judge replay |
 | rc-a10 for rc-a11 | 100 | 4 goals per arm at burst 49 and at burst 77, 4 arms | one segment per arm per burst, seeded after goals 48 and 76; `on` first; the burst-77 `on` segment is curtailable | 44 to 57 |
 | rc-a5 | 40 | the late compaction slice | seeded after goal 48 | fits |
-| larger-model checks | 100 | one `off` and `on` pair per promotion at its stratum on 4B | two segments per promotion, seeded from the 2B state | 31 to 45 per promotion |
+| larger-model checks | 100 | one `off` and `on` pair per promotion at its stratum on 4B | two segments per promotion on the `q4` profile, by `--seed` from the 2B seal | 31 to 45 per promotion |
 | rc-a15, rc-a16 | 10, 15 | single requests | not segmented | fit |
 
 - Where the preceding table names `on` first, run the treatment's first segment first, then the bound arms (`off` or `system`, `repeat`, `sham`), then the treatment's later segments. Every arm starts cold from the same seed under one pin, so the treatment's first progress line costs no discarded goal, and curtailment reads only after the bound arms seal.
-- Hold one build per gate: the closure fingerprint, the Node runtime, and the daemon pin are equal across a gate's arms. A fix accepted mid-gate restarts that gate's arms from the seed, inside the gate's cap.
-- When a screen's projection exceeds its cap with a live judge, take the judge saving from rc-st2 when the user opened the Study release (Q7), else cut goals per arm, never arms, and report the stratum reached. The contingency and larger-model rows stay reserves and top up no screen (O25).
-- The larger-model checks read "4B continuing from a 2B state": both arms share that state, and a snapshot gauge suppresses calibration (`designs/records.md` § Hydrate semantics). Whether the checks' profile supplies a 4B `gauge` is an open Orchestrator item in `plan.md` § State, ruled before the first check.
+- Hold one build per gate: the closure fingerprint, the Node runtime, and the daemon pin are equal across a gate's arms. A fix accepted mid-gate opens another lineage with its own closure and restarts that gate's arms from the seed, inside the gate's cap.
+- When a screen's projection exceeds its cap with a live judge, take the judge saving from rc-st2 when Study 0.0.10 is served (Q7), else cut goals per arm, never arms, and report the stratum reached. The contingency and larger-model rows stay reserves and top up no screen (O25).
+- The larger-model checks read "4B continuing from a 2B state": each runs the `q4` profile with `--seed` from the 2B seal, both arms share that state, and a snapshot gauge suppresses calibration (`designs/records.md` § Hydrate semantics). Whether the checks' profile supplies a 4B `gauge` is an open Orchestrator item in `plan.md` § State, ruled before the first check.
 
 ## First readings
 
@@ -103,7 +110,7 @@ rc-a9's records segments for goals 1–2 and 3–8 measure, before any later seg
 
 ## Progress
 
-The Orchestrator reads each segment at its completion and at no other time (O21). One read is one short Node process that parses appended bytes by offset, contacts no daemon, and writes the step's progress file under the throwaway directory that `.agents/orchestration.md` § tmp layout names for step output.
+The Orchestrator reads each segment at its completion and at no other time (O21). One read is one short Node process that parses appended bytes by offset, contacts no daemon, and writes the step's progress lines beside its run record under `tmp/studies/runs/<step>/`; Q11, approved on 2026-10-31, gives `tmp/studies/` its row in `@orkestrel/scaffold` `.agents/orchestration.md` § tmp layout.
 
 | File | Holds | Appears |
 | --- | --- | --- |
@@ -116,7 +123,7 @@ The Orchestrator reads each segment at its completion and at no other time (O21)
 - Per segment: arm, goals reached of the horizon, ended, failure cause, layer, id, and sealed.
 - The `system` bytes cell is a live check of O11: host-authored text is constant across goals, so a change flags a boundary leak in the run itself.
 - rc-s1's first change appends a `denial` row per denied call on both arms through `buildStudyAgentToolDenial`, so the reader counts repeats per goal.
-- At each boundary, after the segment seals and before the next launch, run `study grade` over the sealed segment with its rubric slice (predicates only, no daemon). Add its per-goal work-criteria and critical-violation counts to the progress line. The micro rung reads the same counts on `on` against `off`.
+- At each boundary, after the segment seals and before the next launch, run `study grade` over the sealed segment with the tracked rubric, which `grade` projects to the manifest's goals (predicates only, no daemon; § Segment selection). Add its per-goal work-criteria and critical-violation counts to the progress line. The micro rung reads the same counts on `on` against `off`.
 
 The form of the line a session reads per segment, with illustrative values:
 
@@ -124,8 +131,7 @@ The form of the line a session reads per segment, with illustrative values:
 rc-a9 records 3-8: 6/6 goals, 1 partial 0 empty, agent 14 calls 2.1 min, judge 21 calls 0.5 min, model 2.6/60, cached 0.71, system 1 msg 216 B, stops none, alerts none, sealed
 ```
 
-- The reader starts as the throwaway rc-p3, which calls one exported, tested projection, `computeStudyMemoryProgress` in `studies/memory/helpers.ts` (rc-a17), and lands in Study as the `study progress` command (rc-st1).
-- `@orkestrel/scaffold` `.agents/orchestration.md` § Depth, breadth, and machinery moves a tool out of the throwaway directory that `.agents/orchestration.md` § tmp layout names at its second consumer; here the move waits on the user's Study publication (Q7). Until then rc-p3 serves, and its removal records the deviation.
+- The reader is Study's `study progress` command (rc-st1), in Study 0.0.9 published before rc-a9's first segment (Q7). It calls the memory adapter's `progress` (`StudyMemoryAdapter#progress`, rc-a17) per listed goal; no throwaway reader serves in its place (rc-p3 is retired, `plan.md` § Sequence, Retired ids).
 - The term is `progress`: never `digest`, which is Study's SHA-256, and never `watch`.
 
 ```ts
@@ -219,7 +225,7 @@ A fix climbs the ladder and stops at the first rung that answers (O22).
 
 - When a failure appears in a segment's progress, read the failing goal's exact input and output from the reader and class it: an instrument defect in `studies/` is a size S unit; a product defect in `src/` is a unit whose test comes first from the fixture rung.
 - Write the brief, dispatch the writer beside the run, run the fixture and hydrate rungs with the touched tests at the boundary, and let the GPU order take the request and micro rungs.
-- A request or micro rung draws on the cap of the step whose segment surfaced the failure. It is projected before launch like a segment and runs one arm per execution. Its reading is written before launch (micro: the failing class's per-goal count on `on` against `off`). Its seeded declarations and profiles are deleted when the fix unit is accepted. When that step's remaining cap cannot fund the rung, the rung waits for the step's screen.
+- A request or micro rung draws on the cap of the step whose segment surfaced the failure. It is projected before launch like a segment and runs one arm per execution. Its reading is written before launch (micro: the failing class's per-goal count on `on` against `off`). It runs from a closure frozen with the fix, which opens another lineage, selects its goals and seed by `--trial`, `--goals`, and `--seed`, and writes nothing outside `tmp/studies/` (§ Run shape). When that step's remaining cap cannot fund the rung, the rung waits for the step's screen.
 - Stop an arm's chain when an invariant fails, an instrument defect leaves the remaining goals unmeasurable for the gate, a curtailment fires, or an accepted `src/` fix changes the arm's request bytes at or before the current goal.
 - Let an arm continue when it is a bound arm the fix does not touch, or when the alert is the subject model's own behavior.
 - `plan.md` § Parallelism holds the line on what runs beside a segment.
@@ -230,7 +236,7 @@ A fix climbs the ladder and stops at the first rung that answers (O22).
 - The live-judge irreproducibility of `research/evidence.md` § Prior-campaign readings holds across lineages, and no gate spans two lineages.
 - After rc-st2, a screen serves judge requests by request-body key from a sealed recording, misses live, which pairs every arm on one judge draw.
 - Rely on no bit-stable generation: identical request bodies matched the sealed product at 3 of 12 checkpoints (`research/evidence.md` § Prior-campaign readings, prefix replay), temperature 0 is not batch-invariant (C49), and llama.cpp's server documents that, depending on the backend, `cache_prompt` logits are "not guaranteed" bit-for-bit identical across batch sizes (C50).
-- A lineage is the chain of segments that share one Node patch and one daemon pin; one opens at rc-a9's first segment and at each S7 screen's first segment, and a daemon change opens a separate one (`tenets.md` § Host).
+- A lineage is the chain of segments that share one Node patch, one daemon pin, and one closure per arm profile; one opens at rc-a9's first segment and at each S7 screen's first segment, and a daemon change or a fix between segments opens a separate one (`tenets.md` § Host; O30).
 - Pin three things per lineage, as the user ruled Q8 and Q9 on 2026-10-31: the Node 22 patch, the most recent Node 22 release at the lineage's start, held through the last replay of that lineage's recordings (amending O18 for the window); the Ollama daemon, its executable digest, version, and model digests in the profile's `daemon` member, which Study verifies before every trial, screened for the most recent stable release only at a lineage start; and one closure fingerprint across the arms of each gate.
 - A Node patch that lands mid-lineage voids that lineage's replay rung and nothing else: the hydrate rung and every seed survive.
 
@@ -240,24 +246,24 @@ Each unit's row in `plan.md` § Sequence names its step, role, owned files, and 
 
 | Unit | Builds | Acceptance | Promotion and removal |
 | --- | --- | --- | --- |
-| rc-p2 | a throwaway custody probe over a protocol-faithful loopback Ollama fixture, never on port 11434 or 11435 | typecheck; the fixture drives 3 goals with `record` and `observe`; control: a complete run seals and `study grade` exits 0; per class (a scope bound refusing before dispatch, a trial deadline mid-request, `record.duration` exhausted, `record.calls` exhausted, a consumer `content` throw, a kill of the recorded process id): the seal, the `study grade` exit, and the exit of an offline replay; a second process reads `evidence.jsonl` between appends, and the report records whether rows are visible before the sink syncs; `fs.watch` event counts on both files | its table feeds rc-p3 and rc-s1's first change; the probe and its throwaway `studies/custody` declarations are deleted before the unit returns |
-| rc-a17 | end-of-goal `checkpoint` rows, `StudyMemorySeed`, the seeded open, the slice scenarios, and `computeStudyMemoryProgress` in `studies/memory` | typecheck; the checkpoint row is appended after the `result` row when no request is in flight; the checkpoint cap is the scenario horizon; a slice test asserts every slice's goals equal the endurance goals at their positions; a CPU round trip with a scripted provider: goals 1 to 4 with checkpoints sealed, and a seed after goal 2 sends a byte-identical goal-3 first request on both arms; controls: `failures` emptied differs, the gauge removed adds a calibration request, a wrong `seal` refuses with `CONFIG` before any request, an unsealed result refuses with `CUSTODY`; a mutation that skips the arrivals hydration throws `Source arrival was replayed within a trial`; `computeStudyMemoryProgress` over a fixture goal returns calls, usage, product flags, lookups, repeats, system bytes, and cache share, and a goal without rows returns undefined cells; `test:studies` green | stays in `studies/memory` until a second driver seeds (D40) |
-| rc-p3 | the throwaway progress reader of § Progress over `computeStudyMemoryProgress` | typecheck; over rc-p2's sealed result the per-goal lines equal a hand count of wire rows, and the tally equals Σ `timing.total`; a copy with one pinned key removed raises the invariant line, and the unchanged copy raises none; it parses appended bytes only and holds no timer | promoted as rc-st1 at the Study release; deleted at promotion, or at campaign close with the deviation of § Progress recorded |
+| rc-p2 | a throwaway custody probe over a protocol-faithful loopback Ollama fixture, never on port 11434 or 11435, with its scratch consumer (a declaration, the bundle, `package.json`, and `dist`) under `tmp/probes/custody/` and the executable run from there | typecheck; the fixture drives 3 goals with `record` and `observe`; control: a complete run seals and `study grade` exits 0; per class (a scope bound refusing before dispatch, a trial deadline mid-request, `record.duration` exhausted, `record.calls` exhausted, a consumer `content` throw, a kill of the recorded process id): the seal, the `study grade` exit, and the exit of an offline replay; a second process reads `evidence.jsonl` between appends, and the report records whether rows are visible before the sink syncs; `fs.watch` event counts on both files; on Study 0.0.9, a `--trial`, a `--goals`, and a `--seed` execution each seal, grade, and report, which makes the probe rc-st3's consumer-side acceptance | its table feeds rc-s1's first change, and its fixture feeds rc-st1's acceptance; the probe and its scratch consumer are deleted before the unit returns |
+| rc-a17 | end-of-goal `checkpoint` rows, the hydrate from the checkpoint value Study hands to the session at `open` (rc-st3), the memory adapter's `progress` (`StudyMemoryAdapter#progress`) over rc-st1's `StudyProgressTarget`, the validator's checkpoint cap raised to the scenario horizon, and the every-goal `settings.checkpoints` list in `studies/memory/profiles/q2.json` | typecheck; the checkpoint row is appended after the `result` row when no request is in flight; the checkpoint cap is the scenario horizon, and `study check endurance --profile q2` exits 0 with a checkpoint id per goal; a CPU round trip with a scripted provider: goals 1 to 4 with checkpoints sealed, and a session opened with the checkpoint row of goal 2 sends a goal-3 first request byte-identical to the uninterrupted run's on both arms; controls: `failures` emptied differs, and the gauge removed adds a calibration request; a mutation that skips the arrivals hydration throws `Source arrival was replayed within a trial`; the adapter's `progress` over a fixture target returns calls, usage, product flags, lookups, repeats, system bytes, and cache share, and a goal without rows returns undefined cells; `study progress` over a sealed scripted result lists the adapter's reading per goal; `test:studies` green | stays in `studies/memory`; seed custody is Study's (rc-st3) |
 | rc-p4 | a throwaway contention probe, only when the user grants Q10 | the gate is written first: offer the exception only when the median per-request `total` beside one `test:studies` run, with `OLLAMA_HOST` at `http://127.0.0.1:1`, is within 5% of quiet, and replies agree as often as quiet repeats agree; cap 3 model minutes inside the rc-a9 probe cap | deleted after its reading |
-| rc-st1 | `study progress` in `@orkestrel/study`: the shapes of § Progress, `readStudyProgress`, and the adapter's optional `progress` | an interrupted fixture reads every complete row and skips a trailing line without LF; a sealed fixture reads `ended` and the failure; a real child appends while the reader reads; an adapter without `progress` yields an undefined reading; a generated 77-goal observed result with a checkpoint row per goal reads, and the report records the duration; an unknown flag exits 64; a mutation that keeps the partial line fails; the project tests and guide parity | ships in Study 0.0.9 (Q7) |
-| rc-st2 | keyed role replay in `@orkestrel/study`, written only when rc-a9's first records segments project a records screen over its cap with a live judge | `--replay RESULT --roles ROLES --offline true|false`, with `ROLES` a JSON role list, is exclusive with `--prefix` and `--extend`; a listed role's request whose path, method, and body bytes equal a recorded attempt's is served and marked replayed; a miss sends live under `--offline false` or refuses before send under `--offline true`; a tampered served row refuses custody; a mutation that drops the role filter serves an agent request; progress counts `replayed`; keyed mode needs no equal Node runtime | ships in Study 0.0.9 when written (Q7); else D48 |
+| rc-st1 | `study progress` in `@orkestrel/study`: the shapes of § Progress, `readStudyProgress`, and the adapter's optional `progress` | an interrupted fixture reads every complete row and skips a trailing line without LF; a sealed fixture reads `ended` and the failure; a real child appends while the reader reads; an adapter without `progress` yields an undefined reading; a generated 77-goal observed result with a checkpoint row per goal reads, and the report records the duration; an unknown flag exits 64; a mutation that keeps the partial line fails; the project tests and guide parity; proven on rc-p2's custody fixture and a scripted memory run, where the per-goal usage equals a hand count of wire rows and the summed `total` equals Σ `timing.total`, with no Agent GPU segment | ships in Study 0.0.9, published before rc-a9's first segment (Q7, O30) |
+| rc-st2 | keyed role replay in `@orkestrel/study`, written only when rc-a9's first records segments project a records screen over its cap with a live judge | `--replay RESULT --roles ROLES --offline true|false`, with `ROLES` a JSON role list, is exclusive with `--prefix` and `--extend`; a listed role's request whose path, method, and body bytes equal a recorded attempt's is served and marked replayed; a miss sends live under `--offline false` or refuses before send under `--offline true`; a tampered served row refuses custody; a mutation that drops the role filter serves an agent request; progress counts `replayed`; keyed mode needs no equal Node runtime | ships in Study 0.0.10 when written, published before the first records screen (Q7); else D48 |
+| rc-st3 | segment selection and seed custody in `@orkestrel/study` (§ Segment selection): the command parser and types, the schedule projection in the execution path, the manifest `selection` record, custody verification of a selected schedule, the rubric projection in `grade` and the `unselected` partition in `report`, and seed reading with the `open` argument on the driver and session contracts | a fixture study runs one trial of a multi-trial schedule, a goal range inside a longer scenario, and a seed from a sealed fixture result, each sealing, grading, and reporting; a wrong seal, a missing row, an unknown trial, and an empty or reversed range refuse `CONFIG` or `CUSTODY` before any request; a mutation that drops the schedule projection fails `computeStudyScores`; the project tests and guide parity; rc-p2's selector cases are its consumer-side acceptance | ships in Study 0.0.9, served before rc-a9's first segment (O30); else D49 opens |
 
 ## Deferred
 
 Each item's trigger lives in `plan.md` § Deferred.
 
 - An in-process quality guard in the memory driver, tripping the `content` cause before the next goal (D39).
-- Seed custody in Study, a profile `seed` member (D40).
 - A Study model-time limit summing `total_duration` (D41).
-- A trial selector or a per-trial failure latch in Study (D42).
 - A Study cause for a planned stop, so curtailment can end a trial in-process and seal (D43).
 - An event-driven milestone waiter (D44).
 - Sequential or anytime-valid promotion stops (D45).
 - Live semantic labeling during a run (D46).
 - One CPU lane beside a GPU segment (D47).
 - Keyed role replay after the campaign (D48).
+- The scratch-root closure route, a consumer root under `tmp/studies/scratch/<lineage>/` (D49).
+- Seed custody (D40) and a trial selector (D42) closed into rc-st3 (O30).

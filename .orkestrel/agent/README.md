@@ -1,6 +1,6 @@
 # Agent records campaign
 
-The tracked record of the Agent records campaign: memos, skills, and durable long-conversation strategies for `@orkestrel/agent`. `.claude/rules/campaign.md` governs this folder.
+The tracked record of the Agent records campaign: memos, skills, and durable long-conversation strategies for `@orkestrel/agent`. `@orkestrel/scaffold` `.claude/rules/campaign.md` governs this folder.
 
 ## Read order
 
@@ -31,7 +31,7 @@ Every id is numbered for life and never reused. A retired id stays retired.
 
 | Prefix | Names | Home |
 | --- | --- | --- |
-| `rc-` | a unit, from the consultations' sequence (`rc-p1`, `rc-u1`, `rc-a14`, `rc-u10`, `rc-e1`, `rc-d1`, and the rest of `plan.md` § Sequence; the retired `rc-a6` in `plan.md` § Sequence, Retired ids; the deferred `rc-t1` in `plan.md` § Deferred); the kind after `rc-` names the unit's sort, and `rc-st` names a unit in `@orkestrel/study` (`rc-st1`, `rc-st2`) | `plan.md` § Sequence |
+| `rc-` | a unit, from the consultations' sequence (`rc-p1`, `rc-u1`, `rc-a14`, `rc-u10`, `rc-e1`, `rc-d1`, and the rest of `plan.md` § Sequence; the retired `rc-a6` and `rc-p3` in `plan.md` § Sequence, Retired ids; the deferred `rc-t1` in `plan.md` § Deferred); the kind after `rc-` names the unit's sort, and `rc-st` names a unit in `@orkestrel/study` (`rc-st1`, `rc-st2`, `rc-st3`) | `plan.md` § Sequence |
 | `O` | an Orchestrator ruling (`O1`, `O2`, …) | `plan.md` § Rulings |
 | `F` | a fact the Orchestrator verified (`F1`, `F2`, …) | `plan.md` § Rulings |
 | `C` | an external research claim (`C01`, `C02`, …) | `research/evidence.md` |

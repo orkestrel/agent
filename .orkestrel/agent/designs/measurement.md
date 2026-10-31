@@ -11,7 +11,7 @@ Every unit runs its acceptance in this order and stops at the first failure:
 3. The project tests.
 4. One mutation probe on the load-bearing line: disable it, watch the test fail, restore it.
 
-Every medium unit then gets one independent review, per the size gate of `.agents/orchestration.md` § Size gate.
+Every medium unit then gets one independent review, per the size gate of `@orkestrel/scaffold` `.agents/orchestration.md` § Size gate.
 
 ## Probes
 
@@ -19,7 +19,7 @@ Every medium unit then gets one independent review, per the size gate of `.agent
 
 | Probe | Reads | Control | Decides |
 | --- | --- | --- | --- |
-| (a) literal census | the public `studies/endurance/sources/runtime/evaluation.json`, never `private/`; simulate folds at the Study `keep: 2` cut and report per fold the distinct ids and numbers in the slice, how many recur within the next 3 to 8 goals, and `estimateTokens` of the anchor line | a slice of known content with known recurrences reports its counts exactly | whether numbers join ids in rc-e1; rc-e1's L0 gate |
+| (a) literal census | the public `studies/memory/sources/evaluation.json`, never the answer key (`tenets.md` § Evaluation); simulate folds at the Study `keep: 2` cut and report per fold the distinct ids and numbers in the slice, how many recur within the next 3 to 8 goals, and `estimateTokens` of the anchor line | a slice of known content with known recurrences reports its counts exactly | whether numbers join ids in rc-e1; rc-e1's L0 gate |
 | (b) pair growth | a scripted conversation from the same arrivals with an inert data-stub judge; pair questions per correction at growing conversation lengths | a conversation with no correction counts 0 | rc-u6's default question and its test fixture |
 
 Probe (c), the `encode` read for `Message.id`, is dropped: F3 settles it.
@@ -78,7 +78,7 @@ The allowance is 600 model minutes: the summed Ollama `total_duration` of every 
 - Each step writes its cap into its run record before it starts, enforces it by projection before each segment launches, and reports its spend beside its result (O19; `designs/runs.md` § Segment plan holds each step's segments and seeds).
 - A screen whose projection exceeds its cap with a live judge follows O25 (`designs/runs.md` § Segment plan); the contingency and larger-model rows top up no screen.
 - An unspent cap carries to no other step, the contingency's included.
-- A request or micro rung of a fix draws on the cap of the step whose segment surfaced the failure. It is projected before launch like a segment and runs one arm per execution. Its reading is written before launch (micro: the failing class's per-goal count on `on` against `off`). Its seeded declarations and profiles are deleted when the fix unit is accepted. When that step's remaining cap cannot fund the rung, the rung waits for the step's screen (`designs/runs.md` § Fixes while a step runs).
+- A request or micro rung of a fix draws on the cap of the step whose segment surfaced the failure. It is projected before launch like a segment and runs one arm per execution. Its reading is written before launch (micro: the failing class's per-goal count on `on` against `off`). It generates no input: it selects its trial, goals, and seed by flags from a closure frozen with the fix (O30). When that step's remaining cap cannot fund the rung, the rung waits for the step's screen (`designs/runs.md` § Fixes while a step runs).
 - A cap stop is a budget stop, never a quality verdict (`tenets.md` § Scope).
 - When the total reaches 600 model minutes, GPU work stops and the campaign reports (O5).
 
@@ -95,11 +95,11 @@ The allowance is 600 model minutes: the summed Ollama `total_duration` of every 
 2. Records and compaction arms of the endurance workload record goals 1 to 24, one arm per segment, with request-body recording on and an end-of-goal checkpoint after every goal (rc-a17).
 3. For rc-a7 and rc-a11, the recording extends to goal 49 on both arms and to goal 77 on the records arm, seeded after goal 24 with no goal re-run.
 
-Every GPU step writes a run record before it starts, holding the daemon version, `/api/show` `parameters` and `details` per digest, each role's `options` as sent, `think`, the Node runtime, the closure fingerprint, the seed's result and seal, each segment's projection and `record` allowances, the step's cap, and the probe verdicts (`designs/layout.md` § Sampling).
+Every GPU step writes a run record before it starts, under `tmp/studies/runs/<step>/` (`designs/runs.md` § Progress), holding the daemon version, `/api/show` `parameters` and `details` per digest, each role's `options` as sent, `think`, the Node runtime, the closure fingerprint, the seed's result and seal, each segment's projection and `record` allowances, the step's cap, and the probe verdicts (`designs/layout.md` § Sampling).
 
 Acceptance: every segment seals; the checkpoints validate; rc-a17's seed test runs over each sealed segment, and a session seeded after goal k builds goal k+1's first request byte-identical to the recorded request on non-maintenance requests; every probe answered; the run record holds its fields; the report names the furthest goal each arm reached.
 
-Removal: rc-a9's and the extension's per-step declarations, slices, and seeded profiles are deleted after the last screen that seeds from their seals.
+Inputs: rc-a9 and the extension generate no input; each segment selects its trial, goals, and seed by `--trial`, `--goals`, and `--seed` from the closure its lineage froze for its arm's profile, and its results, closures, and run records stay under `tmp/studies/`, never committed (O26, O30; `designs/runs.md` § Run shape).
 
 ## Screens
 
