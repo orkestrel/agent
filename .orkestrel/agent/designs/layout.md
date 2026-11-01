@@ -36,7 +36,7 @@ rc-u10 writes the records into a built copy of the request turn: `${records}\n\n
 
 - The stored request stays unchanged; the answer pass reuses the copy.
 - Stored and sent bytes already differ: `Ledger#renderTailStub` sends a rewritten copy of a stored `tool` message under its own id, and rc-u4's replay compares selection messages that are already copies.
-- One turn holds the records and the request: both renderers fold consecutive tool results into one user turn instead of emitting adjacent user turns (C43), and a separate records message would be the only adjacent `user` pair Agent emits on purpose. The separate message is rc-a16's remedy arm and the screen's contingency (D34).
+- One turn holds the records and the request: both renderers fold consecutive tool results into one user turn instead of emitting adjacent user turns (C43). Agent already emits two adjacent `user` pairs by design, the context message then the first user turn, and the digest then the cue (D36), so a separate records message would add a third (O48). The separate message is rc-a16's remedy arm and the screen's contingency (D34).
 - Images attach to the last `user` message (`attachUserImages` in `src/core/contexts/helpers.ts`), which is this turn.
 - `LEDGER_NOTES.cue` names "the request", and the heading is `## Request`: one term in one place.
 - Trim prices the system text, the tail, and the request copy.
@@ -49,7 +49,7 @@ rc-u10 writes the records into a built copy of the request turn: `${records}\n\n
 - Workspace text leaves `system` because the model edits workspace files through a tool (`guides/agent.md` § Giving the model documents to read), and memo text leaves it because the model writes memos (O11).
 - Memos before workspace: a memo write invalidates the cached workspace text after it, and the other order invalidates memos on every file write (`designs/context.md` § AgentContext).
 - The calibration pass sends the built head: `system`, then the context message, then `view()`. rc-u9's pricing fix covers calibration.
-- Moving memos and workspace into the request turn waits for D32.
+- Moving memos and workspace into the request turn waits for D32; the context-message layout reading belongs to rc-s1's `studies/context` study under D32's trigger, and rc-a10 and M3 add none (O48).
 
 ## Literal strings
 
@@ -64,10 +64,12 @@ Each string is judged for a 2B reader. A string that changes ships in the unit n
 | `[N]` plus ` Changed later by [M].` or ` A later change is not shown.` replace `[Ledger source N]` and the two amendment sentences | same | rc-u11, when A2 reads within N of A1 | states the relation in words a reader can act on; no implementation noun |
 | `Your lookups and recalls in this request returned:` replaces `LEDGER_NOTES.results` | `user` digest | rc-u11, same gate | no speaker tag; same fact |
 | `Give your complete answer to the request now, from what you already have.` replaces `LEDGER_NOTES.cue` | `user` cue | rc-u11, same gate | names `## Request`; status-free, next step only |
+| `${holder} (${owner})`, or `${owner}` with no holder, replaces the owner title `${holder} (account ${owner})` or `account ${owner}` | owner record heading in `## Records`, `user` | rc-u11, when A2 reads within N of A1 (O48) | a neutral default with no added option; the id stays in the heading |
+| `or one of the topics` and `An owner name, an id, or a topic` replace `or one of the desk topics` and `An owner name, an id, or a desk topic` | the `recall` tool description and its `topic` parameter, tools block in `system` | rc-u11, same gate (O48) | a neutral default with no added option; `desk` is the Study scenario's word, and the default names no consumer's domain |
 | `Quoted from earlier messages and lookup results for this request.` after `## Records`; `Rules and corrections given earlier. Follow them.` after `## Rules`; `### Related` over non-owner units | `user` | rc-u11, only when A3 beats A2 by more than N on one reading | an addition earns its bytes or never lands |
 
 - Drop `[Desk]` with rc-u11's strings: labels and speaker tags gain little or lose at 2B (D31).
-- Keep unchanged: `## Instructions`, `## Workspace`, `File: `, `## Skills`, `## Memos`, `### <title>`, `- `, `${party}: `, `[Summary of earlier messages] `, `failed`, `no record`, the not-shown stub, every recall string, `LEDGER_NOTES.repeat` and `closure`, and the denial notes of `designs/authority.md` § Denial notes.
+- Keep unchanged: `## Instructions`, `## Workspace`, `File: `, `## Skills`, `## Memos`, `### <title>`, `- `, `${party}: `, `[Summary of earlier messages] `, `failed`, `no record`, the not-shown stub, every recall string except the `recall` tool description of rc-a16's A2 arm, `LEDGER_NOTES.repeat` and `closure`, and the denial notes of `designs/authority.md` § Denial notes.
 
 ## Shapes
 
@@ -122,7 +124,7 @@ rc-u10's canary test proves the boundary on every path.
 The ruling's cost is read one time, and no reading vetoes the ruling (O12). Every reading is study-only and leaves no switch in `src/`.
 
 - rc-a9's render probe M3 compares `[system, A, B]` with `[system, A + '\n\n' + B]` at `num_predict` 1, each behind a unique random system prefix, by `prompt_eval_count`. A delta at or under 0 stops the recording and opens D34.
-- rc-a16 replays every recorded first-pass request under six arms: A0 (the records moved into `system` by a string transform), S (A0 with the `\n\n` before the records replaced by `\n`), A1 (as recorded), A2 (A1 with rc-u11's replacements), A3 (A2 plus the gated lead lines), and R (A1 with the records as a separate `user` message before the request). It runs at `temperature` 0 with thinking off and the tools as recorded, and reads use (the reply names every id the records carry for an owner the request names) and re-acquisition (a `lookup` or `recall` for an id the records hold) by fixed predicate. N = 2·|S − A0|. Its gates are `designs/measurement.md` § Gates, row rc-a16.
+- rc-a16 replays every recorded first-pass request under six arms: A0 (the records moved into `system` by a string transform), S (A0 with the `\n\n` before the records replaced by `\n`), A1 (as recorded), A2 (A1 with rc-u11's replacements), A3 (A2 plus the gated lead lines), and R (A1 with the records as a separate `user` message before the request). It runs at `temperature` 0 with thinking off and the tools as recorded, except that A2 also carries the rewritten `recall` tool description of § Literal strings and A2's request text carries the rewritten owner titles (O48), and reads use (the reply names every id the records carry for an owner the request names) and re-acquisition (a `lookup` or `recall` for an id the records hold) by fixed predicate. N = 2·|S − A0|. Its gates are `designs/measurement.md` § Gates, row rc-a16.
 - rc-a10 for rc-u10 screens the move against a Study transport rewrite that rebuilds the 0.0.34 placement: arm `system` appends the records block to `system` after `\n\n` and strips it from the request copy. The rewrite is deleted after the screen, and no screen returns records to `system` in what Agent ships (O12). On a failed gate the `separate` arm runs as the contingency. Its gates are `designs/measurement.md` § Gates, row rc-a10 for rc-u10.
 - A 0.0.34 tree is no comparison arm: every S2 fix confounds it.
 

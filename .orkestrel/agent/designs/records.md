@@ -116,7 +116,7 @@ Refused (F1): the Ollama judge sends one request per question, so grouping a mes
 - `Classifier` calls `assign` for every message. For each tool message, `Ledger#assign` calls `Ledger#readLookups`, which walks every tool group and runs the application's `read` handler on each lookup result again.
 - The `entities` callback rebuilds the registry from `Ledger#readLookups` on every call, and the pair loop calls it per earlier non-quiet message per correction. The loop walks every correction on every `respond`, even when every answer is cached.
 - Per request that is O(c·n·(n + t)) for t tool messages. `Ledger#plan` then renders the records block again per trim step, O(L·B) for L lines and block size B.
-- `rc-a3` benches `select` CPU against conversation length before anything changes. `rc-a3b` memoizes `Ledger#readLookups`, the registry, and the projection, keyed by message count plus failure count, only when the rc-a3 gate passes (D12).
+- `rc-a3` benches `select` CPU against conversation length before anything changes. `rc-a3b` memoizes `Ledger#readLookups`, the registry, and the projection, keyed by message count plus failure count, only when the rc-a3 reading meets its threshold: `select` CPU at 1600 messages of at least 1000 ms, or at least 660 ms (`designs/measurement.md` § Bench; D12, O48).
 - Refused: memoizing the instruction sort, a micro-optimization with no measurement.
 
 ## Render path
