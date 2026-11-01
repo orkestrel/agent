@@ -27,7 +27,7 @@ Every brief and every unit of this campaign follows these directives. Each line 
 
 - Never contact the user's Ollama daemon on port 11434; set `OLLAMA_HOST` to `http://127.0.0.1:1` as its own statement before every node or npm command (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work; `1e82d145:.orkestrel/plan.md` § Standing readings, row Ollama guard).
 - Run GPU work only as the Orchestrator, on the dedicated daemon on port 11435, after notifying the user and, at each lineage start, screening the most recent stable Ollama release, because a different runner opens a separate lineage (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work; `152ac3c3:.orkestrel/agent/plan.md` § Standing rules). The screen at each lineage start, with one daemon pin across a lineage, is ruled (Q9, approved 2026-10-31; `plan.md` § Decisions; `designs/runs.md` § Replay and pins).
-- Keep one process-running lane on the host, the Orchestrator included; read-only lanes use file tools and run no shell command (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work).
+- Keep one process-running lane on the host, the Orchestrator included, for every test, build, mutation, gate, and long-running command; a writer runs only its owned-file format check, non-fix lint, and scoped type checks beside it; read-only lanes use file tools and run no shell command (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work; O22 and O47: `plan.md` § Rulings).
 - Run every check, gate, probe, and study run on the newest Node 22 release at the start of the run, recorded in its run record, and on the newest Node 24 release at the start of the run, recorded in its run record, only for a package whose manifest requires 24; the declared floor stays `engines` `>=22.18.0` (O18, superseding the 22.18.0 release gate of `1e82d145:.orkestrel/plan.md` § Rulings in force, row Node floor gate). For a GPU lineage, read the Node 22 release at the lineage's start and hold it to that lineage's last replay; this hold is ruled (Q8, approved 2026-10-31; `plan.md` § Decisions; `designs/runs.md` § Replay and pins).
 - Add no native code: no FFI, Node-API addon, or compiled helper (U22: `152ac3c3:.orkestrel/agent/plan.md` § Rulings in force).
 
@@ -37,7 +37,8 @@ Every brief and every unit of this campaign follows these directives. Each line 
 
 ### Release
 
-- Publish Agent first, then its runtime dependents `@orkestrel/ollama` and `@orkestrel/toolbox`, then `@orkestrel/study`, then Agent's devDependencies; a `0.0.x` caret pins exactly, so every dependent re-pins in the same wave or a second Agent copy installs (`7ada8b77:.orkestrel/agent/plan.md` § Outcome and § Rules for future Agent work).
+- Publish a runtime dependency that an Agent release adds before that Agent release: `@orkestrel/ndjson` 0.0.15 goes out after rc-nd1 and ahead of Agent 0.0.35, moves no consumer, and is re-pinned by Ollama together with Agent 0.0.35 at the wave (O47: `plan.md` § Rulings; `plan.md` § Release).
+- Then publish Agent, then its runtime dependents `@orkestrel/ollama` and `@orkestrel/toolbox`, then `@orkestrel/study`, then Agent's devDependencies; a `0.0.x` caret pins exactly, so every dependent re-pins in the same wave or a second Agent copy installs (`7ada8b77:.orkestrel/agent/plan.md` § Outcome and § Rules for future Agent work).
 - The user runs `npm login` and owns every publication (`7ada8b77:.orkestrel/agent/plan.md` § Rules for future Agent work).
 
 ## Briefs
