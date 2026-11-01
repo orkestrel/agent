@@ -1,6 +1,6 @@
 import type { AgentInterface, AgentOptions, AgentResult } from '../agents/index.js'
 import type { Selection } from '../contexts/index.js'
-import type { ConversationInterface } from '../conversations/index.js'
+import type { ConversationInterface, ConversationSnapshot } from '../conversations/index.js'
 import type { ThinkingReplay } from '../types.js'
 import type {
 	ChoiceQuestion,
@@ -232,7 +232,7 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
  * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall,
- * and agent bounds.
+ * agent bounds, and snapshot.
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
@@ -244,7 +244,9 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. The plan budgets
  * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
- * Recall closes when `remainder - predict < 2 * reserve`.
+ * Recall closes when `remainder - predict < 2 * reserve`. `snapshot` hydrates the conversation and
+ * the marked ids a ledger's `snapshot()` returned; construction throws `LedgerError` with code
+ * `'SNAPSHOT'` when `isLedgerSnapshot` refuses it.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
@@ -267,6 +269,30 @@ export interface LedgerOptions {
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly agent?: LedgerAgentOptions
+	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none, because a `gauge` option wins over `snapshot.gauge`. */
+	readonly snapshot?: LedgerSnapshot
+}
+
+/**
+ * Holds the JSON-serializable state a ledger hydrates from: its conversation and the message ids it marked.
+ *
+ * @remarks
+ * `conversation` carries the messages, sections, and judgments. `requests` lists the user messages
+ * `respond` appended, `notes` the user messages carrying `LEDGER_NOTES` text, and `failures` the
+ * tool messages whose call or reading failed, each in conversation order. Each id names a message
+ * of `conversation.messages`: a request or note a `user` message and a failure a `tool` message.
+ * `gauge` carries the scale and overhead alone. The gauge's observations of earlier requests are
+ * not carried, so a hydrated ledger sizes and closes `recall` from its fallback reserve until it
+ * completes a request. A question the classifier held after a deterministic judge failure is not
+ * carried, so a hydrated ledger asks it again. Hydrating a second ledger from one snapshot forks
+ * it at the parent's frontier.
+ */
+export interface LedgerSnapshot {
+	readonly conversation: ConversationSnapshot
+	readonly requests: readonly string[]
+	readonly notes: readonly string[]
+	readonly failures: readonly string[]
+	readonly gauge?: LedgerGauge
 }
 
 /**
@@ -425,7 +451,7 @@ export interface LedgerInterface {
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
 	 * Direct agent runs share an active request's gauge readings and repeat stop, even when their
-	 * selections fault. Only `respond` and `calibrate` calls are refused by the concurrency guard.
+	 * selections fault. Only `respond`, `calibrate`, and `snapshot` calls are refused by the concurrency guard.
 	 * A run no `respond` call owns, including a run during calibration, reads no request's state:
 	 * its lookup and `recall` calls run with no repeat stop, recall limit, or close rule.
 	 * Every rejection leaves the ledger free for a later call.
@@ -454,6 +480,19 @@ export interface LedgerInterface {
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	calibrate(signal: AbortSignal): Promise<LedgerGauge>
+	/**
+	 * Serializes the conversation, the marked ids, and the gauge into a snapshot a later ledger hydrates from.
+	 *
+	 * @remarks
+	 * The ledger first files every tool result whose message is appended, so a failure a direct
+	 * agent run left is marked; a result whose tool message is not yet appended is not captured. A
+	 * call while a `respond` or `calibrate` call is in flight throws, because an entered, unanswered
+	 * request would hydrate as a dangling request; a direct agent run is not refused.
+	 *
+	 * @returns The snapshot, each id list in conversation order and `gauge` present once the ledger holds one
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 */
+	snapshot(): LedgerSnapshot
 }
 
 /**
@@ -818,6 +857,8 @@ export type LedgerErrorCode =
 	| 'GAUGE'
 	/** Reports a render context that holds no reference for a source it annotates. */
 	| 'REFERENCE'
+	/** Reports a snapshot that is malformed or that marks an id its conversation does not hold. */
+	| 'SNAPSHOT'
 
 /** Carries the lowercase words and non-opening capitalized names of a message. */
 export interface LedgerWordSet {

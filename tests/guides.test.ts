@@ -822,6 +822,61 @@ await new GuideCommand({
 			expect(guideText).toContain("const scope = scopes.add({ name: 'read-only' })")
 		})
 
+		it('revises, restores, and forgets memos and replaces skills as the index fence shows', () => {
+			const added: string[] = []
+			const memos = barrel.createMemoManager({
+				id: 'ada',
+				on: {
+					add: (memo) => {
+						added.push(memo.description)
+					},
+				},
+			})
+			const tone = {
+				name: 'tone',
+				description: 'Prefers short replies.',
+				content: 'Answer briefly.',
+			}
+			const first = memos.add(tone)
+
+			expect(memos.add(tone)).toBe(first)
+			memos.add({
+				name: 'tone',
+				description: 'Prefers bullet lists.',
+				content: 'Answer in bullets.',
+			})
+			expect(added).toEqual(['Prefers short replies.', 'Prefers bullet lists.'])
+			expect(memos.count).toBe(1)
+			expect(memos.history('tone')).toHaveLength(2)
+			expect(memos.memo('tone')?.description).toBe('Prefers bullet lists.')
+			expect(
+				barrel.renderSection(memos.open, memos.memos(), (memo) => memos.render(memo), memos.close),
+			).toBe('## Memos\n\n- tone: Prefers bullet lists.')
+
+			const restored = barrel.createMemoManager({ snapshot: memos.snapshot() })
+			expect(restored.id).toBe('ada')
+			expect(memos.remove('tone')).toBe(true)
+			expect(memos.history('tone')).toEqual([])
+			expect(restored.history('tone')).toHaveLength(2)
+
+			const skills = barrel.createSkillManager()
+			const review = skills.add({
+				name: 'review',
+				description: 'Reviews a change for defects.',
+				content: 'Read the diff, then list each defect with its line.',
+				files: [{ path: 'checklist.md', content: { text: '- Tests pass', language: 'markdown' } }],
+			})
+
+			expect(skills.skill('review')?.files[0]?.path).toBe('checklist.md')
+			expect(skills.skills()).toEqual([review])
+			expect(skills.render(review)).toBe('- review: Reviews a change for defects.')
+			expect(skills.open).toBe('## Skills')
+			expect(skills.remove('review')).toBe(true)
+			skills.clear()
+			expect(skills.count).toBe(0)
+			expect(guideText).toContain('memos.add(tone) // unchanged text: the same revision, no event')
+		})
+
 		it('records and reads a judgment as the judgment-recording fence shows', () => {
 			const conversation = createConversation()
 			const complaint = conversation.add({
@@ -1374,6 +1429,93 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				"// '## Records\\n### Brightwater Studio (account BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?'",
+			)
+		})
+
+		it('hydrates a second ledger from a JSON round trip of a snapshot, as the ledger snapshot fence claims', async () => {
+			const { isLedgerSnapshot } = barrel
+			// The fence continues the ledger fence, so the transcription rebuilds that ledger with a third
+			// reply scripted for it, and the first ledger serves the third request beside the second.
+			const request = 'Is the Brightwater Studio refund approved yet?'
+			const answer = 'Not yet. A manager must approve it.'
+			const script: readonly ProviderResult[] = [
+				{ content: '', usage: { prompt: 160, completion: 0, total: 160 } },
+				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+				{
+					content: '',
+					tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+				},
+				{ content: 'Order BW-5512 qualifies for a $148.50 refund.' },
+				{ content: 'Yes. Refunds over $100 need a manager.' },
+				{ content: answer },
+			]
+			const options = {
+				judge: createGuideLedgerJudge(),
+				system: 'You staff the Larkspur support desk. Today is 2026-10-09.',
+				topics: [{ name: 'refunds', criterion: 'refund amounts and approvals' }],
+				questions: LEDGER_QUESTIONS,
+				thresholds: LEDGER_DESK_THRESHOLDS,
+				capacity: 32_768,
+				lookups: [createGuideOrderLookup()],
+			}
+			const ledger = createLedger(
+				createGuideScriptProvider(script.values(), createRecorder<readonly [readonly Message[]]>()),
+				options,
+			)
+			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
+			await ledger.calibrate(AbortSignal.timeout(30_000))
+			await ledger.respond('Can Brightwater Studio get a refund on order BW-5512?')
+			await ledger.respond('Does the Brightwater Studio refund need a manager?')
+
+			const stored = JSON.stringify(ledger.snapshot())
+			const parsed: unknown = JSON.parse(stored)
+			const snapshot = requireValue(isLedgerSnapshot(parsed) ? parsed : undefined)
+			// The second ledger's provider holds the one reply; a calibration call would take it.
+			const replies = [{ content: answer }].values()
+			const restored = createLedger(
+				createGuideScriptProvider(replies, createRecorder<readonly [readonly Message[]]>()),
+				{ ...options, snapshot },
+			)
+			const overhead = restored.gauge?.overhead
+			const copies: Array<string | undefined> = []
+			restored.agent.emitter.on('select', (selection) =>
+				copies.push(selection.messages.at(-1)?.content),
+			)
+			const third = await restored.respond(request)
+			const uninterrupted: Array<string | undefined> = []
+			ledger.agent.emitter.on('select', (selection) =>
+				uninterrupted.push(selection.messages.at(-1)?.content),
+			)
+			await ledger.respond(request)
+
+			expect(snapshot.requests).toHaveLength(2)
+			expect(overhead).toBe(120)
+			expect(restored.gauge).toEqual(snapshot.gauge)
+			expect(third.content).toBe(answer)
+			expect(replies.next()).toEqual({ done: true, value: undefined })
+			expect(copies).toEqual([
+				'## Records\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nIs the Brightwater Studio refund approved yet?',
+			])
+			expect(uninterrupted).toEqual(copies)
+			expect(guideText).toContain(
+				"declare const provider: ProviderInterface // scripted with one reply: 'Not yet. A manager must approve it.'",
+			)
+			expect(guideText).toContain('const stored = JSON.stringify(ledger.snapshot())')
+			expect(guideText).toContain(
+				'const restored = createLedger(provider, { ...options, snapshot: parsed })',
+			)
+			expect(guideText).toContain(
+				'parsed.requests.length // 2 — the two requests the ledger served',
+			)
+			expect(guideText).toContain(
+				'restored.gauge?.overhead // 120 — read from the snapshot, so the ledger calibrates nothing',
+			)
+			expect(guideText).toContain(
+				"const third = await restored.respond('Is the Brightwater Studio refund approved yet?')",
+			)
+			expect(guideText).toContain("third.content // 'Not yet. A manager must approve it.'")
+			expect(guideText).toContain(
+				"// '## Records\\n### Brightwater Studio (account BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
 			)
 		})
 

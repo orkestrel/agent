@@ -184,6 +184,7 @@ import type {
 	GaugeOptions,
 	LedgerCategory,
 	LedgerClassification,
+	LedgerInterface,
 	LedgerLine,
 	LedgerLookupReading,
 	LedgerLookupResult,
@@ -191,6 +192,7 @@ import type {
 	LedgerProjection,
 	LedgerProjectionInput,
 	LedgerProjectionRequest,
+	LedgerSnapshot,
 	LedgerThreshold,
 	AgentContextInterface,
 	AgentInterface,
@@ -3889,6 +3891,18 @@ export const SCOPE_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)
 /** Names a scope manager event recorded by its tests. */
 export type ScopeEventName = (typeof SCOPE_EVENTS)[number]
 
+/** Lists the memo manager events recorded by its tests. */
+export const MEMO_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)
+
+/** Names a memo manager event recorded by its tests. */
+export type MemoEventName = (typeof MEMO_EVENTS)[number]
+
+/** Lists the skill manager events recorded by its tests. */
+export const SKILL_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)
+
+/** Names a skill manager event recorded by its tests. */
+export type SkillEventName = (typeof SKILL_EVENTS)[number]
+
 /** Matches a generated handle such as `m12`, `r8`, or `[r8]`, which no helper writes into a text. */
 export const LEDGER_HANDLE = /\b[mrp]\d+\b/g
 
@@ -5754,4 +5768,256 @@ export function extractLedgerRecords(messages: readonly Message[]): string {
 		(message) => message.role === 'user' && message.content.includes('\n\n## Request\n'),
 	)
 	return copy === undefined ? '' : copy.content.slice(0, copy.content.indexOf('\n\n## Request\n'))
+}
+
+/**
+ * Holds the snapshot replay scenario: a seed, the requests served before the snapshot, the request
+ * served after it, and the provider turns of each side.
+ *
+ * @remarks
+ * The seed holds a rule and a lookup exchange that renders as a tail stub. The first history
+ * request's first pass reads the owner and ends empty, so an answer pass adds the results and cue
+ * notes. The second history request's lookup throws `failure`, so its tool message carries that text,
+ * which names the owner's account: unless the ledger marks it failed, the lookup reader files it as
+ * an owner reading and it joins the owner's record. The request after the snapshot names the owner
+ * and calls only the lookup, because `recall` output reads the gauge observations no snapshot
+ * carries.
+ */
+export const LEDGER_REPLAY_FIXTURE = Object.freeze({
+	rules: Object.freeze(['need a manager']),
+	seed: Object.freeze<readonly MessageInput[]>([
+		{ role: 'user', content: 'Refunds above $100 need a manager.' },
+		...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+	]),
+	history: Object.freeze(['Check account BW-20931.', 'Check order FX-111.']),
+	failure: 'FX-111 failed for BW-20931.',
+	request: 'What refund does Brightwater Studio have on BW-20931?',
+	before: Object.freeze<readonly ScriptedTurn[]>([
+		{ content: '', tools: [{ id: 'first', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+		{ content: '' },
+		{ content: 'Brightwater Studio is owed $148.50.' },
+		{ content: '', tools: [{ id: 'second', name: 'lookup', arguments: { id: 'FX-111' } }] },
+		{ content: 'The FX-111 lookup failed.' },
+	]),
+	after: Object.freeze<readonly ScriptedTurn[]>([
+		{ content: '', tools: [{ id: 'third', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+		{ content: 'The refund is $148.50 and needs a manager.' },
+	]),
+})
+
+/** Carries a replay ledger beside the recorders of the judge keys it asks and the selections it emits. */
+export interface LedgerReplay {
+	readonly ledger: LedgerInterface
+	readonly asked: RecorderInterface<readonly [key: string]>
+	readonly selections: RecorderInterface<readonly [selection: Selection]>
+}
+
+/** Carries what one request a replay ledger served emitted: its selections and the judge keys it asked. */
+export interface LedgerReplayResult {
+	readonly selections: readonly Selection[]
+	readonly keys: readonly string[]
+}
+
+/**
+ * Builds the replay scenario's ledger options: a phrase judge that records each key it is asked, and
+ * a lookup whose call throws for `FX-111`.
+ *
+ * @param asked - The recorder of the judge's question keys
+ * @returns The options, with the gauge `buildLedgerOptions` supplies
+ */
+export function buildLedgerReplayOptions(
+	asked: RecorderInterface<readonly [key: string]>,
+): LedgerOptions {
+	const options = buildLedgerOptions()
+	const lookup = requireValue(options.lookups?.[0])
+	const phrase = createPhraseJudge(LEDGER_REPLAY_FIXTURE.rules)
+	return {
+		...options,
+		judge: createLedgerJudge(
+			asked,
+			(request) => phrase.ask(request, new AbortController().signal),
+			'scripted',
+		),
+		lookups: [
+			{
+				tool: createTool({
+					name: 'lookup',
+					description: 'Read an owner record.',
+					parameters: { type: 'object' },
+					execute: (values) => {
+						if (values.id === 'FX-111') throw new Error(LEDGER_REPLAY_FIXTURE.failure)
+						return 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
+					},
+				}),
+				read: (values, text) => lookup.read(values, text),
+			},
+		],
+	}
+}
+
+/**
+ * Creates a replay ledger: seeded and scripted through the whole scenario without a snapshot, or
+ * hydrated from `snapshot` with no gauge option and scripted with the turns after the snapshot.
+ *
+ * @param snapshot - The snapshot to hydrate from; omission seeds a fresh ledger
+ * @returns The ledger and its recorders
+ */
+export function createLedgerReplay(snapshot?: LedgerSnapshot): LedgerReplay {
+	const asked = createRecorder<readonly [key: string]>()
+	const selections = createRecorder<readonly [selection: Selection]>()
+	const options = buildLedgerReplayOptions(asked)
+	const fixture = LEDGER_REPLAY_FIXTURE
+	const ledger =
+		snapshot === undefined
+			? createLedger(createScriptedProvider([...fixture.before, ...fixture.after]), options)
+			: createLedger(createScriptedProvider(fixture.after), {
+					...buildUncalibratedOptions(options),
+					snapshot,
+				})
+	if (snapshot === undefined) ledger.conversation.add(fixture.seed)
+	ledger.agent.emitter.on('select', selections.handler)
+	return { ledger, asked, selections }
+}
+
+/**
+ * Serves one request through a replay ledger and returns what that request alone emitted.
+ *
+ * @param replay - The replay ledger and its recorders
+ * @param content - The request text
+ * @returns The selections emitted and the judge keys asked during the request
+ */
+export async function serveLedgerReplay(
+	replay: LedgerReplay,
+	content: string,
+): Promise<LedgerReplayResult> {
+	const selected = replay.selections.count
+	const asked = replay.asked.count
+	await replay.ledger.respond(content)
+	return {
+		selections: replay.selections.calls.slice(selected).map(([selection]) => selection),
+		keys: replay.asked.calls.slice(asked).map(([key]) => key),
+	}
+}
+
+/**
+ * Creates a fresh replay ledger and serves the scenario's history requests through it.
+ *
+ * @returns The replay ledger at the snapshot point
+ */
+export async function serveLedgerHistory(): Promise<LedgerReplay> {
+	const replay = createLedgerReplay()
+	for (const request of LEDGER_REPLAY_FIXTURE.history) await replay.ledger.respond(request)
+	return replay
+}
+
+/**
+ * Renders a value as JSON with each message id of `from` replaced by the id at the same
+ * conversation position in `to`, so two ledgers that minted their own ids compare byte for byte.
+ *
+ * @param value - The value to render
+ * @param from - The messages whose ids the value carries
+ * @param to - The messages whose ids replace them, position for position
+ * @returns The JSON text with the ids translated
+ */
+export function translateLedgerIds(
+	value: unknown,
+	from: readonly Message[],
+	to: readonly Message[],
+): string {
+	return from.reduce((text, message, at) => {
+		const target = to[at]
+		return target === undefined ? text : text.replaceAll(message.id, target.id)
+	}, JSON.stringify(value))
+}
+
+/** Holds a hand-built ledger snapshot that marks one request, one note, and one failure, with a gauge. */
+export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
+	conversation: {
+		id: 'snapshot',
+		sections: [],
+		messages: [
+			{ id: 'request', role: 'user', content: 'Check order FX-111.' },
+			{
+				id: 'call',
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'failed', name: 'lookup', arguments: { id: 'FX-111' } }],
+			},
+			{ id: 'failure', role: 'tool', call: 'failed', content: 'FX-111 failed' },
+			{ id: 'note', role: 'user', content: 'Answer from the records.' },
+		],
+	},
+	requests: ['request'],
+	notes: ['note'],
+	failures: ['failure'],
+	gauge: { scale: 2, overhead: 10 },
+})
+
+/**
+ * Builds typed snapshots a ledger refuses: an id absent from the conversation's messages, an id on a
+ * message of the wrong role, a sparse list, and a gauge outside its bounds.
+ *
+ * @returns The titled snapshots, each differing from {@link LEDGER_SNAPSHOT_SEED} in one member
+ */
+export function buildLedgerSnapshotRefusals(): ReadonlyArray<readonly [string, LedgerSnapshot]> {
+	const seed = LEDGER_SNAPSHOT_SEED
+	const sparse: string[] = []
+	sparse[1] = 'note'
+	const folded: Message = { id: 'folded', role: 'user', content: 'Check order FX-110.' }
+	return Object.freeze<ReadonlyArray<readonly [string, LedgerSnapshot]>>([
+		['an absent request id', { ...seed, requests: ['absent'] }],
+		['an absent note id', { ...seed, notes: ['absent'] }],
+		['an absent failure id', { ...seed, failures: ['absent'] }],
+		[
+			'a request id only a section original holds',
+			{
+				...seed,
+				conversation: {
+					...seed.conversation,
+					sections: [{ id: 'section', summary: 'An order check.', messages: [folded] }],
+				},
+				requests: ['folded'],
+			},
+		],
+		['a request id on a tool message', { ...seed, requests: ['failure'] }],
+		['a note id on an assistant message', { ...seed, notes: ['call'] }],
+		['a failure id on a user message', { ...seed, failures: ['request'] }],
+		['a sparse note list', { ...seed, notes: sparse }],
+		['a gauge scale of 0', { ...seed, gauge: { scale: 0, overhead: 10 } }],
+		['a NaN gauge scale', { ...seed, gauge: { scale: NaN, overhead: 10 } }],
+		['an infinite gauge scale', { ...seed, gauge: { scale: Infinity, overhead: 10 } }],
+		['a negative gauge overhead', { ...seed, gauge: { scale: 2, overhead: -1 } }],
+		['an infinite gauge overhead', { ...seed, gauge: { scale: 2, overhead: Infinity } }],
+	])
+}
+
+/**
+ * Builds malformed and hostile values `isLedgerSnapshot` refuses: every typed refusal, then
+ * non-records, missing or malformed members, a throwing getter, and a revoked proxy.
+ *
+ * @returns The titled values
+ */
+export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [string, unknown]> {
+	const seed = LEDGER_SNAPSHOT_SEED
+	const throwing: Record<string, unknown> = { ...seed }
+	const getter = Proxy.revocable(() => [], {})
+	getter.revoke()
+	Object.defineProperty(throwing, 'requests', { enumerable: true, get: getter.proxy })
+	const revoked = Proxy.revocable({ ...seed }, {})
+	revoked.revoke()
+	return Object.freeze<ReadonlyArray<readonly [string, unknown]>>([
+		...buildLedgerSnapshotRefusals(),
+		['a string', 'snapshot'],
+		['null', null],
+		['an array', [seed]],
+		['a missing conversation', { requests: [], notes: [], failures: [] }],
+		['a malformed conversation', { ...seed, conversation: { id: 1, sections: [], messages: [] } }],
+		['a missing requests list', { conversation: seed.conversation, notes: [], failures: [] }],
+		['a notes list that is a string', { ...seed, notes: 'note' }],
+		['a failures list holding a number', { ...seed, failures: [1] }],
+		['a gauge that is a number', { ...seed, gauge: 2 }],
+		['a gauge missing its overhead', { ...seed, gauge: { scale: 2 } }],
+		['a throwing getter', throwing],
+		['a revoked proxy', revoked.proxy],
+	])
 }

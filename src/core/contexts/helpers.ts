@@ -1,3 +1,4 @@
+import type { Memo } from './types.js'
 import type { Message } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
@@ -190,4 +191,27 @@ export function intersectKeys(
 	if (child === undefined) return [...parent]
 	const allowed = new Set(parent)
 	return child.filter((key) => allowed.has(key))
+}
+
+/**
+ * Renders one index line for a memo or a skill — `- name: description`, the built-in `render` of
+ * the memo and skill managers.
+ *
+ * @remarks
+ * Pure and total. The `name` and `description` render verbatim, so a `description` holding a
+ * line break renders across lines.
+ *
+ * @param entry - The memo or skill whose `name` and `description` the line shows
+ * @returns The index line
+ *
+ * @example
+ * ```ts
+ * import { renderIndexEntry } from '@orkestrel/agent'
+ *
+ * renderIndexEntry({ name: 'tone', description: 'Prefers short replies.' })
+ * // '- tone: Prefers short replies.'
+ * ```
+ */
+export function renderIndexEntry(entry: Pick<Memo, 'name' | 'description'>): string {
+	return `- ${entry.name}: ${entry.description}`
 }

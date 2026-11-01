@@ -5,15 +5,21 @@ import type {
 	InstructionInterface,
 	InstructionManagerInterface,
 	InstructionManagerOptions,
+	MemoManagerInterface,
+	MemoManagerOptions,
 	ScopeInput,
 	ScopeInterface,
 	ScopeManagerInterface,
 	ScopeManagerOptions,
+	SkillManagerInterface,
+	SkillManagerOptions,
 } from './types.js'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
+import { MemoManager } from './memos/MemoManager.js'
 import { Scope } from './scopes/Scope.js'
 import { ScopeManager } from './scopes/ScopeManager.js'
+import { SkillManager } from './skills/SkillManager.js'
 import { AgentContext } from './AgentContext.js'
 
 /**
@@ -126,6 +132,61 @@ export function createScope(input: ScopeInput): ScopeInterface {
  */
 export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerInterface {
 	return new ScopeManager(options)
+}
+
+/**
+ * Creates a memo set — a {@link MemoManagerInterface} holding durable facts keyed by `name`, where
+ * a same-name `add` with changed text appends a revision and the earlier ones stay readable.
+ *
+ * @remarks
+ * Starts empty unless a `snapshot` restores revisions, silently. `id` names the set: the
+ * `snapshot.id`, else the `id` option, else a minted UUID. Re-adding unchanged text is a no-op that
+ * emits nothing; `remove` forgets a memo and its whole history. An optional `format` override is
+ * the manager-options level of the build cascade, beating the built-in `'## Memos'` header and the
+ * `- name: description` index line.
+ *
+ * @param options - Optional `id`, `on` hooks, `error` handler, `format` override, and `snapshot`
+ *   (see {@link MemoManagerOptions})
+ * @returns A {@link MemoManagerInterface}
+ *
+ * @example
+ * ```ts
+ * import { createMemoManager } from '@orkestrel/agent'
+ *
+ * const memos = createMemoManager({ id: 'ada' })
+ * const tone = memos.add({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' })
+ * memos.render(tone) // '- tone: Prefers short replies.'
+ * ```
+ */
+export function createMemoManager(options?: MemoManagerOptions): MemoManagerInterface {
+	return new MemoManager(options)
+}
+
+/**
+ * Creates a skill registry — a {@link SkillManagerInterface} holding the skills a host supplies,
+ * keyed by `name` and listed in insertion order.
+ *
+ * @remarks
+ * Starts empty; `add` (one or a batch) mints each `id` and each file through `createFile`, and
+ * overwrites a same-name skill (last write wins, position kept). An optional `format` override is
+ * the manager-options level of the build cascade, beating the built-in `'## Skills'` header and the
+ * `- name: description` index line.
+ *
+ * @param options - Optional `on` hooks, `error` handler, and `format` override (see
+ *   {@link SkillManagerOptions})
+ * @returns An empty {@link SkillManagerInterface}
+ *
+ * @example
+ * ```ts
+ * import { createSkillManager } from '@orkestrel/agent'
+ *
+ * const skills = createSkillManager()
+ * const review = skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+ * skills.render(review) // '- review: Reviews a change.'
+ * ```
+ */
+export function createSkillManager(options?: SkillManagerOptions): SkillManagerInterface {
+	return new SkillManager(options)
 }
 
 /**

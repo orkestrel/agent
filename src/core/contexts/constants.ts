@@ -13,3 +13,23 @@
  * section: their `base64` payload attaches to the last user message.
  */
 export const WORKSPACE_SECTION_HEADER = '## Workspace'
+
+/**
+ * Names the built-in section header a {@link import('./types.js').MemoManagerInterface} renders
+ * its index under — `'## Memos'`, the `open` value when no `format.open` overrides it.
+ *
+ * @remarks
+ * Each memo renders beneath it as one `- name: description` line through
+ * {@link import('./helpers.js').renderIndexEntry}.
+ */
+export const MEMO_SECTION_HEADER = '## Memos'
+
+/**
+ * Names the built-in section header a {@link import('./types.js').SkillManagerInterface} renders
+ * its index under — `'## Skills'`, the `open` value when no `format.open` overrides it.
+ *
+ * @remarks
+ * Each skill renders beneath it as one `- name: description` line through
+ * {@link import('./helpers.js').renderIndexEntry}.
+ */
+export const SKILL_SECTION_HEADER = '## Skills'

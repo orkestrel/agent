@@ -26,6 +26,17 @@ import {
 	measureMessages,
 	readCallRequest,
 } from './setup.js'
+import {
+	LEDGER_REPLAY_FIXTURE,
+	LEDGER_SNAPSHOT_SEED,
+	buildLedgerReplayOptions,
+	buildLedgerSnapshotRefusals,
+	createInvalidLedgerSnapshotCases,
+	createLedgerReplay,
+	serveLedgerHistory,
+	serveLedgerReplay,
+	translateLedgerIds,
+} from './setup.js'
 import type { LedgerProjection, Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
 import { Channel, createAgent, estimateRequest, ProviderAbortError } from '@src/core'
@@ -2444,5 +2455,102 @@ describe('createRelayHop', () => {
 		expect(urls.calls).toEqual([['http://relay.test/exact?route=turn']])
 		expect(replies.calls).toEqual([[400, '']])
 		expect(upstream.started).toBe(0)
+	})
+})
+
+describe('ledger snapshot fixtures', () => {
+	it('scripts a failing history lookup and lookup-only calls after the snapshot', () => {
+		expect(
+			LEDGER_REPLAY_FIXTURE.after.flatMap((turn) =>
+				(splitTurn(turn).result.tools ?? []).map((call) => call.name),
+			),
+		).toEqual(['lookup'])
+		expect(
+			LEDGER_REPLAY_FIXTURE.before.flatMap((turn) =>
+				(splitTurn(turn).result.tools ?? []).map((call) => [call.name, call.arguments.id]),
+			),
+		).toEqual([
+			['lookup', 'BW-20931'],
+			['lookup', 'FX-111'],
+		])
+		expect(LEDGER_REPLAY_FIXTURE.history).toHaveLength(2)
+	})
+
+	it('builds replay options whose reader files any text under the owner and whose judge records each key', async () => {
+		const asked = createRecorder<readonly [key: string]>()
+		const options = buildLedgerReplayOptions(asked)
+		const lookup = requireValue(options.lookups?.[0])
+		expect(LEDGER_REPLAY_FIXTURE.failure).toContain('BW-20931')
+		expect(lookup.read({ id: 'FX-111' }, LEDGER_REPLAY_FIXTURE.failure)).toEqual({
+			ids: ['BW-20931'],
+			owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+		})
+		const result = await options.judge.ask(
+			{
+				state: 'user: Refunds above $100 need a manager.',
+				questions: { rule: LEDGER_QUESTIONS.category },
+			},
+			new AbortController().signal,
+		)
+		expect(result.answers.rule).toEqual({ form: 'choice', probabilities: { rule: 1 } })
+		expect(asked.calls).toEqual([['rule']])
+		expect(options.gauge).toEqual({ scale: 1, overhead: 0 })
+	})
+
+	it('serves the seeded history, reports one request alone, and hydrates a replay ledger', async () => {
+		const replay = await serveLedgerHistory()
+		const served = replay.ledger.conversation.messages()
+		expect(
+			served.slice(0, LEDGER_REPLAY_FIXTURE.seed.length).map((message) => message.content),
+		).toEqual(LEDGER_REPLAY_FIXTURE.seed.map((message) => message.content))
+		const snapshot = replay.ledger.snapshot()
+		const selected = replay.selections.count
+		const asked = replay.asked.count
+		const result = await serveLedgerReplay(replay, LEDGER_REPLAY_FIXTURE.request)
+		expect(result.selections).toHaveLength(replay.selections.count - selected)
+		expect(result.selections.at(-1)).toBe(replay.selections.calls.at(-1)?.[0])
+		expect(result.keys).toHaveLength(replay.asked.count - asked)
+		const hydrated = createLedgerReplay(snapshot)
+		expect(hydrated.ledger.conversation.messages()).toEqual(served)
+		expect(hydrated.ledger.gauge).toEqual(snapshot.gauge)
+		expect(hydrated.selections.count).toBe(0)
+	})
+
+	it('translates message ids by conversation position and leaves unmatched ids alone', () => {
+		const from: readonly Message[] = [
+			{ id: 'one', role: 'user', content: 'x' },
+			{ id: 'two', role: 'user', content: 'x' },
+			{ id: 'three', role: 'user', content: 'x' },
+		]
+		const to: readonly Message[] = [
+			{ id: 'one', role: 'user', content: 'x' },
+			{ id: 'nine', role: 'user', content: 'x' },
+		]
+		expect(translateLedgerIds({ ids: ['one', 'two', 'three'] }, from, to)).toBe(
+			JSON.stringify({ ids: ['one', 'nine', 'three'] }),
+		)
+	})
+
+	it('holds a seed snapshot whose marks name its messages by role', () => {
+		const roles = new Map(
+			LEDGER_SNAPSHOT_SEED.conversation.messages.map((message) => [message.id, message.role]),
+		)
+		expect(isConversationSnapshot(LEDGER_SNAPSHOT_SEED.conversation)).toBe(true)
+		expect(LEDGER_SNAPSHOT_SEED.requests.map((id) => roles.get(id))).toEqual(['user'])
+		expect(LEDGER_SNAPSHOT_SEED.notes.map((id) => roles.get(id))).toEqual(['user'])
+		expect(LEDGER_SNAPSHOT_SEED.failures.map((id) => roles.get(id))).toEqual(['tool'])
+	})
+
+	it('builds typed refusals and hostile cases under unique titles', () => {
+		const refusals = buildLedgerSnapshotRefusals()
+		const cases = createInvalidLedgerSnapshotCases()
+		expect(new Set(cases.map(([title]) => title)).size).toBe(cases.length)
+		expect(cases.slice(0, refusals.length).map(([title]) => title)).toEqual(
+			refusals.map(([title]) => title),
+		)
+		expect(refusals.map(([, snapshot]) => snapshot)).not.toContainEqual(LEDGER_SNAPSHOT_SEED)
+		const hostile = new Map(cases)
+		expect(() => JSON.stringify(hostile.get('a throwing getter'))).toThrow(TypeError)
+		expect(() => JSON.stringify(hostile.get('a revoked proxy'))).toThrow(TypeError)
 	})
 })

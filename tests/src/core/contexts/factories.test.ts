@@ -1,15 +1,19 @@
-import type { InstructionInterface, ScopeInterface } from '@src/core'
+import type { InstructionInterface, Memo, ScopeInterface, Skill } from '@src/core'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
 	createAgentContext,
 	createInstruction,
 	createInstructionManager,
+	createMemoManager,
 	createScope,
 	createScopeManager,
+	createSkillManager,
 	Instruction,
 	InstructionManager,
+	MemoManager,
 	Scope,
 	ScopeManager,
+	SkillManager,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createRecorder } from '@orkestrel/test'
@@ -150,6 +154,108 @@ describe('createScopeManager', () => {
 		const scope = manager.add({ name: 'reader' })
 
 		expect(manager.scope(scope.id)).toBe(scope)
+		expect(errors.calls).toEqual([[expect.any(Error), 'add']])
+	})
+})
+
+describe('createMemoManager', () => {
+	it('returns an empty MemoManager on the built-in framing', () => {
+		const manager = createMemoManager()
+
+		expect(manager).toBeInstanceOf(MemoManager)
+		expect(manager.count).toBe(0)
+		expect(manager.open).toBe('## Memos')
+		expect(manager.close).toBeUndefined()
+	})
+
+	it('returns an independent manager per call', () => {
+		const first = createMemoManager()
+		const second = createMemoManager()
+		first.add({ name: 'tone', description: 'Short replies.', content: 'Answer briefly.' })
+
+		expect(first).not.toBe(second)
+		expect(first.id).not.toBe(second.id)
+		expect(second.count).toBe(0)
+	})
+
+	it('forwards the id, the on hooks, and the format override', () => {
+		const added = createRecorder<[memo: Memo]>()
+		const manager = createMemoManager({
+			id: 'ada',
+			on: { add: added.handler },
+			format: { open: '<memos>', close: '</memos>' },
+		})
+
+		const memo = manager.add({ name: 'tone', description: 'Short replies.', content: 'v1' })
+
+		expect(manager.id).toBe('ada')
+		expect(added.calls).toEqual([[memo]])
+		expect([manager.open, manager.close]).toEqual(['<memos>', '</memos>'])
+	})
+
+	it('forwards the error handler that receives a listener throw', () => {
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
+		const manager = createMemoManager({ error: errors.handler })
+		manager.emitter.on('add', () => {
+			throw new Error('the add observer failed')
+		})
+
+		manager.add({ name: 'tone', description: 'Short replies.', content: 'v1' })
+
+		expect(errors.calls).toEqual([[expect.any(Error), 'add']])
+	})
+
+	it('restores a snapshot', () => {
+		const source = createMemoManager({ id: 'ada' })
+		source.add({ name: 'tone', description: 'Short replies.', content: 'v1' })
+
+		const restored = createMemoManager({ snapshot: source.snapshot() })
+
+		expect(restored.snapshot()).toEqual(source.snapshot())
+	})
+})
+
+describe('createSkillManager', () => {
+	it('returns an empty SkillManager on the built-in framing', () => {
+		const manager = createSkillManager()
+
+		expect(manager).toBeInstanceOf(SkillManager)
+		expect(manager.count).toBe(0)
+		expect(manager.open).toBe('## Skills')
+		expect(manager.close).toBeUndefined()
+	})
+
+	it('returns an independent manager per call', () => {
+		const first = createSkillManager()
+		const second = createSkillManager()
+		first.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+
+		expect(first).not.toBe(second)
+		expect(second.count).toBe(0)
+	})
+
+	it('forwards the on hooks and the format override', () => {
+		const added = createRecorder<[skill: Skill]>()
+		const manager = createSkillManager({
+			on: { add: added.handler },
+			format: { render: (skill) => `* ${skill.name}` },
+		})
+
+		const skill = manager.add({ name: 'review', description: 'Reviews.', content: 'Read.' })
+
+		expect(added.calls).toEqual([[skill]])
+		expect(manager.render(skill)).toBe('* review')
+	})
+
+	it('forwards the error handler that receives a listener throw', () => {
+		const errors = createRecorder<readonly [error: unknown, event: string]>()
+		const manager = createSkillManager({ error: errors.handler })
+		manager.emitter.on('add', () => {
+			throw new Error('the add observer failed')
+		})
+
+		manager.add({ name: 'review', description: 'Reviews.', content: 'Read.' })
+
 		expect(errors.calls).toEqual([[expect.any(Error), 'add']])
 	})
 })

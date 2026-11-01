@@ -7,7 +7,7 @@ import type { Message } from '../types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type { ToolManagerInterface } from '@orkestrel/tool'
-import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
+import type { FileInput, FileInterface, WorkspaceManagerInterface } from '@orkestrel/workspace'
 
 /**
  * Represents an immutable instruction — a named directive a richer context places between the
@@ -181,7 +181,7 @@ export interface InstructionManagerInterface {
  * blank-line (`\n\n`) joined — so `open` + `close` together let you wrap the whole
  * group (for example `open: '<instructions>'` … `close: '</instructions>'`). `open` is the
  * section's leading text (the header, or a group's opening tag); `render` turns one section
- * item (an {@link InstructionInterface}) into its prompt text; `close` is the trailing text.
+ * item (an instruction, a memo, or a skill) into its prompt text; `close` is the trailing text.
  * `open` and `render` cascade through the
  * built-in floor (`open` ⇒ the manager's built-in header, `render` ⇒ the manager's built-in
  * rendering); `close` has no built-in, so an unset `close` yields no closing line.
@@ -409,6 +409,314 @@ export interface ScopeManagerInterface {
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
 	/** Removes every scope. */
+	clear(): void
+}
+
+/**
+ * Holds one memo revision: a durable fact kept across conversations.
+ *
+ * @remarks
+ * A {@link MemoManagerInterface} mints each revision from a {@link MemoInput} and never mutates
+ * it. `name` keys the memo: a same-name `add` whose `description` or `content` changed supersedes
+ * the memo with a later revision, and the earlier revision stays readable through `history`. A
+ * revision's number is its position in `history(name)`, so no member stores it.
+ */
+export interface Memo {
+	/** Identifies this revision; the manager mints a fresh one per revision. */
+	readonly id: string
+	/** Keys the memo; a same-name `add` supersedes it. */
+	readonly name: string
+	/** Holds the one-line entry the memo index shows. */
+	readonly description: string
+	/** Holds the body: the fact, why it holds, and how to apply it. */
+	readonly content: string
+	/** Records `Date.now()` at the revision's `add`, as `Judgment.time` does. */
+	readonly time: number
+	/** Names where the revision came from; present only when the input supplied it. */
+	readonly origin?: MemoOrigin
+}
+
+/** Names where a memo revision came from: a conversation and, optionally, one of its messages. */
+export interface MemoOrigin {
+	/** Holds the id of the conversation the revision came from. */
+	readonly conversation: string
+	/** Holds the id of the message the revision came from. */
+	readonly message?: string
+}
+
+/**
+ * Carries the data to author a {@link Memo} revision; the {@link MemoManagerInterface} that
+ * stores it mints the `id` and records the `time`.
+ */
+export interface MemoInput {
+	readonly name: string
+	readonly description: string
+	readonly content: string
+	/** Names where the revision came from; it never makes a revision on its own. */
+	readonly origin?: MemoOrigin
+}
+
+/**
+ * Holds every revision of a memo set, oldest first; the current memo of a name is its last
+ * revision.
+ *
+ * @remarks
+ * A {@link MemoManagerInterface} returns one from `snapshot()` and restores one through the
+ * {@link MemoManagerOptions} `snapshot` option. It is plain data, so a JSON round trip keeps it
+ * whole.
+ */
+export interface MemoSnapshot {
+	/** Identifies the memo set. */
+	readonly id: string
+	/** Lists every revision, oldest first. */
+	readonly memos: readonly Memo[]
+}
+
+/**
+ * Maps the push observation surface of a {@link MemoManagerInterface}: the mutation moments a
+ * fire-and-forget observer subscribes to through `manager.emitter.on`.
+ *
+ * @remarks
+ * `add` carries the appended revision, and an unchanged re-add emits nothing; `remove` carries
+ * the removed memo's `name`; `clear` is a pure signal (no payload). The emitter isolates a
+ * listener throw and routes it to its `error` handler. A `type` alias so it satisfies `EventMap`
+ * structurally.
+ */
+export type MemoManagerEventMap = {
+	/** Reports a revision appended: the revision. */
+	readonly add: readonly [memo: Memo]
+	/** Reports a memo removed with its whole history: its `name`. */
+	readonly remove: readonly [name: string]
+	/** Reports every memo removed. */
+	readonly clear: readonly []
+}
+
+/**
+ * Configures `createMemoManager`: the memo set's identity, the reserved `on` hooks, a section
+ * format override, and a snapshot to restore.
+ *
+ * @remarks
+ * `id` names the memo set, for example a user or a project the host chooses; omitted ⇒ a minted
+ * UUID. `snapshot` seeds the revisions, and a `snapshot.id` wins over `id`. Restoring is silent
+ * (no events, because nothing was edited). `format` is the manager-options level of the build
+ * cascade: it beats the built-in `open` and `render`.
+ */
+export interface MemoManagerOptions {
+	readonly id?: string
+	readonly on?: EmitterHooks<MemoManagerEventMap>
+	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
+	readonly error?: EmitterErrorHandler
+	/** Holds a manager-level format override that beats the built-in; see {@link AgentContextInterface.build}. */
+	readonly format?: ContextSectionFormat<Memo>
+	/** Holds the revisions to restore, oldest first. */
+	readonly snapshot?: MemoSnapshot
+}
+
+/**
+ * Registers {@link Memo} revisions keyed by `name`: `add` appends a revision when the text
+ * changed, `memo(name)` returns the current revision, and `history(name)` lists every revision.
+ *
+ * @remarks
+ * - **Revisions.** A same-name `add` whose `description` or `content` changed appends a revision
+ *   with a fresh `id` and emits `add`. Re-adding unchanged text returns the current revision and
+ *   emits nothing; a changed `origin` alone makes no revision.
+ * - **Removal.** `remove` forgets a memo and its whole history, so a re-added name starts a fresh
+ *   history. `clear` forgets every memo.
+ * - **Build contract.** `open` is the section header, `render(memo)` renders one index line, and
+ *   `close` is the trailing line, each resolved through the manager-options `format` and the
+ *   built-in.
+ * - **Observable.** The owned `emitter` ({@link MemoManagerEventMap}) carries `add` / `remove` /
+ *   `clear`; the emitter isolates a listener throw and routes it to its `error` handler.
+ */
+export interface MemoManagerInterface {
+	/** Identifies the memo set: the snapshot's `id`, else the `id` option, else a minted UUID. */
+	readonly id: string
+	readonly emitter: EmitterInterface<MemoManagerEventMap>
+	/** Counts the memo names held. */
+	readonly count: number
+	/** Names the section header: the manager-options `open`, else the built-in `'## Memos'`. */
+	readonly open: string
+	/** Holds the line after the memos: the manager-options `close`, or `undefined` when none. */
+	readonly close: string | undefined
+	/**
+	 * Adds one {@link MemoInput}, or a batch, appending a revision only when the name holds no
+	 * current revision with the same `description` and `content`.
+	 *
+	 * @remarks
+	 * A batch runs in input order, each input compared against the state the inputs before it
+	 * left.
+	 *
+	 * @param input - One {@link MemoInput}, or a batch
+	 * @returns The appended or unchanged current revision, or the batch's results in input order
+	 */
+	add(input: MemoInput): Memo
+	add(inputs: readonly MemoInput[]): readonly Memo[]
+	/**
+	 * Looks up the current revision of one memo (`undefined` when absent).
+	 *
+	 * @param name - The memo name to look up
+	 * @returns The name's last revision, or `undefined` when absent
+	 */
+	memo(name: string): Memo | undefined
+	/**
+	 * Lists the current revision of every memo, ordered by each name's first revision.
+	 *
+	 * @returns Each name's last revision
+	 */
+	memos(): readonly Memo[]
+	/**
+	 * Lists every revision of one memo, oldest first.
+	 *
+	 * @param name - The memo name to look up
+	 * @returns A fresh array of the name's revisions, `[]` for an unknown name
+	 */
+	history(name: string): readonly Memo[]
+	/**
+	 * Renders one memo's index line: the manager-options `render`, else `- name: description`.
+	 *
+	 * @param memo - The memo to render
+	 * @returns The memo's prompt text
+	 */
+	render(memo: Memo): string
+	/**
+	 * Removes one memo and its whole history by name, or a batch. True if every supplied name was
+	 * removed; false otherwise.
+	 *
+	 * @param name - One memo name, or a batch
+	 * @returns True if every supplied name was present and removed; false otherwise
+	 */
+	remove(name: string): boolean
+	remove(names: readonly string[]): boolean
+	/** Removes every memo. */
+	clear(): void
+	/**
+	 * Returns the memo set as plain data: its `id` and every revision, oldest first.
+	 *
+	 * @returns A fresh {@link MemoSnapshot}
+	 */
+	snapshot(): MemoSnapshot
+}
+
+/**
+ * Holds one skill: a name and a description the index shows, the instructions loading adds, and
+ * bundled files.
+ *
+ * @remarks
+ * A {@link SkillManagerInterface} mints it from a {@link SkillInput} and never mutates it. Its
+ * `files` are immutable `@orkestrel/workspace` file values.
+ */
+export interface Skill {
+	/** Identifies the skill; the manager mints a fresh one per `add`. */
+	readonly id: string
+	/** Keys the skill; a same-name `add` replaces it. */
+	readonly name: string
+	/** Holds the one-line entry the skill index shows. */
+	readonly description: string
+	/** Holds the instructions loading the skill adds. */
+	readonly content: string
+	/** Lists the bundled files. */
+	readonly files: readonly FileInterface[]
+}
+
+/**
+ * Carries the data to author a {@link Skill}; the {@link SkillManagerInterface} that stores it
+ * mints the `id` and each file.
+ */
+export interface SkillInput {
+	readonly name: string
+	readonly description: string
+	readonly content: string
+	/** Lists the bundled files to mint with `createFile`. Default: none. */
+	readonly files?: readonly FileInput[]
+}
+
+/**
+ * Maps the push observation surface of a {@link SkillManagerInterface}, as
+ * {@link InstructionManagerEventMap} does for instructions.
+ *
+ * @remarks
+ * `add` carries the created (or replaced) {@link Skill}; `remove` carries the removed skill's
+ * `name`; `clear` is a pure signal. The emitter isolates a listener throw and routes it to its
+ * `error` handler. A `type` alias so it satisfies `EventMap` structurally.
+ */
+export type SkillManagerEventMap = {
+	/** Reports a skill added (or a same-name one replaced): the created skill. */
+	readonly add: readonly [skill: Skill]
+	/** Reports a skill removed: its `name`. */
+	readonly remove: readonly [name: string]
+	/** Reports every skill removed. */
+	readonly clear: readonly []
+}
+
+/** Configures `createSkillManager`: the reserved `on` hooks and a section format override. */
+export interface SkillManagerOptions {
+	readonly on?: EmitterHooks<SkillManagerEventMap>
+	/** Holds the emitter's listener-error handler — a listener throw routes here, not to a domain event. */
+	readonly error?: EmitterErrorHandler
+	/** Holds a manager-level format override that beats the built-in; see {@link AgentContextInterface.build}. */
+	readonly format?: ContextSectionFormat<Skill>
+}
+
+/**
+ * Registers {@link Skill} values keyed by `name`: `add` mints each skill and overwrites a
+ * same-name skill, last write wins, while `skills()` lists them in insertion order.
+ *
+ * @remarks
+ * - **Registry.** A same-name `add` replaces the stored skill, mints a fresh `id`, keeps the
+ *   name's position, and emits `add`. The host supplies skills and Agent persists none, so the
+ *   manager carries no `history` and no `snapshot`.
+ * - **Build contract.** `open` is the section header, `render(skill)` renders one index line, and
+ *   `close` is the trailing line, each resolved through the manager-options `format` and the
+ *   built-in.
+ * - **Observable.** The owned `emitter` ({@link SkillManagerEventMap}) carries `add` / `remove` /
+ *   `clear`; the emitter isolates a listener throw and routes it to its `error` handler.
+ */
+export interface SkillManagerInterface {
+	readonly emitter: EmitterInterface<SkillManagerEventMap>
+	readonly count: number
+	/** Names the section header: the manager-options `open`, else the built-in `'## Skills'`. */
+	readonly open: string
+	/** Holds the line after the skills: the manager-options `close`, or `undefined` when none. */
+	readonly close: string | undefined
+	/**
+	 * Adds one {@link SkillInput}, or a batch: mints each `id` and file, and overwrites a
+	 * same-name skill, last write wins.
+	 *
+	 * @param input - One {@link SkillInput}, or a batch
+	 * @returns The stored skill, or the stored batch in input order
+	 */
+	add(input: SkillInput): Skill
+	add(inputs: readonly SkillInput[]): readonly Skill[]
+	/**
+	 * Looks up one skill by name (`undefined` when absent).
+	 *
+	 * @param name - The skill name to look up
+	 * @returns The stored skill, or `undefined` when absent
+	 */
+	skill(name: string): Skill | undefined
+	/**
+	 * Lists every skill, in insertion order.
+	 *
+	 * @returns Every stored skill
+	 */
+	skills(): readonly Skill[]
+	/**
+	 * Renders one skill's index line: the manager-options `render`, else `- name: description`.
+	 *
+	 * @param skill - The skill to render
+	 * @returns The skill's prompt text
+	 */
+	render(skill: Skill): string
+	/**
+	 * Removes one skill by name, or a batch. True if every supplied name was removed; false
+	 * otherwise.
+	 *
+	 * @param name - One skill name, or a batch
+	 * @returns True if every supplied name was present and removed; false otherwise
+	 */
+	remove(name: string): boolean
+	remove(names: readonly string[]): boolean
+	/** Removes every skill. */
 	clear(): void
 }
 

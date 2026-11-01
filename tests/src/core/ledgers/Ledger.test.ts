@@ -1,4 +1,4 @@
-import type { MessageInput, Selection, ThinkingReplay } from '@src/core'
+import type { LedgerSnapshot, MessageInput, Selection, ThinkingReplay } from '@src/core'
 import {
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
@@ -6,15 +6,27 @@ import {
 	createLedger,
 	createScope,
 	estimateMessages,
+	isAgentError,
 	isLedgerError,
+	isLedgerSnapshot,
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
 import { isString } from '@orkestrel/contract'
 import { OllamaProvider } from '@orkestrel/ollama'
 import { createTool } from '@orkestrel/tool'
-import { createRecorder, requireValue, waitForEvent } from '@orkestrel/test'
-import { describe, expect, it } from 'vitest'
+import { captureError, createRecorder, requireValue, waitForEvent } from '@orkestrel/test'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
+	LEDGER_REPLAY_FIXTURE,
+	LEDGER_SNAPSHOT_SEED,
+	buildLedgerReplayOptions,
+	buildLedgerSnapshotRefusals,
+	computeLedgerErrorCode,
+	createGatedProvider,
+	createLedgerReplay,
+	serveLedgerHistory,
+	serveLedgerReplay,
+	translateLedgerIds,
 	buildDeliverySeed,
 	buildLedgerOptions,
 	buildLedgerResponse,
@@ -3102,5 +3114,248 @@ describe('Ledger — the request copy', () => {
 		expect(
 			answer.messages.some((message) => message.role === 'tool' || message.calls !== undefined),
 		).toBe(false)
+	})
+})
+
+describe('Ledger — snapshot and hydrate', () => {
+	it('replays the next request with the selections and judge keys of the uninterrupted ledger', async () => {
+		const parent = await serveLedgerHistory()
+		const snapshot = parent.ledger.snapshot()
+		const served = await serveLedgerReplay(parent, LEDGER_REPLAY_FIXTURE.request)
+		const child = createLedgerReplay(snapshot)
+		const replayed = await serveLedgerReplay(child, LEDGER_REPLAY_FIXTURE.request)
+		const from = child.ledger.conversation.messages()
+		const to = parent.ledger.conversation.messages()
+		expect(from).toHaveLength(to.length)
+		expect(served.selections).not.toEqual([])
+		expect(served.keys).not.toEqual([])
+		expect(translateLedgerIds(replayed.selections, from, to)).toBe(
+			JSON.stringify(served.selections),
+		)
+		expect(translateLedgerIds(replayed.keys, from, to)).toBe(JSON.stringify(served.keys))
+	})
+
+	it('differs from the uninterrupted ledger when the hydrated failures, requests, or notes are emptied', async () => {
+		const parent = await serveLedgerHistory()
+		const snapshot = parent.ledger.snapshot()
+		const served = await serveLedgerReplay(parent, LEDGER_REPLAY_FIXTURE.request)
+		const expected = JSON.stringify(served.selections)
+		const differs: Array<readonly [string, boolean, boolean]> = []
+		for (const [title, emptied] of [
+			['failures', { ...snapshot, failures: [] }],
+			['requests', { ...snapshot, requests: [] }],
+			['notes', { ...snapshot, notes: [] }],
+		] as const) {
+			const child = createLedgerReplay(emptied)
+			const replayed = await serveLedgerReplay(child, LEDGER_REPLAY_FIXTURE.request)
+			const text = translateLedgerIds(
+				replayed.selections,
+				child.ledger.conversation.messages(),
+				parent.ledger.conversation.messages(),
+			)
+			differs.push([title, snapshot[title].length > 0, text !== expected])
+		}
+		expect(differs).toEqual([
+			['failures', true, true],
+			['requests', true, true],
+			['notes', true, true],
+		])
+	})
+
+	it('round-trips the snapshot through JSON with each id list in conversation order', async () => {
+		const parent = await serveLedgerHistory()
+		const snapshot = parent.ledger.snapshot()
+		const parsed: unknown = JSON.parse(JSON.stringify(snapshot))
+		expect(parsed).toEqual(snapshot)
+		expect(isLedgerSnapshot(parsed)).toBe(true)
+		const hydrated = createLedgerReplay(requireValue(isLedgerSnapshot(parsed) ? parsed : undefined))
+		expect(hydrated.ledger.snapshot()).toEqual(snapshot)
+		const messages = parent.ledger.conversation.messages()
+		const requests = messages.filter(
+			(message) =>
+				message.role === 'user' && LEDGER_REPLAY_FIXTURE.history.includes(message.content),
+		)
+		const notes = messages.filter(
+			(message) =>
+				message.content === LEDGER_NOTES.cue || message.content.startsWith(LEDGER_NOTES.results),
+		)
+		const failures = messages.filter((message) => message.call === 'second')
+		expect(requests).toHaveLength(2)
+		expect(notes).toHaveLength(2)
+		expect(failures).toHaveLength(1)
+		expect(snapshot.requests).toEqual(requests.map((message) => message.id))
+		expect(snapshot.notes).toEqual(notes.map((message) => message.id))
+		expect(snapshot.failures).toEqual(failures.map((message) => message.id))
+		expect(snapshot.gauge).toEqual({ scale: 1, overhead: 0 })
+		expect(snapshot.conversation.messages).toEqual(messages)
+	})
+
+	it('refuses snapshot with CONCURRENCY while a respond or calibrate call is in flight', async () => {
+		const gate = Promise.withResolvers<void>()
+		const ledger = createLedger(createGatedProvider(gate), buildLedgerOptions())
+		const pending = ledger.respond('Held request.')
+		const responding = captureError(() => ledger.snapshot())
+		gate.resolve()
+		await pending
+		expect(isAgentError(responding)).toBe(true)
+		expect(responding).toMatchObject({ code: 'CONCURRENCY' })
+		const request = requireValue(
+			ledger.conversation.messages().find((message) => message.content === 'Held request.'),
+		)
+		expect(ledger.snapshot().requests).toEqual([request.id])
+		const calibrating = createLedger(
+			createScriptedProvider(
+				[
+					{ content: '', usage: { prompt: 30, completion: 1, total: 31 } },
+					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+				],
+				{ delay: 10 },
+			),
+			buildUncalibratedOptions(buildLedgerOptions()),
+		)
+		const measured = calibrating.calibrate(new AbortController().signal)
+		const measuring = captureError(() => calibrating.snapshot())
+		const gauge = await measured
+		expect(isAgentError(measuring)).toBe(true)
+		expect(measuring).toMatchObject({ code: 'CONCURRENCY' })
+		expect(calibrating.snapshot().gauge).toEqual(gauge)
+	})
+
+	it('files a pending failed tool result before capturing the snapshot', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([
+				{ content: '', tools: [{ id: 'direct', name: 'lookup', arguments: { id: 'FX-111' } }] },
+			]),
+			{
+				...buildLedgerReplayOptions(createRecorder<readonly [key: string]>()),
+				agent: { limit: 1 },
+			},
+		)
+		ledger.conversation.add({ role: 'user', content: 'Check order FX-111.' })
+		await ledger.agent.generate()
+		const failure = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'direct'),
+		)
+		expect(failure.content).toBe(LEDGER_REPLAY_FIXTURE.failure)
+		expect(ledger.snapshot().failures).toEqual([failure.id])
+	})
+
+	it('keeps the judgments completed before a judge abort and reads them as cached after hydrating', async () => {
+		const options = buildLedgerOptions()
+		const controller = new AbortController()
+		const transport: RecordedTransport = new RecordedTransport(async () => {
+			if (transport.requests.length === 2) controller.abort()
+			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
+		})
+		const ledger = createLedger(createScriptedProvider([]), {
+			...options,
+			topics: [],
+			judge: new SequentialSystemOneJudge({
+				url: 'http://judge.test',
+				model: 'filing',
+				batch: false,
+				fetch: transport.fetch,
+			}),
+		})
+		const seeded = ledger.conversation.add([
+			{ role: 'user', content: 'First.' },
+			{ role: 'user', content: 'Second.' },
+		])
+		expect((await ledger.respond('Request.', controller.signal)).partial).toBe(true)
+		const key = JSON.stringify(['category', requireValue(seeded[0]).id])
+		const snapshot = ledger.snapshot()
+		expect(snapshot.conversation.judgments?.map((judgment) => judgment.id)).toContain(key)
+		const next: RecordedTransport = new RecordedTransport(async () =>
+			buildLedgerResponse(requireValue(next.requests.at(-1))),
+		)
+		const hydrated = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
+			...options,
+			topics: [],
+			judge: new SequentialSystemOneJudge({
+				url: 'http://judge.test',
+				model: 'filing',
+				batch: false,
+				fetch: next.fetch,
+			}),
+			snapshot,
+		})
+		const result = await hydrated.respond('Next request.')
+		expect(summarizeReadings(result.readings)).toContainEqual({
+			key,
+			phase: 'category',
+			outcome: 'cached',
+			duration: 'absent',
+		})
+	})
+
+	it('refuses each mis-marked or out-of-bounds typed snapshot with SNAPSHOT', () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }])
+		const options = buildLedgerOptions()
+		const refusals = buildLedgerSnapshotRefusals()
+		expect(
+			refusals.map(([title, snapshot]) => [
+				title,
+				computeLedgerErrorCode(() => createLedger(provider, { ...options, snapshot })),
+			]),
+		).toEqual(refusals.map(([title]) => [title, 'SNAPSHOT']))
+	})
+
+	it('hydrates the snapshot gauge without a calibration call when the options supply none', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, {
+			...buildUncalibratedOptions(buildLedgerOptions()),
+			snapshot: LEDGER_SNAPSHOT_SEED,
+		})
+		expect(ledger.gauge).toEqual(LEDGER_SNAPSHOT_SEED.gauge)
+		expect((await ledger.respond('Next request.')).content).toBe('Done.')
+		expect(provider.calls).toHaveLength(1)
+		expect(requireValue(provider.calls[0]).messages.at(-1)?.content).toContain('Next request.')
+	})
+
+	it('keeps the gauge option over the snapshot gauge', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const options = buildLedgerOptions()
+		const ledger = createLedger(provider, { ...options, snapshot: LEDGER_SNAPSHOT_SEED })
+		expect(ledger.gauge).toEqual(options.gauge)
+		await ledger.respond('Next request.')
+		expect(provider.calls).toHaveLength(1)
+		expect(ledger.gauge).toEqual(options.gauge)
+	})
+
+	it('calibrates before the first request when neither the options nor a snapshot supply a gauge', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', usage: { prompt: 30, completion: 1, total: 31 } },
+				{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildUncalibratedOptions(buildLedgerOptions()))
+		expect(ledger.gauge).toBeUndefined()
+		await ledger.respond('First request.')
+		expect(provider.calls).toHaveLength(3)
+		expect(ledger.gauge?.overhead).toBe(20)
+	})
+
+	it('forks two ledgers hydrated from one snapshot without changing each other or the parent', async () => {
+		const parent = await serveLedgerHistory()
+		const snapshot = parent.ledger.snapshot()
+		const left = createLedgerReplay(snapshot)
+		const right = createLedgerReplay(snapshot)
+		await left.ledger.respond(LEDGER_REPLAY_FIXTURE.request)
+		expect(left.ledger.conversation.count).toBeGreaterThan(snapshot.conversation.messages.length)
+		expect(right.ledger.snapshot()).toEqual(snapshot)
+		const forked = left.ledger.snapshot()
+		await right.ledger.respond(LEDGER_REPLAY_FIXTURE.request)
+		expect(right.ledger.conversation.count).toBeGreaterThan(snapshot.conversation.messages.length)
+		expect(left.ledger.snapshot()).toEqual(forked)
+		expect(parent.ledger.snapshot()).toEqual(snapshot)
+	})
+
+	it('pins the snapshot members with no version field', () => {
+		expectTypeOf<keyof LedgerSnapshot>().toEqualTypeOf<
+			'conversation' | 'requests' | 'notes' | 'failures' | 'gauge'
+		>()
 	})
 })

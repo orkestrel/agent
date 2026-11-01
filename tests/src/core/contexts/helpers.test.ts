@@ -1,4 +1,4 @@
-import type { Message } from '@src/core'
+import type { Memo, Message } from '@src/core'
 import type { FileInterface } from '@orkestrel/workspace'
 import {
 	attachImages,
@@ -6,6 +6,7 @@ import {
 	collectImageData,
 	renderFencedFile,
 	intersectKeys,
+	renderIndexEntry,
 	renderSection,
 } from '@src/core'
 import { captureError } from '@orkestrel/test'
@@ -94,6 +95,33 @@ describe('renderSection — one assembled context section', () => {
 
 	it('renders nothing when every slot is empty', () => {
 		expect(renderSection('', [''], (one) => one, '')).toBeUndefined()
+	})
+})
+
+describe('renderIndexEntry — one memo or skill index line', () => {
+	it('renders the name and the description as one list line', () => {
+		expect(renderIndexEntry({ name: 'tone', description: 'Prefers short replies.' })).toBe(
+			'- tone: Prefers short replies.',
+		)
+	})
+
+	it('renders a description verbatim, a line break and an empty text included', () => {
+		expect(renderIndexEntry({ name: 'tone', description: 'Short.\nPlain.' })).toBe(
+			'- tone: Short.\nPlain.',
+		)
+		expect(renderIndexEntry({ name: 'tone', description: '' })).toBe('- tone: ')
+	})
+
+	it('reads only the name and the description of a full memo', () => {
+		const memo: Memo = {
+			id: 'r1',
+			name: 'tone',
+			description: 'Prefers short replies.',
+			content: 'Answer briefly.',
+			time: 0,
+		}
+
+		expect(renderIndexEntry(memo)).toBe('- tone: Prefers short replies.')
 	})
 })
 

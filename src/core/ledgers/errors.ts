@@ -8,7 +8,8 @@ import { INTRINSICS, holds } from '@orkestrel/contract'
  * @remarks
  * A threshold, share, capacity, limit, topic, lookup, or gauge outside its bounds is a programmer
  * error and throws this with the matching {@link LedgerErrorCode}. A calibration call that reports
- * no prompt usage throws this with `'GAUGE'`. Narrow a caught value with {@link isLedgerError} and
+ * no prompt usage throws this with `'GAUGE'`. A snapshot option that `isLedgerSnapshot` refuses
+ * throws this with `'SNAPSHOT'`. Narrow a caught value with {@link isLedgerError} and
  * branch on `error.code`. A selection without an active `respond` call, or for a request other than
  * that call's request or a ledger note, reports `'REQUEST'` through the selection's fault.
  */
@@ -63,7 +64,8 @@ export function isLedgerError(value: unknown): value is LedgerError {
 				code === 'TOPIC' ||
 				code === 'LOOKUP' ||
 				code === 'GAUGE' ||
-				code === 'REFERENCE'
+				code === 'REFERENCE' ||
+				code === 'SNAPSHOT'
 			)
 		)
 			return false

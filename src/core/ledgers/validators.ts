@@ -1,4 +1,6 @@
-import { isFiniteNumber } from '@orkestrel/contract'
+import type { LedgerSnapshot } from './types.js'
+import { arrayOf, holds, isFiniteNumber, isRecord, isString } from '@orkestrel/contract'
+import { isConversationSnapshot } from '../conversations/validators.js'
 
 /**
  * Checks whether a value is finite and lies in the interval (0, 1].
@@ -24,4 +26,46 @@ export function isFraction(value: unknown): value is number {
  */
 export function isPositiveSafeInteger(value: unknown): value is number {
 	return isFiniteNumber(value) && Number.isSafeInteger(value) && value > 0
+}
+
+/**
+ * Checks whether a value is a ledger snapshot whose marked ids name messages of its own conversation.
+ *
+ * @remarks
+ * `conversation` must pass `isConversationSnapshot`, and `requests`, `notes`, and `failures` must be
+ * dense arrays of strings. Each request and note id must name a `user` message of
+ * `conversation.messages` and each failure id a `tool` message, so an id only a section original
+ * holds is refused. A `gauge`, when present, must hold a finite `scale` greater than 0 and a finite
+ * `overhead` of at least 0. Unknown members are admitted. Unreadable members and hostile inputs
+ * return false.
+ *
+ * @param value - The value to inspect, such as a parsed checkpoint
+ * @returns True if a ledger hydrates from the value; false otherwise
+ * @example
+ * ```ts
+ * const conversation = { id: 'c1', sections: [], messages: [{ id: 'm1', role: 'user', content: 'Check FX-111.' }] }
+ * isLedgerSnapshot({ conversation, requests: ['m1'], notes: [], failures: [] }) // true
+ * isLedgerSnapshot({ conversation, requests: [], notes: [], failures: ['m1'] }) // false
+ * ```
+ */
+export function isLedgerSnapshot(value: unknown): value is LedgerSnapshot {
+	return holds(() => {
+		if (!isRecord(value)) return false
+		const { conversation, requests, notes, failures, gauge } = value
+		if (!isConversationSnapshot(conversation)) return false
+		const isIds = arrayOf(isString)
+		if (!isIds(requests) || !isIds(notes) || !isIds(failures)) return false
+		if (gauge !== undefined) {
+			if (!isRecord(gauge)) return false
+			const { scale, overhead } = gauge
+			if (!isFiniteNumber(scale) || scale <= 0 || !isFiniteNumber(overhead) || overhead < 0)
+				return false
+		}
+		const roles = new Map(conversation.messages.map((message) => [message.id, message.role]))
+		return (
+			requests.every((id) => roles.get(id) === 'user') &&
+			notes.every((id) => roles.get(id) === 'user') &&
+			failures.every((id) => roles.get(id) === 'tool')
+		)
+	})
 }

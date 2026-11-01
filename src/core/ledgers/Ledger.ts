@@ -18,6 +18,7 @@ import type {
 	LedgerRenderContext,
 	LedgerResult,
 	LedgerShare,
+	LedgerSnapshot,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolContext, ToolResult } from '@orkestrel/tool'
@@ -80,7 +81,7 @@ import {
 	splitTopic,
 	splitSentences,
 } from './helpers.js'
-import { isFraction, isPositiveSafeInteger } from './validators.js'
+import { isFraction, isLedgerSnapshot, isPositiveSafeInteger } from './validators.js'
 
 /**
  * Serves one conversation through classified records, a bounded copy of each request turn that carries them, and a final answer pass.
@@ -114,6 +115,7 @@ export class Ledger implements LedgerInterface {
 	 * @param options - The filing policy, capacity, and request bounds
 	 * @throws {LedgerError} Thrown when a threshold, share, capacity, limit, topic, lookup, or gauge is invalid
 	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
+	 * @throws {LedgerError} Thrown when `snapshot` is malformed or marks an id its conversation does not hold (code `'SNAPSHOT'`)
 	 */
 	constructor(provider: ProviderInterface, options: LedgerOptions) {
 		for (const key of ['category', 'topic', 'correction', 'amends', 'supersedes'] as const) {
@@ -139,20 +141,31 @@ export class Ledger implements LedgerInterface {
 		const lookups = ['recall', ...Array.from(options.lookups ?? [], (lookup) => lookup.tool.name)]
 		if (new Set(lookups).size !== lookups.length)
 			throw new LedgerError('LOOKUP', 'lookup names must be unique and cannot be recall')
+		const snapshot = options.snapshot
+		if (snapshot !== undefined && !isLedgerSnapshot(snapshot))
+			throw new LedgerError(
+				'SNAPSHOT',
+				'snapshot must be well formed and mark only messages of its conversation',
+			)
 		this.#provider = provider
 		this.#replay = provider.replay ?? 'none'
 		this.#options = options
 		this.#share = { ...DEFAULT_LEDGER_SHARE, ...options.share }
-		if (options.gauge !== undefined)
+		const gauge = options.gauge ?? snapshot?.gauge
+		if (gauge !== undefined)
 			this.#gauge = new Gauge({
-				...options.gauge,
+				...gauge,
 				capacity: options.capacity,
 				predict: this.#predict,
 				replay: this.#replay,
 			})
 		const conversations = createConversationManager()
-		this.#conversation = conversations.add()
+		this.#conversation =
+			snapshot === undefined
+				? conversations.add()
+				: conversations.add({ snapshot: snapshot.conversation })
 		conversations.switch(this.#conversation.id)
+		if (snapshot !== undefined) this.#seat(snapshot)
 		this.#classifier = new Classifier({
 			conversation: this.#conversation,
 			judge: options.judge,
@@ -258,6 +271,26 @@ export class Ledger implements LedgerInterface {
 			return await this.#measureGauge(signal)
 		} finally {
 			this.#calibrations.delete(signal)
+		}
+	}
+
+	/**
+	 * Serializes the conversation, the marked ids, and the gauge into a snapshot a later ledger hydrates from.
+	 * @returns The snapshot, each id list in conversation order and `gauge` present once the ledger holds one
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 */
+	snapshot(): LedgerSnapshot {
+		if (this.#busy()) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
+		this.#flush()
+		const conversation = this.#conversation.snapshot()
+		const ids = conversation.messages.map((message) => message.id)
+		const gauge = this.gauge
+		return {
+			conversation,
+			requests: ids.filter((id) => this.#requests.has(id)),
+			notes: ids.filter((id) => this.#annotations.has(id)),
+			failures: ids.filter((id) => this.#results.get(id)?.success === false),
+			...(gauge === undefined ? {} : { gauge }),
 		}
 	}
 
@@ -417,6 +450,27 @@ export class Ledger implements LedgerInterface {
 				this.#results.set(message.id, result)
 				this.#pending.delete(at)
 			}
+		}
+	}
+
+	// Seats the hydrated marks. A failure is rebuilt as the result the agent's `tool` event carried:
+	// its error is the tool message's content, and its name is the call's, or `tool` when no call
+	// pairs with it, as a tail stub names it.
+	#seat(snapshot: LedgerSnapshot): void {
+		for (const id of snapshot.requests) this.#requests.add(id)
+		for (const id of snapshot.notes) this.#annotations.add(id)
+		const messages = this.#conversation.messages()
+		const groups = collectToolGroups(messages)
+		for (const message of messages) {
+			if (!snapshot.failures.includes(message.id)) continue
+			const group = groups.find((entries) => entries.some((one) => one.id === message.id))
+			const call = group === undefined ? undefined : findLedgerCall(group, message)
+			this.#results.set(message.id, {
+				success: false,
+				id: call?.id ?? message.call ?? message.id,
+				name: call?.name ?? 'tool',
+				error: message.content,
+			})
 		}
 	}
 
