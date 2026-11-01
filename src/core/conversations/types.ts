@@ -84,8 +84,8 @@ export interface JudgmentManagerInterface {
 
 /**
  * Stores immutable {@link Message} records in insertion order and mints each `id` on `add` — the
- * message-store contract {@link AgentContextInterface.messages} is typed to, which the active
- * {@link ConversationInterface} satisfies structurally.
+ * message-store contract every {@link ConversationInterface} satisfies structurally, the
+ * {@link AgentContextInterface.messages} conversation included.
  *
  * @remarks
  * - **Store.** Messages live in insertion order; `count` is how many are stored.
@@ -749,10 +749,11 @@ export interface ConversationManagerOptions {
  *   default `summarize` / `keep` of the manager in unless the `input` overrides them; `add` of an
  *   already-present `id` overwrites it (last write wins). `conversation(id)` looks one up
  *   (`undefined` when absent); `conversations()` lists them in insertion order.
- * - **Active pointer.** `active` is the active conversation (the message source of the agent
- *   that the context renders), `undefined` until the first `add` (which auto-activates it — a
- *   registry with conversations always has one active). A subsequent `add` leaves `active`
- *   unchanged. `switch(id)` re-points `active` to the conversation with `id` and returns it; an
+ * - **Active pointer.** `active` is the active conversation (the conversation an agent run binds
+ *   when it names none, and the one the context renders with no selection), `undefined` until the
+ *   first `add` (which auto-activates it — a registry with conversations always has one active). A
+ *   subsequent `add` leaves `active` unchanged. `switch(id)` re-points `active` to the
+ *   conversation with `id` and returns it, never moving a live run; an
  *   unknown `id` returns `undefined` and leaves `active` unchanged (the lenient lookup style —
  *   never throws, no added error code).
  * - **Removal.** `remove` drops one by id, or a batch — `true` only when every supplied id was
@@ -770,7 +771,7 @@ export interface ConversationManagerOptions {
  */
 export interface ConversationManagerInterface {
 	readonly count: number
-	/** Holds the active conversation — the message source of the agent that the context renders; `undefined` until the first `add`. */
+	/** Holds the active conversation — the conversation an agent run binds when it names none; `undefined` until the first `add`. */
 	readonly active: ConversationInterface | undefined
 	/**
 	 * Looks up one conversation by id (`undefined` when absent).

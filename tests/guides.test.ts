@@ -4,7 +4,11 @@
 
 import type {
 	AgentEventMap,
+	AgentInterface,
 	AgentJobInput,
+	AgentResult,
+	ConversationInterface,
+	ConversationManagerInterface,
 	JudgeAnswer,
 	JudgeRequest,
 	JudgeResult,
@@ -46,6 +50,35 @@ const MODULES = Object.freeze({ [PACKAGE_NAME]: 'src/core', '@src/core': 'src/co
  * here stops being stranded, so the list cannot rot.
  */
 const INTERNAL: readonly string[] = Object.freeze(['class LedgerPass'])
+
+// The server fence's declarations, transcribed byte for byte. They sit at module scope because the
+// fence is consumer code and a function declared inside a case body is a nested function; the
+// cases under `flagship fences` build the fence's session table and call them.
+interface Session {
+	readonly agent: AgentInterface
+	readonly threads: ConversationManagerInterface
+}
+
+// A refused run throws before it starts, so its user turn is dropped before the rethrow.
+function startRun(
+	agent: AgentInterface,
+	thread: ConversationInterface,
+	message: Message,
+): Promise<AgentResult> {
+	try {
+		return agent.generate({ conversation: thread })
+	} catch (error) {
+		thread.remove(message.id)
+		throw error
+	}
+}
+
+// Per request: find or add the thread in the principal's own registry, append the turn, run on it.
+async function handle(session: Session, threadId: string, text: string): Promise<string> {
+	const thread = session.threads.conversation(threadId) ?? session.threads.add({ id: threadId })
+	const message = thread.add({ role: 'user', content: text })
+	return (await startRun(session.agent, thread, message)).content
+}
 
 await new GuideCommand({
 	root: new URL('../', import.meta.url),
@@ -656,7 +689,9 @@ await new GuideCommand({
 
 			const plain = createAgent(provider)
 			const request = plain.context.messages.add({ role: 'user', content: 'Invoice 42.' })
-			expect(plain.context.select(request, new AbortController().signal)).toBeUndefined()
+			expect(
+				plain.context.select(plain.context.messages, request, new AbortController().signal),
+			).toBeUndefined()
 		})
 
 		it('carries the selection fence lines the transcription copies', () => {
@@ -670,7 +705,7 @@ await new GuideCommand({
 				'receipts.map((selection) => selection.messages.length) // [2, 1]',
 			)
 			expect(guideText).toContain(
-				'plain.context.select(request, new AbortController().signal) // undefined — no handler in either home',
+				'plain.context.select(plain.context.messages, request, new AbortController().signal) // undefined — no handler in either home',
 			)
 		})
 
@@ -1303,8 +1338,10 @@ await new GuideCommand({
 			await entered.promise
 			// The answer mode applied for the second run reaches the first run's next turn as well.
 			agent.context.apply(createScope({ name: 'answer', tools: [] }))
-			agent.context.messages.add({ role: 'user', content: 'Answer now.' })
-			const second = await agent.generate()
+			// One live run per conversation: the second run binds its own thread.
+			const thread = agent.context.conversations.add()
+			thread.add({ role: 'user', content: 'Answer now.' })
+			const second = await agent.generate({ conversation: thread })
 			release.resolve()
 			const settled = await first.result
 
@@ -1317,6 +1354,217 @@ await new GuideCommand({
 			])
 			expect(guideText).toContain(
 				'Overlapping runs on one agent share its scope and its default handler, so an `apply` made for one run reaches every run in flight at its next site.',
+			)
+		})
+
+		it('runs the server fence per principal', async () => {
+			// The fence's `provider` and `summarize` come from the host application; the transcription
+			// records the provider's requests and digests through the stub.
+			const provider = createScriptedProvider(
+				[{ content: 'Hello, Ada.' }, { content: '4' }, { content: 'You have not said.' }],
+				{ recorded: true, repeat: false },
+			)
+			const { summarize } = createStubSummarizer()
+
+			// `provider` and `summarize` come from the host application.
+			// The session table: one entry per authenticated principal, held by the application.
+			const sessions = new Map<string, Session>()
+			for (const principal of ['ada', 'grace']) {
+				// Each entry owns its threads and its window; neither is shared across principals.
+				const threads = createConversationManager({ summarize, keep: 2 })
+				const agent = createAgent(provider, {
+					conversations: threads,
+					window: createBudget({ max: 8_000, consumer: estimateRequest }),
+				})
+				sessions.set(principal, { agent, threads })
+			}
+
+			const defaults = [...sessions.values()].map((session) => session.threads.active)
+
+			const ada = sessions.get('ada')
+			const grace = sessions.get('grace')
+			if (ada === undefined || grace === undefined) throw new Error('unknown principal')
+			// Ada's trip thread accumulates and compacts on its own.
+			await handle(ada, 'trip', 'Hi, I am Ada.')
+			// Ada's math thread is independent of her trip thread.
+			await handle(ada, 'math', 'What is 2 + 2?')
+			// The same thread id under Grace is her own thread: it carries none of Ada's turns.
+			await handle(grace, 'trip', 'What did I say my name was?')
+
+			// Each thread holds only its own turns.
+			expect(
+				[
+					ada.threads.conversation('trip'),
+					ada.threads.conversation('math'),
+					grace.threads.conversation('trip'),
+				].map((thread) => thread?.messages().map(({ role, content }) => [role, content])),
+			).toEqual([
+				[
+					['user', 'Hi, I am Ada.'],
+					['assistant', 'Hello, Ada.'],
+				],
+				[
+					['user', 'What is 2 + 2?'],
+					['assistant', '4'],
+				],
+				[
+					['user', 'What did I say my name was?'],
+					['assistant', 'You have not said.'],
+				],
+			])
+			// Every provider request carries only its thread's messages.
+			expect(
+				provider.calls.map((call) => call.messages.map(({ role, content }) => [role, content])),
+			).toEqual([
+				[['user', 'Hi, I am Ada.']],
+				[['user', 'What is 2 + 2?']],
+				[['user', 'What did I say my name was?']],
+			])
+			// The two principals' threads of one id are distinct instances.
+			expect(ada.threads.conversation('trip')).not.toBe(grace.threads.conversation('trip'))
+			// Each run named its thread, so neither principal's active conversation moved.
+			expect([...sessions.values()].map((session) => session.threads.active)).toEqual(defaults)
+			expect(defaults[0]).not.toBe(ada.threads.conversation('trip'))
+			expect(guideText).toContain("await handle(grace, 'trip', 'What did I say my name was?')")
+			expect(guideText).toContain(
+				"// The same thread id under Grace is her own thread: it carries none of Ada's turns.",
+			)
+		})
+
+		it('keeps one thread id apart per principal', async () => {
+			const provider = createScriptedProvider(
+				[{ content: 'Noted, Ada.' }, { content: 'Noted, Grace.' }],
+				{ recorded: true, repeat: false },
+			)
+			const { summarize } = createStubSummarizer()
+
+			// `provider` and `summarize` come from the host application.
+			// The session table: one entry per authenticated principal, held by the application.
+			const sessions = new Map<string, Session>()
+			for (const principal of ['ada', 'grace']) {
+				// Each entry owns its threads and its window; neither is shared across principals.
+				const threads = createConversationManager({ summarize, keep: 2 })
+				const agent = createAgent(provider, {
+					conversations: threads,
+					window: createBudget({ max: 8_000, consumer: estimateRequest }),
+				})
+				sessions.set(principal, { agent, threads })
+			}
+
+			const ada = sessions.get('ada')
+			const grace = sessions.get('grace')
+			if (ada === undefined || grace === undefined) throw new Error('unknown principal')
+			expect(await handle(ada, 'trip', 'Hi, I am Ada.')).toBe('Noted, Ada.')
+			expect(await handle(grace, 'trip', 'Hi, I am Grace.')).toBe('Noted, Grace.')
+
+			const adaTrip = requireValue(ada.threads.conversation('trip'), 'Missing Ada trip thread')
+			const graceTrip = requireValue(grace.threads.conversation('trip'), 'Missing Grace thread')
+			expect(adaTrip).not.toBe(graceTrip)
+			expect(adaTrip.messages().map(({ content }) => content)).toEqual([
+				'Hi, I am Ada.',
+				'Noted, Ada.',
+			])
+			expect(graceTrip.messages().map(({ content }) => content)).toEqual([
+				'Hi, I am Grace.',
+				'Noted, Grace.',
+			])
+			// Grace's request carries her own turn and none of Ada's.
+			expect(
+				requireValue(provider.calls[1], 'Missing Grace request').messages.map(
+					({ content }) => content,
+				),
+			).toEqual(['Hi, I am Grace.'])
+		})
+
+		it('rethrows an overlap and drops its turn', async () => {
+			const { createGatedProvider } = await import('./setup.js')
+			const gate = Promise.withResolvers<void>()
+			const provider = createGatedProvider(gate)
+			const { summarize } = createStubSummarizer()
+
+			// `provider` and `summarize` come from the host application.
+			// The session table: one entry per authenticated principal, held by the application.
+			const sessions = new Map<string, Session>()
+			for (const principal of ['ada', 'grace']) {
+				// Each entry owns its threads and its window; neither is shared across principals.
+				const threads = createConversationManager({ summarize, keep: 2 })
+				const agent = createAgent(provider, {
+					conversations: threads,
+					window: createBudget({ max: 8_000, consumer: estimateRequest }),
+				})
+				sessions.set(principal, { agent, threads })
+			}
+
+			const ada = sessions.get('ada')
+			if (ada === undefined) throw new Error('unknown principal')
+			const first = handle(ada, 'trip', 'Book the flight.')
+			const thread = requireValue(ada.threads.conversation('trip'), 'Missing trip thread')
+			const before = thread.count
+			const refused = await handle(ada, 'trip', 'Book the hotel too.').catch(
+				(error: unknown) => error,
+			)
+			const after = thread.count
+			gate.resolve()
+			// The window guard refuses the overlap first, so the code is asserted, never the context.
+			expect(barrel.isAgentError(refused)).toBe(true)
+			expect(refused).toMatchObject({ code: 'CONCURRENCY' })
+			expect(after).toBe(before)
+			expect(await first).toBe('full')
+			expect(thread.messages().map(({ role, content }) => [role, content])).toEqual([
+				['user', 'Book the flight.'],
+				['assistant', 'full'],
+			])
+			expect(guideText).toContain(
+				'A refused run throws synchronously, before it starts, so `startRun` removes its user turn before rethrowing.',
+			)
+		})
+
+		it('keeps the user turn of a rejected run', async () => {
+			const { RecoveringProvider } = await import('./setup.js')
+			const provider = new RecoveringProvider(
+				[{ content: 'The hotel is booked.' }],
+				new Error('upstream unavailable'),
+			)
+			const { summarize } = createStubSummarizer()
+
+			// `provider` and `summarize` come from the host application.
+			// The session table: one entry per authenticated principal, held by the application.
+			const sessions = new Map<string, Session>()
+			for (const principal of ['ada', 'grace']) {
+				// Each entry owns its threads and its window; neither is shared across principals.
+				const threads = createConversationManager({ summarize, keep: 2 })
+				const agent = createAgent(provider, {
+					conversations: threads,
+					window: createBudget({ max: 8_000, consumer: estimateRequest }),
+				})
+				sessions.set(principal, { agent, threads })
+			}
+
+			const ada = sessions.get('ada')
+			if (ada === undefined) throw new Error('unknown principal')
+			await expect(handle(ada, 'trip', 'Book the flight.')).rejects.toThrow('upstream unavailable')
+			const thread = requireValue(ada.threads.conversation('trip'), 'Missing trip thread')
+			// The run rejected before any assistant append, so the user turn is the thread's tail.
+			expect(thread.messages().map(({ role, content }) => [role, content])).toEqual([
+				['user', 'Book the flight.'],
+			])
+			expect(await handle(ada, 'trip', 'Book the hotel instead.')).toBe('The hotel is booked.')
+			expect(thread.messages().map(({ role, content }) => [role, content])).toEqual([
+				['user', 'Book the flight.'],
+				['user', 'Book the hotel instead.'],
+				['assistant', 'The hotel is booked.'],
+			])
+			// The next request carries the unanswered turn directly before the new one, in order.
+			expect(
+				requireValue(provider.calls[0], 'Missing second request').messages.map(
+					({ role, content }) => [role, content],
+				),
+			).toEqual([
+				['user', 'Book the flight.'],
+				['user', 'Book the hotel instead.'],
+			])
+			expect(guideText).toContain(
+				"A run that rejects, aborts, or times out before any assistant append leaves the user turn as the thread's tail; the next request carries it unanswered directly before the new turn, so the model might answer it or call tools for it, and a call the authority allows outright runs without asking.",
 			)
 		})
 
@@ -1951,7 +2199,7 @@ await new GuideCommand({
 				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no records.',
 			)
 			expect(guideText).toContain(
-				"An active `respond` call owns a run whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so the agent emits `fault` and builds the prompt from the whole conversation view with no records, and the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
+				"Run the ledger's agent only through the `respond` method: the ledger's agent serves only the ledger's `conversation`. An active `respond` call owns a run on that conversation whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method or a run on another conversation, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so the agent emits `fault` and builds the prompt from the whole view of the run's conversation with no records, and the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
 			)
 		})
 
@@ -2041,7 +2289,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('plans a direct run started while the active request is the newest message as that request, as the concurrent-run limit states', async () => {
+		it('refuses a direct run beside a request', async () => {
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const entered = Promise.withResolvers<void>()
 			const release = Promise.withResolvers<void>()
@@ -2063,30 +2311,26 @@ await new GuideCommand({
 				}),
 			)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
-			const selections = createRecorder<readonly [Selection]>()
-			ledger.agent.emitter.on('select', selections.handler)
 			const responding = ledger.respond('Does a $148.50 refund need a manager?')
 			await entered.promise
-			const abort = new AbortController()
-			ledger.agent.emitter.once('select', () => abort.abort())
-			await ledger.agent.generate({ signal: abort.signal })
+			const count = ledger.conversation.count
+			const refused = captureError(() => ledger.agent.generate())
+			const stored = ledger.conversation.count
 			release.resolve()
-			await responding
+			const result = await responding
 
-			const [owned, concurrent] = selections.calls.map(([selection]) => selection)
-			expect(selections.calls).toHaveLength(2)
-			expect(requireValue(concurrent, 'Missing concurrent selection').fault).toBeUndefined()
-			expect(requireValue(concurrent, 'Missing concurrent selection').messages.at(-1)).toEqual(
-				requireValue(owned, 'Missing owned selection').messages.at(-1),
-			)
-			expect(
-				extractLedgerRecords(requireValue(concurrent, 'Missing concurrent selection').messages),
-			).toContain('Refunds over $100 need a manager.')
+			// The pass binds the ledger's conversation, so a direct run on it throws synchronously and
+			// stores nothing, and the request still settles on its own reply.
+			expect(barrel.isAgentError(refused)).toBe(true)
+			expect(refused).toMatchObject({ code: 'CONCURRENCY' })
+			expect(stored).toBe(count)
+			expect(result.content).toBe('Done.')
+			expect(provider.calls).toHaveLength(1)
 			expect(guideText).toContain(
-				"The ledger tells its runs apart by the newest message alone, so a direct run started while a `respond` call is active and that call's request or one of the ledger's notes is the newest message gets a planned selection, as the call's own run does.",
+				"A direct run on the ledger's conversation while a `respond` call's pass runs is refused with `AgentError` `'CONCURRENCY'`; during the calibration that opens the call it is a run no active `respond` call owns.",
 			)
 			expect(guideText).toContain(
-				"Any run started during a `respond` call, faulted or planned, adds its turns and usage to that call's gauge readings and shares its repeat stop.",
+				"A run on another conversation started during a `respond` call gets no ledger selection, yet adds its turns and usage to that call's gauge readings and shares its repeat stop.",
 			)
 		})
 

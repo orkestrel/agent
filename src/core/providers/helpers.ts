@@ -4,16 +4,28 @@ import type {
 	ProviderRequest,
 	ProviderResult,
 	Reading,
+	RelayOptions,
+	RelayRefusal,
 	SystemOneAnswer,
 	SystemOneQuestion,
 	SystemOneUsage,
 	TextRead,
 } from './types.js'
-import type { JudgeAnswer, JudgeQuestion, JudgeResult, Refusal } from '../types.js'
+import type { JudgeAnswer, JudgeQuestion, JudgeResult, Message, Refusal } from '../types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import type { ToolCall } from '@orkestrel/tool'
+import type { Result } from '@orkestrel/contract'
+import type { ToolCall, ToolDefinition } from '@orkestrel/tool'
 import { isTokenUsage } from '@orkestrel/budget'
-import { attempt, boundsOf, isArray, isNumber } from '@orkestrel/contract'
+import {
+	attempt,
+	boundsOf,
+	canonicalStringify,
+	failure,
+	isArray,
+	isNumber,
+	preview,
+	success,
+} from '@orkestrel/contract'
 import { JudgeError } from './errors.js'
 import { MAX_ERROR_BODY_LENGTH } from './constants.js'
 import { sanitizeUsage, sumUsage } from '../helpers.js'
@@ -471,6 +483,141 @@ export function requestToRelay(request: ProviderRequest): ProviderRequest {
 						...(request.options.schema === undefined ? {} : { schema: request.options.schema }),
 					},
 				}),
+	}
+}
+
+/**
+ * Builds the request a relay forwards under its system turn and tool definition policy, or every
+ * refusal that policy finds.
+ *
+ * @remarks
+ * One pass collects every refused member. A page `system` message is refused unless
+ * `policy.system.accept` is `true`; under it, only one content-only page message at index 0 is
+ * admitted. When `policy.system.text` is defined, the forwarded request starts with one composed
+ * system message whose content is that text, joined with `'\n\n'` before an admitted page head's
+ * content, and the page head is removed; when it is undefined, an admitted page head is forwarded
+ * unchanged. A page tool definition of a declared name must equal the declared one after both are
+ * projected as {@link requestToRelay} projects them, key order ignored, and the declared copy is
+ * forwarded; a definition of an undeclared name is forwarded only when `policy.tools.accept` is
+ * `true`; each occurrence of a name after its first is refused. The forwarded tools keep the
+ * page's order and stay absent when the page sent none; the messages after the head and the
+ * options pass unchanged. The helper is deterministic except the composed head's id, which takes
+ * `crypto.randomUUID()`.
+ *
+ * @param request - The page request the relay contract admitted
+ * @param policy - The relay's system turn and tool definition policy
+ * @returns The request to forward, or every refusal in message then tool order
+ * @throws {ContractError} Thrown when comparing a page definition with the declared one of its
+ * name reads a `parameters` member that throws, such as a getter or a `Proxy` trap, which parsed
+ * JSON never has
+ * @example
+ * ```ts
+ * const built = buildRelayRequest(
+ * 	{ messages: [{ id: 'u1', role: 'user', content: 'Track BW-5512' }] },
+ * 	{ system: { text: 'Answer for the shipping desk.' } },
+ * )
+ * built.success && built.value.messages[0]?.content // 'Answer for the shipping desk.'
+ * ```
+ */
+export function buildRelayRequest(
+	request: ProviderRequest,
+	policy: Pick<RelayOptions, 'system' | 'tools'>,
+): Result<ProviderRequest, readonly RelayRefusal[]> {
+	const refusals: RelayRefusal[] = []
+	const admits = policy.system?.accept === true
+	for (const [index, message] of request.messages.entries()) {
+		if (message.role !== 'system') continue
+		if (!admits) {
+			refusals.push({ reason: 'system', index })
+			continue
+		}
+		if (
+			index !== 0 ||
+			message.thinking !== undefined ||
+			message.calls !== undefined ||
+			message.call !== undefined ||
+			message.images !== undefined
+		) {
+			refusals.push({ reason: 'head', index })
+		}
+	}
+	const declared = new Map<string, ToolDefinition>()
+	const definitions = policy.tools?.definitions ?? []
+	for (const tool of requestToRelay({ messages: [], tools: definitions }).tools ?? []) {
+		declared.set(tool.name, tool)
+	}
+	const sent =
+		request.tools === undefined
+			? undefined
+			: requestToRelay({ messages: [], tools: request.tools }).tools
+	const forwarded: ToolDefinition[] = []
+	const seen = new Set<string>()
+	for (const [index, tool] of (sent ?? []).entries()) {
+		const server = declared.get(tool.name)
+		if (seen.has(tool.name)) {
+			refusals.push({ reason: 'mismatch', index, name: tool.name })
+		} else if (server !== undefined) {
+			const encoded = canonicalStringify(server)
+			if (encoded === undefined || encoded !== canonicalStringify(tool)) {
+				refusals.push({ reason: 'mismatch', index, name: tool.name })
+			} else forwarded.push(server)
+		} else if (policy.tools?.accept === true) {
+			forwarded.push(tool)
+		} else refusals.push({ reason: 'tool', index, name: tool.name })
+		seen.add(tool.name)
+	}
+	if (refusals.length > 0) return failure(refusals)
+	const text = policy.system?.text
+	const first = request.messages[0]
+	const page = first?.role === 'system' ? first : undefined
+	const head: Message | undefined =
+		text === undefined
+			? undefined
+			: {
+					id: crypto.randomUUID(),
+					role: 'system',
+					content: page === undefined ? text : `${text}\n\n${page.content}`,
+				}
+	const messages =
+		head === undefined
+			? request.messages
+			: [head, ...(page === undefined ? request.messages : request.messages.slice(1))]
+	return success({
+		messages,
+		...(sent === undefined ? {} : { tools: forwarded }),
+		...(request.options === undefined ? {} : { options: request.options }),
+	})
+}
+
+/**
+ * Describes one relay refusal as the line its `422` response body carries.
+ *
+ * @remarks
+ * A line holds only the member's key path, the expected shape, the option that admits the member,
+ * and, for a tool, the name the page sent as `preview` renders it, so no page content or server
+ * text reaches it. `preview` JSON-encodes the name; an encoding longer than 64 characters renders
+ * as its opening quote, at most 63 escaped characters that split no escape or surrogate pair, and
+ * `…`, so a rendered name holds at most 65 characters. A line names only the tool names the page
+ * sent, so the page learns no server tool name it did not send.
+ *
+ * @param refusal - The refused member and where it sits
+ * @returns The refusal line
+ * @example
+ * ```ts
+ * describeRelayRefusal({ reason: 'tool', index: 0, name: 'weather' })
+ * // 'tools[0] "weather": the relay refuses a tool it does not declare; declare it in tools.definitions, or set tools.accept to admit page tools'
+ * ```
+ */
+export function describeRelayRefusal(refusal: RelayRefusal): string {
+	switch (refusal.reason) {
+		case 'system':
+			return `messages[${refusal.index}]: the relay refuses a system message; the server writes the system turn through system.text, and system.accept admits one page system message at index 0`
+		case 'head':
+			return `messages[${refusal.index}]: the relay admits one system message, at index 0, carrying content only`
+		case 'tool':
+			return `tools[${refusal.index}] ${preview(refusal.name)}: the relay refuses a tool it does not declare; declare it in tools.definitions, or set tools.accept to admit page tools`
+		case 'mismatch':
+			return `tools[${refusal.index}] ${preview(refusal.name)}: the definition must equal the relay's declared definition of that name, and a name appears once`
 	}
 }
 

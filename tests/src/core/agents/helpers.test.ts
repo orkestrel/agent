@@ -5,6 +5,7 @@ import {
 	createMessage,
 	CountingAgentResult,
 	createInvalidAgentResultCases,
+	createMalformedConversationCases,
 	createRecordedBudget,
 	createTurnRegistry,
 	AGENT_USAGE,
@@ -18,6 +19,8 @@ import {
 	AUTHORITY_NOTES,
 	SCOPE_NOTE,
 	chargeUsage,
+	createConversation,
+	createConversationManager,
 	denyCall,
 	estimateMessages,
 	estimateRequest,
@@ -30,6 +33,7 @@ import {
 	MESSAGE_TOKEN_OVERHEAD,
 	renderToolValue,
 	requireBudget,
+	requireConversation,
 	settleAgentJob,
 	requireEntry,
 	requireLimit,
@@ -611,6 +615,36 @@ describe('requireBudget', () => {
 			])
 		}
 		expect(consumed.calls).toEqual([])
+	})
+})
+
+describe('requireConversation', () => {
+	it('returns an absent option and a conversation unchanged', () => {
+		const conversation = createConversation()
+		const managed = createConversationManager().add()
+		expect(requireConversation(undefined)).toBeUndefined()
+		expect(requireConversation(conversation)).toBe(conversation)
+		expect(requireConversation(managed)).toBe(managed)
+	})
+
+	it('refuses a malformed conversation with a placement error', () => {
+		const received = new Map([
+			['a string', '"conversation"'],
+			['null', 'null'],
+		])
+		for (const [title, value] of createMalformedConversationCases()) {
+			const caught = captureError(() => requireConversation(value))
+			if (!isContractError(caught)) throw new Error(`expected a ContractError for ${title}`)
+			expect([caught.code, caught.message, caught.context]).toEqual([
+				'placement',
+				'Agent: conversation must implement ConversationInterface',
+				{
+					path: ['options', 'conversation'],
+					limit: 'ConversationInterface',
+					received: received.get(title) ?? 'object',
+				},
+			])
+		}
 	})
 })
 

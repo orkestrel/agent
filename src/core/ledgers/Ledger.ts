@@ -216,7 +216,7 @@ export class Ledger implements LedgerInterface {
 			tools,
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
 			strict: false,
-			select: (_conversation, request, signal) => this.#select(request, signal),
+			select: (conversation, request, signal) => this.#select(conversation, request, signal),
 		})
 		this.#agent.emitter.on('tool', (_call, result) => {
 			this.#flush()
@@ -337,8 +337,8 @@ export class Ledger implements LedgerInterface {
 					createScope({
 						name: 'answer',
 						tools: [],
-						select: async (_conversation, message, selecting) => {
-							const selection = await this.#select(message, selecting)
+						select: async (conversation, message, selecting) => {
+							const selection = await this.#select(conversation, message, selecting)
 							if (selection.fault !== undefined) return selection
 							return {
 								...selection,
@@ -427,7 +427,11 @@ export class Ledger implements LedgerInterface {
 		think?: boolean,
 	): Promise<AgentResult> {
 		request.open(this.#conversation.messages().length)
-		return await this.#agent.generate({ signal, ...(think === undefined ? {} : { think }) })
+		return await this.#agent.generate({
+			signal,
+			conversation: this.#conversation,
+			...(think === undefined ? {} : { think }),
+		})
 	}
 
 	// The live `respond` call's request once it has entered its message; a run during the call's
@@ -602,10 +606,18 @@ export class Ledger implements LedgerInterface {
 			)
 	}
 
-	async #select(message: Message, signal: AbortSignal): Promise<Selection> {
+	// A run owns a selection only on the ledger's conversation, by identity, and only for the active
+	// call's request or a ledger note; any other run is refused over its own conversation's view, so
+	// the refusal never carries the ledger's history to another thread.
+	async #select(
+		conversation: ConversationInterface,
+		message: Message,
+		signal: AbortSignal,
+	): Promise<Selection> {
 		const request = this.#current()
 		const selected = request?.message
 		if (
+			conversation !== this.#conversation ||
 			request === undefined ||
 			selected === undefined ||
 			(message.id !== selected.id && !this.#annotations.has(message.id))
@@ -616,13 +628,14 @@ export class Ledger implements LedgerInterface {
 					'ledger selection requires a request owned by an active respond call',
 				),
 				{ judgments: [] },
+				conversation,
 			)
 		const plan = request.plan
 		if (this.#annotations.has(message.id) && plan !== undefined)
 			return { messages: [...plan.messages, ...this.#collectAfter(selected)], judgments: [] }
 		return await this.#classifier.classify(this.#requests, signal).then(
 			(classified) => this.#file(classified, request, selected, message),
-			(error: unknown) => this.#refuse(error, { judgments: [] }),
+			(error: unknown) => this.#refuse(error, { judgments: [] }, this.#conversation),
 		)
 	}
 
@@ -640,7 +653,7 @@ export class Ledger implements LedgerInterface {
 			return { ...this.#plan(selected), ...filed }
 		})
 		request.file(readings, planned.success ? planned.value : undefined)
-		if (!planned.success) return this.#refuse(planned.error, filed)
+		if (!planned.success) return this.#refuse(planned.error, filed, this.#conversation)
 		return this.#annotations.has(message.id)
 			? {
 					...planned.value,
@@ -649,12 +662,16 @@ export class Ledger implements LedgerInterface {
 			: planned.value
 	}
 
-	// Falls back to the conversation view with the failure as the selection's fault, keeping the
-	// filing completed before it.
-	#refuse(error: unknown, filing: Omit<ClassifierResult, 'readings'>): Selection {
+	// Falls back to the given conversation's view with the failure as the selection's fault, keeping
+	// the filing completed before it.
+	#refuse(
+		error: unknown,
+		filing: Omit<ClassifierResult, 'readings'>,
+		conversation: ConversationInterface,
+	): Selection {
 		return {
 			...filing,
-			messages: this.#conversation.view(),
+			messages: conversation.view(),
 			fault: isError(error) ? error : new Error(String(error)),
 		}
 	}

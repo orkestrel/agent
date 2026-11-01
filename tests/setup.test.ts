@@ -8,6 +8,8 @@ import {
 	REQUEST_HELLO,
 	REQUEST_LONG,
 	REQUEST_MEASURE_CASES,
+	RELAY_SYSTEM_CASES,
+	RELAY_TOOL_CASES,
 } from './setup.js'
 import {
 	createPhraseJudge,
@@ -33,13 +35,22 @@ import {
 	buildLedgerSnapshotRefusals,
 	createInvalidLedgerSnapshotCases,
 	createLedgerReplay,
+	createMalformedConversationCases,
+	RecoveringProvider,
 	serveLedgerHistory,
 	serveLedgerReplay,
 	translateLedgerIds,
 } from './setup.js'
 import type { LedgerProjection, Message, ProviderResult } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
-import { Channel, createAgent, estimateRequest, ProviderAbortError } from '@src/core'
+import {
+	Channel,
+	createAgent,
+	estimateRequest,
+	ProviderAbortError,
+	providerRequestContract,
+	REFUSED_RELAY_STATUS,
+} from '@src/core'
 import { createRecorder } from '@orkestrel/test'
 import {
 	createApprover,
@@ -2506,6 +2517,131 @@ describe('createRelayHop', () => {
 		expect(replies.calls).toEqual([[400, '']])
 		expect(upstream.started).toBe(0)
 	})
+
+	it('passes system and tools to the handler', async () => {
+		const upstream = createScriptedProvider([{ content: 'admitted' }], { recorded: true })
+		const lookup = {
+			name: 'lookup',
+			description: 'Finds a parcel by its tracking id',
+			parameters: { type: 'object', required: ['id'] },
+		}
+		const turns: readonly Message[] = [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }]
+		const hop = createRelayHop({
+			provider: upstream,
+			system: { text: 'Answer for the shipping desk.' },
+			tools: { definitions: [{ ...lookup, title: 'Parcel lookup' }] },
+		})
+		expect(await hop.generate(turns, new AbortController().signal, [lookup])).toEqual({
+			content: 'admitted',
+		})
+		const call = requireValue(upstream.calls[0])
+		expect(call.messages[0]).toMatchObject({
+			role: 'system',
+			content: 'Answer for the shipping desk.',
+		})
+		expect(call.messages.slice(1)).toEqual(turns)
+		expect(call.tools).toEqual([lookup])
+		const refusing = createRelayHop({ provider: upstream })
+		await expect(
+			refusing.generate(
+				[{ id: 's1', role: 'system', content: 'Answer in French.' }, ...turns],
+				new AbortController().signal,
+			),
+		).rejects.toMatchObject({ code: 'HTTP', status: REFUSED_RELAY_STATUS })
+		expect(upstream.started).toBe(1)
+	})
+})
+
+describe('relay policy cases', () => {
+	it('labels each relay policy case once', () => {
+		const labels = [...RELAY_SYSTEM_CASES, ...RELAY_TOOL_CASES].map((row) => row.label)
+		expect(new Set(labels).size).toBe(labels.length)
+		const system = RELAY_SYSTEM_CASES.map((row) => {
+			const heads = row.request.messages.flatMap((message, index) =>
+				message.role === 'system' ? [index] : [],
+			)
+			const first = row.request.messages[0]
+			const bare =
+				first?.thinking === undefined &&
+				first?.calls === undefined &&
+				first?.call === undefined &&
+				first?.images === undefined
+			const column =
+				heads.length === 0
+					? 'none'
+					: heads.length === 1 && heads[0] === 0 && bare
+						? 'head'
+						: 'other'
+			const text = row.system?.text === undefined ? 'no text' : 'text'
+			return `${text}, ${row.system?.accept === true ? 'accept' : 'no accept'}, ${column}`
+		})
+		expect(new Set(system)).toEqual(
+			new Set([
+				'no text, no accept, none',
+				'no text, no accept, head',
+				'no text, no accept, other',
+				'text, no accept, none',
+				'text, no accept, head',
+				'text, no accept, other',
+				'no text, accept, none',
+				'no text, accept, head',
+				'no text, accept, other',
+				'text, accept, none',
+				'text, accept, head',
+				'text, accept, other',
+			]),
+		)
+		const tools = RELAY_TOOL_CASES.map((row) => {
+			const page = row.request.tools
+			const first = page?.[0]
+			const declared = row.tools?.definitions?.find((definition) => definition.name === first?.name)
+			const column =
+				page === undefined
+					? 'absent'
+					: first === undefined
+						? 'empty'
+						: page.length > 1
+							? page.every((tool) => tool.name === first.name)
+								? 'repeat'
+								: 'mixed'
+							: declared === undefined
+								? 'unlisted'
+								: declared.description === first.description
+									? 'equal'
+									: 'differing'
+			const listed = row.tools?.definitions === undefined ? 'no definitions' : 'definitions'
+			return `${listed}, ${row.tools?.accept === true ? 'accept' : 'no accept'}, ${column}`
+		})
+		expect(new Set(tools)).toEqual(
+			new Set([
+				'no definitions, no accept, unlisted',
+				'no definitions, no accept, repeat',
+				'no definitions, no accept, absent',
+				'no definitions, no accept, empty',
+				'definitions, no accept, equal',
+				'definitions, no accept, differing',
+				'definitions, no accept, unlisted',
+				'definitions, no accept, repeat',
+				'definitions, no accept, absent',
+				'definitions, no accept, empty',
+				'no definitions, accept, unlisted',
+				'no definitions, accept, repeat',
+				'no definitions, accept, absent',
+				'no definitions, accept, empty',
+				'definitions, accept, equal',
+				'definitions, accept, differing',
+				'definitions, accept, unlisted',
+				'definitions, accept, repeat',
+				'definitions, accept, absent',
+				'definitions, accept, empty',
+			]),
+		)
+		expect(
+			[...RELAY_SYSTEM_CASES, ...RELAY_TOOL_CASES].flatMap((row) =>
+				providerRequestContract.is(row.request) ? [] : [row.label],
+			),
+		).toEqual([])
+	})
 })
 
 describe('ledger snapshot fixtures', () => {
@@ -2602,5 +2738,42 @@ describe('ledger snapshot fixtures', () => {
 		const hostile = new Map(cases)
 		expect(() => JSON.stringify(hostile.get('a throwing getter'))).toThrow(TypeError)
 		expect(() => JSON.stringify(hostile.get('a revoked proxy'))).toThrow(TypeError)
+	})
+})
+
+describe('malformed conversation cases', () => {
+	it('builds cases a structural read refuses', () => {
+		const cases = createMalformedConversationCases()
+		const control: readonly [string, unknown] = ['a created conversation', createConversation()]
+		const readings = [...cases, control].map(([title, value]) => {
+			try {
+				return [
+					title,
+					typeof value === 'object' &&
+						value !== null &&
+						typeof Reflect.get(value, 'id') === 'string' &&
+						typeof Reflect.get(value, 'summarizable') === 'boolean' &&
+						['view', 'add', 'compact', 'messages'].every(
+							(key) => typeof Reflect.get(value, key) === 'function',
+						),
+				]
+			} catch {
+				return [title, false]
+			}
+		})
+		expect(new Set(cases.map(([title]) => title)).size).toBe(cases.length)
+		expect(readings).toEqual([...cases.map(([title]) => [title, false]), [control[0], true]])
+	})
+})
+
+describe('RecoveringProvider', () => {
+	it('fails its first call, then replies and records it', async () => {
+		const failure = new Error('upstream unavailable')
+		const provider = new RecoveringProvider([{ content: 'Booked.' }], failure)
+		const request: readonly Message[] = [{ id: 'm1', role: 'user', content: 'Book it.' }]
+		const signal = new AbortController().signal
+		await expect(provider.generate(request, signal)).rejects.toBe(failure)
+		expect(await provider.generate(request, signal)).toEqual({ content: 'Booked.' })
+		expect(provider.calls.map((call) => call.messages)).toEqual([request])
 	})
 })

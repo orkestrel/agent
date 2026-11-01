@@ -1,10 +1,13 @@
-import type { ConversationSnapshot, Section } from './types.js'
+import type { ConversationInterface, ConversationSnapshot, Section } from './types.js'
 import type { Judgment, Message } from '../types.js'
 import { isTokenUsage } from '@orkestrel/budget'
 import {
 	arrayOf,
 	attempt,
+	isBoolean,
 	isFiniteNumber,
+	isFunction,
+	isObject,
 	isRecord,
 	isString,
 	optionalOf,
@@ -176,4 +179,36 @@ export function isConversationSnapshot(value: unknown): value is ConversationSna
 			['judgments'],
 		)(value)
 	)
+}
+
+/**
+ * Checks whether a value carries the {@link ConversationInterface} members a run reads: a string
+ * `id`, a boolean `summarizable`, and `view`, `add`, `compact`, and `messages` methods.
+ *
+ * @remarks
+ * A total guard: a throwing getter, a revoked `Proxy`, and any other malformed input return false.
+ * It checks each member as its declared type and admits unknown members and class instances, so
+ * any implementation the interface admits passes; it never calls a method.
+ *
+ * @param value - The value to test
+ * @returns True if `value` carries the conversation members a run reads; false otherwise
+ * @example
+ * ```ts
+ * isConversation(createConversation()) // true
+ * isConversation({ id: 'c1' }) // false
+ * ```
+ */
+export function isConversation(value: unknown): value is ConversationInterface {
+	const checked = attempt(() => {
+		if (!isObject(value)) return false
+		return (
+			isString(Reflect.get(value, 'id')) &&
+			isBoolean(Reflect.get(value, 'summarizable')) &&
+			isFunction(Reflect.get(value, 'view')) &&
+			isFunction(Reflect.get(value, 'add')) &&
+			isFunction(Reflect.get(value, 'compact')) &&
+			isFunction(Reflect.get(value, 'messages'))
+		)
+	})
+	return checked.success && checked.value
 }

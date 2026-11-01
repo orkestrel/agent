@@ -10,8 +10,9 @@ import { INTRINSICS, holds } from '@orkestrel/contract'
  * error and throws this with the matching {@link LedgerErrorCode}. A calibration call that reports
  * no prompt usage throws this with `'GAUGE'`. A snapshot option that `isLedgerSnapshot` refuses
  * throws this with `'SNAPSHOT'`. Narrow a caught value with {@link isLedgerError} and
- * branch on `error.code`. A selection without an active `respond` call, or for a request other than
- * that call's request or a ledger note, reports `'REQUEST'` through the selection's fault.
+ * branch on `error.code`. A selection without an active `respond` call, for a conversation other
+ * than the ledger's, or for a request other than that call's request or a ledger note, reports
+ * `'REQUEST'` through the selection's fault.
  */
 export class LedgerError extends Error {
 	/** Names the machine-readable condition; the {@link LedgerErrorCode} union describes each code. */

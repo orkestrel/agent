@@ -451,8 +451,13 @@ export interface LedgerInterface {
 	 * answer pass rejects as well, `respond` rejects with that pass's error. A `respond` or `calibrate` call while either is in flight
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
-	 * Direct agent runs share an active request's gauge readings and repeat stop, even when their
-	 * selections fault. Only `respond`, `calibrate`, and `snapshot` calls are refused by the concurrency guard.
+	 * A direct agent run on `conversation` while a `respond` call's pass runs is refused with an
+	 * `AgentError` whose `code` is `'CONCURRENCY'`; during the calibration that opens the call it is a
+	 * run no active `respond` call owns. The ledger's agent serves only `conversation`: a run on
+	 * another conversation started during a `respond` call gets no ledger selection, yet adds its
+	 * turns and usage to that call's gauge readings and shares its repeat stop, and it can still
+	 * reach the `recall` and lookup tools, which read `conversation`. The ledger's own guard refuses
+	 * only `respond`, `calibrate`, and `snapshot` calls.
 	 * A run no `respond` call owns, including a run during calibration, reads no request's state:
 	 * its lookup and `recall` calls run with no repeat stop, recall limit, or close rule.
 	 * Every rejection leaves the ledger free for a later call.

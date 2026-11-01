@@ -5,6 +5,7 @@ import type { ToolCall } from '@orkestrel/tool'
 import type {
 	AgentEventMap,
 	AgentResult,
+	AgentStreamInterface,
 	AuthorityDecision,
 	ConversationEventMap,
 	Message,
@@ -54,6 +55,7 @@ import {
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
 	createAuthority,
+	createConversation,
 	createConversationManager,
 	createScope,
 	estimateMessages,
@@ -98,6 +100,7 @@ import {
 	collect,
 	createRecorder,
 	createRecorders,
+	invokeUnchecked,
 	requireValue,
 	waitForAbort,
 	waitForCondition,
@@ -1910,8 +1913,11 @@ describe('Agent — re-entrancy / reuse', () => {
 		const provider = createSharedGatedProvider(g1, g2)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
+		// One live run per conversation: the second run binds its own thread.
+		const thread = agent.context.conversations.add()
+		thread.add({ role: 'user', content: 'hi' })
 		const s1 = agent.stream()
-		const s2 = agent.stream()
+		const s2 = agent.stream({ conversation: thread })
 		const d1 = collect(s1.events)
 		const d2 = collect(s2.events)
 		await waitForDelay() // let both runs reach their gate
@@ -1933,8 +1939,11 @@ describe('Agent — re-entrancy / reuse', () => {
 		const provider = createIndependentGatedProvider(g1, g2)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
+		// One live run per conversation: the second run binds its own thread.
+		const thread = agent.context.conversations.add()
+		thread.add({ role: 'user', content: 'hi' })
 		const s1 = agent.stream()
-		const s2 = agent.stream()
+		const s2 = agent.stream({ conversation: thread })
 		const d1 = collect(s1.events)
 		const d2 = collect(s2.events)
 		await waitForDelay()
@@ -2931,9 +2940,12 @@ describe('Agent — status transitions and getters', () => {
 		const provider = createScriptedProvider([{ result: { content: 'a' } }], { delay: 20 })
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'go' })
+		// One live run per conversation: the second run binds its own thread.
+		const thread = agent.context.conversations.add()
+		thread.add({ role: 'user', content: 'go' })
 
 		const first = agent.stream()
-		const second = agent.stream()
+		const second = agent.stream({ conversation: thread })
 		expect(agent.status).toBe('running')
 
 		await first.result
@@ -4405,9 +4417,15 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 		const gate = Promise.withResolvers<void>()
 		const agent = createAgent(createGatedProvider(gate))
 		agent.context.messages.add({ role: 'user', content: 'hi' })
+		// One live run per conversation: the second run binds its own thread.
+		const thread = agent.context.conversations.add()
+		thread.add({ role: 'user', content: 'hi' })
 
 		const first = agent.stream({ budget: createTokenBudget({ max: 1_000_000, scope: 'total' }) })
-		const second = agent.stream({ budget: createTokenBudget({ max: 1_000_000, scope: 'total' }) })
+		const second = agent.stream({
+			budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
+			conversation: thread,
+		})
 		gate.resolve()
 
 		expect(await Promise.all([first.result, second.result])).toEqual([
@@ -4422,10 +4440,16 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 			budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
 		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
+		// One live run per conversation: the second run binds its own thread.
+		const thread = agent.context.conversations.add()
+		thread.add({ role: 'user', content: 'hi' })
 
 		const run1 = agent.stream()
 		const run2 = attempt(() =>
-			agent.stream({ budget: createTokenBudget({ max: 1_000_000, scope: 'total' }) }),
+			agent.stream({
+				budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
+				conversation: thread,
+			}),
 		)
 		expect(run2.success).toBe(true)
 		if (!run2.success) throw new Error('run2 was not started')
@@ -7406,5 +7430,350 @@ describe('Agent — the system boundary canary, stored ingress', () => {
 				messages.filter((message) => message.content.includes(CANARY_SENTINELS[source])),
 			).toEqual([])
 		}
+	})
+})
+
+describe('Agent — run-bound conversation', () => {
+	it('stores a tools turn in the bound thread', async () => {
+		const entered = Promise.withResolvers<void>()
+		const gate = Promise.withResolvers<void>()
+		const conversations = createConversationManager()
+		const first = conversations.add()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'add',
+				execute: async () => {
+					entered.resolve()
+					await gate.promise
+					return 5
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'Adding.', tools: [createToolCall()] } },
+				{ result: { content: 'Sum is 5.' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { conversations, tools })
+		first.add({ role: 'user', content: 'Add the numbers.' })
+
+		const run = agent.generate()
+		await entered.promise
+		const second = conversations.add()
+		second.add({ role: 'user', content: 'Other thread.' })
+		conversations.switch(second.id)
+		gate.resolve()
+		await run
+
+		expect(first.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'Add the numbers.'],
+			['assistant', 'Adding.'],
+			['tool', '5'],
+			['assistant', 'Sum is 5.'],
+		])
+		expect(second.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'Other thread.'],
+		])
+	})
+
+	it('folds the bound thread under a switch', async () => {
+		const entered = Promise.withResolvers<void>()
+		const gate = Promise.withResolvers<void>()
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		const first = conversations.add()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'add',
+				execute: async () => {
+					entered.resolve()
+					await gate.promise
+					return 5
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'x'.repeat(400), tools: [createToolCall()] } },
+				{ result: { content: 'Sum is 5.' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		// The opening request measures under the window and the request after the tools turn over it,
+		// so the one fold runs at the second turn's admission, after the switch.
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: createBudget({ max: 60, consumer: measureMessages }),
+		})
+		first.add([
+			{ role: 'user', content: 'Earlier question.' },
+			{ role: 'assistant', content: 'Earlier answer.' },
+			{ role: 'user', content: 'Add the numbers.' },
+		])
+
+		const run = agent.generate()
+		await entered.promise
+		const second = conversations.add()
+		second.add({ role: 'user', content: 'Other thread.' })
+		conversations.switch(second.id)
+		gate.resolve()
+		await run
+
+		expect(first.sections).toHaveLength(1)
+		expect(second.sections).toEqual([])
+		expect(provider.calls).toHaveLength(2)
+		expect(provider.calls[1]?.messages.map((message) => [message.role, message.content])).toEqual(
+			first
+				.view()
+				.slice(0, -1)
+				.map((message) => [message.role, message.content]),
+		)
+	})
+
+	it('hands select the bound thread mid-fold', async () => {
+		const summarizing = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const conversations = createConversationManager({
+			summarize: async (messages) => {
+				summarizing.resolve()
+				await release.promise
+				return `recap of ${messages.length}`
+			},
+			keep: 0,
+		})
+		const first = conversations.add()
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'x'.repeat(400), tools: [createToolCall()] } },
+				{ result: { content: 'Sum is 5.' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const selection = createRecordingSelection()
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			select: selection.handler,
+			window: createBudget({ max: 60, consumer: measureMessages }),
+		})
+		first.add([
+			{ role: 'user', content: 'Earlier question.' },
+			{ role: 'assistant', content: 'Earlier answer.' },
+			{ role: 'user', content: 'Add the numbers.' },
+		])
+
+		const run = agent.generate()
+		await summarizing.promise
+		const second = conversations.add()
+		second.add({ role: 'user', content: 'Other thread.' })
+		conversations.switch(second.id)
+		release.resolve()
+		await run
+
+		expect(first.sections).toHaveLength(1)
+		expect(selection.calls.map(([conversation]) => conversation.id)).toEqual([first.id, first.id])
+	})
+
+	it('runs on a named thread, active unchanged', async () => {
+		const conversations = createConversationManager()
+		const first = conversations.add()
+		const second = conversations.add()
+		second.add({ role: 'user', content: 'Other thread.' })
+		const agent = createAgent(createConversationEchoProvider(), { conversations })
+
+		const result = await agent.generate({ conversation: second })
+
+		expect(result).toEqual({ content: 'answer:Other thread.', partial: false })
+		expect(second.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'Other thread.'],
+			['assistant', 'answer:Other thread.'],
+		])
+		expect(first.messages()).toEqual([])
+		expect(conversations.active).toBe(first)
+	})
+
+	it('keeps overlapping threads apart', async () => {
+		const g1 = Promise.withResolvers<void>()
+		const g2 = Promise.withResolvers<void>()
+		const conversations = createConversationManager()
+		const first = conversations.add()
+		const second = conversations.add()
+		first.add({ role: 'user', content: 'First thread.' })
+		second.add({ role: 'user', content: 'Second thread.' })
+		const agent = createAgent(createIndependentGatedProvider(g1, g2), { conversations })
+
+		const one = agent.stream({ conversation: first })
+		const two = agent.stream({ conversation: second })
+		g2.resolve()
+		await two.result
+		g1.resolve()
+		await one.result
+
+		expect(first.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'First thread.'],
+			['assistant', 'full-1'],
+		])
+		expect(second.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'Second thread.'],
+			['assistant', 'full-2'],
+		])
+	})
+
+	it('refuses a second run on one thread', async () => {
+		const gate = Promise.withResolvers<void>()
+		const agent = createAgent(createGatedProvider(gate))
+		const thread = agent.context.messages
+		thread.add({ role: 'user', content: 'Only thread.' })
+		const starts = createRecorder<[id: string]>()
+		agent.emitter.on('start', starts.handler)
+		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
+		const armed = budget.signal
+
+		const first = agent.stream({ conversation: thread })
+		const caught = captureError(() => agent.stream({ conversation: thread, budget }))
+
+		if (!isAgentError(caught)) throw new Error('expected an AgentError')
+		expect([caught.code, caught.context]).toEqual([
+			'CONCURRENCY',
+			{ agent: agent.id, conversation: thread.id },
+		])
+		expect(starts.calls).toEqual([[agent.id]])
+		expect(budget.signal).toBe(armed)
+		gate.resolve()
+		expect(await first.result).toEqual({ content: 'full', partial: false })
+	})
+
+	it('admits a run after the thread settles', async () => {
+		const agent = createAgent(createConversationEchoProvider())
+		const thread = agent.context.messages
+		thread.add({ role: 'user', content: 'First ask.' })
+		expect(await agent.generate({ conversation: thread })).toEqual({
+			content: 'answer:First ask.',
+			partial: false,
+		})
+		thread.add({ role: 'user', content: 'Second ask.' })
+		expect(await agent.generate({ conversation: thread })).toEqual({
+			content: 'answer:Second ask.',
+			partial: false,
+		})
+	})
+
+	it('runs on an unregistered conversation', async () => {
+		const agent = createAgent(createConversationEchoProvider())
+		const count = agent.context.conversations.count
+		const free = createConversation()
+		free.add({ role: 'user', content: 'Unregistered thread.' })
+
+		await agent.generate({ conversation: free })
+
+		expect(free.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'Unregistered thread.'],
+			['assistant', 'answer:Unregistered thread.'],
+		])
+		expect(agent.context.conversations.count).toBe(count)
+	})
+
+	it('stores the reply in a removed thread', async () => {
+		const gate = Promise.withResolvers<void>()
+		const conversations = createConversationManager()
+		const first = conversations.add()
+		first.add({ role: 'user', content: 'Removed thread.' })
+		const agent = createAgent(createGatedProvider(gate), { conversations })
+
+		const run = agent.generate()
+		conversations.remove(first.id)
+		gate.resolve()
+		await run
+
+		expect(conversations.count).toBe(0)
+		expect(conversations.active).toBeUndefined()
+		expect(first.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'Removed thread.'],
+			['assistant', 'full'],
+		])
+	})
+
+	it('rebuilds the head with a mid-run rule', async () => {
+		const entered = Promise.withResolvers<void>()
+		const gate = Promise.withResolvers<void>()
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		const first = conversations.add()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'add',
+				execute: async () => {
+					entered.resolve()
+					await gate.promise
+					return 5
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'x'.repeat(400), tools: [createToolCall()] } },
+				{ result: { content: 'Sum is 5.' } },
+				{ result: { content: 'Listed.' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			window: createBudget({ max: 60, consumer: measureMessages }),
+		})
+		first.add([
+			{ role: 'user', content: 'Earlier question.' },
+			{ role: 'assistant', content: 'Earlier answer.' },
+			{ role: 'user', content: 'Add the numbers.' },
+		])
+
+		const run = agent.generate()
+		await entered.promise
+		agent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		gate.resolve()
+		await run
+		agent.context.instructions.add({ name: 'format', content: 'Use lists.' })
+		first.add({ role: 'user', content: 'List them.' })
+		await agent.generate()
+
+		expect(provider.calls[0]?.messages[0]?.role).toBe('user')
+		expect(provider.calls[1]?.messages[0]?.role).toBe('system')
+		expect(provider.calls[1]?.messages[0]?.content).toContain('Be terse.')
+		expect(provider.calls[2]?.messages[0]?.role).toBe('system')
+		expect(provider.calls[2]?.messages[0]?.content).toContain('Use lists.')
+	})
+
+	it('refuses a malformed conversation option', () => {
+		const agent = createAgent(createConversationEchoProvider())
+		agent.context.messages.add({ role: 'user', content: 'Malformed option.' })
+		const starts = createRecorder<[id: string]>()
+		agent.emitter.on('start', starts.handler)
+
+		const caught = captureError(() =>
+			invokeUnchecked<AgentStreamInterface>(agent, agent.stream, [
+				{ conversation: { id: 'thread' } },
+			]),
+		)
+
+		if (!isContractError(caught)) throw new Error('expected a ContractError')
+		expect([caught.code, caught.message, caught.context]).toEqual([
+			'placement',
+			'Agent: conversation must implement ConversationInterface',
+			{ path: ['options', 'conversation'], limit: 'ConversationInterface', received: 'object' },
+		])
+		expect(starts.calls).toEqual([])
 	})
 })

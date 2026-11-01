@@ -1093,18 +1093,20 @@ describe('AgentContext — the active conversation as the message source', () =>
 		expect(conversations.count).toBe(1)
 	})
 
-	it('select() hands the handler a re-seated default conversation after the supplied registry is cleared', async () => {
+	it('select() passes its conversation through', async () => {
 		const selection = createRecordingSelection()
 		const conversations = new ConversationManager()
 		const context = new AgentContext({ conversations, select: selection.handler })
-		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		const conversation = context.messages
+		const request = conversation.add({ role: 'user', content: 'Invoice 42.' })
 		conversations.clear()
 		const signal = new AbortController().signal
 
-		await context.select(request, signal)
+		await context.select(conversation, request, signal)
 
-		expect(conversations.active).toBeDefined()
-		expect(selection.calls).toEqual([[conversations.active, request, signal]])
+		expect(conversations.active).toBeUndefined()
+		expect(conversations.count).toBe(0)
+		expect(selection.calls).toEqual([[conversation, request, signal]])
 	})
 
 	it('build() folds the active conversation view() — the live tail before any compaction', () => {
@@ -1288,7 +1290,7 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		const request = context.messages.add({ role: 'user', content: 'Summarize the ticket.' })
 
 		// `toBeUndefined` refuses a pending promise, so the call settled without one.
-		expect(context.select(request, new AbortController().signal)).toBeUndefined()
+		expect(context.select(context.messages, request, new AbortController().signal)).toBeUndefined()
 	})
 
 	it('runs the default with the active conversation, the request, and the signal', async () => {
@@ -1301,7 +1303,7 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 		const signal = new AbortController().signal
 
-		const selected = await context.select(request, signal)
+		const selected = await context.select(context.messages, request, signal)
 
 		expect(selected).toBe(selection.selections[0])
 		expect(selected?.messages.map((message) => message.content)).toEqual([
@@ -1318,13 +1320,13 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 		const signal = new AbortController().signal
 
-		await context.select(request, signal)
+		await context.select(context.messages, request, signal)
 		context.apply(new Scope({ name: 'answer', tools: [] }))
-		await context.select(request, signal)
+		await context.select(context.messages, request, signal)
 		context.apply(new Scope({ name: 'triage', select: mode.handler }))
-		await context.select(request, signal)
+		await context.select(context.messages, request, signal)
 		context.apply(undefined)
-		await context.select(request, signal)
+		await context.select(context.messages, request, signal)
 
 		expect(fallback.calls).toHaveLength(3)
 		expect(mode.calls).toHaveLength(1)
@@ -1341,7 +1343,9 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 		const conversation = requireValue(context.conversations.active)
 
-		const selected = requireValue(await context.select(request, new AbortController().signal))
+		const selected = requireValue(
+			await context.select(context.messages, request, new AbortController().signal),
+		)
 
 		expect(selected.messages).toEqual(conversation.view())
 		expect(selected.messages).toHaveLength(2)
@@ -1364,7 +1368,9 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		})
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 
-		const selected = requireValue(await context.select(request, new AbortController().signal))
+		const selected = requireValue(
+			await context.select(context.messages, request, new AbortController().signal),
+		)
 
 		expect(selected.fault).not.toBe(gaveUp)
 		expect(selected.fault?.message).toContain('changed during selection')
@@ -1383,7 +1389,9 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 		const conversation = requireValue(context.conversations.active)
 
-		const selected = requireValue(await context.select(request, new AbortController().signal))
+		const selected = requireValue(
+			await context.select(context.messages, request, new AbortController().signal),
+		)
 
 		expect(selected.messages.map((message) => message.content)).toEqual(['Invoice 43.'])
 		expect(selected.fault?.message).toBe(
@@ -1404,7 +1412,9 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 		const conversation = requireValue(context.conversations.active)
 
-		const selected = requireValue(await context.select(request, new AbortController().signal))
+		const selected = requireValue(
+			await context.select(context.messages, request, new AbortController().signal),
+		)
 
 		// The view holds the request alone, so the planted message sits at index 1.
 		expect(isConversationError(selected.fault) && selected.fault.code).toBe('ROLE')
@@ -1430,7 +1440,9 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		})
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 
-		const selected = requireValue(await context.select(request, new AbortController().signal))
+		const selected = requireValue(
+			await context.select(context.messages, request, new AbortController().signal),
+		)
 
 		expect(isConversationError(selected.fault) && selected.fault.code).toBe('ROLE')
 		expect(selected.fault?.message).toBe(
@@ -1443,9 +1455,9 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		const context = new AgentContext({ select: rejectSelection })
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 
-		await expect(context.select(request, new AbortController().signal)).rejects.toThrow(
-			'the judge is unreachable',
-		)
+		await expect(
+			context.select(context.messages, request, new AbortController().signal),
+		).rejects.toThrow('the judge is unreachable')
 	})
 })
 
@@ -1536,7 +1548,9 @@ describe('AgentContext — build(selection) folds the selected messages in place
 		})
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 
-		const selected = requireValue(await context.select(request, new AbortController().signal))
+		const selected = requireValue(
+			await context.select(context.messages, request, new AbortController().signal),
+		)
 
 		expect(selected.messages).toEqual(requireValue(context.conversations.active).view())
 		expect(selected.messages.some((message) => message.content.includes('Stale plan.'))).toBe(false)
@@ -1650,5 +1664,66 @@ describe('AgentContext — the system boundary canary', () => {
 
 		expect(context.build()).toStrictEqual([stored])
 		expect(context.build({ messages: [stored], judgments: [] })).toStrictEqual([stored])
+	})
+})
+
+describe('AgentContext — select over a given conversation', () => {
+	it('selects over the conversation passed', async () => {
+		const selection = createRecordingSelection()
+		const conversations = new ConversationManager()
+		const passed = conversations.add()
+		const active = conversations.add()
+		conversations.switch(active.id)
+		const context = new AgentContext({ conversations, select: selection.handler })
+		const request = passed.add({ role: 'user', content: 'Invoice 42.' })
+		const signal = new AbortController().signal
+
+		await context.select(passed, request, signal)
+
+		expect(selection.calls).toHaveLength(1)
+		expect(selection.calls[0]?.[0]).toBe(passed)
+		expect(selection.calls[0]?.slice(1)).toEqual([request, signal])
+	})
+
+	it('ignores a change to another conversation', async () => {
+		const conversations = new ConversationManager()
+		const passed = conversations.add()
+		const active = conversations.add()
+		conversations.switch(active.id)
+		const context = new AgentContext({
+			conversations,
+			select: async (conversation) => {
+				active.add({ role: 'user', content: 'Another thread grows.' })
+				return { messages: conversation.view(), judgments: [] }
+			},
+		})
+		const request = passed.add({ role: 'user', content: 'Invoice 42.' })
+
+		const selected = await context.select(passed, request, new AbortController().signal)
+
+		expect(selected?.fault).toBeUndefined()
+		expect(selected?.messages).toEqual(passed.view())
+	})
+
+	it('faults on a change to that conversation', async () => {
+		const conversations = new ConversationManager()
+		const passed = conversations.add()
+		const active = conversations.add()
+		conversations.switch(active.id)
+		const context = new AgentContext({
+			conversations,
+			select: async (conversation) => {
+				passed.add({ role: 'assistant', content: 'Appended during selection.' })
+				return { messages: conversation.view(), judgments: [] }
+			},
+		})
+		const request = passed.add({ role: 'user', content: 'Invoice 42.' })
+
+		const selected = await context.select(passed, request, new AbortController().signal)
+
+		expect(selected?.fault?.message).toBe(
+			`conversation ${passed.id} changed during selection: 1 messages before, 2 after`,
+		)
+		expect(selected?.messages).toEqual(passed.view())
 	})
 })

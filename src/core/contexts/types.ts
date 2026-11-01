@@ -1,8 +1,4 @@
-import type {
-	ConversationInterface,
-	ConversationManagerInterface,
-	MessageManagerInterface,
-} from '../conversations/index.js'
+import type { ConversationInterface, ConversationManagerInterface } from '../conversations/index.js'
 import type { Message } from '../types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
@@ -278,7 +274,7 @@ export interface Selection {
  * Chooses the conversation messages the next prompt carries for one user request.
  *
  * @remarks
- * Receives the active conversation, the user message the run serves (passed by the loop, because
+ * Receives the run's conversation, the user message the run serves (passed by the loop, because
  * a compaction can fold it into a section), and the run's abort signal. A handler that spent judge
  * calls before giving up returns a {@link Selection} with `fault` set, `messages` as `view()`, and
  * the usage spent, rather than throwing. A handler that recovers from an error returns no `fault`.
@@ -772,16 +768,17 @@ export interface AgentContextOptions {
 	/** Sets the initial active scope (the build-time filter); `undefined` ⇒ no filtering. */
 	readonly scope?: ScopeInterface
 	/**
-	 * Reuses a pre-built {@link ConversationManagerInterface} as the message source; a fresh
-	 * empty one is created when omitted. The constructor adds a default conversation when the
-	 * manager has no active one, so `messages` — the manager's active
-	 * conversation's live tail — is always defined. `build()` folds the active conversation's
+	 * Reuses a pre-built {@link ConversationManagerInterface}; a fresh empty one is created when
+	 * omitted. The constructor adds a default conversation when the manager has no active one, so
+	 * `messages` — the manager's active conversation's live tail, which an agent run binds when it
+	 * names no conversation — is always defined. `build()` folds the active conversation's
 	 * `view()` (the per-section summaries + the live tail), or a passed selection's `messages`.
 	 * The scope's filters never touch messages; message inclusion is the conversation's through
 	 * compaction and, when a handler is set, the selection's. A scope change reaches the prompt at
 	 * the next build or select site (run entry, the pre-first-turn compaction fold, or a compaction
 	 * rebuild) and the tools at the next turn's snapshot. The registry is structural; change its
-	 * active conversation through the manager's `switch(id)`.
+	 * active conversation through the manager's `switch(id)`, which sets the next run's default and
+	 * never moves a live run.
 	 */
 	readonly conversations?: ConversationManagerInterface
 	/**
@@ -798,7 +795,7 @@ export interface AgentContextOptions {
  * @remarks
  * The richer context — `system` (the optional system prompt), the prompt context managers
  * (`instructions` / `workspaces` / `conversations`), `messages` (the active
- * conversation's live tail, satisfying {@link MessageManagerInterface}), and the current `scope`
+ * conversation's live tail, satisfying {@link import('../conversations/index.js').MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
  * system prompt and the scoped instructions into one leading `system` message (under the
  * manager's `open`, each item through its `render`), renders the active workspace's scope-filtered
@@ -824,22 +821,24 @@ export interface AgentContextInterface {
 	 */
 	readonly workspaces: WorkspaceManagerInterface
 	/**
-	 * Holds the active conversation's live tail — the agent's message source, always defined (the
-	 * {@link conversations} registry always has an active conversation; a default is added at
-	 * construction). It is the active {@link ConversationInterface} itself (which satisfies
-	 * {@link MessageManagerInterface} structurally), so appends through `messages` route to the
-	 * active conversation's tail and `build()` folds its `view()`. Computed dynamically (it follows
-	 * `conversations.switch(id)`), the same reference the active conversation exposes — no
-	 * duplication.
+	 * Holds the active conversation's live tail — the default conversation of the next agent run,
+	 * never a live run's target, and always defined (the {@link conversations} registry always has
+	 * an active conversation; a default is added at construction). It is the active
+	 * {@link ConversationInterface} itself (which satisfies
+	 * {@link import('../conversations/index.js').MessageManagerInterface} structurally), so appends through `messages` route to the
+	 * active conversation's tail and `build()` with no selection folds its `view()`. Computed
+	 * dynamically (it follows `conversations.switch(id)`), the same reference the active
+	 * conversation exposes — no duplication. A run binds its conversation at its call, so a later
+	 * switch can leave `messages` on another conversation than a live run's.
 	 */
-	readonly messages: MessageManagerInterface
+	readonly messages: ConversationInterface
 	/**
-	 * Holds the {@link ConversationManagerInterface} the message source flows from — `messages` is its
-	 * active conversation's live tail and `build()` folds that conversation's `view()`. Always holds
-	 * an active conversation (a default is added at construction when none was supplied), so
-	 * `messages` is always defined. Switch the active conversation through
-	 * `conversations.switch(id)` — so one agent can serve many conversations (set the active one per
-	 * request). Switch between runs, not during one; for concurrent threads use separate agents.
+	 * Holds the {@link ConversationManagerInterface} whose active conversation is `messages` —
+	 * `build()` with no selection folds that conversation's `view()`. Always holds an active
+	 * conversation (a default is added at construction when none was supplied), so `messages` is
+	 * always defined. `conversations.switch(id)` sets the conversation the next run binds when it
+	 * names none, at any moment, and never moves a live run; a run that names its own
+	 * `conversation` reads no pointer at all.
 	 */
 	readonly conversations: ConversationManagerInterface
 	/**
@@ -869,7 +868,8 @@ export interface AgentContextInterface {
 	 * @remarks
 	 * Resolves the handler once per call. With no handler in either home it returns `undefined`
 	 * synchronously, so a caller awaits nothing. Otherwise it records the message ids of the
-	 * active conversation's `view()`, calls the handler, and compares the ids after it settles: an
+	 * given conversation's `view()`, hands that conversation to the handler, and compares the ids
+	 * after it settles, reading no other conversation, the active one included: an
 	 * unchanged view returns the handler's {@link Selection}; a changed view returns a selection
 	 * whose `fault` names the change, whose `messages` are the current `view()`, and which carries
 	 * the handler's `judgments` and `usage`. An unchanged view whose selection holds a message whose
@@ -878,6 +878,7 @@ export interface AgentContextInterface {
 	 * carries the handler's own `fault` as its `cause`. A handler throw rejects the returned promise
 	 * with the thrown value. The context stays event-free; the agent emits the receipt.
 	 *
+	 * @param conversation - The conversation the handler selects over and the check compares
 	 * @param request - The user message the run serves
 	 * @param signal - The run's abort signal, passed to the handler
 	 * @returns The pending {@link Selection}, or `undefined` when no handler is set
@@ -885,11 +886,15 @@ export interface AgentContextInterface {
 	 * @example
 	 * ```ts
 	 * const request = context.messages.add({ role: 'user', content: 'Summarize the ticket.' })
-	 * const selection = await context.select(request, new AbortController().signal)
+	 * const selection = await context.select(context.messages, request, new AbortController().signal)
 	 * context.build(selection)
 	 * ```
 	 */
-	select(request: Message, signal: AbortSignal): Promise<Selection> | undefined
+	select(
+		conversation: ConversationInterface,
+		request: Message,
+		signal: AbortSignal,
+	): Promise<Selection> | undefined
 	/**
 	 * Builds the provider input for the next turn: a leading `system` message folding the
 	 * prompt and the scope-filtered instructions (each section's header and each item's rendering

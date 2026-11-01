@@ -122,13 +122,14 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 	})
 }
 
-// A real error type, not a sentinel. A run that would share an accounting instance with a live
-// run would corrupt that accounting, so `stream()` throws this synchronously, before any state
-// mutation or emit, rather than letting the runs race. Carries a machine-readable `code` so a
+// A real error type, not a sentinel. A run that would share an accounting instance or a
+// conversation with a live run would corrupt that accounting or interleave that thread, so
+// `stream()` throws this synchronously, before any state mutation or emit, rather than letting the
+// runs race. Carries a machine-readable `code` so a
 // `catch` branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
 
 /**
- * Reports an `ask` on an authority that has no approver, a run sharing accounting with a live run, a `limit` that is not a nonnegative safe integer, a name absent from a registry pool, or a strict run whose request exceeds its window. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise; a `'WINDOW'` refusal rejects the run's `result` instead, and an `'APPROVER'` refusal rejects the promise the `ask` method of an `Authority` returns. Await the call inside `try`/`catch` to catch it.
+ * Reports an `ask` on an authority that has no approver, a run sharing accounting or a conversation with a live run, a `limit` that is not a nonnegative safe integer, a name absent from a registry pool, or a strict run whose request exceeds its window. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise; a `'WINDOW'` refusal rejects the run's `result` instead, and an `'APPROVER'` refusal rejects the promise the `ask` method of an `Authority` returns. Await the call inside `try`/`catch` to catch it.
  *
  * @remarks
  * `'APPROVER'` reports an `ask` on an `Authority` built with no `ask` handler; the agent loop
@@ -136,9 +137,11 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * `'CONCURRENCY'` reports a run started while another run on the same agent is live, when the
  * agent carries a `window` (a shared context budget) or when the run's effective `budget` or
  * `allowance` is an instance a live run holds — the second run's `start()` would replace that
- * instance's signal and race its charges against the first run's. Use separate agents, or
- * distinct budget and allowance instances per run with no `window`, for concurrent runs. Its
- * `context` names the `agent` id.
+ * instance's signal and race its charges against the first run's — or when a live run is bound to
+ * the run's conversation, whose turns the two runs would interleave; its `context` names the
+ * `agent` id, and the `conversation` id for a shared conversation. For concurrent runs, use
+ * separate agents, or one agent with no `window`, distinct budget and allowance instances per
+ * run, and a distinct conversation per run.
  * `'LIMIT'` reports a construction or per-run `limit` that is not a nonnegative safe integer,
  * including one a rehydrated job carries into `build`. `'REGISTRY'` reports a rehydration name
  * absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` / `build`;
@@ -149,7 +152,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * Narrow a caught value with {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver; `'CONCURRENCY'`: a run sharing accounting with a live run; `'LIMIT'`: a `limit` that is not a nonnegative safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
+	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver; `'CONCURRENCY'`: a run sharing accounting or a conversation with a live run; `'LIMIT'`: a `limit` that is not a nonnegative safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
 	readonly code: AgentErrorCode
 	/** Holds the values that locate the failure, such as the `agent` id of a refused run, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined

@@ -26,8 +26,8 @@ import { removeEntries } from '../helpers.js'
  *   default `#summarize` / `#keep` of the manager in unless the `input` overrides them, and stores
  *   it (an already-present `id` overwrites — last write wins). `count` is the map size,
  *   `conversation(id)` looks one up, `conversations()` lists them in insertion order.
- * - **Active pointer.** `active` is the active conversation (the agent's message source the
- *   context renders), `undefined` until the first `add` (which auto-activates it — a registry
+ * - **Active pointer.** `active` is the active conversation (the conversation an agent run binds
+ *   when it names none), `undefined` until the first `add` (which auto-activates it — a registry
  *   with conversations always has one active). A subsequent `add` leaves `active` unchanged.
  *   `switch(id)` re-points `active` to the conversation with `id` and returns it; an unknown `id`
  *   returns `undefined` and leaves `active` unchanged (the lenient lookup style — never throws,

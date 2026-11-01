@@ -1,5 +1,6 @@
 import type { Message } from '../types.js'
 import type { ProviderRequest } from '../providers/index.js'
+import type { ConversationInterface } from '../conversations/index.js'
 import type {
 	AgentInterface,
 	AgentJobInput,
@@ -29,6 +30,7 @@ import {
 } from '@orkestrel/contract'
 import { AUTHORITY_NOTES, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentError, AgentJobError } from './errors.js'
+import { isConversation } from '../conversations/index.js'
 import { hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 
@@ -623,6 +625,37 @@ export function requireBudget(
 	throw new ContractError(`Agent: ${key} must implement BudgetInterface`, {
 		code: 'placement',
 		context: { path: ['options', key], limit: 'BudgetInterface', received: preview(value) },
+	})
+}
+
+/**
+ * Returns a run's `conversation` option after checking it implements `ConversationInterface`, or
+ * throws a coded error before the run starts.
+ *
+ * @remarks
+ * The check is {@link isConversation}, a total guard. `undefined` passes, because an absent option
+ * binds the run to the active conversation. The error's `context` carries the option path, the
+ * limit `'ConversationInterface'`, and a preview of the refused value.
+ *
+ * @param value - The run's `conversation` option, or `undefined`
+ * @returns The value unchanged
+ * @throws {ContractError} Thrown when `value` is defined and does not implement `ConversationInterface` (code `'placement'`)
+ *
+ * @example
+ * ```ts
+ * requireConversation(createConversation()) // the conversation
+ * requireConversation({ id: 'c1' }) // throws ContractError ('placement')
+ * ```
+ */
+export function requireConversation(value: unknown): ConversationInterface | undefined {
+	if (value === undefined || isConversation(value)) return value
+	throw new ContractError('Agent: conversation must implement ConversationInterface', {
+		code: 'placement',
+		context: {
+			path: ['options', 'conversation'],
+			limit: 'ConversationInterface',
+			received: preview(value),
+		},
 	})
 }
 

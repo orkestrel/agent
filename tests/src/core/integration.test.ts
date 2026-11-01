@@ -6,6 +6,7 @@ import {
 	ProviderAbortError,
 	ProviderError,
 	providerRequestContract,
+	REFUSED_RELAY_STATUS,
 	RELAY_PROVIDER_MESSAGE,
 	relayFrameContract,
 } from '@src/core'
@@ -87,6 +88,9 @@ describe('in-process relay hop', () => {
 			url: 'http://relay.test/exact?route=turn',
 			authorize: (request) => request.headers.get('authorization') === 'Bearer fixture',
 			headers: () => ({ authorization: 'Bearer fixture' }),
+			tools: {
+				definitions: [{ name: 'add', description: 'Adds numbers', parameters: { type: 'object' } }],
+			},
 			request: async (input, init) => {
 				const request = new Request(input, init)
 				requests.push(request)
@@ -209,6 +213,47 @@ describe('in-process relay hop', () => {
 			name: 'ProviderError',
 			code: 'PROVIDER',
 			message: RELAY_PROVIDER_MESSAGE,
+		})
+	})
+	it('carries a 422 refusal to the browser', async () => {
+		const provider = new RecordedProvider()
+		const browser = createRelayHop({ provider })
+		const result = browser.generate(
+			[{ id: 's1', role: 'system', content: 'Answer in French.' }],
+			new AbortController().signal,
+		)
+		await expect(result).rejects.toBeInstanceOf(ProviderError)
+		await expect(result).rejects.toMatchObject({
+			code: 'HTTP',
+			status: REFUSED_RELAY_STATUS,
+			message: expect.stringMatching(`^provider error: ${REFUSED_RELAY_STATUS} - messages\\[0\\]:`),
+		})
+		expect(provider.entries).toBe(0)
+	})
+	it('rejects a page agent run with system', async () => {
+		const provider = new RecordedProvider()
+		const agent = createAgent(createRelayHop({ provider }), { system: 'Answer in French.' })
+		agent.context.messages.add({ role: 'user', content: 'Where is BW-5512?' })
+		await expect(agent.generate()).rejects.toMatchObject({
+			code: 'HTTP',
+			status: REFUSED_RELAY_STATUS,
+		})
+		expect(agent.context.messages.messages().map((message) => message.role)).toEqual(['user'])
+		expect(provider.entries).toBe(0)
+	})
+	it('runs a page agent under server text', async () => {
+		const provider = createScriptedProvider([{ content: 'BW-5512 is in Lyon.' }], {
+			recorded: true,
+		})
+		const agent = createAgent(
+			createRelayHop({ provider, system: { text: 'Answer for the shipping desk.' } }),
+		)
+		agent.context.messages.add({ role: 'user', content: 'Where is BW-5512?' })
+		const result = await agent.generate()
+		expect(result.content).toBe('BW-5512 is in Lyon.')
+		expect(requireValue(provider.calls[0]).messages[0]).toMatchObject({
+			role: 'system',
+			content: 'Answer for the shipping desk.',
 		})
 	})
 })

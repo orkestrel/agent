@@ -3,19 +3,24 @@ import type {
 	RelayHandler,
 	RelayOptions,
 	RelayProviderOptions,
+	RelaySystemOptions,
+	RelayToolOptions,
 	SystemOneJudgeOptions,
 	ThinkSplitterInterface,
 } from './types.js'
 import type { JudgeInterface } from '../types.js'
-import { parseJSONAs } from '@orkestrel/contract'
+import { attempt, cloneJSONValue, parseJSONAs, preview } from '@orkestrel/contract'
 import {
 	DEFAULT_RELAY_LIMIT,
 	INVALID_RELAY_STATUS,
 	OVERSIZED_RELAY_STATUS,
+	REFUSED_RELAY_CONTENT_TYPE,
+	REFUSED_RELAY_STATUS,
 	UNAUTHORIZED_RELAY_STATUS,
 	UPSTREAM_RELAY_STATUS,
 } from './constants.js'
-import { readBodyText } from './helpers.js'
+import { buildRelayRequest, describeRelayRefusal, readBodyText, requestToRelay } from './helpers.js'
+import { ProviderError } from './errors.js'
 import { providerRequestContract } from './contracts.js'
 import { RelayStream } from './RelayStream.js'
 import { RelayProvider } from './RelayProvider.js'
@@ -28,11 +33,21 @@ import { SystemOneJudge } from './SystemOneJudge.js'
  * @remarks
  * Answers with the `401` status when authorization refuses or throws, the `400`
  * status when the body is missing, unreadable, or invalid, the `413` status when
- * the body fills its byte budget or the inbound read is aborted, and the `502`
- * status when the upstream provider call cannot be constructed. Refusals carry no body.
+ * the body fills its byte budget or the inbound read is aborted, the `422` status when
+ * the request carries a page `system` message or tool definition that `options.system` or
+ * `options.tools` does not admit, and the `502` status when the upstream provider call cannot
+ * be constructed. A `422` refusal carries one `text/plain` line per refused member, as
+ * {@link describeRelayRefusal} writes it, and the page reads at most `MAX_ERROR_BODY_LENGTH`
+ * bytes of that body into its error message; every other refusal carries no body. An admitted
+ * request is forwarded as {@link buildRelayRequest} builds it, the server's text first, and
+ * `limit` counts only the inbound bytes. The handler copies `options.system` and the tool
+ * definitions at construction, so a later change to either has no effect.
  *
- * @param options - The upstream provider, authorization decision, and optional byte budget
+ * @param options - The upstream provider, authorization decision, optional byte budget, and
+ * system turn and tool definition policy
  * @returns A fetch-standard handler suitable for a router
+ * @throws {ProviderError} Thrown with the `PROTOCOL` code when `options.tools.definitions` is not
+ * JSON or repeats a name
  * @example Mounting the relay on your server
  * ```ts
  * import type { ProviderInterface } from '@orkestrel/agent'
@@ -62,6 +77,34 @@ import { SystemOneJudge } from './SystemOneJudge.js'
  */
 export function createRelay(options: RelayOptions): RelayHandler {
 	const { provider, authorize, limit } = options
+	const system: RelaySystemOptions = { ...options.system }
+	const { definitions, accept } = options.tools ?? {}
+	const snapshot = attempt(() =>
+		cloneJSONValue(requestToRelay({ messages: [], tools: definitions ?? [] })),
+	)
+	if (!snapshot.success) {
+		throw new ProviderError('PROTOCOL', 'relay tool definitions are not JSON', {
+			cause: snapshot.error,
+		})
+	}
+	if (!providerRequestContract.is(snapshot.value)) {
+		throw new ProviderError('PROTOCOL', 'relay tool definitions are not JSON')
+	}
+	const owned = snapshot.value.tools ?? []
+	const names = new Set<string>()
+	for (const tool of owned) {
+		if (names.has(tool.name)) {
+			throw new ProviderError(
+				'PROTOCOL',
+				`relay tool definitions repeat the name ${preview(tool.name)}`,
+			)
+		}
+		names.add(tool.name)
+	}
+	const tools: RelayToolOptions = {
+		...(definitions === undefined ? {} : { definitions: owned }),
+		...(accept === undefined ? {} : { accept }),
+	}
 	return async (request) => {
 		try {
 			if ((await authorize(request)) !== true) {
@@ -84,8 +127,15 @@ export function createRelay(options: RelayOptions): RelayHandler {
 		if (!read.complete) return new Response(undefined, { status: OVERSIZED_RELAY_STATUS })
 		const parsed = parseJSONAs(read.text, providerRequestContract.is)
 		if (parsed === undefined) return new Response(undefined, { status: INVALID_RELAY_STATUS })
+		const built = buildRelayRequest(parsed, { system, tools })
+		if (!built.success) {
+			return new Response(built.error.map(describeRelayRefusal).join('\n'), {
+				status: REFUSED_RELAY_STATUS,
+				headers: { 'content-type': REFUSED_RELAY_CONTENT_TYPE, 'cache-control': 'no-store' },
+			})
+		}
 		try {
-			return new RelayStream({ provider, request: parsed, signal: request.signal }).response
+			return new RelayStream({ provider, request: built.value, signal: request.signal }).response
 		} catch {
 			return new Response(undefined, { status: UPSTREAM_RELAY_STATUS })
 		}

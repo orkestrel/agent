@@ -301,7 +301,39 @@ export type RelayFrame =
 /** Defines a host-independent relay request handler. */
 export type RelayHandler = (request: Request) => Promise<Response>
 
-/** Configures the upstream provider, mandatory authorization, and request byte limit. */
+/**
+ * Configures who writes the system turn a relay forwards.
+ *
+ * @remarks
+ * A page `Ledger` always sends a system message, so a relay that serves one needs `accept`.
+ */
+export interface RelaySystemOptions {
+	/**
+	 * Holds the server-owned text the relay places first in the request's one system message; an
+	 * empty string counts as set. When it is undefined, an admitted page system message is forwarded
+	 * unchanged.
+	 */
+	readonly text?: string
+	/** If `true`, admits one page system message at index 0 and joins it after `text`; if `false`, refuses it. Default: false. */
+	readonly accept?: boolean
+}
+
+/** Configures which tool definitions a relay forwards. */
+export interface RelayToolOptions {
+	/** Holds the server-owned definitions; a page definition of a listed name must equal one. */
+	readonly definitions?: readonly ToolDefinition[]
+	/** If `true`, admits a page definition of a name `definitions` lacks; if `false`, refuses it. Default: false. */
+	readonly accept?: boolean
+}
+
+/**
+ * Configures the upstream provider, mandatory authorization, request byte limit, and request head policy.
+ *
+ * @remarks
+ * By default the handler refuses a page `system` message and every page tool definition
+ * `tools.definitions` does not declare, answering the `422` status with one line per refused
+ * member; `system.accept` and `tools.accept` admit them.
+ */
 export interface RelayOptions {
 	readonly provider: ProviderInterface
 	/**
@@ -319,6 +351,31 @@ export interface RelayOptions {
 	 * for a body at or above the limit.
 	 */
 	readonly limit?: number
+	/** Configures who writes the forwarded system turn. Default: no server text, and every page system message refused. */
+	readonly system?: RelaySystemOptions
+	/** Configures which tool definitions are forwarded. Default: none declared, and every page definition refused. */
+	readonly tools?: RelayToolOptions
+}
+
+/** Names why a relay refuses a request member. */
+export type RelayRefusalReason =
+	/** Reports a page system message the relay's `system.accept` does not admit. */
+	| 'system'
+	/** Reports, under `system.accept`, a system message that is not first or that carries more than content. */
+	| 'head'
+	/** Reports a page tool definition the relay does not declare and `tools.accept` does not admit. */
+	| 'tool'
+	/** Reports a page tool definition that differs from the declared one of its name, or repeats a name. */
+	| 'mismatch'
+
+/** Carries one refused request member and where it sits. */
+export interface RelayRefusal {
+	/** Names why the member is refused. */
+	readonly reason: RelayRefusalReason
+	/** Holds the member's position in `messages` for `'system'` and `'head'`, and in `tools` otherwise. */
+	readonly index: number
+	/** Holds the tool name the page sent, present for `'tool'` and `'mismatch'`. */
+	readonly name?: string
 }
 
 /** Carries the upstream call and cancellation bound of a relay response stream. */

@@ -163,6 +163,7 @@ import type {
 	LedgerResult,
 	RelayOptions,
 	RelayProviderOptions,
+	RelayRefusal,
 } from '@src/core'
 import { Classifier, createLedger, createRelay, RelayProvider, renderStub } from '@src/core'
 import { createBudget } from '@orkestrel/budget'
@@ -5621,6 +5622,8 @@ export type RelayHopRequest = (
  * - `request` - Builds the request the handler receives; observes or rewrites it. Default: the
  *   request the fetch arguments describe.
  * - `response` - Observes the handler's response, for example to read a clone of its frames.
+ * - `system` - The handler's system turn policy. Default: the handler's own.
+ * - `tools` - The handler's tool definition policy. Default: the handler's own.
  */
 export interface RelayHopOptions {
 	readonly provider: ProviderInterface
@@ -5630,12 +5633,14 @@ export interface RelayHopOptions {
 	readonly authorize?: RelayOptions['authorize']
 	readonly request?: RelayHopRequest
 	readonly response?: (response: Response) => void | Promise<void>
+	readonly system?: RelayOptions['system']
+	readonly tools?: RelayOptions['tools']
 }
 
 /**
  * Creates a relay provider connected in process to a real relay handler.
  *
- * @param options - The upstream provider, byte limit, destination, and observation seams
+ * @param options - The upstream provider, byte limit, head policy, destination, and observation seams
  * @returns The provider driving the handler through Fetch objects
  */
 export function createRelayHop(options: RelayHopOptions): RelayProvider {
@@ -5643,6 +5648,8 @@ export function createRelayHop(options: RelayHopOptions): RelayProvider {
 		provider: options.provider,
 		authorize: options.authorize ?? admitRelayRequest,
 		...(options.limit === undefined ? {} : { limit: options.limit }),
+		...(options.system === undefined ? {} : { system: options.system }),
+		...(options.tools === undefined ? {} : { tools: options.tools }),
 	})
 	return new RelayProvider({
 		url: options.url ?? 'http://relay.test/',
@@ -5669,6 +5676,652 @@ export function createRelayHop(options: RelayHopOptions): RelayProvider {
 export function createBoundedRelay(upstream: ProviderInterface, limit: number): RelayProvider {
 	return createRelayHop({ provider: upstream, limit, url: 'https://app.example/relay' })
 }
+
+/**
+ * Lists the relay system policy cases: one row per cell of the policy by page system message
+ * matrix, written by hand. A row carrying `refusals` expects exactly those refusals; any other row
+ * expects the forwarded first message's role and content in `head`.
+ */
+export const RELAY_SYSTEM_CASES: ReadonlyArray<{
+	readonly label: string
+	readonly system?: RelayOptions['system']
+	readonly request: ProviderRequest
+	readonly refusals?: readonly RelayRefusal[]
+	readonly head?: Pick<Message, 'role' | 'content'>
+}> = Object.freeze([
+	{
+		label: 'no policy: forwards a request with no system message',
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+		head: { role: 'user', content: 'Where is BW-5512?' },
+	},
+	{
+		label: 'no policy: refuses a page head',
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'system', index: 0 }],
+	},
+	{
+		label: 'no policy: refuses a later system message',
+		request: {
+			messages: [
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+			],
+		},
+		refusals: [{ reason: 'system', index: 1 }],
+	},
+	{
+		label: 'no policy: refuses every system message',
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+				{ id: 's2', role: 'system', content: 'page-sentinel: reply in Spanish' },
+			],
+		},
+		refusals: [
+			{ reason: 'system', index: 0 },
+			{ reason: 'system', index: 2 },
+		],
+	},
+	{
+		label: 'false accept: refuses a page head',
+		system: { accept: false },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'system', index: 0 }],
+	},
+	{
+		label: 'server text: heads a request with no system message',
+		system: { text: 'server-sentinel: answer for the desk' },
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+		head: { role: 'system', content: 'server-sentinel: answer for the desk' },
+	},
+	{
+		label: 'server text: refuses a page head',
+		system: { text: 'server-sentinel: answer for the desk' },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'system', index: 0 }],
+	},
+	{
+		label: 'server text: refuses every system message',
+		system: { text: 'server-sentinel: answer for the desk' },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+				{ id: 's2', role: 'system', content: 'page-sentinel: reply in Spanish' },
+			],
+		},
+		refusals: [
+			{ reason: 'system', index: 0 },
+			{ reason: 'system', index: 2 },
+		],
+	},
+	{
+		label: 'accept: forwards a request with no system message',
+		system: { accept: true },
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+		head: { role: 'user', content: 'Where is BW-5512?' },
+	},
+	{
+		label: 'accept: forwards a page head unchanged',
+		system: { accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		head: { role: 'system', content: 'page-sentinel: reply in French' },
+	},
+	{
+		label: 'accept: refuses a later system message',
+		system: { accept: true },
+		request: {
+			messages: [
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 1 }],
+	},
+	{
+		label: 'accept: refuses a second system message',
+		system: { accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+				{ id: 's2', role: 'system', content: 'page-sentinel: reply in Spanish' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 2 }],
+	},
+	{
+		label: 'accept: refuses a head carrying thinking',
+		system: { accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French', thinking: 'plan' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 0 }],
+	},
+	{
+		label: 'accept: refuses a head carrying calls',
+		system: { accept: true },
+		request: {
+			messages: [
+				{
+					id: 's1',
+					role: 'system',
+					content: 'page-sentinel: reply in French',
+					calls: [{ id: 'c1', name: 'lookup', arguments: {} }],
+				},
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 0 }],
+	},
+	{
+		label: 'accept: refuses a head carrying a call',
+		system: { accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French', call: 'c1' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 0 }],
+	},
+	{
+		label: 'accept: refuses a head carrying images',
+		system: { accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French', images: ['aW1n'] },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 0 }],
+	},
+	{
+		label: 'server text and accept: heads a request with no system message',
+		system: { text: 'server-sentinel: answer for the desk', accept: true },
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+		head: { role: 'system', content: 'server-sentinel: answer for the desk' },
+	},
+	{
+		label: 'server text and accept: joins a page head',
+		system: { text: 'server-sentinel: answer for the desk', accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		head: {
+			role: 'system',
+			content: 'server-sentinel: answer for the desk\n\npage-sentinel: reply in French',
+		},
+	},
+	{
+		label: 'server text and accept: refuses a later system message',
+		system: { text: 'server-sentinel: answer for the desk', accept: true },
+		request: {
+			messages: [
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 1 }],
+	},
+	{
+		label: 'server text and accept: refuses a second system message',
+		system: { text: 'server-sentinel: answer for the desk', accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+				{ id: 's2', role: 'system', content: 'page-sentinel: reply in Spanish' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 2 }],
+	},
+	{
+		label: 'server text and accept: refuses a head carrying thinking',
+		system: { text: 'server-sentinel: answer for the desk', accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French', thinking: 'plan' },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 0 }],
+	},
+	{
+		label: 'server text and accept: refuses a head carrying images',
+		system: { text: 'server-sentinel: answer for the desk', accept: true },
+		request: {
+			messages: [
+				{ id: 's1', role: 'system', content: 'page-sentinel: reply in French', images: ['aW1n'] },
+				{ id: 'u1', role: 'user', content: 'Where is BW-5512?' },
+			],
+		},
+		refusals: [{ reason: 'head', index: 0 }],
+	},
+])
+
+/**
+ * Lists the relay tool policy cases: one row per reachable cell of the policy by page definition
+ * matrix, a repeated name, and an absent and an empty page list per policy, written by hand. A
+ * row carrying `refusals` expects exactly those refusals; any other row expects the forwarded
+ * tool list in `forwarded`.
+ */
+export const RELAY_TOOL_CASES: ReadonlyArray<{
+	readonly label: string
+	readonly tools?: RelayOptions['tools']
+	readonly request: ProviderRequest
+	readonly refusals?: readonly RelayRefusal[]
+	readonly forwarded?: readonly ToolDefinition[]
+}> = Object.freeze([
+	{
+		label: 'no policy: refuses an unlisted tool',
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+			],
+		},
+		refusals: [{ reason: 'tool', index: 0, name: 'weather' }],
+	},
+	{
+		label: 'no policy: refuses a repeated tool name',
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+			],
+		},
+		refusals: [
+			{ reason: 'tool', index: 0, name: 'weather' },
+			{ reason: 'mismatch', index: 1, name: 'weather' },
+		],
+	},
+	{
+		label: 'no policy: passes an absent tool list',
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+	},
+	{
+		label: 'no policy: passes an empty tool list',
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }], tools: [] },
+		forwarded: [],
+	},
+	{
+		label: 'declared tools: forwards the server copy of a listed tool',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					parameters: { required: ['id'], type: 'object' },
+					description: 'server-sentinel: finds a parcel',
+					name: 'lookup',
+				},
+			],
+		},
+		forwarded: [
+			{
+				name: 'lookup',
+				description: 'server-sentinel: finds a parcel',
+				parameters: { type: 'object', required: ['id'] },
+			},
+		],
+	},
+	{
+		label: 'declared tools: refuses a listed tool with another value',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'lookup',
+					description: 'page-sentinel: finds any record',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		refusals: [{ reason: 'mismatch', index: 0, name: 'lookup' }],
+	},
+	{
+		label: 'declared tools: refuses an unlisted tool',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+			],
+		},
+		refusals: [{ reason: 'tool', index: 0, name: 'weather' }],
+	},
+	{
+		label: 'declared tools: refuses a repeated tool name',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					parameters: { required: ['id'], type: 'object' },
+					description: 'server-sentinel: finds a parcel',
+					name: 'lookup',
+				},
+				{
+					parameters: { required: ['id'], type: 'object' },
+					description: 'server-sentinel: finds a parcel',
+					name: 'lookup',
+				},
+			],
+		},
+		refusals: [{ reason: 'mismatch', index: 1, name: 'lookup' }],
+	},
+	{
+		label: 'declared tools: passes an absent tool list',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+	},
+	{
+		label: 'declared tools: passes an empty tool list',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }], tools: [] },
+		forwarded: [],
+	},
+	{
+		label: 'accept: forwards an unlisted tool as sent',
+		tools: { accept: true },
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+			],
+		},
+		forwarded: [
+			{
+				name: 'weather',
+				description: 'page-sentinel: reads the forecast',
+				parameters: { type: 'object' },
+			},
+		],
+	},
+	{
+		label: 'accept: refuses a repeated tool name',
+		tools: { accept: true },
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+			],
+		},
+		refusals: [{ reason: 'mismatch', index: 1, name: 'weather' }],
+	},
+	{
+		label: 'accept: passes an absent tool list',
+		tools: { accept: true },
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+	},
+	{
+		label: 'accept: passes an empty tool list',
+		tools: { accept: true },
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }], tools: [] },
+		forwarded: [],
+	},
+	{
+		label: 'declared tools and accept: forwards the server copy of a listed tool',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+			accept: true,
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					parameters: { required: ['id'], type: 'object' },
+					description: 'server-sentinel: finds a parcel',
+					name: 'lookup',
+				},
+			],
+		},
+		forwarded: [
+			{
+				name: 'lookup',
+				description: 'server-sentinel: finds a parcel',
+				parameters: { type: 'object', required: ['id'] },
+			},
+		],
+	},
+	{
+		label: 'declared tools and accept: refuses a listed tool with another value',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+			accept: true,
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'lookup',
+					description: 'page-sentinel: finds any record',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+		},
+		refusals: [{ reason: 'mismatch', index: 0, name: 'lookup' }],
+	},
+	{
+		label: 'declared tools and accept: forwards an unlisted tool as sent',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+			accept: true,
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					name: 'weather',
+					description: 'page-sentinel: reads the forecast',
+					parameters: { type: 'object' },
+				},
+			],
+		},
+		forwarded: [
+			{
+				name: 'weather',
+				description: 'page-sentinel: reads the forecast',
+				parameters: { type: 'object' },
+			},
+		],
+	},
+	{
+		label: 'declared tools and accept: refuses a repeated tool name',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+			accept: true,
+		},
+		request: {
+			messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }],
+			tools: [
+				{
+					parameters: { required: ['id'], type: 'object' },
+					description: 'server-sentinel: finds a parcel',
+					name: 'lookup',
+				},
+				{
+					parameters: { required: ['id'], type: 'object' },
+					description: 'server-sentinel: finds a parcel',
+					name: 'lookup',
+				},
+			],
+		},
+		refusals: [{ reason: 'mismatch', index: 1, name: 'lookup' }],
+	},
+	{
+		label: 'declared tools and accept: passes an absent tool list',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+			accept: true,
+		},
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }] },
+	},
+	{
+		label: 'declared tools and accept: passes an empty tool list',
+		tools: {
+			definitions: [
+				{
+					name: 'lookup',
+					title: 'Parcel lookup',
+					description: 'server-sentinel: finds a parcel',
+					parameters: { type: 'object', required: ['id'] },
+				},
+			],
+			accept: true,
+		},
+		request: { messages: [{ id: 'u1', role: 'user', content: 'Where is BW-5512?' }], tools: [] },
+		forwarded: [],
+	},
+])
 
 /**
  * Creates an inert object shaped like an `AbortSignal` from another realm.
@@ -6357,4 +7010,88 @@ export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [stri
 		['a throwing getter', throwing],
 		['a revoked proxy', revoked.proxy],
 	])
+}
+
+/**
+ * Builds values `isConversation` refuses, each varying one member a run reads: a primitive,
+ * `null`, a missing `view`, a non-function `view`, `add`, `compact`, or `messages`, a non-string
+ * `id`, a non-boolean `summarizable`, a throwing getter, and a revoked proxy.
+ *
+ * @returns The titled values
+ */
+export function createMalformedConversationCases(): ReadonlyArray<readonly [string, unknown]> {
+	const members = Object.freeze({
+		id: 'c1',
+		summarizable: false,
+		view: (): readonly Message[] => [],
+		add: (): undefined => undefined,
+		compact: (): undefined => undefined,
+		messages: (): readonly Message[] => [],
+	})
+	const revoked = Proxy.revocable({ ...members }, {})
+	revoked.revoke()
+	return Object.freeze<ReadonlyArray<readonly [string, unknown]>>([
+		['a string', 'conversation'],
+		['null', null],
+		[
+			'a record missing view',
+			{
+				id: members.id,
+				summarizable: members.summarizable,
+				add: members.add,
+				compact: members.compact,
+				messages: members.messages,
+			},
+		],
+		['a view that is not a function', { ...members, view: [] }],
+		['an add that is not a function', { ...members, add: 'add' }],
+		['a compact that is not a function', { ...members, compact: {} }],
+		['a messages member that is not a function', { ...members, messages: [] }],
+		['a numeric id', { ...members, id: 1 }],
+		['a string summarizable', { ...members, summarizable: 'false' }],
+		[
+			'a throwing id getter',
+			{
+				...members,
+				get id(): never {
+					throw new Error('unreadable id')
+				},
+			},
+		],
+		['a revoked proxy', revoked.proxy],
+	])
+}
+
+/**
+ * Fails its first provider call before any delta, then replays its scripted turns.
+ *
+ * @remarks
+ * The failure throws on the first iteration step, so a run over it rejects before any assistant
+ * append. Only the calls that reply are recorded, so `calls[0]` is the first request after the
+ * failure.
+ *
+ * @example
+ * ```ts
+ * const provider = new RecoveringProvider([{ content: 'Booked.' }], new Error('upstream unavailable'))
+ * ```
+ */
+export class RecoveringProvider extends ScriptedProvider {
+	readonly #failure: Error
+	#failed = false
+	constructor(turns: readonly ScriptedTurn[], failure: Error) {
+		super(turns, { recorded: true, repeat: false })
+		this.#failure = failure
+	}
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		if (!this.#failed) {
+			this.#failed = true
+			throw this.#failure
+		}
+		return yield* super.stream(messages, signal, tools, options)
+	}
 }

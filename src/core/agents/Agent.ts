@@ -14,7 +14,7 @@ import type {
 } from './types.js'
 import type { ProviderInterface, ProviderRequest, ProviderResult } from '../providers/index.js'
 import type { AgentContextInterface, Selection } from '../contexts/index.js'
-import type { Section } from '../conversations/index.js'
+import type { ConversationInterface, Section } from '../conversations/index.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, MeterInterface, TokenUsage } from '@orkestrel/budget'
@@ -48,6 +48,7 @@ import {
 	inferStop,
 	renderToolValue,
 	requireBudget,
+	requireConversation,
 	requireLimit,
 	resolveDecision,
 } from './helpers.js'
@@ -138,12 +139,19 @@ export class Agent implements AgentInterface {
 	// overlapping run can never report `done` while another is still in flight.
 	#settled: AgentStatus = 'idle'
 	// Every in-flight run's abort handle, mapped to the distinct budget and allowance instances that
-	// run holds — a run adds its entry on `stream()` and its settle removes it, so `abort()` fires
-	// every live run, not only the most recent, and the concurrency guard reads which instances are
-	// held. Per-run, never a single shared slot a later `stream()` could clobber: `generate`/`stream`
-	// are reusable and may overlap, and each run must cancel independently (its own `stream.abort()`
-	// fires its own handle; `agent.abort()` fires them all).
-	readonly #runs = new Map<AbortInterface, ReadonlyArray<BudgetInterface<TokenUsage>>>()
+	// run holds and the conversation it is bound to — a run adds its entry on `stream()` and its
+	// settle removes it, so `abort()` fires every live run, not only the most recent, and the
+	// concurrency guards read which instances and conversations are held. Per-run, never a single
+	// shared slot a later `stream()` could clobber: `generate`/`stream` are reusable and may overlap,
+	// and each run must cancel independently (its own `stream.abort()` fires its own handle;
+	// `agent.abort()` fires them all).
+	readonly #runs = new Map<
+		AbortInterface,
+		{
+			readonly budgets: ReadonlyArray<BudgetInterface<TokenUsage>>
+			readonly conversation: ConversationInterface
+		}
+	>()
 
 	constructor(provider: ProviderInterface, options?: AgentOptions) {
 		this.#limit = requireLimit(options?.limit ?? DEFAULT_AGENT_LIMIT)
@@ -220,12 +228,24 @@ export class Agent implements AgentInterface {
 		if (
 			this.#runs.size > 0 &&
 			(this.#window !== undefined ||
-				[...this.#runs.values()].some((live) => live.some((one) => held.includes(one))))
+				[...this.#runs.values()].some((live) => live.budgets.some((one) => held.includes(one))))
 		) {
 			throw new AgentError(
 				'CONCURRENCY',
 				'a live run on this agent holds the window or this budget or allowance instance; use separate agents or distinct instances per run',
 				{ context: { agent: this.#id } },
+			)
+		}
+		// The run binds its conversation here, at the call: a later `switch`, `open`, `remove`,
+		// `clear`, or same-id `add` moves the pointer, never this run. One live run per conversation —
+		// two would interleave their turns in one thread — refused synchronously, before any `start()`
+		// or emit, like the guard above.
+		const conversation = requireConversation(options?.conversation) ?? this.#context.messages
+		if ([...this.#runs.values()].some((live) => live.conversation === conversation)) {
+			throw new AgentError(
+				'CONCURRENCY',
+				'a live run on this agent holds this conversation; await it or bind the run to another conversation',
+				{ context: { agent: this.#id, conversation: conversation.id } },
 			)
 		}
 		// The deadline is created unarmed: its signal keeps its identity when `start()` arms it, so
@@ -239,7 +259,7 @@ export class Agent implements AgentInterface {
 		const signal = this.#combineSignals(timeout, budget, allowance, options?.signal)
 		const abort = createAbort(signal === undefined ? {} : { signal })
 		timeout?.start()
-		this.#runs.set(abort, held)
+		this.#runs.set(abort, { budgets: held, conversation })
 		// Observe the run begin — after the run joins `#runs` (which is what `status` derives
 		// `running` from), so a swallowed listener throw can't perturb the state the drive is
 		// about to change.
@@ -252,6 +272,7 @@ export class Agent implements AgentInterface {
 		// `provider.stream`; `limit` / `budget` / `allowance` ride through as the effective run bounds.
 		void this.#drive(
 			abort,
+			conversation,
 			channel,
 			options?.think,
 			options?.schema,
@@ -330,6 +351,7 @@ export class Agent implements AgentInterface {
 	// return value; a genuine provider / tool error rejects. `for await` would discard the return.
 	async #drive(
 		abort: AbortInterface,
+		conversation: ConversationInterface,
 		channel: Channel<AgentChunk>,
 		think: boolean | undefined,
 		schema: Readonly<Record<string, unknown>> | undefined,
@@ -337,7 +359,7 @@ export class Agent implements AgentInterface {
 		budget: BudgetInterface<TokenUsage> | undefined,
 		allowance: BudgetInterface<TokenUsage> | undefined,
 	): Promise<AgentRunResult> {
-		const run = this.#execute(abort, think, schema, limit, budget, allowance)
+		const run = this.#execute(abort, conversation, think, schema, limit, budget, allowance)
 		for (;;) {
 			const next = await run.next()
 			if (next.done === true) return next.value
@@ -375,6 +397,7 @@ export class Agent implements AgentInterface {
 	// provider a step sooner.
 	async *#execute(
 		abort: AbortInterface,
+		conversation: ConversationInterface,
 		think: boolean | undefined,
 		schema: Readonly<Record<string, unknown>> | undefined,
 		limit: number,
@@ -383,14 +406,14 @@ export class Agent implements AgentInterface {
 	): AsyncGenerator<AgentChunk, AgentRunResult> {
 		// Compaction can fold the request into a section, so every select site receives the object
 		// captured at run entry.
-		const last = this.#context.conversations.active?.view().at(-1)
+		const last = conversation.view().at(-1)
 		const request = last?.role === 'user' ? last : undefined
 		// `#select` returns `undefined` when no handler is set, so the default path awaits nothing
 		// before the first provider request.
-		const selecting = this.#select(request, abort, budget)
+		const selecting = this.#select(conversation, request, abort, budget)
 		const entry =
 			selecting === undefined
-				? { messages: this.#context.build(), usage: undefined }
+				? { messages: this.#build(conversation), usage: undefined }
 				: await selecting
 		const tools = this.#context.tools
 		// The per-call options are fixed for the run, so every request carries this one snapshot;
@@ -467,6 +490,7 @@ export class Agent implements AgentInterface {
 					? { dispatch: composed, messages: base, spent: undefined, futile }
 					: await this.#admit(
 							this.#window,
+							conversation,
 							composed,
 							base,
 							request,
@@ -519,7 +543,7 @@ export class Agent implements AgentInterface {
 					turns.push({ ...settled, outcome: 'cancel', partial: true })
 					continue
 				}
-				const assistant = this.#context.messages.add({
+				const assistant = conversation.add({
 					role: 'assistant',
 					content: result.content,
 					calls: result.tools,
@@ -538,7 +562,7 @@ export class Agent implements AgentInterface {
 					// `call` comes from the paired call rather than the result's `id`, so tool message
 					// `position` names `calls[position]` even when a supplied tool manager returns another id.
 					replies.push(
-						this.#context.messages.add({
+						conversation.add({
 							role: 'tool',
 							content: outcome.success ? renderToolValue(outcome.value) : outcome.error,
 							call: call.id,
@@ -556,7 +580,7 @@ export class Agent implements AgentInterface {
 				continue
 			}
 			// No tools: this turn's content is the final answer — record it and finish.
-			this.#context.messages.add({ role: 'assistant', content: result.content, ...recorded })
+			conversation.add({ role: 'assistant', content: result.content, ...recorded })
 			turns.push({
 				...settled,
 				content: result.content,
@@ -659,7 +683,7 @@ export class Agent implements AgentInterface {
 	// Admits one request against the context `window` budget immediately before its provider
 	// dispatch, so only called when a window is set. `clear()` then consuming the request makes
 	// `window.consumed` its estimated footprint, and `exhausted` means it has reached `max`. A
-	// request over the window folds the active conversation once when it is summarizable and not
+	// request over the window folds the run's conversation once when it is summarizable and not
 	// latched futile, then rebuilds through selection, recomposes with the same tool and option
 	// snapshot, and measures again; the request that measures last is the one dispatched. A
 	// non-summarizable conversation is measured but never folded, so the auto path never throws the
@@ -668,6 +692,7 @@ export class Agent implements AgentInterface {
 	// WINDOW error before any dispatch, while the lenient default sends it.
 	async #admit(
 		window: BudgetInterface<ProviderRequest>,
+		conversation: ConversationInterface,
 		composed: ProviderRequest,
 		messages: readonly Message[],
 		request: Message | undefined,
@@ -682,14 +707,24 @@ export class Agent implements AgentInterface {
 		// A cancelled run is about to settle, so a fold would spend summarizer time on a request no
 		// provider reads; the next run's first admission folds instead.
 		if (abort.signal.aborted) return { dispatch: undefined, messages, spent: undefined, futile }
-		const conversation = this.#context.conversations.active
-		if (conversation?.summarizable !== true || futile) {
+		if (!conversation.summarizable || futile) {
 			return { dispatch: this.#enforce(window, composed), messages, spent: undefined, futile }
 		}
 		// The run signal bounds the fold: `compact()` rejects with its reason on a cancel and
 		// commits nothing, even when the summarizer ignores the signal.
 		return conversation.compact({ signal: abort.signal }).then(
-			(section) => this.#refold(section, window, composed, messages, request, latch, abort, budget),
+			(section) =>
+				this.#refold(
+					section,
+					window,
+					conversation,
+					composed,
+					messages,
+					request,
+					latch,
+					abort,
+					budget,
+				),
 			(error: unknown) => this.#unfold(error, composed, messages, abort),
 		)
 	}
@@ -700,6 +735,7 @@ export class Agent implements AgentInterface {
 	async #refold(
 		section: Section | undefined,
 		window: BudgetInterface<ProviderRequest>,
+		conversation: ConversationInterface,
 		composed: ProviderRequest,
 		messages: readonly Message[],
 		request: Message | undefined,
@@ -717,10 +753,10 @@ export class Agent implements AgentInterface {
 				futile: latch,
 			}
 		}
-		const selecting = this.#select(request, abort, budget)
+		const selecting = this.#select(conversation, request, abort, budget)
 		const rebuilt =
 			selecting === undefined
-				? { messages: this.#context.build(), usage: undefined }
+				? { messages: this.#build(conversation), usage: undefined }
 				: await selecting
 		if (abort.signal.aborted) {
 			return {
@@ -773,16 +809,18 @@ export class Agent implements AgentInterface {
 	// usage it spent, or `undefined` when there is no request or no handler, so the caller builds from
 	// `view()` without an await.
 	#select(
+		conversation: ConversationInterface,
 		request: Message | undefined,
 		abort: AbortInterface,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	) {
-		const pending = request === undefined ? undefined : this.#context.select(request, abort.signal)
+		const pending =
+			request === undefined ? undefined : this.#context.select(conversation, request, abort.signal)
 		return pending === undefined
 			? undefined
 			: pending.then(
-					(selection) => this.#adopt(selection, abort, budget),
-					(error: unknown) => this.#reject(error, abort),
+					(selection) => this.#adopt(conversation, selection, abort, budget),
+					(error: unknown) => this.#reject(conversation, error, abort),
 				)
 	}
 
@@ -790,31 +828,38 @@ export class Agent implements AgentInterface {
 	// either way and the charge can itself trip the run's bound; then build from it unless a cancel or
 	// a strict fault intervenes. A cancelled site builds from `view()` and emits no `select`.
 	#adopt(
+		conversation: ConversationInterface,
 		selection: Selection,
 		abort: AbortInterface,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	) {
 		const usage = selection.usage === undefined ? undefined : sanitizeUsage(selection.usage)
 		if (usage !== undefined) chargeUsage(budget, usage, 0)
-		if (abort.signal.aborted) return { messages: this.#context.build(), usage }
+		if (abort.signal.aborted) return { messages: this.#build(conversation), usage }
 		if (selection.fault !== undefined) {
 			this.#emitter.emit('fault', selection.fault)
-			if (abort.signal.aborted) return { messages: this.#context.build(), usage }
+			if (abort.signal.aborted) return { messages: this.#build(conversation), usage }
 			if (this.#strict) throw selection.fault
 		}
-		const messages = this.#context.build(selection)
+		const messages = this.#build(conversation, selection)
 		this.#emitter.emit('select', selection)
 		return { messages, usage }
 	}
 
 	// A rejected selection: a fault unless cancelled, rethrown under `strict`, then the default build.
-	#reject(error: unknown, abort: AbortInterface) {
+	#reject(conversation: ConversationInterface, error: unknown, abort: AbortInterface) {
 		if (!abort.signal.aborted) {
 			this.#emitter.emit('fault', error)
 			// A `fault` listener can cancel the run synchronously; the cancel then wins over `strict`.
 			if (this.#strict && !abort.signal.aborted) throw error
 		}
-		return { messages: this.#context.build(), usage: undefined }
+		return { messages: this.#build(conversation), usage: undefined }
+	}
+
+	// Every build of a run renders its bound conversation: a selection's messages when one is given,
+	// else that conversation's `view()`, never the pointer a later `switch` may have moved.
+	#build(conversation: ConversationInterface, selection?: Selection): readonly Message[] {
+		return this.#context.build(selection ?? { messages: conversation.view(), judgments: [] })
 	}
 
 	// Evaluate policy and emit each verdict before the run's final pre-dispatch abort guard, in call

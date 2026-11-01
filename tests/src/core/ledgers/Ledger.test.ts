@@ -3,6 +3,7 @@ import {
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
 	Ledger,
+	createConversation,
 	createLedger,
 	createScope,
 	estimateMessages,
@@ -15,7 +16,13 @@ import { createTokenBudget } from '@orkestrel/budget'
 import { isString } from '@orkestrel/contract'
 import { OllamaProvider } from '@orkestrel/ollama'
 import { createTool } from '@orkestrel/tool'
-import { captureError, createRecorder, requireValue, waitForEvent } from '@orkestrel/test'
+import {
+	captureError,
+	createRecorder,
+	requireValue,
+	waitForCondition,
+	waitForEvent,
+} from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	LEDGER_REPLAY_FIXTURE,
@@ -544,76 +551,109 @@ describe('Ledger', () => {
 		}
 	})
 
-	for (const phase of ['calibration', 'first pass'] as const) {
-		it(`faults a direct run during ${phase} without judging or replacing the active selection`, async () => {
-			const judge = new RecordingJudge()
-			const options = buildLedgerOptions({ judge })
-			const entered = Promise.withResolvers<void>()
-			const release = Promise.withResolvers<void>()
-			const provider = createScriptedProvider(
-				[
-					...(phase === 'calibration'
-						? [
-								{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
-								{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
-							]
-						: []),
-					{ content: '', usage: { prompt: 50, completion: 2, total: 52 } },
-					{ content: 'Recovered.' },
-				],
-				{ recorded: true },
-			)
-			const ledger = createLedger(
-				{
-					id: provider.id,
-					name: provider.name,
-					generate: async (...args) => {
-						entered.resolve()
-						await release.promise
-						return provider.generate(...args)
-					},
-					stream: async function* (...args) {
-						entered.resolve()
-						await release.promise
-						return yield* provider.stream(...args)
-					},
+	it('faults a direct run during calibration', async () => {
+		const judge = new RecordingJudge()
+		const options = buildLedgerOptions({ judge })
+		const entered = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const provider = createScriptedProvider(
+			[
+				{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
+				{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+				{ content: '', usage: { prompt: 50, completion: 2, total: 52 } },
+				{ content: 'Recovered.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			{
+				id: provider.id,
+				name: provider.name,
+				generate: async (...args) => {
+					entered.resolve()
+					await release.promise
+					return provider.generate(...args)
 				},
-				options,
-			)
-			ledger.conversation.add({ role: 'user', content: 'Seed.' })
-			const selections: Selection[] = []
-			ledger.agent.emitter.on('select', (selection) => selections.push(selection))
-			const pending =
-				phase === 'calibration'
-					? ledger.calibrate(new AbortController().signal)
-					: ledger.respond('Active request.')
-			await entered.promise
-			const judgments = ledger.conversation.judgments.judgments()
-			const asked = judge.requests.length
-			ledger.conversation.add({ role: 'user', content: 'Intruding direct request.' })
-			const abort = new AbortController()
-			ledger.agent.emitter.once('select', () => abort.abort())
-			await ledger.agent.generate({ signal: abort.signal })
-			const rejected = selections.at(-1)
-			const after = judge.requests.length
-			const recorded = ledger.conversation.judgments.judgments()
-			release.resolve()
-			await pending
-			expect(isLedgerError(rejected?.fault)).toBe(true)
-			expect(rejected?.fault).toMatchObject({ code: 'REQUEST' })
-			expect(after).toBe(asked)
-			expect(recorded).toEqual(judgments)
-			expect(ledger.gauge).toEqual(
-				phase === 'first pass' ? { scale: 1, overhead: 0 } : { scale: 10 / 14, overhead: 10 },
-			)
-			expect(selections.at(-1)?.messages.slice(0, selections[0]?.messages.length)).toEqual(
-				selections[0]?.messages,
-			)
-			expect(
-				provider.calls.at(-1)?.messages.some((message) => message.content === 'Active request.'),
-			).toBe(phase === 'first pass')
-		})
-	}
+				stream: async function* (...args) {
+					entered.resolve()
+					await release.promise
+					return yield* provider.stream(...args)
+				},
+			},
+			options,
+		)
+		ledger.conversation.add({ role: 'user', content: 'Seed.' })
+		const selections: Selection[] = []
+		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
+		const pending = ledger.calibrate(new AbortController().signal)
+		await entered.promise
+		const judgments = ledger.conversation.judgments.judgments()
+		const asked = judge.requests.length
+		ledger.conversation.add({ role: 'user', content: 'Intruding direct request.' })
+		const abort = new AbortController()
+		ledger.agent.emitter.once('select', () => abort.abort())
+		await ledger.agent.generate({ signal: abort.signal })
+		const rejected = selections.at(-1)
+		const after = judge.requests.length
+		const recorded = ledger.conversation.judgments.judgments()
+		release.resolve()
+		await pending
+		expect(isLedgerError(rejected?.fault)).toBe(true)
+		expect(rejected?.fault).toMatchObject({ code: 'REQUEST' })
+		expect(after).toBe(asked)
+		expect(recorded).toEqual(judgments)
+		expect(ledger.gauge).toEqual({ scale: 10 / 14, overhead: 10 })
+		expect(selections.at(-1)?.messages.slice(0, selections[0]?.messages.length)).toEqual(
+			selections[0]?.messages,
+		)
+		expect(
+			provider.calls.at(-1)?.messages.some((message) => message.content === 'Active request.'),
+		).toBe(false)
+	})
+
+	it('refuses a direct run during a request', async () => {
+		const judge = new RecordingJudge()
+		const options = buildLedgerOptions({ judge })
+		const entered = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const provider = createScriptedProvider([{ content: 'Answered.' }], { recorded: true })
+		const ledger = createLedger(
+			{
+				id: provider.id,
+				name: provider.name,
+				generate: async (...args) => {
+					entered.resolve()
+					await release.promise
+					return provider.generate(...args)
+				},
+				stream: async function* (...args) {
+					entered.resolve()
+					await release.promise
+					return yield* provider.stream(...args)
+				},
+			},
+			options,
+		)
+		ledger.conversation.add({ role: 'user', content: 'Seed.' })
+		const pending = ledger.respond('Active request.')
+		await entered.promise
+		const asked = judge.requests.length
+		const count = ledger.conversation.count
+		const caught = captureError(() => ledger.agent.generate())
+		const after = judge.requests.length
+		const stored = ledger.conversation.count
+		release.resolve()
+		const result = await pending
+		if (!isAgentError(caught)) throw new Error('expected an AgentError')
+		expect([caught.code, caught.context]).toEqual([
+			'CONCURRENCY',
+			{ agent: ledger.agent.id, conversation: ledger.conversation.id },
+		])
+		expect(after).toBe(asked)
+		expect(stored).toBe(count)
+		expect(result.content).toBe('Answered.')
+		expect(provider.calls).toHaveLength(1)
+	})
 
 	it('keeps interleaved seed calls and results on the same side of the tail cut', async () => {
 		const options = buildLedgerOptions()
@@ -3401,5 +3441,114 @@ describe('Ledger — snapshot and hydrate', () => {
 		expectTypeOf<keyof LedgerSnapshot>().toEqualTypeOf<
 			'conversation' | 'requests' | 'notes' | 'failures' | 'gauge'
 		>()
+	})
+})
+
+describe('Ledger — run-bound conversation', () => {
+	it('keeps respond on its conversation', async () => {
+		const entered = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const gates = new ScriptedReads([release.promise], Promise.resolve())
+		const provider = createScriptedProvider([{ content: '' }, { content: 'Answered.' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(
+			{
+				id: provider.id,
+				name: provider.name,
+				generate: (...args) => provider.generate(...args),
+				stream: async function* (...args) {
+					const gate = gates.read()
+					entered.resolve()
+					await gate
+					return yield* provider.stream(...args)
+				},
+			},
+			buildLedgerOptions(),
+		)
+		ledger.conversation.add({ role: 'user', content: 'Seed.' })
+
+		const pending = ledger.respond('Active request.')
+		await entered.promise
+		const other = ledger.agent.context.conversations.add()
+		other.add({ role: 'user', content: 'Elsewhere.' })
+		ledger.agent.context.conversations.switch(other.id)
+		release.resolve()
+		const result = await pending
+
+		expect(result.passes).toHaveLength(2)
+		expect(result.content).toBe('Answered.')
+		expect(other.messages().map((message) => [message.role, message.content])).toEqual([
+			['user', 'Elsewhere.'],
+		])
+		expect(ledger.conversation.messages().at(-1)).toMatchObject({
+			role: 'assistant',
+			content: 'Answered.',
+		})
+		expect(provider.calls).toHaveLength(2)
+		const contents = provider.calls[1]?.messages.map((message) => message.content)
+		expect(contents).toContain('Active request.')
+		expect(contents).not.toContain('Elsewhere.')
+	})
+
+	it('keeps ledger history off another thread', async () => {
+		const arrived = createRecorder<[]>()
+		const release = Promise.withResolvers<void>()
+		const gates = new ScriptedReads(
+			[Promise.resolve(), Promise.resolve(), release.promise],
+			Promise.resolve(),
+		)
+		const provider = createScriptedProvider([{ content: 'Filed.' }], { recorded: true })
+		// The default options carry no agent `window`, `budget`, or `allowance`, so a run on another
+		// conversation is admitted while a `respond` call's pass runs.
+		const ledger = createLedger(
+			{
+				id: provider.id,
+				name: provider.name,
+				generate: (...args) => provider.generate(...args),
+				stream: async function* (...args) {
+					const gate = gates.read()
+					arrived.handler()
+					await gate
+					return yield* provider.stream(...args)
+				},
+			},
+			buildLedgerOptions(),
+		)
+		ledger.conversation.add({ role: 'user', content: 'Seed.' })
+		await ledger.respond('First request.')
+		const history = ledger.conversation.messages()
+		const other = createConversation()
+		const asked = other.add({ role: 'user', content: 'Other thread.' })
+
+		await ledger.agent.generate({ conversation: other })
+
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role !== 'system')
+				.map((message) => message.id),
+		).toEqual([asked.id])
+		expect(other.messages().map((message) => message.role)).toEqual(['user', 'assistant'])
+		expect(ledger.conversation.messages()).toEqual(history)
+
+		const pending = ledger.respond('Second request.')
+		await waitForCondition(
+			'the second request reaches the provider',
+			() => arrived.calls.length === 3,
+		)
+		const request = requireValue(
+			ledger.conversation.messages().find((message) => message.content === 'Second request.'),
+		)
+		const copy = createConversation({
+			snapshot: { id: 'copy', sections: [], messages: [request] },
+		})
+		await ledger.agent.generate({ conversation: copy })
+		const leaked = provider.calls.at(-1)
+		release.resolve()
+		await pending
+
+		expect(
+			leaked?.messages.filter((message) => message.role !== 'system').map((message) => message.id),
+		).toEqual([request.id])
 	})
 })

@@ -72,5 +72,18 @@ export const INVALID_RELAY_STATUS = 400
  */
 export const OVERSIZED_RELAY_STATUS = 413
 
+/**
+ * Names the status a relay answers for a page system message or tool definition its policy
+ * refuses — `422`, carrying one {@link REFUSED_RELAY_CONTENT_TYPE} line per refused member and
+ * reaching the browser as a `ProviderError` with the `HTTP` code.
+ */
+export const REFUSED_RELAY_STATUS = 422
+
+/**
+ * Names the content type of a relay's `422` refusal body — `'text/plain; charset=utf-8'`, the
+ * header a refusal carries beside `cache-control: no-store`.
+ */
+export const REFUSED_RELAY_CONTENT_TYPE = 'text/plain; charset=utf-8'
+
 /** Names the System One decision endpoint shared by compatible servers. */
 export const SYSTEM_ONE_PATH = '/v1/systemone'

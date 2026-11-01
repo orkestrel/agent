@@ -1,4 +1,7 @@
 import {
+	createConversation,
+	createConversationManager,
+	isConversation,
 	isConversationSnapshot,
 	isJudgment,
 	isMessage,
@@ -11,6 +14,7 @@ import {
 	approveEvery,
 	buildCallsSnapshot,
 	buildConversationSnapshot,
+	createMalformedConversationCases,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
 	TOOL_SNAPSHOT,
 	JUDGMENT_RECORD,
@@ -377,5 +381,33 @@ describe('isMessage — the per-message shape guard (total + defensive)', () => 
 				call: { id: 'call-weather', name: 'weather', arguments: {} },
 			}),
 		).toBe(false)
+	})
+})
+
+describe('isConversation', () => {
+	it('refuses every malformed conversation without throwing', () => {
+		for (const [title, value] of createMalformedConversationCases()) {
+			expect([title, isConversation(value)]).toEqual([title, false])
+		}
+	})
+
+	it('accepts created, managed, and extended conversations', () => {
+		expect(isConversation(createConversation())).toBe(true)
+		expect(isConversation(createConversationManager().add())).toBe(true)
+		expect(isConversation(Object.assign(createConversation(), { extra: 1 }))).toBe(true)
+	})
+
+	it('accepts a structural conversation without calling it', () => {
+		const calls = createRecorder<[]>()
+		const conversation = {
+			id: 'c1',
+			summarizable: true,
+			view: calls.handler,
+			add: calls.handler,
+			compact: calls.handler,
+			messages: calls.handler,
+		}
+		expect(isConversation(conversation)).toBe(true)
+		expect(calls.calls).toEqual([])
 	})
 })
