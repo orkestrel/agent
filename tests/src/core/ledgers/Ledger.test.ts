@@ -3322,6 +3322,29 @@ describe('Ledger — snapshot and hydrate', () => {
 		expect(ledger.gauge).toEqual(options.gauge)
 	})
 
+	it('hydrates one snapshot with the gauge option winning over the snapshot gauge and without it taking the snapshot gauge, with no calibration call', async () => {
+		const base = buildUncalibratedOptions(buildLedgerOptions())
+		const supplied = { scale: 3, overhead: 5 }
+		const withOption = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const first = createLedger(withOption, {
+			...base,
+			gauge: supplied,
+			snapshot: LEDGER_SNAPSHOT_SEED,
+		})
+		const without = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const second = createLedger(without, { ...base, snapshot: LEDGER_SNAPSHOT_SEED })
+		expect(LEDGER_SNAPSHOT_SEED.gauge).not.toEqual(supplied)
+		expect(first.gauge).toEqual(supplied)
+		expect(second.gauge).toEqual(LEDGER_SNAPSHOT_SEED.gauge)
+		await first.respond('Next request.')
+		await second.respond('Next request.')
+		expect(withOption.calls).toHaveLength(1)
+		expect(without.calls).toHaveLength(1)
+		expect(first.gauge?.scale).toBe(supplied.scale)
+		expect(first.gauge?.overhead).toBe(supplied.overhead)
+		expect(second.gauge).toEqual(LEDGER_SNAPSHOT_SEED.gauge)
+	})
+
 	it('calibrates before the first request when neither the options nor a snapshot supply a gauge', async () => {
 		const provider = createScriptedProvider(
 			[
