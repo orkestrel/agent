@@ -165,7 +165,6 @@ Fixes found while a step runs queue their request and micro rungs into this orde
 | the cache saving of rc-u10 | the wall arithmetic uses an unmeasured prefill rate, and the saving needs the agent's slot to survive judge calls | rc-a9's co-residency probe |
 | the merged request turn | no reading compares it with a separate message at any size; the stored-copy precedent is a tool stub, not a user turn | rc-a16's R arm; the screen's `separate` contingency |
 | adjacent user turns at the head (the context message, then a `user` tail) | one summarized read of the renderer, no test | rc-a9's render probe M3 gates the recording |
-| deferring the stored-`system` refusal (D33) | the boundary is complete for Agent's own paths only; a host that stores user text as `system` is unguarded | before the 0.0.35 notes, search the user's applications for `role: 'system'` adds; a hit reopens D33 |
 | dropping `[Desk]` and the "Sentence scope is unresolved" sentence | no reading; the Study's system text introduces a desk, so the tag has meaning there | rc-a16 A2 against A1 |
 | refusing the lead lines by default | an instruction in the user turn is the one slot a 3B followed (C46) | rc-a16 A3 against A2 |
 | the sampling pin as a no-op | rests on C45, read from Ollama's `main` through a summarizing fetch | rc-a9's M1 probe on the pinned daemon version |

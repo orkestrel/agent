@@ -23,6 +23,7 @@ The tracked record of the Agent records campaign: memos, skills, and durable lon
 | `designs/layout.md` | the request layout: the host-authored `system` boundary and its inlets, the layout per configuration, the request turn, the context message, literal strings, shapes, sampling, the canary, the layout readings, layout deferrals |
 | `designs/measurement.md` | the cheap-first order, probes, bench, instruments, the subject models, the GPU allowance, recording and the run record, screens, every unit's gate, the GPU order, open uncertainties |
 | `designs/runs.md` | the run operations: the user's ruling, the segment shape and checkpoints, the segment plan per GPU step, rc-a9's first readings, progress, stops, the fixes checked while a step runs, replay and the per-lineage pins, the run-operation units with their acceptance, run deferrals |
+| `designs/boundary.md` | the browser and server boundary: the four placements and their trust table, the consumer mistakes with remedies R1 to R6 and the rejected list, run binding, relay ownership, the "Page to Node agent" wire with its live `ask` frames, the stored-role refusal, the boundary units, boundary deferrals, and the breaking changes |
 | `research/evidence.md` | the external claims C01 to C51 with verdicts and URLs, the DeltaDB mechanisms, the prior-campaign readings with their commits |
 
 ## Id law
@@ -37,6 +38,7 @@ Every id is numbered for life and never reused. A retired id stays retired.
 | `C` | an external research claim (`C01`, `C02`, …) | `research/evidence.md` |
 | `D` | a deferral with its reopen trigger (`D1`, `D2`, …) | `plan.md` § Deferred |
 | `Q` | a decision only the user can make (`Q1`, `Q2`, …) | `plan.md` § Decisions |
+| `R` | a browser and server boundary remedy (`R1`, `R2`, …) | `designs/boundary.md` § Mistakes |
 
-- Ids from the closed boost campaign, such as `U45` and `R5b`, keep their meaning there and are cited with the commit that holds them.
+- Ids from the closed boost campaign, such as `U45` and `R5b`, keep their meaning there and are cited with the commit that holds them; a bare `R` id in this folder names a boundary remedy.
 - The 0.0.32 ledger fixes are named by what they do, never as `D1` or `D2`, because those ids are this campaign's deferrals.

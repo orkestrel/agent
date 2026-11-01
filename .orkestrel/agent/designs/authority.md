@@ -80,12 +80,14 @@ The loop decides one tools turn after `Agent#reconcile` and the scope allow-list
 
 1. Synchronous pass (`Agent#authorize`, in call order, no `await`).
    - A scope miss emits `deny(call, reason, undefined)`.
+   - From rc-u16 (Q15, O45, `designs/boundary.md` § Page wire), a call whose name no definition advertises this turn is denied beside the scope miss, before `authority.evaluate`, for every verdict: the model reads the scope note, and the loop emits `` deny(call, `${call.name} is not in the active scope`, undefined) ``, so the authority, the approver, and `ToolManager` never see a model-written name.
    - Otherwise the pass runs `attempt(() => authority.evaluate({ call }))`. A throw emits `deny(call, errorToMessage(error), undefined)`, and the model reads the `denied` note. A value that fails `isAuthorityDecision` emits `deny(call, 'invalid decision', undefined)` with the `denied` note.
    - `resolveDecision` raises `allow` to `ask` when the advertised definition's `annotations.consequential` is `true`.
    - `verdict === 'deny'` emits `deny(call, decision.reason, decision)`, and the model reads `decision.reason ?? AUTHORITY_NOTES.denied`. `verdict === 'allow'` emits `allow(call, decision)`. `verdict === 'ask'` queues the call with the registered instance `tools.tool(call.name)` returns.
    - Only `verdict === 'allow'` enters the allowed map; the loop never tests `verdict !== 'deny'`.
 2. Ask pass (`Agent#approve`), entered only when the queue holds a call and the signal is not aborted. For each queued call, in order:
    - Emit `ask(call, decision)`, then `await raceSignal(answer, abort.signal)`, where `answer` is the handler call (an absent `ask` property counts as unanswered: the loop writes the `unanswered` note) mapped through success and failure arms. `raceSignal` (`src/core/conversations/helpers.ts`) removes its abort listener on settle and absorbs a late rejection, so the pass adds no abort helper (F9).
+   - From rc-u16, the pass yields an `ask` chunk into the run's own stream after the handler is entered and before the race, so a page reads the ask in order with the turn's other chunks (`designs/boundary.md` § Page wire, Loop changes).
    - A rejected race, or a signal aborted after settle, returns with no further event.
    - Approved with the registered instance unchanged: `allow(call, decision)`. Approved but replaced during the ask: `deny(call, undefined, decision)` with the `unanswered` note.
    - A resolved value other than `true`: `deny(call, undefined, decision)` with the `refused` note.
@@ -119,7 +121,7 @@ rc-a14 holds each ordering with one test:
 
 ## Denial notes
 
-Every denial goes through one render form in `denyCall`: `${preview(name)} did not run: ${reason}`. The name is model-supplied, so it is JSON-encoded and length-capped by `preview` (§ Shapes). The status comes first and the next step last; no argument is echoed, and no host error text reaches the tool message.
+Every denial goes through one render form in `denyCall`: `${preview(name)} did not run: ${reason}`. The name is model-supplied, so it is JSON-encoded and length-capped by `preview` (§ Shapes). The status comes first and the next step last; no argument is echoed, and no host error text reaches the tool message, but a deny rule's `reason` reaches it verbatim, so the host must author every rule reason.
 
 | Outcome | Tool message the model reads | Events |
 | --- | --- | --- |
@@ -129,7 +131,7 @@ Every denial goes through one render form in `denyCall`: `${preview(name)} did n
 | ask refused by the handler | `"write" did not run: the user refused it. Do not call it again; continue without it.` | `ask`, `deny`, `tool` |
 | ask unanswered: no handler, a throw, a rejection, the tool replaced; a `consequential` tool with no approver | `"write" did not run: it needs approval and none was given. Do not call it again; tell the user it needs approval.` | `ask`, `deny`, `tool` |
 | abort or run `timeout` during an ask | nothing; the call is not stored | `ask`, `abort`, `finish` |
-| scope miss (the scope-miss text, a constant declared beside `AUTHORITY_NOTES` in `src/core/agents/constants.ts`) | `"write" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.` | `deny`, `tool` |
+| scope miss, or from rc-u16 a call whose name no definition advertises this turn, under any verdict (O45) (the scope-miss text, a constant declared beside `AUTHORITY_NOTES` in `src/core/agents/constants.ts`) | `"write" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.` | `deny`, `tool` |
 | no tool advertised | unchanged: no tool message, and the turn is the answer | `deny` |
 
 - A `deny` reason reaches the model; an `ask` reason never does.
@@ -147,7 +149,7 @@ export type AgentEventMap = {
 	readonly allow: readonly [call: ToolCall, decision: AuthorityDecision]
 	/** Reports a call handed to the approver; `allow`, `deny`, or `abort` follows. */
 	readonly ask: readonly [call: ToolCall, decision: AuthorityDecision]
-	/** Reports a denial; `decision` is absent for a scope miss, a no-advertisement drop, an evaluate throw, or an invalid decision. */
+	/** Reports a denial; `decision` is absent for a scope miss, an unadvertised name (from rc-u16), a no-advertisement drop, an evaluate throw, or an invalid decision. */
 	readonly deny: readonly [call: ToolCall, reason: string | undefined, decision: AuthorityDecision | undefined]
 }
 ```
@@ -167,6 +169,7 @@ After rc-a14, Agent protects against these:
 - A cancelled approval leaves nothing in the conversation.
 - A small model reads one short line that says the call did not run and names the next step.
 - A fabricated or stale decision shape is refused, never run.
+- From rc-u16, a call naming no advertised tool is denied before evaluation, so a host rule, an approver, and `ToolManager` never receive a made-up name (O45).
 
 Agent does not protect against these:
 

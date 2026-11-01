@@ -9,7 +9,7 @@ The `system` message carries host-authored text only: nothing a user wrote, a to
 - Agent's inlets to the `system` turn are four: the system text, the instructions with loaded skill bodies, the skill index, and the host-registered tool definitions. Ollama's qwen3.5 renderer writes the tools block inside the `system` turn (see the [Ollama qwen3.5 renderer at v0.40.13](https://raw.githubusercontent.com/ollama/ollama/v0.40.13/model/renderers/qwen35.go)).
 - As of `2da6d0b6`, `AgentContext#build` (`src/core/contexts/AgentContext.ts`) also joins the workspace text and `Selection.briefing` into the `system` message, so a lookup reading and a user's rule sentence reach it through the ledger's `## Pinned` and `## Rules` text. rc-u10 removes both inlets.
 - After rc-u10, `Selection` has no text member and `build` reads no other inlet, so a host adds `system` text only through `system`, `instructions.add`, a skill load, and the skill index.
-- Every `system` message in a conversation is host-written by construction: the loop stores `assistant` and `tool` messages (`Agent` in `src/core/agents/Agent.ts`), the ledger stores `user` notes (`Ledger` in `src/core/ledgers/Ledger.ts`), and a summary renders as `assistant` (`buildRecapMessage` in `src/core/conversations/helpers.ts`). A `system` message a host stores or selects reaches the model in place as the host's own text; refusing it waits for D33.
+- Agent's own paths store no `system` message: the loop stores `assistant` and `tool` messages (`Agent` in `src/core/agents/Agent.ts`), the ledger stores `user` notes (`Ledger` in `src/core/ledgers/Ledger.ts`), and a summary renders as `assistant` (`buildRecapMessage` in `src/core/conversations/helpers.ts`). Client JSON reaches a stored `system` role through `Conversation.add`, the job seed, a snapshot, and a selection until rc-u13 refuses it at every ingress (`plan.md` O37; D33 closed; `designs/boundary.md` § Stored roles).
 - Tool definitions carry host text only. rc-t1's brief states it: no factory interpolates memo names, descriptions, or other stored text into a `description` (D20).
 - Rely on the boundary for authorship, never for obedience: small models follow a system instruction less often than a user one (C36, C46), and the protection lives in the loop's checks (`designs/authority.md` § Principle).
 
@@ -131,7 +131,6 @@ The ruling's cost is read one time, and no reading vetoes the ruling (O12). Ever
 Each item's trigger lives in `plan.md` § Deferred.
 
 - Memos and workspace in the request turn (D32).
-- Refusing a `system` message in a selection or the conversation tail (D33): it would add `ConversationErrorCode` `'ROLE'` and change snapshots and job seeds; a selection-only fault would fault a ledger whose tail holds a host's stored `system` message while a plain agent sends it.
 - Records as a separate `user` message before the request (D34).
 - The call head on owner-record lines from a lookup (D35).
 - Digest and cue as one `user` message (D36).
