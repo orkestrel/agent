@@ -3897,6 +3897,36 @@ export const MEMO_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)
 /** Names a memo manager event recorded by its tests. */
 export type MemoEventName = (typeof MEMO_EVENTS)[number]
 
+/** Holds one valid memo revision, the fixture the foreign snapshot tests build from. */
+export const MEMO_REVISION = Object.freeze({
+	id: 'm1',
+	name: 'tone',
+	description: 'Prefers short replies.',
+	content: 'Answer briefly.',
+	time: 1,
+})
+
+/** Lists the foreign memo snapshots a memo manager must refuse, each with its label. */
+export const MALFORMED_MEMO_SNAPSHOTS: ReadonlyArray<readonly [string, unknown]> = Object.freeze([
+	['a revision missing fields', { id: 'ada', memos: [{ id: 'm1', name: 'tone' }] }],
+	['a non-finite time', { id: 'ada', memos: [{ ...MEMO_REVISION, time: Infinity }] }],
+	[
+		'a sparse memos array',
+		{ id: 'ada', memos: Object.assign(new Array(3), { 0: MEMO_REVISION, 2: MEMO_REVISION }) },
+	],
+	['a non-string id', { id: 7, memos: [] }],
+	['a non-array memos', { id: 'ada', memos: 'none' }],
+	[
+		'a snapshot JSON cannot copy',
+		{
+			id: 'ada',
+			get memos(): never {
+				throw new Error('unreadable memos')
+			},
+		},
+	],
+])
+
 /** Lists the skill manager events recorded by its tests. */
 export const SKILL_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)
 

@@ -10,9 +10,12 @@ import type {
 import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
+import { copyJSON } from '../../cloners.js'
 import { removeEntries } from '../../helpers.js'
 import { MEMO_SECTION_HEADER } from '../constants.js'
+import { ContextError } from '../errors.js'
 import { renderIndexEntry } from '../helpers.js'
+import { isMemoSnapshot } from '../validators.js'
 
 /**
  * Registers the revisions of a memo set — durable facts keyed by `name`, where a same-name `add`
@@ -29,7 +32,9 @@ import { renderIndexEntry } from '../helpers.js'
  * - **Removal.** `remove` drops every revision of a name, so a re-added name starts a fresh
  *   history at the end of `memos()`; `clear` drops every revision.
  * - **Identity.** `id` is the `snapshot.id`, else the `id` option, else a minted UUID. A
- *   `snapshot` option seeds the revisions silently, and `snapshot()` returns them oldest first.
+ *   `snapshot` option is copied through JSON and checked with `isMemoSnapshot`, then seeds the
+ *   revisions silently; a malformed one throws a `ContextError` with code `'SNAPSHOT'`. `snapshot()`
+ *   returns owned copies of the revisions, oldest first.
  * - **Build contract.** `open` returns the options `open`, else `'## Memos'`; `render(memo)`
  *   returns the options `render`, else `- name: description`; `close` returns the options
  *   `close`, else `undefined`.
@@ -55,13 +60,26 @@ export class MemoManager implements MemoManagerInterface {
 	// Every revision, oldest first. Replaced on every change rather than mutated in place.
 	#revisions: readonly Memo[]
 
+	/**
+	 * Creates the memo set, owning a supplied `snapshot` through a JSON copy.
+	 *
+	 * @param options - The optional {@link MemoManagerOptions}
+	 * @throws {ContextError} Thrown when the `snapshot` option cannot be copied through JSON or its copy is not a memo snapshot (code `'SNAPSHOT'`); nothing is seated and nothing is emitted
+	 */
 	constructor(options?: MemoManagerOptions) {
+		// A snapshot is a foreign value: own a JSON copy first so the caller's objects never alias the
+		// state, then refuse a malformed one, or one JSON cannot copy, before anything is seated.
+		const supplied = options?.snapshot
+		const owned = supplied === undefined ? undefined : copyJSON(supplied)
+		const snapshot = isMemoSnapshot(owned) ? owned : undefined
+		if (supplied !== undefined && snapshot === undefined) {
+			throw new ContextError('SNAPSHOT', 'context error: memo snapshot is malformed')
+		}
 		// Restoring is silent: nothing was edited, so no event fires.
-		const snapshot = options?.snapshot
 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
 		this.#emitter = new Emitter<MemoManagerEventMap>(options)
 		this.#format = options?.format
-		this.#revisions = snapshot === undefined ? [] : [...snapshot.memos]
+		this.#revisions = snapshot === undefined ? [] : snapshot.memos
 	}
 
 	get id(): string {
@@ -125,7 +143,14 @@ export class MemoManager implements MemoManagerInterface {
 	}
 
 	snapshot(): MemoSnapshot {
-		return { id: this.#id, memos: [...this.#revisions] }
+		// Owned copies: a returned snapshot never aliases the manager's revisions or their origins.
+		return {
+			id: this.#id,
+			memos: this.#revisions.map((memo) => ({
+				...memo,
+				...(memo.origin === undefined ? {} : { origin: { ...memo.origin } }),
+			})),
+		}
 	}
 
 	// Append a revision unless the name's current one already holds the same text, and emit `add`
@@ -141,7 +166,7 @@ export class MemoManager implements MemoManagerInterface {
 			description: input.description,
 			content: input.content,
 			time: Date.now(),
-			...(input.origin === undefined ? {} : { origin: input.origin }),
+			...(input.origin === undefined ? {} : { origin: { ...input.origin } }),
 		}
 		this.#revisions = [...this.#revisions, memo]
 		this.#emitter.emit('add', memo)

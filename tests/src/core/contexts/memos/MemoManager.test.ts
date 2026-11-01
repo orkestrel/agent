@@ -1,9 +1,15 @@
 import type { MemoEventName } from '../../../../setup.js'
 import type { Memo, MemoManagerEventMap } from '@src/core'
-import { isMemoSnapshot, MEMO_SECTION_HEADER, MemoManager, renderSection } from '@src/core'
+import {
+	isContextError,
+	isMemoSnapshot,
+	MEMO_SECTION_HEADER,
+	MemoManager,
+	renderSection,
+} from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { createRecorder, createRecorders, roundTripJSON } from '@orkestrel/test'
-import { MEMO_EVENTS } from '../../../../setup.js'
+import { MALFORMED_MEMO_SNAPSHOTS, MEMO_EVENTS, MEMO_REVISION } from '../../../../setup.js'
 
 // MemoManager is the name-keyed memo set: one append-ordered list of revisions from which the
 // current memos, each history, and the snapshot derive. Real behavior, no mocks.
@@ -264,7 +270,9 @@ describe('MemoManager — snapshot', () => {
 		const restored = new MemoManager({ snapshot: source.snapshot(), on: { add: add.handler } })
 
 		expect(add.count).toBe(0)
-		expect(restored.add({ name: 'tone', description: 'Short replies.', content: 'v1' })).toBe(memo)
+		expect(restored.add({ name: 'tone', description: 'Short replies.', content: 'v1' })).toEqual(
+			memo,
+		)
 		expect(add.count).toBe(0)
 	})
 
@@ -407,5 +415,65 @@ describe('MemoManager — emitter', () => {
 		expect(manager.memo('a')?.content).toBe('a')
 		expect(errors.count).toBe(1)
 		expect(errors.calls[0]?.[1]).toBe('add')
+	})
+})
+
+describe('MemoManager — foreign snapshot', () => {
+	it.each(MALFORMED_MEMO_SNAPSHOTS)('refuses %s and emits nothing', async (_label, snapshot) => {
+		const add = createRecorder<readonly [memo: Memo]>()
+		const clear = createRecorder<readonly []>()
+
+		// A foreign value is untyped on arrival, so the construct goes through Reflect.
+		await expect(
+			Promise.resolve().then(() =>
+				Reflect.construct(MemoManager, [
+					{ snapshot, on: { add: add.handler, clear: clear.handler } },
+				]),
+			),
+		).rejects.toSatisfy((error) => isContextError(error) && error.code === 'SNAPSHOT')
+		expect(add.count).toBe(0)
+		expect(clear.count).toBe(0)
+	})
+
+	it('owns a passed snapshot: mutating its revision or origin later changes nothing', () => {
+		const revision: Omit<Memo, 'content' | 'origin'> & {
+			content: string
+			origin: { conversation: string; message: string }
+		} = {
+			...MEMO_REVISION,
+			origin: { conversation: 'c1', message: 'x' },
+		}
+		const passed: { readonly id: string; readonly memos: Memo[] } = { id: 'ada', memos: [revision] }
+		const manager = new MemoManager({ snapshot: passed })
+
+		revision.content = 'changed'
+		revision.origin.conversation = 'other'
+		passed.memos.push({ ...MEMO_REVISION, id: 'm2', name: 'extra' })
+
+		expect(manager.memo('tone')?.content).toBe('Answer briefly.')
+		expect(manager.memo('tone')?.origin).toEqual({ conversation: 'c1', message: 'x' })
+		expect(manager.history('tone')).toHaveLength(1)
+		expect(manager.count).toBe(1)
+		expect(manager.snapshot().memos[0]?.origin).toEqual({ conversation: 'c1', message: 'x' })
+	})
+
+	it('returns an owned snapshot: mutating it reaches nothing in the manager', () => {
+		const manager = new MemoManager({
+			snapshot: { id: 'ada', memos: [{ ...MEMO_REVISION, origin: { conversation: 'c1' } }] },
+		})
+		const returned = manager.snapshot()
+		const first = returned.memos[0]
+		if (first === undefined) throw new Error('the snapshot lost its revision')
+
+		Object.assign(first, { content: 'changed' })
+		Object.assign(first.origin ?? {}, { conversation: 'other' })
+		Reflect.apply(Array.prototype.push, returned.memos, [
+			{ ...MEMO_REVISION, id: 'm2', name: 'extra' },
+		])
+
+		expect(manager.memo('tone')?.content).toBe('Answer briefly.')
+		expect(manager.memo('tone')?.origin).toEqual({ conversation: 'c1' })
+		expect(manager.count).toBe(1)
+		expect(manager.snapshot().memos).toEqual([{ ...MEMO_REVISION, origin: { conversation: 'c1' } }])
 	})
 })

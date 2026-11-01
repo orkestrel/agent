@@ -10,6 +10,14 @@ import type { ToolManagerInterface } from '@orkestrel/tool'
 import type { FileInput, FileInterface, WorkspaceManagerInterface } from '@orkestrel/workspace'
 
 /**
+ * Names the machine-readable condition a {@link import('./errors.js').ContextError} reports.
+ *
+ * @remarks
+ * `'SNAPSHOT'`: a `snapshot` option that `isMemoSnapshot` refuses once copied through JSON.
+ */
+export type ContextErrorCode = 'SNAPSHOT'
+
+/**
  * Represents an immutable instruction — a named directive a richer context places between the
  * system prompt and the conversation, ordered by descending {@link priority}.
  *
