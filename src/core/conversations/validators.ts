@@ -148,7 +148,10 @@ export function isSection(value: unknown): value is Section {
  * a missing / non-string `id`, a non-array `sections` / `messages`, or any malformed
  * element) resolves `false`, so a
  * {@link import('./stores/DatabaseConversationStore.js').DatabaseConversationStore}
- * read yields `undefined` rather than a broken conversation.
+ * read yields `undefined` rather than a broken conversation. The guard is structural: it admits a
+ * stored `system` role and a repeated id, which `requireConversationSnapshot` and the
+ * {@link import('./Conversation.js').Conversation} constructor then refuse as the stored-data
+ * check a conversation runs at hydrate.
  *
  * @param value - The value to test (an opaque storage read)
  * @returns True if `value` has the structural shape of a {@link ConversationSnapshot}; false otherwise

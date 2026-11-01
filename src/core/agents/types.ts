@@ -407,9 +407,10 @@ export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
  * - `strict` — when `true`, a summarizer failure during automatic compaction aborts the run
  *   (rethrown after the `fault` event, propagating through `#execute` to a genuine `error`
  *   settle) instead of skipping compaction and continuing over-window. The selection faults (a
- *   thrown handler, a returned `fault`, a conversation changed under the handler) settle the same
- *   way, and a request still over the `window` after the permitted fold, or one that cannot fold,
- *   settles `error` with an `AgentError` coded `'WINDOW'` before the provider is called.
+ *   thrown handler, a returned `fault`, a conversation changed under the handler, a selected
+ *   message whose role is not a `ConversationRole`) settle the same way, and a request still over
+ *   the `window` after the permitted fold, or one that cannot fold, settles `error` with an
+ *   `AgentError` coded `'WINDOW'` before the provider is called.
  *   Default: `false`. The run continues over-window, or on `view()` after a selection fault.
  * - `select` — an optional default {@link SelectionHandler} forwarded to the agent's context; the
  *   active scope's `select` overrides it. The loop runs it at run entry and after each automatic
@@ -907,6 +908,7 @@ export interface AgentRegistryInterface {
 	 * @param signal - An optional cancel threaded into the agent (a queue / runner abort)
 	 * @returns The ready agent, its context seeded with the job's messages
 	 * @throws {AgentError} Thrown when a referenced provider, tool, authority, or scheduler name is unregistered (`code: 'REGISTRY'`), or when the job's `limit` is not a nonnegative safe integer (`code: 'LIMIT'`)
+	 * @throws {ConversationError} Thrown when a seed message's role is not a `ConversationRole` (`code: 'ROLE'`), before the agent is returned
 	 */
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface
 }

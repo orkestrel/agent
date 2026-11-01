@@ -1,8 +1,9 @@
-import type { Message } from '@src/core'
+import type { ConversationRole, Message, MessageInput, MessageRole } from '@src/core'
 import type { ToolCall } from '@orkestrel/tool'
 import {
 	collectExchanges,
 	collectToolGroups,
+	CONVERSATION_ROLES,
 	extractLiterals,
 	filterAllowList,
 	hasCalls,
@@ -18,7 +19,7 @@ import {
 } from '@src/core'
 import { canonicalStringify } from '@orkestrel/contract'
 import { createRecorder } from '@orkestrel/test'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	buildExchangeMessages,
 	buildToolGroupMessages,
@@ -295,6 +296,21 @@ describe('MESSAGE_ROLES — the one role list', () => {
 
 	it('is frozen, so the guard and the shape read one list', () => {
 		expect(Object.isFrozen(MESSAGE_ROLES)).toBe(true)
+	})
+})
+
+describe('CONVERSATION_ROLES — the stored role list', () => {
+	it('lists every MESSAGE_ROLES member except system, in wire order', () => {
+		expect(CONVERSATION_ROLES).toEqual(MESSAGE_ROLES.filter((role) => role !== 'system'))
+	})
+
+	it('is frozen', () => {
+		expect(Object.isFrozen(CONVERSATION_ROLES)).toBe(true)
+	})
+
+	it('narrows the stored and input roles to exclude system', () => {
+		expectTypeOf<ConversationRole>().toEqualTypeOf<Exclude<MessageRole, 'system'>>()
+		expectTypeOf<MessageInput['role']>().toEqualTypeOf<ConversationRole>()
 	})
 })
 

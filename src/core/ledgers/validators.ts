@@ -37,10 +37,12 @@ export function isPositiveSafeInteger(value: unknown): value is number {
  * `conversation.messages` and each failure id a `tool` message, so an id only a section original
  * holds is refused. A `gauge`, when present, must hold a finite `scale` greater than 0 and a finite
  * `overhead` of at least 0. Unknown members are admitted. Unreadable members and hostile inputs
- * return false.
+ * return false. The guard is structural: it admits a conversation holding a stored `system` role
+ * or a repeated id, which `requireConversationSnapshot` and the `Conversation` constructor then
+ * refuse as the stored-data check a ledger's hydrate runs.
  *
  * @param value - The value to inspect, such as a parsed checkpoint
- * @returns True if a ledger hydrates from the value; false otherwise
+ * @returns True if the value has the shape of a ledger snapshot whose marked ids name messages of its own conversation; false otherwise
  * @example
  * ```ts
  * const conversation = { id: 'c1', sections: [], messages: [{ id: 'm1', role: 'user', content: 'Check FX-111.' }] }

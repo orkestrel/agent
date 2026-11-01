@@ -59,6 +59,7 @@ import {
 	estimateMessages,
 	estimateRequest,
 	isAgentError,
+	isConversationError,
 	isProviderAbortError,
 	ProviderAbortError,
 	ProviderError,
@@ -71,6 +72,8 @@ import {
 	createAddTool,
 	createApprover,
 	AUTHORITY_STATES,
+	CANARY_INGRESS_SOURCES,
+	CANARY_SENTINELS,
 	createRecordingScheduler,
 	createRecordingSelection,
 	createScriptedProvider,
@@ -85,6 +88,7 @@ import {
 	seedCompactionArm,
 	seedFramedAgent,
 	SELECTION_FAULT_CASES,
+	serveIngressCanary,
 	SELECTION_USAGE,
 	RecordedTransport,
 	ScriptedWire,
@@ -7385,5 +7389,22 @@ describe('Agent — authority ask', () => {
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
 		expect(executed.calls).toEqual([[{}]])
 		expect(allowed.calls).toEqual([[call, { zone: 'default', verdict: 'allow' }]])
+	})
+})
+
+describe('Agent — the system boundary canary, stored ingress', () => {
+	it.each(CANARY_INGRESS_SOURCES)('refuses a system %s and sends none', async (source) => {
+		const canary = await serveIngressCanary(source)
+
+		expect(isConversationError(canary.error) && canary.error.code).toBe('ROLE')
+		expect(canary.sent.length).toBeGreaterThan(0)
+		for (const messages of canary.sent) {
+			expect(messages.filter((message) => message.role === 'system')).toHaveLength(1)
+			expect(messages[0]?.role).toBe('system')
+			expect(messages[0]?.content).toContain(CANARY_SENTINELS.system)
+			expect(
+				messages.filter((message) => message.content.includes(CANARY_SENTINELS[source])),
+			).toEqual([])
+		}
 	})
 })

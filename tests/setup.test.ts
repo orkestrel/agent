@@ -70,8 +70,12 @@ import {
 } from './setup.js'
 import {
 	CANARY_BUILD_SOURCES,
+	CANARY_INGRESS_SOURCES,
 	CANARY_LEDGER_SOURCES,
 	CANARY_SENTINELS,
+	DUPLICATE_ID_SNAPSHOTS,
+	MALFORMED_CONVERSATION_SNAPSHOTS,
+	MESSAGE_GUARD_CASES,
 	RECORDED_ANSWER_REQUEST,
 	RECORDED_COMPACTION_REQUEST,
 	RECORDED_FIRST_REQUEST,
@@ -81,6 +85,7 @@ import {
 	seedCanaryContext,
 	seedCompactionArm,
 	serveCanaryDesk,
+	serveIngressCanary,
 	serveRecordsDesk,
 } from './setup.js'
 import {
@@ -96,6 +101,7 @@ import {
 	createMemoryConversationStore,
 	isConversationSnapshot,
 	isProviderAbortError,
+	MESSAGE_ROLES,
 	ThinkSplitter,
 } from '@src/core'
 import { requireValue, waitForDelay } from '@orkestrel/test'
@@ -1160,8 +1166,42 @@ describe('system boundary canary fixtures', () => {
 		expect(Object.keys(CANARY_SENTINELS)).toEqual(
 			expect.arrayContaining([...CANARY_LEDGER_SOURCES]),
 		)
+		expect(Object.keys(CANARY_SENTINELS)).toEqual(
+			expect.arrayContaining([...CANARY_INGRESS_SOURCES]),
+		)
 		expect(CANARY_BUILD_SOURCES).not.toContain('system')
 		expect(CANARY_LEDGER_SOURCES).not.toContain('system')
+		expect(CANARY_INGRESS_SOURCES).not.toContain('system')
+	})
+
+	it.each(CANARY_INGRESS_SOURCES)(
+		'serves the %s ingress canary with the system text first',
+		async (source) => {
+			const canary = await serveIngressCanary(source)
+			const first = requireValue(canary.sent[0])
+
+			expect(canary.sent.length).toBeGreaterThan(0)
+			expect(first[0]?.role).toBe('system')
+			expect(first[0]?.content).toContain(CANARY_SENTINELS.system)
+		},
+	)
+
+	it('names malformed snapshots the conversation guard refuses, each title distinct', () => {
+		const titles = MALFORMED_CONVERSATION_SNAPSHOTS.map(([title]) => title)
+
+		expect(new Set(titles).size).toBe(titles.length)
+		for (const [, snapshot] of MALFORMED_CONVERSATION_SNAPSHOTS) {
+			expect(isConversationSnapshot(snapshot)).toBe(false)
+		}
+	})
+
+	it('names snapshots repeating an id that the conversation guard admits, each title distinct', () => {
+		const titles = DUPLICATE_ID_SNAPSHOTS.map(([title]) => title)
+
+		expect(new Set(titles).size).toBe(titles.length)
+		for (const [, snapshot] of DUPLICATE_ID_SNAPSHOTS) {
+			expect(isConversationSnapshot(snapshot)).toBe(true)
+		}
 	})
 
 	it('creates a judge that answers as the phrase judge and carries the sentinel in model and refusals', async () => {
@@ -1448,6 +1488,16 @@ describe('provider wire fixtures', () => {
 	})
 	it('supplies a callable non-JSON domain value', () => {
 		expect(returnDomain()).toBe('domain')
+	})
+	it('supplies message guard cases with distinct labels and every role passing both guards', () => {
+		const labels = MESSAGE_GUARD_CASES.map((row) => row.label)
+
+		expect(new Set(labels).size).toBe(labels.length)
+		expect(
+			MESSAGE_ROLES.every((role) =>
+				MESSAGE_GUARD_CASES.some((row) => row.value.role === role && row.domain && row.wire),
+			),
+		).toBe(true)
 	})
 	it('creates a POST relay request from the default body, a string body, and a signal', async () => {
 		const fallback = createRelayRequest()

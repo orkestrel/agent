@@ -17,8 +17,18 @@ import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkes
  * `'JUDGMENT'`: a judgment or judge request that JSON cannot carry, or whose copy fails its guard.
  * `'KEEP'`: a `keep` that is not a nonnegative safe integer.
  * `'SUMMARY'`: a summarizer digest whose trimmed text is empty.
+ * `'ROLE'`: a stored or selected message whose role is not a `ConversationRole`.
+ * `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot` or repeats an id; a judgment the
+ * guard admits but JSON cannot carry still raises `'JUDGMENT'`.
  */
-export type ConversationErrorCode = 'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT' | 'KEEP' | 'SUMMARY'
+export type ConversationErrorCode =
+	| 'SUMMARIZER'
+	| 'SECTIONS'
+	| 'JUDGMENT'
+	| 'KEEP'
+	| 'SUMMARY'
+	| 'ROLE'
+	| 'SNAPSHOT'
 
 /** Stores judgments by caller key and resolves requests by reusing matching records. */
 export interface JudgmentManagerInterface {
@@ -96,6 +106,7 @@ export interface MessageManagerInterface {
 	 *
 	 * @param input - One {@link MessageInput}, or a batch
 	 * @returns The created {@link Message} record or records, each with its minted `id` value
+	 * @throws ConversationError Thrown when a role is not a `ConversationRole` (code `'ROLE'`), before any message of the batch is stored
 	 */
 	add(input: MessageInput): Message
 	add(inputs: readonly MessageInput[]): readonly Message[]
@@ -246,7 +257,14 @@ export interface ConversationOptions {
 	 * Default: `false`.
 	 */
 	readonly rolling?: boolean
-	/** Hydrates from a {@link ConversationSnapshot} — its `id` wins over `id`; restoring is silent. */
+	/**
+	 * Hydrates from a {@link ConversationSnapshot} — its `id` wins over `id`; restoring is silent.
+	 * The constructor checks it with `requireConversationSnapshot` before seating any member: a
+	 * malformed snapshot or a repeated id throws `ConversationError` code `'SNAPSHOT'`, and a
+	 * stored `system` message throws code `'ROLE'`. Its section and message objects are seated by
+	 * reference, so a host is trusted not to edit them after hydrate or to back their members
+	 * with accessors.
+	 */
 	readonly snapshot?: ConversationSnapshot
 }
 
@@ -378,6 +396,7 @@ export interface ConversationInterface {
 	 *
 	 * @param input - One {@link MessageInput}, or a batch
 	 * @returns The created {@link Message} record or records, each with its minted `id` value
+	 * @throws ConversationError Thrown when a role is not a `ConversationRole` (code `'ROLE'`), before any message of the batch is stored
 	 */
 	add(input: MessageInput): Message
 	add(inputs: readonly MessageInput[]): readonly Message[]
@@ -677,7 +696,10 @@ export interface ConversationInput {
 	readonly on?: EmitterHooks<ConversationEventMap>
 	/** Holds the listener-error handler of the conversation's emitter — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
-	/** Hydrates from a {@link ConversationSnapshot}, passed on as {@link ConversationOptions.snapshot}. */
+	/**
+	 * Hydrates from a {@link ConversationSnapshot}, passed on as {@link ConversationOptions.snapshot},
+	 * whose checks throw `ConversationError` code `'SNAPSHOT'` or `'ROLE'` before anything registers.
+	 */
 	readonly snapshot?: ConversationSnapshot
 }
 
@@ -770,6 +792,7 @@ export interface ConversationManagerInterface {
 	 *
 	 * @param input - Optional {@link ConversationInput} overrides
 	 * @returns The created conversation
+	 * @throws ConversationError Thrown when `snapshot` is malformed or repeats an id (code `'SNAPSHOT'`) or holds a message whose role is not a `ConversationRole` (code `'ROLE'`); nothing registers and `active` is unchanged
 	 */
 	add(input?: ConversationInput): ConversationInterface
 	/**
@@ -796,9 +819,16 @@ export interface ConversationManagerInterface {
 	 *   keeps its turns, and concurrent `open(id)` calls return the one registered instance.
 	 * - Else (no store, a store miss, or a stored snapshot whose `id` is not `id`) ⇒ `undefined`
 	 *   (lenient — no throw).
+	 * - A stored snapshot that holds a message whose role is not a `ConversationRole` or repeats an
+	 *   id rejects with the constructor's `ConversationError` (code `'ROLE'` or `'SNAPSHOT'`) and
+	 *   leaves the registry and `active` unchanged. A malformed snapshot rejects the same way (code
+	 *   `'SNAPSHOT'`) only when the store returns it unguarded: `DatabaseConversationStore` narrows
+	 *   its read through `isConversationSnapshot` and resolves `undefined` for one, so `open`
+	 *   resolves `undefined` as for a store miss.
 	 *
 	 * @param id - The conversation id to open
 	 * @returns The activated {@link ConversationInterface}, or `undefined` when neither registered nor stored
+	 * @throws ConversationError Thrown when the stored snapshot holds a message whose role is not a `ConversationRole` (code `'ROLE'`) or repeats an id (code `'SNAPSHOT'`), or is malformed and the store returned it unguarded (code `'SNAPSHOT'`)
 	 */
 	open(id: string): Promise<ConversationInterface | undefined>
 	/**

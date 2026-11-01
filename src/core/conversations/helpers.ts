@@ -1,8 +1,17 @@
-import type { Section } from './types.js'
-import type { JudgeRequest, JudgeResult, Judgment, JudgmentInput, Message } from '../types.js'
+import type { ConversationSnapshot, Section } from './types.js'
+import type {
+	ConversationRole,
+	JudgeRequest,
+	JudgeResult,
+	Judgment,
+	JudgmentInput,
+	Message,
+} from '../types.js'
+import { attempt, isArray, isRecord } from '@orkestrel/contract'
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 import { ConversationError } from './errors.js'
-import { isJudgment } from './validators.js'
+import { isConversationSnapshot, isJudgment } from './validators.js'
+import { CONVERSATION_ROLES } from '../constants.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 
 /**
@@ -121,6 +130,102 @@ export function requireJudgment(value: unknown): Judgment {
 		throw new ConversationError('JUDGMENT', 'conversation error: a judgment must be a JSON record')
 	}
 	return value
+}
+
+/**
+ * Returns a stored message role after checking it is a conversation role, or throws a coded error.
+ *
+ * @remarks
+ * A stored conversation message plays a `ConversationRole`; the `system` message is built per
+ * request and never stored. The error message names the received role JSON-encoded and cut to 32
+ * characters, or its `typeof` when it is not a string.
+ *
+ * @param role - The role to check
+ * @returns The role, narrowed to a `ConversationRole`
+ * @throws ConversationError Thrown when the role is not a `CONVERSATION_ROLES` member (code `'ROLE'`)
+ *
+ * @example
+ * ```ts
+ * requireRole('user') // 'user'
+ * requireRole('system') // throws ConversationError ('ROLE')
+ * ```
+ */
+export function requireRole(role: unknown): ConversationRole {
+	const stored = CONVERSATION_ROLES.find((one) => one === role)
+	if (stored === undefined) {
+		throw new ConversationError(
+			'ROLE',
+			`a stored message role must be one of ${CONVERSATION_ROLES.map((one) => JSON.stringify(one)).join(', ')}; received ${typeof role === 'string' ? JSON.stringify(role.slice(0, 32)) : typeof role}`,
+		)
+	}
+	return stored
+}
+
+/**
+ * Returns a conversation snapshot after checking its shape, its stored roles, and its ids, or
+ * throws a coded error.
+ *
+ * @remarks
+ * The check reads `id`, `sections`, `messages`, and `judgments` from `value` once each and builds
+ * a candidate from those reads: each array member becomes a fresh array holding the same element
+ * objects, and a member that is not an array stays as read, so the guard refuses it. The candidate
+ * must pass `isConversationSnapshot`, every section message and live message must play a
+ * `ConversationRole`, and no id may repeat across section ids, section message ids, and live
+ * message ids. The candidate is returned, never `value`, so the check and the seating share one
+ * read. Element objects are kept by reference, so a host is trusted not to edit a seated message
+ * object or to back its members with accessors.
+ *
+ * @param value - The snapshot to check, typically a stored read
+ * @returns The candidate snapshot, holding `id`, `sections`, `messages`, and `judgments` when present
+ * @throws ConversationError Thrown when the value fails `isConversationSnapshot` or repeats an id (code `'SNAPSHOT'`), or holds a message whose role is not a `ConversationRole` (code `'ROLE'`)
+ *
+ * @example
+ * ```ts
+ * requireConversationSnapshot({ id: 'c1', sections: [], messages: [] }) // { id: 'c1', sections: [], messages: [] }
+ * requireConversationSnapshot({ id: 'c1', sections: 'nope', messages: [] }) // throws ConversationError ('SNAPSHOT')
+ * ```
+ */
+export function requireConversationSnapshot(value: unknown): ConversationSnapshot {
+	const candidate = attempt(() => {
+		if (!isRecord(value)) return undefined
+		const { id, sections, messages, judgments } = value
+		return {
+			id,
+			sections: isArray(sections) ? Array.from(sections) : sections,
+			messages: isArray(messages) ? Array.from(messages) : messages,
+			...(judgments === undefined
+				? {}
+				: { judgments: isArray(judgments) ? Array.from(judgments) : judgments }),
+		}
+	})
+	if (!candidate.success || !isConversationSnapshot(candidate.value)) {
+		throw new ConversationError(
+			'SNAPSHOT',
+			'a conversation snapshot must carry a string id, valid sections and messages, and valid judgments when present',
+			candidate.success ? undefined : { cause: candidate.error },
+		)
+	}
+	const snapshot = candidate.value
+	snapshot.sections
+		.flatMap((section) => section.messages)
+		.concat(snapshot.messages)
+		.forEach((message) => requireRole(message.role))
+	const ids = [
+		...snapshot.sections.map((section) => section.id),
+		...snapshot.sections.flatMap((section) => section.messages.map((message) => message.id)),
+		...snapshot.messages.map((message) => message.id),
+	]
+	// Built from the reversed pairs, the map keeps each id's first index.
+	const pairs = ids.map((id, index): readonly [string, number] => [id, index])
+	const firsts = new Map(pairs.toReversed())
+	const repeated = ids.find((id, index) => firsts.get(id) !== index)
+	if (repeated !== undefined) {
+		throw new ConversationError(
+			'SNAPSHOT',
+			`a conversation snapshot repeats the id ${JSON.stringify(repeated.slice(0, 64))}`,
+		)
+	}
+	return snapshot
 }
 
 /**

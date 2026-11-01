@@ -255,7 +255,8 @@ export interface ScopeFilter {
  * {@link AgentContextInterface.build} folds its `messages` in place of the active conversation's
  * `view()`. It carries no tool member: what a turn advertises and dispatches stays the scope's
  * `tools` allow-list. What the selection omitted is `view()` minus `messages`; no second list is
- * stored.
+ * stored. `messages` holds conversation parts only: {@link AgentContextInterface.select} turns a
+ * selection holding a `system` message into a `'ROLE'` fault over `view()`.
  *
  * @example
  * ```ts
@@ -269,7 +270,7 @@ export interface Selection {
 	readonly judgments: readonly string[]
 	/** Holds the judge usage this selection spent, on success and on failure alike. */
 	readonly usage?: TokenUsage
-	/** Holds the error a handler gave up on; `messages` is then `view()`. */
+	/** Holds the error a handler gave up on, or the fault `select` raises over a handler's selection (a disallowed role or a changed view); `messages` is then `view()`. */
 	readonly fault?: Error
 }
 
@@ -871,8 +872,11 @@ export interface AgentContextInterface {
 	 * active conversation's `view()`, calls the handler, and compares the ids after it settles: an
 	 * unchanged view returns the handler's {@link Selection}; a changed view returns a selection
 	 * whose `fault` names the change, whose `messages` are the current `view()`, and which carries
-	 * the handler's `judgments` and `usage`. A handler throw rejects the returned promise with the
-	 * thrown value. The context stays event-free; the agent emits the receipt.
+	 * the handler's `judgments` and `usage`. An unchanged view whose selection holds a message whose
+	 * role is not a `ConversationRole`, such as a `system` message, returns the same shape with a
+	 * `ConversationError` coded `'ROLE'` as its `fault`, which names the message's index and role and
+	 * carries the handler's own `fault` as its `cause`. A handler throw rejects the returned promise
+	 * with the thrown value. The context stays event-free; the agent emits the receipt.
 	 *
 	 * @param request - The user message the run serves
 	 * @param signal - The run's abort signal, passed to the handler

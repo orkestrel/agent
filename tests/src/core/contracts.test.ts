@@ -1,8 +1,8 @@
 import type { Message } from '@src/core'
 import { isMessage, messageContract } from '@src/core'
-import { parseJSONAs } from '@orkestrel/contract'
+import { parseJSONAs, seededRandom } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
-import { returnDomain, MESSAGE_WIRE_ROLES } from '../../setup.js'
+import { returnDomain, MESSAGE_GUARD_CASES, MESSAGE_WIRE_ROLES } from '../../setup.js'
 
 describe('wire contracts', () => {
 	it('round-trips a message and reports the malformed image path', () => {
@@ -44,5 +44,26 @@ describe('wire contracts', () => {
 		const value = messageContract.generate()
 		expect(messageContract.is(value)).toBe(true)
 		expect(isMessage(value)).toBe(true)
+	})
+	it('agrees with messageContract on each case', () => {
+		const verdicts = MESSAGE_GUARD_CASES.map((row) => [
+			row.label,
+			isMessage(row.value),
+			messageContract.is(row.value),
+		])
+		expect(verdicts).toEqual(MESSAGE_GUARD_CASES.map((row) => [row.label, row.domain, row.wire]))
+		for (const { value } of MESSAGE_GUARD_CASES.filter((row) => row.wire)) {
+			const parsed = messageContract.parse(value)
+			expect(parsed).toEqual(value)
+			expect(isMessage(parsed)).toBe(true)
+		}
+	})
+	it('keeps seeded wire messages in the domain', () => {
+		const seeds = Array.from({ length: 32 }, (_, index) => index + 1)
+		for (const seed of seeds) {
+			const value = messageContract.generate(seededRandom(seed))
+			expect(messageContract.is(value)).toBe(true)
+			expect(isMessage(value)).toBe(true)
+		}
 	})
 })

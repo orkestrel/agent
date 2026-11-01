@@ -1,10 +1,13 @@
 import type { TokenUsage } from '@orkestrel/budget'
 import type { JSONRecord, JSONValue } from '@orkestrel/contract'
 import type { ToolCall } from '@orkestrel/tool'
-import type { MESSAGE_ROLES } from './constants.js'
+import type { CONVERSATION_ROLES, MESSAGE_ROLES } from './constants.js'
 
 /** Names the role a {@link Message} plays in a conversation turn. */
 export type MessageRole = (typeof MESSAGE_ROLES)[number]
+
+/** Names the role a stored conversation message plays: any {@link MessageRole} except `system`. */
+export type ConversationRole = (typeof CONVERSATION_ROLES)[number]
 
 /**
  * Names which thinking the agent loop, a relay server, and a ledger retain before calling a
@@ -29,7 +32,8 @@ export type ThinkingReplay = 'none' | 'turn' | 'all'
  * JSON-encoded. A failed tool result carries its error text unchanged. `thinking` is present
  * only on an assistant turn whose call surfaced reasoning. The agent loop, a relay server, and
  * a ledger apply the provider's `replay` policy before calling it. A direct `generate` or
- * `stream` call sends messages as given.
+ * `stream` call sends messages as given. A stored conversation message plays a
+ * {@link ConversationRole}; the `system` message is built per request and never stored.
  */
 export interface Message {
 	readonly id: string
@@ -59,9 +63,13 @@ export interface Message {
  * Carries the minimal data needed to author a {@link Message} — the `id` is
  * assigned by the layer that stores it, so a caller supplies only role / content
  * (and, for a replayed assistant turn, its `calls`; for a tool turn, the `call` it answers).
+ *
+ * @remarks
+ * A stored message plays a {@link ConversationRole}; the `system` message is built per request,
+ * so a conversation's `add` refuses it with `ConversationError` code `'ROLE'`.
  */
 export interface MessageInput {
-	readonly role: MessageRole
+	readonly role: ConversationRole
 	readonly content: string
 	readonly calls?: readonly ToolCall[]
 	/** Holds the `id` of the {@link ToolCall} a `tool` turn answers. */

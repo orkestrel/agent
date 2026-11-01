@@ -116,6 +116,7 @@ export class Ledger implements LedgerInterface {
 	 * @throws {LedgerError} Thrown when a threshold, share, capacity, limit, topic, lookup, or gauge is invalid
 	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
 	 * @throws {LedgerError} Thrown when `snapshot` is malformed or marks an id its conversation does not hold (code `'SNAPSHOT'`)
+	 * @throws {ConversationError} Thrown when `isLedgerSnapshot` admits `snapshot` but its conversation holds a `system` message (code `'ROLE'`) or repeats an id (code `'SNAPSHOT'`)
 	 */
 	constructor(provider: ProviderInterface, options: LedgerOptions) {
 		for (const key of ['category', 'topic', 'correction', 'amends', 'supersedes'] as const) {

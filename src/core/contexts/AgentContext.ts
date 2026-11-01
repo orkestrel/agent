@@ -17,7 +17,8 @@ import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
 import { ToolManager } from '@orkestrel/tool'
 import { isTextContent, WorkspaceManager } from '@orkestrel/workspace'
 import { InstructionManager } from './instructions/InstructionManager.js'
-import { ConversationManager } from '../conversations/index.js'
+import { ConversationError, ConversationManager } from '../conversations/index.js'
+import { CONVERSATION_ROLES } from '../constants.js'
 import { filterAllowList } from '../helpers.js'
 import { attachUserImages, collectImageData, renderFencedFile, renderSection } from './helpers.js'
 import { WORKSPACE_SECTION_HEADER } from './constants.js'
@@ -237,6 +238,7 @@ export class AgentContext implements AgentContextInterface {
 	// Another run can append to the conversation while the handler awaits, so the view's ids are
 	// recorded before the call (an async body runs synchronously up to its first `await`) and
 	// compared after it; a changed view turns the handler's selection into a fault over `view()`.
+	// Over an unchanged view, a selected message whose role is not a conversation role does the same.
 	async #check(
 		handler: SelectionHandler,
 		conversation: ConversationInterface,
@@ -250,7 +252,25 @@ export class AgentContext implements AgentContextInterface {
 			after.length === before.length &&
 			after.every((message, index) => message.id === before[index])
 		) {
-			return selection
+			const refused = selection.messages.find(
+				(message) => !CONVERSATION_ROLES.some((role) => role === message.role),
+			)
+			if (refused === undefined) return selection
+			const role =
+				typeof refused.role === 'string'
+					? JSON.stringify(refused.role.slice(0, 32))
+					: typeof refused.role
+			const reason = `a selected message role must be one of ${CONVERSATION_ROLES.map((one) => JSON.stringify(one)).join(', ')}; message ${selection.messages.indexOf(refused)} has ${role}`
+			return {
+				messages: after,
+				judgments: selection.judgments,
+				...(selection.usage === undefined ? {} : { usage: selection.usage }),
+				fault: new ConversationError(
+					'ROLE',
+					reason,
+					selection.fault === undefined ? undefined : { cause: selection.fault },
+				),
+			}
 		}
 		const text = `conversation ${conversation.id} changed during selection: ${before.length} messages before, ${after.length} after`
 		return {

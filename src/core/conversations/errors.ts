@@ -5,10 +5,11 @@ import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
 /**
  * Reports a conversation with no {@link ConversationSummaryHandler} to fold its messages with, a
  * `sections` cap below `1`, a `keep` that is not a nonnegative safe integer, a summarizer digest
- * whose trimmed text is empty, or a judgment or
- * judge request that JSON cannot carry — thrown by the `compact()` method of a
- * {@link ConversationInterface}, its construction, or its judgment store, carrying the
- * machine-readable `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT' | 'KEEP' | 'SUMMARY'`.
+ * whose trimmed text is empty, a judgment or judge request that JSON cannot carry, a stored or
+ * selected message whose role is not a conversation role, or a malformed snapshot — thrown by the
+ * `compact()` and `add` methods of a {@link ConversationInterface}, its construction, or its
+ * judgment store, or returned as the `fault` of an agent selection, carrying the machine-readable
+ * `code` `'SUMMARIZER' | 'SECTIONS' | 'JUDGMENT' | 'KEEP' | 'SUMMARY' | 'ROLE' | 'SNAPSHOT'`.
  *
  * @remarks
  * Compaction requires a summarizer (it digests the folded slice into a section summary); a
@@ -22,11 +23,15 @@ import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
  * record or a judge request that JSON cannot carry, or whose copy fails its guard, is a
  * programmer error and throws this with `'JUDGMENT'`, its `context` naming the `question` id
  * where one exists. A summarizer digest whose trimmed text is empty rejects the `compact()` with
- * `'SUMMARY'`. Narrow a caught value with {@link isConversationError} and branch on
- * `error.code`.
+ * `'SUMMARY'`. A stored message plays a `ConversationRole`: `add` refuses any other role with
+ * `'ROLE'` before it stores any message of the batch, a hydrating snapshot that holds one throws
+ * `'ROLE'`, and an agent's selection that holds one becomes a `'ROLE'` fault. A hydrating snapshot
+ * that fails `isConversationSnapshot` or repeats an id throws `'SNAPSHOT'`; a judgment the guard
+ * admits but JSON cannot carry still throws `'JUDGMENT'`. Narrow a caught value with
+ * {@link isConversationError} and branch on `error.code`.
  */
 export class ConversationError extends Error {
-	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap, or a cap combined with `rolling`; `'JUDGMENT'`: a judgment or judge request that is not JSON; `'KEEP'`: a `keep` that is not a nonnegative safe integer; `'SUMMARY'`: a summarizer digest whose trimmed text is empty. */
+	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap, or a cap combined with `rolling`; `'JUDGMENT'`: a judgment or judge request that is not JSON; `'KEEP'`: a `keep` that is not a nonnegative safe integer; `'SUMMARY'`: a summarizer digest whose trimmed text is empty; `'ROLE'`: a stored or selected message whose role is not a `ConversationRole`; `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot` or repeats an id. */
 	readonly code: ConversationErrorCode
 	/** Holds the values that locate the failure, such as the `question` id of a malformed question, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined
@@ -81,7 +86,9 @@ export function isConversationError(value: unknown): value is ConversationError 
 				code === 'SECTIONS' ||
 				code === 'JUDGMENT' ||
 				code === 'KEEP' ||
-				code === 'SUMMARY'
+				code === 'SUMMARY' ||
+				code === 'ROLE' ||
+				code === 'SNAPSHOT'
 			)
 		)
 			return false

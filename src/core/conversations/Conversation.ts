@@ -20,7 +20,9 @@ import {
 	buildRecapMessage,
 	buildSummaryMessage,
 	raceSignal,
+	requireConversationSnapshot,
 	requireKeep,
+	requireRole,
 	requireRolling,
 	requireSectionsCap,
 	requireSummary,
@@ -40,6 +42,14 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   (`add` / `message` / `messages` / `remove` / `clear` / `count`), exactly as a `Workspace`
  *   owns its files (no separate per-value manager). `#sections` are the compacted history
  *   (oldest → newest), each a summarized slice that retains its originals.
+ * - **Stored roles.** Every stored message plays a `ConversationRole`. `add` checks every role of
+ *   a batch before it stores any and throws `ConversationError` code `'ROLE'` for a `system` or
+ *   unknown role; the `system` message is built per request and never stored. A hydrating
+ *   `snapshot` is checked by `requireConversationSnapshot` before any member is seated: a
+ *   malformed snapshot or a repeated id across section ids, section message ids, and live message
+ *   ids throws `'SNAPSHOT'`, and a stored `system` message throws `'ROLE'`. The checked
+ *   snapshot's top-level members are read once, and its section and message objects are seated by
+ *   reference.
  * - **`view()`.** Each section folds to one synthetic summary message (role `'assistant'` — a
  *   prior-context recap — keyed by the stable `id` of the section), then the live messages
  *   verbatim. The per-section summaries are the compaction benefit.
@@ -113,8 +123,10 @@ export class Conversation implements ConversationInterface {
 
 	constructor(options?: ConversationOptions) {
 		// A summarizer is a function and is never serialized, so it comes from options beside the
-		// snapshot. Restoring is silent: nothing was edited, so no event fires.
-		const snapshot = options?.snapshot
+		// snapshot. Restoring is silent: nothing was edited, so no event fires. The snapshot is checked
+		// before any member is seated, and every member is seated from the checked read alone.
+		const supplied = options?.snapshot
+		const snapshot = supplied === undefined ? undefined : requireConversationSnapshot(supplied)
 		this.#judgments = new JudgmentManager(snapshot?.judgments)
 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
 		this.#emitter = new Emitter<ConversationEventMap>(options)
@@ -157,7 +169,11 @@ export class Conversation implements ConversationInterface {
 	add(input: MessageInput): Message
 	add(inputs: readonly MessageInput[]): readonly Message[]
 	add(input: MessageInput | readonly MessageInput[]): Message | readonly Message[] {
-		if (isArray(input)) return input.map((one) => this.#create(one))
+		if (isArray(input)) {
+			// Every role is checked before any element is stored, so a refused batch stores nothing.
+			input.forEach((one) => requireRole(one.role))
+			return input.map((one) => this.#create(one))
+		}
 		return this.#create(input)
 	}
 
@@ -356,7 +372,7 @@ export class Conversation implements ConversationInterface {
 	#create(input: MessageInput): Message {
 		const message: Message = {
 			id: crypto.randomUUID(),
-			role: input.role,
+			role: requireRole(input.role),
 			content: input.content,
 			...(input.calls === undefined ? {} : { calls: input.calls }),
 			...(input.call === undefined ? {} : { call: input.call }),

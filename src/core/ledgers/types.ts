@@ -246,7 +246,8 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
  * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
  * Recall closes when `remainder - predict < 2 * reserve`. `snapshot` hydrates the conversation and
  * the marked ids a ledger's `snapshot()` returned; construction throws `LedgerError` with code
- * `'SNAPSHOT'` when `isLedgerSnapshot` refuses it.
+ * `'SNAPSHOT'` when `isLedgerSnapshot` refuses it, and `ConversationError` with code `'ROLE'` or
+ * `'SNAPSHOT'` when its conversation holds a `system` message or repeats an id.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
