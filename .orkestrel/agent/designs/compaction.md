@@ -12,13 +12,13 @@ Compaction and the ledger share exactly two seams: `extractLiterals` and `Litera
 | --- | --- | --- |
 | blank digest becomes a section | fix | rc-u1 |
 | `extractTokens` and `LedgerTokenSet` named for model tokens | fix (vocabulary) | rc-u2 |
-| recaps omit literals | experiment-shaped capability | rc-e1 |
+| recaps omit literals | not built: rc-e1 stopped at L0 and is retired (O32, O75) | none |
 | rule retention over rounds | documentation, instrument later | rc-d1; D3 |
-| rolling omission persists | covered by anchors; no second mechanism | rc-e1 |
+| rolling omission persists | no mechanism: anchors were not built, and no second one is planned (O75) | none |
 | accumulation until `WINDOW` | no change; the two-section cap stays excluded | none |
 | cache-safe summarizer call | deferred | D1 |
 | masking old tool results | deferred | D2 |
-| recall over folded originals | study-only experiment, after rc-e1 | rc-a5 |
+| recall over folded originals | study-only experiment, after rc-a9 | rc-a5 |
 | repeated identical lookups | an authority rule in the Study arm; no core switch | rc-s1; D5 |
 
 ## Recap role
@@ -69,7 +69,7 @@ export function extractLiterals(text: string): LiteralSet
 
 ## Anchored recaps
 
-`rc-e1` adds an extractor option to the conversation:
+`rc-e1` stopped at its L0 gate and is retired (`plan.md` O32, O75), so this section records a design that was not built; a redesign that anchors fewer ids or joins numbers to ids is a separate proposal with its own L0. The retired design added an extractor option to the conversation:
 
 ```ts
 export type LiteralExtractor = (text: string) => LiteralSet
@@ -93,7 +93,7 @@ export interface ConversationOptions {
 ## Rule retention
 
 - Instructions never fold, so a rule placed in an instruction survives every compaction round (C09). rc-d1 states this in the guide.
-- Rule decay across rounds is measured elsewhere (C03). The rule-retention instrument joins rc-a8 when rc-e1 promotes or a unit's gate names it, and verbatim rule pins wait for a measured loss (D3).
+- Rule decay across rounds is measured elsewhere (C03). The rule-retention instrument joins rc-a8 when a unit's gate names it, and verbatim rule pins wait for a measured loss (D3).
 
 ## Recall over folded originals
 
@@ -101,7 +101,7 @@ export interface ConversationOptions {
 
 - Build it in `studies/memory`, never in `src/`; removal reverts the study wiring and touches no package surface.
 - It targets closures without evidence and fabricated completions in the compaction arm (`research/evidence.md` § Prior-campaign readings, c1 results). Its known cost is re-acquisition (C06).
-- It runs after rc-e1's reading, with one compaction experiment on the GPU at a time.
+- It runs after rc-a9's reading, with one compaction experiment on the GPU at a time.
 - Promote it into `src/` only for a second consumer.
 
 ## Repeat loops

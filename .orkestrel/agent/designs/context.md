@@ -138,11 +138,11 @@ export interface MemoStoreInterface {
 
 ### Memo stores
 
-`rc-u8` mirrors the conversation stores line for line.
+`rc-u8` mirrors the conversation stores, with the four departures O81 accepts: `MemoryMemoStore` keeps its sets copy-on-write, the D14 timing is a throwaway bench read in a quiet runner slot, the contract test is one `describe.each` over a setup table of both factories, and `plantConversationRow` becomes the table-general `plantSnapshotRow`.
 
 - `MemoryMemoStore` and `DatabaseMemoStore` live in `src/core/contexts/stores/`. The database store writes one `{ id, snapshot }` row over `@orkestrel/database`, as `DatabaseConversationStore` does.
 - Point access is async; deleting a missing key is a no-op; the snapshot is one opaque column narrowed by `isMemoSnapshot`; a row whose blob id differs reads as absent.
-- Every fleet store holds one snapshot per id, so the whole-set row follows the fleet. rc-u8's test times `set` over growing memo sets; a one-row-per-revision store waits for D14.
+- Every fleet store holds one snapshot per id, so the whole-set row follows the fleet. rc-u8's throwaway bench times `set` over growing memo sets in a quiet runner slot, never as a timing assertion in a test; a one-row-per-revision store waits for D14, whose trigger reads 12.5 ms at 2000 revisions under O53, with the 50 ms figure reported beside it (O81).
 
 ### Memo and record
 
