@@ -1,6 +1,6 @@
 import type { JudgeQuestion, Judgment, LiteralSet, Message, ThinkingReplay } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import { attempt, isFiniteNumber } from '@orkestrel/contract'
+import { attempt, isArray, isFiniteNumber, isRecord } from '@orkestrel/contract'
 
 /**
  * Filters a list of members by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
@@ -366,7 +366,64 @@ export function renderJSON(value: unknown): string | undefined {
 }
 
 /**
- * Matches a recorded question, ordered sources, rendered state, and judge identity by JSON text, so key order counts.
+ * Matches two values of JSON data by JSON value, whatever their key order, and reads a value with no JSON text as no match.
+ *
+ * @remarks
+ * True exactly when the two values' JSON texts, as `JSON.stringify` renders them, parse to the
+ * same JSON value, and false when either side has no JSON text, a cycle aside. A record member
+ * whose value is `undefined`, a function, or a symbol is absent, as JSON renders it, and each
+ * member is read as an own member, so a `__proto__` or `constructor` key counts only on a side
+ * that holds it. A list compares by position and length. The walk stops at the first difference.
+ *
+ * Bounded to JSON data. It promises nothing for a cycle, a `toJSON` object, `NaN`, an infinity, or
+ * an `undefined`, function, symbol, or hole inside a list.
+ *
+ * @param left - One value
+ * @param right - The other value
+ * @returns True if the two values are the same JSON value; false otherwise
+ * @example
+ * ```ts
+ * matchesJSON({ order: 'LH-81660', late: true }, { late: true, order: 'LH-81660' }) // true
+ * matchesJSON(['LH-81660', 'LH-81661'], ['LH-81661', 'LH-81660']) // false
+ * matchesJSON(undefined, undefined) // false
+ * ```
+ */
+export function matchesJSON(left: unknown, right: unknown): boolean {
+	if (typeof left !== 'object' || left === null) {
+		return (
+			left === right &&
+			(typeof left === 'string' ||
+				typeof left === 'number' ||
+				typeof left === 'boolean' ||
+				left === null)
+		)
+	}
+	if (isArray(left)) {
+		return (
+			isArray(right) &&
+			left.length === right.length &&
+			left.every((member, index) => matchesJSON(member, right[index]))
+		)
+	}
+	if (!isRecord(left) || !isRecord(right)) return false
+	const ours = Object.keys(left).filter(
+		(key) =>
+			left[key] !== undefined && typeof left[key] !== 'function' && typeof left[key] !== 'symbol',
+	)
+	const theirs = Object.keys(right).filter(
+		(key) =>
+			right[key] !== undefined &&
+			typeof right[key] !== 'function' &&
+			typeof right[key] !== 'symbol',
+	)
+	return (
+		ours.length === theirs.length &&
+		ours.every((key) => Object.hasOwn(right, key) && matchesJSON(left[key], right[key]))
+	)
+}
+
+/**
+ * Matches a recorded question by JSON value, the ordered sources, the rendered state, and the judge identity.
  *
  * @param judgment - The recorded judgment to compare
  * @param question - The question to ask
@@ -391,7 +448,7 @@ export function matchesJudgment(
 		judgment.state === state &&
 		judgment.sources.length === sources.length &&
 		judgment.sources.every((id, index) => id === sources[index]) &&
-		JSON.stringify(judgment.question) === JSON.stringify(question)
+		matchesJSON(judgment.question, question)
 	)
 }
 

@@ -4,10 +4,13 @@ import {
 	collectExchanges,
 	collectToolGroups,
 	CONVERSATION_ROLES,
+	copyJSON,
 	extractLiterals,
 	filterAllowList,
 	hasCalls,
+	isJudgment,
 	joinThinking,
+	matchesJSON,
 	matchesJudgment,
 	stripThinking,
 	MESSAGE_ROLES,
@@ -17,8 +20,8 @@ import {
 	sanitizeUsage,
 	sumUsage,
 } from '@src/core'
-import { canonicalStringify } from '@orkestrel/contract'
-import { createRecorder } from '@orkestrel/test'
+import { canonicalStringify, parseJSONAs } from '@orkestrel/contract'
+import { createRecorder, requireValue } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	buildExchangeMessages,
@@ -28,10 +31,13 @@ import {
 	ALLOW_LIST_MATCH_MEMBERS,
 	THINKING_MESSAGES,
 	createTokenUsage,
+	JSON_ORACLE_VALUES,
 	JUDGMENT_INPUT,
 	JUDGMENT_MISMATCHES,
 	JUDGMENT_QUESTION,
 	JUDGMENT_RECORD,
+	JUDGMENT_REORDERED,
+	returnUndefined,
 } from '../../setup.js'
 
 describe('stripThinking', () => {
@@ -453,6 +459,102 @@ describe('renderJSON', () => {
 	})
 })
 
+describe('matchesJSON', () => {
+	it('matches keys in another order at two depths', () => {
+		expect(matchesJSON({ order: 'LH-81660', late: true }, { late: true, order: 'LH-81660' })).toBe(
+			true,
+		)
+		expect(
+			matchesJSON(
+				{ order: 'LH-81660', items: [{ sku: 'B-2', count: 2 }, null] },
+				{ items: [{ count: 2, sku: 'B-2' }, null], order: 'LH-81660' },
+			),
+		).toBe(true)
+	})
+
+	it('compares a list by position and length', () => {
+		expect(matchesJSON(['LH-81660', 'LH-81661'], ['LH-81660', 'LH-81661'])).toBe(true)
+		expect(matchesJSON(['LH-81660', 'LH-81661'], ['LH-81661', 'LH-81660'])).toBe(false)
+		expect(matchesJSON(['LH-81660'], ['LH-81660', 'LH-81661'])).toBe(false)
+		expect(matchesJSON(['LH-81660', 'LH-81661'], ['LH-81660'])).toBe(false)
+		expect(matchesJSON([], {})).toBe(false)
+		expect(matchesJSON({}, [])).toBe(false)
+	})
+
+	it('treats a member JSON omits as absent', () => {
+		const plain = { order: 'LH-81660' }
+		expect(matchesJSON({ order: 'LH-81660', note: undefined }, plain)).toBe(true)
+		expect(matchesJSON(plain, { order: 'LH-81660', note: undefined })).toBe(true)
+		expect(matchesJSON({ order: 'LH-81660', refund: returnUndefined }, plain)).toBe(true)
+		expect(matchesJSON(plain, { order: 'LH-81660', refund: returnUndefined })).toBe(true)
+		expect(matchesJSON({ order: 'LH-81660', marker: Symbol('refund') }, plain)).toBe(true)
+		expect(matchesJSON(plain, { order: 'LH-81660', marker: Symbol('refund') })).toBe(true)
+		expect(
+			matchesJSON({ order: 'LH-81660', note: undefined }, { order: 'LH-81660', note: 'late' }),
+		).toBe(false)
+		expect(matchesJSON({ note: undefined, order: 'LH-81660' }, { late: true })).toBe(false)
+	})
+
+	it('rejects a changed nested string', () => {
+		expect(
+			matchesJSON(
+				{ order: 'LH-81660', items: [{ sku: 'B-2' }] },
+				{ order: 'LH-81660', items: [{ sku: 'B-3' }] },
+			),
+		).toBe(false)
+	})
+
+	it('rejects a value with no JSON text', () => {
+		const marker = Symbol('refund')
+		const total = { total: 10n }
+		expect(matchesJSON(undefined, undefined)).toBe(false)
+		expect(matchesJSON(returnUndefined, returnUndefined)).toBe(false)
+		expect(matchesJSON(marker, marker)).toBe(false)
+		expect(matchesJSON(10n, 10n)).toBe(false)
+		expect(matchesJSON(total, total)).toBe(false)
+	})
+
+	it('reads own members only', () => {
+		const proto: Record<string, unknown> = JSON.parse('{"__proto__":{}}')
+		const named: Record<string, unknown> = JSON.parse('{"constructor":"LH-81660"}')
+		expect(Object.hasOwn(proto, '__proto__')).toBe(true)
+		expect(Object.hasOwn(named, 'constructor')).toBe(true)
+		expect(matchesJSON(proto, JSON.parse('{"__proto__":{}}'))).toBe(true)
+		expect(matchesJSON(named, JSON.parse('{"constructor":"LH-81660"}'))).toBe(true)
+		expect(matchesJSON(proto, { order: 'LH-81660' })).toBe(false)
+		expect(matchesJSON({ order: 'LH-81660' }, proto)).toBe(false)
+		expect(matchesJSON(named, { order: 'LH-81660' })).toBe(false)
+		expect(matchesJSON({ order: 'LH-81660' }, named)).toBe(false)
+		expect(matchesJSON(proto, {})).toBe(false)
+		expect(matchesJSON({}, proto)).toBe(false)
+		expect(matchesJSON(named, {})).toBe(false)
+		expect(matchesJSON({}, named)).toBe(false)
+	})
+
+	it('agrees with the canonical text oracle', () => {
+		const values = [
+			...JSON_ORACLE_VALUES,
+			...[...JUDGMENT_MISMATCHES, ...JUDGMENT_REORDERED].map(([, record]) => record.question),
+		]
+		for (const left of values) {
+			for (const right of values) {
+				const ours = canonicalStringify(copyJSON(left))
+				const theirs = canonicalStringify(copyJSON(right))
+				expect(matchesJSON(left, right)).toBe(ours !== undefined && ours === theirs)
+			}
+		}
+		const changed = JUDGMENT_MISMATCHES.filter(([name]) =>
+			['text', 'criterion', 'form'].includes(name),
+		)
+		expect(changed.map(([name]) => name)).toEqual(['text', 'criterion', 'form'])
+		expect(changed.map(([, record]) => matchesJSON(record.question, JUDGMENT_QUESTION))).toEqual([
+			false,
+			false,
+			false,
+		])
+	})
+})
+
 describe('matchesJudgment', () => {
 	it('matches the shared record and ignores its time', () => {
 		expect(
@@ -475,6 +577,32 @@ describe('matchesJudgment', () => {
 				JUDGMENT_INPUT.model,
 			),
 		).toBe(false)
+	})
+	it.each(JUDGMENT_REORDERED)('matches a changed %s alone', (_name, record) => {
+		expect(
+			matchesJudgment(
+				record,
+				JUDGMENT_QUESTION,
+				JUDGMENT_INPUT.sources,
+				JUDGMENT_INPUT.state,
+				JUDGMENT_INPUT.model,
+			),
+		).toBe(true)
+	})
+	it('matches a record whose question keys were sorted', () => {
+		const sorted = requireValue(
+			parseJSONAs(requireValue(canonicalStringify(JUDGMENT_RECORD)), isJudgment),
+		)
+		expect(Object.keys(sorted.question)[0]).toBe('criteria')
+		expect(
+			matchesJudgment(
+				sorted,
+				JUDGMENT_QUESTION,
+				JUDGMENT_INPUT.sources,
+				JUDGMENT_INPUT.state,
+				JUDGMENT_INPUT.model,
+			),
+		).toBe(true)
 	})
 })
 

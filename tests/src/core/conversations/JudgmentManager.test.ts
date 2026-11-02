@@ -4,9 +4,11 @@ import {
 	createConversation,
 	isConversationError,
 	isJudgeAbortError,
+	isJudgment,
 	JudgmentManager,
 	JudgeAbortError,
 } from '@src/core'
+import { arrayOf, canonicalStringify, parseJSONAs } from '@orkestrel/contract'
 import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
@@ -144,6 +146,39 @@ describe('JudgmentManager', () => {
 		)
 		await manager.resolve(judge, SYSTEM_ONE_JUDGE_OBJECT, ['b', 'a'], new AbortController().signal)
 		expect(transport.requests).toHaveLength(3)
+	})
+
+	it('reuses a hydrated judgment whose keys were sorted', async () => {
+		const { judge, transport } = createRecordedJudge()
+		const first = new JudgmentManager()
+		await first.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, ['a'], new AbortController().signal)
+		const sorted = requireValue(
+			parseJSONAs(requireValue(canonicalStringify(first.judgments())), arrayOf(isJudgment)),
+		)
+		const manager = new JudgmentManager(sorted)
+		expect(Object.keys(requireValue(manager.judgment('refund')).question)[0]).toBe('criteria')
+		await manager.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, ['a'], new AbortController().signal)
+		expect(transport.requests).toHaveLength(1)
+		await manager.resolve(
+			judge,
+			{
+				...SYSTEM_ONE_JUDGE_REQUEST,
+				questions: {
+					...SYSTEM_ONE_JUDGE_REQUEST.questions,
+					refund: {
+						form: 'noul',
+						instructions: 'Does the customer ask for money back?',
+						criteria: {
+							true: 'The customer asks to be repaid.',
+							false: 'The customer does not ask for money back.',
+						},
+					},
+				},
+			},
+			['a'],
+			new AbortController().signal,
+		)
+		expect(transport.requests).toHaveLength(2)
 	})
 
 	it('records completed partial answers before propagating the original judge abort', async () => {

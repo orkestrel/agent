@@ -1561,17 +1561,6 @@ export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = O
 		},
 	],
 	[
-		'criteria order',
-		{
-			...JUDGMENT_RECORD,
-			question: {
-				form: 'noul',
-				instructions: 'Is a refund owed?',
-				criteria: { false: 'Charged once', true: 'Charged twice' },
-			},
-		},
-	],
-	[
 		'form',
 		{
 			...JUDGMENT_RECORD,
@@ -1584,6 +1573,21 @@ export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = O
 	],
 	['state', { ...JUDGMENT_RECORD, state: 'Charged once' }],
 	['identity', { ...JUDGMENT_RECORD, model: 'other-model' }],
+])
+
+/** Names each key reorder that leaves the shared judgment record's question the same JSON value. */
+export const JUDGMENT_REORDERED: ReadonlyArray<readonly [string, Judgment]> = Object.freeze([
+	[
+		'criteria order',
+		{
+			...JUDGMENT_RECORD,
+			question: {
+				form: 'noul',
+				instructions: 'Is a refund owed?',
+				criteria: { false: 'Charged once', true: 'Charged twice' },
+			},
+		},
+	],
 	[
 		'question member order',
 		{
@@ -1595,6 +1599,29 @@ export const JUDGMENT_MISMATCHES: ReadonlyArray<readonly [string, Judgment]> = O
 			},
 		},
 	],
+])
+
+/** Holds the values the canonical text oracle of `matchesJSON` reads in pairs. */
+export const JSON_ORACLE_VALUES: readonly unknown[] = Object.freeze([
+	{ order: 'LH-81660' },
+	{ order: 'LH-81660', late: true },
+	{ late: true, order: 'LH-81660' },
+	{ order: 'LH-81660', late: false },
+	{ order: 'LH-81660', note: null },
+	{ order: 'LH-81660', items: [{ sku: 'B-2', count: 2 }, null], late: true },
+	{ late: true, items: [{ count: 2, sku: 'B-2' }, null], order: 'LH-81660' },
+	{ order: 'LH-81660', items: [null, { sku: 'B-2', count: 2 }], late: true },
+	JSON.parse('{"__proto__":{"order":"LH-81660"}}'),
+	JSON.parse('{"__proto__":{}}'),
+	JSON.parse('{"constructor":"LH-81660"}'),
+	{ order: 'LH-81660', note: undefined },
+	{ order: 'LH-81660', refund: returnUndefined },
+	{ order: 'LH-81660', marker: Symbol('refund') },
+	undefined,
+	returnUndefined,
+	Symbol('refund'),
+	10n,
+	{ total: 10n },
 ])
 
 /** Drives the real System One wire methods through the judge engine's sequential mode. */

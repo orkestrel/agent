@@ -138,7 +138,7 @@ export interface JudgeRequest {
 	readonly questions: Readonly<Record<string, JudgeQuestion>>
 }
 
-/** Carries a choice distribution keyed by option name, in criteria order. */
+/** Carries a choice distribution keyed by option name, in criteria order for a fresh answer; a restored record keeps the order its store returned. */
 export interface ChoiceAnswer {
 	readonly form: 'choice'
 	readonly probabilities: Readonly<Record<string, number>>

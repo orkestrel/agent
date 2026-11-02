@@ -269,7 +269,8 @@ export async function* readChunks(
  *
  * @remarks
  * The winner is the first strictly greatest candidate in enumeration order: an option name in
- * criteria order, a level index, or `'false'` then `'true'` for a noul, so a noul of exactly 0.5
+ * criteria order for a fresh answer and in the order its store returned for a restored record,
+ * a level index, or `'false'` then `'true'` for a noul, so a noul of exactly 0.5
  * names `'false'`. Confidence follows the TypeSafe formulas, whatever confidence a server sent: a
  * choice reads `(max(p) - 1/n) / (1 - 1/n)`, a noul reads `|2p - 1|` (the choice formula at
  * n = 2), and a score reads `max(0, 1 - spread / even_spread)`, where `spread` sums each level's

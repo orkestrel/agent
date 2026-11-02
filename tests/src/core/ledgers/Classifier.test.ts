@@ -24,6 +24,7 @@ import {
 	CLASSIFIER_PINNED_ASKS,
 	createLedgerJudge,
 	createPhraseJudge,
+	LEDGER_DESK_THRESHOLDS,
 	LEDGER_REFUNDS_TOPIC,
 	type ReadingSummary,
 	RecordedTransport,
@@ -306,6 +307,28 @@ describe('Classifier', () => {
 			buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
 		)
 		expect(transport.requests).toHaveLength(10)
+	})
+
+	it('files a sorted tie by category order', () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: 'Refund rules.' })
+		const judge = new RecordingJudge()
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				thresholds: { ...LEDGER_DESK_THRESHOLDS, category: 0.4 },
+			}),
+		)
+		conversation.judgments.add({
+			id: JSON.stringify(['category', message.id]),
+			model: judge.model,
+			sources: [message.id],
+			state: 'user: Refund rules.',
+			question: LEDGER_QUESTIONS.category,
+			answer: { form: 'choice', probabilities: { chatter: 0.5, fact: 0.5 } },
+		})
+		expect(classifier.category(message.id)).toBe('fact')
 	})
 
 	it('reads group sums and exact cutoffs, rejects stale records, and preserves canonical criteria order', async () => {

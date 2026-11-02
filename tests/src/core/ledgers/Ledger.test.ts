@@ -24,7 +24,7 @@ import {
 	isLedgerSnapshot,
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
-import { isString } from '@orkestrel/contract'
+import { canonicalStringify, isString, parseJSONAs } from '@orkestrel/contract'
 import { OllamaProvider } from '@orkestrel/ollama'
 import { createTool } from '@orkestrel/tool'
 import {
@@ -3459,6 +3459,22 @@ describe('Ledger — snapshot and hydrate', () => {
 		expect(translateLedgerIds(replayed.selections, from, to)).toBe(
 			JSON.stringify(served.selections),
 		)
+		expect(translateLedgerIds(replayed.keys, from, to)).toBe(JSON.stringify(served.keys))
+	})
+
+	it('replays the next request from a sorted snapshot', async () => {
+		const parent = await serveLedgerHistory()
+		const snapshot = parent.ledger.snapshot()
+		const served = await serveLedgerReplay(parent, LEDGER_REPLAY_FIXTURE.request)
+		const sorted = requireValue(
+			parseJSONAs(requireValue(canonicalStringify(snapshot)), isLedgerSnapshot),
+		)
+		const child = createLedgerReplay(sorted)
+		const replayed = await serveLedgerReplay(child, LEDGER_REPLAY_FIXTURE.request)
+		const from = child.ledger.conversation.messages()
+		const to = parent.ledger.conversation.messages()
+		expect(from).toHaveLength(to.length)
+		expect(served.keys).not.toEqual([])
 		expect(translateLedgerIds(replayed.keys, from, to)).toBe(JSON.stringify(served.keys))
 	})
 

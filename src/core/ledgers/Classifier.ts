@@ -80,13 +80,11 @@ export class Classifier implements ClassifierInterface {
 		if (assigned !== undefined) return assigned
 		const answer = this.#readCategories(id)
 		const cutoff = this.#options.thresholds.category
-		const candidates = Object.entries(answer?.probabilities ?? {}).flatMap(
-			([option, probability]) => {
-				const category = LEDGER_CATEGORIES.find((candidate) => candidate === option)
-				return category !== undefined && probability >= cutoff ? [{ category, probability }] : []
-			},
-		)
-		// The first category with the highest probability wins a tie.
+		const candidates = LEDGER_CATEGORIES.flatMap((category) => {
+			const probability = answer?.probabilities[category]
+			return probability !== undefined && probability >= cutoff ? [{ category, probability }] : []
+		})
+		// The first category in `LEDGER_CATEGORIES` order with the highest probability wins a tie.
 		return candidates.reduce<{ category: LedgerCategory; probability: number } | undefined>(
 			(best, candidate) =>
 				best === undefined || candidate.probability > best.probability ? candidate : best,
