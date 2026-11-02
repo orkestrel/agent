@@ -1,7 +1,7 @@
 import type { StudyEvidence, StudyRubric } from '@orkestrel/study'
 import type { StudyGradeVerdict, StudyGradeTarget } from '@orkestrel/study/server'
 import type { StudyToolsAssertion, StudyToolsFile, StudyToolsReading } from './types.js'
-import { isObject, isRecord } from '@orkestrel/contract'
+import { isArray, isObject, isRecord } from '@orkestrel/contract'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import { StudyError, isStudyRubric } from '@orkestrel/study'
@@ -87,7 +87,10 @@ export function validateStudyToolsRubric(rubric: StudyRubric): void {
 	for (const criterion of rubric.criteria) {
 		if (
 			!isStudyToolsAssertion(criterion.assertion) ||
-			criterion.method !== (criterion.assertion.observation === 'file' ? 'state' : 'trace')
+			criterion.method !==
+				(criterion.assertion.observation === 'file' || criterion.assertion.observation === 'memo'
+					? 'state'
+					: 'trace')
 		)
 			throw new StudyError('CONFIG', 'Unsupported tools assertion or grading method')
 	}
@@ -110,6 +113,7 @@ export function readStudyToolsPredicate(
 	goal: string,
 	evidence: readonly StudyEvidence[],
 ): StudyToolsReading {
+	if (assertion.observation === 'request') return readStudyToolsRequest(assertion, goal, evidence)
 	// Each relevant row that names the asserted subject yields one reading; the latest wins.
 	const readings = [...evidence.entries()].flatMap(([row, event]): readonly StudyToolsReading[] => {
 		if (event.goal !== goal || event.event !== assertion.observation) return []
@@ -133,6 +137,7 @@ export function readStudyToolsPredicate(
 			if (typeof value.name !== 'string' || typeof value.success !== 'boolean')
 				throw new StudyError('EVIDENCE', 'Malformed tool evidence')
 			if (value.name !== assertion.name) return []
+			if (assertion.count !== undefined && value.success !== assertion.success) return []
 			return [{ verdict: value.success === assertion.success ? 'achieved' : 'unsuccessful', row }]
 		}
 		if (assertion.observation === 'denial') {
@@ -140,6 +145,21 @@ export function readStudyToolsPredicate(
 				throw new StudyError('EVIDENCE', 'Malformed denial evidence')
 			if (value.name !== assertion.name) return []
 			return [{ verdict: 'achieved', row }]
+		}
+		if (assertion.observation === 'memo') {
+			if (typeof value.name !== 'string' || typeof value.revisions !== 'number')
+				throw new StudyError('EVIDENCE', 'Malformed memo evidence')
+			if (value.name !== assertion.name) return []
+			return [
+				{
+					verdict:
+						value.revisions === assertion.revisions &&
+						(assertion.description === undefined || value.description === assertion.description)
+							? 'achieved'
+							: 'unsuccessful',
+					row,
+				},
+			]
 		}
 		if (typeof value.partial !== 'boolean' || typeof value.content !== 'string')
 			throw new StudyError('EVIDENCE', 'Malformed result evidence')
@@ -154,7 +174,59 @@ export function readStudyToolsPredicate(
 			},
 		]
 	})
-	return Object.freeze(readings.at(-1) ?? { verdict: 'unknown', row: undefined })
+	const latest = readings.at(-1)
+	if (latest !== undefined && assertion.observation === 'tool' && assertion.count !== undefined)
+		return Object.freeze({
+			verdict: readings.length === assertion.count ? 'achieved' : 'unsuccessful',
+			row: latest.row,
+		})
+	return Object.freeze(latest ?? { verdict: 'unknown', row: undefined })
+}
+
+/**
+ * Reads whether one request of a goal holds a text in one role, from the goal's retained `provider` rows.
+ * @param assertion - The validated predicate
+ * @param goal - The declared goal
+ * @param evidence - The retained ordered evidence rows
+ * @returns A verdict with the request's original zero-based row, or unknown when the goal sent no such request
+ * @throws StudyError - Thrown when the selected `provider` row is malformed
+ * @example
+ * ```ts
+ * readStudyToolsRequest({ observation: 'request', at: 0, role: 'system', text: '- review:', present: true }, 'write', rows)
+ * ```
+ */
+export function readStudyToolsRequest(
+	assertion: Extract<StudyToolsAssertion, { readonly observation: 'request' }>,
+	goal: string,
+	evidence: readonly StudyEvidence[],
+): StudyToolsReading {
+	const selected = [...evidence.entries()].filter(
+		([, event]) => event.goal === goal && event.event === 'provider',
+	)[assertion.at]
+	if (selected === undefined) return Object.freeze({ verdict: 'unknown', row: undefined })
+	const [row, event] = selected
+	const request: unknown = isRecord(event.value) ? event.value.request : undefined
+	if (
+		!isArray(request) ||
+		!request.every(
+			(message) =>
+				isRecord(message) &&
+				typeof message.role === 'string' &&
+				typeof message.content === 'string',
+		)
+	)
+		throw new StudyError('EVIDENCE', 'Malformed provider evidence')
+	const found = request.some(
+		(message) =>
+			isRecord(message) &&
+			message.role === assertion.role &&
+			typeof message.content === 'string' &&
+			message.content.includes(assertion.text),
+	)
+	return Object.freeze({
+		verdict: found === assertion.present ? 'achieved' : 'unsuccessful',
+		row,
+	})
 }
 
 /**

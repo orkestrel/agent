@@ -27,6 +27,7 @@ it('keeps a fault raised in one goal out of the next goal of the same session an
 	}
 	// A listener that throws on every dispatched tool is routed to the session's own error handler.
 	const faulty = {
+		createScope: fixture.agent.createScope,
 		Agent: new Proxy(fixture.agent.Agent, {
 			construct(target, args, newTarget) {
 				const agent = Reflect.construct(target, args, newTarget)

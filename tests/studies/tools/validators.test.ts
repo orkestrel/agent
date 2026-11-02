@@ -5,7 +5,10 @@ import {
 	isStudyToolsFile,
 	isStudyToolsFileName,
 	isStudyToolsInput,
+	isStudyToolsName,
+	isStudyToolsNames,
 	isStudyToolsRead,
+	isStudyToolsRemember,
 	isStudyToolsResponse,
 	isStudyToolsRuntime,
 	isStudyToolsWrite,
@@ -13,7 +16,13 @@ import {
 import { parseStudyToolsInput } from '../../../studies/tools/parsers.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from '../../../studies/tools/errors.js'
 import { ScriptedReads } from '../../setup.js'
-import { loadStudyToolsFixture } from '../../setupStudy.js'
+import {
+	STUDY_TOOLS_LIBRARY_ASSERTIONS,
+	STUDY_TOOLS_LIBRARY_INPUT,
+	STUDY_TOOLS_MALFORMED_ASSERTIONS,
+	STUDY_TOOLS_MALFORMED_LIBRARIES,
+	loadStudyToolsFixture,
+} from '../../setupStudy.js'
 
 it('validates actual admitted constructors and bounds every declared workload without coercion', async () => {
 	const fixture = await loadStudyToolsFixture()
@@ -32,7 +41,10 @@ it('validates actual admitted constructors and bounds every declared workload wi
 			),
 		),
 	).toBe(false)
-	expect(isStudyToolsRuntime({ Agent: function Agent() {} })).toBe(true)
+	expect(isStudyToolsRuntime({ Agent: function Agent() {} })).toBe(false)
+	expect(isStudyToolsRuntime({ Agent: function Agent() {}, createScope: () => undefined })).toBe(
+		true,
+	)
 	expect(
 		isStudyToolsRuntime({
 			get Agent() {
@@ -160,4 +172,38 @@ it('validates independent state/trace schemas and exact operation arguments', ()
 	expect(isStudyToolsFile({ path: 'note.txt', exists: true, content: 'x', bytes: -1 })).toBe(false)
 	expect(isStudyToolsRefusal(new StudyToolsRefusal('Path refused'))).toBe(true)
 	expect(isStudyToolsRefusal(new Error('ordinary'))).toBe(false)
+})
+
+it('admits the library goal members', () => {
+	expect(isStudyToolsInput(STUDY_TOOLS_LIBRARY_INPUT)).toBe(true)
+	expect(isStudyToolsNames(['tone', 'reach'])).toBe(true)
+	expect(isStudyToolsNames(['con'])).toBe(false)
+	expect(isStudyToolsNames('tone')).toBe(false)
+	const memo = { name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' }
+	expect(isStudyToolsRemember(memo)).toBe(true)
+	expect(isStudyToolsRemember({ ...memo, extra: true })).toBe(false)
+	expect(isStudyToolsRemember({ ...memo, content: 'a'.repeat(1025) })).toBe(false)
+	expect(isStudyToolsName({ name: 'review' })).toBe(true)
+	expect(isStudyToolsName({ name: 'review', content: 'Injected body.' })).toBe(false)
+	expect(isStudyToolsName({ name: 'a'.repeat(1025) })).toBe(false)
+})
+
+it('refuses malformed library members', () => {
+	expect(isStudyToolsInput(STUDY_TOOLS_LIBRARY_INPUT)).toBe(true)
+	expect(STUDY_TOOLS_MALFORMED_LIBRARIES).toHaveLength(9)
+	expect(STUDY_TOOLS_MALFORMED_LIBRARIES.filter((row) => isStudyToolsInput(row))).toEqual([])
+})
+
+it('admits the request and memo assertions', () => {
+	expect(isStudyToolsAssertion(STUDY_TOOLS_LIBRARY_ASSERTIONS.request)).toBe(true)
+	expect(isStudyToolsAssertion(STUDY_TOOLS_LIBRARY_ASSERTIONS.memo)).toBe(true)
+	expect(isStudyToolsAssertion(STUDY_TOOLS_LIBRARY_ASSERTIONS.tool)).toBe(true)
+})
+
+it('refuses malformed new assertions', () => {
+	expect(isStudyToolsAssertion(STUDY_TOOLS_LIBRARY_ASSERTIONS.request)).toBe(true)
+	expect(isStudyToolsAssertion(STUDY_TOOLS_LIBRARY_ASSERTIONS.memo)).toBe(true)
+	expect(isStudyToolsAssertion(STUDY_TOOLS_LIBRARY_ASSERTIONS.tool)).toBe(true)
+	expect(STUDY_TOOLS_MALFORMED_ASSERTIONS).toHaveLength(11)
+	expect(STUDY_TOOLS_MALFORMED_ASSERTIONS.filter((row) => isStudyToolsAssertion(row))).toEqual([])
 })

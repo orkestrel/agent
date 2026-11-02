@@ -1,0 +1,368 @@
+{
+	"version": "1",
+	"criteria": [
+		{
+			"id": "write-tool",
+			"scenario": "libraries",
+			"goal": "write",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "tool", "name": "remember", "success": true }
+		},
+		{
+			"id": "write-tone",
+			"scenario": "libraries",
+			"goal": "write",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "memo", "name": "tone", "revisions": 1 }
+		},
+		{
+			"id": "write-reach",
+			"scenario": "libraries",
+			"goal": "write",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "memo", "name": "reach", "revisions": 1 }
+		},
+		{
+			"id": "write-index",
+			"scenario": "libraries",
+			"goal": "write",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "- review: Reviews a change for defects.",
+				"present": true
+			}
+		},
+		{
+			"id": "write-body",
+			"scenario": "libraries",
+			"goal": "write",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "Read the diff",
+				"present": false
+			}
+		},
+		{
+			"id": "write-memos",
+			"scenario": "libraries",
+			"goal": "write",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "## Memos",
+				"present": false
+			}
+		},
+		{
+			"id": "write-head",
+			"scenario": "libraries",
+			"goal": "write",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 1,
+				"role": "user",
+				"text": "Prefers short replies.",
+				"present": false
+			}
+		},
+		{
+			"id": "revise-index",
+			"scenario": "libraries",
+			"goal": "revise",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "- tone: Prefers short replies.",
+				"present": true
+			}
+		},
+		{
+			"id": "revise-system",
+			"scenario": "libraries",
+			"goal": "revise",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "Prefers short replies.",
+				"present": false
+			}
+		},
+		{
+			"id": "revise-memo",
+			"scenario": "libraries",
+			"goal": "revise",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "memo",
+				"name": "tone",
+				"revisions": 2,
+				"description": "Prefers bullet lists."
+			}
+		},
+		{
+			"id": "refuse-denial",
+			"scenario": "libraries",
+			"goal": "refuse",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "denial", "name": "remember" }
+		},
+		{
+			"id": "refuse-memo",
+			"scenario": "libraries",
+			"goal": "refuse",
+			"method": "state",
+			"critical": true,
+			"assertion": { "observation": "memo", "name": "gossip", "revisions": 0 }
+		},
+		{
+			"id": "read-index",
+			"scenario": "libraries",
+			"goal": "read",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "- tone: Prefers bullet lists.",
+				"present": true
+			}
+		},
+		{
+			"id": "read-stale",
+			"scenario": "libraries",
+			"goal": "read",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "Prefers short replies.",
+				"present": false
+			}
+		},
+		{
+			"id": "read-body",
+			"scenario": "libraries",
+			"goal": "read",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "Answer in bullets.",
+				"present": false
+			}
+		},
+		{
+			"id": "read-prompt",
+			"scenario": "libraries",
+			"goal": "read",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "Remember the reply tone",
+				"present": false
+			}
+		},
+		{
+			"id": "read-tool",
+			"scenario": "libraries",
+			"goal": "read",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 1,
+				"role": "tool",
+				"text": "Answer in bullets.",
+				"present": true
+			}
+		},
+		{
+			"id": "read-result",
+			"scenario": "libraries",
+			"goal": "read",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": false, "content": "Answer in bullets." }
+		},
+		{
+			"id": "scoped-skill",
+			"scenario": "libraries",
+			"goal": "scoped",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "- triage:",
+				"present": true
+			}
+		},
+		{
+			"id": "scoped-review",
+			"scenario": "libraries",
+			"goal": "scoped",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "- review:",
+				"present": false
+			}
+		},
+		{
+			"id": "scoped-reach",
+			"scenario": "libraries",
+			"goal": "scoped",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "- reach:",
+				"present": true
+			}
+		},
+		{
+			"id": "scoped-tone",
+			"scenario": "libraries",
+			"goal": "scoped",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "user",
+				"text": "- tone:",
+				"present": false
+			}
+		},
+		{
+			"id": "load-index",
+			"scenario": "libraries",
+			"goal": "load",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "- review:",
+				"present": true
+			}
+		},
+		{
+			"id": "load-tool",
+			"scenario": "libraries",
+			"goal": "load",
+			"method": "trace",
+			"critical": true,
+			"assertion": { "observation": "tool", "name": "skill", "success": true, "count": 1 }
+		},
+		{
+			"id": "load-body",
+			"scenario": "libraries",
+			"goal": "load",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 1,
+				"role": "system",
+				"text": "Read the diff",
+				"present": false
+			}
+		},
+		{
+			"id": "load-injected",
+			"scenario": "libraries",
+			"goal": "load",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 1,
+				"role": "system",
+				"text": "Injected body.",
+				"present": false
+			}
+		},
+		{
+			"id": "load-ack",
+			"scenario": "libraries",
+			"goal": "load",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 1,
+				"role": "tool",
+				"text": "loaded",
+				"present": true
+			}
+		},
+		{
+			"id": "loaded-body",
+			"scenario": "libraries",
+			"goal": "loaded",
+			"method": "trace",
+			"critical": false,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "Read the diff",
+				"present": true
+			}
+		},
+		{
+			"id": "loaded-other",
+			"scenario": "libraries",
+			"goal": "loaded",
+			"method": "trace",
+			"critical": true,
+			"assertion": {
+				"observation": "request",
+				"at": 0,
+				"role": "system",
+				"text": "Read the report",
+				"present": false
+			}
+		}
+	]
+}

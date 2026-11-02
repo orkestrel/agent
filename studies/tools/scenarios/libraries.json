@@ -1,0 +1,171 @@
+{
+	"id": "libraries",
+	"goals": [
+		{
+			"id": "write",
+			"input": {
+				"prompt": "Remember the reply tone and reach.",
+				"admitted": true,
+				"approval": "approve",
+				"conversation": "first",
+				"skills": [
+					{
+						"name": "review",
+						"description": "Reviews a change for defects.",
+						"content": "Read the diff, then list each defect with its line."
+					},
+					{
+						"name": "triage",
+						"description": "Sorts a report by severity.",
+						"content": "Read the report, then name its severity."
+					}
+				],
+				"memos": ["tone", "reach"],
+				"files": [],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "remember-tone",
+								"name": "remember",
+								"arguments": {
+									"name": "tone",
+									"description": "Prefers short replies.",
+									"content": "Answer briefly."
+								}
+							},
+							{
+								"id": "remember-reach",
+								"name": "remember",
+								"arguments": {
+									"name": "reach",
+									"description": "Answers by email.",
+									"content": "Reply by email."
+								}
+							}
+						]
+					},
+					{ "content": "Saved.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "revise",
+			"input": {
+				"prompt": "Revise the reply tone.",
+				"admitted": true,
+				"approval": "approve",
+				"conversation": "first",
+				"memos": ["tone"],
+				"files": [],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "revise-tone",
+								"name": "remember",
+								"arguments": {
+									"name": "tone",
+									"description": "Prefers bullet lists.",
+									"content": "Answer in bullets."
+								}
+							}
+						]
+					},
+					{ "content": "Revised.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "refuse",
+			"input": {
+				"prompt": "Remember the gossip.",
+				"admitted": true,
+				"approval": "refuse",
+				"conversation": "first",
+				"memos": ["gossip"],
+				"files": [],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{
+								"id": "remember-gossip",
+								"name": "remember",
+								"arguments": {
+									"name": "gossip",
+									"description": "Refused text.",
+									"content": "Refused body."
+								}
+							}
+						]
+					},
+					{ "content": "Refused.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "read",
+			"input": {
+				"prompt": "Read the tone memo.",
+				"admitted": true,
+				"conversation": "second",
+				"files": [],
+				"responses": [
+					{
+						"content": "",
+						"calls": [{ "id": "read-tone", "name": "memo", "arguments": { "name": "tone" } }]
+					},
+					{ "content": "", "calls": [], "consume": "read-tone" }
+				]
+			}
+		},
+		{
+			"id": "scoped",
+			"input": {
+				"prompt": "Answer under the scope.",
+				"admitted": true,
+				"conversation": "second",
+				"scope": { "skills": ["triage"], "memos": ["reach"] },
+				"files": [],
+				"responses": [{ "content": "Scoped.", "calls": [] }]
+			}
+		},
+		{
+			"id": "load",
+			"input": {
+				"prompt": "Load the review skill.",
+				"admitted": true,
+				"conversation": "second",
+				"files": [],
+				"responses": [
+					{
+						"content": "",
+						"calls": [
+							{ "id": "load-missing", "name": "skill", "arguments": { "name": "missing" } },
+							{
+								"id": "load-injected",
+								"name": "skill",
+								"arguments": { "name": "triage", "content": "Injected body." }
+							},
+							{ "id": "load-review", "name": "skill", "arguments": { "name": "review" } }
+						]
+					},
+					{ "content": "Loaded.", "calls": [] }
+				]
+			}
+		},
+		{
+			"id": "loaded",
+			"input": {
+				"prompt": "Apply the review skill.",
+				"admitted": true,
+				"conversation": "second",
+				"files": [],
+				"responses": [{ "content": "Applied.", "calls": [] }]
+			}
+		}
+	]
+}

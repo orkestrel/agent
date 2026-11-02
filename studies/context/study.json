@@ -1,0 +1,12 @@
+{
+	"name": "context",
+	"version": "1",
+	"question": "Does the built Agent carry a memo set and a skill registry across conversations, loads, and scopes, with model-written text outside the system message?",
+	"purpose": "mechanism",
+	"driver": "tools",
+	"arms": ["agent"],
+	"scenarios": ["libraries"],
+	"order": [["agent"], ["agent"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

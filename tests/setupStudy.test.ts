@@ -132,6 +132,12 @@ describe('study declaration fixtures', () => {
 			'result',
 		])
 	})
+
+	it('loads the context declaration', async () => {
+		const { manifest } = await loadStudyToolsFixture('context')
+		expect(manifest.definition.driver).toBe('tools')
+		expect(manifest.scenarios.map((scenario) => scenario.id)).toEqual(['libraries'])
+	})
 })
 
 describe('study install fixtures', () => {

@@ -3,7 +3,9 @@ import type {
 	StudyToolsAssertion,
 	StudyToolsFile,
 	StudyToolsInput,
+	StudyToolsName,
 	StudyToolsRead,
+	StudyToolsRemember,
 	StudyToolsRuntime,
 	StudyToolsWrite,
 } from './types.js'
@@ -19,16 +21,23 @@ import {
 } from './constants.js'
 
 /**
- * Checks whether an admitted runtime namespace supplies a constructable Agent export.
+ * Checks whether an admitted runtime namespace supplies a constructable Agent and a scope factory.
  * @param value - The admitted built module namespace
- * @returns True if the required constructor exists; false otherwise
+ * @returns True if the required exports exist; false otherwise
  * @example
  * ```ts
  * isStudyToolsRuntime({}) // false
  * ```
  */
 export function isStudyToolsRuntime(value: unknown): value is StudyToolsRuntime {
-	return holds(() => isObject(value) && 'Agent' in value && isConstructor(value.Agent))
+	return holds(
+		() =>
+			isObject(value) &&
+			'Agent' in value &&
+			isConstructor(value.Agent) &&
+			'createScope' in value &&
+			typeof value.createScope === 'function',
+	)
 }
 
 /**
@@ -54,6 +63,30 @@ export function isStudyToolsAgent(value: unknown): value is StudyToolsAgentInter
 			isObject(value.context.messages) &&
 			'add' in value.context.messages &&
 			typeof value.context.messages.add === 'function' &&
+			'memos' in value.context &&
+			isObject(value.context.memos) &&
+			'add' in value.context.memos &&
+			typeof value.context.memos.add === 'function' &&
+			'memo' in value.context.memos &&
+			typeof value.context.memos.memo === 'function' &&
+			'history' in value.context.memos &&
+			typeof value.context.memos.history === 'function' &&
+			'skills' in value.context &&
+			isObject(value.context.skills) &&
+			'add' in value.context.skills &&
+			typeof value.context.skills.add === 'function' &&
+			'skill' in value.context.skills &&
+			typeof value.context.skills.skill === 'function' &&
+			'instructions' in value.context &&
+			isObject(value.context.instructions) &&
+			'add' in value.context.instructions &&
+			typeof value.context.instructions.add === 'function' &&
+			'conversations' in value.context &&
+			isObject(value.context.conversations) &&
+			'add' in value.context.conversations &&
+			typeof value.context.conversations.add === 'function' &&
+			'apply' in value.context &&
+			typeof value.context.apply === 'function' &&
 			'emitter' in value &&
 			isObject(value.emitter) &&
 			'destroy' in value.emitter &&
@@ -114,7 +147,11 @@ export function isStudyToolsInput(value: unknown): value is StudyToolsInput {
 	return holds(
 		() =>
 			isRecord(value) &&
-			matchesStudyKeys(value, ['prompt', 'responses', 'files', 'admitted'], ['approval']) &&
+			matchesStudyKeys(
+				value,
+				['prompt', 'responses', 'files', 'admitted'],
+				['approval', 'conversation', 'scope', 'skills', 'memos'],
+			) &&
 			typeof value.prompt === 'string' &&
 			value.prompt.trim().length > 0 &&
 			new TextEncoder().encode(value.prompt).byteLength <= STUDY_TOOLS_TEXT &&
@@ -132,7 +169,37 @@ export function isStudyToolsInput(value: unknown): value is StudyToolsInput {
 			value.files.length <= STUDY_TOOLS_CALLS &&
 			value.files.every(isStudyToolsFileName) &&
 			new Set(value.files).size === value.files.length &&
-			isJSONValue(value.files),
+			isJSONValue(value.files) &&
+			(!('conversation' in value) || isStudyCustodyName(value.conversation)) &&
+			(!('scope' in value) ||
+				(isRecord(value.scope) &&
+					matchesStudyKeys(value.scope, [], ['skills', 'memos']) &&
+					(!('skills' in value.scope) || isStudyToolsNames(value.scope.skills)) &&
+					(!('memos' in value.scope) || isStudyToolsNames(value.scope.memos)))) &&
+			// A skill entry holds the three bounded texts a memo revision holds, under a custody name.
+			(!('skills' in value) ||
+				(isArray(value.skills) &&
+					value.skills.length <= STUDY_TOOLS_CALLS &&
+					value.skills.every(
+						(skill) => isStudyToolsRemember(skill) && isStudyCustodyName(skill.name),
+					))) &&
+			(!('memos' in value) ||
+				(isStudyToolsNames(value.memos) && new Set(value.memos).size === value.memos.length)),
+	)
+}
+
+/**
+ * Checks whether a declared list holds bounded custody names.
+ * @param value - The candidate list
+ * @returns True if it is a bounded list of custody names; false otherwise
+ * @example
+ * ```ts
+ * isStudyToolsNames(['tone', 'reach']) // true
+ * ```
+ */
+export function isStudyToolsNames(value: unknown): value is readonly string[] {
+	return holds(
+		() => isArray(value) && value.length <= STUDY_TOOLS_CALLS && value.every(isStudyCustodyName),
 	)
 }
 
@@ -172,6 +239,48 @@ export function isStudyToolsRead(value: unknown): value is StudyToolsRead {
 }
 
 /**
+ * Checks whether remember arguments declare exactly one bounded memo revision.
+ * @param value - The unknown tool arguments
+ * @returns True if the arguments are exact and bounded; false otherwise
+ * @example
+ * ```ts
+ * isStudyToolsRemember({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' }) // true
+ * ```
+ */
+export function isStudyToolsRemember(value: unknown): value is StudyToolsRemember {
+	return holds(
+		() =>
+			isRecord(value) &&
+			matchesStudyKeys(value, ['name', 'description', 'content']) &&
+			typeof value.name === 'string' &&
+			new TextEncoder().encode(value.name).byteLength <= STUDY_TOOLS_TEXT &&
+			typeof value.description === 'string' &&
+			new TextEncoder().encode(value.description).byteLength <= STUDY_TOOLS_TEXT &&
+			typeof value.content === 'string' &&
+			new TextEncoder().encode(value.content).byteLength <= STUDY_TOOLS_TEXT,
+	)
+}
+
+/**
+ * Checks whether arguments declare exactly one bounded name.
+ * @param value - The unknown tool arguments
+ * @returns True if the arguments are exact and bounded; false otherwise
+ * @example
+ * ```ts
+ * isStudyToolsName({ name: 'review' }) // true
+ * ```
+ */
+export function isStudyToolsName(value: unknown): value is StudyToolsName {
+	return holds(
+		() =>
+			isRecord(value) &&
+			matchesStudyKeys(value, ['name']) &&
+			typeof value.name === 'string' &&
+			new TextEncoder().encode(value.name).byteLength <= STUDY_TOOLS_TEXT,
+	)
+}
+
+/**
  * Checks whether an independent assertion uses a supported state or trace schema.
  * @param value - The unknown rubric assertion
  * @returns True if the assertion is supported; false otherwise
@@ -183,6 +292,12 @@ export function isStudyToolsRead(value: unknown): value is StudyToolsRead {
 export function isStudyToolsAssertion(value: unknown): value is StudyToolsAssertion {
 	return holds(() => {
 		if (!isRecord(value)) return false
+		const named =
+			value.name === 'write' ||
+			value.name === 'read' ||
+			value.name === 'remember' ||
+			value.name === 'memo' ||
+			value.name === 'skill'
 		if (value.observation === 'file')
 			return (
 				matchesStudyKeys(value, ['observation', 'path', 'exists'], ['content']) &&
@@ -192,14 +307,33 @@ export function isStudyToolsAssertion(value: unknown): value is StudyToolsAssert
 			)
 		if (value.observation === 'tool')
 			return (
-				matchesStudyKeys(value, ['observation', 'name', 'success']) &&
-				(value.name === 'read' || value.name === 'write') &&
-				typeof value.success === 'boolean'
+				matchesStudyKeys(value, ['observation', 'name', 'success'], ['count']) &&
+				named &&
+				typeof value.success === 'boolean' &&
+				(!('count' in value) ||
+					(typeof value.count === 'number' && Number.isSafeInteger(value.count) && value.count > 0))
 			)
 		if (value.observation === 'denial')
+			return matchesStudyKeys(value, ['observation', 'name']) && named
+		if (value.observation === 'request')
 			return (
-				matchesStudyKeys(value, ['observation', 'name']) &&
-				(value.name === 'read' || value.name === 'write')
+				matchesStudyKeys(value, ['observation', 'at', 'role', 'text', 'present']) &&
+				typeof value.at === 'number' &&
+				Number.isSafeInteger(value.at) &&
+				value.at >= 0 &&
+				(value.role === 'system' || value.role === 'user' || value.role === 'tool') &&
+				typeof value.text === 'string' &&
+				value.text.length > 0 &&
+				typeof value.present === 'boolean'
+			)
+		if (value.observation === 'memo')
+			return (
+				matchesStudyKeys(value, ['observation', 'name', 'revisions'], ['description']) &&
+				isStudyCustodyName(value.name) &&
+				typeof value.revisions === 'number' &&
+				Number.isSafeInteger(value.revisions) &&
+				value.revisions >= 0 &&
+				(!('description' in value) || typeof value.description === 'string')
 			)
 		return (
 			value.observation === 'result' &&

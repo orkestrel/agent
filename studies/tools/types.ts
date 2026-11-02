@@ -2,8 +2,15 @@ import type {
 	AgentOptions,
 	AgentResult,
 	AgentRunOptions,
-	MessageInput,
+	ConversationInterface,
+	ConversationManagerInterface,
+	InstructionManagerInterface,
+	MemoManagerInterface,
 	ProviderInterface,
+	ScopeInterface,
+	SkillInput,
+	SkillManagerInterface,
+	createScope,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { StudyContext, StudyEvidence, StudyJudgment } from '@orkestrel/study'
@@ -21,14 +28,22 @@ export interface StudyToolsDriverOptions {
 	readonly directory: string
 }
 
-/** Holds the one admitted built constructor the consumer invokes. */
+/** Holds the admitted built constructor and scope factory the consumer invokes. */
 export interface StudyToolsRuntime {
 	readonly Agent: new (provider: ProviderInterface, options?: AgentOptions) => unknown
+	readonly createScope: typeof createScope
 }
 
 /** Holds only the foreign agent operations this consumer dereferences. */
 export interface StudyToolsAgentInterface {
-	readonly context: { readonly messages: { add(message: MessageInput): unknown } }
+	readonly context: {
+		readonly messages: ConversationInterface
+		readonly memos: Pick<MemoManagerInterface, 'add' | 'memo' | 'history'>
+		readonly skills: Pick<SkillManagerInterface, 'add' | 'skill'>
+		readonly instructions: Pick<InstructionManagerInterface, 'add'>
+		readonly conversations: Pick<ConversationManagerInterface, 'add'>
+		apply(scope: ScopeInterface | undefined): void
+	}
 	readonly emitter: { destroy(): void }
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	abort(reason?: unknown): void
@@ -46,6 +61,9 @@ export type StudyToolsApproval = 'approve' | 'refuse' | 'pending'
  * Holds public mechanism input without any criterion or expected outcome.
  * @remarks
  * `approval` answers every asked call of the goal; absent, an asked call is unanswered.
+ * `conversation` names the conversation the goal's run binds; absent, the run binds the active one.
+ * `scope` lists the skill and memo names the goal's run sees. `skills` adds registry entries before
+ * the run. `memos` names the memo rows the goal retains after its run.
  */
 export interface StudyToolsInput {
 	readonly prompt: string
@@ -53,6 +71,10 @@ export interface StudyToolsInput {
 	readonly files: readonly string[]
 	readonly admitted: boolean
 	readonly approval?: StudyToolsApproval
+	readonly conversation?: string
+	readonly scope?: { readonly skills?: readonly string[]; readonly memos?: readonly string[] }
+	readonly skills?: readonly SkillInput[]
+	readonly memos?: readonly string[]
 }
 
 /** Holds the values one goal's workload is created from. */
@@ -103,6 +125,18 @@ export interface StudyToolsRead {
 	readonly path: string
 }
 
+/** Holds validated arguments for one memo revision. */
+export interface StudyToolsRemember {
+	readonly name: string
+	readonly description: string
+	readonly content: string
+}
+
+/** Holds validated arguments that name one memo or one skill. */
+export interface StudyToolsName {
+	readonly name: string
+}
+
 /** Holds an independently authored state or trace predicate. */
 export type StudyToolsAssertion =
 	| {
@@ -111,9 +145,30 @@ export type StudyToolsAssertion =
 			readonly exists: boolean
 			readonly content?: string
 	  }
-	| { readonly observation: 'tool'; readonly name: 'write' | 'read'; readonly success: boolean }
-	| { readonly observation: 'denial'; readonly name: 'write' | 'read' }
+	| {
+			readonly observation: 'tool'
+			readonly name: 'write' | 'read' | 'remember' | 'memo' | 'skill'
+			readonly success: boolean
+			readonly count?: number
+	  }
+	| {
+			readonly observation: 'denial'
+			readonly name: 'write' | 'read' | 'remember' | 'memo' | 'skill'
+	  }
 	| { readonly observation: 'result'; readonly partial: boolean; readonly content?: string }
+	| {
+			readonly observation: 'request'
+			readonly at: number
+			readonly role: 'system' | 'user' | 'tool'
+			readonly text: string
+			readonly present: boolean
+	  }
+	| {
+			readonly observation: 'memo'
+			readonly name: string
+			readonly revisions: number
+			readonly description?: string
+	  }
 
 /** Holds an observed bounded file state after actual filesystem inspection. */
 export interface StudyToolsFile {

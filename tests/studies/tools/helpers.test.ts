@@ -7,6 +7,7 @@ import {
 	observeStudyToolsFile,
 	readStudyToolsGrade,
 	readStudyToolsPredicate,
+	readStudyToolsRequest,
 	resolveStudyToolsPath,
 	validateStudyToolsRubric,
 } from '../../../studies/tools/helpers.js'
@@ -165,4 +166,140 @@ it('cites the zero-based matched row as a one-based retained reference and keeps
 			criterion: { ...target.criterion, assertion: { unsupported: true } },
 		}),
 	).toThrow('Unsupported')
+})
+
+it('reads a request predicate by position', () => {
+	const rows: readonly StudyEvidence[] = [
+		{
+			event: 'provider',
+			goal: 'foreign',
+			value: { request: [{ role: 'system', content: 'Keep notes.' }] },
+		},
+		{
+			event: 'provider',
+			goal: 'save',
+			value: {
+				request: [
+					{ role: 'system', content: 'Keep notes.' },
+					{ role: 'user', content: 'Save the note.' },
+				],
+			},
+		},
+		{ event: 'tool', goal: 'save', value: { name: 'write', success: true } },
+		{ event: 'provider', goal: 'save', value: { request: [{ role: 'tool', content: 'stored' }] } },
+	]
+	const request = {
+		observation: 'request' as const,
+		at: 0,
+		role: 'system' as const,
+		text: 'Keep notes.',
+		present: true,
+	}
+	expect(readStudyToolsRequest(request, 'save', rows)).toEqual({ verdict: 'achieved', row: 1 })
+	expect(readStudyToolsRequest({ ...request, present: false }, 'save', rows)).toEqual({
+		verdict: 'unsuccessful',
+		row: 1,
+	})
+	expect(readStudyToolsRequest({ ...request, text: 'Absent.' }, 'save', rows)).toEqual({
+		verdict: 'unsuccessful',
+		row: 1,
+	})
+	expect(
+		readStudyToolsRequest({ ...request, text: 'Absent.', present: false }, 'save', rows),
+	).toEqual({ verdict: 'achieved', row: 1 })
+	// A text held by another role reads as absent from the asserted role.
+	expect(readStudyToolsRequest({ ...request, text: 'Save the note.' }, 'save', rows)).toEqual({
+		verdict: 'unsuccessful',
+		row: 1,
+	})
+	// The position counts the goal's requests, and the citation names the retained row.
+	expect(
+		readStudyToolsRequest({ ...request, at: 1, role: 'tool', text: 'stored' }, 'save', rows),
+	).toEqual({ verdict: 'achieved', row: 3 })
+	expect(readStudyToolsRequest({ ...request, at: 2 }, 'save', rows)).toEqual({
+		verdict: 'unknown',
+		row: undefined,
+	})
+	expect(readStudyToolsPredicate(request, 'save', rows)).toEqual({ verdict: 'achieved', row: 1 })
+	expect(() =>
+		readStudyToolsRequest(request, 'save', [
+			{ event: 'provider', goal: 'save', value: { request: 'text' } },
+		]),
+	).toThrow(expect.objectContaining({ code: 'EVIDENCE' }))
+	expect(() =>
+		readStudyToolsRequest(request, 'save', [
+			{ event: 'provider', goal: 'save', value: { request: [{ role: 'user' }] } },
+		]),
+	).toThrow(expect.objectContaining({ code: 'EVIDENCE' }))
+})
+
+it('reads a memo predicate', () => {
+	const rows: readonly StudyEvidence[] = [
+		{ event: 'memo', goal: 'revise', value: { name: 'reach', revisions: 1 } },
+		{
+			event: 'memo',
+			goal: 'revise',
+			value: { name: 'tone', revisions: 2, description: 'Prefers bullet lists.' },
+		},
+	]
+	const memo = {
+		observation: 'memo' as const,
+		name: 'tone',
+		revisions: 2,
+		description: 'Prefers bullet lists.',
+	}
+	expect(readStudyToolsPredicate(memo, 'revise', rows)).toEqual({ verdict: 'achieved', row: 1 })
+	expect(readStudyToolsPredicate({ ...memo, revisions: 1 }, 'revise', rows)).toEqual({
+		verdict: 'unsuccessful',
+		row: 1,
+	})
+	expect(readStudyToolsPredicate({ ...memo, description: 'Absent.' }, 'revise', rows)).toEqual({
+		verdict: 'unsuccessful',
+		row: 1,
+	})
+	expect(
+		readStudyToolsPredicate({ observation: 'memo', name: 'gossip', revisions: 0 }, 'revise', rows),
+	).toEqual({ verdict: 'unknown', row: undefined })
+	expect(() =>
+		readStudyToolsPredicate(memo, 'revise', [
+			{ event: 'memo', goal: 'revise', value: { name: 'tone' } },
+		]),
+	).toThrow(expect.objectContaining({ code: 'EVIDENCE' }))
+})
+
+it('counts tool rows for a predicate', () => {
+	const rows: readonly StudyEvidence[] = [
+		{ event: 'tool', goal: 'load', value: { name: 'skill', success: false } },
+		{ event: 'tool', goal: 'load', value: { name: 'skill', success: true } },
+		{ event: 'tool', goal: 'load', value: { name: 'memo', success: true } },
+		{ event: 'tool', goal: 'load', value: { name: 'skill', success: false } },
+	]
+	expect(
+		readStudyToolsPredicate(
+			{ observation: 'tool', name: 'skill', success: true, count: 1 },
+			'load',
+			rows,
+		),
+	).toEqual({ verdict: 'achieved', row: 1 })
+	expect(
+		readStudyToolsPredicate(
+			{ observation: 'tool', name: 'skill', success: true, count: 2 },
+			'load',
+			rows,
+		),
+	).toEqual({ verdict: 'unsuccessful', row: 1 })
+	expect(
+		readStudyToolsPredicate(
+			{ observation: 'tool', name: 'skill', success: false, count: 2 },
+			'load',
+			rows,
+		),
+	).toEqual({ verdict: 'achieved', row: 3 })
+	expect(
+		readStudyToolsPredicate(
+			{ observation: 'tool', name: 'write', success: true, count: 1 },
+			'load',
+			rows,
+		),
+	).toEqual({ verdict: 'unknown', row: undefined })
 })

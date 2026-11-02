@@ -1,3 +1,4 @@
+import type { ConversationInterface } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { ToolContext } from '@orkestrel/tool'
 import type {
@@ -23,12 +24,23 @@ import {
 	buildStudyAgentToolResult,
 	encodeStudyJSON,
 } from '@orkestrel/study/server'
-import { STUDY_TOOLS_BYTES } from './constants.js'
+import {
+	STUDY_TOOLS_BYTES,
+	STUDY_TOOLS_LOADED,
+	STUDY_TOOLS_REMEMBERED,
+	STUDY_TOOLS_SKILL_PREFIX,
+} from './constants.js'
 import { isStudyToolsRefusal, StudyToolsRefusal } from './errors.js'
 import { observeStudyToolsFile, resolveStudyToolsPath } from './helpers.js'
 import { parseStudyToolsInput } from './parsers.js'
 import { StudyToolsWorkload } from './StudyToolsWorkload.js'
-import { isStudyToolsAgent, isStudyToolsRead, isStudyToolsWrite } from './validators.js'
+import {
+	isStudyToolsAgent,
+	isStudyToolsName,
+	isStudyToolsRead,
+	isStudyToolsRemember,
+	isStudyToolsWrite,
+} from './validators.js'
 
 /** Retains one actual Agent and scratch-file state across the declared trial goals. */
 export class StudyToolsSession implements StudySessionInterface {
@@ -38,6 +50,8 @@ export class StudyToolsSession implements StudySessionInterface {
 	readonly #agent: StudyToolsAgentInterface
 	readonly #live = new Set<StudyToolsWorkload>()
 	readonly #flights = new Set<Promise<StudyProduct>>()
+	// One instance per declared id, added once, because a same-id `add` replaces the registered one.
+	readonly #conversations = new Map<string, ConversationInterface>()
 	#closing: Promise<void> | undefined
 
 	/**
@@ -58,6 +72,25 @@ export class StudyToolsSession implements StudySessionInterface {
 				name: 'read',
 				description: 'Reads one bounded scratch text file',
 				execute: (args, context) => this.#read(args, context),
+			}),
+			createTool({
+				name: 'remember',
+				description:
+					'Stores one memo revision from its name, description, and content, and acknowledges it; use memo to read the content',
+				annotations: { consequential: true },
+				execute: (args, context) => this.#remember(args, context),
+			}),
+			createTool({
+				name: 'memo',
+				description:
+					'Reads the current content of one memo by name; use remember to store a revision',
+				execute: (args, context) => this.#memo(args, context),
+			}),
+			createTool({
+				name: 'skill',
+				description:
+					'Loads one registered skill by name for the next run, and acknowledges it without returning the body',
+				execute: (args, context) => this.#skill(args, context),
 			}),
 		])
 		const agent: unknown = new options.agent.Agent(this.#provider, {
@@ -130,9 +163,19 @@ export class StudyToolsSession implements StudySessionInterface {
 				context,
 				workload: workload.controller,
 			})
-			this.#agent.context.messages.add({ role: 'user', content: input.prompt })
+			if (input.skills !== undefined) this.#agent.context.skills.add(input.skills)
+			if (input.scope !== undefined)
+				this.#agent.context.apply(
+					this.#options.agent.createScope({ name: 'libraries', ...input.scope }),
+				)
+			const conversation =
+				input.conversation === undefined
+					? this.#agent.context.messages
+					: this.#bind(input.conversation)
+			conversation.add({ role: 'user', content: input.prompt })
 			const result: unknown = await this.#agent.generate({
 				signal: AbortSignal.any([context.signal, context.meter.signal, workload.controller.signal]),
+				conversation,
 			})
 			context.signal.throwIfAborted()
 			context.meter.signal.throwIfAborted()
@@ -167,6 +210,18 @@ export class StudyToolsSession implements StudySessionInterface {
 					throw error
 				}
 			}
+			for (const name of input.memos ?? []) {
+				const current = this.#agent.context.memos.memo(name)
+				await context.evidence.append({
+					event: 'memo',
+					goal: goal.id,
+					value: {
+						name,
+						revisions: this.#agent.context.memos.history(name).length,
+						...(current === undefined ? {} : { description: current.description }),
+					},
+				})
+			}
 			await context.evidence.append({
 				event: 'result',
 				goal: goal.id,
@@ -177,6 +232,7 @@ export class StudyToolsSession implements StudySessionInterface {
 				partial,
 			})
 		} finally {
+			if (input.scope !== undefined) this.#agent.context.apply(undefined)
 			try {
 				for (const row of workload.trace) await context.evidence.append(row)
 			} finally {
@@ -217,6 +273,54 @@ export class StudyToolsSession implements StudySessionInterface {
 				throw new StudyToolsRefusal('Scratch file is absent')
 			return file.content
 		})
+	}
+
+	async #remember(
+		args: Readonly<Record<string, unknown>>,
+		context: ToolContext,
+	): Promise<JSONValue> {
+		return this.#executeTool(args, context, async (signal) => {
+			if (!isStudyToolsRemember(args)) throw new StudyToolsRefusal('Remember arguments refused')
+			signal.throwIfAborted()
+			this.#agent.context.memos.add({
+				name: args.name,
+				description: args.description,
+				content: args.content,
+			})
+			return STUDY_TOOLS_REMEMBERED
+		})
+	}
+
+	async #memo(args: Readonly<Record<string, unknown>>, context: ToolContext): Promise<JSONValue> {
+		return this.#executeTool(args, context, async (signal) => {
+			if (!isStudyToolsName(args)) throw new StudyToolsRefusal('Memo arguments refused')
+			signal.throwIfAborted()
+			const memo = this.#agent.context.memos.memo(args.name)
+			if (memo === undefined) throw new StudyToolsRefusal('Memo is absent')
+			return memo.content
+		})
+	}
+
+	async #skill(args: Readonly<Record<string, unknown>>, context: ToolContext): Promise<JSONValue> {
+		return this.#executeTool(args, context, async (signal) => {
+			if (!isStudyToolsName(args)) throw new StudyToolsRefusal('Skill arguments refused')
+			signal.throwIfAborted()
+			const skill = this.#agent.context.skills.skill(args.name)
+			if (skill === undefined) throw new StudyToolsRefusal('Skill is absent')
+			this.#agent.context.instructions.add({
+				name: STUDY_TOOLS_SKILL_PREFIX + args.name,
+				content: skill.content,
+			})
+			return STUDY_TOOLS_LOADED
+		})
+	}
+
+	#bind(id: string): ConversationInterface {
+		const known = this.#conversations.get(id)
+		if (known !== undefined) return known
+		const conversation = this.#agent.context.conversations.add({ id })
+		this.#conversations.set(id, conversation)
+		return conversation
 	}
 
 	async #executeTool(
