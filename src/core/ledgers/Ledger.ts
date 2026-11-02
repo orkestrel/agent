@@ -149,7 +149,7 @@ export class Ledger implements LedgerInterface {
 		if (snapshot !== undefined && !isLedgerSnapshot(snapshot))
 			throw new LedgerError(
 				'SNAPSHOT',
-				'snapshot must be well formed and mark only messages of its conversation',
+				'snapshot must be well formed and mark only messages of its conversation; pass what snapshot() returned',
 			)
 		this.#provider = provider
 		this.#replay = provider.replay ?? 'none'

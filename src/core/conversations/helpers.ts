@@ -138,7 +138,8 @@ export function requireJudgment(value: unknown): Judgment {
  * @remarks
  * A stored conversation message plays a `ConversationRole`; the `system` message is built per
  * request and never stored. The error message names the received role JSON-encoded and cut to 32
- * characters, or its `typeof` when it is not a string.
+ * characters, or its `typeof` when it is not a string, and for the role `'system'` adds that host
+ * text goes in the `system` option or an instruction.
  *
  * @param role - The role to check
  * @returns The role, narrowed to a `ConversationRole`
@@ -155,7 +156,7 @@ export function requireRole(role: unknown): ConversationRole {
 	if (stored === undefined) {
 		throw new ConversationError(
 			'ROLE',
-			`a stored message role must be one of ${CONVERSATION_ROLES.map((one) => JSON.stringify(one)).join(', ')}; received ${typeof role === 'string' ? JSON.stringify(role.slice(0, 32)) : typeof role}`,
+			`a stored message role must be one of ${CONVERSATION_ROLES.map((one) => JSON.stringify(one)).join(', ')}; received ${typeof role === 'string' ? JSON.stringify(role.slice(0, 32)) : typeof role}${role === 'system' ? '; host text goes in the system option or an instruction' : ''}`,
 		)
 	}
 	return stored
@@ -171,9 +172,11 @@ export function requireRole(role: unknown): ConversationRole {
  * objects, and a member that is not an array stays as read, so the guard refuses it. The candidate
  * must pass `isConversationSnapshot`, every section message and live message must play a
  * `ConversationRole`, and no id may repeat across section ids, section message ids, and live
- * message ids. The candidate is returned, never `value`, so the check and the seating share one
- * read. Element objects are kept by reference, so a host is trusted not to edit a seated message
- * object or to back its members with accessors.
+ * message ids. The `'ROLE'` refusal of a `system` message names the row a snapshot written before
+ * 0.0.35 can hold, and each `'SNAPSHOT'` refusal asks for what `snapshot()` returned. The candidate
+ * is returned, never `value`, so the check and the seating share one read. Element objects are kept
+ * by reference, so a host is trusted not to edit a seated message object or to back its members
+ * with accessors.
  *
  * @param value - The snapshot to check, typically a stored read
  * @returns The candidate snapshot, holding `id`, `sections`, `messages`, and `judgments` when present
@@ -201,7 +204,7 @@ export function requireConversationSnapshot(value: unknown): ConversationSnapsho
 	if (!candidate.success || !isConversationSnapshot(candidate.value)) {
 		throw new ConversationError(
 			'SNAPSHOT',
-			'a conversation snapshot must carry a string id, valid sections and messages, and valid judgments when present',
+			'a conversation snapshot must carry a string id, valid sections and messages, and valid judgments when present; pass what snapshot() returned',
 			candidate.success ? undefined : { cause: candidate.error },
 		)
 	}
@@ -209,7 +212,14 @@ export function requireConversationSnapshot(value: unknown): ConversationSnapsho
 	snapshot.sections
 		.flatMap((section) => section.messages)
 		.concat(snapshot.messages)
-		.forEach((message) => requireRole(message.role))
+		.forEach((message) => {
+			if (message.role === 'system')
+				throw new ConversationError(
+					'ROLE',
+					'a conversation snapshot holds a system message; a snapshot written before 0.0.35 can hold a system row; remove it before loading',
+				)
+			requireRole(message.role)
+		})
 	const ids = [
 		...snapshot.sections.map((section) => section.id),
 		...snapshot.sections.flatMap((section) => section.messages.map((message) => message.id)),
@@ -222,7 +232,7 @@ export function requireConversationSnapshot(value: unknown): ConversationSnapsho
 	if (repeated !== undefined) {
 		throw new ConversationError(
 			'SNAPSHOT',
-			`a conversation snapshot repeats the id ${JSON.stringify(repeated.slice(0, 64))}`,
+			`a conversation snapshot repeats the id ${JSON.stringify(repeated.slice(0, 64))}; pass what snapshot() returned`,
 		)
 	}
 	return snapshot

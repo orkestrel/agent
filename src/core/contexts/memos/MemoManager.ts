@@ -73,7 +73,10 @@ export class MemoManager implements MemoManagerInterface {
 		const owned = supplied === undefined ? undefined : copyJSON(supplied)
 		const snapshot = isMemoSnapshot(owned) ? owned : undefined
 		if (supplied !== undefined && snapshot === undefined) {
-			throw new ContextError('SNAPSHOT', 'context error: memo snapshot is malformed')
+			throw new ContextError(
+				'SNAPSHOT',
+				'context error: memo snapshot is malformed; pass what snapshot() returned',
+			)
 		}
 		// Restoring is silent: nothing was edited, so no event fires.
 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()

@@ -3394,6 +3394,24 @@ describe('Ledger — snapshot and hydrate', () => {
 		).toEqual(refusals.map(([title]) => [title, 'SNAPSHOT']))
 	})
 
+	it('hints snapshot() on a SNAPSHOT refusal', () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }])
+		const options = buildLedgerOptions()
+		const refusals = buildLedgerSnapshotRefusals()
+		const messages = refusals.map(([, snapshot]) => {
+			const error = captureError(() => createLedger(provider, { ...options, snapshot }))
+
+			return isLedgerError(error) && error.message
+		})
+
+		expect(messages).toEqual(
+			refusals.map(
+				() =>
+					'snapshot must be well formed and mark only messages of its conversation; pass what snapshot() returned',
+			),
+		)
+	})
+
 	it('hydrates the snapshot gauge without a calibration call when the options supply none', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, {

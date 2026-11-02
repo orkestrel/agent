@@ -8,7 +8,7 @@ import {
 	renderSection,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createRecorder, createRecorders, roundTripJSON } from '@orkestrel/test'
+import { captureError, createRecorder, createRecorders, roundTripJSON } from '@orkestrel/test'
 import { MALFORMED_MEMO_SNAPSHOTS, MEMO_EVENTS, MEMO_REVISION } from '../../../../setup.js'
 
 // MemoManager is the name-keyed memo set: one append-ordered list of revisions from which the
@@ -433,6 +433,21 @@ describe('MemoManager — foreign snapshot', () => {
 		).rejects.toSatisfy((error) => isContextError(error) && error.code === 'SNAPSHOT')
 		expect(add.count).toBe(0)
 		expect(clear.count).toBe(0)
+	})
+
+	it('hints snapshot() on a SNAPSHOT refusal', () => {
+		const messages = MALFORMED_MEMO_SNAPSHOTS.map(([, snapshot]) => {
+			// A foreign value is untyped on arrival, so the construct goes through Reflect.
+			const error = captureError(() => Reflect.construct(MemoManager, [{ snapshot }]))
+
+			return isContextError(error) && error.message
+		})
+
+		expect(messages).toEqual(
+			MALFORMED_MEMO_SNAPSHOTS.map(
+				() => 'context error: memo snapshot is malformed; pass what snapshot() returned',
+			),
+		)
 	})
 
 	it('owns a passed snapshot: mutating its revision or origin later changes nothing', () => {
