@@ -143,6 +143,43 @@ describe('Ledger', () => {
 		expect(extractLedgerRecords(selection.messages)).toBe(row.records)
 	})
 
+	it('keeps a reversed request in registry order', async () => {
+		const owners = [
+			{ id: 'BW-20931', names: ['Brightwater Studio'] },
+			{ id: 'OM-30418', names: ['Odile Marlow'] },
+		]
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				judge: createPhraseJudge([]),
+				topics: [],
+				share: { prompt: 1, tail: 0.001 },
+				lookups: [
+					{
+						tool: createTool({ name: 'lookup', execute: () => '' }),
+						read: (values) => ({
+							ids: [],
+							owners: owners.filter((owner) => owner.id === values.id),
+						}),
+					},
+				],
+			}),
+		)
+		ledger.conversation.add(
+			buildLedgerExchange('Brightwater Studio ordered glazed lanterns.', 'owner-0', {
+				id: 'BW-20931',
+			}),
+		)
+		ledger.conversation.add(
+			buildLedgerExchange('Odile Marlow paid in full.', 'owner-1', { id: 'OM-30418' }),
+		)
+		await ledger.respond('Check Odile Marlow and Brightwater Studio.')
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toBe(
+			'## Records\n### Brightwater Studio (account BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n\n### Odile Marlow (account OM-30418)\n- Odile Marlow paid in full.',
+		)
+	})
+
 	it.each(LEDGER_PRESERVATION_FIXTURE.cases)(
 		'prices amendment notes and keeps $sentences source sentences at capacity $capacity',
 		async ({ capacity, sentences }) => {

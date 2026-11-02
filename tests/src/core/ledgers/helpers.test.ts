@@ -35,6 +35,7 @@ import {
 	matchEntities,
 	matchesCutLine,
 	normalizeArgument,
+	normalizeWord,
 	placeMember,
 	renderLedgerPinned,
 	renderLedgerRecord,
@@ -671,11 +672,70 @@ describe('buildLedgerIndex', () => {
 		expect(index.words.size).toBe(0)
 	})
 
+	it('keys each name on its rarest run', () => {
+		const index = buildLedgerIndex({
+			ids: new Set(),
+			owners: new Map([
+				['OR-1000', ['Customer OR-1000']],
+				['OR-1001', ['Customer OR-1001']],
+			]),
+		})
+		expect(index.keys.has('or')).toBe(false)
+		expect(index.keys.has('customer')).toBe(false)
+		expect([...index.keys.values()].map((names) => names.length)).toEqual([1, 1])
+		expect([...index.keys]).toEqual([
+			['1000', ['Customer OR-1000']],
+			['1001', ['Customer OR-1001']],
+		])
+		const tied = buildLedgerIndex({ ids: new Set(), owners: new Map([['NP-1', ['north pier']]]) })
+		expect([...tied.keys]).toEqual([['north', ['north pier']]])
+	})
+
+	it('keys a unique word under its name', () => {
+		const index = buildLedgerIndex({
+			ids: new Set(),
+			owners: new Map([['BW-20931', ['Brightwater Studio']]]),
+		})
+		expect([...index.keys]).toEqual([
+			['brightwater', ['Brightwater Studio']],
+			['studio', ['Brightwater Studio']],
+		])
+	})
+
+	it('ranks ids and names apart', () => {
+		const index = buildLedgerIndex({
+			ids: new Set(['A-1', 'B-2']),
+			owners: new Map([['B-2', ['A-1']]]),
+		})
+		expect([...index.ranks.ids]).toEqual([
+			['A-1', 0],
+			['B-2', 1],
+		])
+		expect([...index.ranks.names]).toEqual([['A-1', 0]])
+	})
+
 	it('indexes nothing for an empty registry', () => {
 		const ids = new Set<string>()
 		const index = buildLedgerIndex({ ids, owners: new Map() })
 		expect(index.ids).toBe(ids)
 		expect(index.aliases.size + index.carriers.size + index.names.size + index.words.size).toBe(0)
+		expect(index.keys.size + index.ranks.ids.size + index.ranks.names.size).toBe(0)
+	})
+})
+
+describe('normalizeWord', () => {
+	it('folds each case of a word to one form', () => {
+		const studio = ['Studio', 'STUDIO', 'studio', 'ſtudio'].map((word) => normalizeWord(word))
+		const road = ['ΟΔΟΣ', 'οδος', 'οδοσ'].map((word) => normalizeWord(word))
+		expect(new Set(studio)).toEqual(new Set(['studio']))
+		expect(new Set(road)).toEqual(new Set(['οδος']))
+		expect(normalizeWord('Straße')).toBe('strasse')
+		expect(normalizeWord('STRASSE')).toBe('strasse')
+	})
+
+	it('keeps a word of no cased letter', () => {
+		expect(normalizeWord('1000')).toBe('1000')
+		expect(normalizeWord('東京')).toBe('東京')
 	})
 })
 
@@ -692,6 +752,8 @@ describe('matchEntities', () => {
 			}),
 		]),
 	)
+
+	const studio = buildLedgerIndex({ ids: new Set(), owners: new Map([['ST-1', ['Studio']]]) })
 
 	it('names a registry id that the text holds as an id token', () => {
 		expect([...matchEntities(index, 'Refund for bw-5512 today', false)]).toEqual(['BW-5512'])
@@ -726,6 +788,73 @@ describe('matchEntities', () => {
 		)
 		expect([...matchEntities(odd, 'Call A+B (Studio) now', false)]).toEqual(['BW-20931'])
 		expect(matchEntities(odd, 'Call AAB Studio now', false).size).toBe(0)
+	})
+
+	it('keeps registry order for reversed ids', () => {
+		expect([...matchEntities(index, 'Compare OM-30418 with BW-5512', false)]).toEqual([
+			'BW-5512',
+			'OM-30418',
+		])
+	})
+
+	it('keeps registry order for reversed owners', () => {
+		for (const partial of [true, false])
+			expect([...matchEntities(index, 'Odile Marlow then Brightwater Studio', partial)]).toEqual([
+				'BW-20931',
+				'OM-30418',
+			])
+	})
+
+	it('keeps ids in order when a name spells one', () => {
+		const spelled = buildLedgerIndex({
+			ids: new Set(['A-1', 'B-2']),
+			owners: new Map([['B-2', ['A-1']]]),
+		})
+		expect([...matchEntities(spelled, 'B-2 then A-1', false)]).toEqual(['A-1', 'B-2'])
+	})
+
+	it('finds a long s against an s', () => {
+		expect([...matchEntities(studio, 'ſtudio called', false)]).toEqual(['ST-1'])
+	})
+
+	it('finds a Greek final sigma', () => {
+		const greek = buildLedgerIndex({ ids: new Set(), owners: new Map([['GR-1', ['ΟΔΟΣ']]]) })
+		expect([...matchEntities(greek, 'οδος called', false)]).toEqual(['GR-1'])
+		expect([...matchEntities(greek, 'οδοσ called', false)]).toEqual(['GR-1'])
+	})
+
+	it('folds each run of a wide text alone', () => {
+		const greek = buildLedgerIndex({ ids: new Set(), owners: new Map([['GR-1', ['ΟΔΟΣ']]]) })
+		expect([...matchEntities(greek, 'ΟΔΟΣ.Α called', false)]).toEqual(['GR-1'])
+		expect([...matchEntities(greek, 'οδος.α called', false)]).toEqual(['GR-1'])
+		expect([...matchEntities(studio, 'Studio — called', false)]).toEqual(['ST-1'])
+	})
+
+	it('finds a unique word that is no anchor', () => {
+		expect([...matchEntities(index, 'Studio called', true)]).toEqual(['BW-20931'])
+		expect([...matchEntities(index, 'Studio called', false)]).toEqual([])
+	})
+
+	it('leaves out a name inside a longer word', () => {
+		expect([...matchEntities(studio, 'XStudio called', true)]).toEqual([])
+		expect([...matchEntities(studio, 'Studios called', true)]).toEqual([])
+	})
+
+	it('finds a whole name holding a shared word', () => {
+		expect([...matchEntities(index, 'Odile Marlow called', false)]).toEqual(['OM-30418'])
+	})
+
+	it('misses U+0345 written for an iota', () => {
+		const greek = buildLedgerIndex({ ids: new Set(), owners: new Map([['GR-2', ['Ιων']]]) })
+		expect(requireValue(greek.names.get('Ιων')).test('ͅων called')).toBe(true)
+		expect([...matchEntities(greek, 'ͅων called', false)]).toEqual([])
+	})
+
+	it('leaves a name with no run unmatched', () => {
+		const bare = buildLedgerIndex({ ids: new Set(['ZZ-1']), owners: new Map([['OW-1', ['+++']]]) })
+		expect(requireValue(bare.names.get('+++')).test('Call +++ now')).toBe(true)
+		expect([...matchEntities(bare, 'Call +++ now', true)]).toEqual([])
+		expect([...matchEntities(bare, 'Call ZZ-1 on +++ now', true)]).toEqual(['ZZ-1'])
 	})
 
 	it('refuses a hole in an owner name list, as a for…of visits it as an undefined name', () => {

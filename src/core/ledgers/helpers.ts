@@ -22,7 +22,12 @@ import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestre
 import { estimateMessages } from '../agents/helpers.js'
 import { extractLiterals, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
-import { LEDGER_OWNER_PREFIX, LEDGER_RULES_KEY, PLACED_CATEGORIES } from './constants.js'
+import {
+	LEDGER_OWNER_PREFIX,
+	LEDGER_RULES_KEY,
+	LEDGER_WORD,
+	PLACED_CATEGORIES,
+} from './constants.js'
 import { LedgerError } from './errors.js'
 
 /**
@@ -149,7 +154,7 @@ export function renderCauseChain(error: unknown): string {
  */
 export function extractWords(message: Message): LedgerWordSet {
 	return {
-		words: new Set(message.content.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []),
+		words: new Set(message.content.toLowerCase().match(LEDGER_WORD) ?? []),
 		names: new Set(
 			[...message.content.matchAll(/(?<![\p{L}\p{N}'-])\p{Lu}\p{Ll}+(?![\p{L}\p{N}-])/gu)]
 				.filter((match) => {
@@ -507,12 +512,36 @@ export function collectRegistry(readings: readonly LedgerLookupReading[]): Ledge
 }
 
 /**
- * Builds a registry's matching index: each name's owners, each name word's carriers, and the compiled needles.
+ * Normalizes a run of letters and digits to the one form each of its cases folds to.
+ *
+ * @remarks
+ * The word is one run as {@link LEDGER_WORD} matches it, not a `carriers` word split on whitespace.
+ * The lowercase comes first and last so a capital sharp s, a long s, and a Greek final sigma each
+ * reach the form of their plain letters.
+ *
+ * @param word - The run to normalize
+ * @returns The run's one form
+ *
+ * @example
+ * ```ts
+ * normalizeWord('ΟΔΟΣ') // 'οδος'
+ * normalizeWord('ſtudio') // 'studio'
+ * ```
+ */
+export function normalizeWord(word: string): string {
+	return word.toLowerCase().toUpperCase().toLowerCase()
+}
+
+/**
+ * Builds a registry's matching index: each name's owners, each word's carriers, the needles, keys, and ranks.
  *
  * @remarks
  * The index holds the registry's own `ids` set. A needle escapes its text's pattern characters and
  * matches at word edges: a whole name in any case, and a capitalized name word that only one name
- * carries in its own case, so a common word that spells a first name does not.
+ * carries in its own case, so a common word that spells a first name does not. `keys` enters each
+ * name under its least-carried run of {@link LEDGER_WORD}, a tie going to its first run, and under
+ * each word its word needles hold. `ranks` holds each id's and each name's position, so
+ * {@link matchEntities} returns registry order whatever order a text names them in.
  *
  * @param registry - The registry to index
  * @returns The index, which {@link matchEntities} reads without building anything
@@ -561,6 +590,30 @@ export function buildLedgerIndex(registry: LedgerRegistry): LedgerIndex {
 			),
 		})),
 	)
+	const unique = Map.groupBy(
+		needles.filter((entry) => !entry.whole),
+		(entry) => entry.name,
+	)
+	const runs = new Map(
+		[...aliases.keys()].map((name) => [
+			name,
+			[...new Set((name.match(LEDGER_WORD) ?? []).map((run) => normalizeWord(run)))],
+		]),
+	)
+	const counts = new Map(
+		[...Map.groupBy([...runs.values()].flat(), (run) => run)].map(([run, names]) => [
+			run,
+			names.length,
+		]),
+	)
+	// A stable sort gives a tie to the run that comes first in the name.
+	const keyed = [...runs].flatMap(([name, held]) => {
+		const anchor = held
+			.toSorted((left, right) => (counts.get(left) ?? 0) - (counts.get(right) ?? 0))
+			.slice(0, 1)
+		const words = (unique.get(name) ?? []).map((entry) => normalizeWord(entry.needle))
+		return [...new Set([...anchor, ...words])].map((key) => ({ key, name }))
+	})
 	return {
 		ids: registry.ids,
 		aliases,
@@ -569,13 +622,18 @@ export function buildLedgerIndex(registry: LedgerRegistry): LedgerIndex {
 			needles.filter((entry) => entry.whole).map((entry) => [entry.name, entry.pattern]),
 		),
 		words: new Map(
-			[
-				...Map.groupBy(
-					needles.filter((entry) => !entry.whole),
-					(entry) => entry.name,
-				),
-			].map(([name, entries]) => [name, entries.map((entry) => entry.pattern)]),
+			[...unique].map(([name, entries]) => [name, entries.map((entry) => entry.pattern)]),
 		),
+		keys: new Map(
+			[...Map.groupBy(keyed, (entry) => entry.key)].map(([key, entries]) => [
+				key,
+				entries.map((entry) => entry.name),
+			]),
+		),
+		ranks: {
+			ids: new Map([...registry.ids].map((id, at) => [id, at])),
+			names: new Map([...aliases.keys()].map((name, at) => [name, at])),
+		},
 	}
 }
 
@@ -586,6 +644,15 @@ export function buildLedgerIndex(registry: LedgerRegistry): LedgerIndex {
  * An id counts when the text holds it as an id token. An owner counts when the text holds one of
  * its names whole. With `partial`, a capitalized name word that only one name carries also names
  * that name's owners, matched case-sensitively so a common word that spells a first name does not.
+ * The text's words select candidates through `keys`, and the needles confirm each candidate. A
+ * pure-ASCII text takes one lowercase, which equals {@link normalizeWord} on ASCII. Any other text
+ * folds run by run, because folding it whole would read a final sigma across a run's edge.
+ *
+ * The lookup carries two limits. U+0345 folds to iota under the needles' `iu` flags but is no
+ * letter, so a text or a name using it in iota's place can pass the needle and miss the key. A name
+ * holding no letter or digit run has no key and never matches; {@link collectRegistry} keeps no
+ * such name, so only a hand-built registry reaches that limit. The fold was proven on Node 22's
+ * Unicode data; a browser's tables are unread.
  *
  * @param index - The registry's index, from {@link buildLedgerIndex}
  * @param text - The text to read
@@ -604,16 +671,23 @@ export function matchEntities(
 	text: string,
 	partial: boolean,
 ): ReadonlySet<string> {
-	const ids = extractLiterals(text).ids
-	return new Set([
-		...[...index.ids].filter((id) => ids.has(id)),
-		...[...index.aliases].flatMap(([name, owners]) =>
-			index.names.get(name)?.test(text) === true ||
-			(partial && (index.words.get(name) ?? []).some((needle) => needle.test(text)))
-				? owners
-				: [],
-		),
-	])
+	const ids = [...extractLiterals(text).ids]
+		.filter((id) => index.ids.has(id))
+		.toSorted((left, right) => (index.ranks.ids.get(left) ?? 0) - (index.ranks.ids.get(right) ?? 0))
+	if (index.keys.size === 0) return new Set(ids)
+	const runs: readonly string[] = /\P{ASCII}/u.test(text)
+		? (text.match(LEDGER_WORD) ?? []).map((run) => normalizeWord(run))
+		: (text.toLowerCase().match(LEDGER_WORD) ?? [])
+	const names = [...new Set(runs.flatMap((run) => index.keys.get(run) ?? []))]
+		.filter(
+			(name) =>
+				index.names.get(name)?.test(text) === true ||
+				(partial && (index.words.get(name) ?? []).some((needle) => needle.test(text))),
+		)
+		.toSorted(
+			(left, right) => (index.ranks.names.get(left) ?? 0) - (index.ranks.names.get(right) ?? 0),
+		)
+	return new Set([...ids, ...names.flatMap((name) => index.aliases.get(name) ?? [])])
 }
 
 /**

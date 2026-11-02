@@ -128,5 +128,14 @@ export const LEDGER_SLICE = 5
  */
 export const LEDGER_SCALE_DRIFT = 0.06
 
+/**
+ * Matches a run of letters and digits, which the ledger reads as one word.
+ *
+ * @remarks
+ * `String.prototype.match` resets the pattern's `lastIndex`, so this shared instance keeps no
+ * position between reads.
+ */
+export const LEDGER_WORD = /[\p{L}\p{N}]+/gu
+
 /** Matches the logprob decoding failure `invalid or duplicate top logprob token`, which the ledger holds for the ledger's life. */
 export const DETERMINISTIC_JUDGE_ERROR = /invalid or duplicate top logprob token/

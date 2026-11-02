@@ -233,6 +233,12 @@ export interface LedgerRegistry {
  * `words` maps a name to the needles of its capitalized words that no other name carries, which
  * match in their own case; a name without such a word has no `words` entry. Every needle matches
  * at word edges and carries neither the `g` nor the `y` flag, so a test keeps no state.
+ *
+ * `keys` maps each folded word to the names it selects, in alias order: each name enters under its
+ * least-carried run of letters and digits, a tie going to its first run, and under the folded form
+ * of each word its `words` needles hold, and a value lists a name once. `ranks` holds each id's
+ * position in `ids` and each name's position in `aliases`, in two maps because a name can spell an
+ * id.
  */
 export interface LedgerIndex {
 	readonly ids: ReadonlySet<string>
@@ -240,6 +246,11 @@ export interface LedgerIndex {
 	readonly carriers: ReadonlyMap<string, readonly string[]>
 	readonly names: ReadonlyMap<string, RegExp>
 	readonly words: ReadonlyMap<string, readonly RegExp[]>
+	readonly keys: ReadonlyMap<string, readonly string[]>
+	readonly ranks: {
+		readonly ids: ReadonlyMap<string, number>
+		readonly names: ReadonlyMap<string, number>
+	}
 }
 
 /**
