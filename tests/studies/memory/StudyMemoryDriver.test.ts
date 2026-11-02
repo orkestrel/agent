@@ -10,6 +10,7 @@ import {
 	buildMemoryProfile,
 	createMemoryContext,
 	createMemoryServer,
+	readMemoryCheckpoint,
 	runMemoryTrial,
 	STUDY_MEMORY_INERT_EXCHANGES,
 	STUDY_MEMORY_INERT_REPLAY,
@@ -21,6 +22,51 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
+	it('refuses a malformed seed', async () => {
+		const server = await createMemoryServer()
+		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })
+		const fixture = createMemoryContext(profile)
+		const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
+		const compaction = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [],
+			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1),
+			settings: { ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['opening'] },
+		})
+		const row = readMemoryCheckpoint(compaction.evidence, 'opening')
+		const records = { id: 'records', scenario: 'public', arm: 'records', repetition: 0 }
+		try {
+			for (const seed of [
+				7,
+				null,
+				[],
+				{},
+				{ records: [], arrivals: [] },
+				{ ledger: {}, conversation: {}, records: [], arrivals: [] },
+				{ conversation: 7, records: [], arrivals: [] },
+				{ conversation: {}, arrivals: [] },
+				{ conversation: {}, records: [] },
+				{ conversation: {}, records: [7], arrivals: [] },
+				{ conversation: {}, records: [], arrivals: [7] },
+				row,
+			])
+				await expect(driver.open(records, fixture.context.signal, seed)).rejects.toMatchObject({
+					code: 'CONFIG',
+				})
+			await expect(
+				driver.open({ ...records, arm: 'compaction' }, fixture.context.signal, {
+					ledger: {},
+					records: [],
+					arrivals: [],
+				}),
+			).rejects.toMatchObject({ code: 'CONFIG' })
+			expect(server.requests).toEqual([])
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+
 	it('constructs from the selected runtime without reading the subject and needs Ledger and judge factories only for records', async () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })

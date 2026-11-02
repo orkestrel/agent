@@ -21,6 +21,8 @@ import {
 	buildMemoryRecording,
 	buildMemoryReply,
 	buildMemoryRollingGoals,
+	buildMemorySeedLedger,
+	buildMemorySeedResponses,
 	buildMemorySummaryGoals,
 	buildMemoryVerdict,
 	countMemoryPairs,
@@ -29,9 +31,13 @@ import {
 	listMemoryKeys,
 	loadMemoryInputs,
 	readMemoryAdmission,
+	readMemoryCheckpoint,
 	readMemoryEvents,
+	readMemoryFirstChat,
+	readMemoryGoalRequests,
 	readMemoryOrigins,
 	readMemoryParts,
+	readMemorySealedCheckpoint,
 	readMemoryShapes,
 	readMemorySnapshot,
 	readMemoryTimeline,
@@ -62,6 +68,8 @@ import {
 	STUDY_MEMORY_RELEASE_GOALS,
 	STUDY_MEMORY_REPLAY_REFUSAL,
 	STUDY_MEMORY_SAMPLING_PINS,
+	STUDY_MEMORY_SEED_GOALS,
+	STUDY_MEMORY_SEED_SETTINGS,
 	STUDY_MEMORY_SETTINGS,
 	WINDOW_GOAL,
 	STUDY_MEMORY_TIMING,
@@ -1505,7 +1513,7 @@ describe('passive observation of actual memory requests', () => {
 		).toBe(true)
 	})
 
-	it('attaches an owned pre-arrival snapshot once to the first dispatch of a selected goal', async () => {
+	it('attaches an owned input once to the first dispatch of a selected goal', async () => {
 		const result = await runMemoryTrial({
 			...base,
 			settings: { observe: true, checkpoints: ['correction'] },
@@ -1516,36 +1524,217 @@ describe('passive observation of actual memory requests', () => {
 		expect(first).toBe(carriers[0])
 		expect(first?.event).toBe('dispatch')
 		const snapshot = readMemorySnapshot(result.evidence, 'correction')
-		expect(snapshot.arrivals).toEqual(['source-1'])
-		expect(snapshot.records).toEqual([
-			{ id: 'order-1', name: 'Owner', content: 'Confirmed reference' },
-		])
-		expect(snapshot.gauge).toBeNull()
+		expect(Object.keys(snapshot)).toEqual(['input'])
 		expect(snapshot.input).toEqual(goals[1]?.input)
 		expect(snapshot.input).not.toBe(goals[1]?.input)
-		const view = JSON.stringify(snapshot.conversation)
-		expect(view).toContain('Count was three.')
-		expect(view).toContain('Confirmed reference')
-		expect(view).toContain('Initial handoff')
-		expect(view).not.toContain('Correction: count is two.')
-		expect(result.requests.filter((request) => request.path === '/api/chat').at(2)?.body).toContain(
-			'Correction: count is two.',
-		)
-		// The snapshot retains the goal's own input by design; its pre-arrival state must not hold it.
-		expect(JSON.stringify(snapshot.input)).toContain('Correction: count is two.')
-		expect(JSON.stringify(snapshot.records)).not.toContain('Correction: count is two.')
-		expect(JSON.stringify(snapshot.arrivals)).not.toContain('source-2')
 		expect(parseJSON(JSON.stringify(snapshot))).toEqual(snapshot)
-		const later = await runMemoryTrial({
-			...base,
-			settings: { observe: true, checkpoints: ['correction', 'closure'] },
+	})
+
+	it('appends a checkpoint row after result', async () => {
+		for (const arm of ['records', 'compaction'] as const) {
+			const result = await runMemoryTrial({
+				arm,
+				responses: buildMemorySeedResponses(arm),
+				goals: STUDY_MEMORY_OBSERVATION_GOALS,
+				settings: { ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['correction'] },
+			})
+			expect(result.failure).toBeUndefined()
+			const rows = result.evidence.filter((row) => row.goal === 'correction')
+			const events = rows.map((row) => row.event)
+			expect(events.filter((event) => event === 'checkpoint')).toHaveLength(1)
+			expect(events.indexOf('checkpoint')).toBeGreaterThan(events.indexOf('result'))
+			expect(events.indexOf('result')).toBeGreaterThanOrEqual(0)
+			expect(
+				result.evidence.filter((row) => row.event === 'checkpoint').map((row) => row.goal),
+			).toEqual(['correction'])
+			const failed = await runMemoryTrial({
+				arm,
+				responses: [{ path: '/api/chat', status: 503, body: 'unavailable' }],
+				goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1),
+				settings: { ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['opening'] },
+			})
+			expect(failed.failure).toBeDefined()
+			expect(failed.evidence.filter((row) => row.event === 'checkpoint')).toEqual([])
+		}
+	})
+
+	it('holds the end of a goal in a checkpoint row', async () => {
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: buildMemorySeedResponses('compaction'),
+			goals: STUDY_MEMORY_OBSERVATION_GOALS,
+			settings: STUDY_MEMORY_SEED_SETTINGS,
 		})
+		const value = readMemoryCheckpoint(result.evidence, 'correction')
+		if (!isRecord(value)) throw new Error('Missing checkpoint value')
+		expect(Object.keys(value).sort()).toEqual(['arrivals', 'conversation', 'records'])
+		expect(value.arrivals).toEqual(['source-1', 'source-2'])
+		expect(value.records).toEqual([
+			{ id: 'order-1', name: 'Owner', content: 'Confirmed reference' },
+		])
+		const view = JSON.stringify(value.conversation)
+		expect(view).toContain('Correction: count is two.')
+		expect(view).toContain('Corrected handoff')
+		expect(view).not.toContain('Close handoff')
+		const closing = readMemoryCheckpoint(result.evidence, 'closure')
+		expect(JSON.stringify(closing)).toContain('Close handoff')
+		expect(parseJSON(JSON.stringify(value))).toEqual(value)
+	})
+
+	it('seeds goal three byte-identical', async () => {
+		for (const arm of ['records', 'compaction'] as const) {
+			const uninterrupted = await runMemoryTrial({
+				arm,
+				responses: buildMemorySeedResponses(arm),
+				goals: STUDY_MEMORY_SEED_GOALS,
+				settings: STUDY_MEMORY_SEED_SETTINGS,
+			})
+			expect(uninterrupted.failure).toBeUndefined()
+			const seeded = await runMemoryTrial({
+				arm,
+				responses: [],
+				goals: STUDY_MEMORY_SEED_GOALS.slice(2),
+				settings: STUDY_MEMORY_SEED_SETTINGS,
+				seed: readMemorySealedCheckpoint(uninterrupted.evidence, 'correction'),
+			})
+			expect(seeded.failure).toBeUndefined()
+			const first = readMemoryFirstChat(uninterrupted, 'closure')
+			expect(first).toBeDefined()
+			expect(readMemoryFirstChat(seeded, 'closure')).toBe(first)
+			for (const goal of ['closure', 'review'])
+				expect(readMemoryGoalRequests(seeded, goal)).toEqual(
+					readMemoryGoalRequests(uninterrupted, goal),
+				)
+		}
+	}, 60000)
+
+	it('asks no judge question again', async () => {
+		const uninterrupted = await runMemoryTrial({
+			arm: 'records',
+			responses: buildMemorySeedResponses('records'),
+			goals: STUDY_MEMORY_SEED_GOALS,
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		})
+		const seeded = await runMemoryTrial({
+			arm: 'records',
+			responses: [],
+			goals: STUDY_MEMORY_SEED_GOALS.slice(2),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+			seed: readMemorySealedCheckpoint(uninterrupted.evidence, 'correction'),
+		})
+		expect(seeded.failure).toBeUndefined()
+		for (const goal of ['closure', 'review']) {
+			const asked = readMemoryGoalRequests(uninterrupted, goal)
+				.filter((request) => request.path === '/api/generate')
+				.map((request) => request.body)
+			expect(
+				readMemoryGoalRequests(seeded, goal)
+					.filter((request) => request.path === '/api/generate')
+					.map((request) => request.body),
+			).toEqual(asked)
+		}
+		// The arrival goal asks, so the compare above holds a body.
 		expect(
-			JSON.stringify(readMemorySnapshot(later.evidence, 'correction').conversation),
-		).not.toContain('Correction: count is two.')
-		const closing = readMemorySnapshot(later.evidence, 'closure')
-		expect(JSON.stringify(closing.conversation)).toContain('Correction: count is two.')
-		expect(closing.arrivals).toEqual(['source-1', 'source-2'])
+			readMemoryGoalRequests(uninterrupted, 'review').some(
+				(request) => request.path === '/api/generate',
+			),
+		).toBe(true)
+	}, 60000)
+
+	it('differs with failures emptied', async () => {
+		const lookup = buildMemoryCall('lookup', { id: 'order-1' })
+		const held = await runMemoryTrial({
+			arm: 'records',
+			responses: [
+				...STUDY_MEMORY_CALIBRATION,
+				lookup,
+				lookup,
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Answered' }) },
+			],
+			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 2),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		})
+		expect(held.failure).toBeUndefined()
+		const row = readMemoryCheckpoint(held.evidence, 'correction')
+		if (!isRecord(row) || !isRecord(row.ledger) || !Array.isArray(row.ledger.failures))
+			throw new Error('Missing checkpoint ledger')
+		expect(row.ledger.failures.length).toBeGreaterThan(0)
+		// A request that names the record selects its lookup results, which is where a mark can show.
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: [],
+			goals: [
+				{ id: 'closure', input: { prompt: 'Close order-1 handoff', arrivals: [], records: [] } },
+			],
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		}
+		const intact = await runMemoryTrial({ ...trial, seed: row })
+		const emptied = await runMemoryTrial({
+			...trial,
+			seed: buildMemorySeedLedger(row, { failures: [] }),
+		})
+		expect(intact.failure).toBeUndefined()
+		expect(emptied.failure).toBeUndefined()
+		const seated = readMemoryFirstChat(intact, 'closure')
+		expect(seated).toBeDefined()
+		expect(readMemoryFirstChat(emptied, 'closure')).toBeDefined()
+		expect(readMemoryFirstChat(emptied, 'closure')).not.toBe(seated)
+	}, 60000)
+
+	it('calibrates with the gauge removed', async () => {
+		const uninterrupted = await runMemoryTrial({
+			arm: 'records',
+			responses: buildMemorySeedResponses('records'),
+			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 2),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		})
+		const row = readMemoryCheckpoint(uninterrupted.evidence, 'correction')
+		if (!isRecord(row) || !isRecord(row.ledger)) throw new Error('Missing checkpoint ledger')
+		expect(row.ledger.gauge).toEqual({ scale: expect.any(Number), overhead: expect.any(Number) })
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: [],
+			goals: STUDY_MEMORY_SEED_GOALS.slice(2, 3),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		}
+		const present = await runMemoryTrial({ ...trial, seed: row })
+		const removed = await runMemoryTrial({
+			...trial,
+			seed: buildMemorySeedLedger(row, { gauge: undefined }),
+		})
+		expect(present.failure).toBeUndefined()
+		expect(removed.failure).toBeUndefined()
+		const held = present.requests.filter((request) => request.path === '/api/chat')
+		const measured = removed.requests.filter((request) => request.path === '/api/chat')
+		expect(held).toHaveLength(1)
+		expect(measured.length - held.length).toBe(STUDY_MEMORY_CALIBRATION.length)
+	}, 60000)
+
+	it('refuses a replayed arrival when seeded', async () => {
+		const uninterrupted = await runMemoryTrial({
+			arm: 'full',
+			responses: [],
+			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 1),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		})
+		const seed = readMemoryCheckpoint(uninterrupted.evidence, 'opening')
+		const replayed = await runMemoryTrial({
+			arm: 'full',
+			responses: [],
+			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 1),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+			seed,
+		})
+		expect(replayed.failure).toBe('Source arrival was replayed within a trial')
+		expect(replayed.requests.filter((request) => request.path === '/api/chat')).toEqual([])
+		const later = await runMemoryTrial({
+			arm: 'full',
+			responses: [],
+			goals: STUDY_MEMORY_SEED_GOALS.slice(1, 2),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+			seed,
+		})
+		expect(later.failure).toBeUndefined()
 	})
 
 	it('retains the snapshot of a selected goal whose model later fails', async () => {
@@ -1618,8 +1807,10 @@ describe('passive observation of actual memory requests', () => {
 		)
 		const judges = readMemoryEvents(on.evidence, 'wire').filter((value) => value.role === 'judge')
 		expect(judges.length).toBeGreaterThan(0)
-		expect(readMemorySnapshot(on.evidence, 'opening').gauge).toBeNull()
-		expect(readMemorySnapshot(on.evidence, 'closure').gauge).toEqual({
+		const calibrated = readMemoryCheckpoint(on.evidence, 'opening')
+		if (!isRecord(calibrated) || !isRecord(calibrated.ledger))
+			throw new Error('Missing checkpoint ledger')
+		expect(calibrated.ledger.gauge).toEqual({
 			scale: expect.any(Number),
 			overhead: expect.any(Number),
 		})

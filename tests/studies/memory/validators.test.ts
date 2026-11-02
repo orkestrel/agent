@@ -25,6 +25,7 @@ describe('memory declaration and mechanical evidence', () => {
 			['no checkpoints', { observe: true, checkpoints: [] }],
 			['longest checkpoint', { observe: true, checkpoints: ['x'.repeat(128)] }],
 			['all members', { gauge, observe: true, checkpoints: names.slice(0, 12) }],
+			['more checkpoints than the former cap', { observe: true, checkpoints: names }],
 			['undefined members', { gauge: undefined, observe: undefined, checkpoints: undefined }],
 			['rolling true', { gauge, rolling: true }],
 			['rolling false', { gauge, rolling: false }],
@@ -65,7 +66,6 @@ describe('memory declaration and mechanical evidence', () => {
 			['duplicate checkpoint', { observe: true, checkpoints: ['a', 'a'] }],
 			['long checkpoint', { observe: true, checkpoints: ['x'.repeat(129)] }],
 			['non-text checkpoint', { observe: true, checkpoints: [1] }],
-			['too many checkpoints', { observe: true, checkpoints: names }],
 			['text rolling', { gauge, rolling: 'true' }],
 			['numeric rolling', { gauge, rolling: 1 }],
 			['null rolling', { gauge, rolling: null }],
@@ -218,6 +218,14 @@ describe('memory wire guard', () => {
 		expect(
 			isStudyMemoryWire({ role: 'agent', timing: { counts: { prompt: null, cached: null } } }),
 		).toBe(true)
+		expect(
+			isStudyMemoryWire({
+				role: 'agent',
+				prompt: 10,
+				completion: null,
+				timing: { counts: { prompt: 10, cached: 5 }, durations: { total: null } },
+			}),
+		).toBe(true)
 	})
 
 	it('refuses a non-record, a bad role, a bad counts member and a non-finite count', () => {
@@ -230,6 +238,20 @@ describe('memory wire guard', () => {
 		).toBe(false)
 		expect(
 			isStudyMemoryWire({ role: 'agent', timing: { counts: { prompt: 1, cached: 'x' } } }),
+		).toBe(false)
+		expect(isStudyMemoryWire({ role: 'agent', prompt: 'ten' })).toBe(false)
+		expect(isStudyMemoryWire({ role: 'agent', completion: Infinity })).toBe(false)
+		expect(
+			isStudyMemoryWire({
+				role: 'agent',
+				timing: { counts: { prompt: 1, cached: 0 }, durations: 'none' },
+			}),
+		).toBe(false)
+		expect(
+			isStudyMemoryWire({
+				role: 'agent',
+				timing: { counts: { prompt: 1, cached: 0 }, durations: { total: 'x' } },
+			}),
 		).toBe(false)
 	})
 })

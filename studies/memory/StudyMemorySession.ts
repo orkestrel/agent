@@ -21,6 +21,7 @@ import { canonicalStringify, cloneJSONValue, isJSONValue, isObject } from '@orke
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
+	STUDY_CHECKPOINT_EVENT,
 	StudyAgentSummary,
 	StudyAgentTrace,
 	StudyOllamaTransport,
@@ -78,6 +79,10 @@ export class StudyMemorySession implements StudySessionInterface {
 			options.arm === 'compaction' ? readStudyMemoryCompaction(options.profile) : undefined
 		const gauge = compaction?.gauge
 		this.#options = options
+		const seed = options.seed
+		for (const record of seed?.records ?? [])
+			this.#records.set(record.id, Object.freeze({ ...record }))
+		for (const arrival of seed?.arrivals ?? []) this.#arrivals.add(arrival)
 		this.#tools = createToolManager()
 		this.#observation = resolveStudyMemoryObservation(options.profile.settings)
 		const provider = options.profile.provider
@@ -209,6 +214,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					},
 				],
 				...(settings?.correction === undefined ? {} : { correction: settings.correction }),
+				...(seed?.ledger === undefined ? {} : { snapshot: seed.ledger }),
 				agent: {
 					limit: 8,
 					timeout: options.profile.bounds.goal.duration,
@@ -229,10 +235,12 @@ export class StudyMemorySession implements StudySessionInterface {
 		} else {
 			this.#ledger = undefined
 			const conversations = options.agent.createConversationManager()
+			const held = seed?.conversation === undefined ? {} : { snapshot: seed.conversation }
 			this.#conversation = conversations.add(
 				summary === undefined
-					? {}
+					? held
 					: {
+							...held,
 							keep: 2,
 							summarize: (messages, signal) => summary.summarize(messages, signal),
 							...(settings?.rolling === true ? { rolling: true } : {}),
@@ -369,6 +377,12 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#transport.check()
 			signal.throwIfAborted()
 			if (this.#goals === undefined || this.#goals.at(-1) === goal) await this.#transport.verify()
+			if (this.#observation.checkpoints.has(goal))
+				await context.evidence.append({
+					event: STUDY_CHECKPOINT_EVENT,
+					goal,
+					value: this.#state(),
+				})
 			return product
 		} catch (error) {
 			throw this.#trace.translate(error)
@@ -401,14 +415,22 @@ export class StudyMemorySession implements StudySessionInterface {
 		}
 	}
 
+	// Keeps the transport retaining a listed goal's request bodies; the state itself lands after the goal ends.
 	#checkpoint(goal: string, input: StudyMemoryInput): JSONValue | undefined {
-		if (!this.#observation.observe || !this.#observation.checkpoints.has(goal)) return undefined
+		if (!this.#observation.checkpoints.has(goal)) return undefined
+		const value: unknown = { input }
+		if (!isJSONValue(value)) throw new StudyError('FAULT', 'Checkpoint is not JSON')
+		return cloneJSONValue(value)
+	}
+
+	// Copies the end of a goal, when no request is in flight, so `snapshot()` cannot refuse.
+	#state(): JSONValue {
 		const value: unknown = {
-			conversation: this.#conversation.snapshot(),
+			...(this.#ledger === undefined
+				? { conversation: this.#conversation.snapshot() }
+				: { ledger: this.#ledger.snapshot() }),
 			records: [...this.#records.values()],
 			arrivals: [...this.#arrivals],
-			gauge: this.#ledger?.gauge ?? null,
-			input,
 		}
 		if (!isJSONValue(value)) throw new StudyError('FAULT', 'Checkpoint is not JSON')
 		return cloneJSONValue(value)

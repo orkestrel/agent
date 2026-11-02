@@ -1,3 +1,4 @@
+import type { JSONValue } from '@orkestrel/contract'
 import type {
 	StudyDriverInterface,
 	StudyProfile,
@@ -20,6 +21,7 @@ import { validateStudyMemoryProfile } from './helpers.js'
 import { StudyMemorySession } from './StudyMemorySession.js'
 import {
 	isStudyMemoryArm,
+	isStudyMemoryCheckpoint,
 	isStudyMemoryClassifier,
 	isStudyMemoryLedger,
 	isStudyMemoryProvider,
@@ -54,12 +56,21 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 		this.#replay = options.replay
 	}
 
-	/** Creates one independent trial session. @param trial - Scheduled treatment. @param signal - Parent cancellation. @returns Fresh state with no previous trial messages. */
-	async open(trial: StudyTrial, signal: AbortSignal): Promise<StudySessionInterface> {
+	/** Creates one independent trial session. @param trial - Scheduled treatment. @param signal - Parent cancellation. @param seed - The checkpoint value of a seeded execution. @returns Fresh state with no previous trial messages, or the seed's state. @throws StudyError - CONFIG when the seed is no checkpoint, or holds the other strategy's state member. */
+	async open(
+		trial: StudyTrial,
+		signal: AbortSignal,
+		seed?: JSONValue,
+	): Promise<StudySessionInterface> {
 		signal.throwIfAborted()
 		if (!isStudyMemoryArm(trial.arm)) throw new StudyError('CONFIG', 'Unsupported memory arm')
 		validateStudyMemoryProfile(this.#profile, [trial.arm])
 		const records = trial.arm === 'records'
+		if (
+			seed !== undefined &&
+			(!isStudyMemoryCheckpoint(seed) || records !== (seed.ledger !== undefined))
+		)
+			throw new StudyError('CONFIG', 'Memory seed is not a checkpoint of this arm')
 		if (records && (this.#ledger === undefined || this.#classifier === undefined))
 			throw new StudyError(
 				'CONFIG',
@@ -75,6 +86,7 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 			signal,
 			...(this.#exchanges === undefined ? {} : { exchanges: this.#exchanges }),
 			...(this.#replay === undefined ? {} : { replay: this.#replay }),
+			...(seed === undefined ? {} : { seed }),
 		})
 	}
 }

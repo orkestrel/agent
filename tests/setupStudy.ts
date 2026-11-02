@@ -16,6 +16,7 @@ import type {
 	StudySessionInterface,
 } from '@orkestrel/study'
 import type {
+	StudyExchangeAttempt,
 	StudyExchangeRow,
 	StudyExchangeSinkInterface,
 	StudyOllamaReplayInterface,
@@ -25,8 +26,17 @@ import type { RecorderInterface } from '@orkestrel/test'
 import type { StudyAttempt, StudyFailure, StudyRole, StudyRubric } from '@orkestrel/study'
 import type { JSONValue } from '@orkestrel/contract'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
-import { isRecord, parseJSON } from '@orkestrel/contract'
-import { createRecorder } from '@orkestrel/test'
+import {
+	arrayOf,
+	canonicalStringify,
+	cloneJSONValue,
+	isArray,
+	isJSONValue,
+	isRecord,
+	isString,
+	parseJSON,
+} from '@orkestrel/contract'
+import { createRecorder, waitForCondition } from '@orkestrel/test'
 import {
 	parseStudyProfile,
 	parseStudyScenario,
@@ -37,13 +47,24 @@ import {
 	StudyMeter,
 	StudyScope,
 } from '@orkestrel/study'
-import { buildStudyExchangeDeclaration, readStudyDeclaration } from '@orkestrel/study/server'
-import { StudyMemoryDriver } from '../studies/memory/index.js'
+import {
+	STUDY_CHECKPOINT_EVENT,
+	buildStudyExchangeDeclaration,
+	collectStudyEvidence,
+	readStudyDeclaration,
+	readStudyExchanges,
+	readStudyResult,
+} from '@orkestrel/study/server'
+import {
+	STUDY_MEMORY_REPEAT,
+	StudyMemoryDriver,
+	isStudyMemoryArm,
+} from '../studies/memory/index.js'
 import * as agent from '../src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createServer } from 'node:http'
 import { execFile } from 'node:child_process'
-import { cpSync, lstatSync, readFileSync } from 'node:fs'
+import { cpSync, lstatSync, mkdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -362,17 +383,23 @@ console.log(JSON.stringify({
  * Serves a native loopback Ollama protocol fixture on an ephemeral port.
  * @remarks
  * Create one per test. A scripted reply is consumed by the next request for its path while it heads
- * the script; any other request is answered by default. The script and the request log are
- * replaced and appended by this entity alone, and its getters return copies.
+ * the script; `metadata` answers a metadata path ahead of its default; any other request is answered
+ * by default. The script and the request log are replaced and appended by this entity alone, and its
+ * getters return copies.
  */
 export class MemoryServer implements MemoryServerFixture {
 	readonly #server: Server
 	readonly #requests: Array<{ readonly path: string; readonly body: string }> = []
+	readonly #metadata: ReadonlyMap<string, string>
 	#pending: readonly MemoryWireFixture[]
 
-	/** Creates an unstarted fixture. @param responses - The scripted replies in the order their paths are requested. */
-	constructor(responses: readonly MemoryWireFixture[] = []) {
+	/** Creates an unstarted fixture. @param responses - The scripted replies in the order their paths are requested. @param metadata - The body served for a metadata path ahead of its default. */
+	constructor(
+		responses: readonly MemoryWireFixture[] = [],
+		metadata: Readonly<Record<string, string>> = {},
+	) {
 		this.#pending = responses
+		this.#metadata = new Map(Object.entries(metadata))
 		this.#server = createServer((request, response) => this.#serve(request, response))
 	}
 
@@ -416,6 +443,11 @@ export class MemoryServer implements MemoryServerFixture {
 			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
 		this.#requests.push({ path: request.url ?? '', body: Buffer.concat(chunks).toString('utf8') })
 		const [next, ...rest] = this.#pending
+		const metadata = this.#metadata.get(request.url ?? '')
+		if (metadata !== undefined && next?.path !== request.url) {
+			response.end(metadata)
+			return
+		}
 		if (request.url === '/api/tags' && next?.path !== '/api/tags') {
 			response.end(
 				JSON.stringify({
@@ -475,12 +507,14 @@ export class MemoryServer implements MemoryServerFixture {
 /**
  * Starts a native loopback Ollama protocol fixture on an ephemeral port.
  * @param responses - The scripted replies in the order their paths are requested. Default: none.
+ * @param metadata - The body served for a metadata path ahead of its default. Default: none.
  * @returns A listening fixture the caller closes.
  */
 export async function createMemoryServer(
 	responses: readonly MemoryWireFixture[] = [],
+	metadata: Readonly<Record<string, string>> = {},
 ): Promise<MemoryServerFixture> {
-	const server = new MemoryServer(responses)
+	const server = new MemoryServer(responses, metadata)
 	await server.start()
 	return server
 }
@@ -553,7 +587,12 @@ export const STUDY_MEMORY_REFUSAL_KEYS = Object.freeze([
 ])
 
 /** Pins the evidence events only observation adds, so an off-versus-on comparison can exclude exactly them. */
-export const STUDY_MEMORY_OBSERVED_EVENTS = Object.freeze(['context', 'estimate', 'refusal'])
+export const STUDY_MEMORY_OBSERVED_EVENTS = Object.freeze([
+	'context',
+	'estimate',
+	'refusal',
+	'checkpoint',
+])
 
 /** Pins settings the driver must refuse with CONFIG: checkpoints without observation, a text switch, an unrelated key and an unknown key. */
 export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
@@ -703,6 +742,7 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 		}).open(
 			{ id: 'observation', scenario: 'public', arm: options.arm, repetition: 0 },
 			fixture.context.signal,
+			options.seed,
 		)
 		try {
 			const run = await executeMemoryGoals(session, options.goals, fixture.context)
@@ -1549,6 +1589,61 @@ export interface MemoryTrialFixture {
 	readonly duration?: number
 	/** Overrides room allowances, such as a window small enough to fold. */
 	readonly room?: Partial<StudyProfile['room']>
+	/** Holds the checkpoint value the driver's `open` receives. */
+	readonly seed?: JSONValue
+}
+/** Holds one request a protocol fixture received. */
+export interface MemoryRequestFixture {
+	readonly path: string
+	readonly body: string
+}
+/** Holds what one seated session needs to run one goal against recorded replies. */
+export interface MemorySeedFixture {
+	readonly arm: 'records' | 'compaction' | 'full'
+	readonly profile: StudyProfile
+	readonly seed: JSONValue
+	readonly goal: StudyGoal
+	readonly replies: readonly MemoryWireFixture[]
+	/** Holds the body served for each metadata path, keyed by that path. */
+	readonly metadata: Readonly<Record<string, string>>
+}
+/** Holds one request of a seated goal that differs from its recording. */
+export interface MemorySeedDifference {
+	/** Names the seated goal. */
+	readonly goal: string
+	/** Holds the recorded exchange's ordinal; undefined when the seated run sent a request the recording does not hold. */
+	readonly ordinal: number | undefined
+	readonly role: StudyRole | undefined
+	/** Holds the first differing byte; 0 when one side holds no request at that position. */
+	readonly offset: number
+}
+/** Holds a sealed segment's comparison of its own recording with each seated checkpoint. */
+export interface MemorySeedReading {
+	/** Counts the checkpoints whose next goal the result holds. */
+	readonly compared: number
+	/** Counts those whose first agent request equals its recording, byte for byte. */
+	readonly equal: number
+	/** Counts those whose control run sent a chat and whose every chat differs from the first agent request, once the newest seated message that request renders is replaced. */
+	readonly control: number
+	/** Counts those whose every served request equals its recording. */
+	readonly whole: number
+	/** Lists each differing request, for reading a difference past the first agent request. */
+	readonly differences: readonly MemorySeedDifference[]
+}
+/** Holds what a seeded chain executed and where. */
+export interface MemorySeedChainFixture {
+	readonly trial: string
+	readonly profile: StudyProfile
+	readonly first: string
+	readonly second: string
+	/** Holds the first segment's command result. */
+	readonly opened: StudyInstallResult
+	/** Holds the seeded segment's command result. */
+	readonly seeded: StudyInstallResult
+	/** Counts the requests the fixture took once the first segment ended. */
+	readonly boundary: number
+	/** Counts the requests the fixture took once both segments ended. */
+	readonly sent: number
 }
 /** Holds what a real trial sent, admitted, retained and returned. */
 export interface MemoryTrialResult {
@@ -1975,10 +2070,14 @@ export function buildMemoryCapture(
 /**
  * Rewrites a scratch workspace's authored local profile to declare recording, keeping its other members.
  * @param scratch - The workspace `createStudyInstallFixture` populated.
+ * @param checkpoints - The goal ids to list. Default: none.
  * @returns Nothing after the profile is replaced.
  * @throws Error - Thrown when the workspace holds no authored local profile.
  */
-export function writeStudyInstallRecording(scratch: ScratchInterface): void {
+export function writeStudyInstallRecording(
+	scratch: ScratchInterface,
+	checkpoints: readonly string[] = [],
+): void {
 	const path = 'studies/memory/profiles/local.json'
 	const raw = parseJSON(scratch.read(path) ?? '')
 	if (!isRecord(raw)) throw new Error('Missing authored memory profile')
@@ -1987,7 +2086,12 @@ export function writeStudyInstallRecording(scratch: ScratchInterface): void {
 		JSON.stringify({
 			...raw,
 			record: STUDY_MEMORY_RECORDING.record,
-			settings: { ...STUDY_MEMORY_SETTINGS, ...STUDY_MEMORY_RECORDING.settings, observe: true },
+			settings: {
+				...STUDY_MEMORY_SETTINGS,
+				...STUDY_MEMORY_RECORDING.settings,
+				observe: true,
+				...(checkpoints.length === 0 ? {} : { checkpoints }),
+			},
 		}),
 	)
 }
@@ -2008,4 +2112,582 @@ export function countMemoryPairs(requests: MemoryTrialResult['requests']): numbe
 					request.body.includes(JSON.stringify(instructions).slice(1, -1)),
 			),
 	).length
+}
+
+/**
+ * Waits until this process holds no listening server.
+ * @remarks
+ * A closed server stays on the active list for a host-chosen number of loop turns after `close` resolves, so one read can see a closing handle.
+ * @returns Completion once the active list holds none.
+ * @throws Error - Thrown when a server still listens at the end of the budget.
+ */
+export function waitForMemoryListeners(): Promise<void> {
+	return waitForCondition(
+		'no listening server',
+		() => !process.getActiveResourcesInfo().includes('TCPServerWrap'),
+		{ budget: 10000 },
+	)
+}
+
+/** Pins a four-goal trajectory, so a session seeded after the second goal has two goals to run. */
+export const STUDY_MEMORY_SEED_GOALS: readonly StudyGoal[] = Object.freeze([
+	...STUDY_MEMORY_OBSERVATION_GOALS,
+	Object.freeze({
+		id: 'review',
+		input: Object.freeze({
+			prompt: 'Review handoff',
+			arrivals: Object.freeze([{ id: 'source-3', content: 'Review is due Friday.' }]),
+			records: Object.freeze([]),
+		}),
+	}),
+])
+
+/** Pins settings that list every goal of the seed trajectory; the gauge serves the compaction arm alone. */
+export const STUDY_MEMORY_SEED_SETTINGS = Object.freeze({
+	...STUDY_MEMORY_SETTINGS,
+	observe: true,
+	checkpoints: Object.freeze(STUDY_MEMORY_SEED_GOALS.map((goal) => goal.id)),
+})
+
+/** Pins the text that replaces the newest seated message a comparand renders, so the comparison can fail. */
+export const STUDY_MEMORY_SEED_SENTINEL = 'A control sentence no goal holds.'
+
+/** Pins one goal's rows, so each progress cell has a hand count: metadata and judge dispatches ahead of the agent's, and a denial of another reason. */
+export const STUDY_MEMORY_PROGRESS_ROWS: readonly StudyEvidence[] = Object.freeze(
+	[
+		{ event: 'dispatch', value: { role: 'metadata', path: '/api/tags', body: null } },
+		{
+			event: 'dispatch',
+			value: { role: 'metadata', path: '/api/show', body: '{"model":"model"}' },
+		},
+		{
+			event: 'dispatch',
+			value: { role: 'judge', path: '/api/generate', body: JSON.stringify({ system: 'Judge' }) },
+		},
+		{
+			event: 'dispatch',
+			value: {
+				role: 'agent',
+				path: '/api/chat',
+				body: JSON.stringify({
+					messages: [
+						{ role: 'system', content: 'Désk' },
+						{ role: 'system', content: 'two' },
+						{ role: 'user', content: 'not counted' },
+					],
+				}),
+			},
+		},
+		{
+			event: 'dispatch',
+			value: {
+				role: 'agent',
+				path: '/api/chat',
+				body: JSON.stringify({ messages: [{ role: 'system', content: 'a later request' }] }),
+			},
+		},
+		{ event: 'wire', value: { role: 'metadata', prompt: null, completion: null, timing: null } },
+		{
+			event: 'wire',
+			value: {
+				role: 'judge',
+				prompt: 10,
+				completion: 1,
+				timing: { counts: { prompt: 10, cached: 4 }, durations: { total: 100 } },
+			},
+		},
+		{
+			event: 'wire',
+			value: {
+				role: 'agent',
+				prompt: 20,
+				completion: 5,
+				timing: { counts: { prompt: 20, cached: 5 }, durations: { total: 200 } },
+			},
+		},
+		{
+			event: 'wire',
+			value: {
+				role: 'agent',
+				prompt: 40,
+				completion: 6,
+				timing: { counts: { prompt: 40, cached: 10 }, durations: { total: 300 } },
+			},
+		},
+		{ event: 'wire', value: { role: 'agent', prompt: null, completion: null, timing: null } },
+		{ event: 'result', value: { content: ' \n', partial: true, conversation: 'c' } },
+		{ event: 'lookup', value: { id: 'a', found: true } },
+		{ event: 'lookup', value: { id: 'b', found: false } },
+		{ event: 'denial', value: { id: '1', name: 'lookup', reason: STUDY_MEMORY_REPEAT } },
+		{ event: 'denial', value: { id: '2', name: 'lookup', reason: agent.LEDGER_NOTES.repeat } },
+		{
+			event: 'denial',
+			value: { id: '3', name: 'absent', reason: 'absent is not in the active scope' },
+		},
+	].map((row) => Object.freeze({ ...row, goal: 'goal' })),
+)
+
+/**
+ * Builds the replies of a seed trajectory's first two goals: one lookup call, then two answers, with a records trial's calibration ahead of them.
+ * @param arm - The treatment.
+ * @returns The script; the later goals take the fixture's default replies.
+ */
+export function buildMemorySeedResponses(
+	arm: MemorySeedFixture['arm'],
+): readonly MemoryWireFixture[] {
+	return [
+		...(arm === 'records' ? STUDY_MEMORY_CALIBRATION : []),
+		buildMemoryCall('lookup', { id: 'order-1' }),
+		...['Initial handoff', 'Corrected handoff'].map((content) => ({
+			path: '/api/chat',
+			body: buildMemoryReply({ content }),
+		})),
+	]
+}
+
+/**
+ * Reads the value of a goal's one retained `checkpoint` row.
+ * @param evidence - Retained rows.
+ * @param goal - The goal the row names.
+ * @returns The owned value.
+ * @throws Error - Thrown when the goal does not hold exactly one row.
+ */
+export function readMemoryCheckpoint(evidence: readonly StudyEvidence[], goal: string): JSONValue {
+	const rows = evidence.filter((row) => row.event === STUDY_CHECKPOINT_EVENT && row.goal === goal)
+	const [row] = rows
+	if (row === undefined || rows.length !== 1)
+		throw new Error(`Expected one ${goal} checkpoint row, found ${rows.length}`)
+	return row.value
+}
+
+/**
+ * Reads the value of a goal's one retained `checkpoint` row as a sealed row holds it, with its keys sorted by the canonical text Study's encoder writes.
+ * @param evidence - Retained rows.
+ * @param goal - The goal the row names.
+ * @returns The owned value.
+ * @throws Error - Thrown when the goal does not hold exactly one row, or the value holds no canonical text.
+ */
+export function readMemorySealedCheckpoint(
+	evidence: readonly StudyEvidence[],
+	goal: string,
+): JSONValue {
+	const text = canonicalStringify(readMemoryCheckpoint(evidence, goal))
+	if (text === undefined) throw new Error(`The ${goal} checkpoint holds no canonical text`)
+	const value = parseJSON(text)
+	if (!isJSONValue(value)) throw new Error(`The ${goal} checkpoint is not a JSON value`)
+	return value
+}
+
+/**
+ * Reads the state text of each judge request, ignoring every other path.
+ * @param requests - Requests in arrival order.
+ * @returns The text between the state markers of each `/api/generate` prompt, in arrival order.
+ * @throws Error - Thrown when a generate body holds no such text, so a negative read cannot pass on a skipped body.
+ */
+export function readMemoryJudgeStates(
+	requests: readonly MemoryRequestFixture[],
+): readonly string[] {
+	return requests
+		.filter((request) => request.path === '/api/generate')
+		.map((request) => {
+			const body = parseJSON(request.body)
+			const prompt = isRecord(body) ? body.prompt : undefined
+			const state = isString(prompt) ? /<state>\n(.*?)\n<\/state>/su.exec(prompt)?.[1] : undefined
+			if (state === undefined) throw new Error(`A judge request holds no state: ${request.body}`)
+			return state
+		})
+}
+
+/**
+ * Reads the model requests one goal sent, joining each retained `dispatch` row to the request it dispatched.
+ * @param result - A finished trial whose rows and requests align one to one.
+ * @param goal - The goal to read.
+ * @returns The goal's `/api/chat` and `/api/generate` requests in arrival order.
+ * @throws Error - Thrown when the rows and requests do not align.
+ */
+export function readMemoryGoalRequests(
+	result: MemoryTrialResult,
+	goal: string,
+): readonly MemoryRequestFixture[] {
+	const dispatches = result.evidence.filter((row) => row.event === 'dispatch')
+	if (dispatches.length !== result.requests.length)
+		throw new Error('The dispatch rows do not align with the requests')
+	return result.requests.filter(
+		(request, index) =>
+			dispatches[index]?.goal === goal &&
+			(request.path === '/api/chat' || request.path === '/api/generate'),
+	)
+}
+
+/**
+ * Reads the body of the first chat request one goal sent.
+ * @param result - A finished trial whose rows and requests align one to one.
+ * @param goal - The goal to read.
+ * @returns The exact body, or `undefined` when the goal sent none.
+ */
+export function readMemoryFirstChat(result: MemoryTrialResult, goal: string): string | undefined {
+	return readMemoryGoalRequests(result, goal).find((request) => request.path === '/api/chat')?.body
+}
+
+/**
+ * Builds a checkpoint whose ledger member takes the given changes; an `undefined` change removes its member.
+ * @param value - A records checkpoint.
+ * @param change - The members to replace.
+ * @returns The owned changed value.
+ * @throws Error - Thrown when the value holds no ledger member.
+ */
+export function buildMemorySeedLedger(
+	value: JSONValue,
+	change: Readonly<Record<string, JSONValue | undefined>>,
+): JSONValue {
+	if (!isRecord(value) || !isRecord(value.ledger)) throw new Error('Missing checkpoint ledger')
+	return cloneJSONValue(
+		parseJSON(JSON.stringify({ ...value, ledger: { ...value.ledger, ...change } })),
+	)
+}
+
+/**
+ * Builds a checkpoint whose newest conversation message the comparand renders holds {@link STUDY_MEMORY_SEED_SENTINEL}, on either arm's state member.
+ * @remarks
+ * The comparand is JSON text, so a content renders when its JSON-escaped form occurs there. An empty
+ * or non-string content never does, because an empty string occurs in every body and a tool-call
+ * message holds empty content.
+ * @param value - A checkpoint.
+ * @param comparand - The decoded body of the request the seated session reproduces.
+ * @returns The owned changed value.
+ * @throws Error - Thrown when the value holds no conversation, or the comparand renders none of its messages.
+ */
+export function buildMemorySeedControl(value: JSONValue, comparand: string): JSONValue {
+	if (!isRecord(value)) throw new Error('Missing checkpoint')
+	const state = isRecord(value.ledger) ? value.ledger : value
+	const conversation = state.conversation
+	if (!isRecord(conversation) || !isArray(conversation.messages))
+		throw new Error('Missing checkpoint conversation')
+	const index = conversation.messages.findLastIndex(
+		(message) =>
+			isRecord(message) &&
+			isString(message.content) &&
+			message.content !== '' &&
+			comparand.includes(JSON.stringify(message.content).slice(1, -1)),
+	)
+	const selected: unknown = conversation.messages[index]
+	if (!isRecord(selected)) throw new Error('The comparand renders no checkpoint message')
+	const replaced = {
+		...conversation,
+		messages: conversation.messages.with(index, {
+			...selected,
+			content: STUDY_MEMORY_SEED_SENTINEL,
+		}),
+	}
+	return cloneJSONValue(
+		parseJSON(
+			JSON.stringify(
+				isRecord(value.ledger)
+					? { ...value, ledger: { ...value.ledger, conversation: replaced } }
+					: { ...value, conversation: replaced },
+			),
+		),
+	)
+}
+
+/**
+ * Finds the first byte two bodies differ at.
+ * @param left - One body.
+ * @param right - The other body.
+ * @returns The offset, or `undefined` when they are equal.
+ */
+export function findMemoryOffset(left: Uint8Array, right: Uint8Array): number | undefined {
+	const [longer, shorter] = left.byteLength >= right.byteLength ? [left, right] : [right, left]
+	const offset = longer.findIndex((byte, index) => byte !== shorter[index])
+	return offset === -1 ? undefined : offset
+}
+
+/**
+ * Reports whether a control run's every chat request differs from the comparand.
+ * @remarks
+ * Changing a judged message re-asks its question, which moves only `/api/generate`, and a fold's
+ * summary chat sits ahead of the agent's request, so no position is read. An absent chat reads false.
+ * @param expected - The comparand's bytes.
+ * @param requests - The control run's requests in arrival order.
+ * @returns True if the run sent a chat and none equals the comparand; false otherwise.
+ */
+export function readMemoryControl(
+	expected: Uint8Array,
+	requests: readonly MemoryRequestFixture[],
+): boolean {
+	const chats = requests.filter((request) => request.path === '/api/chat')
+	return (
+		chats.length > 0 &&
+		chats.every(
+			(request) => findMemoryOffset(expected, Buffer.from(request.body, 'utf8')) !== undefined,
+		)
+	)
+}
+
+/**
+ * Lists each request of a seated goal that differs from its recording, position by position.
+ * @param goal - The seated goal.
+ * @param recorded - The goal's recorded attempts.
+ * @param seated - The requests the seated session sent.
+ * @returns One entry per differing position, with offset 0 where one side holds no request.
+ */
+export function listMemorySeedDifferences(
+	goal: string,
+	recorded: readonly StudyExchangeAttempt[],
+	seated: readonly MemoryRequestFixture[],
+): readonly MemorySeedDifference[] {
+	return Array.from({ length: Math.max(recorded.length, seated.length) }).flatMap((_, at) => {
+		const attempt = recorded[at]
+		const request = seated[at]
+		const offset =
+			attempt === undefined || request === undefined
+				? 0
+				: findMemoryOffset(Buffer.from(attempt.body, 'base64'), Buffer.from(request.body, 'utf8'))
+		return offset === undefined
+			? []
+			: [{ goal, ordinal: attempt?.ordinal, role: attempt?.role, offset }]
+	})
+}
+
+/**
+ * Opens a session on a checkpoint and runs one goal against a fresh loopback fixture.
+ * @remarks
+ * The fixture replaces the profile's provider URL, and neither `provider.daemon` nor `record` reaches
+ * the driver, so no daemon starts and no recording opens.
+ * @param options - The arm, profile, checkpoint value, goal, replies, and metadata bodies.
+ * @returns The goal's `/api/chat` and `/api/generate` requests in arrival order.
+ * @throws Error - Rethrows a refused seed or a goal failure, after closing the session and the fixture.
+ */
+export async function readMemorySeedRequests(
+	options: MemorySeedFixture,
+): Promise<readonly MemoryRequestFixture[]> {
+	const declared = options.profile.provider
+	if (declared === undefined) throw new Error('Missing seed provider')
+	const server = await createMemoryServer(options.replies, options.metadata)
+	// A JSON copy drops both members, which `exactOptionalPropertyTypes` holds no undefined for.
+	const profile = parseStudyProfile(
+		parseJSON(
+			JSON.stringify({
+				...options.profile,
+				provider: { ...declared, url: server.url, daemon: undefined },
+				record: undefined,
+			}),
+		),
+	)
+	const fixture = createMemoryContext(profile)
+	try {
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+			{ id: 'seed', scenario: 'public', arm: options.arm, repetition: 0 },
+			fixture.context.signal,
+			options.seed,
+		)
+		try {
+			await session.execute(options.goal, fixture.context)
+		} finally {
+			await session.close()
+		}
+		return server.requests.filter(
+			(request) => request.path === '/api/chat' || request.path === '/api/generate',
+		)
+	} finally {
+		fixture.close()
+		await server.close()
+	}
+}
+
+/**
+ * Compares a sealed segment's own recording with each checkpoint it holds, seated and served the recorded replies.
+ * @remarks
+ * A records goal's first agent request depends on its judge replies, so the recorded replies are
+ * served. The comparand is the next goal's first `agent` attempt at `execution`; a request of another
+ * role is served and read only into `whole` and `differences`. The control seats the newest message
+ * the comparand renders with the sentinel, and reads every chat of its run.
+ * @param directory - The sealed result, which holds one trial.
+ * @param profile - The profile the segment ran under.
+ * @returns The counts and the differences.
+ * @throws Error - Thrown when the result is not one sealed trial of a memory arm, a next goal holds no agent attempt, or its comparand renders no seated message.
+ */
+export async function compareMemorySeed(
+	directory: string,
+	profile: StudyProfile,
+): Promise<MemorySeedReading> {
+	const result = await readStudyResult(directory)
+	if (result.status !== 'sealed') throw new Error('The seed comparison reads a sealed result')
+	const [trial, ...others] = result.manifest.schedule
+	if (trial === undefined || others.length > 0)
+		throw new Error('The seed comparison reads one trial')
+	const { arm } = trial
+	if (!isStudyMemoryArm(arm)) throw new Error(`Unsupported memory arm ${arm}`)
+	const goals = result.manifest.scenarios.find((scenario) => scenario.id === trial.scenario)?.goals
+	if (goals === undefined) throw new Error('The sealed trial names no scenario')
+	const evidence = (await collectStudyEvidence(result))[trial.id] ?? []
+	const { exchanges } = await readStudyExchanges(result, trial.id)
+	const metadata = new Map<string, string>()
+	for (const { attempt, response } of exchanges)
+		if (attempt.role === 'metadata' && !metadata.has(attempt.path))
+			metadata.set(attempt.path, Buffer.from(response.body, 'base64').toString('utf8'))
+	const readings: Array<{
+		readonly equal: boolean
+		readonly control: boolean
+		readonly differences: readonly MemorySeedDifference[]
+	}> = []
+	for (const [index, goal] of goals.entries()) {
+		const next = goals[index + 1]
+		const row = evidence.find(
+			(entry) => entry.event === STUDY_CHECKPOINT_EVENT && entry.goal === goal.id,
+		)
+		if (next === undefined || row === undefined) continue
+		const recorded = exchanges.filter(
+			({ attempt }) =>
+				attempt.goal === next.id &&
+				attempt.stage === 'execution' &&
+				(attempt.path === '/api/chat' || attempt.path === '/api/generate'),
+		)
+		const position = recorded.findIndex(({ attempt }) => attempt.role === 'agent')
+		const comparand = recorded[position]
+		if (comparand === undefined) throw new Error(`Goal ${next.id} recorded no agent attempt`)
+		const seat = {
+			arm,
+			profile,
+			goal: next,
+			replies: recorded.map(({ attempt, response }) => ({
+				path: attempt.path,
+				status: response.status,
+				body: Buffer.from(response.body, 'base64').toString('utf8'),
+			})),
+			metadata: Object.fromEntries(metadata),
+		}
+		const expected = Buffer.from(comparand.attempt.body, 'base64')
+		const seated = await readMemorySeedRequests({ ...seat, seed: row.value })
+		const control = await readMemorySeedRequests({
+			...seat,
+			seed: buildMemorySeedControl(row.value, expected.toString('utf8')),
+		})
+		readings.push({
+			equal:
+				findMemoryOffset(expected, Buffer.from(seated[position]?.body ?? '', 'utf8')) === undefined,
+			control: readMemoryControl(expected, control),
+			differences: listMemorySeedDifferences(
+				next.id,
+				recorded.map((exchange) => exchange.attempt),
+				seated,
+			),
+		})
+	}
+	return {
+		compared: readings.length,
+		equal: readings.filter((entry) => entry.equal).length,
+		control: readings.filter((entry) => entry.control).length,
+		whole: readings.filter((entry) => entry.differences.length === 0).length,
+		differences: readings.flatMap((entry) => entry.differences),
+	}
+}
+
+/**
+ * Reads each listed goal's adapter reading from a `study progress` document.
+ * @param stdout - The command's standard output.
+ * @returns The readings of the document's first trial, by goal, in listed order.
+ * @throws Error - Thrown when the document holds no such trial.
+ */
+export function readMemoryProgressReadings(stdout: string): ReadonlyMap<string, unknown> {
+	const document = parseJSON(stdout)
+	const progress = isRecord(document) ? document.progress : undefined
+	const trials = isRecord(progress) ? progress.trials : undefined
+	const [trial] = arrayOf(isRecord)(trials) ? trials : []
+	if (trial === undefined || !arrayOf(isRecord)(trial.goals))
+		throw new Error('The progress document lists no trial')
+	return new Map(trial.goals.map((goal) => [String(goal.goal), goal.reading]))
+}
+
+/**
+ * Reads a trial id of one arm from a capacity check's schedule.
+ * @param fixture - The installed command.
+ * @param arm - The arm to find.
+ * @returns The first trial of that arm.
+ * @throws Error - Thrown when the check refuses or schedules none.
+ */
+export async function readStudyInstallTrial(
+	fixture: StudyInstallFixture,
+	arm: MemorySeedFixture['arm'],
+): Promise<string> {
+	const checked = await executeStudyInstall(fixture, ['check', 'capacity'])
+	const plan: unknown = checked.code === 0 ? parseJSON(checked.stdout) : undefined
+	const trial =
+		isRecord(plan) && arrayOf(isRecord)(plan.schedule)
+			? plan.schedule.find((entry) => entry.arm === arm)
+			: undefined
+	if (trial === undefined || !isString(trial.id)) throw new Error(`No ${arm} trial is scheduled`)
+	return trial.id
+}
+
+/**
+ * Checks one capacity selection and executes the arguments that check returns, as an operator does.
+ * @param fixture - The installed command.
+ * @param selectors - The `--trial`, `--goals`, and `--seed` arguments.
+ * @param output - The result directory.
+ * @returns The refusing check, or the execution.
+ * @throws Error - Thrown when a passing check returns no arguments.
+ */
+export async function executeMemorySegment(
+	fixture: StudyInstallFixture,
+	selectors: readonly string[],
+	output: string,
+): Promise<StudyInstallResult> {
+	const checked = await executeStudyInstall(fixture, [
+		'check',
+		'capacity',
+		'--profile',
+		'local',
+		...selectors,
+	])
+	if (checked.code !== 0) return checked
+	const plan = parseJSON(checked.stdout)
+	if (!isRecord(plan) || !arrayOf(isString)(plan.next))
+		throw new Error('Missing selected execution arguments')
+	return executeStudyInstall(fixture, [...plan.next, '--out', output], 260000)
+}
+
+/**
+ * Executes a two-segment chain on the install fixture's `capacity` target: `opening..correction`, then `closure..closure` seeded from the first segment's `correction` row.
+ * @param fixture - The installed command; its `local.json` is rewritten to record and to list each goal.
+ * @param server - The loopback provider, whose `/api/version` default answers each verification.
+ * @param arm - The arm whose trial runs.
+ * @param directory - The folder that holds both results; it is created when absent.
+ * @returns The trial, the rewritten profile, both results, and the request counts at the boundary and at the end.
+ * @throws Error - Thrown when the check schedules no trial of the arm.
+ */
+export async function executeMemorySeedChain(
+	fixture: StudyInstallFixture,
+	server: MemoryServerFixture,
+	arm: MemorySeedFixture['arm'],
+	directory: string,
+): Promise<MemorySeedChainFixture> {
+	writeStudyInstallRecording(fixture.scratch, STUDY_MEMORY_GOALS)
+	mkdirSync(directory, { recursive: true })
+	const trial = await readStudyInstallTrial(fixture, arm)
+	const first = join(directory, 'first')
+	const second = join(directory, 'second')
+	const opened = await executeMemorySegment(
+		fixture,
+		['--trial', trial, '--goals', 'opening..correction'],
+		first,
+	)
+	const boundary = server.requests.length
+	const seeded = await executeMemorySegment(
+		fixture,
+		['--trial', trial, '--goals', 'closure..closure', '--seed', `${first}:${trial}:correction`],
+		second,
+	)
+	return {
+		trial,
+		profile: parseStudyProfile(
+			parseJSON(fixture.scratch.read('studies/memory/profiles/local.json') ?? ''),
+		),
+		first,
+		second,
+		opened,
+		seeded,
+		boundary,
+		sent: server.requests.length,
+	}
 }

@@ -15,6 +15,7 @@ import {
 	readStudyMemoryJudge,
 	readStudyMemoryProvenance,
 	readStudyMemoryRecap,
+	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_LOOKUPS,
 	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
@@ -32,6 +33,7 @@ import {
 	omitMemoryAuxiliaries,
 	readMemoryOrigins,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
+	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_RECORDING,
 	STUDY_MEMORY_SAMPLING_PINS,
 	STUDY_MEMORY_SETTINGS,
@@ -433,6 +435,10 @@ function literals(text: string): ReadonlySet<string> {
 }
 
 describe('memory measurement instruments', () => {
+	it('pins the ledger repeat reason', () => {
+		expect(STUDY_MEMORY_LEDGER_REPEAT).toBe(STUDY_MEMORY_MODULES.agent.LEDGER_NOTES.repeat)
+	})
+
 	it('reads literal retention over the recurring ids and fails the recap-only control', () => {
 		const { history, later, anchored, recap } = MEMORY_RETENTION
 		expect(computeStudyMemoryRetention({ history, later, view: anchored, literals })).toEqual({

@@ -1,4 +1,6 @@
-import { isStudyJudgment, parseStudyScenario } from '@orkestrel/study'
+import { isRecord, parseJSON } from '@orkestrel/contract'
+import { isStudyJudgment, parseStudyProfile, parseStudyScenario } from '@orkestrel/study'
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { createStudyAdapter } from '../../../studies/memory/index.js'
 import {
@@ -8,10 +10,96 @@ import {
 	buildMemoryProfile,
 	loadMemoryInputs,
 	omitMemoryAuxiliaries,
+	STUDY_MEMORY_PROGRESS_ROWS,
 	STUDY_MEMORY_SETTINGS,
 } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
+	it('checks the list against the horizon', async () => {
+		const adapter = createStudyAdapter()
+		const url = 'http://127.0.0.1:7'
+		const q2 = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8')),
+		)
+		const input = await loadMemoryInputs(buildMemoryProfile({ url }), 'qualification')
+		const declared = input.scenarios[0]?.goals.map((goal) => goal.id) ?? []
+		const settings = { ...STUDY_MEMORY_SETTINGS, observe: true }
+		expect(declared).toHaveLength(96)
+		// Goal k reads the zero-padded ceiling of k/4, then ((k-1) mod 4)+1; the declaration can disagree.
+		expect(declared).toEqual(
+			Array.from(
+				{ length: 96 },
+				(_, index) =>
+					`ev-${String(Math.ceil((index + 1) / 4)).padStart(2, '0')}-${(index % 4) + 1}`,
+			),
+		)
+		if (!isRecord(q2.settings)) throw new Error('Missing q2 settings')
+		expect(q2.settings.checkpoints).toEqual(declared)
+		expect(() =>
+			adapter.validate({
+				...input,
+				profile: buildMemoryProfile({ url, settings: { ...settings, checkpoints: declared } }),
+			}),
+		).not.toThrow()
+		for (const [checkpoints, message] of [
+			[[...declared, 'ev-25-1'], /horizon of 96/],
+			[['ev-25-1'], /ev-25-1 names no goal/],
+		] as const)
+			expect(() =>
+				adapter.validate({
+					...input,
+					profile: buildMemoryProfile({
+						url,
+						settings: { ...settings, checkpoints: [...checkpoints] },
+					}),
+				}),
+			).toThrow(
+				expect.objectContaining({ code: 'CONFIG', message: expect.stringMatching(message) }),
+			)
+		const handoff = await loadMemoryInputs(buildMemoryProfile({ url }))
+		expect(() =>
+			adapter.validate({
+				...handoff,
+				profile: buildMemoryProfile({ url, settings: { ...settings, checkpoints: [...declared] } }),
+			}),
+		).toThrow(/horizon of 3/)
+	})
+
+	it('reads one goal into progress', () => {
+		expect(
+			createStudyAdapter().progress?.({
+				trial: { id: 'trial', scenario: 'public', arm: 'records', repetition: 0 },
+				goal: 'goal',
+				evidence: STUDY_MEMORY_PROGRESS_ROWS,
+			}),
+		).toEqual({
+			calls: { metadata: 1, judge: 1, agent: 3 },
+			usage: { prompt: 70, cached: 19, completion: 12, total: 600 },
+			partial: true,
+			empty: true,
+			lookups: { found: 1, missing: 1 },
+			repeats: 2,
+			system: { count: 2, bytes: 8 },
+			cache: [0.25, 0.25],
+		})
+	})
+
+	it('omits cells for a goal without rows', () => {
+		const trial = { id: 'trial', scenario: 'public', arm: 'records', repetition: 0 }
+		const adapter = createStudyAdapter()
+		const reading = adapter.progress?.({ trial, goal: 'goal', evidence: [] })
+		expect(reading).toEqual({})
+		expect(isRecord(reading) && 'calls' in reading).toBe(false)
+		// A metadata body and a judge body hold no agent request, so the system cell stays absent.
+		expect(
+			adapter.progress?.({
+				trial,
+				goal: 'goal',
+				evidence: STUDY_MEMORY_PROGRESS_ROWS.slice(0, 3),
+			}),
+		).toEqual({})
+	})
+
 	it('requires an explicit valid gauge for any compaction arm at declaration only', async () => {
 		const url = 'http://127.0.0.1:7'
 		const adapter = createStudyAdapter()

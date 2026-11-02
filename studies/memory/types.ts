@@ -1,9 +1,11 @@
 import type {
 	Agent,
+	ConversationSnapshot,
 	LEDGER_NOTES,
 	LEDGER_QUESTIONS,
 	LedgerCorrectionOptions,
 	LedgerGauge,
+	LedgerSnapshot,
 	createAuthority,
 	createConversationManager,
 	createLedger,
@@ -55,6 +57,41 @@ export interface StudyMemoryInput {
 		readonly name: string
 		readonly content: string
 	}>
+}
+
+/**
+ * Holds one goal's end state as the `checkpoint` evidence row.
+ * @remarks
+ * The arm's strategy names which state member is present: `ledger` on `records` and `conversation` on every other arm. A session opened with this value hydrates that state, its released records, and the arrival ids it already took. Provenance is not carried, so an arrival from before the seed reads origin `history`.
+ */
+export interface StudyMemoryCheckpoint {
+	readonly ledger?: LedgerSnapshot
+	readonly conversation?: ConversationSnapshot
+	readonly records: StudyMemoryInput['records']
+	readonly arrivals: readonly string[]
+}
+
+/** Holds one goal's reading in `study progress`; a cell is absent when the goal holds none of the rows it reads. */
+export interface StudyMemoryProgress {
+	/** Counts the goal's `wire` rows per role, `metadata` included. */
+	readonly calls?: Readonly<Record<string, number>>
+	/** Sums what the goal's `wire` rows report; `total` is in the daemon's own duration unit. */
+	readonly usage?: {
+		readonly prompt: number
+		readonly cached: number
+		readonly completion: number
+		readonly total: number
+	}
+	readonly partial?: boolean
+	/** Reports that the product's content holds nothing but whitespace. */
+	readonly empty?: boolean
+	readonly lookups?: { readonly found: number; readonly missing: number }
+	/** Counts the `denial` rows whose reason is a repeat reason; absent when the goal denied nothing. */
+	readonly repeats?: number
+	/** Reads the `system` messages of the goal's first retained agent request, which a calibrating ledger's first goal spends on calibration. */
+	readonly system?: { readonly count: number; readonly bytes: number }
+	/** Lists the cache share of each agent request that reported both counts, in row order. */
+	readonly cache?: readonly number[]
 }
 
 /** Holds the admitted Agent runtime capabilities every memory arm invokes, beyond the shared instrumentation's own. */
@@ -148,6 +185,7 @@ export type StudyMemoryArm = 'records' | 'compaction' | 'full'
  * @remarks
  * `ledger` and `classifier` are present exactly for the records arm; no other arm requires them.
  * `exchanges` and `replay` retain and answer the recorded bytes of a profile that declares `record`.
+ * `seed` is the checkpoint a seeded execution hands the driver at `open`.
  */
 export interface StudyMemorySessionOptions {
 	readonly agent: StudyMemoryRuntime
@@ -159,6 +197,7 @@ export interface StudyMemorySessionOptions {
 	readonly signal: AbortSignal
 	readonly exchanges?: StudyExchangeSinkInterface
 	readonly replay?: StudyOllamaReplayInterface
+	readonly seed?: StudyMemoryCheckpoint
 }
 
 /** Holds mechanical predicates over retained observations. */
@@ -200,13 +239,16 @@ export interface StudyMemoryCarriageInput {
 	readonly literals: StudyMemoryLiteralHandler
 }
 
-/** Holds the counts of a Study `wire` timing the cache instrument reads; `null` mirrors `buildStudyOllamaTiming`, which reports an unreported count as `null`. */
+/** Holds the counts and durations of a Study `wire` timing the instruments read; `null` mirrors `buildStudyOllamaTiming`, which reports an unreported value as `null`. */
 export interface StudyMemoryTiming {
 	readonly counts: { readonly prompt: number | null; readonly cached: number | null }
+	readonly durations?: { readonly total: number | null } | undefined
 }
 
-/** Holds the members of a Study `wire` value the cache instrument reads; `timing` is `null` when `buildStudyOllamaTiming` observed no terminal timing. */
+/** Holds the members of a Study `wire` value the instruments read; `timing` is `null` when `buildStudyOllamaTiming` observed no terminal timing, and `prompt` and `completion` are `null` when the terminal reported none. */
 export interface StudyMemoryWire {
 	readonly role: string
+	readonly prompt?: number | null | undefined
+	readonly completion?: number | null | undefined
 	readonly timing?: StudyMemoryTiming | null | undefined
 }

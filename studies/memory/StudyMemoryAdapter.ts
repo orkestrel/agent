@@ -1,15 +1,20 @@
+import type { JSONValue } from '@orkestrel/contract'
 import type { StudyDriverInterface, StudyJudgment } from '@orkestrel/study'
 import type {
 	StudyAdapterInterface,
 	StudyAdjudication,
 	StudyDriverOptions,
+	StudyProgressTarget,
 	StudyValidation,
 } from '@orkestrel/study/server'
+import { isJSONValue } from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
 import { gradeStudyEvidence } from '@orkestrel/study/server'
 import {
 	readStudyMemoryCompaction,
 	readStudyMemoryGrade,
+	readStudyMemoryProgress,
+	validateStudyMemoryCheckpoints,
 	validateStudyMemoryProfile,
 } from './helpers.js'
 import { StudyMemoryDriver } from './StudyMemoryDriver.js'
@@ -26,6 +31,7 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 				'Memory declaration requires the shared memory driver and supported arms',
 			)
 		validateStudyMemoryProfile(input.profile, arms)
+		validateStudyMemoryCheckpoints(input.profile.settings, input.scenarios)
 		if (arms.includes('compaction')) readStudyMemoryCompaction(input.profile)
 		if (input.definition.purpose === 'quality' && input.profile.qualification === undefined)
 			throw new StudyError('CONFIG', 'Memory quality requires a sealed capacity qualification')
@@ -52,5 +58,11 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 	/** Reads retained mechanics separately from semantic labels. @param input - Independent grading inputs. @returns Mechanical judgments and semantic unknowns. */
 	grade(input: StudyAdjudication): readonly StudyJudgment[] {
 		return gradeStudyEvidence(input, readStudyMemoryGrade)
+	}
+	/** Reads one listed goal's rows into the line `study progress` lists. @param target - The trial, the goal, and exactly that goal's rows. @returns The goal's reading. */
+	progress(target: StudyProgressTarget): JSONValue {
+		const reading: unknown = readStudyMemoryProgress(target.evidence)
+		if (!isJSONValue(reading)) throw new StudyError('FAULT', 'Memory progress is not JSON')
+		return reading
 	}
 }

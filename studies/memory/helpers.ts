@@ -6,6 +6,7 @@ import type {
 	StudyProfile,
 	StudyProvider,
 	StudyRoom,
+	StudyScenario,
 } from '@orkestrel/study'
 import type {
 	StudyGradeVerdict,
@@ -20,13 +21,18 @@ import type {
 	StudyMemoryObservation,
 	StudyMemoryProvenance,
 	StudyMemoryCarriageInput,
+	StudyMemoryProgress,
 	StudyMemoryProvenanceSource,
 	StudyMemoryRetentionInput,
 	StudyMemoryTally,
 } from './types.js'
-import { isRecord } from '@orkestrel/contract'
+import { isArray, isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
-import { STUDY_MEMORY_SAMPLING } from './constants.js'
+import {
+	STUDY_MEMORY_LEDGER_REPEAT,
+	STUDY_MEMORY_REPEAT,
+	STUDY_MEMORY_SAMPLING,
+} from './constants.js'
 import { isStudyMemoryAssertion, isStudyMemoryOptions, isStudyMemoryWire } from './validators.js'
 
 /** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
@@ -117,6 +123,27 @@ export function validateStudyMemoryProfile(
 	if (!isStudyRoom(room)) throw new StudyError('CONFIG', 'Memory room declaration is invalid')
 	if (arms.includes('compaction') && room.recap === undefined)
 		throw new StudyError('CONFIG', 'Memory compaction requires a declared recap allowance')
+}
+
+/** Checks the checkpoint list against the scenarios a declaration holds, which only the adapter sees whole under a goal range. @param settings - Profile settings, already well formed. @param scenarios - The declaration's complete scenarios. @returns Nothing when admitted. @throws StudyError - CONFIG when the list is longer than the largest scenario's goal count or an id names no goal of a scenario. */
+export function validateStudyMemoryCheckpoints(
+	settings: unknown,
+	scenarios: readonly StudyScenario[],
+): void {
+	if (!isStudyMemoryOptions(settings) || settings.checkpoints === undefined) return
+	const horizon = Math.max(0, ...scenarios.map((scenario) => scenario.goals.length))
+	if (settings.checkpoints.length > horizon)
+		throw new StudyError(
+			'CONFIG',
+			`Memory checkpoints list ${settings.checkpoints.length} goals over a horizon of ${horizon}; list at most one id per goal, or select a study whose scenario holds them`,
+		)
+	const goals = new Set(scenarios.flatMap((scenario) => scenario.goals.map((goal) => goal.id)))
+	for (const checkpoint of settings.checkpoints)
+		if (!goals.has(checkpoint))
+			throw new StudyError(
+				'CONFIG',
+				`Memory checkpoint ${checkpoint} names no goal of this study's scenarios; list a declared goal id, or select a study whose scenario holds it`,
+			)
 }
 
 /** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room. @param arm - The treatment; only compaction declares the summary role and the strict native flags, and only records declares the one-token judge. @returns The agent role, plus the summary role for compaction and the judge role for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */
@@ -281,6 +308,87 @@ export function computeStudyMemoryCacheShares(
 		)
 	}
 	return shares
+}
+
+/** Reads the `system` messages of the goal's first retained agent request. @param evidence - One goal's evidence rows. @returns The message count and summed UTF-8 bytes, or `undefined` when no agent `dispatch` row retains a body or the body holds no message list. */
+export function readStudyMemorySystem(
+	evidence: readonly StudyEvidence[],
+): StudyMemoryProgress['system'] {
+	for (const row of evidence) {
+		if (row.event !== 'dispatch' || !isRecord(row.value) || row.value.role !== 'agent') continue
+		const body = row.value.body
+		if (typeof body !== 'string') continue
+		const parsed = parseJSON(body)
+		if (!isRecord(parsed) || !isArray(parsed.messages)) return undefined
+		const encoder = new TextEncoder()
+		const contents = parsed.messages.flatMap((message) =>
+			isRecord(message) && message.role === 'system' && typeof message.content === 'string'
+				? [message.content]
+				: [],
+		)
+		return {
+			count: contents.length,
+			bytes: contents.reduce((sum, content) => sum + encoder.encode(content).byteLength, 0),
+		}
+	}
+	return undefined
+}
+
+/**
+ * Projects one goal's rows into its progress reading, one to one per goal; each cell filters that goal's rows.
+ * @param evidence - One goal's evidence rows.
+ * @returns The reading, with each cell absent when the goal holds none of the rows it reads.
+ */
+export function readStudyMemoryProgress(evidence: readonly StudyEvidence[]): StudyMemoryProgress {
+	const wires = evidence.flatMap((row) =>
+		row.event === 'wire' && isStudyMemoryWire(row.value) ? [row.value] : [],
+	)
+	const calls = new Map<string, number>()
+	const usage = { prompt: 0, cached: 0, completion: 0, total: 0 }
+	for (const wire of wires) {
+		calls.set(wire.role, (calls.get(wire.role) ?? 0) + 1)
+		usage.prompt += wire.prompt ?? 0
+		usage.completion += wire.completion ?? 0
+		usage.cached += wire.timing?.counts.cached ?? 0
+		usage.total += wire.timing?.durations?.total ?? 0
+	}
+	const product = evidence.find((row) => row.event === 'result')?.value
+	const lookups = evidence.flatMap((row) =>
+		row.event === 'lookup' && isRecord(row.value) ? [row.value.found === true] : [],
+	)
+	const reasons = evidence.flatMap((row) =>
+		row.event === 'denial' && isRecord(row.value) ? [row.value.reason] : [],
+	)
+	const system = readStudyMemorySystem(evidence)
+	const cache = computeStudyMemoryCacheShares(evidence, 'agent').filter(
+		(share) => share !== undefined,
+	)
+	return {
+		...(wires.length === 0 ? {} : { calls: Object.fromEntries(calls), usage }),
+		...(isRecord(product) && typeof product.partial === 'boolean'
+			? { partial: product.partial }
+			: {}),
+		...(isRecord(product) && typeof product.content === 'string'
+			? { empty: product.content.trim() === '' }
+			: {}),
+		...(lookups.length === 0
+			? {}
+			: {
+					lookups: {
+						found: lookups.filter((found) => found).length,
+						missing: lookups.filter((found) => !found).length,
+					},
+				}),
+		...(reasons.length === 0
+			? {}
+			: {
+					repeats: reasons.filter(
+						(reason) => reason === STUDY_MEMORY_REPEAT || reason === STUDY_MEMORY_LEDGER_REPEAT,
+					).length,
+				}),
+		...(system === undefined ? {} : { system }),
+		...(cache.length === 0 ? {} : { cache }),
+	}
 }
 
 /** Counts re-acquisitions per goal. @param evidence - Study evidence rows. @param events - Event names that count. @returns One entry per goal in first-seen row order with the count of its rows whose event is listed; a goal with none reads 0. */

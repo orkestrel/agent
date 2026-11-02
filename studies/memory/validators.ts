@@ -1,6 +1,7 @@
 import type {
 	StudyMemoryArm,
 	StudyMemoryAssertion,
+	StudyMemoryCheckpoint,
 	StudyMemoryClassifier,
 	StudyMemoryInput,
 	StudyMemoryLedger,
@@ -10,6 +11,7 @@ import type {
 	StudyMemoryWire,
 } from './types.js'
 import {
+	arrayOf,
 	holds,
 	isArray,
 	isBoolean,
@@ -18,6 +20,7 @@ import {
 	isNonNegativeInteger,
 	isObject,
 	isRecord,
+	isString,
 	recordOf,
 } from '@orkestrel/contract'
 import { isStudyAgentRuntime } from '@orkestrel/study'
@@ -95,12 +98,32 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		return (
 			observe === true &&
 			isArray(checkpoints) &&
-			checkpoints.length <= 12 &&
 			new Set(checkpoints).size === checkpoints.length &&
 			checkpoints.every(
 				(checkpoint) =>
 					typeof checkpoint === 'string' && checkpoint.length > 0 && checkpoint.length <= 128,
 			)
+		)
+	})
+}
+
+/**
+ * Checks a checkpoint's shape, because Agent stays types-only in the bundle.
+ * @remarks
+ * The admitted `createLedger` and `conversations.add` refuse a malformed state member with their coded `SNAPSHOT` errors; nothing later reads the released records or the arrival ids, so this guard checks each entry.
+ * @param value - The value Study hands over at `open`.
+ * @returns Whether exactly one state member is a record and the records and arrivals are shaped.
+ */
+export function isStudyMemoryCheckpoint(value: unknown): value is StudyMemoryCheckpoint {
+	return holds(() => {
+		if (!isRecord(value)) return false
+		const { ledger, conversation, records, arrivals } = value
+		return (
+			(ledger === undefined
+				? isRecord(conversation)
+				: isRecord(ledger) && conversation === undefined) &&
+			arrayOf(recordOf({ id: isString, name: isString, content: isString }))(records) &&
+			arrayOf(isString)(arrivals)
 		)
 	})
 }
@@ -190,14 +213,22 @@ export function isStudyMemoryAssertion(value: unknown): value is StudyMemoryAsse
 	})
 }
 
-/** Checks the members of a Study `wire` value the cache instrument reads. @param value - Evidence value of a `wire` row. @returns Whether `role` is a string and any present timing holds `prompt` and `cached` counts that are each a finite number or `null`. */
+/** Checks the members of a Study `wire` value the instruments read. @param value - Evidence value of a `wire` row. @returns Whether `role` is a string, any present `prompt` and `completion` are each a finite number or `null`, and any present timing holds `prompt` and `cached` counts and any `total` duration that are each a finite number or `null`. */
 export function isStudyMemoryWire(value: unknown): value is StudyMemoryWire {
 	return holds(() => {
 		if (!isRecord(value) || typeof value.role !== 'string') return false
+		for (const count of [value.prompt, value.completion])
+			if (count !== undefined && count !== null && !isFiniteNumber(count)) return false
 		const timing = value.timing
 		if (timing === undefined || timing === null) return true
 		if (!isRecord(timing) || !isRecord(timing.counts)) return false
 		const { prompt, cached } = timing.counts
+		const durations = timing.durations
+		if (
+			durations !== undefined &&
+			(!isRecord(durations) || (durations.total !== null && !isFiniteNumber(durations.total)))
+		)
+			return false
 		return (
 			(prompt === null || isFiniteNumber(prompt)) && (cached === null || isFiniteNumber(cached))
 		)

@@ -79,3 +79,6 @@ export const STUDY_MEMORY_SAMPLING: Readonly<
 /** Answers a repeated compaction call with fixed host text that echoes no argument. */
 export const STUDY_MEMORY_REPEAT =
 	'the earlier result is in the conversation. Answer from it or call something else.'
+/** Holds the text of `LEDGER_NOTES.repeat`, because `progress` holds no admitted Agent namespace; a case compares the two. */
+export const STUDY_MEMORY_LEDGER_REPEAT =
+	'You already have this result earlier in this request; give your complete answer now as your final message.'
