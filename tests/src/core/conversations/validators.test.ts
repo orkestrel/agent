@@ -17,6 +17,7 @@ import {
 	createMalformedConversationCases,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
 	TOOL_SNAPSHOT,
+	JUDGMENT_EDGE_RECORDS,
 	JUDGMENT_RECORD,
 	JUDGMENT_SNAPSHOT,
 	INVALID_JUDGMENTS,
@@ -108,6 +109,12 @@ describe('isJudgment and snapshot carriage', () => {
 				}),
 			),
 		).toBe(false)
+	})
+
+	it('pins each judgment verdict by shape', () => {
+		expect(JUDGMENT_EDGE_RECORDS.map(([title, record]) => [title, isJudgment(record)])).toEqual(
+			JUDGMENT_EDGE_RECORDS.map(([title, , verdict]) => [title, verdict]),
+		)
 	})
 })
 

@@ -1,4 +1,5 @@
 import type { Memo, MemoSnapshot } from './types.js'
+import type { Guard } from '@orkestrel/contract'
 import { andOf, arrayOf, isFiniteNumber, isRecord, isString, objectOf } from '@orkestrel/contract'
 
 /**
@@ -22,25 +23,20 @@ import { andOf, arrayOf, isFiniteNumber, isRecord, isString, objectOf } from '@o
  * isMemo({ id: 'm1', name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.', time: Number.NaN }) // false
  * ```
  */
-export function isMemo(value: unknown): value is Memo {
-	return (
-		isRecord(value) &&
-		objectOf(
-			{
-				id: isString,
-				name: isString,
-				description: isString,
-				content: isString,
-				time: isFiniteNumber,
-				origin: andOf(
-					isRecord,
-					objectOf({ conversation: isString, message: isString }, ['message']),
-				),
-			},
-			['origin'],
-		)(value)
-	)
-}
+export const isMemo: Guard<Memo> = andOf(
+	isRecord,
+	objectOf(
+		{
+			id: isString,
+			name: isString,
+			description: isString,
+			content: isString,
+			time: isFiniteNumber,
+			origin: andOf(isRecord, objectOf({ conversation: isString, message: isString }, ['message'])),
+		},
+		['origin'],
+	),
+)
 
 /**
  * Checks whether a value is a stored memo set: a record with a string `id` and a dense `memos`

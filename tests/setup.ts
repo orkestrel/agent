@@ -8165,3 +8165,89 @@ export function buildJudgmentRecords(count: number): readonly Judgment[] {
 		time: index,
 	}))
 }
+
+/** Supplies titled judgment records beside the verdict `isJudgment` returns for each. */
+export const JUDGMENT_EDGE_RECORDS: ReadonlyArray<readonly [string, unknown, boolean]> =
+	Object.freeze([
+		[
+			'a refusal',
+			{
+				id: JUDGMENT_RECORD.id,
+				question: JUDGMENT_RECORD.question,
+				refusal: { missing: ['true'] },
+				model: JUDGMENT_RECORD.model,
+				sources: JUDGMENT_RECORD.sources,
+				state: JUDGMENT_RECORD.state,
+				time: JUDGMENT_RECORD.time,
+			},
+			true,
+		],
+		[
+			'a refusal with an extra member',
+			{
+				id: JUDGMENT_RECORD.id,
+				question: JUDGMENT_RECORD.question,
+				refusal: { missing: ['true'], note: 'kept open' },
+				model: JUDGMENT_RECORD.model,
+				sources: JUDGMENT_RECORD.sources,
+				state: JUDGMENT_RECORD.state,
+				time: JUDGMENT_RECORD.time,
+			},
+			true,
+		],
+		[
+			'an answer with an extra member',
+			{ ...JUDGMENT_RECORD, answer: { form: 'noul', noul: 0.9, note: 'kept open' } },
+			true,
+		],
+		[
+			'a refusal beside an undefined answer',
+			{ ...JUDGMENT_RECORD, answer: undefined, refusal: { missing: ['true'] } },
+			false,
+		],
+		['an answer beside an undefined refusal', { ...JUDGMENT_RECORD, refusal: undefined }, false],
+		['both an answer and a refusal', { ...JUDGMENT_RECORD, refusal: { missing: [] } }, false],
+		[
+			'a choice answer whose probabilities is an array',
+			{ ...JUDGMENT_RECORD, answer: { form: 'choice', probabilities: [0.5, 0.5] } },
+			false,
+		],
+		['an answer of an unknown form', { ...JUDGMENT_RECORD, answer: { form: 'other' } }, false],
+		[
+			'an answer that is a class instance',
+			{ ...JUDGMENT_RECORD, answer: Object.assign(new Date(0), { form: 'noul', noul: 0.9 }) },
+			false,
+		],
+		[
+			'a refusal that is a class instance',
+			{
+				id: JUDGMENT_RECORD.id,
+				question: JUDGMENT_RECORD.question,
+				refusal: Object.assign(new Date(0), { missing: ['true'] }),
+				model: JUDGMENT_RECORD.model,
+				sources: JUDGMENT_RECORD.sources,
+				state: JUDGMENT_RECORD.state,
+				time: JUDGMENT_RECORD.time,
+			},
+			false,
+		],
+		['a function carrying the members', Object.assign(() => undefined, JUDGMENT_RECORD), false],
+		[
+			'a null-prototype record carrying the members',
+			Object.assign(Object.create(null), JUDGMENT_RECORD),
+			true,
+		],
+		['a class instance carrying the members', Object.assign(new Date(0), JUDGMENT_RECORD), false],
+		[
+			'a record whose answer getter throws',
+			{
+				...JUDGMENT_RECORD,
+				get answer(): never {
+					throw new Error('unreadable answer')
+				},
+			},
+			false,
+		],
+		['a frozen record carrying the members', Object.freeze({ ...JUDGMENT_RECORD }), true],
+		['a record with a present usage of undefined', { ...JUDGMENT_RECORD, usage: undefined }, false],
+	])

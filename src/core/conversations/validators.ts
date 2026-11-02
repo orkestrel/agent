@@ -1,7 +1,9 @@
 import type { ConversationInterface, ConversationSnapshot, Section } from './types.js'
 import type { Judgment, Message } from '../types.js'
+import type { Guard } from '@orkestrel/contract'
 import { isTokenUsage } from '@orkestrel/budget'
 import {
+	andOf,
 	arrayOf,
 	attempt,
 	isBoolean,
@@ -10,9 +12,12 @@ import {
 	isObject,
 	isRecord,
 	isString,
+	literalOf,
 	optionalOf,
 	objectOf,
 	recordOf,
+	unionOf,
+	whereOf,
 } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 import { MESSAGE_ROLES } from '../constants.js'
@@ -69,38 +74,46 @@ export function isMessage(value: unknown): value is Message {
  * isJudgment({ id: 'q' }) // false
  * ```
  */
-export function isJudgment(value: unknown): value is Judgment {
-	const checked = attempt(() => {
-		if (!isRecord(value)) return false
-		const { answer, refusal } = value
-		if (
-			!recordOf(
-				{
-					id: isString,
-					question: isJudgeQuestion,
-					model: isString,
-					sources: arrayOf(isString),
-					state: isString,
-					time: isFiniteNumber,
-					usage: optionalOf(isTokenUsage),
-					...(answer === undefined ? { refusal: isRecord } : { answer: isRecord }),
-				},
-				['usage'],
-			)(value)
-		)
-			return false
-		if (answer === undefined) return objectOf({ missing: arrayOf(isString) })(refusal)
-		if (refusal !== undefined || !isRecord(answer)) return false
-		if (answer.form === 'noul') return isFiniteNumber(answer.noul)
-		if (answer.form === 'score') return arrayOf(isFiniteNumber)(answer.probabilities)
-		return (
-			answer.form === 'choice' &&
-			isRecord(answer.probabilities) &&
-			Object.values(answer.probabilities).every(isFiniteNumber)
-		)
-	})
-	return checked.success && checked.value
-}
+export const isJudgment: Guard<Judgment> = unionOf(
+	recordOf(
+		{
+			id: isString,
+			question: isJudgeQuestion,
+			model: isString,
+			sources: arrayOf(isString),
+			state: isString,
+			time: isFiniteNumber,
+			usage: isTokenUsage,
+			answer: andOf(
+				isRecord,
+				unionOf(
+					objectOf({ form: literalOf('noul'), noul: isFiniteNumber }),
+					objectOf({ form: literalOf('score'), probabilities: arrayOf(isFiniteNumber) }),
+					objectOf({
+						form: literalOf('choice'),
+						probabilities: whereOf(isRecord, (value): value is Readonly<Record<string, number>> =>
+							Object.values(value).every(isFiniteNumber),
+						),
+					}),
+				),
+			),
+		},
+		['usage'],
+	),
+	recordOf(
+		{
+			id: isString,
+			question: isJudgeQuestion,
+			model: isString,
+			sources: arrayOf(isString),
+			state: isString,
+			time: isFiniteNumber,
+			usage: isTokenUsage,
+			refusal: andOf(isRecord, objectOf({ missing: arrayOf(isString) })),
+		},
+		['usage'],
+	),
+)
 
 /**
  * Checks whether an `unknown` is structurally a {@link Section} record — a `string` `id` and

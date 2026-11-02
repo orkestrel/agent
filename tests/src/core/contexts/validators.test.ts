@@ -89,6 +89,19 @@ describe('isMemo', () => {
 		expect(reads.calls).toEqual([['content']])
 		expect(isMemo(revoked.proxy)).toBe(false)
 	})
+
+	it('refuses a function with memo members', () => {
+		// A function's own `name` is read-only, so it is defined rather than assigned.
+		const named = Object.defineProperty(() => undefined, 'name', { value: 'tone' })
+		const revision = Object.assign(named, {
+			id: 'r1',
+			description: 'Short replies.',
+			content: 'v1',
+			time: 0,
+		})
+
+		expect(isMemo(revision)).toBe(false)
+	})
 })
 
 describe('isMemoSnapshot', () => {
