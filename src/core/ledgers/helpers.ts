@@ -227,6 +227,64 @@ export function rankLedgerCut(
 }
 
 /**
+ * Finds the first cut in a range whose probe returns a value, by bisection.
+ *
+ * @param low - The first cut to try; 0 tries that cut alone before any bisection
+ * @param high - The end of the range, which the search never probes
+ * @param probe - Reads a cut and returns its value when the cut fits, or undefined when it does not
+ * @param found - The value of the earliest fitting cut the search has probed
+ * @returns The value of the fitting cut the search lands on, or undefined when none fits
+ * @remarks
+ * A range of `S` cuts takes at most `ceil(log2(S)) + 1` probes and one probe when cut 0 fits. The
+ * cut it lands on is the range's first fitting cut while no cut past a fitting cut stops fitting.
+ * @example
+ * ```ts
+ * findLedgerCut(0, 8, (cut) => (cut >= 3 ? cut : undefined)) // 3
+ * ```
+ */
+export function findLedgerCut<T>(
+	low: number,
+	high: number,
+	probe: (cut: number) => T | undefined,
+	found?: T,
+): T | undefined {
+	if (low >= high) return found
+	if (low === 0) return probe(0) ?? findLedgerCut(1, high, probe)
+	const middle = Math.floor((low + high) / 2)
+	const value = probe(middle)
+	return value === undefined
+		? findLedgerCut(middle + 1, high, probe, found)
+		: findLedgerCut(low, middle, probe, value)
+}
+
+/**
+ * Builds the cut the given steps leave: each step drops the line it is, by identity, or the source it names.
+ *
+ * @param steps - The lines and source ids to drop
+ * @param records - The records to drop lines from
+ * @param included - The source ids to drop sources from
+ * @returns The records without the dropped lines and the sources without the dropped ids
+ * @example
+ * ```ts
+ * buildLedgerCut(['a'], [], new Set(['a', 'b'])).included // Set { 'b' }
+ * ```
+ */
+export function buildLedgerCut(
+	steps: ReadonlyArray<LedgerLine | string>,
+	records: readonly LedgerRecord[],
+	included: ReadonlySet<string>,
+): { readonly records: readonly LedgerRecord[]; readonly included: ReadonlySet<string> } {
+	const dropped = new Set(steps)
+	return {
+		records: records.map((record) => ({
+			...record,
+			lines: record.lines.filter((line) => !dropped.has(line)),
+		})),
+		included: new Set([...included].filter((source) => !dropped.has(source))),
+	}
+}
+
+/**
  * Resolves the generation cap and checks it against the context capacity.
  *
  * @param predict - The optional generation cap in tokens; see {@link LedgerOptions}

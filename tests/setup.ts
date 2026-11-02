@@ -5360,6 +5360,74 @@ export const LEDGER_TRIM_RULED_FIXTURE = Object.freeze({
 	request: 'Check Brightwater Studio.',
 })
 
+/** Supplies the trim across an accepted amendment: a seed reading, a filed correction and the fact that amends it, three sentences each, then each cut of their owner record, whose second step removes the later source's first line and so turns the earlier source's note to the omission note. */
+export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
+	seed: 'Account BW-20931: Brightwater Studio.',
+	earlier:
+		'Code BW-20931 leaves from the north dock today. The north dock opens at nine on every weekday. The dock foreman signs each release sheet here.',
+	later:
+		'Code BW-20931 leaves from the south dock instead. The south dock opens at ten on every weekday. The yard clerk signs each release sheet there.',
+	request: 'Check Brightwater Studio.',
+	cuts: Object.freeze([
+		{
+			title: 'after the seed, with the later source whole',
+			lines: [
+				'[Ledger source 1]',
+				'Accepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
+				'- Code BW-20931 leaves from the north dock today.',
+				'- The north dock opens at nine on every weekday.',
+				'- The dock foreman signs each release sheet here.',
+				'[Ledger source 2]',
+				'- Code BW-20931 leaves from the south dock instead.',
+				'- The south dock opens at ten on every weekday.',
+				'- The yard clerk signs each release sheet there.',
+			],
+		},
+		{
+			title: 'at the flip, with the later source short one line',
+			lines: [
+				'[Ledger source 1]',
+				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'- Code BW-20931 leaves from the north dock today.',
+				'- The north dock opens at nine on every weekday.',
+				'- The dock foreman signs each release sheet here.',
+				'- The south dock opens at ten on every weekday.',
+				'- The yard clerk signs each release sheet there.',
+			],
+		},
+		{
+			title: 'past the flip, with one line of the later source left',
+			lines: [
+				'[Ledger source 1]',
+				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'- Code BW-20931 leaves from the north dock today.',
+				'- The north dock opens at nine on every weekday.',
+				'- The dock foreman signs each release sheet here.',
+				'- The yard clerk signs each release sheet there.',
+			],
+		},
+		{
+			title: 'with the later source gone',
+			lines: [
+				'[Ledger source 1]',
+				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'- Code BW-20931 leaves from the north dock today.',
+				'- The north dock opens at nine on every weekday.',
+				'- The dock foreman signs each release sheet here.',
+			],
+		},
+		{
+			title: 'with the earlier source short one line',
+			lines: [
+				'[Ledger source 1]',
+				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'- The north dock opens at nine on every weekday.',
+				'- The dock foreman signs each release sheet here.',
+			],
+		},
+	]),
+})
+
 /** Holds the cutoffs shared by fictional ledger scenarios. */
 export const LEDGER_DESK_THRESHOLDS: LedgerThreshold = Object.freeze({
 	category: 0.7,
@@ -5819,6 +5887,38 @@ export function seedLedgerTrimOrder(ledger: LedgerInterface): void {
 				},
 			}),
 		)
+}
+
+/**
+ * Seeds a ledger's conversation with {@link LEDGER_TRIM_FLIP_FIXTURE}: the seed exchange, the earlier
+ * text filed as a `correction`, and the later text filed as a `fact` whose `amends` answer the
+ * ledger accepts, so the later text's lines drop first.
+ * @param ledger - The ledger whose conversation takes the fixture
+ */
+export function seedLedgerTrimFlip(ledger: LedgerInterface): void {
+	const fixture = LEDGER_TRIM_FLIP_FIXTURE
+	ledger.conversation.add(buildLedgerExchange(fixture.seed))
+	const earlier = ledger.conversation.add({ role: 'user', content: fixture.earlier })
+	const later = ledger.conversation.add({ role: 'user', content: fixture.later })
+	for (const message of [earlier, later])
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(message, {
+				answer: {
+					form: 'choice',
+					probabilities: {
+						fact: message === later ? 1 : 0,
+						rule: 0,
+						correction: message === later ? 0 : 1,
+						request: 0,
+						opinion: 0,
+						chatter: 0,
+						distractor: 0,
+					},
+				},
+			}),
+		)
+	ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+	ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
 }
 
 /**

@@ -83,6 +83,7 @@ import {
 	LEDGER_OWNER_FIXTURE,
 	LEDGER_OWNER_RENDER_CASES,
 	LEDGER_PRESERVATION_FIXTURE,
+	LEDGER_TRIM_FLIP_FIXTURE,
 	LEDGER_TRIM_ORDER_FIXTURE,
 	LEDGER_TRIM_RULED_FIXTURE,
 	RECORDED_ANSWER_REQUEST,
@@ -97,6 +98,7 @@ import {
 	createScriptedProvider,
 	extractLedgerRecords,
 	readCallRequest,
+	seedLedgerTrimFlip,
 	seedLedgerTrimOrder,
 	serveCanaryDesk,
 	serveRecordsDesk,
@@ -2973,6 +2975,98 @@ describe('Ledger', () => {
 		const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 		expect(text).toBe(expected)
 		expect(text).not.toContain(fixture.first)
+	})
+
+	it.each(LEDGER_TRIM_FLIP_FIXTURE.cuts)(
+		'stops at the first fitting cut of an amended record $title',
+		async ({ lines }) => {
+			const fixture = LEDGER_TRIM_FLIP_FIXTURE
+			const expected = ['## Records', '### Brightwater Studio (account BW-20931)', ...lines].join(
+				'\n',
+			)
+			const capacity =
+				Math.ceil(
+					estimateMessages([
+						{ id: 'system', role: 'system', content: 'Serve the desk.' },
+						{
+							id: 'request',
+							role: 'user',
+							content: `${expected}\n\n## Request\n${fixture.request}`,
+						},
+					]) *
+						(1 + LEDGER_SCALE_DRIFT),
+				) + 1
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 } }),
+			)
+			seedLedgerTrimFlip(ledger)
+			await ledger.respond(fixture.request)
+			expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toBe(expected)
+		},
+	)
+
+	it('keeps an amended record whole when it fits and drops every line when nothing fits', async () => {
+		const fixture = LEDGER_TRIM_FLIP_FIXTURE
+		const [whole, none] = await Promise.all(
+			[4096, 20].map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 } }),
+				)
+				seedLedgerTrimFlip(ledger)
+				await ledger.respond(fixture.request)
+				return extractLedgerRecords(requireValue(provider.calls[0]).messages)
+			}),
+		)
+		expect(whole).toBe(
+			[
+				'## Records',
+				'### Brightwater Studio (account BW-20931)',
+				'- Account BW-20931: Brightwater Studio.',
+				'[Ledger source 2]',
+				'Accepted later amendment [Ledger source 3] is fully included in these records. Sentence scope is unresolved.',
+				'- Code BW-20931 leaves from the north dock today.',
+				'- The north dock opens at nine on every weekday.',
+				'- The dock foreman signs each release sheet here.',
+				'[Ledger source 3]',
+				'- Code BW-20931 leaves from the south dock instead.',
+				'- The south dock opens at ten on every weekday.',
+				'- The yard clerk signs each release sheet there.',
+			].join('\n'),
+		)
+		expect(none).toBe('')
+	})
+
+	it('renders a rule unit sentence by sentence', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ share: { tail: 0.001 } }))
+		ledger.conversation.add(buildLedgerExchange('Account BW-20931: Brightwater Studio.'))
+		const rule = ledger.conversation.add({
+			role: 'user',
+			content:
+				'Brightwater Studio refunds need a manager.\n\nBrightwater Studio credits need a clerk.',
+		})
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(rule, { answer: { form: 'choice', probabilities: { rule: 1 } } }),
+		)
+		await ledger.respond('Check the desk.')
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toBe(
+			'## Rules\nBrightwater Studio refunds need a manager.\nBrightwater Studio credits need a clerk.',
+		)
+	})
+
+	it('renders a whole unit as its stored text', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ share: { tail: 0.001 } }))
+		const content = 'Ask Mira about the receipt.\n\nAsk Mira about the crate.'
+		ledger.conversation.add({ role: 'user', content })
+		await ledger.respond('Check Mira receipt.')
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toBe(
+			`## Records\n${content}`,
+		)
 	})
 
 	it('uses the measured default turn limit and the default recall limit', async () => {

@@ -53,6 +53,7 @@ import {
 } from './constants.js'
 import { isLedgerError, LedgerError } from './errors.js'
 import {
+	buildLedgerCut,
 	buildLedgerIndex,
 	buildLines,
 	buildLedgerRenderContext,
@@ -60,6 +61,7 @@ import {
 	buildRequestMessage,
 	collectProjectionIds,
 	extractWords,
+	findLedgerCut,
 	renderTopicNames,
 	scanAmendments,
 	splitWords,
@@ -597,14 +599,15 @@ export class Ledger implements LedgerInterface {
 
 	#renderSource(
 		id: string,
+		sentences: readonly string[],
 		lines: readonly LedgerLine[],
 		context: LedgerRenderContext,
 		scan: LedgerScan,
 	): string {
 		const message = this.#conversation.message(id)
 		if (message === undefined) return ''
-		const sentences = splitSentences(message.content)
-		const text = sentences.every((_, index) => lines.some((line) => line.sentence === index))
+		const retained = new Set(lines.map((line) => line.sentence))
+		const text = sentences.every((_, index) => retained.has(index))
 			? message.content
 			: lines.map((line) => sentences[line.sentence] ?? '').join(' ')
 		if (text === '') return ''
@@ -857,25 +860,24 @@ export class Ledger implements LedgerInterface {
 				right.position - left.position,
 		)
 		const rules = records.find((record) => record.key === LEDGER_RULES_KEY)
+		const owned = records.filter((record) => record.key !== LEDGER_RULES_KEY)
+		const rulings = new Set(
+			[...new Map(owned.flatMap((record) => record.lines).map((line) => [line.source, line.role]))]
+				.filter(([source, role]) => this.#ruled(source, role))
+				.map(([source]) => source),
+		)
 		const steps = [
-			...(rules?.lines
-				.filter((line) => !line.topics.some((topic) => near.has(topic)))
-				.reverse()
-				.map((line) => ({ key: rules.key, source: undefined, line })) ?? []),
-			...cuts.map((unit) => ({ key: undefined, source: unit.source, line: undefined })),
-			...(rules?.lines
-				.filter((line) => line.topics.some((topic) => near.has(topic)))
-				.reverse()
-				.map((line) => ({ key: rules.key, source: undefined, line })) ?? []),
-			...records
-				.filter((record) => record.key !== LEDGER_RULES_KEY)
-				.reverse()
-				.flatMap((record) =>
-					[
-						...record.lines.filter((line) => !this.#ruled(line.source, line.role)),
-						...record.lines.filter((line) => this.#ruled(line.source, line.role)),
-					].map((line) => ({ key: record.key, source: undefined, line })),
-				),
+			...(rules?.lines.filter((line) => !line.topics.some((topic) => near.has(topic))).reverse() ??
+				[]),
+			...cuts.map((unit) => unit.source),
+			...(rules?.lines.filter((line) => line.topics.some((topic) => near.has(topic))).reverse() ??
+				[]),
+			...owned
+				.toReversed()
+				.flatMap((record) => [
+					...record.lines.filter((line) => !rulings.has(line.source)),
+					...record.lines.filter((line) => rulings.has(line.source)),
+				]),
 		]
 		const mapped = ordered.map((unit) => ({
 			source: unit.source,
@@ -917,16 +919,12 @@ export class Ledger implements LedgerInterface {
 		}
 	}
 
-	// Renders the records for each cut in step order (each step drops the line it names from the
-	// record it keys, or the source it names) and returns the first cut whose built head, tail, and
-	// request copy fit `total`; the cut after every step is returned unchecked. No cut renders after
-	// the one returned.
+	// Searches the cuts in step order (each step drops the line it is, or the source it names) for one
+	// whose built head, tail, and request copy fit `total`, and returns the winning probe's render; the
+	// cut after every step is returned unchecked. A cut past the first fit fits too while the price does
+	// not rise along the steps, so the search lands on the first fitting cut.
 	#trim(
-		steps: ReadonlyArray<{
-			readonly key: string | undefined
-			readonly source: string | undefined
-			readonly line: LedgerLine | undefined
-		}>,
+		steps: ReadonlyArray<LedgerLine | string>,
 		records: readonly LedgerRecord[],
 		mapped: ReadonlyArray<{ readonly source: string; readonly record: LedgerRecord }>,
 		included: ReadonlySet<string>,
@@ -943,38 +941,20 @@ export class Ledger implements LedgerInterface {
 		const built = this.#agent.context.build({ messages: [request], judgments: [] })
 		const head = built.slice(0, -1)
 		const priced = built.at(-1) ?? request
-		const trimmed = steps.reduce<{
-			readonly rendered: string | undefined
-			readonly records: readonly LedgerRecord[]
-			readonly included: ReadonlySet<string>
-		}>(
-			(cut, step) => {
-				if (cut.rendered !== undefined) return cut
-				const rendered = this.#render(cut.records, mapped, cut.included, amendments, scan)
-				const copy = buildRequestMessage(priced, rendered)
-				if (
-					this.#price([...head, ...stripThinking([...tail.slice(0, -1), copy], this.#replay)]) <=
-					total
-				)
-					return { ...cut, rendered }
-				return {
-					rendered: undefined,
-					records: cut.records.map((record) =>
-						record.key === step.key
-							? { ...record, lines: record.lines.filter((line) => line !== step.line) }
-							: record,
-					),
-					included: new Set([...cut.included].filter((source) => source !== step.source)),
-				}
-			},
-			{ rendered: undefined, records, included },
-		)
+		const found = findLedgerCut(0, steps.length, (count) => {
+			const cut = buildLedgerCut(steps.slice(0, count), records, included)
+			const rendered = this.#render(cut.records, mapped, cut.included, amendments, scan)
+			const copy = buildRequestMessage(priced, rendered)
+			return this.#price([...head, ...stripThinking([...tail.slice(0, -1), copy], this.#replay)]) <=
+				total
+				? { ...cut, rendered }
+				: undefined
+		})
+		if (found !== undefined) return found
+		const last = buildLedgerCut(steps, records, included)
 		return {
-			records: trimmed.records,
-			included: trimmed.included,
-			rendered:
-				trimmed.rendered ??
-				this.#render(trimmed.records, mapped, trimmed.included, amendments, scan),
+			...last,
+			rendered: this.#render(last.records, mapped, last.included, amendments, scan),
 		}
 	}
 
@@ -1056,13 +1036,16 @@ export class Ledger implements LedgerInterface {
 			amendments,
 		)
 		const owners = ownerRecords.map((owner) => renderLedgerPinned(owner, context)).join('\n\n')
-		const rendered = unique.map(({ unit, source, lines }) => ({
-			rules: unit.key === LEDGER_RULES_KEY,
-			texts:
-				unit.key === LEDGER_RULES_KEY && source === unit.members[0]
-					? lines.map((line) => this.#renderSource(source, [line], context, scan))
-					: [this.#renderSource(source, lines, context, scan)],
-		}))
+		const rendered = unique.map(({ unit, source, lines }) => {
+			const sentences = splitSentences(this.#conversation.message(source)?.content ?? '')
+			return {
+				rules: unit.key === LEDGER_RULES_KEY,
+				texts:
+					unit.key === LEDGER_RULES_KEY && source === unit.members[0]
+						? lines.map((line) => this.#renderSource(source, sentences, [line], context, scan))
+						: [this.#renderSource(source, sentences, lines, context, scan)],
+			}
+		})
 		const pinned = rendered.filter((one) => !one.rules).flatMap((one) => one.texts)
 		const rules = rendered.filter((one) => one.rules).flatMap((one) => one.texts)
 		const body = [owners, pinned.join('\n')].filter((text) => text !== '').join('\n\n')

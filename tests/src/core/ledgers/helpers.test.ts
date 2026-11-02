@@ -7,11 +7,13 @@ import type {
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
 import {
+	buildLedgerCut,
 	buildLedgerIndex,
 	buildRecallMessage,
 	buildRequestMessage,
 	collectProjectionIds,
 	extractWords,
+	findLedgerCut,
 	renderCauseChain,
 	renderTopicNames,
 	scanAmendments,
@@ -46,7 +48,7 @@ import {
 	splitSentences,
 	splitTopic,
 } from '../../../../src/core/ledgers/helpers.js'
-import { captureError, requireValue } from '@orkestrel/test'
+import { captureError, createRecorder, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildGaugeCall,
@@ -185,6 +187,84 @@ describe('rankLedgerCut', () => {
 		expect(rankLedgerCut(2, false, 'rule')).toBe(3)
 		expect(rankLedgerCut(1, false, 'rule')).toBe(4)
 		expect(rankLedgerCut(1, false, undefined)).toBe(4)
+	})
+})
+
+describe('findLedgerCut', () => {
+	it('probes nothing when no step exists', () => {
+		const probe = createRecorder<[cut: number]>()
+		expect(
+			findLedgerCut(0, 0, (cut) => {
+				probe.handler(cut)
+				return { cut }
+			}),
+		).toBeUndefined()
+		expect(probe.count).toBe(0)
+	})
+
+	it('probes only the first cut when it fits', () => {
+		const probe = createRecorder<[cut: number]>()
+		expect(
+			findLedgerCut(0, 2140, (cut) => {
+				probe.handler(cut)
+				return { cut }
+			}),
+		).toEqual({ cut: 0 })
+		expect(probe.calls).toEqual([[0]])
+	})
+
+	it.each([1, 2, 3, 4, 7, 8, 9, 64, 65])('reads as the walk does over %i steps', (count) => {
+		const thresholds = Array.from({ length: count + 1 }, (_unused, at) => at)
+		expect(
+			thresholds.map((threshold) =>
+				findLedgerCut(0, count, (cut) => (cut >= threshold ? { cut } : undefined)),
+			),
+		).toEqual(thresholds.map((at) => (at === count ? undefined : { cut: at })))
+	})
+
+	it.each([1, 2, 1071, 1785, 2139, 2140])(
+		'takes the winning probe at threshold %i, probing no cut twice and at most 13 cuts',
+		(threshold) => {
+			const probe = createRecorder<[cut: number]>()
+			const found = findLedgerCut(0, 2140, (cut) => {
+				probe.handler(cut)
+				return cut >= threshold ? { cut } : undefined
+			})
+			const cuts = probe.calls.map(([cut]) => cut)
+			expect(found).toEqual(threshold === 2140 ? undefined : { cut: threshold })
+			expect(new Set(cuts).size).toBe(cuts.length)
+			expect(cuts.length).toBeLessThanOrEqual(13)
+		},
+	)
+})
+
+describe('buildLedgerCut', () => {
+	const kept = { text: 'Kept.', source: 'a', sentence: 0, topics: [], role: 'user' } as const
+	const dropped = { text: 'Dropped.', source: 'a', sentence: 1, topics: [], role: 'user' } as const
+	const records = [{ key: 'owner', title: 'Owner', members: ['a'], lines: [kept, dropped] }]
+
+	it('leaves every line and source without a step', () => {
+		const cut = buildLedgerCut([], records, new Set(['b', 'c']))
+		expect(cut.records).toEqual(records)
+		expect([...cut.included]).toEqual(['b', 'c'])
+	})
+
+	it('drops a step by its line and a step by its source', () => {
+		const cut = buildLedgerCut([dropped, 'b'], records, new Set(['b', 'c']))
+		expect(cut.records[0]?.lines).toEqual([kept])
+		expect(cut.records[0]?.key).toBe('owner')
+		expect([...cut.included]).toEqual(['c'])
+	})
+
+	it('reads a line by identity, so an equal line in another record stays', () => {
+		const copy = structuredClone(dropped)
+		const cut = buildLedgerCut(
+			[dropped],
+			[...records, { key: 'other', title: 'Other', members: ['a'], lines: [copy] }],
+			new Set(),
+		)
+		expect(cut.records[1]?.lines).toEqual([copy])
+		expect(cut.records[0]?.lines).toEqual([kept])
 	})
 })
 
