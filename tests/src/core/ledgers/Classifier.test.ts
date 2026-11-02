@@ -1,12 +1,14 @@
 import type { ClassifierReading, LedgerTopic } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
-import { captureError, createRecorder, requireValue } from '@orkestrel/test'
+import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
+import { createScheduler } from '@orkestrel/workflow'
 import { describe, expect, it } from 'vitest'
 import { Classifier } from '../../../../src/core/ledgers/Classifier.js'
 import {
 	DETERMINISTIC_JUDGE_ERROR,
 	LEDGER_QUESTIONS,
+	LEDGER_SLICE,
 } from '../../../../src/core/ledgers/constants.js'
 import { extractLiterals } from '../../../../src/core/helpers.js'
 import { buildLedgerIndex, matchEntities } from '../../../../src/core/ledgers/helpers.js'
@@ -22,8 +24,11 @@ import {
 	buildLedgerTopicJudgment,
 	buildReadingSummaries,
 	CLASSIFIER_PINNED_ASKS,
+	createFailingScheduler,
+	createGatedScheduler,
 	createLedgerJudge,
 	createPhraseJudge,
+	createRecordingScheduler,
 	LEDGER_DESK_THRESHOLDS,
 	LEDGER_REFUNDS_TOPIC,
 	type ReadingSummary,
@@ -1169,5 +1174,179 @@ describe('Classifier', () => {
 					JSON.stringify(['supersedes', earlier.id, correction.id]),
 				]),
 		)
+	})
+
+	it('yields once a slice is spent', async () => {
+		const conversation = createConversation()
+		conversation.add([
+			{ role: 'user', content: 'Refund AB-12 is 20.' },
+			{ role: 'user', content: 'Refund CD-34 is 30.' },
+		])
+		const scheduler = createRecordingScheduler()
+		// The judge waits past a slice, so the second question opens with the slice spent.
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				scheduler,
+				judge: createLedgerJudge(createRecorder(), async () => {
+					await waitForDelay(LEDGER_SLICE * 2)
+					return { model: 'partial', answers: {} }
+				}),
+			}),
+		)
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(scheduler.yields).toBe(2)
+	})
+
+	it('holds a live slice without a host turn', async () => {
+		const conversation = createConversation()
+		conversation.add(buildDeliverySeed(200))
+		conversation.judgments.add(
+			conversation.messages().map((message) => buildLedgerJudgment(message)),
+		)
+		const scheduler = createRecordingScheduler()
+		const classifier = new Classifier(buildClassifierOptions({ conversation, scheduler }))
+		const result = await classifier.classify(new Set(), new AbortController().signal)
+		expect(result.readings).toHaveLength(200)
+		expect(scheduler.yields).toBeGreaterThan(0)
+		expect(scheduler.yields).toBeLessThan(200)
+	})
+
+	it('takes a host turn on a real scheduler', async () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		conversation.judgments.add(buildLedgerJudgment(message))
+		const classifier = new Classifier(
+			buildClassifierOptions({ conversation, scheduler: createScheduler() }),
+		)
+		const fired = createRecorder<[]>()
+		setTimeout(fired.handler, 0)
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(fired.count).toBe(1)
+	})
+
+	it('takes no host turn with no scheduler', async () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		conversation.judgments.add(buildLedgerJudgment(message))
+		const classifier = new Classifier(buildClassifierOptions({ conversation }))
+		const fired = createRecorder<[]>()
+		setTimeout(fired.handler, 0)
+		const result = await classifier.classify(new Set(), new AbortController().signal)
+		expect(fired.count).toBe(0)
+		expect(result.readings.map((reading) => reading.outcome)).toEqual(['cached'])
+	})
+
+	it('asks the same questions when paced', async () => {
+		const seed = createConversation()
+		seed.add(buildCorrectionSeed(3))
+		const snapshot = seed.snapshot()
+		const phrase = createPhraseJudge([], ['Correction:'])
+		const plainAsked = createRecorder<readonly [key: string]>()
+		const pacedAsked = createRecorder<readonly [key: string]>()
+		const scheduler = createRecordingScheduler()
+		const plain = new Classifier(
+			buildClassifierOptions({
+				conversation: createConversation({ snapshot }),
+				judge: createLedgerJudge(
+					plainAsked,
+					(request) => phrase.ask(request, new AbortController().signal),
+					phrase.model,
+				),
+				topics: [LEDGER_REFUNDS_TOPIC],
+				entities: (text) => extractLiterals(text).ids,
+			}),
+		)
+		const paced = new Classifier(
+			buildClassifierOptions({
+				conversation: createConversation({ snapshot }),
+				judge: createLedgerJudge(
+					pacedAsked,
+					(request) => phrase.ask(request, new AbortController().signal),
+					phrase.model,
+				),
+				topics: [LEDGER_REFUNDS_TOPIC],
+				entities: (text) => extractLiterals(text).ids,
+				scheduler,
+			}),
+		)
+		const unpaced = await plain.classify(new Set(), new AbortController().signal)
+		const stepped = await paced.classify(new Set(), new AbortController().signal)
+		expect(scheduler.yields).toBeGreaterThan(0)
+		expect(plainAsked.count).toBeGreaterThan(0)
+		expect(pacedAsked.calls).toEqual(plainAsked.calls)
+		expect(summarizeReadings(stepped.readings)).toEqual(summarizeReadings(unpaced.readings))
+		expect(stepped.judgments).toEqual(unpaced.judgments)
+	})
+
+	it('skips asks on a removed source', async () => {
+		const conversation = createConversation()
+		const [first, second] = conversation.add([
+			{ role: 'user', content: 'Refund AB-12 is 20.' },
+			{ role: 'user', content: 'Refund CD-34 is 30.' },
+		])
+		const kept = requireValue(first)
+		const removed = requireValue(second)
+		const phrase = createPhraseJudge([])
+		const asked = createRecorder<readonly [key: string]>()
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				topics: [LEDGER_REFUNDS_TOPIC],
+				// The first question's wait is where the source goes.
+				judge: createLedgerJudge(
+					asked,
+					(request) => {
+						conversation.remove(removed.id)
+						return phrase.ask(request, new AbortController().signal)
+					},
+					phrase.model,
+				),
+			}),
+		)
+		const result = await classifier.classify(new Set(), new AbortController().signal)
+		expect(asked.calls).toEqual([
+			[JSON.stringify(['category', kept.id])],
+			[JSON.stringify(['topic', kept.id, LEDGER_REFUNDS_TOPIC.name])],
+		])
+		expect(
+			result.readings
+				.filter((reading) => reading.key.includes(removed.id))
+				.map((reading) => [reading.phase, reading.outcome]),
+		).toEqual([
+			['category', 'skipped'],
+			['topic', 'skipped'],
+		])
+		expect(result.judgments.some((key) => key.includes(removed.id))).toBe(false)
+	})
+
+	it('an abort during a turn asks nothing more', async () => {
+		const conversation = createConversation()
+		conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		const judge = new RecordingJudge()
+		const scheduler = createGatedScheduler(Promise.withResolvers<void>())
+		const classifier = new Classifier(buildClassifierOptions({ conversation, judge, scheduler }))
+		const caller = new AbortController()
+		const reason = new Error('stopped')
+		const pending = classifier.classify(new Set(), caller.signal)
+		await scheduler.reached
+		caller.abort(reason)
+		const result = await pending
+		expect(result.fault).toBe(reason)
+		expect(result.readings).toEqual([])
+		expect(judge.requests).toEqual([])
+	})
+
+	it('a scheduler fault returns the fault', async () => {
+		const conversation = createConversation()
+		conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		const judge = new RecordingJudge()
+		const classifier = new Classifier(
+			buildClassifierOptions({ conversation, judge, scheduler: createFailingScheduler() }),
+		)
+		const result = await classifier.classify(new Set(), new AbortController().signal)
+		expect(result.fault?.message).toBe('scheduler fault')
+		expect(result.readings).toEqual([])
+		expect(judge.requests).toEqual([])
 	})
 })

@@ -2553,6 +2553,57 @@ export function createRecordingScheduler(): RecordingSchedulerInterface {
 	return new RecordedScheduler()
 }
 
+/** Records each `yield` of a {@link SchedulerInterface} and reports when one parks on its gate. */
+export interface GatedSchedulerInterface extends RecordingSchedulerInterface {
+	/** Settles when the first `yield` parks on the gate. */
+	readonly reached: Promise<void>
+}
+
+/**
+ * Counts each yield and holds it on a test's gate, so a test acts while a run waits for its host
+ * turn. A pending yield rejects with its signal's reason on abort; an aborted signal rejects at once
+ * and counts nothing; delay resolves without a timer.
+ */
+export class GatedScheduler implements GatedSchedulerInterface {
+	readonly #gate: PromiseWithResolvers<void>
+	readonly #reached = Promise.withResolvers<void>()
+	#yields = 0
+
+	constructor(gate: PromiseWithResolvers<void>) {
+		this.#gate = gate
+	}
+
+	get yields(): number {
+		return this.#yields
+	}
+
+	get reached(): Promise<void> {
+		return this.#reached.promise
+	}
+
+	async yield(options?: SchedulerOptions): Promise<void> {
+		const signal = options?.signal
+		signal?.throwIfAborted()
+		this.#yields += 1
+		this.#reached.resolve()
+		const aborted = Promise.withResolvers<void>()
+		signal?.addEventListener('abort', () => aborted.reject(signal.reason), { once: true })
+		await Promise.race([this.#gate.promise, aborted.promise])
+	}
+
+	async delay(): Promise<void> {}
+}
+
+/**
+ * Creates a scheduler boundary fixture that holds each yield until a test's gate resolves.
+ *
+ * @param gate - The gate each yield waits on; once resolved, every later yield passes
+ * @returns A scheduler that reports each yield and when the first one parked
+ */
+export function createGatedScheduler(gate: PromiseWithResolvers<void>): GatedSchedulerInterface {
+	return new GatedScheduler(gate)
+}
+
 // Store scenarios share this host-independent battery so each backend exercises the same snapshots.
 
 /**
@@ -7953,6 +8004,13 @@ export interface LedgerSeed {
 	readonly readings: readonly ClassifierReading[]
 }
 
+/** Carries a bench ledger over a seeded snapshot, with the recorders a paced-selection test reads. */
+export interface PacedLedgerFixture {
+	readonly ledger: LedgerInterface
+	readonly asked: RecorderInterface<readonly [key: string]>
+	readonly selections: RecorderInterface<readonly [selection: Selection]>
+}
+
 /** Carries the answers a correction judge gives every amends and supersedes question. */
 export interface LedgerPairAnswer {
 	readonly amends: number
@@ -8143,12 +8201,14 @@ export function extractLedgerOrder(
  * @param judge - The judge that answers the filing questions
  * @param requested - If `true`, the topics keep their defaults; if `false`, every topic skips requests, so a cached request asks nothing
  * @param snapshot - The snapshot to hydrate from, when given
+ * @param scheduler - The scheduler the agent options carry, when given
  * @returns The ledger options
  */
 export function buildLedgerBenchOptions(
 	judge: JudgeInterface,
 	requested: boolean,
 	snapshot?: LedgerSnapshot,
+	scheduler?: SchedulerInterface,
 ): LedgerOptions {
 	return {
 		judge,
@@ -8173,7 +8233,7 @@ export function buildLedgerBenchOptions(
 				read: extractLedgerOrder,
 			},
 		],
-		agent: { limit: 8 },
+		agent: { limit: 8, ...(scheduler === undefined ? {} : { scheduler }) },
 		...(snapshot === undefined ? {} : { snapshot }),
 	}
 }
@@ -8201,6 +8261,37 @@ export async function seedLedgerPrefix(length: number, arm: LedgerBenchArm): Pro
 		corrections: prefix.corrections.size,
 		readings: result.readings,
 	}
+}
+
+/**
+ * Creates a bench ledger over a seeded snapshot, with the recorders a paced-selection test reads.
+ * Every topic skips requests, so a cached request asks the judge nothing.
+ *
+ * @param snapshot - The seeded snapshot to hydrate from
+ * @param turns - The provider's scripted turns
+ * @param scheduler - The scheduler the agent options carry, when given
+ * @param overrides - The ledger options to replace
+ * @returns The ledger, the question keys its judge received, and its selections
+ */
+export function createPacedLedger(
+	snapshot: LedgerSnapshot,
+	turns: readonly ScriptedTurn[],
+	scheduler?: SchedulerInterface,
+	overrides: Partial<LedgerOptions> = {},
+): PacedLedgerFixture {
+	const asked = createRecorder<readonly [key: string]>()
+	const selections = createRecorder<readonly [selection: Selection]>()
+	const ledger = createLedger(createScriptedProvider(turns), {
+		...buildLedgerBenchOptions(
+			createCorrectionJudge(asked, new Set(), { amends: 0, supersedes: 0 }),
+			false,
+			snapshot,
+			scheduler,
+		),
+		...overrides,
+	})
+	ledger.agent.emitter.on('select', selections.handler)
+	return { ledger, asked, selections }
 }
 
 /**

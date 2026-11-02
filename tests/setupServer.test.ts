@@ -1,4 +1,5 @@
 import { cpus } from 'node:os'
+import { setImmediate as waitForImmediate } from 'node:timers/promises'
 import { isLedgerSnapshot } from '@src/core'
 import { isRecord, parseJSONAs } from '@orkestrel/contract'
 import { createRecorder, requireValue, waitForCondition } from '@orkestrel/test'
@@ -7,8 +8,11 @@ import { describe, expect, it } from 'vitest'
 import { computeTextDigest, seedLedgerPrefix } from './setup.js'
 import {
 	addBusyWait,
+	addLedgerHeartbeat,
 	checkLedgerSample,
 	createFixtureServer,
+	createLedgerPace,
+	fireLedgerHeartbeat,
 	isLedgerCell,
 	LEDGER_CELL_DEFAULT,
 	LEDGER_CELL_VARIABLE,
@@ -18,6 +22,7 @@ import {
 	measureOtherLoad,
 	readHostTimes,
 	readLedgerCell,
+	readLedgerPacing,
 	runLedgerCell,
 	stopTimed,
 	takeLedgerSample,
@@ -149,6 +154,80 @@ describe('addBusyWait', () => {
 	})
 })
 
+describe('createLedgerPace', () => {
+	it('creates no scheduler for no pace, a host turn for node, and no host turn for micro', async () => {
+		expect(createLedgerPace(undefined)).toBeUndefined()
+		const fired = createRecorder<readonly []>()
+		setImmediate(() => fired.handler())
+		await requireValue(createLedgerPace('micro')).yield()
+		expect(fired.count).toBe(0)
+		await requireValue(createLedgerPace('node')).yield()
+		expect(fired.count).toBe(1)
+	})
+})
+
+describe('fireLedgerHeartbeat', () => {
+	it('records the clock and re-arms on each host turn until its signal aborts', async () => {
+		const firings = createRecorder<readonly [at: number]>()
+		const heartbeat = new AbortController()
+		fireLedgerHeartbeat(firings, heartbeat.signal)
+		expect(firings.count).toBe(1)
+		await waitForImmediate()
+		await waitForImmediate()
+		expect(firings.count).toBeGreaterThanOrEqual(2)
+		const ats = firings.calls.map(([at]) => at)
+		expect(ats).toEqual(ats.toSorted((left, right) => left - right))
+		heartbeat.abort()
+		const stopped = firings.count
+		await waitForImmediate()
+		await waitForImmediate()
+		expect(firings.count).toBe(stopped)
+	})
+
+	it('records nothing on an aborted signal', () => {
+		const firings = createRecorder<readonly [at: number]>()
+		fireLedgerHeartbeat(firings, AbortSignal.abort())
+		expect(firings.count).toBe(0)
+	})
+})
+
+describe('addLedgerHeartbeat', () => {
+	it('arms no firing before start, fires after a host turn, and stops on select', async () => {
+		const registered = createRecorder<readonly [event: string, handler: () => void]>()
+		const firings = createRecorder<readonly [at: number]>()
+		const heartbeat = new AbortController()
+		addLedgerHeartbeat(
+			{ on: (event, handler) => registered.handler(event, handler) },
+			firings,
+			heartbeat,
+		)
+		const [, start] = requireValue(registered.calls.find(([event]) => event === 'start'))
+		const [, select] = requireValue(registered.calls.find(([event]) => event === 'select'))
+		await waitForImmediate()
+		expect(firings.count).toBe(0)
+		start()
+		expect(firings.count).toBe(0)
+		await waitForImmediate()
+		expect(firings.count).toBeGreaterThanOrEqual(1)
+		select()
+		expect(heartbeat.signal.aborted).toBe(true)
+		const stopped = firings.count
+		await waitForImmediate()
+		await waitForImmediate()
+		expect(firings.count).toBe(stopped)
+	})
+})
+
+describe('readLedgerPacing', () => {
+	it('reads the gaps across start, each firing, and the end', () => {
+		expect(readLedgerPacing(10, [12, 17], 20)).toEqual({ longest: 5, gaps: [2, 5, 3], turns: 2 })
+	})
+
+	it('reads the wall as the one gap with no firing', () => {
+		expect(readLedgerPacing(10, [], 57)).toEqual({ longest: 47, gaps: [47], turns: 0 })
+	})
+})
+
 describe('takeLedgerSample', () => {
 	it('never reaches the judge, files every reading from cache, and emits one start, one select, and no fault', async () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
@@ -177,6 +256,41 @@ describe('takeLedgerSample', () => {
 		const sample = await takeLedgerSample(seed.snapshot, 30)
 		expect(sample.wall).toBeGreaterThanOrEqual(30)
 		expect(sample.asked).toBe(0)
+	})
+
+	it('reads no pacing with no pace', async () => {
+		const seed = await seedLedgerPrefix(18, 'control')
+		const sample = await takeLedgerSample(seed.snapshot)
+		expect(['longest' in sample, 'gaps' in sample, 'turns' in sample]).toEqual([
+			false,
+			false,
+			false,
+		])
+	})
+
+	it('reads gaps that sum to the wall on a node pace, and the same digest', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const sample = await takeLedgerSample(seed.snapshot, undefined, 'node')
+		const gaps = requireValue(sample.gaps)
+		expect(gaps).toHaveLength(requireValue(sample.turns) + 1)
+		expect(sample.longest).toBe(Math.max(...gaps))
+		expect(gaps.reduce((sum, gap) => sum + gap, 0)).toBeCloseTo(sample.wall, 6)
+		expect(sample.digest).toBe((await takeLedgerSample(seed.snapshot)).digest)
+		expect(sample.asked).toBe(0)
+	})
+
+	it('reads a busy wait inside one gap', async () => {
+		const seed = await seedLedgerPrefix(18, 'control')
+		const sample = await takeLedgerSample(seed.snapshot, 30, 'node')
+		expect(sample.longest).toBeGreaterThanOrEqual(30)
+	})
+
+	it('reads the wall as the longest gap on a micro pace, with no firing', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const sample = await takeLedgerSample(seed.snapshot, undefined, 'micro')
+		expect(sample.turns).toBe(0)
+		expect(sample.longest).toBe(sample.wall)
+		expect(sample.gaps).toEqual([sample.wall])
 	})
 })
 
@@ -227,8 +341,10 @@ describe('isLedgerCell', () => {
 			warmups: 1,
 			seed: 'a.json',
 			record: 'b.json',
+			pace: 'node',
 		}
 		expect(isLedgerCell(full)).toBe(true)
+		expect(isLedgerCell({ ...full, pace: 'micro' })).toBe(true)
 		expect(isLedgerCell({ arm: 'correction', size: 100, ...LEDGER_CELL_DEFAULT })).toBe(true)
 		for (const refused of [
 			{ ...full, arm: 'other' },
@@ -239,6 +355,7 @@ describe('isLedgerCell', () => {
 			{ ...full, warmups: -1 },
 			{ ...full, seed: 1 },
 			{ ...full, record: null },
+			{ ...full, pace: 'other' },
 			undefined,
 		])
 			expect(isLedgerCell(refused)).toBe(false)
@@ -342,6 +459,8 @@ describe('warmLedgerSamples', () => {
 		const seed = await seedLedgerPrefix(18, 'control')
 		expect(await warmLedgerSamples(seed.snapshot, undefined, 0)).toEqual([])
 		expect(await warmLedgerSamples(seed.snapshot, undefined, 1)).toHaveLength(1)
+		const [paced] = await warmLedgerSamples(seed.snapshot, undefined, 1, 'micro')
+		expect(paced?.turns).toBe(0)
 		expect(await warmLedgerSamples(seed.snapshot, 600, undefined)).toHaveLength(2)
 		const ruled = await warmLedgerSamples(seed.snapshot, undefined, undefined)
 		const wall = ruled.reduce((sum, sample) => sum + sample.wall, 0)

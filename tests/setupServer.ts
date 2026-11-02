@@ -2,6 +2,8 @@ import type { LedgerBenchArm } from './setup.js'
 import type { LedgerSnapshot, Selection } from '@src/core'
 import type { RouteInput } from '@orkestrel/router'
 import type { ServerInterface } from '@orkestrel/server'
+import type { RecorderInterface } from '@orkestrel/test'
+import type { SchedulerInterface } from '@orkestrel/workflow'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { cpus } from 'node:os'
 import { dirname } from 'node:path'
@@ -10,10 +12,12 @@ import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
 import { createDispatcher } from '@orkestrel/router'
 import { createServer } from '@orkestrel/server'
 import { createRecorder, requireValue } from '@orkestrel/test'
+import { createNodeScheduler } from '@orkestrel/workflow/server'
 import {
 	buildLedgerBenchOptions,
 	computeTextDigest,
 	createLedgerJudge,
+	createRecordingScheduler,
 	createScriptedProvider,
 	LEDGER_BENCH_MODEL,
 	renderLedgerPositions,
@@ -73,8 +77,18 @@ export async function stopTimed(
 	return performance.now() - closing
 }
 
-/** Carries what one timed ledger bench request measured, from the agent's first `start` event to its first `select` event. */
-export interface LedgerSample {
+/** Carries what a ledger bench heartbeat read: the largest gap, every gap in order, and its firings. */
+export interface LedgerPacing {
+	readonly longest: number
+	readonly gaps: readonly number[]
+	readonly turns: number
+}
+
+/**
+ * Carries what one timed ledger bench request measured, from the agent's first `start` event to its
+ * first `select` event. A sample of a paced cell also carries its heartbeat's {@link LedgerPacing}.
+ */
+export interface LedgerSample extends Partial<LedgerPacing> {
 	readonly wall: number
 	readonly cpu: number
 	readonly asked: number
@@ -95,9 +109,13 @@ export interface HostTimes {
 /** Names what a ledger bench process does with its cell: seed the prefix, log one digest, or time samples. */
 export type LedgerCellTask = 'seed' | 'digest' | 'time'
 
+/** Names the scheduler a ledger bench sample passes: the host's Node backend, or a stub resolving with no macrotask. */
+export type LedgerCellPace = 'node' | 'micro'
+
 /**
  * Carries one ledger bench cell: the arm and size, the measured sample count, the task, and the
- * optional busy wait, fixed warmup count, seed file, and record file.
+ * optional busy wait, fixed warmup count, seed file, record file, and pace. With no pace, a sample
+ * passes no scheduler and arms no heartbeat.
  */
 export interface LedgerCell {
 	readonly arm: LedgerBenchArm
@@ -108,6 +126,7 @@ export interface LedgerCell {
 	readonly warmups?: number
 	readonly seed?: string
 	readonly record?: string
+	readonly pace?: LedgerCellPace
 }
 
 /** Carries what a ledger bench run reports of its measurement: tinybench's latency mean and relative margin of error. */
@@ -183,16 +202,83 @@ export function addBusyWait(
 }
 
 /**
+ * Creates the scheduler a ledger bench sample passes.
+ *
+ * @param pace - The cell's pace; undefined passes no scheduler
+ * @returns The Node backend, a recording stub that resolves with no macrotask, or undefined
+ */
+export function createLedgerPace(pace: LedgerCellPace | undefined): SchedulerInterface | undefined {
+	if (pace === undefined) return undefined
+	return pace === 'node' ? createNodeScheduler() : createRecordingScheduler()
+}
+
+/**
+ * Fires one beat of a ledger bench heartbeat: records the clock and arms the next `setImmediate`,
+ * until the signal aborts. Each firing is a host turn the timed region gave up, which a recorder
+ * around `yield` could not tell from a microtask.
+ *
+ * @param firings - The log each firing appends its clock reading to
+ * @param signal - The signal that stops the chain
+ */
+export function fireLedgerHeartbeat(
+	firings: RecorderInterface<readonly [at: number]>,
+	signal: AbortSignal,
+): void {
+	if (signal.aborted) return
+	firings.handler(performance.now())
+	setImmediate(fireLedgerHeartbeat, firings, signal)
+}
+
+/**
+ * Registers a heartbeat on an emitter: armed on `start`, stopped on `select`.
+ *
+ * @param emitter - The emitter to register on, such as an agent's
+ * @param firings - The log the heartbeat appends to
+ * @param heartbeat - The controller that stops the chain
+ */
+export function addLedgerHeartbeat(
+	emitter: { on(event: 'start' | 'select', handler: () => void): void },
+	firings: RecorderInterface<readonly [at: number]>,
+	heartbeat: AbortController,
+): void {
+	emitter.on('start', () => {
+		setImmediate(fireLedgerHeartbeat, firings, heartbeat.signal)
+	})
+	emitter.on('select', () => heartbeat.abort())
+}
+
+/**
+ * Reads a heartbeat's pacing: the gaps across the region's start, each firing, and its end. With no
+ * firing, the one gap and the longest are the wall.
+ *
+ * @param start - The clock at the `start` mark
+ * @param firings - The clock at each firing, in order
+ * @param end - The clock at the `select` mark
+ * @returns The largest gap, every gap in order, and the firing count
+ */
+export function readLedgerPacing(
+	start: number,
+	firings: readonly number[],
+	end: number,
+): LedgerPacing {
+	const points = [start, ...firings]
+	const gaps = points.map((at, index) => (points[index + 1] ?? end) - at)
+	return { longest: Math.max(...gaps), gaps, turns: firings.length }
+}
+
+/**
  * Takes one timed sample of a ledger bench request: a fresh ledger hydrated from `snapshot`, with
  * every topic skipping requests and a judge that rejects when a question reaches it.
  *
  * @param snapshot - The seeded snapshot to hydrate from
  * @param wait - The busy wait in milliseconds, registered after the `start` mark; undefined registers none
- * @returns The wall and CPU time from the first `start` to the first `select`, the judge-call count, the event tallies, the reading outcomes, and the digest of the position-labelled selection
+ * @param pace - The scheduler to pass and the heartbeat to arm at the `start` mark; undefined does neither
+ * @returns The wall and CPU time from the first `start` to the first `select`, the judge-call count, the event tallies, the reading outcomes, the digest of the position-labelled selection, and with a pace the heartbeat's pacing
  */
 export async function takeLedgerSample(
 	snapshot: LedgerSnapshot,
 	wait?: number,
+	pace?: LedgerCellPace,
 ): Promise<LedgerSample> {
 	const asked = createRecorder<readonly [key: string]>()
 	const ledger = createLedger(
@@ -205,6 +291,7 @@ export async function takeLedgerSample(
 			),
 			false,
 			snapshot,
+			createLedgerPace(pace),
 		),
 	)
 	const marks =
@@ -223,7 +310,12 @@ export async function takeLedgerSample(
 	ledger.agent.emitter.on('fault', () =>
 		marks.handler('fault', process.cpuUsage(), performance.now()),
 	)
-	const result = await ledger.respond('What is the status of OR-1000?')
+	const firings = createRecorder<readonly [at: number]>()
+	const heartbeat = new AbortController()
+	if (pace !== undefined) addLedgerHeartbeat(ledger.agent.emitter, firings, heartbeat)
+	const result = await ledger
+		.respond('What is the status of OR-1000?')
+		.finally(() => heartbeat.abort())
 	const [, startUsage, startAt] = requireValue(marks.calls.find(([name]) => name === 'start'))
 	const [, selectUsage, selectAt] = requireValue(marks.calls.find(([name]) => name === 'select'))
 	const [selection] = requireValue(selections.calls.at(0))
@@ -242,6 +334,13 @@ export async function takeLedgerSample(
 		digest: await computeTextDigest(
 			renderLedgerPositions(selection.messages, ledger.conversation.messages()),
 		),
+		...(pace === undefined
+			? {}
+			: readLedgerPacing(
+					startAt,
+					firings.calls.map(([at]) => at),
+					selectAt,
+				)),
 	}
 }
 
@@ -299,7 +398,8 @@ export function isLedgerCell(value: unknown): value is LedgerCell {
 		(value.warmups === undefined ||
 			(Number.isSafeInteger(value.warmups) && Number(value.warmups) >= 0)) &&
 		(value.seed === undefined || isString(value.seed)) &&
-		(value.record === undefined || isString(value.record))
+		(value.record === undefined || isString(value.record)) &&
+		(value.pace === undefined || value.pace === 'node' || value.pace === 'micro')
 	)
 }
 
@@ -355,6 +455,7 @@ export function checkLedgerSample(sample: LedgerSample): LedgerSample {
  * @param snapshot - The seeded snapshot each sample hydrates from
  * @param wait - The busy wait each sample registers; undefined registers none
  * @param count - The fixed warmup count; undefined applies {@link LEDGER_WARMUP}
+ * @param pace - The pace each sample takes; undefined takes none
  * @param taken - The warmup samples taken so far
  * @returns Every warmup sample in the order taken
  */
@@ -362,6 +463,7 @@ export async function warmLedgerSamples(
 	snapshot: LedgerSnapshot,
 	wait: number | undefined,
 	count: number | undefined,
+	pace?: LedgerCellPace,
 	taken: readonly LedgerSample[] = [],
 ): Promise<readonly LedgerSample[]> {
 	const wall = taken.reduce((sum, sample) => sum + sample.wall, 0)
@@ -373,9 +475,9 @@ export async function warmLedgerSamples(
 	if (warm) return taken
 	const sample = logLedgerSample(
 		'warmup',
-		checkLedgerSample(await takeLedgerSample(snapshot, wait)),
+		checkLedgerSample(await takeLedgerSample(snapshot, wait, pace)),
 	)
-	return warmLedgerSamples(snapshot, wait, count, [...taken, sample])
+	return warmLedgerSamples(snapshot, wait, count, pace, [...taken, sample])
 }
 
 /**
@@ -400,7 +502,8 @@ export function logLedgerSample(phase: 'warmup' | 'measured', sample: LedgerSamp
  * and no warmup. A time task takes the warmups, then `count` measured samples through one
  * `bench(name, {}, fn).run({ time: 0, iterations: count, warmup: false, throws: true })` call,
  * whose own timing serves only the reported `mean` and `rme`. Every sample is checked and logged,
- * and the record lists the distinct selection digests of the warmups and the measured samples.
+ * and the record lists the distinct selection digests of the warmups and the measured samples. A
+ * cell's pace applies to its warmups and to every sample it takes.
  *
  * @param bench - The `bench` test-context fixture
  * @param arm - The arm the calling bench case measures
@@ -419,7 +522,9 @@ export async function runLedgerCell(
 	const snapshot = await loadLedgerSeed(cell.seed, arm, size)
 	const seed = await computeTextDigest(JSON.stringify(snapshot))
 	const warmups =
-		cell.task === 'time' ? await warmLedgerSamples(snapshot, cell.wait, cell.warmups) : []
+		cell.task === 'time'
+			? await warmLedgerSamples(snapshot, cell.wait, cell.warmups, cell.pace)
+			: []
 	const samples = createRecorder<readonly [sample: LedgerSample]>()
 	const measured = await measureOtherLoad(async () => {
 		if (cell.task === 'time')
@@ -427,13 +532,16 @@ export async function runLedgerCell(
 				samples.handler(
 					logLedgerSample(
 						'measured',
-						checkLedgerSample(await takeLedgerSample(snapshot, cell.wait)),
+						checkLedgerSample(await takeLedgerSample(snapshot, cell.wait, cell.pace)),
 					),
 				),
 			).run({ time: 0, iterations: cell.count, warmup: false, throws: true })
 		if (cell.task === 'digest')
 			samples.handler(
-				logLedgerSample('measured', checkLedgerSample(await takeLedgerSample(snapshot))),
+				logLedgerSample(
+					'measured',
+					checkLedgerSample(await takeLedgerSample(snapshot, undefined, cell.pace)),
+				),
 			)
 		return undefined
 	})

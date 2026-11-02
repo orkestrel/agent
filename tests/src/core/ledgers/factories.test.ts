@@ -21,6 +21,7 @@ describe('createLedger', () => {
 		expectTypeOf<LedgerAgentOptions>().toHaveProperty('skills')
 		expectTypeOf<LedgerAgentOptions>().toHaveProperty('memos')
 		expectTypeOf<LedgerAgentOptions>().toHaveProperty('workspaces')
+		expectTypeOf<LedgerAgentOptions>().toHaveProperty('scheduler')
 		expectTypeOf<LedgerOptions>().not.toHaveProperty('notes')
 		expectTypeOf<Gauge>().not.toHaveProperty('measure')
 		const ledger = createLedger(createScriptedProvider([]), options)

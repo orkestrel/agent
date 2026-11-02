@@ -188,6 +188,7 @@ export class Ledger implements LedgerInterface {
 				)
 			},
 			...(options.correction === undefined ? {} : { correction: options.correction }),
+			...(options.agent?.scheduler === undefined ? {} : { scheduler: options.agent.scheduler }),
 		})
 		const tools = createToolManager()
 		for (const lookup of options.lookups ?? []) {

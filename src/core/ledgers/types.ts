@@ -13,6 +13,7 @@ import type {
 import type { LEDGER_CATEGORIES } from './constants.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolInterface } from '@orkestrel/tool'
+import type { SchedulerInterface } from '@orkestrel/workflow'
 
 /** Names the category the ledger files a message under, one of {@link LEDGER_CATEGORIES}. */
 export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number]
@@ -255,17 +256,18 @@ export interface LedgerGauge {
 }
 
 /**
- * Selects the agent bounds, hooks, and context libraries a ledger passes through to the agent it builds.
+ * Selects the agent bounds, hooks, scheduler, and context libraries a ledger passes through to the agent it builds.
  *
  * @remarks
  * `limit` must be a nonnegative safe integer. Default: the `DEFAULT_LEDGER_LIMIT` constant. The
  * ledger owns every other agent option: the conversation, the tools, the selection handler, and
  * the scope. One memo set can serve many ledgers of one principal, and the plan prices what these
- * libraries add to the head.
+ * libraries add to the head. `scheduler` also reaches the ledger's classifier, which hands the host
+ * a turn while it files, so a page passes it to keep the filing out of one long task.
  */
 export type LedgerAgentOptions = Pick<
 	AgentOptions,
-	'limit' | 'timeout' | 'on' | 'instructions' | 'skills' | 'memos' | 'workspaces'
+	'limit' | 'timeout' | 'on' | 'scheduler' | 'instructions' | 'skills' | 'memos' | 'workspaces'
 >
 
 /**
@@ -669,16 +671,18 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
 
 /**
  * Configures a classifier: the conversation it files, the judge and the wording it asks with, the
- * desk topics, the cutoffs, the ledger's handlers, and the optional correction bound.
+ * desk topics, the cutoffs, the ledger's handlers, and the optional correction bound and scheduler.
  *
  * @remarks
  * `assign` decides the category of a message the ledger wrote or a tool returned, without a
  * question. `entities` names the registry ids a text carries, which decide the pairs it asks about.
  * While it pairs corrections, the `classify` method reads each message's quiet flag and near set at
  * most once per call and reuses them for every later correction, so a change to the conversation,
- * its judgments, or the judge's model made while the call waits on the judge reaches the next call.
- * `correction` caps the earlier messages each correction's pair questions compare, most recent
- * first.
+ * its judgments, or the judge's model made while the call waits on the judge or a host turn reaches
+ * the next call. `correction` caps the earlier messages each correction's pair questions compare,
+ * most recent first. `scheduler` paces the filing: before a step, when the `LEDGER_SLICE` constant's
+ * milliseconds have run since the last host turn, the call awaits the scheduler's `yield` method. With
+ * no scheduler, the call takes no host turn and reads no added clock.
  */
 export interface ClassifierOptions {
 	readonly conversation: ConversationInterface
@@ -689,6 +693,7 @@ export interface ClassifierOptions {
 	readonly assign: LedgerCategoryHandler
 	readonly entities: LedgerEntityHandler
 	readonly correction?: LedgerCorrectionOptions
+	readonly scheduler?: SchedulerInterface
 }
 
 /** Names the filing question a classifier asked: a message's category, a message's topic, or an earlier and later message's amendment or supersession. */
@@ -699,7 +704,7 @@ export type ClassifierPhase = 'category' | 'topic' | 'amends' | 'supersedes'
  *
  * @remarks
  * `cached` means the conversation already held a matching judgment, so the classifier did not call the judgment manager.
- * `skipped` means the classifier held the question after a deterministic failure and did not call the judgment manager.
+ * `skipped` means the classifier held the question, after a deterministic failure or because a message it names left the conversation, and did not call the judgment manager.
  * `resolved` means the judgment manager's resolve call fulfilled. `failed` means it rejected while the caller's signal was live.
  * `aborted` means it rejected with a `JudgeAbortError` or after the caller's signal aborted.
  */
@@ -734,7 +739,7 @@ export interface ClassifierResult {
 	readonly judgments: readonly string[]
 	readonly usage?: TokenUsage
 	readonly readings: readonly ClassifierReading[]
-	/** Holds the error when an assign or entities handler throw, or a caller abort, interrupts classification; judgments and usage retain the partial result. A judge rejection under a live signal sets no fault. */
+	/** Holds the error when an assign or entities handler throw, a scheduler rejection, or a caller abort interrupts classification; judgments and usage retain the partial result. A judge rejection under a live signal sets no fault. */
 	readonly fault?: Error
 }
 
@@ -751,7 +756,7 @@ export interface ClassifierInterface {
 	 *
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
-	 * @returns The judgment keys, usage spent, and one reading per logical question attempt; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+	 * @returns The judgment keys, usage spent, and one reading per logical question attempt; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**

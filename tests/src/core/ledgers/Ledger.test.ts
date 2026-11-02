@@ -26,6 +26,7 @@ import {
 import { createTokenBudget } from '@orkestrel/budget'
 import { canonicalStringify, isString, parseJSONAs } from '@orkestrel/contract'
 import { OllamaProvider } from '@orkestrel/ollama'
+import type { ToolCall, ToolResult } from '@orkestrel/tool'
 import { createTool } from '@orkestrel/tool'
 import {
 	createBinaryContent,
@@ -55,8 +56,13 @@ import {
 	buildLedgerReplayOptions,
 	buildLedgerSnapshotRefusals,
 	computeLedgerErrorCode,
+	createFailingScheduler,
 	createGatedProvider,
+	createGatedScheduler,
 	createLedgerReplay,
+	createPacedLedger,
+	createRecordingScheduler,
+	seedLedgerPrefix,
 	serveLedgerHistory,
 	serveLedgerReplay,
 	translateLedgerIds,
@@ -4022,5 +4028,246 @@ describe('Ledger — run-bound conversation', () => {
 		expect(
 			leaked?.messages.filter((message) => message.role !== 'system').map((message) => message.id),
 		).toEqual([request.id])
+	})
+})
+
+describe('Ledger — host turns', () => {
+	it('refuses each entry during a host turn', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const { ledger } = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], scheduler)
+		const pending = ledger.respond('What is the status of OR-1000?')
+		await scheduler.reached
+		const count = ledger.conversation.count
+		await expect(ledger.respond('Concurrent request.')).rejects.toMatchObject({
+			code: 'CONCURRENCY',
+		})
+		await expect(ledger.calibrate(new AbortController().signal)).rejects.toMatchObject({
+			code: 'CONCURRENCY',
+		})
+		expect(captureError(() => ledger.snapshot())).toMatchObject({ code: 'CONCURRENCY' })
+		expect(
+			captureError(() => ledger.agent.generate({ conversation: ledger.conversation })),
+		).toMatchObject({ code: 'CONCURRENCY' })
+		expect(ledger.conversation.count).toBe(count)
+		gate.resolve()
+		expect((await pending).content).toBe('Noted.')
+	})
+
+	it('refuses another thread in a host turn', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const { ledger, selections } = createPacedLedger(
+			seed.snapshot,
+			[{ content: 'Elsewhere.' }, { content: 'Noted.' }],
+			scheduler,
+		)
+		const plain = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }])
+		const pending = ledger.respond('What is the status of OR-1000?')
+		await scheduler.reached
+		const other = createConversation()
+		other.add({ role: 'user', content: 'Other thread.' })
+		await ledger.agent.generate({ conversation: other })
+		const [refused] = requireValue(selections.calls[0])
+		expect(refused.fault).toMatchObject({ code: 'REQUEST' })
+		expect(refused.messages.map((message) => message.content)).toEqual(['Other thread.'])
+		gate.resolve()
+		await pending
+		await plain.ledger.respond('What is the status of OR-1000?')
+		const [live] = requireValue(selections.calls[1])
+		const [unpaced] = requireValue(plain.selections.calls[0])
+		expect(live.fault).toBeUndefined()
+		expect(renderLedgerPositions(live.messages, ledger.conversation.messages())).toBe(
+			renderLedgerPositions(unpaced.messages, plain.ledger.conversation.messages()),
+		)
+	})
+
+	it('another thread recalls during a turn', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const recalled = {
+			content: '',
+			tools: [{ id: 'later', name: 'recall', arguments: { topic: 'OR-1000' } }],
+		}
+		const { ledger, selections } = createPacedLedger(
+			seed.snapshot,
+			[
+				{ content: '', tools: [{ id: 'other', name: 'recall', arguments: { topic: 'orders' } }] },
+				recalled,
+				{ content: 'Noted.' },
+			],
+			scheduler,
+			{ recall: { limit: 1 } },
+		)
+		const plain = createPacedLedger(seed.snapshot, [recalled, { content: 'Noted.' }], undefined, {
+			recall: { limit: 1 },
+		})
+		const results = createRecorder<readonly [call: ToolCall, result: ToolResult]>()
+		const unspent = createRecorder<readonly [call: ToolCall, result: ToolResult]>()
+		ledger.agent.emitter.on('tool', results.handler)
+		plain.ledger.agent.emitter.on('tool', unspent.handler)
+		const pending = ledger.respond('What is the status of OR-1000?')
+		await scheduler.reached
+		const other = createConversation()
+		other.add({ role: 'user', content: 'Other thread.' })
+		// A run of one turn ends on the recall, with the gate that holds the selection still shut.
+		await ledger.agent.generate({ conversation: other, limit: 1 })
+		expect(requireValue(results.calls[0])[1].success).toBe(true)
+		gate.resolve()
+		await pending
+		await plain.ledger.respond('What is the status of OR-1000?')
+		expect(requireValue(results.calls[1])[1]).toMatchObject({
+			success: false,
+			error: LEDGER_NOTES.closure,
+		})
+		expect(requireValue(unspent.calls[0])[1].success).toBe(true)
+		const [live] = requireValue(selections.calls[1])
+		const [unpaced] = requireValue(plain.selections.calls[0])
+		expect(renderLedgerPositions(live.messages, ledger.conversation.messages())).toBe(
+			renderLedgerPositions(unpaced.messages, plain.ledger.conversation.messages()),
+		)
+	})
+
+	it('faults on an append during a host turn', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const { ledger, asked, selections } = createPacedLedger(
+			seed.snapshot,
+			[{ content: 'Noted.' }, { content: 'Noted again.' }],
+			scheduler,
+		)
+		const pending = ledger.respond('What is the status of OR-1000?')
+		await scheduler.reached
+		const before = ledger.conversation.count
+		const added = ledger.conversation.add({ role: 'user', content: 'Order OR-1000 is on hold.' })
+		gate.resolve()
+		await pending
+		const [faulted] = requireValue(selections.calls[0])
+		expect(faulted.fault?.message).toBe(
+			`conversation ${ledger.conversation.id} changed during selection: ${before} messages before, ${before + 1} after`,
+		)
+		expect(faulted.messages).toEqual(ledger.conversation.view().slice(0, before + 1))
+		expect(asked.count).toBe(0)
+		await ledger.respond('What is open on the desk?')
+		expect(asked.calls).toContainEqual([JSON.stringify(['category', added.id])])
+	})
+
+	it('asks nothing on a removal during a turn', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const removed = requireValue(seed.snapshot.conversation.messages[1])
+		for (const clearing of [false, true]) {
+			const gate = Promise.withResolvers<void>()
+			const scheduler = createGatedScheduler(gate)
+			// The empty first reply opens the answer pass, whose selection reuses the request's plan.
+			const { ledger, asked, selections } = createPacedLedger(
+				seed.snapshot,
+				[{ content: '' }, { content: 'Noted.' }],
+				scheduler,
+			)
+			const pending = ledger.respond('What is the status of OR-1000?')
+			await scheduler.reached
+			const before = ledger.conversation.count
+			if (clearing) ledger.conversation.clear()
+			else ledger.conversation.remove(removed.id)
+			gate.resolve()
+			const result = await pending
+			const [faulted] = requireValue(selections.calls[0])
+			const [answer] = requireValue(selections.calls[1])
+			expect(asked.count).toBe(0)
+			expect(faulted.fault?.message).toBe(
+				`conversation ${ledger.conversation.id} changed during selection: ${before} messages before, ${clearing ? 0 : before - 1} after`,
+			)
+			expect(answer.messages.some((message) => message.id === removed.id)).toBe(false)
+			const gone = result.readings.filter((reading) => reading.key.includes(removed.id))
+			expect(gone.length).toBeGreaterThan(0)
+			expect(gone.every((reading) => reading.outcome === 'skipped')).toBe(true)
+		}
+	})
+
+	it('re-asks a judgment removed in a turn', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const [first, second] = seed.snapshot.conversation.messages
+		const ahead = JSON.stringify(['category', requireValue(first).id])
+		const refiled = JSON.stringify(['category', requireValue(second).id])
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const { ledger, asked } = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], scheduler)
+		const held = requireValue(ledger.conversation.judgments.judgment(refiled))
+		ledger.conversation.judgments.remove(refiled)
+		const pending = ledger.respond('What is the status of OR-1000?')
+		await scheduler.reached
+		ledger.conversation.judgments.remove(ahead)
+		ledger.conversation.judgments.add(held)
+		gate.resolve()
+		const result = await pending
+		expect(asked.calls).toEqual([[ahead]])
+		expect(result.readings.find((reading) => reading.key === ahead)?.outcome).toBe('resolved')
+		expect(result.readings.find((reading) => reading.key === refiled)?.outcome).toBe('cached')
+	})
+
+	it('commits partial on an abort in a turn', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const { ledger, asked } = createPacedLedger(
+			seed.snapshot,
+			[{ content: 'Noted.' }, { content: 'Noted again.' }],
+			scheduler,
+		)
+		const caller = new AbortController()
+		const pending = ledger.respond('What is the status of OR-1000?', caller.signal)
+		await scheduler.reached
+		caller.abort('stopped')
+		expect((await pending).partial).toBe(true)
+		expect(asked.count).toBe(0)
+		gate.resolve()
+		expect((await ledger.respond('What is open on the desk?')).partial).toBe(false)
+	})
+
+	it('a scheduler fault leaves the ledger free', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const { ledger, selections } = createPacedLedger(
+			seed.snapshot,
+			[{ content: 'Noted.' }, { content: 'Noted again.' }],
+			createFailingScheduler(),
+		)
+		const result = await ledger.respond('What is the status of OR-1000?')
+		const [faulted] = requireValue(selections.calls[0])
+		expect(faulted.fault?.message).toBe('scheduler fault')
+		expect(result.content).toBe('Noted.')
+		expect((await ledger.respond('What is open on the desk?')).content).toBe('Noted again.')
+	})
+
+	it('selects the same bytes when paced', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const scheduler = createRecordingScheduler()
+		const paced = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], scheduler)
+		const plain = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }])
+		await paced.ledger.respond('What is the status of OR-1000?')
+		await plain.ledger.respond('What is the status of OR-1000?')
+		const [stepped] = requireValue(paced.selections.calls[0])
+		const [unpaced] = requireValue(plain.selections.calls[0])
+		expect(scheduler.yields).toBeGreaterThan(0)
+		expect(renderLedgerPositions(stepped.messages, paced.ledger.conversation.messages())).toBe(
+			renderLedgerPositions(unpaced.messages, plain.ledger.conversation.messages()),
+		)
+	})
+
+	it('paces the agent between turns', async () => {
+		const scheduler = createRecordingScheduler()
+		// A conversation of the request alone reaches no filing step, so only the agent yields.
+		const ledger = createLedger(
+			createScriptedProvider([
+				{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }] },
+				{ content: 'Noted.' },
+			]),
+			buildLedgerOptions({ agent: { scheduler }, topics: [] }),
+		)
+		expect((await ledger.respond('What is open on the desk?')).content).toBe('Noted.')
+		expect(scheduler.yields).toBe(1)
 	})
 })

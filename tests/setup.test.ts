@@ -174,6 +174,8 @@ import {
 	createAgentJob,
 	createAgentTurn,
 	createLoopTool,
+	createGatedScheduler,
+	createPacedLedger,
 	createRecordingScheduler,
 	createRecordedJudge,
 	RecordingJudge,
@@ -899,6 +901,41 @@ describe('createRecordingScheduler', () => {
 		const second = createRecordingScheduler()
 		await first.yield()
 		expect([first.yields, second.yields]).toEqual([1, 0])
+	})
+})
+
+describe('createGatedScheduler', () => {
+	it('holds each yield until the gate resolves, then passes every later one', async () => {
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const passed = createRecorder<readonly []>()
+		const first = scheduler.yield().then(() => passed.handler())
+		await scheduler.reached
+		await scheduler.delay(1_000)
+		expect([scheduler.yields, passed.count]).toEqual([1, 0])
+		gate.resolve()
+		await first
+		await scheduler.yield()
+		expect([scheduler.yields, passed.count]).toEqual([2, 1])
+	})
+
+	it('rejects a pending yield with the signal reason and an aborted one at once', async () => {
+		const scheduler = createGatedScheduler(Promise.withResolvers<void>())
+		const reason = new Error('cancelled')
+		const abort = new AbortController()
+		const pending = scheduler.yield({ signal: abort.signal })
+		await scheduler.reached
+		abort.abort(reason)
+		await expect(pending).rejects.toBe(reason)
+		await expect(scheduler.yield({ signal: abort.signal })).rejects.toBe(reason)
+		expect(scheduler.yields).toBe(1)
+	})
+
+	it('resolves a signalled yield through its gate', async () => {
+		const gate = Promise.withResolvers<void>()
+		const pending = createGatedScheduler(gate).yield({ signal: new AbortController().signal })
+		gate.resolve()
+		await expect(pending).resolves.toBeUndefined()
 	})
 })
 
@@ -3337,6 +3374,12 @@ describe('ledger bench builders', () => {
 		})
 		expect('snapshot' in requested).toBe(false)
 		expect(timed.snapshot?.conversation.messages).toHaveLength(8)
+		const scheduler = createRecordingScheduler()
+		expect(requested.agent).toEqual({ limit: 8 })
+		expect(buildLedgerBenchOptions(judge, false, undefined, scheduler).agent).toEqual({
+			limit: 8,
+			scheduler,
+		})
 		expect(requested.lookups?.[0]?.read({ id: 'OR-1' }, 'No record')).toEqual(
 			extractLedgerOrder({ id: 'OR-1' }),
 		)
@@ -3359,6 +3402,20 @@ describe('ledger bench builders', () => {
 		expect(plain.corrections).toBe(0)
 		expect(weighted.readings.some((reading) => reading.phase === 'amends')).toBe(true)
 		expect(plain.readings.some((reading) => reading.phase === 'amends')).toBe(false)
+	})
+
+	it('creates a paced ledger whose cached request asks nothing', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const scheduler = createRecordingScheduler()
+		const { ledger, asked, selections } = createPacedLedger(
+			seed.snapshot,
+			[{ content: 'Noted.' }],
+			scheduler,
+		)
+		expect((await ledger.respond('What is the status of OR-1000?')).content).toBe('Noted.')
+		expect(asked.count).toBe(0)
+		expect(selections.count).toBe(1)
+		expect(selections.calls[0]?.[0].fault).toBeUndefined()
 	})
 
 	it('renders a value with each message id written as its position', () => {

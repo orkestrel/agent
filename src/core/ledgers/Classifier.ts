@@ -18,6 +18,7 @@ import {
 	DECISIVE_CATEGORIES,
 	DETERMINISTIC_JUDGE_ERROR,
 	LEDGER_CATEGORIES,
+	LEDGER_SLICE,
 	QUIET_CATEGORIES,
 } from './constants.js'
 import { renderCauseChain } from './helpers.js'
@@ -35,6 +36,7 @@ import { renderCauseChain } from './helpers.js'
 export class Classifier implements ClassifierInterface {
 	readonly #options: ClassifierOptions
 	readonly #failed = new Set<string>()
+	#slice = 0
 
 	/**
 	 * Creates the filing engine with the ledger's handlers and calibrated questions.
@@ -48,7 +50,7 @@ export class Classifier implements ClassifierInterface {
 	 * Asks the judge every question the filing still lacks, in the measured order.
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
-	 * @returns The judgment keys, summed usage, and one reading per logical question attempt, in asking order; a throw from the assign or entities handler, or a caller abort, returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+	 * @returns The judgment keys, summed usage, and one reading per logical question attempt, in asking order; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
@@ -214,14 +216,16 @@ export class Classifier implements ClassifierInterface {
 		const messages = this.#options.conversation.messages()
 		const asked = messages.filter((message) => this.#options.assign(message) === undefined)
 		for (const message of asked) {
-			if (!requests.has(message.id))
-				results.push(await this.#ask(this.#buildCategory(message.id), 'category', signal, results))
+			if (requests.has(message.id)) continue
+			if (this.#spent()) await this.#turn(signal)
+			results.push(await this.#ask(this.#buildCategory(message.id), 'category', signal, results))
 		}
 		const quiets = new Map<string, boolean>()
 		for (const message of asked) {
 			if (!requests.has(message.id) && this.#readQuiet(message.id, quiets)) continue
 			for (const topic of this.#options.topics) {
 				if (requests.has(message.id) && topic.requested === false) continue
+				if (this.#spent()) await this.#turn(signal)
 				results.push(await this.#ask(this.#buildTopic(message.id, topic), 'topic', signal, results))
 			}
 		}
@@ -242,6 +246,7 @@ export class Classifier implements ClassifierInterface {
 					: this.#collectKept(messages, later, near, limit, quiets, nears)
 			for (const earlier of messages) {
 				if (earlier.id === later.id) break
+				if (this.#spent()) await this.#turn(signal)
 				if (
 					kept === undefined ? !this.#eligible(earlier, near, quiets, nears) : !kept.has(earlier.id)
 				)
@@ -259,6 +264,17 @@ export class Classifier implements ClassifierInterface {
 					)
 			}
 		}
+	}
+
+	// Reports whether the slice since the last host turn has run its length; with no scheduler no clock is read.
+	#spent(): boolean {
+		return this.#options.scheduler !== undefined && performance.now() - this.#slice >= LEDGER_SLICE
+	}
+
+	// Hands the host a turn, which a caller abort rejects, and opens the next slice.
+	async #turn(signal: AbortSignal): Promise<void> {
+		await this.#options.scheduler?.yield({ signal })
+		this.#slice = performance.now()
 	}
 
 	#renderState(id: string): string {
@@ -416,6 +432,8 @@ export class Classifier implements ClassifierInterface {
 		if (this.#failed.has(fingerprint))
 			return { judgments: [], readings: [{ key: spec.id, phase, outcome: 'skipped' }] }
 		signal.throwIfAborted()
+		if (spec.sources.some((id) => this.#options.conversation.message(id) === undefined))
+			return { judgments: [], readings: [{ key: spec.id, phase, outcome: 'skipped' }] }
 		const started = performance.now()
 		try {
 			const [judgment] = await this.#options.conversation.judgments.resolve(
