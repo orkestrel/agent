@@ -142,7 +142,8 @@ export interface MemoStoreInterface {
 
 - `MemoryMemoStore` and `DatabaseMemoStore` live in `src/core/contexts/stores/`. The database store writes one `{ id, snapshot }` row over `@orkestrel/database`, as `DatabaseConversationStore` does.
 - Point access is async; deleting a missing key is a no-op; the snapshot is one opaque column narrowed by `isMemoSnapshot`; a row whose blob id differs reads as absent.
-- Every fleet store holds one snapshot per id, so the whole-set row follows the fleet. rc-u8's throwaway bench times `set` over growing memo sets in a quiet runner slot, never as a timing assertion in a test; a one-row-per-revision store waits for D14, whose trigger reads 12.5 ms at 2000 revisions under O53, with the 50 ms figure reported beside it (O81).
+- Every fleet store holds one snapshot per id, so the whole-set row follows the fleet. rc-u8's throwaway bench times `set` over growing memo sets in a quiet runner slot, never as a timing assertion in a test; a one-row-per-revision store waited on D14, whose trigger read 12.5 ms at 2000 revisions under O53, with the 50 ms figure reported beside it (O81). D14 is closed: on the memory driver, `sets 2000 revisions` reads 4.563 ms, with `set` linear from 0.279 ms at 125 revisions to 9.538 ms at 4000 (O104).
+- D81 holds the read path, `DatabaseMemoStore.get` through `isMemoSnapshot`, because the same slot's `gets` cells read 14.67, 28.72, and 58.34 ms at 500, 1000, and 2000 revisions on the memory driver alone, the other drivers unmeasured, and decided nothing. rc-u20 cut the guard 12.6x (`designs/measurement.md` § Method, TH-5), so about 4.4 ms at 1000 and about 10 ms at 2000 revisions on the committed tree are derived, unmeasured, and decide nothing (O99).
 
 ### Memo and record
 

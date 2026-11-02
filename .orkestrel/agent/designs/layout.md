@@ -105,7 +105,8 @@ rc-u10 deletes in one change, with no shim:
 The Study pins the effective sampling values on every role; a value change is D38 (O13).
 
 - rc-s1 adds `STUDY_MEMORY_SAMPLING` in `studies/memory/constants.ts`, one record per role (`agent`, `summary`, `judge`) carrying `temperature`, `seed`, `top_k`, `top_p`, `min_p`, `presence_penalty`, and `repeat_penalty`.
-- The agent and summary records carry the `qwen3.5:2b-q4_K_M` stored values (`top_k` 20, `top_p` 0.95, `min_p` 0, `presence_penalty` 1.5, `repeat_penalty` 1; C44) under `temperature` 0 and `seed` 0. The judge record carries the values `/api/show` reports for the Mica v0.1 4B digest, with Ollama's defaults pinned where the model stores none (C45).
+- The agent and summary records carry `top_k` 20, `top_p` 0.95, `min_p` 0, `presence_penalty` 1.5, and `repeat_penalty` 1 under `temperature` 0 and `seed` 0. The `qwen3.5:2b-q4_K_M` digest the screen read stores `top_k`, `top_p`, and `presence_penalty` among its parameters (C44) and no `min_p` or `repeat_penalty`, so those two equal `DefaultOptions` in Ollama's `api/types.go` at tag v0.40.13 and the pin changes no value (`plan.md` O103).
+- The judge record carries `temperature` 1, `seed` 0, `top_k` 40, `top_p` 0.9, `min_p` 0, `presence_penalty` 0, and `repeat_penalty` 1: the Mica v0.1 4B digest stores no parameters, so its values are those defaults under the design's `temperature` and `seed` (C45; `plan.md` O103).
 - `buildStudyMemoryRoles` in `studies/memory/helpers.ts` spreads each record into its role's options; a roles test asserts every role sends every key, and a missing key fails.
 - A pin that changes a value is a hidden experiment, so the pin repeats what the daemon applies when a request omits a key (C45). rc-a9's sampling probes prove it, and every GPU step's run record carries the options as sent (`designs/measurement.md` § Recording).
 
