@@ -79,6 +79,19 @@ describe('memory declaration and mechanical evidence', () => {
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, false])
 	})
 
+	it('admits version, metadata, and a correction limit', () => {
+		const metadata = { calls: 8192, bytes: 67108864, duration: 600000 }
+		for (const settings of [
+			{ version: '0.40.13' },
+			{ metadata },
+			{ correction: {} },
+			{ correction: { limit: 0 } },
+			{ correction: { limit: 8 } },
+			{ version: '0.40.13', metadata, correction: { limit: 8 } },
+		])
+			expect([settings, isStudyMemoryOptions(settings)]).toEqual([settings, true])
+	})
+
 	it('checks each admitted capability its treatments invoke and tolerates a hostile namespace', () => {
 		const { agent, provider } = STUDY_MEMORY_MODULES
 		expect(isStudyMemoryRuntime(agent)).toBe(true)
@@ -89,6 +102,7 @@ describe('memory declaration and mechanical evidence', () => {
 		const surface = {
 			Agent: agent.Agent,
 			createConversationManager: agent.createConversationManager,
+			createAuthority: agent.createAuthority,
 			estimateRequest: agent.estimateRequest,
 			measureRequest: agent.measureRequest,
 			isAgentError: agent.isAgentError,
@@ -104,6 +118,22 @@ describe('memory declaration and mechanical evidence', () => {
 		}
 		expect(isStudyMemoryRuntime({ ...surface, isAgentError: 'guard' })).toBe(false)
 		expect(isStudyMemoryRuntime({ ...surface, Agent: {} })).toBe(false)
+		expect(isStudyMemoryRuntime({ ...surface, createAuthority: {} })).toBe(false)
+		const ledger = {
+			createLedger: agent.createLedger,
+			LEDGER_QUESTIONS: agent.LEDGER_QUESTIONS,
+			LEDGER_NOTES: agent.LEDGER_NOTES,
+		}
+		expect(isStudyMemoryLedger(ledger)).toBe(true)
+		for (const missing of Object.keys(ledger)) {
+			const remaining = Object.entries(ledger).filter(([key]) => key !== missing)
+			expect([missing, isStudyMemoryLedger(Object.fromEntries(remaining))]).toEqual([
+				missing,
+				false,
+			])
+		}
+		expect(isStudyMemoryLedger({ ...ledger, LEDGER_NOTES: 'notes' })).toBe(false)
+		expect(isStudyMemoryLedger({ ...ledger, LEDGER_NOTES: {} })).toBe(false)
 		expect(
 			isStudyMemoryLedger({ createLedger: agent.createLedger, LEDGER_QUESTIONS: 'questions' }),
 		).toBe(false)

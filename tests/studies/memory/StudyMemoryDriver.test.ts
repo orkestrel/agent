@@ -11,6 +11,8 @@ import {
 	createMemoryContext,
 	createMemoryServer,
 	runMemoryTrial,
+	STUDY_MEMORY_INERT_EXCHANGES,
+	STUDY_MEMORY_INERT_REPLAY,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVATION_GOALS,
@@ -39,6 +41,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const runtime = {
 			Agent: agent.Agent,
 			createConversationManager: agent.createConversationManager,
+			createAuthority: agent.createAuthority,
 			estimateRequest: agent.estimateRequest,
 			measureRequest: agent.measureRequest,
 			isAgentError: agent.isAgentError,
@@ -117,6 +120,39 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			}
 		},
 	)
+
+	it('forwards the sink and the replay to the session', async () => {
+		const server = await createMemoryServer()
+		const profile = buildMemoryProfile({ url: server.url })
+		const fixture = createMemoryContext(profile)
+		const trial = { id: 'forward', scenario: 'public', arm: 'full', repetition: 0 }
+		try {
+			for (const collaborator of [
+				{ exchanges: STUDY_MEMORY_INERT_EXCHANGES },
+				{ replay: STUDY_MEMORY_INERT_REPLAY },
+			])
+				await expect(
+					new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile, ...collaborator }).open(
+						trial,
+						fixture.context.signal,
+					),
+				).rejects.toThrow(
+					expect.objectContaining({
+						code: 'CONFIG',
+						message: 'Memory exchanges and replay require declared recording',
+					}),
+				)
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				trial,
+				fixture.context.signal,
+			)
+			await session.close()
+			expect(server.requests).toEqual([])
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
 
 	it('refuses malformed settings when the driver is constructed', () => {
 		for (const settings of [

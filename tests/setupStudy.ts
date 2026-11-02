@@ -15,7 +15,12 @@ import type {
 	StudyProfile,
 	StudySessionInterface,
 } from '@orkestrel/study'
-import type { StudyValidation } from '@orkestrel/study/server'
+import type {
+	StudyExchangeRow,
+	StudyExchangeSinkInterface,
+	StudyOllamaReplayInterface,
+	StudyValidation,
+} from '@orkestrel/study/server'
 import type { RecorderInterface } from '@orkestrel/test'
 import type { StudyAttempt, StudyFailure, StudyRole, StudyRubric } from '@orkestrel/study'
 import type { JSONValue } from '@orkestrel/contract'
@@ -28,10 +33,11 @@ import {
 	buildStudySchedule,
 	validateStudyInputs,
 	StudyControl,
+	StudyError,
 	StudyMeter,
 	StudyScope,
 } from '@orkestrel/study'
-import { readStudyDeclaration } from '@orkestrel/study/server'
+import { buildStudyExchangeDeclaration, readStudyDeclaration } from '@orkestrel/study/server'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import * as agent from '../src/core/index.js'
 import * as provider from '@orkestrel/ollama'
@@ -421,6 +427,10 @@ export class MemoryServer implements MemoryServerFixture {
 			)
 			return
 		}
+		if (request.url === '/api/version' && next?.path !== '/api/version') {
+			response.end(JSON.stringify({ version: 'fixture-1' }))
+			return
+		}
 		if (next !== undefined && next.path === request.url) {
 			this.#pending = rest
 			response.writeHead(next.status ?? 200)
@@ -557,6 +567,23 @@ export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
 		settings: Object.freeze({ checkpoints: Object.freeze(['opening']) }),
 	}),
 	Object.freeze({ name: 'unknown key', settings: Object.freeze({ observe: true, extra: 1 }) }),
+	Object.freeze({ name: 'empty version', settings: Object.freeze({ version: '' }) }),
+	Object.freeze({
+		name: 'malformed metadata',
+		settings: Object.freeze({ metadata: Object.freeze({ calls: 0, bytes: 1, duration: 1 }) }),
+	}),
+	Object.freeze({
+		name: 'negative correction limit',
+		settings: Object.freeze({ correction: Object.freeze({ limit: -1 }) }),
+	}),
+	Object.freeze({
+		name: 'fractional correction limit',
+		settings: Object.freeze({ correction: Object.freeze({ limit: 1.5 }) }),
+	}),
+	Object.freeze({
+		name: 'unknown correction member',
+		settings: Object.freeze({ correction: Object.freeze({ other: 1 }) }),
+	}),
 ])
 
 /** Builds a three-goal trajectory with a lookup, a correction and a closing request.
@@ -1740,3 +1767,245 @@ export const MEMORY_EVIDENCE: readonly StudyEvidence[] = Object.freeze([
 	{ event: 'wire', goal: 'g2', value: { role: 'agent' } },
 	{ event: 'summary', goal: 'g2', value: {} },
 ])
+
+/**
+ * Pins each role's sampling keys apart from `STUDY_MEMORY_SAMPLING`: agent and summary hold the 2B
+ * digest's stored values under temperature 0 and seed 0, and the judge holds Ollama's v0.40.13
+ * defaults under temperature 1 and seed 0, because the Mica digest stores no parameters.
+ */
+export const STUDY_MEMORY_SAMPLING_PINS = Object.freeze({
+	agent: Object.freeze({
+		temperature: 0,
+		seed: 0,
+		top_k: 20,
+		top_p: 0.95,
+		min_p: 0,
+		presence_penalty: 1.5,
+		repeat_penalty: 1,
+	}),
+	summary: Object.freeze({
+		temperature: 0,
+		seed: 0,
+		top_k: 20,
+		top_p: 0.95,
+		min_p: 0,
+		presence_penalty: 1.5,
+		repeat_penalty: 1,
+	}),
+	judge: Object.freeze({
+		temperature: 1,
+		seed: 0,
+		top_k: 40,
+		top_p: 0.9,
+		min_p: 0,
+		presence_penalty: 0,
+		repeat_penalty: 1,
+	}),
+})
+
+/** Pins the sorted option keys every generation request sends. */
+export const STUDY_MEMORY_OPTION_KEYS = Object.freeze([
+	'min_p',
+	'num_ctx',
+	'num_predict',
+	'presence_penalty',
+	'repeat_penalty',
+	'seed',
+	'temperature',
+	'top_k',
+	'top_p',
+])
+
+/** Pins a fixture recording: the sidecar bounds, and the version `MemoryServer` answers with the metadata bounds. */
+export const STUDY_MEMORY_RECORDING = Object.freeze({
+	record: Object.freeze({ bytes: 4194304, calls: 256, duration: 60000 }),
+	settings: Object.freeze({
+		version: 'fixture-1',
+		metadata: Object.freeze({ calls: 64, bytes: 1048576, duration: 30000 }),
+	}),
+})
+
+/** Holds an inert exchange sink that declares nothing and retains nothing. */
+export const STUDY_MEMORY_INERT_EXCHANGES: StudyExchangeSinkInterface = Object.freeze({
+	declaration: undefined,
+	next: 1,
+	append: () => Promise.resolve(),
+	close: () => Promise.resolve(),
+})
+
+/** Holds an inert replay that answers every fetch with an empty response. */
+export const STUDY_MEMORY_INERT_REPLAY: StudyOllamaReplayInterface = Object.freeze({
+	fetch: () => Promise.resolve(new Response('')),
+	check: () => undefined,
+	close: () => Promise.resolve(),
+})
+
+/** Pins the message a capture's replay refuses each request with. */
+export const STUDY_MEMORY_REPLAY_REFUSAL = 'The capture replay holds no reply'
+
+/** Holds a recording's collaborators and what reached each. */
+export interface MemoryCaptureFixture {
+	readonly exchanges: StudyExchangeSinkInterface
+	readonly replay: StudyOllamaReplayInterface
+	/** Holds each row the sink accepted. */
+	readonly rows: RecorderInterface<readonly [row: StudyExchangeRow]>
+	/** Holds the role and the path of each request the replay refused. */
+	readonly sent: RecorderInterface<readonly [role: StudyRole, path: string]>
+}
+
+/** Pins the two chat replies a Ledger's first request spends measuring its gauge, ahead of its first pass. */
+export const STUDY_MEMORY_CALIBRATION: readonly MemoryWireFixture[] = Object.freeze([
+	Object.freeze({ path: '/api/chat', body: buildMemoryReply() }),
+	Object.freeze({ path: '/api/chat', body: buildMemoryReply() }),
+])
+
+/** Pins one goal of three statements and one correction, so a correction has three earlier messages to pair with. */
+export const STUDY_MEMORY_CORRECTION_GOALS: readonly StudyGoal[] = Object.freeze([
+	Object.freeze({
+		id: 'opening',
+		input: Object.freeze({
+			prompt: 'Report the order count',
+			arrivals: Object.freeze([
+				{ id: 'first', content: 'The order count is one.' },
+				{ id: 'second', content: 'The order count is two.' },
+				{ id: 'third', content: 'The order count is three.' },
+				{ id: 'fix', content: 'Correction: the order count is four.' },
+			]),
+			records: Object.freeze([]),
+		}),
+	}),
+])
+
+/**
+ * Builds a scripted model reply holding one tool call.
+ * @param name - The called tool's name.
+ * @param args - The call's arguments, in the order the wire carries them.
+ * @returns One chat reply for a protocol fixture script.
+ */
+export function buildMemoryCall(
+	name: string,
+	args: Readonly<Record<string, JSONValue>>,
+): MemoryWireFixture {
+	return {
+		path: '/api/chat',
+		body: buildMemoryReply({ content: '', calls: [{ function: { name, arguments: args } }] }),
+	}
+}
+
+/**
+ * Builds a one-token judge reply whose top reading is the named label.
+ * @param label - The label that takes nearly all the probability.
+ * @returns One generate reply for a protocol fixture script.
+ */
+export function buildMemoryVerdict(label: string): MemoryWireFixture {
+	return {
+		path: '/api/generate',
+		body: JSON.stringify({
+			model: 'judge',
+			done: true,
+			done_reason: 'length',
+			response: label,
+			prompt_eval_count: 10,
+			eval_count: 1,
+			logprobs: [
+				{
+					token: label,
+					logprob: -0.01,
+					top_logprobs: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Yes', 'No'].map((token) => ({
+						token,
+						logprob: token === label ? -0.01 : -8,
+					})),
+				},
+			],
+		}),
+	}
+}
+
+/**
+ * Builds a finite CPU-only profile that declares recording.
+ * @param url - The protocol fixture origin.
+ * @returns The fixture profile with the recording bounds, version, and metadata.
+ */
+export function buildMemoryRecording(url: string): StudyProfile {
+	return {
+		...buildMemoryProfile({ url, settings: STUDY_MEMORY_RECORDING.settings }),
+		record: STUDY_MEMORY_RECORDING.record,
+	}
+}
+
+/**
+ * Builds Study's own declaration of a one-goal recording behind a sink that keeps each row and a replay that refuses each request.
+ * @param profile - A recording profile.
+ * @param trial - The trial the declaration binds.
+ * @param goal - The scenario's only goal.
+ * @returns The two collaborators and their recorders.
+ */
+export function buildMemoryCapture(
+	profile: StudyProfile,
+	trial: StudyTrial,
+	goal: StudyGoal,
+): MemoryCaptureFixture {
+	const rows = createRecorder<readonly [row: StudyExchangeRow]>()
+	const sent = createRecorder<readonly [role: StudyRole, path: string]>()
+	return {
+		exchanges: {
+			...STUDY_MEMORY_INERT_EXCHANGES,
+			declaration: buildStudyExchangeDeclaration(
+				profile,
+				trial,
+				parseStudyScenario({ id: trial.scenario, goals: [goal] }),
+				false,
+			),
+			append: async (row) => {
+				rows.handler(row)
+			},
+		},
+		replay: {
+			...STUDY_MEMORY_INERT_REPLAY,
+			fetch: (role, input) => {
+				sent.handler(role, new URL(input).pathname)
+				return Promise.reject(new StudyError('FAULT', STUDY_MEMORY_REPLAY_REFUSAL))
+			},
+		},
+		rows,
+		sent,
+	}
+}
+
+/**
+ * Rewrites a scratch workspace's authored local profile to declare recording, keeping its other members.
+ * @param scratch - The workspace `createStudyInstallFixture` populated.
+ * @returns Nothing after the profile is replaced.
+ * @throws Error - Thrown when the workspace holds no authored local profile.
+ */
+export function writeStudyInstallRecording(scratch: ScratchInterface): void {
+	const path = 'studies/memory/profiles/local.json'
+	const raw = parseJSON(scratch.read(path) ?? '')
+	if (!isRecord(raw)) throw new Error('Missing authored memory profile')
+	scratch.write(
+		path,
+		JSON.stringify({
+			...raw,
+			record: STUDY_MEMORY_RECORDING.record,
+			settings: { ...STUDY_MEMORY_SETTINGS, ...STUDY_MEMORY_RECORDING.settings, observe: true },
+		}),
+	)
+}
+
+/**
+ * Counts the correction pair questions a trial asked its judge, from the exact wire bytes.
+ * @param requests - Recorded HTTP requests.
+ * @returns The generate requests that carry the `amends` or the `supersedes` instructions.
+ */
+export function countMemoryPairs(requests: MemoryTrialResult['requests']): number {
+	const { amends, supersedes } = agent.LEDGER_QUESTIONS
+	return requests.filter(
+		(request) =>
+			request.path === '/api/generate' &&
+			[amends.instructions, supersedes.instructions].some(
+				(instructions) =>
+					instructions !== undefined &&
+					request.body.includes(JSON.stringify(instructions).slice(1, -1)),
+			),
+	).length
+}

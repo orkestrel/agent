@@ -13,7 +13,12 @@ import {
 	captureStudyPackages,
 	createStudyMeterFixture,
 	buildMemoryEdge,
+	buildMemoryCall,
+	buildMemoryCapture,
 	buildMemoryCriterion,
+	buildMemoryRecording,
+	buildMemoryVerdict,
+	countMemoryPairs,
 	omitMemoryAuxiliaries,
 	buildMemoryFoldGoals,
 	buildMemoryObservationGoals,
@@ -42,15 +47,22 @@ import {
 	runMemoryFailure,
 	runMemoryTrial,
 	totalMemoryUsage,
+	writeStudyInstallRecording,
 	STUDY_MEMORY_CONTEXT_KEYS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
+	STUDY_MEMORY_INERT_EXCHANGES,
+	STUDY_MEMORY_INERT_REPLAY,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVED_EVENTS,
 	STUDY_MEMORY_OBSERVED_KEYS,
+	STUDY_MEMORY_OPTION_KEYS,
+	STUDY_MEMORY_RECORDING,
 	STUDY_MEMORY_REFUSAL_KEYS,
+	STUDY_MEMORY_REPLAY_REFUSAL,
 	STUDY_MEMORY_SETTINGS,
 	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_TIMING,
+	WINDOW_GOAL,
 } from './setupStudy.js'
 
 describe('study meter fixture lifecycle', () => {
@@ -284,6 +296,19 @@ describe('study install fixtures', () => {
 			expect((await fetch(`${other.url}/api/tags`)).status).toBe(500)
 		} finally {
 			await Promise.all([down.close(), other.close()])
+		}
+	})
+
+	it('answers a version request unless the script heads with one', async () => {
+		const server = await createMemoryServer([{ path: '/api/version', status: 500, body: 'down' }])
+		try {
+			const refused = await fetch(`${server.url}/api/version`)
+			expect([refused.status, await refused.text()]).toEqual([500, 'down'])
+			const answered = await fetch(`${server.url}/api/version`)
+			expect(parseJSON(await answered.text())).toEqual({ version: 'fixture-1' })
+			expect(server.responses).toEqual([])
+		} finally {
+			await server.close()
 		}
 	})
 
@@ -632,9 +657,7 @@ describe('study install fixtures', () => {
 		expect(totalMemoryUsage(result.usage).agent).toEqual({ calls: 1, tokens: 12 })
 		expect(readMemoryModels(result.requests)).toEqual(['model'])
 		const shapes = readMemoryShapes(result.requests)
-		expect(shapes.map((shape) => shape.options)).toEqual([
-			['num_ctx', 'num_predict', 'seed', 'temperature'],
-		])
+		expect(shapes.map((shape) => shape.options)).toEqual([[...STUDY_MEMORY_OPTION_KEYS]])
 		expect(shapes[0]?.body).toEqual(expect.arrayContaining(['messages', 'model', 'options']))
 		expect(readMemoryEvents(result.evidence, 'result')).toEqual([
 			expect.objectContaining({ content: 'Receipt retained.', partial: false }),
@@ -696,6 +719,90 @@ describe('study install fixtures', () => {
 		expect(() => readMemoryShapes([{ path: '/api/chat', body: '{"model":"m"}' }])).toThrow(
 			'Invalid generation request',
 		)
+	})
+
+	it('scripts one tool call and one judge label on the wire shapes the provider reads', () => {
+		const call = buildMemoryCall('lookup', { id: 'one', scope: 'desk' })
+		expect(call.path).toBe('/api/chat')
+		expect(parseJSON(call.body)).toMatchObject({
+			message: {
+				content: '',
+				tool_calls: [{ function: { name: 'lookup', arguments: { id: 'one', scope: 'desk' } } }],
+			},
+		})
+		const verdict = buildMemoryVerdict('C')
+		expect(verdict.path).toBe('/api/generate')
+		const body = parseJSON(verdict.body)
+		if (!isRecord(body) || !Array.isArray(body.logprobs) || !isRecord(body.logprobs[0]))
+			throw new Error('Invalid verdict fixture')
+		expect(body.response).toBe('C')
+		expect(body.logprobs[0].top_logprobs).toContainEqual({ token: 'C', logprob: -0.01 })
+		expect(body.logprobs[0].top_logprobs).toContainEqual({ token: 'A', logprob: -8 })
+	})
+
+	it('declares recording on a built profile and on a scratch local profile, keeping its other members', () => {
+		const profile = buildMemoryRecording('http://127.0.0.1:7')
+		expect(profile.record).toEqual({ bytes: 4194304, calls: 256, duration: 60000 })
+		expect(profile.settings).toEqual({
+			version: 'fixture-1',
+			metadata: { calls: 64, bytes: 1048576, duration: 30000 },
+		})
+		const scratch = createScratch({ prefix: 'study-recording-setup-' })
+		try {
+			expect(() => writeStudyInstallRecording(scratch)).toThrow('Missing authored memory profile')
+			scratch.write('studies/memory/profiles/local.json', '{"name":"local","settings":{"a":1}}')
+			writeStudyInstallRecording(scratch)
+			expect(parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')).toEqual({
+				name: 'local',
+				record: STUDY_MEMORY_RECORDING.record,
+				settings: {
+					...STUDY_MEMORY_RECORDING.settings,
+					gauge: STUDY_MEMORY_SETTINGS.gauge,
+					observe: true,
+				},
+			})
+		} finally {
+			destroyScratch(scratch)
+		}
+	})
+
+	it('counts only the judge requests that carry a correction pair question', () => {
+		const { amends, supersedes, topic } = STUDY_MEMORY_MODULES.agent.LEDGER_QUESTIONS
+		expect(
+			countMemoryPairs([
+				{ path: '/api/generate', body: JSON.stringify({ prompt: amends.instructions }) },
+				{ path: '/api/generate', body: JSON.stringify({ prompt: supersedes.instructions }) },
+				{ path: '/api/generate', body: JSON.stringify({ prompt: topic }) },
+				{ path: '/api/chat', body: JSON.stringify({ prompt: amends.instructions }) },
+			]),
+		).toBe(2)
+	})
+
+	it('holds an inert sink and replay that declare and answer nothing', async () => {
+		expect(STUDY_MEMORY_INERT_EXCHANGES).toMatchObject({ declaration: undefined, next: 1 })
+		await expect(STUDY_MEMORY_INERT_EXCHANGES.close()).resolves.toBeUndefined()
+		expect(STUDY_MEMORY_INERT_REPLAY.check()).toBeUndefined()
+		await expect(STUDY_MEMORY_INERT_REPLAY.close()).resolves.toBeUndefined()
+	})
+
+	it('builds a capture whose sink keeps each row and whose replay refuses each request', async () => {
+		const capture = buildMemoryCapture(
+			buildMemoryRecording('http://127.0.0.1:7'),
+			{ id: 'captured', scenario: 'public', arm: 'full', repetition: 0 },
+			WINDOW_GOAL,
+		)
+		expect(capture.exchanges.declaration).toMatchObject({
+			phase: 'declaration',
+			trial: 'captured',
+			version: 'fixture-1',
+			goals: ['first'],
+		})
+		await capture.exchanges.append({ phase: 'complete', count: 0 })
+		expect(capture.rows.calls).toEqual([[{ phase: 'complete', count: 0 }]])
+		await expect(
+			capture.replay.fetch('metadata', 'http://127.0.0.1:7/api/tags', {}),
+		).rejects.toThrow(STUDY_MEMORY_REPLAY_REFUSAL)
+		expect(capture.sent.calls).toEqual([['metadata', '/api/tags']])
 	})
 
 	it('loads actual tools declarations', async () => {

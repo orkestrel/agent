@@ -1,4 +1,5 @@
 import type { StudyOllamaMetadata } from '@orkestrel/study/server'
+import type { StudyMemorySampling } from './types.js'
 
 /** Bounds trial-wide metadata independently of model calls, tokens and bytes. */
 export const STUDY_MEMORY_METADATA: StudyOllamaMetadata = Object.freeze({
@@ -37,3 +38,44 @@ export const STUDY_MEMORY_TOPICS = Object.freeze([
 ])
 /** Names the evidence events a re-acquisition counts, written by the session's lookup tool. */
 export const STUDY_MEMORY_LOOKUPS: readonly string[] = Object.freeze(['lookup'])
+/**
+ * Pins each role's effective sampling values, so no role's request takes a value from the daemon.
+ * @remarks
+ * `agent` and `summary` hold the 2B digest's stored values under temperature 0 and seed 0. `judge`
+ * holds Ollama's v0.40.13 defaults under temperature 1 and seed 0, because the Mica digest stores no
+ * parameters.
+ */
+export const STUDY_MEMORY_SAMPLING: Readonly<
+	Record<'agent' | 'summary' | 'judge', StudyMemorySampling>
+> = Object.freeze({
+	agent: Object.freeze({
+		temperature: 0,
+		seed: 0,
+		top_k: 20,
+		top_p: 0.95,
+		min_p: 0,
+		presence_penalty: 1.5,
+		repeat_penalty: 1,
+	}),
+	summary: Object.freeze({
+		temperature: 0,
+		seed: 0,
+		top_k: 20,
+		top_p: 0.95,
+		min_p: 0,
+		presence_penalty: 1.5,
+		repeat_penalty: 1,
+	}),
+	judge: Object.freeze({
+		temperature: 1,
+		seed: 0,
+		top_k: 40,
+		top_p: 0.9,
+		min_p: 0,
+		presence_penalty: 0,
+		repeat_penalty: 1,
+	}),
+})
+/** Answers a repeated compaction call with fixed host text that echoes no argument. */
+export const STUDY_MEMORY_REPEAT =
+	'the earlier result is in the conversation. Answer from it or call something else.'

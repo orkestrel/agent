@@ -1,0 +1,109 @@
+{
+	"name": "q2",
+	"agent": "dist/src/core/index.js",
+	"subject": "dist/src/core/index.js",
+	"roots": [
+		".",
+		"node_modules/@orkestrel/agent",
+		"node_modules/@orkestrel/ollama",
+		"node_modules/@orkestrel/study",
+		"node_modules/@orkestrel/abort",
+		"node_modules/@orkestrel/budget",
+		"node_modules/@orkestrel/contract",
+		"node_modules/@orkestrel/database",
+		"node_modules/@orkestrel/emitter",
+		"node_modules/@orkestrel/process",
+		"node_modules/@orkestrel/queue",
+		"node_modules/@orkestrel/timeout",
+		"node_modules/@orkestrel/tool",
+		"node_modules/@orkestrel/workflow",
+		"node_modules/@orkestrel/workspace",
+		"node_modules/@orkestrel/ndjson",
+		"node_modules/@orkestrel/indexeddb",
+		"node_modules/@orkestrel/sqlite"
+	],
+	"provider": {
+		"entry": "node_modules/@orkestrel/ollama/dist/src/core/index.js",
+		"url": "http://127.0.0.1:11435",
+		"model": "qwen3.5:2b-q4_K_M",
+		"judge": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
+		"digest": {
+			"model": "78a738cc751e89cba72bb1feabf70f30c31772eb81a89a66af94ecea90dc5d11",
+			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+		},
+		"daemon": {
+			"executable": "C:\\Users\\mikes\\scoop\\apps\\ollama-full\\0.40.13\\ollama.exe",
+			"digest": "c1cca2937421d78877d5961746d25e33acd62e194d881f90fb63dca7f3e10f41",
+			"version": "0.40.13",
+			"models": [
+				{
+					"name": "qwen3.5:2b-q4_K_M",
+					"digest": "78a738cc751e89cba72bb1feabf70f30c31772eb81a89a66af94ecea90dc5d11"
+				},
+				{
+					"name": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
+					"digest": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+				}
+			],
+			"environment": {
+				"OLLAMA_NUM_PARALLEL": "1",
+				"OLLAMA_MAX_LOADED_MODELS": "0",
+				"LLAMA_ARG_CONTEXT_SHIFT": "0",
+				"OLLAMA_NOPRUNE": "1"
+			}
+		}
+	},
+	"qualification": "tmp/studies/qualification",
+	"room": {
+		"context": 20480,
+		"output": 8192,
+		"safety": 512,
+		"recap": 2048,
+		"think": false
+	},
+	"settings": {
+		"observe": true,
+		"version": "0.40.13",
+		"metadata": {
+			"calls": 8192,
+			"bytes": 67108864,
+			"duration": 600000
+		},
+		"gauge": {
+			"scale": 0.8275862068965517,
+			"overhead": 354
+		},
+		"checkpoints": ["ev-01-2", "ev-02-4", "ev-03-4", "ev-04-4", "ev-06-4"]
+	},
+	"record": {
+		"bytes": 536870912,
+		"calls": 4096,
+		"duration": 1800000
+	},
+	"bounds": {
+		"request": {
+			"duration": 360000,
+			"calls": 1,
+			"tokens": 19968,
+			"bytes": 1048576
+		},
+		"goal": {
+			"duration": 900000,
+			"calls": 512,
+			"tokens": 10223616,
+			"bytes": 536870912
+		},
+		"trial": {
+			"duration": 2400000,
+			"calls": 4096,
+			"tokens": 81788928,
+			"bytes": 1073741824
+		},
+		"series": {
+			"duration": 2400000,
+			"calls": 8192,
+			"tokens": 163577856,
+			"bytes": 2147483648
+		}
+	}
+}

@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
-import { buildStudySchedule, parseStudyProfile, validateStudyInputs } from '@orkestrel/study'
+import {
+	buildStudySchedule,
+	isStudyProvider,
+	parseStudyProfile,
+	validateStudyInputs,
+} from '@orkestrel/study'
 import { createStudyAdapter, isStudyMemoryInput } from '../../../studies/memory/index.js'
 import {
 	buildCustodyManifest,
@@ -235,6 +240,42 @@ describe('prospective public endurance declarations', () => {
 		expect(closing.input.records[0]?.content).toContain(
 			'submission WR-6212 accepted GD-7312 for $1, 200.00; $80.00 freight excluded; grant cash payment unconfirmed',
 		)
+	})
+
+	it('pins the q2 subject and its bounds', async () => {
+		const q2 = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8')),
+		)
+		const q4 = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/q4.json', 'utf8')),
+		)
+		const provider = q2.provider
+		if (provider === undefined) throw new Error('Missing q2 provider')
+		expect(q2.bounds.goal.calls).toBe(512)
+		expect(provider.digest.model).toMatch(/^[0-9a-f]{64}$/)
+		// The one-variable comparison with the larger model holds the same room and the same roots.
+		expect(q2.room).toEqual(q4.room)
+		expect(q2.roots).toEqual(q4.roots)
+		const fixture = await loadMemoryInputs(
+			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
+			'qualification',
+		)
+		const goals = new Set(fixture.scenarios[0]?.goals.map((goal) => goal.id))
+		const settings = q2.settings
+		if (!isRecord(settings) || !Array.isArray(settings.checkpoints))
+			throw new Error('Missing q2 checkpoints')
+		expect(settings.checkpoints.length).toBeGreaterThan(0)
+		expect(settings.checkpoints.filter((id) => !goals.has(id))).toEqual([])
+		const model = { name: provider.model, digest: provider.digest.model }
+		const judge = { name: provider.judge, digest: provider.digest.judge }
+		const daemon = {
+			executable: process.execPath,
+			digest: 'a'.repeat(64),
+			version: '0.40.13',
+			models: [model, judge],
+		}
+		expect(isStudyProvider({ ...provider, daemon })).toBe(true)
+		expect(isStudyProvider({ ...provider, daemon: { ...daemon, models: [model] } })).toBe(false)
 	})
 
 	it('admits identical schedules and the pinned finite q4 profile while keeping semantics independently unknown', async () => {

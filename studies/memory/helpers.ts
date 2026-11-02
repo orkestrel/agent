@@ -26,6 +26,7 @@ import type {
 } from './types.js'
 import { isRecord } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
+import { STUDY_MEMORY_SAMPLING } from './constants.js'
 import { isStudyMemoryAssertion, isStudyMemoryOptions, isStudyMemoryWire } from './validators.js'
 
 /** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
@@ -91,7 +92,7 @@ export function buildStudyMemoryOrigins(
 	})
 }
 
-/** Checks well-formed driver settings, then the generic provider and room declarations through Study's guards, then what only the selected arms require. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest and the compaction arm a recap allowance. @returns Nothing when admitted. @throws StudyError - CONFIG when the settings, the provider declaration (exact digests and uncredentialed origin) or the room (positive finite integers leaving prompt capacity) is invalid, or an arm's requirement is not met. */
+/** Checks well-formed driver settings, then the generic provider and room declarations through Study's guards, then what only the selected arms require. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest and the compaction arm a recap allowance. @returns Nothing when admitted. @throws StudyError - CONFIG when the settings, the provider declaration (exact digests and uncredentialed origin) or the room (positive finite integers leaving prompt capacity) is invalid, a declared recording names no version or metadata, or an arm's requirement is not met. */
 export function validateStudyMemoryProfile(
 	profile: StudyProfile,
 	arms: readonly StudyMemoryArm[],
@@ -99,6 +100,13 @@ export function validateStudyMemoryProfile(
 	const { room, provider } = profile
 	if (profile.settings !== undefined && !isStudyMemoryOptions(profile.settings))
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
+	if (
+		profile.record !== undefined &&
+		(!isStudyMemoryOptions(profile.settings) ||
+			profile.settings.version === undefined ||
+			profile.settings.metadata === undefined)
+	)
+		throw new StudyError('CONFIG', 'Memory recording requires a declared version and metadata')
 	if (provider === undefined || !isStudyProvider(provider))
 		throw new StudyError('CONFIG', 'Memory provider declaration is invalid')
 	if (arms.includes('records') && provider.judge === undefined)
@@ -122,7 +130,11 @@ export function buildStudyMemoryRoles(
 	return {
 		agent: {
 			model: provider.model,
-			options: { num_ctx: room.context, num_predict: room.output, temperature: 0, seed: 0 },
+			options: {
+				num_ctx: room.context,
+				num_predict: room.output,
+				...STUDY_MEMORY_SAMPLING.agent,
+			},
 			think: room.think,
 			strict: compaction,
 			length: false,
@@ -134,8 +146,7 @@ export function buildStudyMemoryRoles(
 						options: {
 							num_ctx: room.context,
 							num_predict: readStudyMemoryRecap(room),
-							temperature: 0,
-							seed: 0,
+							...STUDY_MEMORY_SAMPLING.summary,
 						},
 						think: false,
 						strict: true,
@@ -147,7 +158,7 @@ export function buildStudyMemoryRoles(
 			? {
 					judge: {
 						model: readStudyMemoryJudge(provider),
-						options: { num_ctx: room.context, num_predict: 1, temperature: 1, seed: 0 },
+						options: { num_ctx: room.context, num_predict: 1, ...STUDY_MEMORY_SAMPLING.judge },
 						think: false,
 						strict: false,
 						length: true,

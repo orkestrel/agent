@@ -23,6 +23,7 @@ import {
 	buildMemoryCriterion,
 	buildMemoryGradingFixture,
 	buildMemoryProfile,
+	buildMemoryRecording,
 	MEMORY_CARRIAGE,
 	MEMORY_EVIDENCE,
 	MEMORY_LITERALS,
@@ -31,6 +32,8 @@ import {
 	omitMemoryAuxiliaries,
 	readMemoryOrigins,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
+	STUDY_MEMORY_RECORDING,
+	STUDY_MEMORY_SAMPLING_PINS,
 	STUDY_MEMORY_SETTINGS,
 } from '../../setupStudy.js'
 
@@ -204,7 +207,7 @@ describe('memory declaration and mechanical evidence', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const agent = {
 			model: 'model',
-			options: { num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 },
+			options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_SAMPLING_PINS.agent },
 			think: false,
 			strict: false,
 			length: false,
@@ -215,7 +218,7 @@ describe('memory declaration and mechanical evidence', () => {
 			agent: { ...agent, strict: true },
 			summary: {
 				model: 'model',
-				options: { num_ctx: 32768, num_predict: 256, temperature: 0, seed: 0 },
+				options: { num_ctx: 32768, num_predict: 256, ...STUDY_MEMORY_SAMPLING_PINS.summary },
 				think: false,
 				strict: true,
 				length: false,
@@ -226,7 +229,7 @@ describe('memory declaration and mechanical evidence', () => {
 			agent,
 			judge: {
 				model: 'judge',
-				options: { num_ctx: 32768, num_predict: 1, temperature: 1, seed: 0 },
+				options: { num_ctx: 32768, num_predict: 1, ...STUDY_MEMORY_SAMPLING_PINS.judge },
 				think: false,
 				strict: false,
 				length: true,
@@ -247,6 +250,43 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(() => buildStudyMemoryRoles({ ...profile, provider: undefined }, 'full')).toThrow(
 			expect.objectContaining({ code: 'CONFIG' }),
 		)
+	})
+
+	it('every role sends every pinned sampling key', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const budgets = { agent: 512, summary: 256, judge: 1 }
+		const sent = (['full', 'compaction', 'records'] as const).flatMap((arm) => {
+			const roles = buildStudyMemoryRoles(profile, arm)
+			return (['agent', 'summary', 'judge'] as const).flatMap((role) => {
+				const options = roles[role]?.options
+				return options === undefined ? [] : [{ arm, role, options }]
+			})
+		})
+		expect(sent.map((entry) => [entry.arm, entry.role])).toEqual([
+			['full', 'agent'],
+			['compaction', 'agent'],
+			['compaction', 'summary'],
+			['records', 'agent'],
+			['records', 'judge'],
+		])
+		for (const { role, options } of sent)
+			expect(options).toEqual({
+				num_ctx: 32768,
+				num_predict: budgets[role],
+				...STUDY_MEMORY_SAMPLING_PINS[role],
+			})
+	})
+
+	it('refuses a recording profile with no version or metadata', () => {
+		const profile = buildMemoryRecording('http://127.0.0.1:7')
+		const { version, metadata } = STUDY_MEMORY_RECORDING.settings
+		const refusal = expect.objectContaining({
+			code: 'CONFIG',
+			message: 'Memory recording requires a declared version and metadata',
+		})
+		for (const settings of [undefined, { version }, { metadata }])
+			expect(() => validateStudyMemoryProfile({ ...profile, settings }, [])).toThrow(refusal)
+		expect(() => validateStudyMemoryProfile(profile, [])).not.toThrow()
 	})
 
 	it('joins message origins from session state only, in priority order, leaving the rest unknown', () => {

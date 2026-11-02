@@ -28,6 +28,7 @@ import {
 	runMemoryFailure,
 	runMemorySummary,
 	runMemoryTrial,
+	writeStudyInstallRecording,
 	STUDY_MEMORY_ACTUAL_REFUSALS,
 	STUDY_MEMORY_GOALS,
 	STUDY_MEMORY_MODULES,
@@ -385,6 +386,116 @@ it('drives captured installed Agent and Ollama through qualification, complete e
 			}
 			expect(server.requests.some((request) => request.path === '/api/chat')).toBe(true)
 			expect(server.requests.some((request) => request.path === '/api/generate')).toBe(true)
+		} finally {
+			await server.close()
+		}
+	} finally {
+		await destroyScratch(scratch)
+	}
+}, 540000)
+
+it('freezes and checks without a request', async () => {
+	const scratch = createScratch({ prefix: 'study-memory-freeze-' })
+	try {
+		const server = await createMemoryServer()
+		try {
+			const fixture = createStudyInstallFixture(scratch, server.url)
+			const closure = join(scratch.ensure(join('tmp', 'studies', 'closures')), 'capacity')
+			for (const command of [
+				['check', 'capacity'],
+				['freeze', 'capacity', '--profile', 'local', '--to', closure],
+				['check', 'capacity', '--profile', 'local', '--closure', closure],
+			])
+				expect(await executeStudyInstall(fixture, command)).toMatchObject({ code: 0 })
+			expect(server.requests).toEqual([])
+		} finally {
+			await server.close()
+		}
+	} finally {
+		await destroyScratch(scratch)
+	}
+}, 240000)
+
+it('seals a recorded segment and grades it', async () => {
+	const scratch = createScratch({ prefix: 'study-memory-recorded-' })
+	try {
+		const server = await createMemoryServer()
+		try {
+			const fixture = createStudyInstallFixture(scratch, server.url)
+			writeStudyInstallRecording(scratch)
+			const planned = await executeStudyInstall(fixture, ['check', 'capacity'])
+			expect(planned).toMatchObject({ code: 0 })
+			const plan = parseJSON(planned.stdout)
+			const trial = isRecord(plan) && isArray(plan.schedule) ? plan.schedule[0] : undefined
+			if (!isRecord(trial) || typeof trial.id !== 'string') throw new Error('Missing first trial')
+			const selected = await executeStudyInstall(fixture, [
+				'check',
+				'capacity',
+				'--profile',
+				'local',
+				'--trial',
+				trial.id,
+				'--goals',
+				'opening..closure',
+			])
+			expect(selected).toMatchObject({ code: 0 })
+			const selection = parseJSON(selected.stdout)
+			if (
+				!isRecord(selection) ||
+				!isArray(selection.next) ||
+				!selection.next.every((token): token is string => typeof token === 'string')
+			)
+				throw new Error('Missing selected execution arguments')
+			expect(server.requests).toEqual([])
+			const output = join(scratch.path, 'tmp', 'studies', 'recorded')
+			const executed = await executeStudyInstall(
+				fixture,
+				[...selection.next, '--out', output],
+				260000,
+			)
+			expect(executed).toMatchObject({ code: 0 })
+			expect(parseJSON(executed.stdout)).toMatchObject({
+				command: 'execute',
+				status: 'completed',
+				path: output,
+			})
+			const result = await readStudyResult(output)
+			if (result.status !== 'sealed') throw new Error('The recorded segment did not seal')
+			expect(
+				scratch.has(
+					join('tmp', 'studies', 'recorded', 'execution', 'trials', trial.id, 'exchanges.jsonl'),
+				),
+			).toBe(true)
+			// The preflight joins the first goal and the postflight the last, so no middle goal verifies.
+			const paths = server.requests.map((request) => request.path)
+			const models = paths.flatMap((path, index) =>
+				path === '/api/chat' || path === '/api/generate' ? [index] : [],
+			)
+			expect(paths.filter((path) => path === '/api/version')).toHaveLength(2)
+			expect(paths.indexOf('/api/version')).toBeLessThan(models[0] ?? -1)
+			expect(paths.lastIndexOf('/api/version')).toBeGreaterThan(models.at(-1) ?? paths.length)
+			const sent = server.requests.length
+			const graded = await executeStudyInstall(fixture, [
+				'grade',
+				output,
+				'--rubric',
+				join(scratch.path, 'studies', 'memory', 'rubric.json'),
+			])
+			expect(graded).toMatchObject({ code: 0 })
+			expect(server.requests).toHaveLength(sent)
+			const grade = parseJSON(graded.stdout)
+			if (!isRecord(grade) || typeof grade.assessment !== 'string')
+				throw new Error('Missing recorded assessment')
+			const assessment = parseStudyAssessment(
+				parseJSON(await readFile(join(output, 'grades', grade.assessment, 'grading.json'), 'utf8')),
+			)
+			const rubric = parseStudyRubric(parseJSON(scratch.read('studies/memory/rubric.json') ?? ''))
+			const semantic = assessment.judgments.filter(
+				(judgment) =>
+					rubric.criteria.find((entry) => entry.id === judgment.criterion)?.method === 'semantic',
+			)
+			expect(semantic.length).toBeGreaterThan(0)
+			expect(semantic.map((judgment) => judgment.verdict)).toEqual(semantic.map(() => 'unknown'))
 		} finally {
 			await server.close()
 		}

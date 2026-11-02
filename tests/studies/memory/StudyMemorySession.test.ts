@@ -3,16 +3,27 @@ import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
 import { isStudyError, readStudyFailure, validateStudyInputs } from '@orkestrel/study'
-import { StudyMemoryDriver } from '../../../studies/memory/index.js'
 import {
+	isStudyMemoryProvider,
+	isStudyMemoryRuntime,
+	STUDY_MEMORY_REPEAT,
+	StudyMemoryDriver,
+	StudyMemorySession,
+} from '../../../studies/memory/index.js'
+import {
+	buildMemoryCall,
+	buildMemoryCapture,
 	buildMemoryEdge,
 	buildMemoryFoldGoals,
 	buildMemoryObservationGoals,
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
+	buildMemoryRecording,
 	buildMemoryReply,
 	buildMemoryRollingGoals,
 	buildMemorySummaryGoals,
+	buildMemoryVerdict,
+	countMemoryPairs,
 	createMemoryContext,
 	createMemoryServer,
 	listMemoryKeys,
@@ -28,7 +39,9 @@ import {
 	runMemorySummary,
 	runMemoryTrial,
 	totalMemoryUsage,
+	STUDY_MEMORY_CALIBRATION,
 	STUDY_MEMORY_CONTEXT_KEYS,
+	STUDY_MEMORY_CORRECTION_GOALS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
 	STUDY_MEMORY_EVENT_KEYS,
 	STUDY_MEMORY_OBSERVED_EVENTS,
@@ -39,12 +52,16 @@ import {
 	STUDY_MEMORY_SUMMARY_LIMIT,
 	STUDY_MEMORY_SUMMARY_PROJECTIONS,
 	STUDY_MEMORY_SUMMARY_ROOM,
+	STUDY_MEMORY_INERT_EXCHANGES,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVATION_GOALS,
 	STUDY_MEMORY_OBSERVED_KEYS,
 	STUDY_MEMORY_OBSERVED_SETTINGS,
+	STUDY_MEMORY_OPTION_KEYS,
 	STUDY_MEMORY_PASSIVE_SETTINGS,
 	STUDY_MEMORY_RELEASE_GOALS,
+	STUDY_MEMORY_REPLAY_REFUSAL,
+	STUDY_MEMORY_SAMPLING_PINS,
 	STUDY_MEMORY_SETTINGS,
 	WINDOW_GOAL,
 	STUDY_MEMORY_TIMING,
@@ -915,7 +932,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				model: 'model',
 				stream: true,
 				think: false,
-				options: { num_ctx: 32768, num_predict: 512, temperature: 0, seed: 0 },
+				options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_SAMPLING_PINS.agent },
 			})
 			// Compaction adds only the two explicit native controls; every other member matches the plain request.
 			expect(Object.keys(windowed).toSorted()).toEqual(
@@ -1597,7 +1614,7 @@ describe('passive observation of actual memory requests', () => {
 		const shapes = readMemoryShapes(on.requests)
 		expect(shapes).toEqual(readMemoryShapes(off.requests))
 		expect(shapes.map((shape) => shape.options)).toEqual(
-			shapes.map(() => ['num_ctx', 'num_predict', 'seed', 'temperature']),
+			shapes.map(() => [...STUDY_MEMORY_OPTION_KEYS]),
 		)
 		const judges = readMemoryEvents(on.evidence, 'wire').filter((value) => value.role === 'judge')
 		expect(judges.length).toBeGreaterThan(0)
@@ -1881,5 +1898,206 @@ describe('passive observation of actual memory requests', () => {
 			settings: STUDY_MEMORY_FIXED_SETTINGS,
 		})
 		expect(gauged.failure).toContain('usable prompt count')
+	})
+})
+
+describe('repeated and denied tool calls', () => {
+	const opening = STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1)
+	const lookup = buildMemoryCall('lookup', { id: 'order-1' })
+	const answer = { path: '/api/chat', body: buildMemoryReply({ content: 'Answered' }) }
+	const receipt = 'order-1: Owner\nConfirmed reference'
+	const refused = `"lookup" did not run: ${STUDY_MEMORY_REPEAT}`
+
+	it('denies a repeated compaction lookup', async () => {
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [lookup, lookup, answer],
+			goals: opening,
+			settings: STUDY_MEMORY_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		expect(STUDY_MEMORY_REPEAT).toBe(
+			'the earlier result is in the conversation. Answer from it or call something else.',
+		)
+		const last = result.requests.filter((request) => request.path === '/api/chat').at(-1)
+		expect(readMemoryToolResults(last?.body ?? '')).toEqual([receipt, refused])
+		expect(readMemoryEvents(result.evidence, 'lookup')).toEqual([{ id: 'order-1', found: true }])
+		expect(readMemoryEvents(result.evidence, 'denial', 'opening')).toEqual([
+			{ id: expect.any(String), name: 'lookup', reason: STUDY_MEMORY_REPEAT },
+		])
+	})
+
+	it('resets the repeat rule on each run', async () => {
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [lookup, answer, lookup, answer],
+			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
+			settings: STUDY_MEMORY_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		const last = result.requests.filter((request) => request.path === '/api/chat').at(-1)
+		expect(readMemoryToolResults(last?.body ?? '')).toEqual([receipt, receipt])
+		expect(readMemoryEvents(result.evidence, 'lookup')).toEqual([
+			{ id: 'order-1', found: true },
+			{ id: 'order-1', found: true },
+		])
+		expect(readMemoryEvents(result.evidence, 'denial')).toEqual([])
+	})
+
+	it('compares canonical arguments', async () => {
+		const result = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [
+				buildMemoryCall('lookup', { id: 'order-1', scope: 'desk' }),
+				buildMemoryCall('lookup', { scope: 'desk', id: 'order-1' }),
+				answer,
+			],
+			goals: opening,
+			settings: STUDY_MEMORY_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		const last = result.requests.filter((request) => request.path === '/api/chat').at(-1)
+		expect(readMemoryToolResults(last?.body ?? '')).toEqual([receipt, refused])
+		expect(readMemoryEvents(result.evidence, 'lookup')).toHaveLength(1)
+		expect(readMemoryEvents(result.evidence, 'denial')).toHaveLength(1)
+	})
+
+	it('files a ledger repeat as a denial row', async () => {
+		const result = await runMemoryTrial({
+			arm: 'records',
+			responses: [...STUDY_MEMORY_CALIBRATION, lookup, lookup, answer],
+			goals: opening,
+		})
+		expect(result.failure).toBeUndefined()
+		expect(readMemoryEvents(result.evidence, 'lookup')).toEqual([{ id: 'order-1', found: true }])
+		expect(readMemoryEvents(result.evidence, 'denial', 'opening')).toEqual([
+			{
+				id: expect.any(String),
+				name: 'lookup',
+				reason: STUDY_MEMORY_MODULES.agent.LEDGER_NOTES.repeat,
+			},
+		])
+	})
+
+	it('appends a denial row per denied call', async () => {
+		const absent = buildMemoryCall('absent', {})
+		const denial = {
+			id: expect.any(String),
+			name: 'absent',
+			reason: 'absent is not in the active scope',
+		}
+		const compaction = await runMemoryTrial({
+			arm: 'compaction',
+			responses: [absent, answer],
+			goals: opening,
+			settings: STUDY_MEMORY_SETTINGS,
+		})
+		const records = await runMemoryTrial({
+			arm: 'records',
+			responses: [...STUDY_MEMORY_CALIBRATION, absent, answer],
+			goals: opening,
+		})
+		expect(compaction.failure).toBeUndefined()
+		expect(records.failure).toBeUndefined()
+		expect(readMemoryEvents(compaction.evidence, 'denial', 'opening')).toEqual([denial])
+		expect(readMemoryEvents(records.evidence, 'denial', 'opening')).toEqual([denial])
+	})
+
+	it('forwards the correction limit', async () => {
+		// Each statement reads as a fact and the last arrival as a correction; the default reply answers every pair yes.
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: ['A', 'A', 'A', 'C'].map(buildMemoryVerdict),
+			goals: STUDY_MEMORY_CORRECTION_GOALS,
+		}
+		const limited = await runMemoryTrial({ ...trial, settings: { correction: { limit: 1 } } })
+		const unset = await runMemoryTrial({ ...trial, settings: { correction: {} } })
+		const absent = await runMemoryTrial(trial)
+		expect(limited.failure).toBeUndefined()
+		expect(unset.failure).toBeUndefined()
+		expect(countMemoryPairs(limited.requests)).toBe(2)
+		expect(countMemoryPairs(unset.requests)).toBe(6)
+		expect(unset.requests).toEqual(absent.requests)
+	})
+})
+
+describe('recording declarations of a memory session', () => {
+	const { agent: admitted, provider: ollama } = STUDY_MEMORY_MODULES
+
+	it('refuses recording without a sink', () => {
+		if (!isStudyMemoryRuntime(admitted) || !isStudyMemoryProvider(ollama))
+			throw new Error('Missing admitted modules')
+		expect(
+			() =>
+				new StudyMemorySession({
+					agent: admitted,
+					ledger: undefined,
+					provider: ollama,
+					classifier: undefined,
+					profile: buildMemoryRecording('http://127.0.0.1:1'),
+					arm: 'full',
+					signal: new AbortController().signal,
+				}),
+		).toThrow(
+			expect.objectContaining({
+				code: 'CONFIG',
+				message: 'Memory recording requires declarations and an exchange sink',
+			}),
+		)
+	})
+
+	it('refuses a sink without recording', () => {
+		if (!isStudyMemoryRuntime(admitted) || !isStudyMemoryProvider(ollama))
+			throw new Error('Missing admitted modules')
+		expect(
+			() =>
+				new StudyMemorySession({
+					agent: admitted,
+					ledger: undefined,
+					provider: ollama,
+					classifier: undefined,
+					profile: buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
+					arm: 'full',
+					signal: new AbortController().signal,
+					exchanges: STUDY_MEMORY_INERT_EXCHANGES,
+				}),
+		).toThrow(
+			expect.objectContaining({
+				code: 'CONFIG',
+				message: 'Memory exchanges and replay require declared recording',
+			}),
+		)
+	})
+
+	it('sends a recording through its sink and its replay and not to the daemon', async () => {
+		const server = await createMemoryServer()
+		const profile = buildMemoryRecording(server.url)
+		const fixture = createMemoryContext(profile)
+		const trial = { id: 'captured', scenario: 'public', arm: 'full', repetition: 0 }
+		const capture = buildMemoryCapture(profile, trial, WINDOW_GOAL)
+		try {
+			const session = await new StudyMemoryDriver({
+				...STUDY_MEMORY_MODULES,
+				profile,
+				exchanges: capture.exchanges,
+				replay: capture.replay,
+			}).open(trial, fixture.context.signal)
+			try {
+				await expect(session.execute(WINDOW_GOAL, fixture.context)).rejects.toThrow(
+					STUDY_MEMORY_REPLAY_REFUSAL,
+				)
+			} finally {
+				await session.close()
+			}
+			// A declared preflight opens with the version, which a transport with no sink never fetches.
+			expect(capture.sent.calls).toEqual([['metadata', '/api/version']])
+			expect(capture.rows.calls).toMatchObject([
+				[{ phase: 'attempt', ordinal: 1, role: 'metadata', path: '/api/version' }],
+			])
+			expect(server.requests).toEqual([])
+		} finally {
+			fixture.close()
+			await server.close()
+		}
 	})
 })

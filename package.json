@@ -65,6 +65,7 @@
 		"study": "study",
 		"study:check": "study check",
 		"study:execute": "study execute",
+		"study:freeze": "study freeze",
 		"study:grade": "study grade",
 		"study:label": "study label",
 		"study:report": "study report",

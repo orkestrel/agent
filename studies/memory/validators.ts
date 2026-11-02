@@ -9,11 +9,22 @@ import type {
 	StudyMemoryRuntime,
 	StudyMemoryWire,
 } from './types.js'
-import { holds, isArray, isBoolean, isFiniteNumber, isObject, isRecord } from '@orkestrel/contract'
+import {
+	holds,
+	isArray,
+	isBoolean,
+	isFiniteNumber,
+	isNonEmptyString,
+	isNonNegativeInteger,
+	isObject,
+	isRecord,
+	recordOf,
+} from '@orkestrel/contract'
 import { isStudyAgentRuntime } from '@orkestrel/study'
+import { isStudyOllamaMetadata } from '@orkestrel/study/server'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
-/** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent and conversation factories exist. */
+/** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent, conversation and authority factories exist. */
 export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntime {
 	return holds(
 		() =>
@@ -21,11 +32,13 @@ export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntim
 			'Agent' in value &&
 			typeof value.Agent === 'function' &&
 			'createConversationManager' in value &&
-			typeof value.createConversationManager === 'function',
+			typeof value.createConversationManager === 'function' &&
+			'createAuthority' in value &&
+			typeof value.createAuthority === 'function',
 	)
 }
 
-/** Checks the admitted Agent capabilities only the records arm invokes. @param value - Admitted namespace. @returns Whether the Ledger factory and its question set exist. */
+/** Checks the admitted Agent capabilities only the records arm invokes. @param value - Admitted namespace. @returns Whether the Ledger factory, its question set and its repeat note exist. */
 export function isStudyMemoryLedger(value: unknown): value is StudyMemoryLedger {
 	return holds(
 		() =>
@@ -33,7 +46,11 @@ export function isStudyMemoryLedger(value: unknown): value is StudyMemoryLedger 
 			'createLedger' in value &&
 			typeof value.createLedger === 'function' &&
 			'LEDGER_QUESTIONS' in value &&
-			isObject(value.LEDGER_QUESTIONS),
+			isObject(value.LEDGER_QUESTIONS) &&
+			'LEDGER_NOTES' in value &&
+			isObject(value.LEDGER_NOTES) &&
+			'repeat' in value.LEDGER_NOTES &&
+			typeof value.LEDGER_NOTES.repeat === 'string',
 	)
 }
 
@@ -43,12 +60,25 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		if (!isRecord(value)) return false
 		if (
 			Object.keys(value).some(
-				(key) => !['gauge', 'observe', 'checkpoints', 'rolling'].includes(key),
+				(key) =>
+					![
+						'gauge',
+						'observe',
+						'checkpoints',
+						'rolling',
+						'version',
+						'metadata',
+						'correction',
+					].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, rolling } = value
+		const { gauge, observe, checkpoints, rolling, version, metadata, correction } = value
 		if (rolling !== undefined && !isBoolean(rolling)) return false
+		if (version !== undefined && !isNonEmptyString(version)) return false
+		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
+		if (correction !== undefined && !recordOf({ limit: isNonNegativeInteger }, true)(correction))
+			return false
 		if (gauge !== undefined) {
 			if (
 				!isRecord(gauge) ||

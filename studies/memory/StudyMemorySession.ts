@@ -1,5 +1,6 @@
 import type {
 	AgentInterface,
+	AuthorityContext,
 	ConversationInterface,
 	LedgerInterface,
 	ProviderRequest,
@@ -16,7 +17,7 @@ import type {
 	StudyMemoryObservation,
 } from './types.js'
 import { createBudget } from '@orkestrel/budget'
-import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
+import { canonicalStringify, cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
@@ -24,12 +25,14 @@ import {
 	StudyAgentTrace,
 	StudyOllamaTransport,
 	buildStudyAgentReadings,
+	buildStudyAgentToolDenial,
 	buildStudyOllamaModels,
 	buildStudyOllamaOptions,
 } from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_JUDGE,
 	STUDY_MEMORY_METADATA,
+	STUDY_MEMORY_REPEAT,
 	STUDY_MEMORY_SUMMARY,
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_THRESHOLDS,
@@ -62,6 +65,10 @@ export class StudyMemorySession implements StudySessionInterface {
 	// The goal in flight: added when it starts, deleted on every path that ends it, and capped at one by the busy refusal.
 	readonly #live = new Set<StudyOllamaActivity>()
 	readonly #flights = new Set<Promise<StudyProduct>>()
+	// A recording's declared goal range, so its preflight and postflight join the range's two ends.
+	readonly #goals: readonly string[] | undefined
+	// The calls the compaction arm dispatched in this run, replaced on each admission as `LedgerRequest` replaces its own.
+	#repeats: ReadonlySet<string> = new Set()
 	#input: string | undefined
 	#closing: Promise<void> | undefined
 
@@ -76,6 +83,21 @@ export class StudyMemorySession implements StudySessionInterface {
 		const provider = options.profile.provider
 		if (provider === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 		const room = options.profile.room
+		const settings = isStudyMemoryOptions(options.profile.settings)
+			? options.profile.settings
+			: undefined
+		const recorded = options.profile.record !== undefined
+		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
+			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
+		const declaration = options.exchanges?.declaration
+		if (
+			recorded &&
+			(declaration === undefined ||
+				settings?.version === undefined ||
+				settings.metadata === undefined)
+		)
+			throw new StudyError('CONFIG', 'Memory recording requires declarations and an exchange sink')
+		this.#goals = declaration === undefined ? undefined : [...declaration.goals]
 		// One declaration of every role's wire policy feeds both the transport and the provider constructors.
 		const roles = buildStudyMemoryRoles(options.profile, options.arm)
 		const policy = roles.agent
@@ -84,12 +106,14 @@ export class StudyMemorySession implements StudySessionInterface {
 			url: provider.url,
 			room,
 			limit: options.profile.bounds.request,
-			metadata: STUDY_MEMORY_METADATA,
+			metadata: settings?.metadata ?? STUDY_MEMORY_METADATA,
 			models: buildStudyOllamaModels(provider),
 			roles,
 			signal: options.signal,
 			observe: this.#observation.observe,
 			timing: options.provider.extractTiming,
+			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),
+			...(options.replay === undefined ? {} : { fetch: options.replay.fetch }),
 		})
 		this.#trace = new StudyAgentTrace({
 			runtime: options.agent,
@@ -150,6 +174,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				throw new StudyError('CONFIG', 'Memory records require the Ledger and judge factories')
 			const role = roles.judge
 			if (role === undefined) throw new StudyError('CONFIG', 'Memory records require a judge role')
+			const repeat = options.ledger.LEDGER_NOTES.repeat
 			const judge = new StudyAgentJudge(
 				options.classifier.createOllamaJudge({
 					model: role.model,
@@ -183,10 +208,20 @@ export class StudyMemorySession implements StudySessionInterface {
 								: undefined,
 					},
 				],
+				...(settings?.correction === undefined ? {} : { correction: settings.correction }),
 				agent: {
 					limit: 8,
 					timeout: options.profile.bounds.goal.duration,
-					on: { fault: (error) => this.#trace.translate(error) },
+					on: {
+						fault: (error) => this.#trace.translate(error),
+						deny: (call, reason) =>
+							this.#trace.append('denial', buildStudyAgentToolDenial(call, reason)),
+						// A ledger repeat fails inside the tool and is no denial, so `deny` never reads it.
+						tool: (call, result) => {
+							if (!result.success && result.error === repeat)
+								this.#trace.append('denial', buildStudyAgentToolDenial(call, repeat))
+						},
+					},
 				},
 			})
 			this.#agent = this.#ledger.agent
@@ -200,10 +235,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					: {
 							keep: 2,
 							summarize: (messages, signal) => summary.summarize(messages, signal),
-							...(isStudyMemoryOptions(options.profile.settings) &&
-							options.profile.settings.rolling === true
-								? { rolling: true }
-								: {}),
+							...(settings?.rolling === true ? { rolling: true } : {}),
 						},
 			)
 			this.#agent = new options.agent.Agent(observer, {
@@ -220,8 +252,25 @@ export class StudyMemorySession implements StudySessionInterface {
 								max: room.context - room.output - room.safety,
 								consumer: (request) => this.#trace.admit(request, compaction.gauge),
 							}),
+							authority: options.agent.createAuthority({
+								rules: [
+									{
+										match: (context) => this.#repeat(context),
+										zone: 'study',
+										verdict: 'deny',
+										reason: STUDY_MEMORY_REPEAT,
+									},
+								],
+							}),
 						}),
-				on: { fault: (error) => this.#trace.translate(error) },
+				on: {
+					fault: (error) => this.#trace.translate(error),
+					start: () => {
+						this.#repeats = new Set()
+					},
+					deny: (call, reason) =>
+						this.#trace.append('denial', buildStudyAgentToolDenial(call, reason)),
+				},
 				error: (error) => this.#trace.translate(error),
 			})
 			this.#agent.context.instructions.add({ name: 'desk', content: STUDY_MEMORY_SYSTEM })
@@ -262,7 +311,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#input = undefined
 		this.#live.add(activity)
 		try {
-			await this.#transport.verify()
+			if (this.#goals === undefined || this.#goals[0] === goal) await this.#transport.verify()
 			for (const record of input.records) {
 				this.#records.set(record.id, Object.freeze({ ...record }))
 			}
@@ -319,7 +368,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			})
 			this.#transport.check()
 			signal.throwIfAborted()
-			await this.#transport.verify()
+			if (this.#goals === undefined || this.#goals.at(-1) === goal) await this.#transport.verify()
 			return product
 		} catch (error) {
 			throw this.#trace.translate(error)
@@ -331,6 +380,16 @@ export class StudyMemorySession implements StudySessionInterface {
 				this.#transport.clear()
 			}
 		}
+	}
+
+	// Keys one dispatched call as `LedgerRequest` keys its own; the authority evaluates each call once.
+	#repeat(context: AuthorityContext): boolean {
+		const key = canonicalStringify([context.call.name, context.call.arguments])
+		if (key === undefined)
+			throw new StudyError('FAULT', 'Tool arguments have no canonical identity')
+		if (this.#repeats.has(key)) return true
+		this.#repeats = new Set([...this.#repeats, key])
+		return false
 	}
 
 	#provenance(): StudyMemoryProvenanceSource {
