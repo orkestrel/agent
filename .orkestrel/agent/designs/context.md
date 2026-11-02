@@ -216,7 +216,7 @@ Loading a skill adds instruction `skill:<name>` with the skill's content to the 
 - The ledger never files the body as a `fact`, because the body is not a tool result; successful tool results file as `fact` (`Ledger#assign` in `src/core/ledgers/Ledger.ts`).
 - Host-authored directives do not arrive as tool results, which carry no authority by default (C25).
 - The instruction inherits scope and `priority`; unloading is `instructions.remove('skill:<name>')`.
-- Each load changes the head one time, one prefix miss per load, accepted and measured: rc-s1's `studies/context` study counts loads per run, and rc-a9's skill-load probe reads `cached` around a load (`designs/measurement.md` § Recording). Loaded bodies leave the head only on D4, and never into a late `system` message.
+- Each load changes the head one time, one prefix miss per load, accepted and measured: rc-s2's `studies/context` study counts loads per run, and rc-a9's skill-load probe reads `cached` around a load (`designs/measurement.md` § Recording). Loaded bodies leave the head only on D4, and never into a late `system` message.
 - A host scope with an explicit `instructions` allow-list filters a loaded `skill:<name>` instruction; rc-d1 documents this, and no code works around it.
 
 ### Skill and instruction
@@ -239,7 +239,7 @@ The tools live in `@orkestrel/toolbox` (rc-t1), which owns ready-made tools over
 - Tool definitions carry host text only: no factory interpolates memo names, descriptions, or other stored text into a `description`, because the tools block renders inside the `system` turn (O11; `designs/layout.md` § Boundary). rc-t1's brief states this constraint.
 - Each description leads with a worked example and the reply shape. Each refusal names the key path, the expected shape, and the valid names, with an untrusted identifier JSON-encoded and length-capped.
 - Authority gates the tools by name with rules, for example `{ match: ({ call }) => call.name === 'remember', zone: 'memo', verdict: 'ask' }` (`designs/authority.md` § Shapes).
-- The `studies/context` mechanism study, modeled on `studies/tools`, proves the managers inside Agent first: a scripted memo write, revision, and read across two conversations; a skill load adds the instruction; scope lists filter (rc-s1). The release order carries Agent, then Toolbox (`tenets.md` § Release).
+- The `studies/context` mechanism study, modeled on `studies/tools`, proves the managers inside Agent first: a scripted memo write, revision, and read across two conversations; a skill load adds the instruction; scope lists filter (rc-s2, after rc-u9 and before rc-u17 and the falsify round; `plan.md` O94). The release order carries Agent, then Toolbox (`tenets.md` § Release).
 - Model-written memos can carry injected text across conversations, so `remember` never ships without Authority `ask`, which ships first, in Agent 0.0.35 as rc-a14 (O2). A memo's text reaches the model in the `user` context message, never in `system` (O11).
 - When D20 opens, the tools' gate adds a run on the smallest local model: from each description alone, the model calls each tool with valid arguments and reads each refusal into a valid retry (Q5).
 
@@ -261,9 +261,9 @@ The tools live in `@orkestrel/toolbox` (rc-t1), which owns ready-made tools over
 export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on' | 'instructions' | 'skills' | 'memos' | 'workspaces'>
 ```
 
-- One memo set can serve many ledgers and agents; cross-conversation memory depends on that.
-- `Ledger#trim` prices the built head plus the request copy, not `[options.system, briefing]`, and the calibration pass sends the same head (`designs/records.md` § Head pricing). Acceptance: with an instruction on the ledger's agent long enough to push the head past the cap when only `system` and the records are priced, the planned request stays at or under the plan cap; with pricing reverted to `options.system`, the same fixture exceeds it.
-- The canary of `designs/layout.md` § Canary gains memo and skill sentinels: the skill description appears in `system`, and the memo sentinels appear in the context message only.
+- One memo set can serve many ledgers and agents of one principal; cross-conversation memory depends on that, and a memo can be model-written, so a host never passes one set across principals (`plan.md` O93).
+- `Ledger#trim` prices the head and the request copy of one build over `{ messages: [request], judgments: [] }`, not `[options.system, briefing]`, so a workspace image counts on the copy, and the calibration pass keeps the empty selection and sends the same head (`designs/records.md` § Head pricing; `plan.md` O93). Acceptance: with an instruction on the ledger's agent long enough to push the head past the cap when only `system` and the records are priced, the planned request stays at or under the plan cap; with pricing reverted to `options.system`, the same fixture exceeds it.
+- The canary of `designs/layout.md` § Canary gains memo and skill sentinels: the skill description appears in `system`, the memo name and description appear in the context message only, the memo content appears in no message, and none of the four reaches a frame (`plan.md` O93).
 - The ledger still plugs in through `select`.
 
 ## Refused

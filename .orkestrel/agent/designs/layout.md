@@ -49,7 +49,7 @@ rc-u10 writes the records into a built copy of the request turn: `${records}\n\n
 - Workspace text leaves `system` because the model edits workspace files through a tool (`guides/agent.md` § Giving the model documents to read), and memo text leaves it because the model writes memos (O11).
 - Memos before workspace: a memo write invalidates the cached workspace text after it, and the other order invalidates memos on every file write (`designs/context.md` § AgentContext).
 - The calibration pass sends the built head: `system`, then the context message, then `view()`. rc-u9's pricing fix covers calibration.
-- Moving memos and workspace into the request turn waits for D32; the context-message layout reading belongs to rc-s1's `studies/context` study under D32's trigger, and rc-a10 and M3 add none (O48).
+- Moving memos and workspace into the request turn waits for D32; the context-message layout reading belongs to rc-s2's `studies/context` study under D32's trigger, and rc-a10 and M3 add none (O48).
 
 ## Literal strings
 
@@ -117,7 +117,7 @@ rc-u10's canary test proves the boundary on every path.
 - None appears in any `system` message of `build()`, a ledger first pass, an answer pass, a late request, or a fault path; the system-text and instruction sentinels do appear.
 - Exactly one `system` message is sent, at index 0.
 - On the unchanged tree the canary fails first on the workspace and briefing sentinels; pushing the records back into the `system` parts makes it fail again (mutation).
-- rc-u9 adds memo name, description, and content sentinels and a skill description sentinel: the skill description appears in `system`, and the memo sentinels appear in the context message only.
+- rc-u9 adds memo name, description, and content sentinels and a skill description sentinel: the skill description appears in `system`, the memo name and description appear in the context message only, the memo content appears in no message, and none of the four reaches a frame (`plan.md` O93).
 
 ## Layout readings
 
