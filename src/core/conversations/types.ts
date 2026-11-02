@@ -30,7 +30,13 @@ export type ConversationErrorCode =
 	| 'ROLE'
 	| 'SNAPSHOT'
 
-/** Stores judgments by caller key and resolves requests by reusing matching records. */
+/**
+ * Stores judgments by caller key and resolves requests by reusing matching records.
+ *
+ * @remarks
+ * Every record the store returns, from `add`, `judgment`, `judgments`, and `resolve`, is the
+ * stored record, deep-frozen, so a caller copies a record before changing it.
+ */
 export interface JudgmentManagerInterface {
 	readonly count: number
 	/**
@@ -549,7 +555,8 @@ export interface ConversationInterface {
 	 * of the `snapshot` option: a {@link ConversationManagerInterface} hydrates a conversation from
 	 * it through that seam (see {@link ConversationManagerInterface.open}). Pure — the sections +
 	 * messages are already plain immutable records (so a `structuredClone` call or a JSON round
-	 * trip keeps the snapshot lossless), and snapshotting mutates nothing.
+	 * trip keeps the snapshot lossless), and snapshotting mutates nothing. The snapshot's judgments
+	 * are the judgment store's frozen records, so a host copies one before changing it.
 	 *
 	 * @returns The {@link ConversationSnapshot} (`{ id, sections, messages, judgments? }`), the
 	 * judgments present only when the store holds one

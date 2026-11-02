@@ -8090,3 +8090,38 @@ export async function computeTextDigest(text: string): Promise<string> {
 	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
 	return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
+
+/**
+ * Builds amendment judgment records in the shape the classifier records for an `amends` pair.
+ *
+ * @remarks
+ * Record `i` pairs the user messages `m<i>` and `m<i+1>`, answers `noul` 0, and stores `i` as its
+ * time. Each record and its sources stay unfrozen, and each question is the shared
+ * `LEDGER_QUESTIONS.amends`, so a judgment store owns every record as it owns a restored one.
+ *
+ * @param count - The number of records
+ * @returns The records, in pair order
+ * @example
+ * ```ts
+ * buildJudgmentRecords(2)[1]?.id // '["amends","m1","m2"]'
+ * ```
+ */
+export function buildJudgmentRecords(count: number): readonly Judgment[] {
+	return Array.from({ length: count }, (_unused, index) => ({
+		...buildLedgerPairJudgment(
+			'amends',
+			buildLedgerMessage(
+				`m${index}`,
+				'user',
+				`[Source ${index}] Order OR-${1000 + index} for Customer OR-${1000 + index} ships on day ${index}.`,
+			),
+			buildLedgerMessage(
+				`m${index + 1}`,
+				'user',
+				`[Source ${index + 1}] Order OR-${1001 + index} for Customer OR-${1001 + index} ships on day ${index + 1}.`,
+			),
+			0,
+		),
+		time: index,
+	}))
+}

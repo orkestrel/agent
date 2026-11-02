@@ -21,3 +21,32 @@ export function copyJSON(value: unknown): unknown {
 	if (!text.success || typeof text.value !== 'string') return undefined
 	return parseJSON(text.value)
 }
+
+/**
+ * Owns a value through JSON and freezes every record and list of the copy, leaving the value unchanged.
+ *
+ * @remarks
+ * Returns undefined exactly where `copyJSON` does, a value too deep for `JSON.stringify` among them.
+ * A worklist over the owned copy does the freezing, so any depth `JSON.stringify` holds also freezes.
+ *
+ * @param value - The value to own and freeze
+ * @returns The frozen JSON copy, or undefined when the value is not JSON
+ * @example
+ * ```ts
+ * Object.isFrozen(freezeJSON({ state: 'A ticket.' })) // true
+ * freezeJSON(() => 1) // undefined
+ * ```
+ */
+export function freezeJSON(value: unknown): unknown {
+	const copy = copyJSON(value)
+	if (typeof copy !== 'object' || copy === null) return copy
+	const worklist: object[] = [copy]
+	for (const node of worklist) {
+		Object.freeze(node)
+		const children: readonly unknown[] = Object.values(node)
+		for (const child of children) {
+			if (typeof child === 'object' && child !== null) worklist.push(child)
+		}
+	}
+	return copy
+}

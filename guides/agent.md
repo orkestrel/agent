@@ -822,9 +822,10 @@ The following table lists the root wire shapes and the contract compiled from th
 
 The following table lists the cloners the root declares:
 
-| Name       | Kind     | Signature                     | Summary                                                                                                  |
-| ---------- | -------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `copyJSON` | function | `(value: unknown) => unknown` | Owns a value by serializing it to JSON and parsing the text, so the copy shares nothing with its source. |
+| Name         | Kind     | Signature                     | Summary                                                                                                  |
+| ------------ | -------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `copyJSON`   | function | `(value: unknown) => unknown` | Owns a value by serializing it to JSON and parsing the text, so the copy shares nothing with its source. |
+| `freezeJSON` | function | `(value: unknown) => unknown` | Owns a value through JSON and freezes every record and list of the copy, leaving the value unchanged.    |
 
 #### Helpers
 
@@ -1712,7 +1713,7 @@ The stream-stateful `<think>…</think>` separator a provider routes raw content
 
 #### `JudgmentManagerInterface`
 
-The conversation's judgment store. `add` stamps each record's `time` and carries batch overloads (one input → one record, a batch → the array), replacing an existing key in place; `remove` carries batch overloads (one key or a list). The `count` data member stays a Surface row.
+The conversation's judgment store. `add` stamps each record's `time` and carries batch overloads (one input → one record, a batch → the array), replacing an existing key in place; `remove` carries batch overloads (one key or a list). Every record the store returns is the stored record, deep-frozen, so a caller copies a record before changing it. The `count` data member stays a Surface row.
 
 | Method      | Returns                            | Summary                                                                         |
 | ----------- | ---------------------------------- | ------------------------------------------------------------------------------- |
@@ -3175,7 +3176,7 @@ The following test files back this guide:
 
 - [`tests/guides.test.ts`](../tests/guides.test.ts) — the Surface and method parity with `src/core`, the `Summary`, titled example, and pitch equality, and the executed flagship fences with the Contract clauses they back: scope timing, selection, judgments, modes, answer-only runs, recorded thinking and the replay policy, the ledger over a scripted provider and judge with its thinking budget, the classifier and the gauge, the relay over a loopback listener, the page wire to a Node agent over a loopback listener with its approval asks, its refusals, its two principals, and its `409` overlap, the System One judge over a recorded response, the server fence: one session entry per principal, the refused overlap that adds no user turn, and the user turn a rejected run keeps, and both server fences tied to their transcriptions byte for byte.
 - [`tests/src/core/helpers.test.ts`](../tests/src/core/helpers.test.ts) — the root helpers `filterAllowList`, `joinThinking`, `stripThinking`, `sanitizeToken`, `sanitizeUsage`, `sumUsage`, `removeEntries`, `collectExchanges`, `hasCalls`, `collectToolGroups`, `renderJSON`, and `matchesJudgment`, the `MESSAGE_ROLES` role list, and the `CONVERSATION_ROLES` stored role list with the `ConversationRole` and `MessageInput` role types.
-- [`tests/src/core/cloners.test.ts`](../tests/src/core/cloners.test.ts) — `copyJSON` copying a proxied record where a structured clone refuses it and returning `undefined` for a value JSON can't carry.
+- [`tests/src/core/cloners.test.ts`](../tests/src/core/cloners.test.ts) — `copyJSON` copying a proxied record where a structured clone refuses it and returning `undefined` for a value JSON can't carry, and `freezeJSON` returning a copy whose every nested record and list is frozen while its input stays unchanged, freezing every member of a very wide list, and returning `undefined` wherever `copyJSON` does.
 - [`tests/src/core/validators.test.ts`](../tests/src/core/validators.test.ts) — the root guards `isJudgeEntry`, `isJudgeQuestion`, and `isNonNegativeSafeInteger`, each total over hostile input.
 - [`tests/src/core/contracts.test.ts`](../tests/src/core/contracts.test.ts) — the message contract's round trip and malformed paths, function-valued arguments accepted in the domain and refused on the wire, the `MESSAGE_GUARD_CASES` agreement between `isMessage` and `messageContract`, and seeded wire messages kept in the domain.
 - [`tests/src/core/shapers.test.ts`](../tests/src/core/shapers.test.ts) — the message, tool-call, and token usage wire shapes at the type level, with execution context kept off the wire, and the provider result schema unchanged by the shared usage shape.
@@ -3193,7 +3194,7 @@ The following test files back this guide:
 - [`tests/src/core/providers/validators.test.ts`](../tests/src/core/providers/validators.test.ts) — the System One guards `isSystemOneResponse` and `isSystemOneAnswer` over recorded, transliterated, and hostile envelopes.
 - [`tests/src/core/conversations/Conversation.test.ts`](../tests/src/core/conversations/Conversation.test.ts) — the conversation's construction, `view`, `compact` with `keep` and its no-op and missing-summarizer cases, `rehydrate`, `search`, `reference`, `snapshot`, the `sections` cap, hydration, and the stored roles and snapshot checks: a `system` add or batch refused with nothing stored, a snapshot refused for a `system` role, a repeated id, or a malformed shape, the single read of its members, and `'JUDGMENT'` kept for a non-JSON judgment.
 - [`tests/src/core/conversations/ConversationManager.test.ts`](../tests/src/core/conversations/ConversationManager.test.ts) — the registry's accessors, active pointer and `switch`, removal, the inherited `summarize`, `keep`, and `sections` defaults, independence, the durable `open` / `save` seam, a 0.0.29 snapshot read through `open` without its conversation `summary`, and `open` refusing a stored `system` role with the registry and `active` unchanged.
-- [`tests/src/core/conversations/JudgmentManager.test.ts`](../tests/src/core/conversations/JudgmentManager.test.ts) — the keyed storage of `JudgmentManager` and its `resolve` method, which asks only unmatched questions, attaches one-question usage, records partial answers on abort, and restores from a snapshot.
+- [`tests/src/core/conversations/JudgmentManager.test.ts`](../tests/src/core/conversations/JudgmentManager.test.ts) — the keyed storage of `JudgmentManager` and its `resolve` method, which asks only unmatched questions, attaches one-question usage, records partial answers on abort, and restores from a snapshot, and the frozen records it returns.
 - [`tests/src/core/conversations/factories.test.ts`](../tests/src/core/conversations/factories.test.ts) — `createConversation`, `createConversationManager`, `createMemoryConversationStore`, and `createDatabaseConversationStore`, each driving the instance it returns.
 - [`tests/src/core/conversations/helpers.test.ts`](../tests/src/core/conversations/helpers.test.ts) — `buildJudgments`, `buildSummaryMessage`, `buildRecapMessage`, `requireJudgment`, `requireRole`, `requireConversationSnapshot`, `requireSectionsCap`, `requireKeep`, and `raceSignal`.
 - [`tests/src/core/conversations/validators.test.ts`](../tests/src/core/conversations/validators.test.ts) — `isMessage`, `isJudgment` with snapshot carriage, `isSection`, `isConversationSnapshot`, and `isConversation`, each total over malformed input.

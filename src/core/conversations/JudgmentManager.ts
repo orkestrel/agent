@@ -3,7 +3,7 @@ import type { JudgeInterface, JudgeRequest, Judgment, JudgmentInput } from '../t
 import { isArray, isRecord } from '@orkestrel/contract'
 import { ConversationError } from './errors.js'
 import { buildJudgments, requireJudgment } from './helpers.js'
-import { copyJSON } from '../cloners.js'
+import { copyJSON, freezeJSON } from '../cloners.js'
 import { JudgeAbortError, isJudgeAbortError } from '../errors.js'
 import { matchesJudgment, removeEntries } from '../helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
@@ -15,8 +15,8 @@ import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
  * Adding an existing key replaces it without changing its insertion position. Construction
  * restores recorded times; adding stamps the current epoch milliseconds. Caller input is owned
  * through JSON on arrival, so a proxied record or request is accepted where a structured clone
- * refuses it, and records are copied on reads, so callers cannot change the stored identity
- * through nested values.
+ * refuses it. Each record is stored deep-frozen, and every read returns that frozen record, so a
+ * write to one throws in strict-mode code and a caller that edits a record copies it first.
  *
  * @example
  * ```ts
@@ -34,7 +34,7 @@ export class JudgmentManager implements JudgmentManagerInterface {
 	constructor(judgments: readonly Judgment[] = []) {
 		// `Array.from` visits a hole in `judgments` as an undefined record, which `requireJudgment` refuses; `map` skips it.
 		this.#judgments = new Map(
-			Array.from(judgments, (judgment) => requireJudgment(copyJSON(judgment))).map((owned) => [
+			Array.from(judgments, (judgment) => requireJudgment(freezeJSON(judgment))).map((owned) => [
 				owned.id,
 				owned,
 			]),
@@ -53,12 +53,11 @@ export class JudgmentManager implements JudgmentManagerInterface {
 	}
 
 	judgment(id: string): Judgment | undefined {
-		const judgment = this.#judgments.get(id)
-		return judgment === undefined ? undefined : structuredClone(judgment)
+		return this.#judgments.get(id)
 	}
 
 	judgments(): readonly Judgment[] {
-		return structuredClone([...this.#judgments.values()])
+		return [...this.#judgments.values()]
 	}
 
 	remove(id: string): boolean
@@ -125,7 +124,7 @@ export class JudgmentManager implements JudgmentManagerInterface {
 		])
 		return entries.flatMap(([id]) => {
 			const judgment = resolved.get(id)
-			return judgment === undefined ? [] : [structuredClone(judgment)]
+			return judgment === undefined ? [] : [judgment]
 		})
 	}
 
@@ -151,8 +150,10 @@ export class JudgmentManager implements JudgmentManagerInterface {
 
 	#store(input: JudgmentInput): Judgment {
 		const copy = copyJSON(input)
-		const judgment = requireJudgment(isRecord(copy) ? { ...copy, time: Date.now() } : copy)
+		const judgment = requireJudgment(
+			freezeJSON(isRecord(copy) ? { ...copy, time: Date.now() } : copy),
+		)
 		this.#judgments.set(judgment.id, judgment)
-		return structuredClone(judgment)
+		return judgment
 	}
 }

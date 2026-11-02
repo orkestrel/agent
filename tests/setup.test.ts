@@ -1,5 +1,6 @@
 import {
 	answerLedgerKey,
+	buildJudgmentRecords,
 	buildLedgerBenchOptions,
 	buildLedgerBlock,
 	buildLedgerPrefix,
@@ -63,6 +64,7 @@ import {
 	ProviderAbortError,
 	providerRequestContract,
 	REFUSED_RELAY_STATUS,
+	requireJudgment,
 } from '@src/core'
 import { collect, createRecorder } from '@orkestrel/test'
 import {
@@ -3314,5 +3316,32 @@ describe('ledger bench builders', () => {
 		expect(await computeTextDigest('')).toBe(
 			'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
 		)
+	})
+})
+
+describe('buildJudgmentRecords', () => {
+	it('builds distinct unfrozen amends records over adjacent messages that a store accepts', () => {
+		const records = buildJudgmentRecords(3)
+		expect(records).toHaveLength(3)
+		expect(records.map((record) => record.id)).toEqual([
+			'["amends","m0","m1"]',
+			'["amends","m1","m2"]',
+			'["amends","m2","m3"]',
+		])
+		expect(new Set(buildJudgmentRecords(500).map((record) => record.id)).size).toBe(500)
+		expect(records[2]).toEqual({
+			id: '["amends","m2","m3"]',
+			question: LEDGER_QUESTIONS.amends,
+			sources: ['m2', 'm3'],
+			state:
+				'Earlier message: user: [Source 2] Order OR-1002 for Customer OR-1002 ships on day 2.\nLater message: user: [Source 3] Order OR-1003 for Customer OR-1003 ships on day 3.',
+			model: 'recording-model',
+			answer: { form: 'noul', noul: 0 },
+			time: 2,
+		})
+		expect(records.every((record) => requireJudgment(record) === record)).toBe(true)
+		expect(records.some((record) => Object.isFrozen(record))).toBe(false)
+		expect(records.some((record) => Object.isFrozen(record.sources))).toBe(false)
+		expect(buildJudgmentRecords(0)).toEqual([])
 	})
 })

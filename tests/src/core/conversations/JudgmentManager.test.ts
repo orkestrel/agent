@@ -345,3 +345,98 @@ describe('JudgmentManager', () => {
 		expect(restored.judgments.count).toBe(1)
 	})
 })
+
+describe('JudgmentManager — frozen records', () => {
+	it('reads one frozen record on every read', () => {
+		const manager = new JudgmentManager()
+		manager.add(JUDGMENT_INPUT)
+		const record = requireValue(manager.judgment('refund'))
+		expect(manager.judgment('refund')).toBe(record)
+		expect(record.question.criteria).toEqual(JUDGMENT_QUESTION.criteria)
+		expect(Object.isFrozen(record)).toBe(true)
+		expect(Object.isFrozen(record.question)).toBe(true)
+		expect(Object.isFrozen(record.question.criteria)).toBe(true)
+		expect(Object.isFrozen(requireValue(record.answer))).toBe(true)
+		expect(Object.isFrozen(record.sources)).toBe(true)
+	})
+
+	it('lists frozen records in a fresh array', () => {
+		const manager = new JudgmentManager()
+		manager.add([
+			{ ...JUDGMENT_INPUT, id: 'first' },
+			{ ...JUDGMENT_INPUT, id: 'second' },
+		])
+		const listed = manager.judgments()
+		expect(manager.judgments()).not.toBe(listed)
+		expect(listed.map((record) => record.id)).toEqual(['first', 'second'])
+		expect(listed[0]).toBe(manager.judgment('first'))
+		expect(listed[1]).toBe(manager.judgment('second'))
+		expect(listed.every((record) => Object.isFrozen(record))).toBe(true)
+	})
+
+	it('refuses a nested write to a read record', () => {
+		const manager = new JudgmentManager()
+		const added = manager.add(JUDGMENT_INPUT)
+		const record = requireValue(manager.judgment('refund'))
+		expect(Reflect.set(record.question, 'instructions', 'changed')).toBe(false)
+		expect(Reflect.set(record.sources, '0', 'changed')).toBe(false)
+		expect(Reflect.defineProperty(requireValue(record.answer), 'noul', { value: 0 })).toBe(false)
+		expect(manager.judgment('refund')).toEqual({ ...JUDGMENT_INPUT, time: added.time })
+	})
+
+	it('freezes a restored record, not its input', () => {
+		const input: Judgment = {
+			...JUDGMENT_RECORD,
+			question: { ...JUDGMENT_QUESTION },
+			answer: { form: 'noul', noul: 0.9 },
+			sources: ['message-a', 'message-b'],
+		}
+		const record = requireValue(new JudgmentManager([input]).judgment('refund'))
+		expect(record).toEqual(input)
+		expect(Object.isFrozen(record)).toBe(true)
+		expect(Object.isFrozen(record.question)).toBe(true)
+		expect(Object.isFrozen(record.sources)).toBe(true)
+		expect(Object.isFrozen(input)).toBe(false)
+		expect(Object.isFrozen(input.question)).toBe(false)
+		expect(Object.isFrozen(input.sources)).toBe(false)
+	})
+
+	it('returns the stored record from add', () => {
+		const manager = new JudgmentManager()
+		const added = manager.add(JUDGMENT_INPUT)
+		expect(added).toBe(manager.judgment('refund'))
+		expect(Object.isFrozen(added)).toBe(true)
+		const batch = manager.add([
+			{ ...JUDGMENT_INPUT, id: 'first' },
+			{ ...JUDGMENT_INPUT, id: 'second' },
+		])
+		expect(batch[0]).toBe(manager.judgment('first'))
+		expect(batch[1]).toBe(manager.judgment('second'))
+	})
+
+	it('resolves to the stored frozen records', async () => {
+		const { judge, transport } = createRecordedJudge()
+		const manager = new JudgmentManager()
+		const cached = manager.add({
+			id: 'refund',
+			question: requireValue(SYSTEM_ONE_JUDGE_REQUEST.questions.refund),
+			answer: TEV1_NOUL,
+			model: judge.model,
+			sources: JUDGMENT_INPUT.sources,
+			state: SYSTEM_ONE_TEV1_REQUEST.state,
+		})
+		const records = await manager.resolve(
+			judge,
+			SYSTEM_ONE_JUDGE_REQUEST,
+			JUDGMENT_INPUT.sources,
+			new AbortController().signal,
+		)
+		expect(transport.requests).toHaveLength(1)
+		expect(records.map((record) => record.id)).toEqual(['label', 'refund', 'severity'])
+		expect(records[0]).toBe(manager.judgment('label'))
+		expect(records[1]).toBe(cached)
+		expect(records[1]).toBe(manager.judgment('refund'))
+		expect(records[2]).toBe(manager.judgment('severity'))
+		expect(records.every((record) => Object.isFrozen(record))).toBe(true)
+	})
+})
