@@ -237,11 +237,15 @@ export class Classifier implements ClassifierInterface {
 				continue
 			const near = this.#readNear(later, nears)
 			if (near.size === 0) continue
+			const limit = this.#options.correction?.limit
+			const kept =
+				limit === undefined
+					? undefined
+					: this.#collectKept(messages, later, near, limit, quiets, nears)
 			for (const earlier of messages) {
 				if (earlier.id === later.id) break
 				if (
-					this.#readQuiet(earlier.id, quiets) ||
-					![...this.#readNear(earlier, nears)].some((topic) => near.has(topic))
+					kept === undefined ? !this.#eligible(earlier, near, quiets, nears) : !kept.has(earlier.id)
 				)
 					continue
 				const spec = this.#buildPair('amends', earlier.id, later.id)
@@ -364,6 +368,42 @@ export class Classifier implements ClassifierInterface {
 		const quiet = this.quiet(id)
 		quiets.set(id, quiet)
 		return quiet
+	}
+
+	// Reports whether a correction is compared against an earlier message: the message is not quiet
+	// and its near set shares a member with the correction's. The quiet flag is read first, so a
+	// quiet message's near set is never read.
+	#eligible(
+		earlier: Message,
+		near: ReadonlySet<string>,
+		quiets: Map<string, boolean>,
+		nears: Map<string, ReadonlySet<string>>,
+	): boolean {
+		return (
+			!this.#readQuiet(earlier.id, quiets) &&
+			[...this.#readNear(earlier, nears)].some((topic) => near.has(topic))
+		)
+	}
+
+	// Collects the ids of the most recent eligible messages before a correction, walking back from it
+	// until the set holds `limit` of them.
+	#collectKept(
+		messages: readonly Message[],
+		later: Message,
+		near: ReadonlySet<string>,
+		limit: number,
+		quiets: Map<string, boolean>,
+		nears: Map<string, ReadonlySet<string>>,
+	): ReadonlySet<string> {
+		const kept = new Set<string>()
+		if (limit === 0) return kept
+		const position = messages.findIndex((message) => message.id === later.id)
+		for (const earlier of messages.slice(0, position).toReversed()) {
+			if (!this.#eligible(earlier, near, quiets, nears)) continue
+			kept.add(earlier.id)
+			if (kept.size === limit) break
+		}
+		return kept
 	}
 
 	async #ask(

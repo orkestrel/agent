@@ -119,6 +119,18 @@ export interface LedgerRecallOptions {
 }
 
 /**
+ * Bounds the pair questions the ledger asks about each correction.
+ *
+ * @remarks
+ * `limit` caps the earlier messages one correction is compared against, most recent first; it must
+ * be a nonnegative safe integer. Default: no cap. A cap bounds judge calls and is no verdict, so a
+ * supersession older than the cap is never filed.
+ */
+export interface LedgerCorrectionOptions {
+	readonly limit?: number
+}
+
+/**
  * Carries one owner a lookup result names: its id and the names it goes by.
  *
  * @remarks
@@ -254,8 +266,8 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
 
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
- * context capacity, and the optional first-pass thinking, lookups, gauge, shares, recall,
- * agent bounds, and snapshot.
+ * context capacity, and the optional first-pass thinking, lookups, gauge, shares, snapshot, and
+ * recall, correction, and agent bounds.
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
@@ -292,6 +304,7 @@ export interface LedgerOptions {
 	readonly lookups?: readonly LedgerLookup[]
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
+	readonly correction?: LedgerCorrectionOptions
 	readonly agent?: LedgerAgentOptions
 	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none, because a `gauge` option wins over `snapshot.gauge`. */
 	readonly snapshot?: LedgerSnapshot
@@ -652,7 +665,7 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
 
 /**
  * Configures a classifier: the conversation it files, the judge and the wording it asks with, the
- * desk topics, the cutoffs, and the ledger's handlers.
+ * desk topics, the cutoffs, the ledger's handlers, and the optional correction bound.
  *
  * @remarks
  * `assign` decides the category of a message the ledger wrote or a tool returned, without a
@@ -660,6 +673,8 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
  * While it pairs corrections, the `classify` method reads each message's quiet flag and near set at
  * most once per call and reuses them for every later correction, so a change to the conversation,
  * its judgments, or the judge's model made while the call waits on the judge reaches the next call.
+ * `correction` caps the earlier messages each correction's pair questions compare, most recent
+ * first.
  */
 export interface ClassifierOptions {
 	readonly conversation: ConversationInterface
@@ -669,6 +684,7 @@ export interface ClassifierOptions {
 	readonly thresholds: LedgerThreshold
 	readonly assign: LedgerCategoryHandler
 	readonly entities: LedgerEntityHandler
+	readonly correction?: LedgerCorrectionOptions
 }
 
 /** Names the filing question a classifier asked: a message's category, a message's topic, or an earlier and later message's amendment or supersession. */
@@ -879,7 +895,7 @@ export type LedgerErrorCode =
 	| 'SHARE'
 	/** Reports an invalid capacity or a generation cap that is not a nonnegative safe integer less than capacity. */
 	| 'CAPACITY'
-	/** Reports a recall limit or an agent limit that is not a nonnegative safe integer. */
+	/** Reports a recall limit, a correction limit, or an agent limit that is not a nonnegative safe integer. */
 	| 'LIMIT'
 	/** Reports a topic with an empty name or a name another topic carries. */
 	| 'TOPIC'

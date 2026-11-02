@@ -1788,6 +1788,43 @@ await new GuideCommand({
 			)
 		})
 
+		it('caps correction pairs as the guide says', async () => {
+			const { buildCorrectionSeed } = await import('./setup.js')
+			const conversation = createConversation()
+			conversation.add(buildCorrectionSeed(6))
+			const messages = conversation.messages()
+			const correction = requireValue(messages.at(-1))
+			const limit = 2
+			const classifier = new Classifier({
+				conversation,
+				judge: createPhraseJudge([], ['Correction:']),
+				questions: LEDGER_QUESTIONS,
+				topics: [LEDGER_REFUNDS_TOPIC],
+				thresholds: LEDGER_DESK_THRESHOLDS,
+				assign: () => undefined,
+				entities: (text) => barrel.extractLiterals(text).ids,
+				correction: { limit },
+			})
+			const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+
+			// Every pair passes `amends`, so each kept statement asks `amends`, then `supersedes`.
+			expect(
+				filed.readings
+					.filter((reading) => reading.phase === 'amends' || reading.phase === 'supersedes')
+					.map((reading) => reading.key),
+			).toEqual(
+				messages
+					.slice(-1 - limit, -1)
+					.flatMap((earlier) => [
+						JSON.stringify(['amends', earlier.id, correction.id]),
+						JSON.stringify(['supersedes', earlier.id, correction.id]),
+					]),
+			)
+			expect(guideText).toContain(
+				'The `limit` member of the `correction` option caps the earlier messages one correction is compared against, the most recent eligible ones first, so a correction asks at most twice that many pair questions; with no `limit`, the ledger asks about every eligible earlier message.',
+			)
+		})
+
 		it('fits the tail inside the tail share of the prompt budget less the overhead cost, as the plan claims', async () => {
 			const capacity = 600
 			const measured: Array<readonly [overhead: number, tail: number]> = []

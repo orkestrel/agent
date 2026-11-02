@@ -5620,6 +5620,30 @@ export function buildDeliverySeed(count: number): readonly MessageInput[] {
 }
 
 /**
+ * Builds refund statements about one account followed by a correction that names the same account.
+ * @param count - The number of statements before the correction
+ * @returns The user messages to append to a conversation, the correction last
+ */
+export function buildCorrectionSeed(count: number): readonly MessageInput[] {
+	return [
+		...Array.from({ length: count }, (_unused, at): MessageInput => ({
+			role: 'user',
+			content: `Account BW-20931 asked for refund ${at + 1} on a damaged order.`,
+		})),
+		{ role: 'user', content: 'Correction: account BW-20931 gets one refund for that order.' },
+	]
+}
+
+/** Supplies the limit values a ledger refuses with `'LIMIT'`. */
+export const LEDGER_INVALID_LIMITS = Object.freeze([
+	-1,
+	0.5,
+	NaN,
+	Infinity,
+	Number.MAX_SAFE_INTEGER + 1,
+])
+
+/**
  * Builds the assistant call and tool result of a seeded lookup exchange.
  * @param content - The result text
  * @param id - The call id

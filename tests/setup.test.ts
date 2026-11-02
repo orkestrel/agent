@@ -241,6 +241,7 @@ import {
 	createLedgerJudge,
 	SwitchingJudge,
 	buildDeliverySeed,
+	buildCorrectionSeed,
 	buildLedgerPairJudgment,
 	buildLedgerTopicJudgment,
 	buildUncalibratedOptions,
@@ -2674,6 +2675,21 @@ describe('shared ledger builders', () => {
 		expect(buildDeliverySeed(20).at(-1)?.content).toBe(
 			'Delivery 19 arrived Tuesday with a completed receipt.',
 		)
+	})
+
+	it('buildCorrectionSeed ends in a correction', () => {
+		const seed = buildCorrectionSeed(3)
+		expect(seed).toHaveLength(4)
+		expect(new Set(seed.map((message) => message.content)).size).toBe(4)
+		expect(seed.every((message) => message.role === 'user')).toBe(true)
+		expect(
+			seed.every(
+				(message) => message.content.includes('BW-20931') && message.content.includes('refund'),
+			),
+		).toBe(true)
+		expect(seed.slice(0, -1).some((message) => message.content.includes('Correction'))).toBe(false)
+		expect(seed.at(-1)?.content.startsWith('Correction:')).toBe(true)
+		expect(buildCorrectionSeed(0)).toEqual([requireValue(seed.at(-1))])
 	})
 })
 

@@ -51,6 +51,8 @@ import {
 	serveLedgerReplay,
 	translateLedgerIds,
 	buildDeliverySeed,
+	buildCorrectionSeed,
+	buildGuideLedgerOptions,
 	buildLedgerOptions,
 	buildLedgerResponse,
 	buildLedgerJudgment,
@@ -61,6 +63,7 @@ import {
 	CANARY_LEDGER_SOURCES,
 	CANARY_SENTINELS,
 	LEDGER_HANDLE,
+	LEDGER_INVALID_LIMITS,
 	LEDGER_OWNER_FIXTURE,
 	LEDGER_OWNER_RENDER_CASES,
 	LEDGER_PRESERVATION_FIXTURE,
@@ -1846,6 +1849,42 @@ describe('Ledger', () => {
 		const options = buildLedgerOptions()
 		expect(() => new Ledger(createScriptedProvider([]), { ...options, capacity: 0 })).toThrow(
 			expect.objectContaining({ code: 'CAPACITY' }),
+		)
+	})
+	it('refuses a bad correction limit', () => {
+		const options = buildLedgerOptions()
+		for (const value of LEDGER_INVALID_LIMITS)
+			expect(
+				() => new Ledger(createScriptedProvider([]), { ...options, correction: { limit: value } }),
+			).toThrow(expect.objectContaining({ code: 'LIMIT' }))
+		expect(
+			() => new Ledger(createScriptedProvider([]), { ...options, correction: { limit: 0 } }),
+		).not.toThrow()
+	})
+	it('forwards the correction limit', async () => {
+		const limit = 2
+		const ledger = new Ledger(
+			createScriptedProvider([{ content: 'Noted.' }]),
+			buildGuideLedgerOptions({
+				judge: createPhraseJudge([], ['Correction:']),
+				correction: { limit },
+			}),
+		)
+		ledger.conversation.add(buildCorrectionSeed(5))
+		const messages = ledger.conversation.messages()
+		const correction = requireValue(messages.at(-1))
+		const result = await ledger.respond('Is the refund for account BW-20931 settled?')
+		expect(
+			result.readings
+				.filter((reading) => reading.phase === 'amends' || reading.phase === 'supersedes')
+				.map((reading) => reading.key),
+		).toEqual(
+			messages
+				.slice(-1 - limit, -1)
+				.flatMap((earlier) => [
+					JSON.stringify(['amends', earlier.id, correction.id]),
+					JSON.stringify(['supersedes', earlier.id, correction.id]),
+				]),
 		)
 	})
 

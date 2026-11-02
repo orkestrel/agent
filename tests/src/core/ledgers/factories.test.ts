@@ -4,6 +4,7 @@ import { captureError } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
+	LEDGER_INVALID_LIMITS,
 	buildLedgerOptions,
 	createEmptyLedgerLookup,
 	createScriptedProvider,
@@ -84,6 +85,16 @@ describe('createLedger', () => {
 				agent: { limit: 0 },
 			}),
 		).not.toThrow()
+	})
+	it('refuses each bad correction limit', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
+		for (const value of LEDGER_INVALID_LIMITS)
+			expect(() =>
+				createLedger(createScriptedProvider([]), { ...options, correction: { limit: value } }),
+			).toThrow(expect.objectContaining({ code: 'LIMIT' }))
+		expect(
+			createLedger(createScriptedProvider([]), { ...options, correction: { limit: 0 } }),
+		).toBeInstanceOf(Ledger)
 	})
 	it('rejects empty or duplicate topics and duplicate or reserved lookup names', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })

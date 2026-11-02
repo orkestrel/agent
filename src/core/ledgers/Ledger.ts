@@ -133,7 +133,7 @@ export class Ledger implements LedgerInterface {
 		if (!isPositiveSafeInteger(options.capacity))
 			throw new LedgerError('CAPACITY', 'capacity must be a positive safe integer')
 		this.#predict = resolvePredict(options.predict, options.capacity)
-		for (const value of [options.recall?.limit, options.agent?.limit]) {
+		for (const value of [options.recall?.limit, options.correction?.limit, options.agent?.limit]) {
 			if (value !== undefined && !isNonNegativeSafeInteger(value))
 				throw new LedgerError('LIMIT', 'limits must be nonnegative safe integers')
 		}
@@ -187,6 +187,7 @@ export class Ledger implements LedgerInterface {
 					partial,
 				)
 			},
+			...(options.correction === undefined ? {} : { correction: options.correction }),
 		})
 		const tools = createToolManager()
 		for (const lookup of options.lookups ?? []) {
