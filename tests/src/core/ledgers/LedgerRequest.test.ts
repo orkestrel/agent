@@ -1,11 +1,11 @@
 import type { ClassifierReading, Selection } from '@src/core'
 import { createConversation, DEFAULT_RECALL_LIMIT, LEDGER_NOTES, LedgerRequest } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { computeLedgerErrorCode } from '../../../setup.js'
+import { LEDGER_INVALID_LIMITS, computeLedgerErrorCode } from '../../../setup.js'
 
 describe('LedgerRequest', () => {
 	it('refuses a recall limit that is not a nonnegative safe integer and accepts its boundaries', () => {
-		for (const limit of [-1, 0.5, Number.NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+		for (const limit of LEDGER_INVALID_LIMITS) {
 			expect(computeLedgerErrorCode(() => new LedgerRequest('Check.', limit))).toBe('LIMIT')
 		}
 		for (const limit of [0, -0, Number.MAX_SAFE_INTEGER]) {

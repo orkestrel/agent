@@ -70,7 +70,7 @@ describe('createLedger', () => {
 			expect(() =>
 				createLedger(createScriptedProvider([]), { ...options, capacity: value }),
 			).toThrow(expect.objectContaining({ code: 'CAPACITY' }))
-		for (const value of [-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+		for (const value of LEDGER_INVALID_LIMITS) {
 			expect(() =>
 				createLedger(createScriptedProvider([]), { ...options, recall: { limit: value } }),
 			).toThrow(expect.objectContaining({ code: 'LIMIT' }))
