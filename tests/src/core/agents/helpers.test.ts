@@ -73,6 +73,8 @@ import {
 	CANARY_FRAME_SOURCES,
 	CANARY_SENTINELS,
 	createAskAgent,
+	createCanaryMemos,
+	createCanarySkills,
 	createRecordedTool,
 	createScriptedProvider,
 	createThrowingProvider,
@@ -1413,6 +1415,10 @@ describe('agentStreamToFrames — the page projection of one run', () => {
 			'budget',
 			'thinking',
 			'argument',
+			'skill',
+			'memo',
+			'gist',
+			'fact',
 		])
 		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const tools = createToolManager()
@@ -1447,6 +1453,8 @@ describe('agentStreamToFrames — the page projection of one run', () => {
 		const agent = createAgent(provider, {
 			system: `Serve the ${CANARY_SENTINELS.system} desk.`,
 			tools,
+			skills: createCanarySkills(),
+			memos: createCanaryMemos(),
 			budget: createTokenBudget({ id: CANARY_SENTINELS.budget, max: 1_000_000 }),
 			select: async (conversation) => ({
 				messages: [
@@ -1495,6 +1503,10 @@ describe('agentStreamToFrames — the page projection of one run', () => {
 			'reason',
 			'name',
 			'budget',
+			'skill',
+			'memo',
+			'gist',
+			'fact',
 		] as const) {
 			expect([source, serialized.some((line) => line.includes(CANARY_SENTINELS[source]))]).toEqual([
 				source,

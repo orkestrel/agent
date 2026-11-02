@@ -1,9 +1,11 @@
 import type {
 	AgentContextInterface,
 	InstructionManagerInterface,
+	MemoManagerInterface,
 	ScopeInterface,
 	Selection,
 	SelectionHandler,
+	SkillManagerInterface,
 } from '../contexts/index.js'
 import type {
 	ConversationInterface,
@@ -463,7 +465,7 @@ export interface ApproverInterface {
 
 /**
  * Configures `createAgent` — the loop's bounds and pacing, the reserved `on` hooks, the
- * construction-time context wiring (`instructions` / `workspaces` / `scope`), the `conversations`
+ * construction-time context wiring (`instructions` / `skills` / `memos` / `workspaces` / `scope`), the `conversations`
  * registry holding every run's default, the context `window` budget that opts into automatic
  * compaction of the run's conversation, and the `strict` switch that aborts the run on an
  * automatic-compaction summarizer failure instead of the lenient default.
@@ -516,6 +518,10 @@ export interface ApproverInterface {
  *   selection's usage to `budget` and the result's `usage`.
  * - `instructions` — an optional pre-built {@link InstructionManagerInterface} forwarded to the
  *   agent's context; an empty one is created when omitted (mirrors {@link AgentContextOptions.instructions}).
+ * - `skills` — an optional pre-built {@link SkillManagerInterface} forwarded to the agent's context,
+ *   whose index renders in the `system` message; an empty one is created when omitted (mirrors {@link AgentContextOptions.skills}).
+ * - `memos` — an optional pre-built {@link MemoManagerInterface} forwarded to the agent's context,
+ *   whose index renders in the `user` context message; an empty one is created when omitted (mirrors {@link AgentContextOptions.memos}).
  * - `workspaces` — an optional pre-built {@link WorkspaceManagerInterface} forwarded to the
  *   agent's context; a fresh empty one is created when omitted (mirrors {@link AgentContextOptions.workspaces}).
  * - `scope` — an optional initial active {@link ScopeInterface} forwarded to the agent's context
@@ -532,6 +538,10 @@ export interface AgentOptions {
 	readonly tools?: ToolManagerInterface
 	/** Reuses a pre-built instruction registry forwarded to the agent's context; an empty one is created when omitted. */
 	readonly instructions?: InstructionManagerInterface
+	/** Reuses a pre-built skill registry forwarded to the agent's context; an empty one is created when omitted. */
+	readonly skills?: SkillManagerInterface
+	/** Reuses a pre-built memo set forwarded to the agent's context; an empty one is created when omitted. */
+	readonly memos?: MemoManagerInterface
 	/** Reuses a pre-built workspace registry forwarded to the agent's context; a fresh empty one is created when omitted. */
 	readonly workspaces?: WorkspaceManagerInterface
 	/**
@@ -544,7 +554,7 @@ export interface AgentOptions {
 	 * Other scoped-out calls produce denial tool results and messages, and the loop continues.
 	 * A scope change through the context's `apply` method applies the tool allow-list at the next
 	 * turn's snapshot, which a `turn` listener reaches for the same turn, and the instructions,
-	 * files, and `select` at the next build or select site: run entry, the pre-first-turn
+	 * skills, memos, files, and `select` at the next build or select site: run entry, the pre-first-turn
 	 * compaction fold, or a compaction rebuild.
 	 */
 	readonly scope?: ScopeInterface

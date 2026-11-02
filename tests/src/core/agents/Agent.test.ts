@@ -61,7 +61,9 @@ import {
 	createAuthority,
 	createConversation,
 	createConversationManager,
+	createMemoManager,
 	createScope,
+	createSkillManager,
 	denyCall,
 	estimateMessages,
 	estimateRequest,
@@ -83,6 +85,8 @@ import {
 	AUTHORITY_STATES,
 	CANARY_INGRESS_SOURCES,
 	CANARY_SENTINELS,
+	createCanaryMemos,
+	createCanarySkills,
 	createRecordingScheduler,
 	createRecordingSelection,
 	createScriptedProvider,
@@ -7438,6 +7442,33 @@ describe('Agent — the system boundary canary, stored ingress', () => {
 				messages.filter((message) => message.content.includes(CANARY_SENTINELS[source])),
 			).toEqual([])
 		}
+	})
+})
+
+describe('Agent — the skills and memos indexes', () => {
+	it('forwards skills and memos to its context', () => {
+		const skills = createSkillManager()
+		const memos = createMemoManager()
+		const agent = createAgent(createScriptedProvider([]), { skills, memos })
+
+		expect(agent.context.skills).toBe(skills)
+		expect(agent.context.memos).toBe(memos)
+	})
+
+	it('sends the indexes on the first request', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const agent = createAgent(provider, {
+			skills: createCanarySkills(),
+			memos: createCanaryMemos(),
+		})
+		agent.context.messages.add({ role: 'user', content: 'Tidy the desk.' })
+
+		await agent.generate()
+
+		const text = provider.calls[0]?.messages.map((message) => message.content).join('\n')
+		expect(text).toContain(CANARY_SENTINELS.skill)
+		expect(text).toContain(CANARY_SENTINELS.memo)
+		expect(text).toContain(CANARY_SENTINELS.gist)
 	})
 })
 

@@ -183,7 +183,10 @@ export interface InstructionManagerInterface {
  * the top, only the per-item rendering, only the bottom, or any mix). A section assembles
  * as `[open, ...items.map(render), close]` with empty / absent slots dropped, the survivors
  * blank-line (`\n\n`) joined — so `open` + `close` together let you wrap the whole
- * group (for example `open: '<instructions>'` … `close: '</instructions>'`). `open` is the
+ * group (for example `open: '<instructions>'` … `close: '</instructions>'`). The memo and skill
+ * indexes join their rendered items with a single newline into the one block their section holds,
+ * so an item rendered to `''` leaves an empty line in that block, and a sole item rendered to `''`
+ * leaves the header alone. `open` is the
  * section's leading text (the header, or a group's opening tag); `render` turns one section
  * item (an instruction, a memo, or a skill) into its prompt text; `close` is the trailing text.
  * `open` and `render` cascade through the
@@ -212,10 +215,10 @@ export interface ContextSectionFormat<T> {
 
 /**
  * Lists the per-category allow-lists a {@link ScopeInterface} carries — an optional `readonly
- * string[]` for `instructions`, for `tools`, and for `files`, each keyed by that category's
- * identity (an instruction's `name`, a tool's `name`, a workspace file's `path`) and read as an
- * allow-list: `undefined` lets everything pass, `[]` lets nothing pass, and a non-empty list passes
- * the listed keys alone.
+ * string[]` for `instructions`, for `skills`, for `memos`, for `tools`, and for `files`, each keyed
+ * by that category's identity (an instruction's, a skill's, a memo's, or a tool's `name`, a workspace
+ * file's `path`) and read as an allow-list: `undefined` lets everything pass, `[]` lets nothing pass,
+ * and a non-empty list passes the listed keys alone.
  *
  * @remarks
  * Each list is three-way (see {@link import('../helpers.js').filterAllowList}): `undefined`
@@ -228,6 +231,10 @@ export interface ContextSectionFormat<T> {
 export interface ScopeFilter {
 	/** Lists the allowed instruction names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
 	readonly instructions?: readonly string[]
+	/** Lists the allowed skill names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
+	readonly skills?: readonly string[]
+	/** Lists the allowed memo names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
+	readonly memos?: readonly string[]
 	/**
 	 * Lists the allowed tool names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed).
 	 * The loop advertises and dispatches only admitted tools, checking scope before authority.
@@ -783,13 +790,13 @@ export interface SkillManagerInterface {
 
 /**
  * Configures `createAgentContext` — the optional system prompt plus the pre-built managers to
- * reuse: an `instructions` registry, a `workspaces` registry (the only document channel), a
- * `conversations` registry (the message source), a `tools` registry (the loop's advertise and
- * dispatch surface), and an initial `scope`.
+ * reuse: an `instructions` registry, a `skills` registry, a `memos` set, a `workspaces` registry
+ * (the only document channel), a `conversations` registry (the message source), a `tools` registry
+ * (the loop's advertise and dispatch surface), and an initial `scope`.
  *
  * @remarks
- * `system` is the optional system prompt prepended to the turn's input. `instructions` /
- * `workspaces` are optional pre-built context managers to reuse (bring your own registry);
+ * `system` is the optional system prompt prepended to the turn's input. `instructions` / `skills` /
+ * `memos` / `workspaces` are optional pre-built context managers to reuse (bring your own registry);
  * when one is omitted, the context creates a fresh empty one. `tools` supplies the loop's
  * call-dispatch and provider-advertising registry; it never renders into the prompt. `scope` is the
  * initial active filter applied at `build()` time (and at the loop's tool-advertise step); it
@@ -812,6 +819,10 @@ export interface AgentContextOptions {
 	readonly tools?: ToolManagerInterface
 	/** Reuses a pre-built instruction registry; an empty one is created when omitted. */
 	readonly instructions?: InstructionManagerInterface
+	/** Reuses a pre-built skill registry whose index `build()` renders in the `system` message; an empty one is created when omitted. */
+	readonly skills?: SkillManagerInterface
+	/** Reuses a pre-built memo set whose index `build()` renders in the `user` context message; an empty one is created when omitted. */
+	readonly memos?: MemoManagerInterface
 	/**
 	 * Reuses a pre-built {@link WorkspaceManagerInterface}; a fresh empty one is created when
 	 * omitted (so `context.workspaces` is always present). `build()` renders the active workspace's
@@ -850,13 +861,13 @@ export interface AgentContextOptions {
  *
  * @remarks
  * The richer context — `system` (the optional system prompt), the prompt context managers
- * (`instructions` / `workspaces` / `conversations`), `messages` (the active
+ * (`instructions` / `skills` / `memos` / `workspaces` / `conversations`), `messages` (the active
  * conversation's live tail, satisfying {@link import('../conversations/index.js').MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
- * system prompt and the scoped instructions into one leading `system` message (under the
- * manager's `open`, each item through its `render`), renders the active workspace's scope-filtered
- * text files (fenced reference blocks) into one `user` context message after it, and appends the
- * active conversation's `view()`, attaching the active workspace's scope-filtered image files'
+ * system prompt, the scoped instructions, and the scoped skills index into one leading `system`
+ * message (under each manager's `open`, each item through its `render`), renders the scoped memos
+ * index and the active workspace's scope-filtered text files (fenced reference blocks) into one
+ * `user` context message after it, and appends the active conversation's `view()`, attaching the active workspace's scope-filtered image files'
  * `base64` payload to the last user message. The
  * active workspace is the sole document/image context. Tools are advertised to the provider
  * structurally (through `tools.definitions()`, scope-filtered by the loop), not serialized into
@@ -866,6 +877,10 @@ export interface AgentContextOptions {
 export interface AgentContextInterface {
 	readonly system: string | undefined
 	readonly instructions: InstructionManagerInterface
+	/** Holds the always-present skill registry whose index `build()` renders in the `system` message. */
+	readonly skills: SkillManagerInterface
+	/** Holds the always-present memo set whose index `build()` renders in the `user` context message. */
+	readonly memos: MemoManagerInterface
 	/**
 	 * Holds the {@link WorkspaceManagerInterface} whose active workspace `build()` renders by carrier —
 	 * its text files folded into the `user` context message (fenced reference blocks) and its image files'
@@ -953,14 +968,15 @@ export interface AgentContextInterface {
 	): Promise<Selection> | undefined
 	/**
 	 * Builds the provider input for the next turn: a leading `system` message folding the
-	 * prompt and the scope-filtered instructions (each section's header and each item's rendering
-	 * resolved through the format cascade), then one `user` context message holding the active
-	 * workspace's scope-filtered (`scope.files`) text files as fenced reference blocks in a
+	 * prompt, the scope-filtered instructions, and the scope-filtered skills index (each section's
+	 * header and each item's rendering resolved through the format cascade), then one `user` context
+	 * message holding the scope-filtered memos index before the active workspace's scope-filtered
+	 * (`scope.files`) text files as fenced reference blocks in a
 	 * `## Workspace` section, then the active conversation's `view()`, or the selection's
 	 * `messages` when a selection is passed, with the active workspace's image files' `base64`
 	 * payload attached to the last user message. With no override set, each section renders on its
 	 * manager's built-in framing. The `system` message is prepended only when some part of it
-	 * exists, the context message only when the workspace section renders, the workspace render
+	 * exists, the context message only when the memos or workspace section renders, the workspace render
 	 * covers the active workspace alone, tools are advertised structurally rather than in the
 	 * prompt, and the input is built fresh on each call.
 	 *
@@ -981,7 +997,8 @@ export interface AgentContextInterface {
 	 *
 	 * **The format cascade.** Each manager section frames as `[open, ...items.map(render), close]`
 	 * (empty / absent slots dropped, the survivors `\n\n`-joined), reading the manager's `open`,
-	 * `render`, and `close`. Each slot resolves independently, most-specific-first, across three
+	 * `render`, and `close`, and each index joins its items with a single newline into the one block
+	 * its section holds. Each slot resolves independently, most-specific-first, across three
 	 * levels — an item override, the manager-options {@link ContextSectionFormat}, and the
 	 * manager's built-in. For the instructions manager's options format `O`:
 	 * - **open** = `O.open ?? '## Instructions'` — **manager-options override > built-in** (the
@@ -1003,9 +1020,9 @@ export interface AgentContextInterface {
 	 * `selection.messages`.
 	 *
 	 * @param selection - The selection whose `messages` replace `view()`; omitted ⇒ `view()`
-	 * @returns The scoped conversation, prefixed by the context message when the active workspace's
-	 *   scoped text files are non-empty, and before it by the assembled `system` message when the
-	 *   prompt or the scoped instructions are non-empty
+	 * @returns The scoped conversation, prefixed by the context message when the scoped memos or the
+	 *   active workspace's scoped text files are non-empty, and before it by the assembled `system`
+	 *   message when the prompt, the scoped instructions, or the scoped skills are non-empty
 	 */
 	build(selection?: Selection): readonly Message[]
 }

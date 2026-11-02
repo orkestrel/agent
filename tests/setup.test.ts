@@ -117,6 +117,8 @@ import {
 	RENDERED_ARGUMENTS,
 	createAskAgent,
 	createCanaryJudge,
+	createCanaryMemos,
+	createCanarySkills,
 	createGuardAgent,
 	createWireDecision,
 	createWireHeaders,
@@ -147,6 +149,7 @@ import {
 	createSystemOneJudge,
 	ConversationManager,
 	createConversation,
+	createLedger,
 	createMemoManager,
 	createMemoryConversationStore,
 	isConversationSnapshot,
@@ -242,6 +245,8 @@ import {
 	LEDGER_DESK_THRESHOLDS,
 	buildLedgerJudgment,
 	buildLedgerExchange,
+	seedLedgerTrimOrder,
+	LEDGER_TRIM_ORDER_FIXTURE,
 	buildLedgerResponse,
 	createLedgerJudge,
 	SwitchingJudge,
@@ -1228,6 +1233,20 @@ describe('system boundary canary fixtures', () => {
 		expect(CANARY_BUILD_SOURCES).not.toContain('system')
 		expect(CANARY_LEDGER_SOURCES).not.toContain('system')
 		expect(CANARY_INGRESS_SOURCES).not.toContain('system')
+		expect(CANARY_BUILD_SOURCES).not.toContain('skill')
+		expect(CANARY_LEDGER_SOURCES).not.toContain('skill')
+	})
+
+	it('builds the canary skill and memo', () => {
+		const skills = createCanarySkills().skills()
+		const memos = createCanaryMemos().memos()
+
+		expect(skills).toHaveLength(1)
+		expect(skills[0]?.description).toContain(CANARY_SENTINELS.skill)
+		expect(memos).toHaveLength(1)
+		expect(memos[0]?.name).toBe(CANARY_SENTINELS.memo)
+		expect(memos[0]?.description).toContain(CANARY_SENTINELS.gist)
+		expect(memos[0]?.content).toContain(CANARY_SENTINELS.fact)
 	})
 
 	it.each(CANARY_INGRESS_SOURCES)(
@@ -2304,6 +2323,23 @@ describe('ledger setup leaves', () => {
 			topics: [],
 			role: 'user',
 		})
+	})
+	it('seeds the trim order with its judgments', () => {
+		const fixture = LEDGER_TRIM_ORDER_FIXTURE
+		const ledger = createLedger(createScriptedProvider([]), buildLedgerOptions())
+		seedLedgerTrimOrder(ledger)
+		expect(ledger.conversation.view().map((message) => message.content)).toEqual([
+			'',
+			fixture.seed,
+			fixture.older,
+			fixture.correction,
+			fixture.newer,
+		])
+		expect(ledger.conversation.judgments.judgments().map((one) => one.answer)).toMatchObject([
+			{ probabilities: { fact: 1, correction: 0 } },
+			{ probabilities: { fact: 0, correction: 1 } },
+			{ probabilities: { fact: 1, correction: 0 } },
+		])
 	})
 	it('builds protocol answers from each request and refuses malformed requests', async () => {
 		const response = await buildLedgerResponse(

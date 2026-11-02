@@ -48,6 +48,17 @@ describe('Scope — construction', () => {
 		expect(scope.tools).toEqual(['search'])
 	})
 
+	it('copies the skills and memos lists', () => {
+		const skills = ['review']
+		const memos = ['tone']
+		const scope = new Scope({ name: 'r', skills, memos })
+		skills.push('triage')
+		memos.push('reach')
+
+		expect(scope.skills).toEqual(['review'])
+		expect(scope.memos).toEqual(['tone'])
+	})
+
 	it('distinguishes an empty list ([] ⇒ none) from an omitted one (undefined ⇒ all)', () => {
 		const scope = new Scope({ name: 'none-tools', tools: [] })
 
@@ -63,6 +74,15 @@ describe('Scope — narrow (set-intersection)', () => {
 		const child = parent.narrow({ tools: ['b', 'c', 'd'] })
 
 		expect(child.tools).toEqual(['b', 'c'])
+	})
+
+	it('narrows skills and memos by intersection', () => {
+		const parent = new Scope({ name: 'p', skills: ['review', 'triage'], memos: ['tone'] })
+
+		const child = parent.narrow({ skills: ['triage', 'draft'], memos: ['tone', 'reach'] })
+
+		expect(child.skills).toEqual(['triage'])
+		expect(child.memos).toEqual(['tone'])
 	})
 
 	it('passes the child list through when the parent imposes no constraint (undefined ∩ list = list)', () => {

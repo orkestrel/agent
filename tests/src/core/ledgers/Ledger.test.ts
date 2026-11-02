@@ -10,9 +10,13 @@ import {
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
 	Ledger,
+	IMAGE_TOKEN_ESTIMATE,
 	createConversation,
+	createInstructionManager,
 	createLedger,
+	createMemoManager,
 	createScope,
+	createSkillManager,
 	estimateMessages,
 	isAgentError,
 	isConversationError,
@@ -23,6 +27,12 @@ import { createTokenBudget } from '@orkestrel/budget'
 import { isString } from '@orkestrel/contract'
 import { OllamaProvider } from '@orkestrel/ollama'
 import { createTool } from '@orkestrel/tool'
+import {
+	createBinaryContent,
+	createFile,
+	createTextContent,
+	createWorkspaceManager,
+} from '@orkestrel/workspace'
 import {
 	captureError,
 	createRecorder,
@@ -81,6 +91,7 @@ import {
 	createScriptedProvider,
 	extractLedgerRecords,
 	readCallRequest,
+	seedLedgerTrimOrder,
 	serveCanaryDesk,
 	serveRecordsDesk,
 	summarizeReadings,
@@ -2868,27 +2879,7 @@ describe('Ledger', () => {
 				provider,
 				buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 } }),
 			)
-			ledger.conversation.add(buildLedgerExchange(fixture.seed))
-			const older = ledger.conversation.add({ role: 'user', content: fixture.older })
-			const correction = ledger.conversation.add({ role: 'user', content: fixture.correction })
-			const newer = ledger.conversation.add({ role: 'user', content: fixture.newer })
-			for (const message of [older, correction, newer])
-				ledger.conversation.judgments.add(
-					buildLedgerJudgment(message, {
-						answer: {
-							form: 'choice',
-							probabilities: {
-								fact: message === correction ? 0 : 1,
-								rule: 0,
-								correction: message === correction ? 1 : 0,
-								request: 0,
-								opinion: 0,
-								chatter: 0,
-								distractor: 0,
-							},
-						},
-					}),
-				)
+			seedLedgerTrimOrder(ledger)
 			await ledger.respond(fixture.request)
 			const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 			expect(text).toBe(expected)
@@ -3050,6 +3041,214 @@ describe('Ledger', () => {
 	})
 })
 
+describe('Ledger — head pricing', () => {
+	it('keeps a long head under the plan cap', async () => {
+		const fixture = LEDGER_TRIM_ORDER_FIXTURE
+		const instruction = 'Read the whole refund note before you answer the desk. '.repeat(12)
+		const instructions = createInstructionManager()
+		instructions.add({ name: 'desk', content: instruction })
+		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const capacity =
+			Math.ceil(
+				estimateMessages([
+					{
+						id: 'system',
+						role: 'system',
+						content: `Serve the desk.\n\n## Instructions\n\n${instruction}`,
+					},
+					{ id: 'request', role: 'user', content: `${expected}\n\n## Request\n${fixture.request}` },
+				]) *
+					(1 + LEDGER_SCALE_DRIFT),
+			) + 1
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 }, agent: { instructions } }),
+		)
+		seedLedgerTrimOrder(ledger)
+
+		await ledger.respond(fixture.request)
+
+		const messages = requireValue(provider.calls[0]).messages
+		expect(extractLedgerRecords(messages)).toBe(expected)
+		expect(estimateMessages(messages)).toBeLessThanOrEqual(capacity / (1 + LEDGER_SCALE_DRIFT))
+	})
+
+	it('sends the same head with no libraries', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ share: { prompt: 1, tail: 0.001 } }))
+
+		await ledger.respond('Check the desk.')
+
+		expect(requireValue(provider.calls[0]).messages.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'Serve the desk.' },
+			{ role: 'user', content: 'Check the desk.' },
+		])
+	})
+
+	it('calibrates on the built head', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', usage: { prompt: 140, completion: 0, total: 140 } },
+				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+			],
+			{ recorded: true },
+		)
+		const instructions = createInstructionManager()
+		instructions.add({ name: 'desk', content: 'Be terse.' })
+		const skills = createSkillManager()
+		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+		const memos = createMemoManager()
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+		const workspaces = createWorkspaceManager()
+		workspaces.add({
+			seed: [
+				createFile({ path: 'notes.txt', content: createTextContent('NOTES', 'text') }),
+				createFile({ path: 'scan.png', content: createBinaryContent('U0NBTg==', 'image/png') }),
+			],
+		})
+		const ledger = createLedger(
+			provider,
+			buildUncalibratedOptions(
+				buildLedgerOptions({ agent: { instructions, skills, memos, workspaces } }),
+			),
+		)
+		ledger.conversation.add({ role: 'user', content: 'Seed.' })
+
+		const gauge = await ledger.calibrate(new AbortController().signal)
+
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.map(({ id, ...body }) => body)).toStrictEqual([
+			{
+				role: 'system',
+				content:
+					'Serve the desk.\n\n## Instructions\n\nBe terse.\n\n## Skills\n\n- review: Reviews a change.',
+			},
+			{
+				role: 'user',
+				content:
+					'## Memos\n\n- tone: Prefers bullet lists.\n\n## Workspace\n\nFile: notes.txt\n```text\nNOTES\n```',
+			},
+			{ role: 'user', content: 'Seed.' },
+		])
+		expect(requireValue(provider.calls[1]).messages).toEqual(sent)
+		expect(gauge.scale).toBe(40 / estimateMessages(sent))
+	})
+
+	it('reads the index once per trim', async () => {
+		const fixture = LEDGER_TRIM_ORDER_FIXTURE
+		const reads = createRecorder<[name: string]>()
+		const memos = createMemoManager({
+			format: {
+				render: (one) => {
+					reads.handler(one.name)
+					return `- ${one.name}`
+				},
+			},
+		})
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const capacity =
+			Math.ceil(
+				estimateMessages([
+					{ id: 'system', role: 'system', content: 'Serve the desk.' },
+					{ id: 'context', role: 'user', content: '## Memos\n\n- tone' },
+					{ id: 'request', role: 'user', content: `${expected}\n\n## Request\n${fixture.request}` },
+				]) *
+					(1 + LEDGER_SCALE_DRIFT),
+			) + 1
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 }, agent: { memos } }),
+		)
+		seedLedgerTrimOrder(ledger)
+
+		await ledger.respond(fixture.request)
+
+		// One read each for the plan's trim, the run's build, and the turn's estimate.
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toBe(expected)
+		expect(reads.calls).toEqual([['tone'], ['tone'], ['tone']])
+	})
+
+	it('prices a workspace image on the copy', async () => {
+		const fixture = LEDGER_TRIM_ORDER_FIXTURE
+		const workspaces = createWorkspaceManager()
+		workspaces.add({
+			seed: [
+				createFile({ path: 'scan.png', content: createBinaryContent('U0NBTg==', 'image/png') }),
+			],
+		})
+		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const capacity =
+			Math.ceil(
+				(estimateMessages([
+					{ id: 'system', role: 'system', content: 'Serve the desk.' },
+					{ id: 'request', role: 'user', content: `${expected}\n\n## Request\n${fixture.request}` },
+				]) +
+					IMAGE_TOKEN_ESTIMATE) *
+					(1 + LEDGER_SCALE_DRIFT),
+			) + 1
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 }, agent: { workspaces } }),
+		)
+		seedLedgerTrimOrder(ledger)
+
+		await ledger.respond(fixture.request)
+
+		const messages = requireValue(provider.calls[0]).messages
+		expect(extractLedgerRecords(messages)).toBe(expected)
+		expect(messages.at(-1)?.images).toEqual(['U0NBTg=='])
+		expect(estimateMessages(messages)).toBeLessThanOrEqual(capacity / (1 + LEDGER_SCALE_DRIFT))
+	})
+
+	it('cuts every record when the head is over', async () => {
+		const fixture = LEDGER_TRIM_ORDER_FIXTURE
+		const instruction = 'Read the whole refund note before you answer the desk. '.repeat(12)
+		const instructions = createInstructionManager()
+		instructions.add({ name: 'desk', content: instruction })
+		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const capacity =
+			Math.ceil(
+				estimateMessages([
+					{ id: 'system', role: 'system', content: 'Serve the desk.' },
+					{ id: 'request', role: 'user', content: `${expected}\n\n## Request\n${fixture.request}` },
+				]) *
+					(1 + LEDGER_SCALE_DRIFT),
+			) + 1
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 }, agent: { instructions } }),
+		)
+		seedLedgerTrimOrder(ledger)
+
+		await ledger.respond(fixture.request)
+
+		const messages = requireValue(provider.calls[0]).messages
+		expect(messages.at(-1)?.content).toBe(fixture.request)
+		expect(estimateMessages(messages)).toBeGreaterThan(capacity / (1 + LEDGER_SCALE_DRIFT))
+	})
+
+	it('forwards skills and memos to the agent', () => {
+		const instructions = createInstructionManager()
+		const skills = createSkillManager()
+		const memos = createMemoManager()
+		const workspaces = createWorkspaceManager()
+		const ledger = createLedger(
+			createScriptedProvider([]),
+			buildLedgerOptions({ agent: { instructions, skills, memos, workspaces } }),
+		)
+
+		expect(ledger.agent.context.instructions).toBe(instructions)
+		expect(ledger.agent.context.skills).toBe(skills)
+		expect(ledger.agent.context.memos).toBe(memos)
+		expect(ledger.agent.context.workspaces).toBe(workspaces)
+	})
+})
+
 describe('Ledger — the system boundary canary', () => {
 	it.each(CANARY_LEDGER_SOURCES)(
 		'keeps the %s sentinel out of every system message on every ledger path',
@@ -3095,6 +3294,40 @@ describe('Ledger — the system boundary canary', () => {
 			expect(messages[0]?.role).toBe('system')
 			expect(messages[0]?.content).toContain(CANARY_SENTINELS.system)
 		}
+	})
+
+	it('holds the skill sentinel on every path', async () => {
+		const desk = await serveCanaryDesk()
+
+		expect(desk.calls).toHaveLength(5)
+		for (const messages of desk.calls) {
+			expect(messages[0]?.content).toContain(CANARY_SENTINELS.skill)
+		}
+	})
+
+	it('holds memo sentinels in one user turn', async () => {
+		const desk = await serveCanaryDesk()
+
+		expect(desk.calls).toHaveLength(5)
+		for (const messages of desk.calls) {
+			expect(messages[1]?.role).toBe('user')
+			for (const sentinel of [CANARY_SENTINELS.memo, CANARY_SENTINELS.gist]) {
+				expect(messages.filter((message) => message.content.includes(sentinel))).toEqual([
+					messages[1],
+				])
+			}
+		}
+	})
+
+	it('sends no memo content on any path', async () => {
+		const desk = await serveCanaryDesk()
+		const text = desk.calls
+			.flat()
+			.map((message) => message.content)
+			.join('\n')
+
+		expect(text).toContain(CANARY_SENTINELS.memo)
+		expect(text).not.toContain(CANARY_SENTINELS.fact)
 	})
 })
 

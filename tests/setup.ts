@@ -221,6 +221,7 @@ import type {
 	ConversationManagerInterface,
 	ConversationSnapshot,
 	ConversationSnapshotRow,
+	MemoManagerInterface,
 	MemoSnapshot,
 	MemoSnapshotRow,
 	MemoStoreInterface,
@@ -240,6 +241,7 @@ import type {
 	ProviderStreamOptions,
 	Selection,
 	SelectionHandler,
+	SkillManagerInterface,
 	ThinkingReplay,
 	ThinkSplitterInterface,
 } from '@src/core'
@@ -281,6 +283,7 @@ import {
 	createMemoManager,
 	createMemoryMemoStore,
 	createScope,
+	createSkillManager,
 	InstructionManager,
 	JudgeError,
 	ProviderAbortError,
@@ -2924,11 +2927,11 @@ export const RECORDED_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freez
  *
  * @remarks
  * Each value is one lowercase word that no other fixture text contains, and none contains another.
- * rc-u9 extends the table with the memo name, description, and content sentinels and the skill
- * description sentinel. The `add`, `snapshot`, `seed`, and `select` sentinels each mark the
- * `system` message {@link serveIngressCanary} offers through that ingress. The `reason`, `body`,
- * `argument`, `thinking`, `budget`, `name`, and `copy` sentinels each mark a source a server-run
- * agent's frames must keep off the wire, or carry only in their own arm.
+ * The `memo`, `gist`, and `fact` sentinels mark a memo's name, description, and content, and the
+ * `skill` sentinel marks a skill's description. The `add`, `snapshot`, `seed`, and `select` sentinels
+ * each mark the `system` message {@link serveIngressCanary} offers through that ingress. The
+ * `reason`, `body`, `argument`, `thinking`, `budget`, `name`, and `copy` sentinels each mark a source
+ * a server-run agent's frames must keep off the wire, or carry only in their own arm.
  */
 export const CANARY_SENTINELS = Object.freeze({
 	system: 'canarysystem',
@@ -2952,6 +2955,10 @@ export const CANARY_SENTINELS = Object.freeze({
 	budget: 'canarybudget',
 	name: 'canaryname',
 	copy: 'canarycopy',
+	memo: 'canarymemo',
+	gist: 'canarygist',
+	fact: 'canaryfact',
+	skill: 'canaryskill',
 })
 
 /** Lists the {@link CANARY_SENTINELS} sources a context build carries outside the system text and instructions. */
@@ -2994,6 +3001,10 @@ export const CANARY_FRAME_SOURCES = Object.freeze([
 	'budget',
 	'thinking',
 	'argument',
+	'skill',
+	'memo',
+	'gist',
+	'fact',
 ] as const)
 
 /**
@@ -5702,6 +5713,37 @@ export function buildLedgerExchange(
 }
 
 /**
+ * Seeds a ledger's conversation with {@link LEDGER_TRIM_ORDER_FIXTURE}: the seed exchange, then the
+ * three user texts in conversation order, filing the correction as a `correction` and each other
+ * text as a `fact`.
+ * @param ledger - The ledger whose conversation takes the fixture
+ */
+export function seedLedgerTrimOrder(ledger: LedgerInterface): void {
+	const fixture = LEDGER_TRIM_ORDER_FIXTURE
+	ledger.conversation.add(buildLedgerExchange(fixture.seed))
+	const older = ledger.conversation.add({ role: 'user', content: fixture.older })
+	const correction = ledger.conversation.add({ role: 'user', content: fixture.correction })
+	const newer = ledger.conversation.add({ role: 'user', content: fixture.newer })
+	for (const message of [older, correction, newer])
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(message, {
+				answer: {
+					form: 'choice',
+					probabilities: {
+						fact: message === correction ? 0 : 1,
+						rule: 0,
+						correction: message === correction ? 1 : 0,
+						request: 0,
+						opinion: 0,
+						chatter: 0,
+						distractor: 0,
+					},
+				},
+			}),
+		)
+}
+
+/**
  * Creates a phrase-driven judge for deterministic ledger scenarios.
  * @param rules - Text fragments filed as rules
  * @param amenders - Text fragments that approve amendment questions
@@ -6976,6 +7018,38 @@ export function createCanaryJudge(rules: readonly string[]): JudgeInterface {
 }
 
 /**
+ * Creates the skill manager the system boundary canary supplies.
+ *
+ * @returns A fresh manager holding one `desk` skill whose description carries the skill sentinel of
+ * {@link CANARY_SENTINELS}
+ */
+export function createCanarySkills(): SkillManagerInterface {
+	const skills = createSkillManager()
+	skills.add({
+		name: 'desk',
+		description: `Follow the ${CANARY_SENTINELS.skill} steps.`,
+		content: 'Read the refund rules.',
+	})
+	return skills
+}
+
+/**
+ * Creates the memo manager the system boundary canary supplies.
+ *
+ * @returns A fresh manager holding one memo named by the memo sentinel of {@link CANARY_SENTINELS},
+ * whose description carries the gist sentinel and whose content carries the fact sentinel
+ */
+export function createCanaryMemos(): MemoManagerInterface {
+	const memos = createMemoManager()
+	memos.add({
+		name: CANARY_SENTINELS.memo,
+		description: `Holds the ${CANARY_SENTINELS.gist} note.`,
+		content: `Recall the ${CANARY_SENTINELS.fact} line.`,
+	})
+	return memos
+}
+
+/**
  * Builds an {@link AgentContextInterface} that carries every build-path sentinel of
  * {@link CANARY_SENTINELS}.
  *
@@ -6983,7 +7057,8 @@ export function createCanaryJudge(rules: readonly string[]): JudgeInterface {
  * The system text and the `desk` instruction carry their sentinels. The active workspace holds one
  * text file carrying the workspace sentinel and one image. The conversation's first exchange folds
  * into a section whose summary is the summary sentinel, and the live tail holds the user, assistant,
- * and tool sentinels and ends in a `user` message.
+ * and tool sentinels and ends in a `user` message. {@link createCanarySkills} and
+ * {@link createCanaryMemos} supply the skill and memo sentinels.
  *
  * @returns The seeded context after its compaction
  */
@@ -6995,6 +7070,8 @@ export async function seedCanaryContext(): Promise<AgentContextInterface> {
 	const context = new AgentContext({
 		system: `Serve the ${CANARY_SENTINELS.system} desk.`,
 		conversations,
+		skills: createCanarySkills(),
+		memos: createCanaryMemos(),
 	})
 	context.instructions.add({
 		name: 'desk',
@@ -7041,6 +7118,8 @@ export interface CanaryDesk {
  * a note lookup whose result carries the tool sentinel, under content carrying the assistant
  * sentinel, then ends empty, so an answer pass runs. A late request follows, then a direct
  * `agent.generate()` with a user message newest, whose selection faults with code `'REQUEST'`.
+ * The `agent` option takes {@link createCanarySkills} and {@link createCanaryMemos}, which supply the
+ * skill and memo sentinels.
  *
  * @returns The provider calls, the selections, and the judgment records
  */
@@ -7063,6 +7142,7 @@ export async function serveCanaryDesk(): Promise<CanaryDesk> {
 			system: `Serve the ${CANARY_SENTINELS.system} desk.`,
 			capacity: 4096,
 			share: { prompt: 1, tail: 0.001 },
+			agent: { skills: createCanarySkills(), memos: createCanaryMemos() },
 			lookups: [
 				LEDGER_ORDER_LOOKUP,
 				{

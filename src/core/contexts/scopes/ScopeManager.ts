@@ -18,7 +18,7 @@ import { Scope } from './Scope.js'
  *
  * @remarks
  * - **Registry.** Scopes live in an insertion-ordered `Map` keyed by their minted `id`;
- *   `add` mints a {@link Scope} from a {@link ScopeInput} (an `id` plus the three
+ *   `add` mints a {@link Scope} from a {@link ScopeInput} (an `id` plus the per-category
  *   allow-lists), stores it, and returns it. `count` is the map size, `scope(id)` looks
  *   one up, and `scopes()` lists them in insertion order. (Unlike the name-keyed
  *   instruction registry, a scope's key is its minted `id`, so two scopes may share a

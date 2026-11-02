@@ -399,7 +399,7 @@ export class Ledger implements LedgerInterface {
 		try {
 			const messages = stripThinking(
 				[
-					{ id: 'system', role: 'system', content: this.#options.system },
+					...this.#agent.context.build({ messages: [], judgments: [] }),
 					...this.#conversation.view(),
 					{ id: 'calibration', role: 'user', content: '' },
 				],
@@ -917,7 +917,7 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// Renders the records for each cut in step order (each step drops the line it names from the
-	// record it keys, or the source it names) and returns the first cut whose system text, tail, and
+	// record it keys, or the source it names) and returns the first cut whose built head, tail, and
 	// request copy fit `total`; the cut after every step is returned unchecked. No cut renders after
 	// the one returned.
 	#trim(
@@ -939,6 +939,9 @@ export class Ledger implements LedgerInterface {
 		readonly records: readonly LedgerRecord[]
 		readonly included: ReadonlySet<string>
 	} {
+		const built = this.#agent.context.build({ messages: [request], judgments: [] })
+		const head = built.slice(0, -1)
+		const priced = built.at(-1) ?? request
 		const trimmed = steps.reduce<{
 			readonly rendered: string | undefined
 			readonly records: readonly LedgerRecord[]
@@ -947,10 +950,10 @@ export class Ledger implements LedgerInterface {
 			(cut, step) => {
 				if (cut.rendered !== undefined) return cut
 				const rendered = this.#render(cut.records, mapped, cut.included, amendments, scan)
-				const copy = buildRequestMessage(request, rendered)
-				const head: Message = { id: 'system', role: 'system', content: this.#options.system }
+				const copy = buildRequestMessage(priced, rendered)
 				if (
-					this.#price([head, ...stripThinking([...tail.slice(0, -1), copy], this.#replay)]) <= total
+					this.#price([...head, ...stripThinking([...tail.slice(0, -1), copy], this.#replay)]) <=
+					total
 				)
 					return { ...cut, rendered }
 				return {

@@ -10,6 +10,8 @@ import {
 	AgentContext,
 	CONVERSATION_RECAP_PREFIX,
 	ConversationManager,
+	createMemoManager,
+	createSkillManager,
 	InstructionManager,
 	isConversationError,
 	Scope,
@@ -1584,6 +1586,32 @@ describe('AgentContext — the system boundary canary', () => {
 		expect(built[0]?.content).toContain(CANARY_SENTINELS.instruction)
 	})
 
+	it('holds the skill sentinel in system only', async () => {
+		const built = (await seedCanaryContext()).build()
+
+		expect(built[0]?.role).toBe('system')
+		expect(built.filter((message) => message.content.includes(CANARY_SENTINELS.skill))).toEqual([
+			built[0],
+		])
+	})
+
+	it('holds memo sentinels in context only', async () => {
+		const built = (await seedCanaryContext()).build()
+
+		expect(built[1]?.role).toBe('user')
+		for (const sentinel of [CANARY_SENTINELS.memo, CANARY_SENTINELS.gist]) {
+			expect(built.filter((message) => message.content.includes(sentinel))).toEqual([built[1]])
+		}
+	})
+
+	it('sends no memo content sentinel', async () => {
+		const built = (await seedCanaryContext()).build()
+		const text = built.map((message) => message.content).join('\n')
+
+		expect(text).toContain(CANARY_SENTINELS.memo)
+		expect(text).not.toContain(CANARY_SENTINELS.fact)
+	})
+
 	it('returns the system message, then one context message, then the tail', () => {
 		const context = new AgentContext({ system: 'sys' })
 		context.instructions.add({ name: 'tone', content: 'Be terse.' })
@@ -1664,6 +1692,247 @@ describe('AgentContext — the system boundary canary', () => {
 
 		expect(context.build()).toStrictEqual([stored])
 		expect(context.build({ messages: [stored], judgments: [] })).toStrictEqual([stored])
+	})
+})
+
+describe('AgentContext — the skills and memos indexes', () => {
+	it('exposes always-present skills and memos', () => {
+		const context = new AgentContext()
+
+		expect(context.skills.count).toBe(0)
+		expect(context.memos.count).toBe(0)
+	})
+
+	it('reuses supplied skills and memos', () => {
+		const skills = createSkillManager()
+		const memos = createMemoManager()
+		const context = new AgentContext({ skills, memos })
+
+		expect(context.skills).toBe(skills)
+		expect(context.memos).toBe(memos)
+	})
+
+	it('renders the skills index in system', () => {
+		const skills = createSkillManager()
+		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+		const context = new AgentContext({ system: 'You are concise.', skills })
+		context.instructions.add({ name: 'tone', content: 'Be terse.' })
+		context.messages.add({ role: 'user', content: 'hi' })
+
+		const built = context.build()
+
+		expect(built.map(({ id, ...body }) => body)).toStrictEqual([
+			{
+				role: 'system',
+				content:
+					'You are concise.\n\n## Instructions\n\nBe terse.\n\n## Skills\n\n- review: Reviews a change.',
+			},
+			{ role: 'user', content: 'hi' },
+		])
+	})
+
+	it('renders the memos index before workspace', () => {
+		const memos = createMemoManager()
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+		const context = new AgentContext({ system: 'sys', memos })
+		context.workspaces.add().write('notes.txt', 'NOTES')
+		context.messages.add({ role: 'user', content: 'hi' })
+
+		const built = context.build()
+
+		expect(built.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys' },
+			{
+				role: 'user',
+				content:
+					'## Memos\n\n- tone: Prefers bullet lists.\n\n## Workspace\n\nFile: notes.txt\n```text\nNOTES\n```',
+			},
+			{ role: 'user', content: 'hi' },
+		])
+	})
+
+	it('joins index entries with one newline', () => {
+		const skills = createSkillManager()
+		skills.add([
+			{ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' },
+			{ name: 'triage', description: 'Sorts a ticket.', content: 'Read the ticket.' },
+		])
+		const memos = createMemoManager()
+		memos.add([
+			{ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' },
+			{ name: 'reach', description: 'Answers by email.', content: 'Reply by email.' },
+		])
+
+		const built = new AgentContext({ skills, memos }).build()
+
+		expect(built.map(({ id, ...body }) => body)).toStrictEqual([
+			{
+				role: 'system',
+				content: '## Skills\n\n- review: Reviews a change.\n- triage: Sorts a ticket.',
+			},
+			{
+				role: 'user',
+				content: '## Memos\n\n- tone: Prefers bullet lists.\n- reach: Answers by email.',
+			},
+		])
+	})
+
+	it('renders no header for an empty manager', () => {
+		const context = new AgentContext({
+			system: 'sys',
+			skills: createSkillManager(),
+			memos: createMemoManager(),
+		})
+		context.messages.add({ role: 'user', content: 'hi' })
+
+		expect(context.build().map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys' },
+			{ role: 'user', content: 'hi' },
+		])
+	})
+
+	it('renders no header when scoped out', () => {
+		const skills = createSkillManager()
+		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+		const memos = createMemoManager()
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+		const context = new AgentContext({ system: 'sys', skills, memos })
+
+		expect(context.build().map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys\n\n## Skills\n\n- review: Reviews a change.' },
+			{ role: 'user', content: '## Memos\n\n- tone: Prefers bullet lists.' },
+		])
+
+		context.apply(new Scope({ name: 'none', skills: [], memos: [] }))
+
+		expect(context.build().map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys' },
+		])
+	})
+
+	it('filters the skills index by scope', () => {
+		const skills = createSkillManager()
+		skills.add([
+			{ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' },
+			{ name: 'triage', description: 'Sorts a ticket.', content: 'Read the ticket.' },
+		])
+		const context = new AgentContext({
+			skills,
+			scope: new Scope({ name: 'reviewer', skills: ['review'] }),
+		})
+
+		expect(context.build()[0]?.content).toBe('## Skills\n\n- review: Reviews a change.')
+	})
+
+	it('filters the memos index by scope', () => {
+		const memos = createMemoManager()
+		memos.add([
+			{ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' },
+			{ name: 'reach', description: 'Answers by email.', content: 'Reply by email.' },
+		])
+		const context = new AgentContext({
+			memos,
+			scope: new Scope({ name: 'writer', memos: ['reach'] }),
+		})
+
+		expect(context.build()[0]?.content).toBe('## Memos\n\n- reach: Answers by email.')
+	})
+
+	it('renders the current memo revision', () => {
+		const memos = createMemoManager()
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+		memos.add({ name: 'tone', description: 'Prefers short replies.', content: 'Keep it short.' })
+
+		expect(new AgentContext({ memos }).build()[0]?.content).toBe(
+			'## Memos\n\n- tone: Prefers short replies.',
+		)
+	})
+
+	it('honors a manager format on each index', () => {
+		const skills = createSkillManager({
+			format: {
+				open: '<skills>',
+				render: (one) => `<skill>${one.name}</skill>`,
+				close: '</skills>',
+			},
+		})
+		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+		const memos = createMemoManager({
+			format: { open: '<memos>', render: (one) => `<memo>${one.name}</memo>`, close: '</memos>' },
+		})
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+
+		const built = new AgentContext({ skills, memos }).build()
+
+		expect(built.map((message) => message.content)).toEqual([
+			'<skills>\n\n<skill>review</skill>\n\n</skills>',
+			'<memos>\n\n<memo>tone</memo>\n\n</memos>',
+		])
+	})
+
+	it('keeps a blank rendered entry as a line', () => {
+		const memos = createMemoManager({
+			format: { render: (one) => (one.name === 'blank' ? '' : one.description) },
+		})
+		memos.add([
+			{ name: 'blank', description: 'Holds no line.', content: 'Holds no line.' },
+			{ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' },
+		])
+		const sole = createMemoManager({ format: { render: () => '' } })
+		sole.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+
+		expect(new AgentContext({ memos }).build()[0]?.content).toBe(
+			'## Memos\n\n\nPrefers bullet lists.',
+		)
+		expect(new AgentContext({ memos: sole }).build()[0]?.content).toBe('## Memos')
+	})
+
+	it('leaves the instructions join unchanged', () => {
+		const skills = createSkillManager()
+		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+		const context = new AgentContext({ skills })
+		context.instructions.add([
+			{ name: 'one', content: 'One.' },
+			{ name: 'two', content: 'Two.' },
+		])
+
+		expect(context.build()[0]?.content).toContain('## Instructions\n\nOne.\n\nTwo.')
+	})
+
+	it('loads a skill through the instructions', () => {
+		const skills = createSkillManager()
+		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+		const context = new AgentContext({ skills })
+
+		context.instructions.add({
+			name: 'skill:review',
+			content: requireValue(skills.skill('review')?.content),
+		})
+
+		expect(context.build()[0]?.content).toBe(
+			'## Instructions\n\nRead the diff.\n\n## Skills\n\n- review: Reviews a change.',
+		)
+
+		context.instructions.remove('skill:review')
+
+		expect(context.build()[0]?.content).toBe('## Skills\n\n- review: Reviews a change.')
+	})
+
+	it('keeps memo and skill bodies out of head', () => {
+		const skills = createSkillManager()
+		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
+		const memos = createMemoManager()
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+
+		const text = new AgentContext({ skills, memos })
+			.build()
+			.map((message) => message.content)
+			.join('\n')
+
+		expect(text).toContain('- review: Reviews a change.')
+		expect(text).toContain('- tone: Prefers bullet lists.')
+		expect(text).not.toContain('Read the diff.')
+		expect(text).not.toContain('Use bullet lists.')
 	})
 })
 

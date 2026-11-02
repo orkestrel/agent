@@ -255,14 +255,18 @@ export interface LedgerGauge {
 }
 
 /**
- * Selects the agent bounds and hooks a ledger passes through to the agent it builds.
+ * Selects the agent bounds, hooks, and context libraries a ledger passes through to the agent it builds.
  *
  * @remarks
  * `limit` must be a nonnegative safe integer. Default: the `DEFAULT_LEDGER_LIMIT` constant. The
  * ledger owns every other agent option: the conversation, the tools, the selection handler, and
- * the scope.
+ * the scope. One memo set can serve many ledgers of one principal, and the plan prices what these
+ * libraries add to the head.
  */
-export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
+export type LedgerAgentOptions = Pick<
+	AgentOptions,
+	'limit' | 'timeout' | 'on' | 'instructions' | 'skills' | 'memos' | 'workspaces'
+>
 
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
@@ -271,7 +275,7 @@ export type LedgerAgentOptions = Pick<AgentOptions, 'limit' | 'timeout' | 'on'>
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
- * sentence included, and the whole of the system message; the records go into a copy of each request turn. `topics` lists the desk
+ * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it, and the records go into a copy of each request turn. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, the ledger calibrates before its first pass. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
@@ -510,7 +514,7 @@ export interface LedgerInterface {
 	 * Measures the gauge, holds it as `gauge`, and returns it.
 	 *
 	 * @remarks
-	 * The ledger sends its system message and its conversation's view to the provider twice, with
+	 * The ledger sends the head its agent's context builds and its conversation's view to the provider twice, with
 	 * and without the tool definitions. The call without tools prices the messages and the
 	 * difference between the calls is the overhead cost.
 	 * An abort during calibration rejects with the abort reason. A call during `respond` or `calibrate` rejects

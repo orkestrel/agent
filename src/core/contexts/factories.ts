@@ -97,8 +97,8 @@ export function createInstructionManager(
  * tighter child by set-intersection (an `undefined` side imposing no constraint). Stored
  * immutable — never mutated after creation (`narrow` returns a new scope).
  *
- * @param input - `name` (required) and the optional `instructions` / `tools` / `files`
- *   allow-lists (see {@link ScopeInput})
+ * @param input - `name` (required) and the optional `instructions` / `skills` / `memos` /
+ *   `tools` / `files` allow-lists (see {@link ScopeInput})
  * @returns A working {@link ScopeInterface}
  *
  * @example
@@ -268,26 +268,28 @@ export function createSkillManager(options?: SkillManagerOptions): SkillManagerI
 
 /**
  * Creates a richer turn context — an {@link AgentContextInterface} assembling a provider request
- * from the optional system prompt, the instruction registry, the workspace registry (the only
- * document channel), the conversation registry that is its `messages` source, the tool registry,
- * and the active scope, which `build()` folds into the next turn's input.
+ * from the optional system prompt, the instruction registry, the skill registry, the memo set, the
+ * workspace registry (the only document channel), the conversation registry that is its `messages`
+ * source, the tool registry, and the active scope, which `build()` folds into the next turn's input.
  *
  * @remarks
- * `system` is the optional system prompt; `tools` / `instructions` / `workspaces` are pre-built
- * managers to reuse (empty ones are created when omitted, so `context.workspaces` is always
- * present); `scope` is the initial active filter (`undefined` ⇒ no filtering, changeable afterwards
- * through `context.apply(...)`). `conversations` is the message source: a supplied manager's
- * active conversation is reused as `messages`, and a default conversation is added only when it
- * has none (a fresh registry with one default conversation is created when omitted). `build()`
- * folds the scoped instructions — plus the active workspace's scope-filtered text files (fenced) —
- * into one leading `system` message and appends the active conversation's `view()` (attaching the
- * active workspace's scope-filtered image files' `base64` payload to the last user message), built
+ * `system` is the optional system prompt; `tools` / `instructions` / `skills` / `memos` /
+ * `workspaces` are pre-built managers to reuse (empty ones are created when omitted, so
+ * `context.workspaces` is always present); `scope` is the initial active filter (`undefined` ⇒ no
+ * filtering, changeable afterwards through `context.apply(...)`). `conversations` is the message
+ * source: a supplied manager's active conversation is reused as `messages`, and a default
+ * conversation is added only when it has none (a fresh registry with one default conversation is
+ * created when omitted). `build()` folds the system prompt, the scoped instructions, and the scoped
+ * skills index into one leading `system` message, renders the scoped memos index and the active
+ * workspace's scope-filtered text files (fenced) into one `user` context message after it, and
+ * appends the active conversation's `view()` (attaching the active workspace's scope-filtered image
+ * files' `base64` payload to the last user message), built
  * fresh each call; the scope never filters the conversation. The active workspace is the sole
  * document/image context. Tools are advertised structurally (through
  * `tools.definitions()`, scope-filtered by the loop), never serialized into the prompt.
  *
- * @param options - Optional `system` / `tools` / `instructions` / `workspaces` /
- *   `conversations` / `scope` / `select` (see {@link AgentContextOptions})
+ * @param options - Optional `system` / `tools` / `instructions` / `skills` / `memos` /
+ *   `workspaces` / `conversations` / `scope` / `select` (see {@link AgentContextOptions})
  * @returns A working {@link AgentContextInterface}
  *
  * @example

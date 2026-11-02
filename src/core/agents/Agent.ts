@@ -172,6 +172,8 @@ export class Agent implements AgentInterface {
 			...(options?.system === undefined ? {} : { system: options.system }),
 			...(options?.tools === undefined ? {} : { tools: options.tools }),
 			...(options?.instructions === undefined ? {} : { instructions: options.instructions }),
+			...(options?.skills === undefined ? {} : { skills: options.skills }),
+			...(options?.memos === undefined ? {} : { memos: options.memos }),
 			...(options?.workspaces === undefined ? {} : { workspaces: options.workspaces }),
 			...(options?.scope === undefined ? {} : { scope: options.scope }),
 			...(options?.conversations === undefined ? {} : { conversations: options.conversations }),

@@ -889,13 +889,18 @@ await new GuideCommand({
 				description: 'Prefers bullet lists.',
 				content: 'Answer in bullets.',
 			})
-			expect(added).toEqual(['Prefers short replies.', 'Prefers bullet lists.'])
 			expect(memos.count).toBe(1)
 			expect(memos.history('tone')).toHaveLength(2)
 			expect(memos.memo('tone')?.description).toBe('Prefers bullet lists.')
-			expect(
-				barrel.renderSection(memos.open, memos.memos(), (memo) => memos.render(memo), memos.close),
-			).toBe('## Memos\n\n- tone: Prefers bullet lists.')
+			memos.add({ name: 'reach', description: 'Answers by email.', content: 'Reply by email.' })
+			expect(added).toEqual([
+				'Prefers short replies.',
+				'Prefers bullet lists.',
+				'Answers by email.',
+			])
+			expect(barrel.createAgentContext({ memos }).build()[0]?.content).toBe(
+				'## Memos\n\n- tone: Prefers bullet lists.\n- reach: Answers by email.',
+			)
 
 			const restored = barrel.createMemoManager({ snapshot: memos.snapshot() })
 			expect(restored.id).toBe('ada')
@@ -915,10 +920,19 @@ await new GuideCommand({
 			expect(skills.skills()).toEqual([review])
 			expect(skills.render(review)).toBe('- review: Reviews a change for defects.')
 			expect(skills.open).toBe('## Skills')
+			expect(barrel.createAgentContext({ skills }).build()[0]?.content).toBe(
+				'## Skills\n\n- review: Reviews a change for defects.',
+			)
 			expect(skills.remove('review')).toBe(true)
 			skills.clear()
 			expect(skills.count).toBe(0)
 			expect(guideText).toContain('memos.add(tone) // unchanged text: the same revision, no event')
+			expect(guideText).toContain(
+				'A skills index with no tool that loads a skill is inert for the model.',
+			)
+			expect(guideText).toContain(
+				"The skills index and a loaded body render in the `system` message, so build each `SkillInput` from text the host authored, never from a user message, a tool result, a stored memo, or a page's request body, and read a loaded body from `skills.skill(name)`, never from the tool's arguments.",
+			)
 		})
 
 		it('records and reads a judgment as the judgment-recording fence shows', () => {
@@ -2589,7 +2603,7 @@ await new GuideCommand({
 			expect(estimateMessages(first)).toBeGreaterThan(capacity)
 			expect(second.findLast(({ role }) => role === 'tool')?.content).toBe(reading)
 			expect(guideText).toContain(
-				"The budget bounds only the records and the tail of a request's first call: the plan prices the system message, the tail, and the copy of the request turn with the records it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The budget bounds only the records and the tail of a request's first call: the plan prices the built head, the tail, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 			expect(guideText).toContain(
 				"A request, a lookup result, the pass's own turns, the answer note, or the whole view a faulted selection builds from reaches the provider whole when it's larger than the room the `capacity` option leaves, and the provider's own context limit decides what happens to it.",
@@ -2665,7 +2679,7 @@ await new GuideCommand({
 			)
 			expect(estimateMessages(direct)).toBeGreaterThan(budget)
 			expect(guideText).toContain(
-				"The budget bounds only the records and the tail of a request's first call: the plan prices the system message, the tail, and the copy of the request turn with the records it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The budget bounds only the records and the tail of a request's first call: the plan prices the built head, the tail, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 		})
 

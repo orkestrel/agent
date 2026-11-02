@@ -3,8 +3,9 @@ import { intersectKeys } from '../helpers.js'
 
 /**
  * Represents a named, immutable filter over a richer context's items — an optional allow-list per
- * category (`instructions` / `tools` / `files`), each keyed by that category's identity (an
- * instruction's `name`, a tool's `name`, a workspace file's `path`) and read as an allow-list:
+ * category (`instructions` / `skills` / `memos` / `tools` / `files`), each keyed by that category's
+ * identity (an instruction's, a skill's, a memo's, or a tool's `name`, a workspace file's `path`)
+ * and read as an allow-list:
  * `undefined` lets everything pass, `[]` lets nothing pass, and a non-empty list passes the listed
  * keys alone. `narrow` composes a tighter child by set intersection.
  *
@@ -37,6 +38,8 @@ export class Scope implements ScopeInterface {
 	readonly id: string = crypto.randomUUID()
 	readonly name: string
 	readonly instructions?: readonly string[]
+	readonly skills?: readonly string[]
+	readonly memos?: readonly string[]
 	readonly tools?: readonly string[]
 	readonly files?: readonly string[]
 	readonly select?: SelectionHandler
@@ -47,18 +50,24 @@ export class Scope implements ScopeInterface {
 		// Copy each supplied list in (a later mutation of the caller's array can't leak in);
 		// an omitted list stays `undefined` — the absence of a constraint.
 		if (input.instructions !== undefined) this.instructions = [...input.instructions]
+		if (input.skills !== undefined) this.skills = [...input.skills]
+		if (input.memos !== undefined) this.memos = [...input.memos]
 		if (input.tools !== undefined) this.tools = [...input.tools]
 		if (input.files !== undefined) this.files = [...input.files]
 	}
 
 	narrow(config: ScopeFilter): ScopeInterface {
 		const instructions = intersectKeys(this.instructions, config.instructions)
+		const skills = intersectKeys(this.skills, config.skills)
+		const memos = intersectKeys(this.memos, config.memos)
 		const tools = intersectKeys(this.tools, config.tools)
 		const files = intersectKeys(this.files, config.files)
 		return new Scope({
 			name: this.name,
 			...(this.select === undefined ? {} : { select: this.select }),
 			...(instructions === undefined ? {} : { instructions }),
+			...(skills === undefined ? {} : { skills }),
+			...(memos === undefined ? {} : { memos }),
 			...(tools === undefined ? {} : { tools }),
 			...(files === undefined ? {} : { files }),
 		})

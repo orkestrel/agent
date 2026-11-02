@@ -2,9 +2,11 @@ import type {
 	AgentContextInterface,
 	AgentContextOptions,
 	InstructionManagerInterface,
+	MemoManagerInterface,
 	ScopeInterface,
 	Selection,
 	SelectionHandler,
+	SkillManagerInterface,
 } from './types.js'
 import type { ConversationInterface, ConversationManagerInterface } from '../conversations/index.js'
 import type { Message } from '../types.js'
@@ -13,6 +15,8 @@ import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
 import { ToolManager } from '@orkestrel/tool'
 import { isTextContent, WorkspaceManager } from '@orkestrel/workspace'
 import { InstructionManager } from './instructions/InstructionManager.js'
+import { MemoManager } from './memos/MemoManager.js'
+import { SkillManager } from './skills/SkillManager.js'
 import { ConversationError, ConversationManager } from '../conversations/index.js'
 import { CONVERSATION_ROLES } from '../constants.js'
 import { filterAllowList } from '../helpers.js'
@@ -21,17 +25,17 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
 
 /**
  * Assembles a provider request from the richer turn context — the optional system prompt, the
- * observable context managers (instructions / workspaces), the
+ * observable context managers (instructions / skills / memos / workspaces), the
  * {@link ConversationManagerInterface} message source whose active conversation is `messages`, the
  * {@link ToolManagerInterface} registry, and an active {@link ScopeInterface} changed through
- * {@link AgentContextInterface.apply}. `build()` folds the system prompt and the scoped instructions
- * into one system message, the active workspace's text into one `user` context message after it,
- * then the conversation, and never reads `tools`.
+ * {@link AgentContextInterface.apply}. `build()` folds the system prompt, the scoped instructions,
+ * and the skills index into one system message, the memos index and the active workspace's text into
+ * one `user` context message after it, then the conversation, and never reads `tools`.
  *
  * @remarks
- * - **Composition.** `system` is the optional system prompt; `instructions` / `tools` /
- *   `workspaces` / `conversations` are the registries passed in `options` (bring your own), or
- *   fresh empty ones when omitted (so `workspaces` is always present); `messages` is the active
+ * - **Composition.** `system` is the optional system prompt; `instructions` / `skills` / `memos` /
+ *   `tools` / `workspaces` / `conversations` are the registries passed in `options` (bring your own),
+ *   or fresh empty ones when omitted (so `workspaces` is always present); `messages` is the active
  *   conversation's live tail (always defined — see the following item). `scope` is the active filter —
  *   `undefined` (the default) ⇒ no filtering; change it through `apply(scope)`. The structural
  *   `workspaces` / `conversations` registries are fixed at construction; switch their active
@@ -45,15 +49,17 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   reference, no duplication), and `build()` with no selection folds that conversation's `view()`
  *   (its per-section summaries + live tail) as the authoritative message inclusion — the scope does
  *   not filter the conversation (it owns inclusion through compaction; scope filters only
- *   instructions / tools / workspace files). An agent run binds a conversation at its call, the
- *   active one unless the run names another, and builds through a selection over that
+ *   instructions / skills / memos / tools / workspace files). An agent run binds a conversation at
+ *   its call, the active one unless the run names another, and builds through a selection over that
  *   conversation, so `conversations.switch(id)` sets the next run's default at any moment and never
  *   moves a live run; `select(conversation, request, signal)` checks the conversation it is given.
  * - **`build()` — the scoped assembly + the format cascade.** It folds, in order,
- *   the system prompt then the scope-filtered instructions (a block: the section's `open` text,
- *   each item's rendering, then any `close` text) into one leading `system` message (prepended
- *   only when at least one part exists), then the active workspace's text files into one `user`
- *   context message (present only when the workspace section renders), then
+ *   the system prompt, the scope-filtered instructions (a block: the section's `open` text,
+ *   each item's rendering, then any `close` text), then the scope-filtered skills index (a block
+ *   whose entries join with a single newline) into one leading `system` message (prepended only
+ *   when at least one part exists), then the scope-filtered memos index (the same block) and the
+ *   active workspace's text files into one `user` context message (present only when the memos or
+ *   workspace section renders), then
  *   appends the active conversation's `view()` (the conversation owns message inclusion through
  *   compaction — the scope does not filter the conversation). The instruction manager resolves
  *   each `open` / item / `close` most-specific-first: `open` = manager-options-override >
@@ -70,9 +76,9 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   then split: text files fold into a dedicated `## Workspace` section (fenced reference blocks)
  *   in the context message — a `user` message with a minted id, never stored — and image files'
  *   `base64` payload attaches to the last user message of the conversation, never to the context
- *   message. The `system` message holds host-authored text alone: the system prompt and the
- *   instructions. Active-only — never the other registered workspaces; with no active
- *   workspace nothing renders for workspaces. `build()` owns this render (a `Workspace` /
+ *   message. The `system` message holds host-authored text alone: the system prompt, the
+ *   instructions, and the skills index. Active-only — never the other registered workspaces; with no
+ *   active workspace nothing renders for workspaces. `build()` owns this render (a `Workspace` /
  *   `WorkspaceManager` stays file-focused).
  * - **Tools are structural, not in the prompt.** The registry is advertised to the provider
  *   through `tools.definitions()` (scope-filtered by the loop), never serialized into the
@@ -91,6 +97,8 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
 export class AgentContext implements AgentContextInterface {
 	readonly #system: string | undefined
 	readonly #instructions: InstructionManagerInterface
+	readonly #skills: SkillManagerInterface
+	readonly #memos: MemoManagerInterface
 	// The workspace registry whose active workspace `build()` renders by carrier (text files →
 	// the context message, image files → the last user message). Always present (a fresh empty
 	// manager when none was supplied). The registry is structural; switch its active workspace
@@ -109,6 +117,8 @@ export class AgentContext implements AgentContextInterface {
 	constructor(options?: AgentContextOptions) {
 		this.#system = options?.system
 		this.#instructions = options?.instructions ?? new InstructionManager()
+		this.#skills = options?.skills ?? new SkillManager()
+		this.#memos = options?.memos ?? new MemoManager()
 		// Default to a fresh empty registry so `context.workspaces` is always present (mirroring
 		// the always-present instruction manager); a supplied one is reused. The active workspace
 		// is the sole document/image context.
@@ -132,6 +142,14 @@ export class AgentContext implements AgentContextInterface {
 
 	get instructions(): InstructionManagerInterface {
 		return this.#instructions
+	}
+
+	get skills(): SkillManagerInterface {
+		return this.#skills
+	}
+
+	get memos(): MemoManagerInterface {
+		return this.#memos
 	}
 
 	get workspaces(): WorkspaceManagerInterface {
@@ -195,6 +213,14 @@ export class AgentContext implements AgentContextInterface {
 			this.#instructions.close,
 		)
 		if (instructed !== undefined) parts.push(instructed)
+		const skills = filterAllowList(scope?.skills, this.#skills.skills(), (one) => one.name)
+		const indexed = renderSection(
+			this.#skills.open,
+			skills.length === 0 ? [] : [skills.map((one) => this.#skills.render(one)).join('\n')],
+			(block) => block,
+			this.#skills.close,
+		)
+		if (indexed !== undefined) parts.push(indexed)
 		// The active workspace is the sole document/image context. `build()` owns this render
 		// because a `Workspace` / `WorkspaceManager` stays file-focused.
 		const files = filterAllowList(
@@ -213,18 +239,27 @@ export class AgentContext implements AgentContextInterface {
 			(file) => renderFencedFile(file.path, file.language, file.text),
 			undefined,
 		)
+		const memos = filterAllowList(scope?.memos, this.#memos.memos(), (one) => one.name)
+		const remembered = renderSection(
+			this.#memos.open,
+			memos.length === 0 ? [] : [memos.map((one) => this.#memos.render(one)).join('\n')],
+			(block) => block,
+			this.#memos.close,
+		)
 		// With no selection, the active conversation's `view()` is authoritative (the per-section
 		// summaries + the live tail) — the conversation owns message inclusion through compaction, so the
 		// scope does not filter the conversation here (scope filters only the preceding instructions /
-		// tools / workspace files). The active conversation is always present (the constructor adds
-		// one), with `#ensureConversation()` as a total fallback if a caller emptied its supplied registry.
+		// skills / memos / tools / workspace files). The active conversation is always present (the
+		// constructor adds one), with `#ensureConversation()` as a total fallback if a caller emptied its
+		// supplied registry.
 		const conversation = selection?.messages ?? this.#ensureConversation().view()
 		// A vision provider reads image payloads from a user turn.
 		const tail = attachUserImages(conversation, collectImageData(files))
+		const slots = [remembered, documented].filter((slot) => slot !== undefined)
 		const context: readonly Message[] =
-			documented === undefined
+			slots.length === 0
 				? []
-				: [{ id: crypto.randomUUID(), role: 'user', content: documented }]
+				: [{ id: crypto.randomUUID(), role: 'user', content: slots.join('\n\n') }]
 
 		if (parts.length === 0) return [...context, ...tail]
 		const system: Message = {
