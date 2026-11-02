@@ -15,6 +15,7 @@ import {
 	createAgentQueue,
 	createAgentRegistry,
 	createAgentRunner,
+	createApprover,
 	createChannel,
 	createInstructionManager,
 	createScope,
@@ -120,6 +121,15 @@ describe('createAgent', () => {
 })
 
 // Exercises serializable jobs through real queues and runners.
+
+describe('createApprover', () => {
+	it('creates an approver with no waiting ask', () => {
+		const approver = createApprover()
+
+		expect(approver.frame({ id: 'c1', name: 'write', arguments: {} })).toBeUndefined()
+		expect(approver.answer({ id: 'a1', approved: true })).toBe(false)
+	})
+})
 
 describe('createAgentRegistry', () => {
 	it('round-trips: build an agent from a serializable job and run it to its result', async () => {

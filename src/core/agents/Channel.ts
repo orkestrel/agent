@@ -1,4 +1,5 @@
 import type { ChannelInterface } from './types.js'
+import { ChannelCell } from './ChannelCell.js'
 
 /**
  * Buffers chunks in a minimal unbounded async channel — the eager pump writes them in (`push`)
@@ -8,11 +9,16 @@ import type { ChannelInterface } from './types.js'
  * its `events` are drained.
  *
  * @remarks
- * A waiting `drain` parks its void resolver in `#waiting`; `push` / `close` / `fail`
- * enqueue/flag, then fire and clear every parked resolver, so each parked reader wakes,
- * re-reads the shared buffer, and either takes the next chunk, returns (on `close`), throws
- * (on `fail`), or parks again when another reader took the chunk first. Taking a chunk is
- * synchronous, so each value reaches exactly one reader.
+ * A waiting `drain` call parks its void resolver in the `#waiting` field. The `push` method links a
+ * cell after the `#tail` cell, and the `close` and `fail` methods flag the end; each then fires and
+ * clears every parked resolver, so each parked reader wakes, reads the `#head` cell, and either
+ * takes the next chunk, returns (on `close`), throws (on `fail`), or parks again when another
+ * reader took the chunk first. Taking a chunk reads its value and moves `#head` to the next cell
+ * synchronously, so each value reaches exactly one reader, a push and a take each cost constant
+ * time, and every taken cell but the newest is released at once; the `#tail` field holds the newest
+ * cell until the next push links after it, so a channel retains at most one taken value. A reader
+ * suspended at its `yield` expression holds only the value it took, never a cell, so the bound on
+ * retained values covers both the channel's fields and a suspended reader.
  * A `return()` issued while a read is parked waits for the next `push`, `close`, or `fail`.
  * The parked read takes a pushed value before that `return()` settles.
  *
@@ -29,13 +35,17 @@ import type { ChannelInterface } from './types.js'
  * ```
  */
 export class Channel<T> implements ChannelInterface<T> {
-	#buffer: ReadonlyArray<{ readonly value: T }> = []
+	#head: ChannelCell<T> | undefined
+	#tail: ChannelCell<T> | undefined
 	#waiting: ReadonlyArray<() => void> = []
 	#closed = false
 	#failure: { error: unknown } | undefined
 
 	push(value: T): void {
-		this.#buffer = [...this.#buffer, { value }]
+		const cell = new ChannelCell(value)
+		this.#tail?.link(cell)
+		this.#tail = cell
+		this.#head ??= cell
 		this.#signal()
 	}
 
@@ -55,10 +65,10 @@ export class Channel<T> implements ChannelInterface<T> {
 		for (;;) {
 			// Yield everything buffered before checking for end, so a close / fail that
 			// arrives alongside the last chunks still delivers those chunks first.
-			while (this.#buffer.length > 0) {
-				const [cell, ...remaining] = this.#buffer
-				this.#buffer = remaining
-				if (cell !== undefined) yield cell.value
+			while (this.#head !== undefined) {
+				const value = this.#head.value
+				this.#head = this.#head.next
+				yield value
 			}
 			if (this.#failure !== undefined) throw this.#failure.error
 			if (this.#closed) return

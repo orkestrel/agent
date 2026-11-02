@@ -7,6 +7,7 @@ import type {
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
 import {
+	buildLedgerIndex,
 	buildRecallMessage,
 	buildRequestMessage,
 	collectProjectionIds,
@@ -44,7 +45,7 @@ import {
 	splitSentences,
 	splitTopic,
 } from '../../../../src/core/ledgers/helpers.js'
-import { captureError } from '@orkestrel/test'
+import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	buildGaugeCall,
@@ -597,47 +598,132 @@ describe('collectRegistry', () => {
 	})
 })
 
-describe('matchEntities', () => {
-	const registry = collectRegistry([
-		buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
-			ids: ['BW-5512'],
-			owners: [
-				{ id: 'BW-20931', names: ['Brightwater Studio'] },
-				{ id: 'OM-30418', names: ['Odile Marlow'] },
-				{ id: 'OM-77001', names: ['Odile Marsh'] },
+describe('buildLedgerIndex', () => {
+	it('indexes each name, its words, and their needles, keeping the registry ids set', () => {
+		const registry = collectRegistry([
+			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+				ids: ['BW-5512'],
+				owners: [
+					{ id: 'BW-20931', names: ['Brightwater Studio'] },
+					{ id: 'OM-30418', names: ['Odile Marlow'] },
+					{ id: 'OM-77001', names: ['Odile Marsh'] },
+				],
+			}),
+		])
+		const index = buildLedgerIndex(registry)
+		expect(index.ids).toBe(registry.ids)
+		expect(Object.fromEntries(index.aliases)).toEqual({
+			'Brightwater Studio': ['BW-20931'],
+			'Odile Marlow': ['OM-30418'],
+			'Odile Marsh': ['OM-77001'],
+		})
+		expect(Object.fromEntries(index.carriers)).toEqual({
+			Brightwater: ['Brightwater Studio'],
+			Studio: ['Brightwater Studio'],
+			Odile: ['Odile Marlow', 'Odile Marsh'],
+			Marlow: ['Odile Marlow'],
+			Marsh: ['Odile Marsh'],
+		})
+		expect(
+			[...index.names].map(([name, needle]) => [
+				name,
+				needle.flags,
+				needle.test(name.toUpperCase()),
+			]),
+		).toEqual([
+			['Brightwater Studio', 'iu', true],
+			['Odile Marlow', 'iu', true],
+			['Odile Marsh', 'iu', true],
+		])
+		expect(
+			[...index.words].map(([name, needles]) => [
+				name,
+				needles.map((needle) => [
+					needle.flags,
+					name.split(' ').filter((word) => needle.test(`${word} called`)),
+					needle.test(`${name.toLowerCase()} called`),
+				]),
+			]),
+		).toEqual([
+			[
+				'Brightwater Studio',
+				[
+					['u', ['Brightwater'], false],
+					['u', ['Studio'], false],
+				],
 			],
-		}),
-	])
+			['Odile Marlow', [['u', ['Marlow'], false]]],
+			['Odile Marsh', [['u', ['Marsh'], false]]],
+		])
+	})
+
+	it('compiles a name that holds pattern characters as text, testing it the same way twice', () => {
+		const index = buildLedgerIndex({
+			ids: new Set(),
+			owners: new Map([['BW-20931', ['A+B (Studio)']]]),
+		})
+		const needle = requireValue(index.names.get('A+B (Studio)'))
+		expect([needle.test('Call A+B (Studio) now'), needle.test('Call A+B (Studio) now')]).toEqual([
+			true,
+			true,
+		])
+		expect(needle.test('Call AAB Studio now')).toBe(false)
+		expect(index.words.size).toBe(0)
+	})
+
+	it('indexes nothing for an empty registry', () => {
+		const ids = new Set<string>()
+		const index = buildLedgerIndex({ ids, owners: new Map() })
+		expect(index.ids).toBe(ids)
+		expect(index.aliases.size + index.carriers.size + index.names.size + index.words.size).toBe(0)
+	})
+})
+
+describe('matchEntities', () => {
+	const index = buildLedgerIndex(
+		collectRegistry([
+			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+				ids: ['BW-5512'],
+				owners: [
+					{ id: 'BW-20931', names: ['Brightwater Studio'] },
+					{ id: 'OM-30418', names: ['Odile Marlow'] },
+					{ id: 'OM-77001', names: ['Odile Marsh'] },
+				],
+			}),
+		]),
+	)
 
 	it('names a registry id that the text holds as an id token', () => {
-		expect([...matchEntities(registry, 'Refund for bw-5512 today', false)]).toEqual(['BW-5512'])
-		expect(matchEntities(registry, 'Refund for BW-55123', true).size).toBe(0)
+		expect([...matchEntities(index, 'Refund for bw-5512 today', false)]).toEqual(['BW-5512'])
+		expect(matchEntities(index, 'Refund for BW-55123', true).size).toBe(0)
 	})
 
 	it('names an owner by its whole name, whatever the case, at word edges', () => {
-		expect([...matchEntities(registry, 'brightwater studio called', false)]).toEqual(['BW-20931'])
-		expect(matchEntities(registry, 'XBrightwater Studio called', false).size).toBe(0)
-		expect(matchEntities(registry, 'Brightwater Studios called', false).size).toBe(0)
+		expect([...matchEntities(index, 'brightwater studio called', false)]).toEqual(['BW-20931'])
+		expect(matchEntities(index, 'XBrightwater Studio called', false).size).toBe(0)
+		expect(matchEntities(index, 'Brightwater Studios called', false).size).toBe(0)
 	})
 
 	it('names an owner by a capitalized name word that only one name carries, with partial', () => {
-		expect([...matchEntities(registry, 'Brightwater called', true)]).toEqual(['BW-20931'])
-		expect(matchEntities(registry, 'Brightwater called', false).size).toBe(0)
-		expect(matchEntities(registry, 'brightwater called', true).size).toBe(0)
+		expect([...matchEntities(index, 'Brightwater called', true)]).toEqual(['BW-20931'])
+		expect(matchEntities(index, 'Brightwater called', false).size).toBe(0)
+		expect(matchEntities(index, 'brightwater called', true).size).toBe(0)
 	})
 
 	it('leaves out a name word that two names carry', () => {
-		expect(matchEntities(registry, 'Odile called', true).size).toBe(0)
-		expect([...matchEntities(registry, 'Marlow called', true)]).toEqual(['OM-30418'])
+		expect(matchEntities(index, 'Odile called', true).size).toBe(0)
+		expect([...matchEntities(index, 'Marlow called', true)]).toEqual(['OM-30418'])
 	})
 
 	it('reads a name that holds pattern characters as text', () => {
-		const odd = collectRegistry([
-			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
-				ids: [],
-				owners: [{ id: 'BW-20931', names: ['A+B (Studio)'] }],
-			}),
-		])
+		const odd = buildLedgerIndex(
+			collectRegistry([
+				buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+					ids: [],
+					owners: [{ id: 'BW-20931', names: ['A+B (Studio)'] }],
+				}),
+			]),
+		)
 		expect([...matchEntities(odd, 'Call A+B (Studio) now', false)]).toEqual(['BW-20931'])
 		expect(matchEntities(odd, 'Call AAB Studio now', false).size).toBe(0)
 	})
@@ -648,7 +734,9 @@ describe('matchEntities', () => {
 		names[2] = 'Odile Marlow'
 		const sparse = { ids: new Set<string>(), owners: new Map([['BW-20931', names]]) }
 		expect(
-			captureError(() => matchEntities(sparse, 'Brightwater Studio called', false)),
+			captureError(() =>
+				matchEntities(buildLedgerIndex(sparse), 'Brightwater Studio called', false),
+			),
 		).toBeInstanceOf(TypeError)
 	})
 })

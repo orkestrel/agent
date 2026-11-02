@@ -1,4 +1,4 @@
-import { createApprover, createAuthorityContext } from '../../../setup.js'
+import { createScriptedApprover, createAuthorityContext } from '../../../setup.js'
 import { describe, expect, it } from 'vitest'
 import { createAuthority, isAgentError } from '@src/core'
 
@@ -134,7 +134,7 @@ describe('Authority — ask answers through the approver', () => {
 	})
 
 	it('passes the context, the decision, and the signal to the handler', async () => {
-		const approver = createApprover([true])
+		const approver = createScriptedApprover([true])
 		const context = createAuthorityContext('write', { path: 'note.txt' })
 		const signal = new AbortController().signal
 		const authority = createAuthority({ ask: approver.ask })

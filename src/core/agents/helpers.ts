@@ -2,13 +2,17 @@ import type { Message } from '../types.js'
 import type { ProviderRequest } from '../providers/index.js'
 import type { ConversationInterface } from '../conversations/index.js'
 import type {
+	AgentChunk,
+	AgentFrame,
 	AgentInterface,
 	AgentJobInput,
 	AgentRegistryInterface,
 	AgentResult,
 	AgentRunResult,
 	AgentStop,
+	AgentStreamInterface,
 	AgentTurn,
+	ApproverInterface,
 	AuthorityDecision,
 	MessageMeasure,
 	RequestMeasure,
@@ -20,6 +24,7 @@ import type { ToolCall, ToolDefinition, ToolResult } from '@orkestrel/tool'
 import { isBudget, isBudgetError } from '@orkestrel/budget'
 import {
 	attempt,
+	canonicalStringify,
 	ContractError,
 	isBoolean,
 	isFiniteNumber,
@@ -149,6 +154,134 @@ export function tokenUsageToJSON(value: unknown): TokenUsage | undefined {
 			: undefined
 	})
 	return captured.success ? captured.value : undefined
+}
+
+/**
+ * Projects one {@link AgentChunk} onto the {@link AgentFrame} a page receives, member by member, or
+ * returns `undefined` for an `ask` chunk.
+ *
+ * @remarks
+ * A `tool` chunk projects to `{ category: 'tool', success: true, name }` only when its result
+ * succeeded, and to `{ category: 'tool', success: false }` otherwise, so neither the tool's value nor
+ * a denial's text crosses. An `ask` chunk returns `undefined`, because only the approver holding the
+ * ask knows its id: read its frame through the `frame` method of an {@link ApproverInterface}.
+ *
+ * @param chunk - The chunk the run yielded
+ * @returns The chunk's frame, or `undefined` for an `ask` chunk
+ *
+ * @example
+ * ```ts
+ * agentChunkToFrame({ category: 'token', content: 'Hi' }) // { category: 'token', content: 'Hi' }
+ * ```
+ */
+export function agentChunkToFrame(chunk: AgentChunk): AgentFrame | undefined {
+	switch (chunk.category) {
+		case 'token':
+			return { category: 'token', content: chunk.content }
+		case 'think':
+			return { category: 'think', content: chunk.content }
+		case 'tool':
+			return chunk.result.success === true
+				? { category: 'tool', success: true, name: chunk.call.name }
+				: { category: 'tool', success: false }
+		case 'usage':
+			return {
+				category: 'usage',
+				usage: {
+					prompt: chunk.usage.prompt,
+					completion: chunk.usage.completion,
+					total: chunk.usage.total,
+				},
+				estimate: chunk.estimate,
+			}
+		case 'ask':
+			return undefined
+	}
+}
+
+/**
+ * Projects a settled {@link AgentResult} onto the terminal `finish` frame a page receives.
+ *
+ * @remarks
+ * Keeps `content`, `partial`, `usage` when present, and the stop's `layer` when a layer stopped the
+ * run; drops `thinking` and every other stop member.
+ *
+ * @param result - The run's settled result
+ * @returns A fresh `finish` frame
+ *
+ * @example
+ * ```ts
+ * agentResultToFrame({ content: 'Done.', partial: false }) // { category: 'finish', content: 'Done.', partial: false }
+ * ```
+ */
+export function agentResultToFrame(
+	result: AgentResult,
+): Extract<AgentFrame, { readonly category: 'finish' }> {
+	return {
+		category: 'finish',
+		content: result.content,
+		partial: result.partial,
+		...(result.usage === undefined
+			? {}
+			: {
+					usage: {
+						prompt: result.usage.prompt,
+						completion: result.usage.completion,
+						total: result.usage.total,
+					},
+				}),
+		...(result.stop === undefined ? {} : { layer: result.stop.layer }),
+	}
+}
+
+/**
+ * Projects a run's live handle onto the frames a page receives — one frame per projected chunk, in
+ * order, then exactly one terminal `finish` or `error`, last.
+ *
+ * @remarks
+ * Reads `events` and `result` once each. An `ask` chunk crosses as the frame `approver` holds for
+ * its call, and every other chunk through {@link agentChunkToFrame}; after the drain ends, the
+ * settled result crosses through {@link agentResultToFrame}, and any throw ends the frames with a
+ * bare `{ category: 'error' }`. It never calls `abort` itself, and drained to the end it yields
+ * exactly one terminal frame, last. A consumer's `return()` while it waits at a chunk's frame
+ * closes the drain of `events`, whose `return()` aborts the run, and no terminal frame is yielded.
+ * When the run aborts while an ask waits and the reader pulls the `ask` chunk afterwards, the
+ * approver holds no waiting ask, marks the call, and frames nothing, so no `ask` frame crosses and
+ * the frames end `finish` with `partial: true`.
+ *
+ * @param stream - The run's live handle
+ * @param approver - The approver wired as the authority's `ask` handler; with `undefined` every
+ *   `ask` chunk is dropped, so pass `undefined` only when an in-process handler answers the asks.
+ *   An `Approver` wired as the handler but passed as `undefined` leaves each ask waiting with no
+ *   frame until the run `timeout` or an abort.
+ * @returns An async generator of the run's frames
+ *
+ * @example
+ * ```ts
+ * const approver = createApprover()
+ * const authority = createAuthority({ rules, ask: approver.ask })
+ * const agent = createAgent(provider, { tools, authority })
+ * for await (const frame of agentStreamToFrames(agent.stream({ prompt }), approver)) {
+ * 	send(JSON.stringify(frame))
+ * }
+ * ```
+ */
+export async function* agentStreamToFrames(
+	stream: AgentStreamInterface,
+	approver: ApproverInterface | undefined,
+): AsyncGenerator<AgentFrame, void, undefined> {
+	const events = stream.events
+	const result = stream.result
+	try {
+		for await (const chunk of events) {
+			const frame =
+				chunk.category === 'ask' ? approver?.frame(chunk.call) : agentChunkToFrame(chunk)
+			if (frame !== undefined) yield frame
+		}
+		yield agentResultToFrame(await result)
+	} catch {
+		yield { category: 'error' }
+	}
 }
 
 /**
@@ -506,6 +639,38 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
 		name: call.name,
 		error: `${preview(call.name)} did not run: ${reason ?? AUTHORITY_NOTES.denied}`,
 	}
+}
+
+/**
+ * Renders a tool call's arguments as escaped canonical JSON text — sorted keys, with every control,
+ * format, line-separator, and paragraph-separator code point written as `\uXXXX` — or returns
+ * `undefined` when they cannot be rendered.
+ *
+ * @remarks
+ * Keeps the semantics of `canonicalStringify` from `@orkestrel/contract`, so `NaN` renders as `null`
+ * and an `undefined` member is dropped, as `JSON.stringify` does; the exact round trip through
+ * `JSON.parse` is promised for JSON arguments only, which a provider's parsed call carries. A cycle,
+ * a throwing getter, or a value JSON cannot encode returns `undefined`. Each escaped code point is
+ * written over its UTF-16 code units, so bidi overrides, zero-width characters, U+0085, U+2028,
+ * U+2029, U+FEFF, and tag characters appear only encoded. The text carries no length cap.
+ *
+ * @param value - The call's arguments
+ * @returns The rendered text, or `undefined` when the arguments cannot be rendered
+ *
+ * @example
+ * ```ts
+ * renderArguments({ path: 'a\u202Eb', mode: 'r' }) // '{"mode":"r","path":"a\\u202eb"}'
+ * ```
+ */
+export function renderArguments(value: Readonly<Record<string, unknown>>): string | undefined {
+	const rendered = attempt(() => canonicalStringify(value))
+	if (!rendered.success || rendered.value === undefined) return undefined
+	return rendered.value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, (match) =>
+		Array.from(
+			{ length: match.length },
+			(_, index) => `\\u${match.charCodeAt(index).toString(16).padStart(4, '0')}`,
+		).join(''),
+	)
 }
 
 /**

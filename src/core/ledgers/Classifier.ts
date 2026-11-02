@@ -219,13 +219,15 @@ export class Classifier implements ClassifierInterface {
 			if (!requests.has(message.id))
 				results.push(await this.#ask(this.#buildCategory(message.id), 'category', signal, results))
 		}
+		const quiets = new Map<string, boolean>()
 		for (const message of asked) {
-			if (!requests.has(message.id) && this.quiet(message.id)) continue
+			if (!requests.has(message.id) && this.#readQuiet(message.id, quiets)) continue
 			for (const topic of this.#options.topics) {
 				if (requests.has(message.id) && topic.requested === false) continue
 				results.push(await this.#ask(this.#buildTopic(message.id, topic), 'topic', signal, results))
 			}
 		}
+		const nears = new Map<string, ReadonlySet<string>>()
 		for (const later of asked) {
 			if (
 				later.role !== 'user' ||
@@ -233,13 +235,13 @@ export class Classifier implements ClassifierInterface {
 					this.#options.thresholds.correction
 			)
 				continue
-			const near = this.#collectNear(later)
+			const near = this.#readNear(later, nears)
 			if (near.size === 0) continue
 			for (const earlier of messages) {
 				if (earlier.id === later.id) break
 				if (
-					this.quiet(earlier.id) ||
-					![...this.#collectNear(earlier)].some((topic) => near.has(topic))
+					this.#readQuiet(earlier.id, quiets) ||
+					![...this.#readNear(earlier, nears)].some((topic) => near.has(topic))
 				)
 					continue
 				const spec = this.#buildPair('amends', earlier.id, later.id)
@@ -344,6 +346,24 @@ export class Classifier implements ClassifierInterface {
 			...this.#options.entities(text, false),
 			...(this.#options.assign(message) === undefined ? this.topics(message.id) : []),
 		])
+	}
+
+	// Reads a message's near set from this call's memo, collecting it on the first read.
+	#readNear(message: Message, nears: Map<string, ReadonlySet<string>>): ReadonlySet<string> {
+		const known = nears.get(message.id)
+		if (known !== undefined) return known
+		const near = this.#collectNear(message)
+		nears.set(message.id, near)
+		return near
+	}
+
+	// Reads a message's quiet flag from this call's memo, reading it on the first request.
+	#readQuiet(id: string, quiets: Map<string, boolean>): boolean {
+		const known = quiets.get(id)
+		if (known !== undefined) return known
+		const quiet = this.quiet(id)
+		quiets.set(id, quiet)
+		return quiet
 	}
 
 	async #ask(

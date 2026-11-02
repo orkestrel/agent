@@ -168,6 +168,10 @@ export type LedgerLookupHandler = (
  * arguments when deciding which reading replaces an earlier one.
  * A throwing `read` handler makes the lookup failed: it files as chatter and replaces no reading.
  * A seed tool message with no recorded result counts as a successful lookup.
+ * The ledger calls the `read` handler at most once for each lookup result in each selection and in
+ * each `recall` call. It calls the handler again in a selection whose conversation changes while the
+ * selection waits on the judge, and in a selection or call that a result's unreadable `ids` or
+ * `owners` faults.
  */
 export interface LedgerLookup {
 	readonly tool: ToolInterface
@@ -204,6 +208,25 @@ export type LedgerLookupState = 'failed' | 'empty' | 'shown' | 'hidden'
 export interface LedgerRegistry {
 	readonly ids: ReadonlySet<string>
 	readonly owners: ReadonlyMap<string, readonly string[]>
+}
+
+/**
+ * Carries a registry prepared for matching: its ids, each owner name's owners, and the compiled needles.
+ *
+ * @remarks
+ * `ids` is the registry's own id set. `aliases` maps each owner name to the ids of the owners that
+ * carry it, in registry order, and `carriers` maps each word of a name to the distinct names it
+ * appears in. `names` maps each name to its whole-name needle, which matches in any case, and
+ * `words` maps a name to the needles of its capitalized words that no other name carries, which
+ * match in their own case; a name without such a word has no `words` entry. Every needle matches
+ * at word edges and carries neither the `g` nor the `y` flag, so a test keeps no state.
+ */
+export interface LedgerIndex {
+	readonly ids: ReadonlySet<string>
+	readonly aliases: ReadonlyMap<string, readonly string[]>
+	readonly carriers: ReadonlyMap<string, readonly string[]>
+	readonly names: ReadonlyMap<string, RegExp>
+	readonly words: ReadonlyMap<string, readonly RegExp[]>
 }
 
 /**
@@ -634,6 +657,9 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
  * @remarks
  * `assign` decides the category of a message the ledger wrote or a tool returned, without a
  * question. `entities` names the registry ids a text carries, which decide the pairs it asks about.
+ * While it pairs corrections, the `classify` method reads each message's quiet flag and near set at
+ * most once per call and reuses them for every later correction, so a change to the conversation,
+ * its judgments, or the judge's model made while the call waits on the judge reaches the next call.
  */
 export interface ClassifierOptions {
 	readonly conversation: ConversationInterface

@@ -31,12 +31,21 @@ import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
 import { createTokenMeter } from '@orkestrel/budget'
-import { attempt, errorToMessage, failure, isObject, success } from '@orkestrel/contract'
+import {
+	attempt,
+	ContractError,
+	errorToMessage,
+	failure,
+	isObject,
+	preview,
+	success,
+} from '@orkestrel/contract'
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
 import { AgentContext } from '../contexts/index.js'
 import { raceSignal } from '../conversations/index.js'
 import { AUTHORITY_NOTES, DEFAULT_AGENT_LIMIT, SCOPE_NOTE } from './constants.js'
+import { agentPromptContract } from './contracts.js'
 import { AgentError } from './errors.js'
 import { Authority } from './Authority.js'
 import { Channel } from './Channel.js'
@@ -74,7 +83,8 @@ import { isProviderAbortError } from '../providers/index.js'
  *   yielding each content delta as a `token` chunk and charging its estimate to the
  *   `allowance` when one is set; reconcile the turn's usage against the `budget`, before a
  *   genuine provider error rejects the run too, and yield a `usage` chunk; if the model
- *   requested tools, append the assistant turn, pass them to the tool manager's `execute`
+ *   requested tools, yield an `ask` chunk per asked call once its approver is entered,
+ *   append the assistant turn, pass them to the tool manager's `execute`
  *   method, yield a `tool` chunk per call, append each tool result message, and continue;
  *   otherwise append the final assistant message and stop. The run's content,
  *   thinking, usage, and stop derive from the turn records. Each assistant message stores its
@@ -89,7 +99,7 @@ import { isProviderAbortError } from '../providers/index.js'
  * - **Paced + capped.** The loop calls the `scheduler` object's `yield` method between turns when given; tool
  *   iteration is capped at `limit`.
  * - **Two observation surfaces.** The pull {@link AgentChunk} stream carries per-token
- *   deltas (+ usage/tool chunks); the push {@link emitter} ({@link AgentEventMap}) carries
+ *   deltas (+ usage/ask/tool chunks); the push {@link emitter} ({@link AgentEventMap}) carries
  *   lifecycle + usage/tool/allow/ask/deny moments for fire-and-forget observers. Every event is
  *   emitted directly, after the relevant state transition / settle; the emitter isolates a
  *   listener throw and routes it to its `error` handler (the `error` option), so a buggy
@@ -205,6 +215,14 @@ export class Agent implements AgentInterface {
 	}
 
 	stream(options?: AgentRunOptions): AgentStreamInterface {
+		// The prompt is checked exactly before every other guard, so a refused prompt starts nothing.
+		const prompt = options?.prompt
+		if (prompt !== undefined && !agentPromptContract.is(prompt)) {
+			throw new ContractError('Agent: prompt must be an exact AgentPrompt', {
+				code: 'placement',
+				context: { path: ['options', 'prompt'], limit: 'AgentPrompt', received: preview(prompt) },
+			})
+		}
 		// Resolve effective per-run bounds — a per-run override wins, else the construction
 		// default. `limit`, `budget`, and `allowance` also thread into `#execute` (the loop bound,
 		// the reconcile, and the mid-stream meter); each budget is the same instance folded into
@@ -252,6 +270,14 @@ export class Agent implements AgentInterface {
 		// it can be composed first and armed only after nothing left can throw.
 		const timeoutMs = options?.timeout ?? this.#timeoutMs
 		const timeout = timeoutMs === undefined ? undefined : createTimeout({ ms: timeoutMs })
+		// The prompt joins the conversation from its named members after every guard, before `start()`.
+		if (prompt !== undefined) {
+			conversation.add({
+				role: 'user',
+				content: prompt.content,
+				...(prompt.images === undefined ? {} : { images: prompt.images }),
+			})
+		}
 		// `start()` replaces each held budget's signal, so it precedes the composition that reads it.
 		for (const one of held) one.start()
 		// Fold every present bound (external signal + a per-run signal + deadline + budget +
@@ -391,10 +417,10 @@ export class Agent implements AgentInterface {
 	// requested tools. A cancel (the bound abort) ends a turn with a `cancel` record — it never
 	// throws; only a genuine provider / tool error propagates. Every record is local to one call, so
 	// concurrent runs share nothing, and the settled `AgentRunResult` derives from the records.
-	// Each turn runs in this generator, which delegates only the provider stream to `#provide`: a
-	// delta crosses these two layers before `#drive` pushes it, and no per-turn generator settles
-	// between a turn's chunks. Every further layer would let a consumer's early `return()` cancel the
-	// provider a step sooner.
+	// Each turn runs in this generator, which delegates only the provider stream to `#provide` and the
+	// ask pass to `#approve`: a delta crosses these two layers before `#drive` pushes it, and no
+	// per-turn generator settles between a turn's chunks. Every further layer would let a consumer's
+	// early `return()` cancel the provider a step sooner.
 	async *#execute(
 		abort: AbortInterface,
 		conversation: ConversationInterface,
@@ -537,7 +563,7 @@ export class Agent implements AgentInterface {
 				const authorization = this.#authorize(tools, result.tools, admittedCalls, advertised)
 				// The ask pass runs only for an asked call, so a turn with no `ask` verdict adds no `await`.
 				if (authorization.asked.length > 0 && !abort.signal.aborted) {
-					await this.#approve(tools, authorization, abort.signal)
+					yield* this.#approve(tools, authorization, abort.signal)
 				}
 				if (abort.signal.aborted) {
 					turns.push({ ...settled, outcome: 'cancel', partial: true })
@@ -901,15 +927,20 @@ export class Agent implements AgentInterface {
 		return { allowed, denials, asked }
 	}
 
-	// Decides one call — scope, then authority, then the `consequential` floor. A scope miss, an
-	// evaluate throw, and an invalid decision emit `deny` with no decision and fail with the denial;
-	// otherwise the owned copy of the decision, raised by the advertised definition, succeeds.
+	// Decides one call — scope, then authority, then the `consequential` floor. A scope miss (a call
+	// the allow-list excludes, or whose name no definition advertises this turn), an evaluate throw,
+	// and an invalid decision emit `deny` with no decision and fail with the denial; otherwise the
+	// owned copy of the decision, raised by the advertised definition, succeeds. The scope miss is
+	// decided before the authority is read, so it never sees a name no definition advertises.
 	#decide(
 		call: ToolCall,
 		admitted: readonly ToolCall[],
 		advertised: readonly ToolDefinition[],
 	): Result<AuthorityDecision, ToolResult> {
-		if (!admitted.includes(call)) {
+		const definition = admitted.includes(call)
+			? advertised.find((advertisement) => advertisement.name === call.name)
+			: undefined
+		if (definition === undefined) {
 			const denial = denyCall(call, SCOPE_NOTE)
 			this.#emitter.emit('deny', call, `${call.name} is not in the active scope`, undefined)
 			return failure(denial)
@@ -927,7 +958,6 @@ export class Agent implements AgentInterface {
 			const copy = { zone, verdict, ...(reason === undefined ? {} : { reason }) }
 			if (!isAuthorityDecision(copy)) return undefined
 			// The floor reads this turn's advertised definition, so a structural authority cannot skip it.
-			const definition = advertised.find((advertisement) => advertisement.name === call.name)
 			return resolveDecision(copy, definition)
 		})
 		if (!evaluated.success) {
@@ -948,10 +978,12 @@ export class Agent implements AgentInterface {
 	}
 
 	// Hands each asked call to the approver in call order, entering handler k+1 only after handler k
-	// settles, and races each answer against the run signal. An abort returns at once, so the pending
-	// call emits nothing further and no later handler is entered; `raceSignal` absorbs a late settle.
-	// An approval of a tool the registry replaced during the ask is denied as unanswered.
-	async #approve(
+	// settles, and races each answer against the run signal. Each call's `ask` chunk is yielded after
+	// its handler is entered and before its answer is awaited, so a reader that sees the chunk finds
+	// the ask registered. An abort returns at once, so the pending call emits nothing further and no
+	// later handler is entered; `raceSignal` absorbs a late settle. An approval of a tool the registry
+	// replaced during the ask is denied as unanswered.
+	async *#approve(
 		tools: ToolManagerInterface,
 		authorization: {
 			readonly allowed: Map<number, ToolCall>
@@ -964,7 +996,7 @@ export class Agent implements AgentInterface {
 			}>
 		},
 		signal: AbortSignal,
-	): Promise<void> {
+	): AsyncGenerator<AgentChunk, void> {
 		const authority = this.#authority
 		for (const { index, call, decision, tool } of authorization.asked) {
 			if (signal.aborted) return
@@ -994,6 +1026,7 @@ export class Agent implements AgentInterface {
 				reason: errorToMessage(error),
 				note: AUTHORITY_NOTES.unanswered,
 			}))
+			yield { category: 'ask', call, decision }
 			const outcome = await raceSignal(answer, signal).catch(() => undefined)
 			if (outcome === undefined || signal.aborted) return
 			if (outcome.approved && tools.tool(call.name) === tool) {

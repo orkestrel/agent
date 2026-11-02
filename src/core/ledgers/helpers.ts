@@ -3,6 +3,7 @@ import type {
 	GaugeCall,
 	LedgerAmendment,
 	LedgerCategory,
+	LedgerIndex,
 	LedgerLine,
 	LedgerLookupReading,
 	LedgerLookupState,
@@ -506,6 +507,79 @@ export function collectRegistry(readings: readonly LedgerLookupReading[]): Ledge
 }
 
 /**
+ * Builds a registry's matching index: each name's owners, each name word's carriers, and the compiled needles.
+ *
+ * @remarks
+ * The index holds the registry's own `ids` set. A needle escapes its text's pattern characters and
+ * matches at word edges: a whole name in any case, and a capitalized name word that only one name
+ * carries in its own case, so a common word that spells a first name does not.
+ *
+ * @param registry - The registry to index
+ * @returns The index, which {@link matchEntities} reads without building anything
+ * @throws {TypeError} Thrown when an owner's name list holds a hole
+ *
+ * @example
+ * ```ts
+ * const index = buildLedgerIndex({ ids: new Set(['BW-20931']), owners: new Map([['BW-20931', ['Brightwater Studio']]]) })
+ * // index.aliases is Map { 'Brightwater Studio' => ['BW-20931'] }
+ * ```
+ */
+export function buildLedgerIndex(registry: LedgerRegistry): LedgerIndex {
+	// `Array.from` visits a hole in an owner's names as an undefined name, as iteration does; `map` skips it.
+	const aliases = new Map(
+		[
+			...Map.groupBy(
+				[...registry.owners].flatMap(([id, names]) => Array.from(names, (name) => ({ name, id }))),
+				(entry) => entry.name,
+			),
+		].map(([name, entries]) => [name, entries.map((entry) => entry.id)]),
+	)
+	// A word's carriers are the distinct names it appears in.
+	const carriers = new Map(
+		[
+			...Map.groupBy(
+				[...aliases.keys()].flatMap((name) =>
+					[...new Set(name.split(/\s+/))].map((word) => ({ word, name })),
+				),
+				(entry) => entry.word,
+			),
+		].map(([word, entries]) => [word, entries.map((entry) => entry.name)]),
+	)
+	// Neither flag set carries `g` or `y`, so a shared needle keeps no `lastIndex` between tests.
+	const needles = [...aliases.keys()].flatMap((name) =>
+		[
+			{ name, needle: name, whole: true },
+			...name
+				.split(/\s+/)
+				.filter((word) => /^\p{Lu}\p{L}+$/u.test(word) && carriers.get(word)?.length === 1)
+				.map((word) => ({ name, needle: word, whole: false })),
+		].map((entry) => ({
+			...entry,
+			pattern: new RegExp(
+				`(?<![\\p{L}\\p{N}])${entry.needle.replace(/[.*+?^$()|{}[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`,
+				entry.whole ? 'iu' : 'u',
+			),
+		})),
+	)
+	return {
+		ids: registry.ids,
+		aliases,
+		carriers,
+		names: new Map(
+			needles.filter((entry) => entry.whole).map((entry) => [entry.name, entry.pattern]),
+		),
+		words: new Map(
+			[
+				...Map.groupBy(
+					needles.filter((entry) => !entry.whole),
+					(entry) => entry.name,
+				),
+			].map(([name, entries]) => [name, entries.map((entry) => entry.pattern)]),
+		),
+	}
+}
+
+/**
  * Matches the registry ids and owners a text names.
  *
  * @remarks
@@ -513,52 +587,32 @@ export function collectRegistry(readings: readonly LedgerLookupReading[]): Ledge
  * its names whole. With `partial`, a capitalized name word that only one name carries also names
  * that name's owners, matched case-sensitively so a common word that spells a first name does not.
  *
- * @param registry - The registry to match against
+ * @param index - The registry's index, from {@link buildLedgerIndex}
  * @param text - The text to read
  * @param partial - If `true`, a name word only one name carries also names its owners; if `false`, only a whole name does
  * @returns The registry ids and owner ids the text names
  *
  * @example
  * ```ts
- * const registry = { ids: new Set(['BW-20931']), owners: new Map([['BW-20931', ['Brightwater Studio']]]) }
- * matchEntities(registry, 'Ask Brightwater about it', true) // Set { 'BW-20931' }
- * matchEntities(registry, 'Ask Brightwater about it', false) // Set {}
+ * const index = buildLedgerIndex({ ids: new Set(['BW-20931']), owners: new Map([['BW-20931', ['Brightwater Studio']]]) })
+ * matchEntities(index, 'Ask Brightwater about it', true) // Set { 'BW-20931' }
+ * matchEntities(index, 'Ask Brightwater about it', false) // Set {}
  * ```
  */
 export function matchEntities(
-	registry: LedgerRegistry,
+	index: LedgerIndex,
 	text: string,
 	partial: boolean,
 ): ReadonlySet<string> {
 	const ids = extractLiterals(text).ids
-	// `Array.from` visits a hole in an owner's names as an undefined name, as iteration does; `map` skips it.
-	const aliases = Map.groupBy(
-		[...registry.owners].flatMap(([id, names]) => Array.from(names, (name) => ({ name, id }))),
-		(entry) => entry.name,
-	)
-	// A word's carriers are the distinct names it appears in.
-	const carriers = Map.groupBy(
-		[...aliases.keys()].flatMap((name) => [...new Set(name.split(/\s+/))]),
-		(word) => word,
-	)
 	return new Set([
-		...[...registry.ids].filter((id) => ids.has(id)),
-		...[...aliases].flatMap(([name, entries]) => {
-			const words = partial
-				? name
-						.split(/\s+/)
-						.filter((word) => /^\p{Lu}\p{L}+$/u.test(word) && carriers.get(word)?.length === 1)
-				: []
-			const needles = [
-				{ needle: name, flags: 'iu' },
-				...words.map((word) => ({ needle: word, flags: 'u' })),
-			]
-			const named = needles.some(({ needle, flags }) => {
-				const escaped = needle.replace(/[.*+?^$()|{}[\]\\]/g, '\\$&')
-				return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, flags).test(text)
-			})
-			return named ? entries.map((entry) => entry.id) : []
-		}),
+		...[...index.ids].filter((id) => ids.has(id)),
+		...[...index.aliases].flatMap(([name, owners]) =>
+			index.names.get(name)?.test(text) === true ||
+			(partial && (index.words.get(name) ?? []).some((needle) => needle.test(text)))
+				? owners
+				: [],
+		),
 	])
 }
 

@@ -260,3 +260,76 @@ describe('Channel — close idempotence & end semantics', () => {
 		expect(await collect(channel.drain())).toEqual([99])
 	})
 })
+
+describe('Channel — partial reads and early return', () => {
+	it('settles a parked return after a push', async () => {
+		const channel = new Channel<number>()
+		const iterator = channel.drain()
+		const parked = iterator.next()
+		await waitForDelay()
+		const returned = iterator.return()
+		expect(
+			await Promise.race([returned.then(() => 'settled'), waitForDelay(20).then(() => 'parked')]),
+		).toBe('parked')
+		channel.push(1)
+		expect(await parked).toEqual({ done: false, value: 1 })
+		expect(await returned).toEqual({ done: true, value: undefined })
+		// The returned reader took nothing after it ended, so a fresh reader sees only the later push.
+		channel.push(2)
+		channel.close()
+		expect(await collect(channel.drain())).toEqual([2])
+	})
+
+	it('hands each of many values to one reader', async () => {
+		const channel = new Channel<number>()
+		const left = collect(channel.drain())
+		const right = collect(channel.drain())
+		await waitForDelay()
+		const bursts = Array.from({ length: 20 }, (_burst, index) =>
+			Array.from({ length: 15 }, (_value, offset) => index * 15 + offset),
+		)
+		for (const burst of bursts) {
+			for (const value of burst) channel.push(value)
+			await waitForDelay()
+		}
+		// Both readers take every value and park again before the end arrives.
+		await waitForDelay()
+		channel.close()
+		const [leftValues, rightValues] = await Promise.all([left, right])
+		const delivered = [...leftValues, ...rightValues]
+		expect(delivered.toSorted((one, other) => one - other)).toEqual(bursts.flat())
+		expect(delivered).toHaveLength(300)
+		expect(leftValues).toEqual(leftValues.toSorted((one, other) => one - other))
+		expect(rightValues).toEqual(rightValues.toSorted((one, other) => one - other))
+	})
+
+	it('yields the unread rest before close', async () => {
+		const channel = new Channel<number>()
+		channel.push(1)
+		channel.push(2)
+		channel.push(3)
+		const iterator = channel.drain()
+		expect(await iterator.next()).toEqual({ done: false, value: 1 })
+		channel.push(4)
+		channel.close()
+		expect(await collect(iterator)).toEqual([2, 3, 4])
+		expect(await collect(channel.drain())).toEqual([])
+	})
+
+	it('yields the unread rest before fail', async () => {
+		const channel = new Channel<number>()
+		const error = new Error('ended')
+		channel.push(1)
+		channel.push(2)
+		channel.push(3)
+		const iterator = channel.drain()
+		expect(await iterator.next()).toEqual({ done: false, value: 1 })
+		channel.push(4)
+		channel.fail(error)
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: 2 })
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: 3 })
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: 4 })
+		await expect(iterator.next()).rejects.toBe(error)
+		await expect(collect(channel.drain())).rejects.toBe(error)
+	})
+})

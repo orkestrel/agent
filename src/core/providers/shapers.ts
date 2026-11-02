@@ -4,14 +4,13 @@ import {
 	booleanShape,
 	jsonShape,
 	literalShape,
-	numberShape,
 	objectShape,
 	optionalShape,
 	recordShape,
 	stringShape,
 	unionShape,
 } from '@orkestrel/contract'
-import { messageShape, toolCallShape } from '../shapers.js'
+import { messageShape, tokenUsageShape, toolCallShape } from '../shapers.js'
 
 /**
  * Describes a provider request's JSON wire projection.
@@ -51,13 +50,7 @@ export const providerResultShape = objectShape({
 	content: stringShape(),
 	thinking: optionalShape(stringShape()),
 	tools: optionalShape(arrayShape(toolCallShape)),
-	usage: optionalShape(
-		objectShape({
-			prompt: numberShape(),
-			completion: numberShape(),
-			total: numberShape(),
-		}),
-	),
+	usage: optionalShape(tokenUsageShape),
 	truncated: optionalShape(booleanShape()),
 }) satisfies ContractShape
 

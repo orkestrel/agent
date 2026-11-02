@@ -1,4 +1,11 @@
-import type { LedgerSnapshot, Message, MessageInput, Selection, ThinkingReplay } from '@src/core'
+import type {
+	ConversationInterface,
+	LedgerSnapshot,
+	Message,
+	MessageInput,
+	Selection,
+	ThinkingReplay,
+} from '@src/core'
 import {
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
@@ -25,8 +32,16 @@ import {
 } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
+	LEDGER_BENCH_MODEL,
 	LEDGER_REPLAY_FIXTURE,
 	LEDGER_SNAPSHOT_SEED,
+	buildLedgerBenchOptions,
+	buildLedgerPrefix,
+	computeTextDigest,
+	createCorrectionJudge,
+	createLedgerJudge,
+	extractLedgerOrder,
+	renderLedgerPositions,
 	buildLedgerReplayOptions,
 	buildLedgerSnapshotRefusals,
 	computeLedgerErrorCode,
@@ -3441,6 +3456,157 @@ describe('Ledger — snapshot and hydrate', () => {
 		expectTypeOf<keyof LedgerSnapshot>().toEqualTypeOf<
 			'conversation' | 'requests' | 'notes' | 'failures' | 'gauge'
 		>()
+	})
+
+	it('files a correction fixture as recorded', async () => {
+		const prefix = buildLedgerPrefix(34, 'correction')
+		expect(prefix.snapshot.conversation.messages).toHaveLength(32)
+		expect(prefix.corrections.size).toBe(2)
+		const pairs = { amends: 0.9, supersedes: 0.9 }
+		const asked = createRecorder<readonly [key: string]>()
+		const selections = createRecorder<readonly [selection: Selection]>()
+		const parent = createLedger(
+			createScriptedProvider([{ content: 'Noted.' }]),
+			buildLedgerBenchOptions(
+				createCorrectionJudge(asked, prefix.corrections, pairs),
+				true,
+				prefix.snapshot,
+			),
+		)
+		parent.agent.emitter.on('select', selections.handler)
+		const first = await parent.respond('What is the status of OR-1000?')
+		const firstKeys = asked.calls.map(([key]) => key)
+		const snapshot = parent.snapshot()
+		const selected = selections.count
+		const second = await parent.respond('What is open on the desk?')
+		const secondKeys = asked.calls.slice(firstKeys.length).map(([key]) => key)
+		const childAsked = createRecorder<readonly [key: string]>()
+		const childSelections = createRecorder<readonly [selection: Selection]>()
+		const child = createLedger(createScriptedProvider([{ content: 'Noted.' }]), {
+			...buildUncalibratedOptions(
+				buildLedgerBenchOptions(createCorrectionJudge(childAsked, prefix.corrections, pairs), true),
+			),
+			snapshot,
+		})
+		child.agent.emitter.on('select', childSelections.handler)
+		await child.respond('What is open on the desk?')
+		const from = child.conversation.messages()
+		const to = parent.conversation.messages()
+		expect(from).toHaveLength(to.length)
+		expect(secondKeys).not.toEqual([])
+		expect(translateLedgerIds(childSelections.calls, from, to)).toBe(
+			JSON.stringify(selections.calls.slice(selected)),
+		)
+		expect(translateLedgerIds(childAsked.calls, from, to)).toBe(
+			JSON.stringify(asked.calls.slice(firstKeys.length)),
+		)
+		const judgments = parent.conversation.judgments
+			.judgments()
+			.map(({ time: _time, ...judgment }) => judgment)
+		expect({
+			keys: [firstKeys.length, secondKeys.length],
+			amends: [first, second].map(
+				(result) => result.readings.filter((reading) => reading.phase === 'amends').length,
+			),
+			supersedes: [first, second].map(
+				(result) => result.readings.filter((reading) => reading.phase === 'supersedes').length,
+			),
+			digest: await computeTextDigest(
+				renderLedgerPositions({ keys: [firstKeys, secondKeys], judgments }, to),
+			),
+		}).toEqual({
+			keys: [89, 1],
+			amends: [26, 26],
+			supersedes: [26, 26],
+			digest: 'b722676db088eac263ab063f8e0b6b055af63683b634ac043c6f5a1561938396',
+		})
+	})
+
+	it('reads each lookup once per selection', async () => {
+		const prefix = buildLedgerPrefix(34, 'correction')
+		expect(prefix.corrections.size).toBe(2)
+		const reads = createRecorder<readonly [id: string]>()
+		const selections = createRecorder<readonly [selection: Selection]>()
+		// With no request marked, the seed runs up to the request, so each lookup renders as a tail stub.
+		const options = buildLedgerBenchOptions(
+			createCorrectionJudge(createRecorder(), prefix.corrections, { amends: 0.9, supersedes: 0 }),
+			true,
+			{ ...prefix.snapshot, requests: [] },
+		)
+		const ledger = createLedger(createScriptedProvider([{ content: 'Noted.' }]), {
+			...options,
+			lookups: [
+				{
+					tool: requireValue(options.lookups?.[0]).tool,
+					read: (args) => {
+						reads.handler(isString(args.id) ? args.id : '')
+						return extractLedgerOrder(args)
+					},
+				},
+			],
+		})
+		ledger.agent.emitter.on('select', selections.handler)
+		await ledger.respond('What is the status of OR-1000?')
+		expect(selections.count).toBe(1)
+		expect(
+			Object.fromEntries(
+				[...Map.groupBy(reads.calls, ([id]) => id)].map(([id, calls]) => [id, calls.length]),
+			),
+		).toEqual({ 'OR-1000': 1, 'OR-1001': 1, 'OR-1002': 1, 'OR-1003': 1 })
+	})
+
+	it('plans without a message removed mid-pass', async () => {
+		const prefix = buildLedgerPrefix(18, 'correction')
+		const messages = prefix.snapshot.conversation.messages
+		const removed = requireValue(messages[1])
+		const kept = requireValue(messages[0])
+		const correction = requireValue(messages[10])
+		const last = JSON.stringify(['amends', requireValue(messages[9]).id, correction.id])
+		expect(prefix.corrections).toEqual(new Set([correction.id]))
+		expect(removed.content).toBe('[Source 0-b] The refund for OR-1000 is $0.50.')
+		const keyed = createCorrectionJudge(createRecorder(), prefix.corrections, {
+			amends: 0,
+			supersedes: 0,
+		})
+		const asked = createRecorder<readonly [key: string]>()
+		const ready = Promise.withResolvers<ConversationInterface>()
+		// The judge removes the earlier statement while the pass waits on its last question. The
+		// changed view faults the first selection, so the empty first reply opens the answer pass,
+		// whose selection reuses the request's plan.
+		const ledger = createLedger(
+			createScriptedProvider([{ content: '' }, { content: 'Noted.' }]),
+			buildLedgerBenchOptions(
+				createLedgerJudge(
+					asked,
+					async (request) => {
+						if (Object.hasOwn(request.questions, last)) (await ready.promise).remove(removed.id)
+						return keyed.ask(request, new AbortController().signal)
+					},
+					LEDGER_BENCH_MODEL,
+				),
+				true,
+				prefix.snapshot,
+			),
+		)
+		ready.resolve(ledger.conversation)
+		const selections = createRecorder<readonly [selection: Selection]>()
+		ledger.agent.emitter.on('select', selections.handler)
+		const result = await ledger.respond('What is the status of OR-1000?')
+		const [faulted] = requireValue(selections.calls[0])
+		const [selection] = requireValue(selections.calls[1])
+		const contents = selection.messages.map((message) => message.content)
+		expect(asked.calls.at(-1)).toEqual([last])
+		expect(ledger.conversation.message(removed.id)).toBeUndefined()
+		expect(result.passes).toHaveLength(2)
+		expect(selections.count).toBe(2)
+		expect(faulted.fault?.message).toBe(
+			`conversation ${ledger.conversation.id} changed during selection: ${messages.length + 1} messages before, ${messages.length} after`,
+		)
+		expect(selection.fault).toBeUndefined()
+		expect(selection.messages.some((message) => message.id === removed.id)).toBe(false)
+		expect(contents.some((content) => content.includes('[Source 0-b]'))).toBe(false)
+		expect(contents.some((content) => content.includes('[Source 0-a]'))).toBe(true)
+		expect(kept.content).toBe('[Source 0-a] Order OR-1000 for Customer OR-1000 ships on day 0.')
 	})
 })
 

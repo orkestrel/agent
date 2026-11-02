@@ -1,4 +1,12 @@
-import type { AgentResult, AgentStop, Message, ProviderRequest } from '@src/core'
+import type {
+	AgentFrame,
+	AgentResult,
+	AgentStop,
+	AgentStreamInterface,
+	ApproverInterface,
+	Message,
+	ProviderRequest,
+} from '@src/core'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import {
 	createAgentTurn,
@@ -14,11 +22,18 @@ import {
 	REQUEST_MEASURE_CASES,
 } from '../../../setup.js'
 import {
+	agentChunkToFrame,
+	agentFrameContract,
+	agentResultToFrame,
 	agentResultToJSON,
+	agentStreamToFrames,
 	assembleResult,
 	AUTHORITY_NOTES,
 	SCOPE_NOTE,
 	chargeUsage,
+	createAgent,
+	createApprover,
+	createAuthority,
 	createConversation,
 	createConversationManager,
 	denyCall,
@@ -31,6 +46,7 @@ import {
 	measureMessage,
 	measureRequest,
 	MESSAGE_TOKEN_OVERHEAD,
+	renderArguments,
 	renderToolValue,
 	requireBudget,
 	requireConversation,
@@ -43,9 +59,27 @@ import {
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
 import { attempt, isContractError, isRecord, parseJSONValue } from '@orkestrel/contract'
-import { captureError, createRecorder, invokeUnchecked } from '@orkestrel/test'
-import { describe, expect, it } from 'vitest'
-import { createToolCall, createTokenUsage } from '../../../setup.js'
+import {
+	captureError,
+	collect,
+	createRecorder,
+	invokeUnchecked,
+	requireValue,
+} from '@orkestrel/test'
+import { createToolManager } from '@orkestrel/tool'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import {
+	AGENT_SCRIPT_OPTIONS,
+	CANARY_FRAME_SOURCES,
+	CANARY_SENTINELS,
+	createAskAgent,
+	createRecordedTool,
+	createScriptedProvider,
+	createThrowingProvider,
+	createToolCall,
+	createTokenUsage,
+	RENDERED_ARGUMENTS,
+} from '../../../setup.js'
 
 describe('requireEntry', () => {
 	it('returns the registered value without copying it', () => {
@@ -1007,7 +1041,7 @@ describe('denyCall — the synthesized denial result', () => {
 		],
 		[
 			AUTHORITY_NOTES.refused,
-			'"write" did not run: the user refused it. Do not call it again; continue without it.',
+			'"write" did not run: it was refused. Do not call it again; continue without it.',
 		],
 		[
 			AUTHORITY_NOTES.unanswered,
@@ -1015,7 +1049,7 @@ describe('denyCall — the synthesized denial result', () => {
 		],
 		[
 			SCOPE_NOTE,
-			'"write" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.',
+			'"write" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.',
 		],
 	])('renders the note %s byte for byte', (note, error) => {
 		expect(denyCall(createToolCall({ name: 'write' }), note)).toMatchObject({
@@ -1147,5 +1181,342 @@ describe('chargeUsage — the residual budget charge', () => {
 
 	it('consumes nothing without a budget', () => {
 		expect(() => chargeUsage(undefined, { prompt: 1, completion: 4, total: 5 }, 2)).not.toThrow()
+	})
+})
+
+describe('renderArguments — the escaped canonical arguments text', () => {
+	it('renders arguments as canonical JSON', () => {
+		for (const [title, value, text] of RENDERED_ARGUMENTS) {
+			expect([title, renderArguments(value)]).toEqual([title, text])
+			expect(JSON.parse(text)).toEqual(value)
+		}
+	})
+
+	it('encodes format and control characters', () => {
+		for (const [title, value, text] of RENDERED_ARGUMENTS) {
+			const rendered = renderArguments(value) ?? ''
+
+			expect([title, /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(rendered)]).toEqual([title, false])
+			expect([title, rendered]).toEqual([title, text])
+		}
+	})
+
+	it('refuses unrenderable arguments', () => {
+		const cyclic: Record<string, unknown> = { path: 'a.txt' }
+		cyclic.self = cyclic
+		const unreadable = new Proxy(
+			{ path: 'a.txt' },
+			{
+				get() {
+					throw new Error('unreadable path')
+				},
+			},
+		)
+
+		expect(attempt(() => [renderArguments(cyclic), renderArguments(unreadable)])).toEqual({
+			success: true,
+			value: [undefined, undefined],
+		})
+	})
+})
+
+describe('agentChunkToFrame — the page projection of one chunk', () => {
+	it('projects each chunk arm to its frame', () => {
+		const call = createToolCall({ id: 'c9', name: 'read', arguments: { path: 'a.txt' } })
+		const usage = { prompt: 12, completion: 4, total: 16 }
+
+		expect([
+			agentChunkToFrame({ category: 'token', content: 'The invoice' }),
+			agentChunkToFrame({ category: 'think', content: 'Check the total.' }),
+			agentChunkToFrame({
+				category: 'tool',
+				call,
+				result: { success: true, id: 'c9', name: 'read', value: 'paid' },
+			}),
+			agentChunkToFrame({ category: 'tool', call, result: denyCall(call, 'read-only') }),
+			agentChunkToFrame({ category: 'usage', usage, estimate: 4 }),
+			agentChunkToFrame({ category: 'ask', call, decision: { zone: 'files', verdict: 'ask' } }),
+		]).toEqual([
+			{ category: 'token', content: 'The invoice' },
+			{ category: 'think', content: 'Check the total.' },
+			{ category: 'tool', success: true, name: 'read' },
+			{ category: 'tool', success: false },
+			{ category: 'usage', usage, estimate: 4 },
+			undefined,
+		])
+	})
+
+	it('drops the name and reason of a denial', () => {
+		const call = createToolCall({ name: CANARY_SENTINELS.name })
+		const frame = agentChunkToFrame({
+			category: 'tool',
+			call,
+			result: denyCall(call, CANARY_SENTINELS.reason),
+		})
+
+		expect(frame).toEqual({ category: 'tool', success: false })
+		expect(JSON.stringify(frame)).not.toContain(CANARY_SENTINELS.name)
+		expect(JSON.stringify(frame)).not.toContain(CANARY_SENTINELS.reason)
+	})
+})
+
+describe('agentResultToFrame — the terminal finish frame', () => {
+	it('keeps content, partial, usage, layer', () => {
+		const usage = { prompt: 12, completion: 4, total: 16 }
+
+		expect([
+			agentResultToFrame({
+				content: 'The invoice',
+				partial: true,
+				usage,
+				thinking: 'Check the total.',
+				stop: { layer: 'budget', id: 'cost', max: 10, consumed: 16, usage },
+			}),
+			agentResultToFrame({
+				content: 'The invoice is',
+				partial: true,
+				stop: { layer: 'model', id: 'ollama', estimate: 4 },
+			}),
+			agentResultToFrame({ content: 'The invoice is paid.', partial: false }),
+		]).toEqual([
+			{ category: 'finish', content: 'The invoice', partial: true, usage, layer: 'budget' },
+			{ category: 'finish', content: 'The invoice is', partial: true, layer: 'model' },
+			{ category: 'finish', content: 'The invoice is paid.', partial: false },
+		])
+	})
+})
+
+describe('agentStreamToFrames — the page projection of one run', () => {
+	it('ends frames with one finish, last', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(createRecordedTool('read', executed))
+		const provider = createScriptedProvider(
+			[
+				{ content: 'Checking.', tools: [createToolCall({ name: 'read' })], usage: AGENT_USAGE },
+				{ content: 'The invoice is paid.' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools })
+		agent.context.messages.add({ role: 'user', content: 'Check the invoice.' })
+
+		const run = agent.stream()
+		const frames = await collect(agentStreamToFrames(run, undefined))
+
+		expect(frames.every((frame) => agentFrameContract.is(frame))).toBe(true)
+		expect(frames.map((frame) => frame.category)).toEqual([
+			'token',
+			'usage',
+			'tool',
+			'token',
+			'finish',
+		])
+		expect(frames.at(-1)).toEqual({
+			category: 'finish',
+			content: (await run.result).content,
+			partial: false,
+			usage: AGENT_USAGE,
+		})
+	})
+
+	it('finishes last for a lazy reader', async () => {
+		const provider = createScriptedProvider(
+			[{ content: 'The invoice is paid.' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'Check the invoice.' })
+
+		const run = agent.stream()
+		await run.result
+		const frames = await collect(agentStreamToFrames(run, undefined))
+
+		expect(frames).toEqual([
+			{ category: 'token', content: 'The invoice is paid.' },
+			{ category: 'finish', content: 'The invoice is paid.', partial: false },
+		])
+	})
+
+	it('ends with a bare error frame', async () => {
+		const agent = createAgent(createThrowingProvider(`The ${CANARY_SENTINELS.body} desk failed.`))
+		agent.context.messages.add({ role: 'user', content: 'Check the invoice.' })
+
+		const frames = await collect(agentStreamToFrames(agent.stream(), undefined))
+
+		expect(frames).toEqual([{ category: 'error' }])
+		expect(JSON.stringify(frames)).not.toContain(CANARY_SENTINELS.body)
+	})
+
+	it('finishes partial on an abort', async () => {
+		const provider = createScriptedProvider(
+			[{ content: 'The invoice is paid.' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'Check the invoice.' })
+
+		const frames = await collect(
+			agentStreamToFrames(agent.stream({ signal: AbortSignal.abort() }), undefined),
+		)
+
+		expect(frames.filter((frame) => frame.category === 'finish')).toHaveLength(1)
+		expect(frames.at(-1)).toMatchObject({ category: 'finish', partial: true })
+	})
+
+	it('frames an ask through the approver', async () => {
+		const approver = createApprover()
+		const asked = createAskAgent(approver.ask)
+		const frames = createRecorder<[frame: AgentFrame]>()
+
+		const run = asked.agent.stream({ timeout: 2_000 })
+		for await (const frame of agentStreamToFrames(run, approver)) {
+			frames.handler(frame)
+			if (frame.category === 'ask') approver.answer({ id: frame.id, approved: true })
+		}
+
+		const seen = frames.calls.map(([frame]) => frame)
+		expect(seen.map((frame) => frame.category)).toEqual(['ask', 'tool', 'token', 'finish'])
+		expect(seen[0]).toEqual({
+			category: 'ask',
+			id: seen[0]?.category === 'ask' ? seen[0].id : '',
+			name: 'write',
+			zone: 'files',
+			arguments: '{"path":"a.txt"}',
+		})
+		expect(asked.executed.calls).toEqual([[{ path: 'a.txt' }]])
+	})
+
+	it('drops ask chunks with no approver', async () => {
+		expectTypeOf<Parameters<typeof agentStreamToFrames>>().toEqualTypeOf<
+			[AgentStreamInterface, ApproverInterface | undefined]
+		>()
+		const asked = createAskAgent(() => true)
+
+		const frames = await collect(agentStreamToFrames(asked.agent.stream(), undefined))
+
+		expect(frames).toEqual([
+			{ category: 'tool', success: true, name: 'write' },
+			{ category: 'token', content: 'done' },
+			{ category: 'finish', content: 'done', partial: false },
+		])
+	})
+
+	it('keeps every sentinel off the frames', async () => {
+		expect(CANARY_FRAME_SOURCES).toEqual([
+			'system',
+			'instruction',
+			'copy',
+			'tool',
+			'reason',
+			'name',
+			'budget',
+			'thinking',
+			'argument',
+		])
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(createRecordedTool('read', executed, `Found ${CANARY_SENTINELS.tool} only.`))
+		tools.add(createRecordedTool('drop', executed))
+		tools.add(createRecordedTool('write', executed))
+		const approver = createApprover()
+		const provider = createScriptedProvider(
+			[
+				{
+					result: {
+						content: '',
+						thinking: `Weigh ${CANARY_SENTINELS.thinking} first.`,
+						tools: [
+							createToolCall({ id: 'r1', name: 'read' }),
+							createToolCall({ id: 'd1', name: 'drop' }),
+							createToolCall({ id: 'n1', name: CANARY_SENTINELS.name }),
+							createToolCall({
+								id: 'w1',
+								name: 'write',
+								arguments: { note: `Keep ${CANARY_SENTINELS.argument} safe.` },
+							}),
+						],
+						usage: AGENT_USAGE,
+					},
+					thoughts: [`Weigh ${CANARY_SENTINELS.thinking} first.`],
+				},
+				{ content: 'The desk is tidy.' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			system: `Serve the ${CANARY_SENTINELS.system} desk.`,
+			tools,
+			budget: createTokenBudget({ id: CANARY_SENTINELS.budget, max: 1_000_000 }),
+			select: async (conversation) => ({
+				messages: [
+					{ id: 'copy', role: 'user', content: `Recall ${CANARY_SENTINELS.copy} too.` },
+					...conversation.view(),
+				],
+				judgments: [],
+			}),
+			authority: createAuthority({
+				rules: [
+					{
+						match: ({ call }) => call.name === 'drop',
+						zone: 'locked',
+						verdict: 'deny',
+						reason: `The ${CANARY_SENTINELS.reason} folder is read-only.`,
+					},
+					{
+						match: ({ call }) => call.name === 'write',
+						zone: 'files',
+						verdict: 'ask',
+						reason: `The ${CANARY_SENTINELS.reason} files need a look.`,
+					},
+				],
+				ask: approver.ask,
+			}),
+		})
+		agent.context.instructions.add({
+			name: 'desk',
+			content: `Follow the ${CANARY_SENTINELS.instruction} rule.`,
+		})
+		agent.context.messages.add({ role: 'user', content: 'Tidy the desk.' })
+		const frames = createRecorder<[frame: AgentFrame]>()
+
+		for await (const frame of agentStreamToFrames(agent.stream({ timeout: 2_000 }), approver)) {
+			frames.handler(frame)
+			if (frame.category === 'ask') approver.answer({ id: frame.id, approved: true })
+		}
+
+		const seen = frames.calls.map(([frame]) => frame)
+		const serialized = seen.map((frame) => JSON.stringify(frame))
+		for (const source of [
+			'system',
+			'instruction',
+			'copy',
+			'tool',
+			'reason',
+			'name',
+			'budget',
+		] as const) {
+			expect([source, serialized.some((line) => line.includes(CANARY_SENTINELS[source]))]).toEqual([
+				source,
+				false,
+			])
+		}
+		expect(
+			seen
+				.filter((frame) => JSON.stringify(frame).includes(CANARY_SENTINELS.thinking))
+				.map((frame) => frame.category),
+		).toEqual(['think'])
+		expect(
+			seen
+				.filter((frame) => JSON.stringify(frame).includes(CANARY_SENTINELS.argument))
+				.map((frame) => frame.category),
+		).toEqual(['ask'])
+		expect(seen.at(-1)).toMatchObject({ category: 'finish', partial: false })
+		expect(executed.calls).toEqual([[{}], [{ note: `Keep ${CANARY_SENTINELS.argument} safe.` }]])
+		expect(
+			requireValue(provider.calls[0])
+				.messages.map((message) => message.content)
+				.join('\n'),
+		).toContain(CANARY_SENTINELS.copy)
 	})
 })

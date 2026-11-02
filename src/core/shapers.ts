@@ -4,6 +4,7 @@ import {
 	arrayShape,
 	jsonShape,
 	literalShape,
+	numberShape,
 	objectShape,
 	optionalShape,
 	recordShape,
@@ -39,4 +40,17 @@ export const messageShape = objectShape({
 	call: optionalShape(stringShape()),
 	images: optionalShape(arrayShape(stringShape())),
 	thinking: optionalShape(stringShape()),
+}) satisfies ContractShape
+
+/**
+ * Describes a token usage record's JSON wire projection — its `prompt`, `completion`, and `total`
+ * counts, shared by the provider result and the agent frame wires.
+ *
+ * @remarks
+ * The guard refuses extra members; the contract parser drops them.
+ */
+export const tokenUsageShape = objectShape({
+	prompt: numberShape(),
+	completion: numberShape(),
+	total: numberShape(),
 }) satisfies ContractShape

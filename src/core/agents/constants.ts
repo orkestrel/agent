@@ -20,17 +20,17 @@ export const DEFAULT_AUTHORITY_ZONE = 'default'
  */
 export const AUTHORITY_NOTES: AuthorityNote = Object.freeze({
 	denied: 'it is not allowed. Do not call it again; answer with what you have.',
-	refused: 'the user refused it. Do not call it again; continue without it.',
+	refused: 'it was refused. Do not call it again; continue without it.',
 	unanswered:
 		'it needs approval and none was given. Do not call it again; tell the user it needs approval.',
 })
 
 /**
  * Holds the model-facing text the loop writes after a tool name in the denial result of a call
- * outside the active scope's tool allow-list.
+ * outside the active scope's tool allow-list or whose name no definition advertises this turn.
  */
 export const SCOPE_NOTE =
-	'it is not in the active scope. Use a tool from the list or answer with what you have.'
+	'it is not one of the listed tools. Use a listed tool or answer with what you have.'
 
 /**
  * Estimates the role and framing overhead added to each message by {@link estimateMessages}.

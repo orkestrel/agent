@@ -9,7 +9,7 @@ import {
 	LEDGER_QUESTIONS,
 } from '../../../../src/core/ledgers/constants.js'
 import { extractLiterals } from '../../../../src/core/helpers.js'
-import { matchEntities } from '../../../../src/core/ledgers/helpers.js'
+import { buildLedgerIndex, matchEntities } from '../../../../src/core/ledgers/helpers.js'
 import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildLedgerMessage,
@@ -21,6 +21,7 @@ import {
 	buildReadingSummaries,
 	CLASSIFIER_PINNED_ASKS,
 	createLedgerJudge,
+	createPhraseJudge,
 	RecordedTransport,
 	RecordingJudge,
 	ScriptedJudge,
@@ -401,7 +402,10 @@ describe('Classifier', () => {
 					message.id === 'quiet' ? 'chatter' : message.id === 'call' ? 'fact' : undefined,
 				entities: (text, partial) =>
 					matchEntities(
-						{ ids: new Set(['OM-12']), owners: new Map([['OM-12', ['Odile Marlow']]]) },
+						buildLedgerIndex({
+							ids: new Set(['OM-12']),
+							owners: new Map([['OM-12', ['Odile Marlow']]]),
+						}),
 						text,
 						partial,
 					),
@@ -830,5 +834,127 @@ describe('Classifier', () => {
 		conversation.judgments.add(buildLedgerTopicJudgment(tool, refunds, 0.9))
 		expect(classifier.classification().topics.get(tool.id)).toEqual(['refunds'])
 		expect(classifier.quiet(noise.id)).toBe(true)
+	})
+
+	it('reads each eligibility once per pass', async () => {
+		const conversation = createConversation()
+		const [refund, order, , account] = conversation.add([
+			{ role: 'user', content: 'Refund AB-12 is 20.' },
+			{ role: 'user', content: 'Order AB-12 ships Tuesday.' },
+			{ role: 'user', content: 'Correction: refund AB-12 is 25.' },
+			{ role: 'user', content: 'Account AB-12 is open.' },
+			{ role: 'user', content: 'Correction: order AB-12 ships Friday.' },
+		])
+		const phrase = createPhraseJudge([], ['Correction:'])
+		// The judge reports the model the case last set, `A` before any.
+		const judge = new SwitchingJudge(
+			createLedgerJudge(
+				createRecorder<readonly [key: string]>(),
+				(request) => phrase.ask(request, new AbortController().signal),
+				'A',
+			),
+		)
+		const assigned = createRecorder<readonly [id: string]>()
+		const entities = createRecorder<readonly [text: string]>()
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [],
+				assign: (message) => {
+					assigned.handler(message.id)
+					return undefined
+				},
+				entities: (text) => {
+					entities.handler(text)
+					return extractLiterals(text).ids
+				},
+			}),
+		)
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(entities.calls.map(([text]) => text)).toEqual([
+			'Correction: refund AB-12 is 25.',
+			'Refund AB-12 is 20.',
+			'Order AB-12 ships Tuesday.',
+			'Correction: order AB-12 ships Friday.',
+			'Account AB-12 is open.',
+		])
+		expect(
+			[requireValue(refund).id, requireValue(account).id].map(
+				(id) => assigned.calls.filter(([one]) => one === id).length,
+			),
+		).toEqual([3, 3])
+		conversation.remove(requireValue(order).id)
+		const second = entities.count
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(entities.calls.slice(second).map(([text]) => text)).toEqual([
+			'Correction: refund AB-12 is 25.',
+			'Refund AB-12 is 20.',
+			'Correction: order AB-12 ships Friday.',
+			'Account AB-12 is open.',
+		])
+		judge.use('B')
+		const third = entities.count
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(entities.calls.slice(third).map(([text]) => text)).toEqual([
+			'Correction: refund AB-12 is 25.',
+			'Refund AB-12 is 20.',
+			'Correction: order AB-12 ships Friday.',
+			'Account AB-12 is open.',
+		])
+	})
+
+	it('keeps a near set read once per pass', async () => {
+		const conversation = createConversation({
+			snapshot: {
+				id: 'near',
+				sections: [],
+				messages: [
+					buildLedgerMessage('early', 'user', 'Shipping is delayed.'),
+					buildLedgerMessage('order', 'user', 'Refund AB-12 is 20.'),
+					buildLedgerMessage('first', 'user', 'Correction: refund AB-12 is 25.'),
+					buildLedgerMessage('second', 'user', 'Correction: the refund total is 30.'),
+				],
+			},
+		})
+		const refunds = { name: 'refunds', criterion: 'Refund amounts' }
+		const early = requireValue(conversation.message('early'))
+		const phrase = createPhraseJudge([])
+		const asked = createRecorder<readonly [key: string]>()
+		// Answering the first pair files a refunds topic for `early`, whose near set the pass already read.
+		const judge = createLedgerJudge(
+			asked,
+			(request) => {
+				if (Object.hasOwn(request.questions, '["amends","order","first"]'))
+					conversation.judgments.add({
+						...buildLedgerTopicJudgment(early, refunds, 0.9),
+						model: 'widening',
+					})
+				return phrase.ask(request, new AbortController().signal)
+			},
+			'widening',
+		)
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [refunds],
+				entities: (text) => extractLiterals(text).ids,
+			}),
+		)
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(asked.calls.map(([key]) => key)).toEqual([
+			'["category","early"]',
+			'["category","order"]',
+			'["category","first"]',
+			'["category","second"]',
+			'["topic","early","refunds"]',
+			'["topic","order","refunds"]',
+			'["topic","first","refunds"]',
+			'["topic","second","refunds"]',
+			'["amends","order","first"]',
+			'["amends","order","second"]',
+			'["amends","first","second"]',
+		])
 	})
 })

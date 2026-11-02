@@ -44,12 +44,16 @@ export type AgentStatus = 'idle' | 'running' | 'done' | 'error'
  *   provider response that reported it (folded into the running total + any budget).
  *   `estimate` is the token estimate of the answer the call streamed, the meter layer's reading
  *   beside the reported usage.
+ * - `ask` — an asked call handed to the approver, carrying the same `call` and `decision` objects
+ *   as the `ask` {@link AgentEventMap} event, yielded after the approver is entered and before its
+ *   answer is awaited.
  */
 export type AgentChunk =
 	| { readonly category: 'token'; readonly content: string }
 	| { readonly category: 'think'; readonly content: string }
 	| { readonly category: 'tool'; readonly call: ToolCall; readonly result: ToolResult }
 	| { readonly category: 'usage'; readonly usage: TokenUsage; readonly estimate: number }
+	| { readonly category: 'ask'; readonly call: ToolCall; readonly decision: AuthorityDecision }
 
 /**
  * Holds the settled outcome of an agent turn — the assembled assistant `content`, the
@@ -240,10 +244,12 @@ export type AgentEventMap = {
 	readonly ask: readonly [call: ToolCall, decision: AuthorityDecision]
 	/**
 	 * Reports a call denied by scope or authority, before dispatch; `decision` is absent for a scope
-	 * miss, a no-advertisement drop, an evaluate throw, or an invalid decision.
+	 * miss, a call whose name no definition advertises this turn, a no-advertisement drop, an evaluate
+	 * throw, or an invalid decision.
 	 * A turn advertising no tools drops each call with `no tool is advertised in the active scope`.
-	 * Otherwise a call excluded by the tool allow-list carries `<tool name> is not in the active scope` and
-	 * produces a denial tool result and message. Authority evaluates only admitted calls. `reason` is
+	 * Otherwise a call excluded by the tool allow-list, or whose name no definition advertises this
+	 * turn, carries `<tool name> is not in the active scope` and produces a denial tool result and
+	 * message. Authority evaluates only admitted calls that name an advertised definition. `reason` is
 	 * the rule's `deny` reason, the thrown error's text, `invalid decision`, or `undefined`.
 	 */
 	readonly deny: readonly [
@@ -366,6 +372,96 @@ export interface StreamInterface<T, R> {
 export type AgentStreamInterface = StreamInterface<AgentChunk, AgentResult>
 
 /**
+ * Represents one step of a server-run agent turn as a page receives it — one frame per projected
+ * {@link AgentChunk}, then exactly one terminal `finish` or `error`.
+ *
+ * @remarks
+ * - `token` and `think` — a content or reasoning delta.
+ * - `tool` — a dispatched call's outcome: `success: true` with the tool `name`, or `success: false`
+ *   with nothing of the denial or the error.
+ * - `usage` — one provider call's usage and its streamed-answer `estimate`.
+ * - `ask` — a call waiting for the page's {@link AgentAnswer}: the approver's minted `id`, the tool
+ *   `name`, the decision's `zone`, and the call's `arguments` as escaped canonical JSON text.
+ * - `finish` — the settled result's `content`, `partial`, `usage` when present, and the stop's
+ *   `layer` when a layer stopped the run.
+ * - `error` — the run failed; the frame carries no message.
+ */
+export type AgentFrame =
+	| { readonly category: 'token'; readonly content: string }
+	| { readonly category: 'think'; readonly content: string }
+	| { readonly category: 'tool'; readonly success: true; readonly name: string }
+	| { readonly category: 'tool'; readonly success: false }
+	| { readonly category: 'usage'; readonly usage: TokenUsage; readonly estimate: number }
+	| {
+			readonly category: 'ask'
+			readonly id: string
+			readonly name: string
+			readonly zone: string
+			readonly arguments: string
+	  }
+	| {
+			readonly category: 'finish'
+			readonly content: string
+			readonly partial: boolean
+			readonly usage?: TokenUsage
+			readonly layer?: AgentStop['layer']
+	  }
+	| { readonly category: 'error' }
+
+/**
+ * Holds the one user turn a run appends to its conversation — passed as
+ * {@link AgentRunOptions.prompt} by a host or sent by a page; the run writes `role: 'user'` itself.
+ */
+export interface AgentPrompt {
+	readonly content: string
+	readonly images?: readonly string[]
+}
+
+/** Carries a page's answer to one `ask` frame; only `approved: true` approves. */
+export interface AgentAnswer {
+	readonly id: string
+	readonly approved: boolean
+}
+
+/**
+ * Holds a server's waiting asks between the run that asked them and the page that answers them —
+ * the authority's `ask` handler, the frame each waiting ask crosses as, and the answer that settles it.
+ */
+export interface ApproverInterface {
+	/**
+	 * Holds the {@link AuthorityHandler} that registers each ask, bound to its approver and the same
+	 * function on every read, so `createAuthority({ rules, ask: approver.ask })` wires it.
+	 *
+	 * @remarks
+	 * A host handler that wraps it must pass the received `context` unchanged and synchronously: the
+	 * approver keys each waiting ask by the call object, so a copy of the call gets no frame and waits
+	 * until the run `timeout` or an abort.
+	 *
+	 * @example
+	 * ```ts
+	 * const approver = createApprover()
+	 * const authority = createAuthority({ rules, ask: approver.ask })
+	 * ```
+	 */
+	readonly ask: AuthorityHandler
+	/**
+	 * Returns the frame of the call's waiting ask, or `undefined` when none waits; a call framed with
+	 * no waiting ask is refused when it is asked later.
+	 *
+	 * @param call - The `call` of an `ask` chunk
+	 * @returns The waiting ask's `ask` frame, or `undefined`
+	 */
+	frame(call: ToolCall): AgentFrame | undefined
+	/**
+	 * Settles the waiting ask whose `id` the answer names; only `approved: true` approves.
+	 *
+	 * @param answer - The page's answer
+	 * @returns True if it settled a waiting ask; false for an unknown, settled, late, or other principal's id, with no effect
+	 */
+	answer(answer: AgentAnswer): boolean
+}
+
+/**
  * Configures `createAgent` — the loop's bounds and pacing, the reserved `on` hooks, the
  * construction-time context wiring (`instructions` / `workspaces` / `scope`), the `conversations`
  * registry holding every run's default, the context `window` budget that opts into automatic
@@ -441,8 +537,8 @@ export interface AgentOptions {
 	/**
 	 * Sets the initial active scope; `undefined` admits every registered tool.
 	 * Each turn snapshots the scope's tool allow-list before advertising and checks calls
-	 * against that list before applying authority. An absent list also admits unknown names
-	 * to authority and the registry, which returns its tool-not-found failure.
+	 * against that list before applying authority. A call whose name no definition advertises is
+	 * denied the same way, whatever the authority would decide.
 	 * A reply to a turn advertising no tools ends the run as its answer, records an assistant
 	 * message without calls, and emits a `deny` event for every dropped call without marking it partial.
 	 * Other scoped-out calls produce denial tool results and messages, and the loop continues.
@@ -546,7 +642,7 @@ export interface AgentOptions {
 }
 
 /**
- * Carries overrides for one call to the `generate` or `stream` method of an {@link AgentInterface}. Each member overrides the matching {@link AgentOptions} value, while `signal` composes with the construction signal and `conversation` binds the run to one conversation.
+ * Carries overrides for one call to the `generate` or `stream` method of an {@link AgentInterface}. Each member overrides the matching {@link AgentOptions} value, while `signal` composes with the construction signal, `conversation` binds the run to one conversation, and `prompt` adds the run's user turn to it.
  *
  * @remarks
  * Every member is optional and resolved independently, so an omitted member leaves the
@@ -554,8 +650,9 @@ export interface AgentOptions {
  * agent it configured. `think` / `schema` ride through to the provider as
  * {@link ProviderStreamOptions}; `limit` / `timeout` / `budget` / `allowance` replace their construction
  * defaults for this run only; `signal` composes with the constructed `signal` (both fold into
- * the run's bound abort) rather than replacing it; `conversation`, which has no construction
- * counterpart, names the conversation the run binds in place of the one active at the call.
+ * the run's bound abort) rather than replacing it. `conversation` and `prompt` have no construction
+ * counterpart: `conversation` names the conversation the run binds in place of the one active at
+ * the call, and `prompt` is the user turn the run appends to that conversation before it starts.
  * Nothing here mutates the agent — the next run reads the construction defaults again.
  */
 export interface AgentRunOptions {
@@ -608,6 +705,13 @@ export interface AgentRunOptions {
 	 * active when `stream()` or `generate()` is called.
 	 */
 	readonly conversation?: ConversationInterface
+	/**
+	 * Adds the run's request: the run checks it exactly against `agentPromptContract`, appends it to
+	 * the run's conversation as one `user` turn built from `content` and, when present, `images`,
+	 * after the run's guards and before it starts, and reads that turn as its request. Omitted ⇒ the
+	 * run reads its request from the conversation's tail.
+	 */
+	readonly prompt?: AgentPrompt
 }
 
 /**
@@ -634,14 +738,15 @@ export interface AgentRunOptions {
  * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
  *   iteration is capped at `limit` so the loop always terminates.
  * - **Two observation surfaces.** Pull: the {@link AgentChunk} stream (`stream().events`)
- *   carries per-token answer deltas, per-think reasoning deltas, and usage/tool chunks for a live consumer. Push: the
+ *   carries per-token answer deltas, per-think reasoning deltas, and usage/ask/tool chunks for a live consumer. Push: the
  *   {@link emitter} ({@link AgentEventMap}) carries lifecycle + usage/tool/deny moments
  *   for fire-and-forget observers — the emitter isolates a listener throw and routes it to
  *   its `error` handler (the `error` option), so a buggy observer can never corrupt the
  *   loop. Per-token / per-thinking deltas are the stream's job exclusively; there is no
  *   `token` or `think` event.
  * - **Per-run overrides.** Both faces accept an optional {@link AgentRunOptions} bag whose
- *   members override the construction {@link AgentOptions} for that one run.
+ *   members override the construction {@link AgentOptions} for that one run, beside the members
+ *   that bind the run's conversation and add its prompt.
  */
 export interface AgentInterface {
 	readonly emitter: EmitterInterface<AgentEventMap>
@@ -657,18 +762,19 @@ export interface AgentInterface {
 	 * `code: 'CONCURRENCY'` when the agent carries a `window`, when the run's effective
 	 * `budget` or `allowance` is an instance a live run holds, or when a live run is bound to the
 	 * run's conversation; a run whose `limit` is not a nonnegative safe
-	 * integer throws one with `code: 'LIMIT'`. A `budget` or `allowance` that does not implement
-	 * `BudgetInterface`, or a `conversation` that does not implement `ConversationInterface`, throws
-	 * a `ContractError` with code `'placement'` before either bound starts.
-	 * Each throws synchronously, before any `Promise` is
-	 * returned. A fire-and-forget `agent.generate().catch(...)` therefore will not catch them (the
-	 * throw happens on the call itself, ahead of the `.catch` ever attaching) — await the call
-	 * (inside a `try`/`catch`) or wrap the call expression itself in `try`/`catch`.
+	 * integer throws one with `code: 'LIMIT'`. A `prompt` that `agentPromptContract` refuses, a
+	 * `budget` or `allowance` that does not implement `BudgetInterface`, or a `conversation` that
+	 * does not implement `ConversationInterface`, throws a `ContractError` with code `'placement'`
+	 * before either bound starts. Each throws synchronously, before any `Promise` is returned, and
+	 * leaves the run's conversation unchanged. A fire-and-forget `agent.generate().catch(...)`
+	 * therefore will not catch them (the throw happens on the call itself, ahead of the `.catch` ever
+	 * attaching) — await the call (inside a `try`/`catch`) or wrap the call expression itself in
+	 * `try`/`catch`.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
 	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
-	 * @throws {ContractError} Thrown when the `budget` or `allowance` does not implement `BudgetInterface` or the `conversation` does not implement `ConversationInterface` (`code: 'placement'`), synchronously before a handle returns.
+	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, or the `conversation` does not implement `ConversationInterface` (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
@@ -679,17 +785,20 @@ export interface AgentInterface {
 	 * @remarks
 	 * Like `generate()`, a run that would share the `window`, a live run's budget or allowance
 	 * instance, or a live run's conversation throws an {@link import('./errors.js').AgentError} with
-	 * `code: 'CONCURRENCY'`, an invalid `limit` throws one with `code: 'LIMIT'`, and a `budget` or
-	 * `allowance` that does not implement `BudgetInterface` or a `conversation` that does not implement
-	 * `ConversationInterface` throws a `ContractError` with code `'placement'`, synchronously — before the
+	 * `code: 'CONCURRENCY'`, an invalid `limit` throws one with `code: 'LIMIT'`, and a `prompt` that
+	 * `agentPromptContract` refuses, a `budget` or `allowance` that does not implement
+	 * `BudgetInterface`, or a `conversation` that does not implement `ConversationInterface` throws a
+	 * `ContractError` with code `'placement'`, synchronously — before the
 	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
-	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`. A `signal` that
-	 * `AbortSignal.any` refuses throws its `TypeError` the same way, before any deadline is armed.
+	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`. Each of those leaves
+	 * the run's conversation unchanged. A `signal` that `AbortSignal.any` refuses throws its
+	 * `TypeError` the same way, before any deadline is armed, but after the `prompt` is appended, so
+	 * the prompt stays in the conversation.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
 	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
-	 * @throws {ContractError} Thrown when the `budget` or `allowance` does not implement `BudgetInterface` or the `conversation` does not implement `ConversationInterface` (`code: 'placement'`), synchronously before a handle returns.
+	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, or the `conversation` does not implement `ConversationInterface` (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**

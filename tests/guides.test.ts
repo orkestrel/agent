@@ -3,11 +3,11 @@
 // package's own, as is the executed section that closes the file.
 
 import type {
+	AgentAnswer,
 	AgentEventMap,
 	AgentInterface,
 	AgentJobInput,
-	AgentResult,
-	ConversationInterface,
+	ApproverInterface,
 	ConversationManagerInterface,
 	JudgeAnswer,
 	JudgeRequest,
@@ -49,35 +49,43 @@ const MODULES = Object.freeze({ [PACKAGE_NAME]: 'src/core', '@src/core': 'src/co
  * intentional rather than forgotten, and the assertion that follows it fails when a name
  * here stops being stranded, so the list cannot rot.
  */
-const INTERNAL: readonly string[] = Object.freeze(['class LedgerPass'])
+const INTERNAL: readonly string[] = Object.freeze([
+	'class LedgerPass',
+	'class LedgerScan',
+	'class ChannelCell',
+])
 
-// The server fence's declarations, transcribed byte for byte. They sit at module scope because the
-// fence is consumer code and a function declared inside a case body is a nested function; the
-// cases under `flagship fences` build the fence's session table and call them.
+// The server and page fences' declarations, transcribed byte for byte. They sit at module scope
+// because each fence is consumer code and a function declared inside a case body is a nested
+// function; the cases under `flagship fences` build each server fence's session table and call them.
 interface Session {
 	readonly agent: AgentInterface
 	readonly threads: ConversationManagerInterface
 }
 
-// A refused run throws before it starts, so its user turn is dropped before the rethrow.
-function startRun(
-	agent: AgentInterface,
-	thread: ConversationInterface,
-	message: Message,
-): Promise<AgentResult> {
-	try {
-		return agent.generate({ conversation: thread })
-	} catch (error) {
-		thread.remove(message.id)
-		throw error
-	}
-}
-
-// Per request: find or add the thread in the principal's own registry, append the turn, run on it.
+// Per request: find or add the thread in the principal's own registry, then run on it with the
+// request's text as the prompt, which the run appends after its guards.
 async function handle(session: Session, threadId: string, text: string): Promise<string> {
 	const thread = session.threads.conversation(threadId) ?? session.threads.add({ id: threadId })
-	const message = thread.add({ role: 'user', content: text })
-	return (await startRun(session.agent, thread, message)).content
+	return (await session.agent.generate({ conversation: thread, prompt: { content: text } })).content
+}
+
+interface PageSession {
+	readonly agent: AgentInterface
+	readonly threads: ConversationManagerInterface
+	readonly approver: ApproverInterface
+}
+
+// Splits decoded text into lines, holding a partial line until its newline arrives.
+class LineSplitter implements Transformer<string, string> {
+	#pending = ''
+	transform(chunk: string, controller: TransformStreamDefaultController<string>): void {
+		const lines = `${this.#pending}${chunk}`.split('\n')
+		this.#pending = lines.pop() ?? ''
+		for (const line of lines) {
+			if (line.length > 0) controller.enqueue(line)
+		}
+	}
 }
 
 await new GuideCommand({
@@ -159,6 +167,7 @@ await new GuideCommand({
 		SystemOneJudge,
 	} = barrel
 	const {
+		AGENT_WIRE_CASES,
 		RELAY_INVALID_RECORDS,
 		createLedgerJudge,
 		LEDGER_OVERHEAD_CASES,
@@ -465,7 +474,7 @@ await new GuideCommand({
 			expect(guideText).toContain('A scoped-out tool is neither described nor callable.')
 			expect(guideText).toContain('no tool is advertised in the active scope')
 			expect(guideText).toContain(
-				'`"TOOL" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.`',
+				'`"TOOL" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.`',
 			)
 			expect(guideText).toContain(
 				'A scope change through the `context.apply` method applies at each later site that reads the scope.',
@@ -517,7 +526,7 @@ await new GuideCommand({
 					.filter((message) => message.role === 'tool')
 					.map((message) => message.content),
 			).toEqual([
-				'"delete" did not run: it is not in the active scope. Use a tool from the list or answer with what you have.',
+				'"delete" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.',
 				'search',
 			])
 			expect(agent.context.messages.messages().at(-1)).not.toHaveProperty('calls')
@@ -1476,7 +1485,7 @@ await new GuideCommand({
 			).toEqual(['Hi, I am Grace.'])
 		})
 
-		it('rethrows an overlap and drops its turn', async () => {
+		it('rethrows an overlap and adds no turn', async () => {
 			const { createGatedProvider } = await import('./setup.js')
 			const gate = Promise.withResolvers<void>()
 			const provider = createGatedProvider(gate)
@@ -1515,7 +1524,7 @@ await new GuideCommand({
 				['assistant', 'full'],
 			])
 			expect(guideText).toContain(
-				'A refused run throws synchronously, before it starts, so `startRun` removes its user turn before rethrowing.',
+				'The run appends the prompt to the thread as a `user` turn after its guards, so a refused run appends nothing',
 			)
 		})
 
@@ -3246,6 +3255,14 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				'planned proof “executes a page tool through an agent over a Node relay”',
 			)
+			// The page-wire transcription's title lives in its setup row, which the guide names.
+			const setup = requireValue(files['tests/setup.ts'], 'Missing file: tests/setup.ts')
+			const transcription = requireValue(files['tests/guides.test.ts'])
+			expect(setup).toContain("['serves the page wire over an HTTP hop', 'wire'],")
+			expect(transcription).toMatch(/^\t\tit\.each\(AGENT_WIRE_CASES\)\('%s'/m)
+			expect(guideText).toContain(
+				'The `guides` project executes “serves the page wire over an HTTP hop” in [`tests/guides.test.ts`]',
+			)
 			expect(guideText).toContain('await cancelled.promise // true — observed inside the handler')
 			expect(guideText).toContain('result.partial // true')
 		})
@@ -3792,6 +3809,443 @@ await new GuideCommand({
 			// keep-alive socket. One server per case keeps the stop immediate.
 			expect(drain).toBeLessThan(1000)
 			expect(server.status).toBe('stopped')
+		})
+
+		it.each(AGENT_WIRE_CASES)('%s', async (_title, scenario) => {
+			const {
+				AGENT_WIRE_RULES: rules,
+				authenticateWire: authenticate,
+				createGatedProvider,
+				createRecordedTool,
+				createWireDecision,
+				createWireHeaders,
+				readWireFrames,
+				verifyWire: verify,
+			} = await import('./setup.js')
+			const {
+				agentAnswerContract,
+				agentFrameContract,
+				agentPromptContract,
+				agentStreamToFrames,
+				createApprover,
+				createAuthority,
+				isAgentError,
+			} = barrel
+			// The fence's declared provider, tools, rules, and lookups are the lines the transcription
+			// replaces: a scripted provider that asks before each write, or a gated provider that holds
+			// its run open, a recorded `write` tool, one `ask` rule, and the setup stand-ins.
+			const gate = Promise.withResolvers<void>()
+			const writes = ['notes/a.md', 'notes/b.md', 'notes/c.md'].map((path, index) =>
+				createToolCall({ id: `w${index + 1}`, name: 'write', arguments: { path } }),
+			)
+			const answers = ['Archived.', 'Kept the notes.', 'Archived the drafts.']
+			const wireTurns = writes.flatMap((call, index) => [
+				{ content: '', tools: [call] },
+				{ content: answers[index] ?? '' },
+			])
+			const principalTurns = [{ content: 'Noted, Ada.' }, { content: 'Noted, Grace.' }]
+			const turns = scenario === 'principals' ? principalTurns : wireTurns
+			const scripted = createScriptedProvider(turns, { recorded: true, repeat: false })
+			const provider = scenario === 'overlap' ? createGatedProvider(gate) : scripted
+			const written = createRecorder<[Readonly<Record<string, unknown>>]>()
+			const tools = createToolManager()
+			tools.add(createRecordedTool('write', written))
+
+			// The session table: one entry per authenticated principal, filled before any request.
+			const sessions = new Map<string, PageSession>()
+			for (const principal of ['ada', 'grace']) {
+				// Each entry owns its threads, approver, and agent; none is shared across principals.
+				const threads = createConversationManager()
+				const approver = createApprover()
+				const agent = createAgent(provider, {
+					tools,
+					conversations: threads,
+					authority: createAuthority({ rules, ask: approver.ask }),
+				})
+				sessions.set(principal, { agent, threads, approver })
+			}
+
+			const dispatcher = createDispatcher({
+				routes: [
+					{
+						method: 'POST',
+						path: '/threads/:thread',
+						handler: async (request, context) => {
+							const principal = authenticate(request)
+							const session = principal === undefined ? undefined : sessions.get(principal)
+							if (session === undefined) return new Response(null, { status: 401 })
+							if (!verify(request)) return new Response(null, { status: 403 })
+							const prompt = parseJSONAs(await request.text(), agentPromptContract.is)
+							const id = context.params.thread
+							if (prompt === undefined || id === undefined) {
+								return new Response(null, { status: 400 })
+							}
+							const thread = session.threads.conversation(id) ?? session.threads.add({ id })
+							try {
+								// The run appends the prompt after its guards, so a refused run adds no turn.
+								const stream = session.agent.stream({
+									conversation: thread,
+									prompt,
+									signal: request.signal,
+								})
+								const frames = agentStreamToFrames(stream, session.approver)
+								const lines = new ReadableStream<string>({
+									pull: async (controller) => {
+										const step = await frames.next()
+										if (step.done) controller.close()
+										else controller.enqueue(`${JSON.stringify(step.value)}\n`)
+									},
+									cancel: () => stream.abort(),
+								})
+								return new Response(lines.pipeThrough(new TextEncoderStream()), {
+									headers: {
+										'content-type': 'application/x-ndjson; charset=utf-8',
+										'cache-control': 'no-store',
+									},
+								})
+							} catch (error) {
+								if (isAgentError(error) && error.code === 'CONCURRENCY') {
+									return new Response(null, { status: 409 })
+								}
+								throw error
+							}
+						},
+					},
+					{
+						method: 'POST',
+						path: '/answers',
+						handler: async (request) => {
+							const principal = authenticate(request)
+							const session = principal === undefined ? undefined : sessions.get(principal)
+							if (session === undefined) return new Response(null, { status: 401 })
+							if (!verify(request)) return new Response(null, { status: 403 })
+							const answer = parseJSONAs(await request.text(), agentAnswerContract.is)
+							if (answer === undefined) return new Response(null, { status: 400 })
+							// An unknown, settled, or other principal's ask id settles nothing.
+							return new Response(null, { status: session.approver.answer(answer) ? 204 : 404 })
+						},
+					},
+				],
+			})
+
+			// The server fence's composition runs as written apart from the `host` option a test listener
+			// needs. Each case starts its own server, because a cancelled body leaves an aborted socket
+			// that slows a shared server's stop, and the `finally` block opens the gate and stops it.
+			const server = createServer({ dispatcher, state: () => undefined, host: '127.0.0.1' })
+			const port = await server.start()
+			const origin = `http://127.0.0.1:${port}`
+			try {
+				switch (scenario) {
+					case 'wire': {
+						const ada = requireValue(sessions.get('ada'), 'Missing ada session')
+						const trip = ada.threads.add({ id: 'trip' })
+						const forbidden = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers: { ...createWireHeaders('ada'), origin: 'https://other.example' },
+							body: JSON.stringify({ content: 'Archive the notes.' }),
+						})
+						const malformed = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers: createWireHeaders('ada'),
+							body: JSON.stringify({ role: 'user', content: 'Archive the notes.' }),
+						})
+						// The origin check and the prompt contract refuse before the run starts, so the
+						// provider is unentered and the thread gains no turn.
+						expect([forbidden.status, malformed.status]).toEqual([403, 400])
+						expect([scripted.started, trip.count]).toEqual([0, 0])
+
+						// The page's `decide` stand-in reports the ask id, and the answers beside it post
+						// while that ask waits; the page's own answer follows them.
+						const asked = Promise.withResolvers<string>()
+						const approval = Promise.withResolvers<boolean>()
+						const decide = createWireDecision(asked, approval.promise)
+						const rendered = createRecorder<[text: string]>()
+						const render = rendered.handler
+						const strays = [
+							{ principal: 'grace', answer: { approved: true } },
+							{ principal: 'ada', answer: { approved: 'true' } },
+							{ principal: 'ada', answer: { approved: true, reason: 'looks fine' } },
+						]
+						const waiting = asked.promise.then(async (pending) => {
+							try {
+								const replies = await Promise.all(
+									strays.map(({ principal, answer }) =>
+										fetch(`${origin}/answers`, {
+											method: 'POST',
+											headers: createWireHeaders(principal),
+											body: JSON.stringify({ id: pending, ...answer }),
+										}),
+									),
+								)
+								return {
+									pending,
+									statuses: replies.map((reply) => reply.status),
+									early: written.calls.length,
+								}
+							} finally {
+								approval.resolve(true)
+							}
+						})
+
+						const headers = createWireHeaders('ada')
+						const response = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers,
+							body: JSON.stringify({ content: 'Archive the notes from last week.' }),
+						})
+						if (!response.ok || response.body === null) {
+							throw new Error(`the run was refused: ${response.status}`)
+						}
+						const lines = response.body
+							.pipeThrough(new TextDecoderStream())
+							.pipeThrough(new TransformStream(new LineSplitter()))
+							.getReader()
+						for (;;) {
+							const line = await lines.read()
+							if (line.done) throw new Error('the frames ended without finish or error')
+							const frame = parseJSONAs(line.value, agentFrameContract.is)
+							if (frame === undefined) throw new Error('a frame line was refused')
+							if (frame.category === 'error') throw new Error('the run failed')
+							if (frame.category === 'finish') break
+							if (frame.category === 'token') render(frame.content)
+							if (frame.category === 'tool') {
+								render(frame.success ? `${frame.name} ran` : 'a call did not run')
+							}
+							if (frame.category === 'ask') {
+								render(`${frame.name} asks in ${frame.zone} with ${frame.arguments}`)
+								const answer: AgentAnswer = { id: frame.id, approved: await decide(frame.id) }
+								const answered = await fetch(`${origin}/answers`, {
+									method: 'POST',
+									headers,
+									body: JSON.stringify(answer),
+								})
+								if (answered.status !== 204) render(`the answer was not taken: ${answered.status}`)
+							}
+						}
+
+						// Another principal's answer finds no ask of its own, and an answer that is not exact
+						// is refused, so the ask waited for its own principal's `204`; that answer settled it.
+						const { pending, statuses, early } = await waiting
+						const repeated = await fetch(`${origin}/answers`, {
+							method: 'POST',
+							headers,
+							body: JSON.stringify({ id: pending, approved: true }),
+						})
+						const texts = rendered.calls.map(([text]) => text).filter((text) => text.length > 0)
+						expect(statuses).toEqual([404, 400, 400])
+						expect(early).toBe(0)
+						expect(repeated.status).toBe(404)
+						expect(texts).toEqual([
+							'write asks in files with {"path":"notes/a.md"}',
+							'write ran',
+							'Archived.',
+						])
+						expect(written.calls).toEqual([[{ path: 'notes/a.md' }]])
+
+						// A refused ask answers `204`, and the call's tool frame follows it as a failure.
+						const declined = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers,
+							body: JSON.stringify({ content: 'Archive the drafts.' }),
+						})
+						const declinedLines = requireValue(declined.body, 'Missing declined body')
+							.pipeThrough(new TextDecoderStream())
+							.pipeThrough(new TransformStream(new LineSplitter()))
+							.getReader()
+						const declinedAsk = (await readWireFrames(declinedLines, 'ask')).at(-1)
+						if (declinedAsk?.category !== 'ask') throw new Error('Missing declined ask frame')
+						const refused = await fetch(`${origin}/answers`, {
+							method: 'POST',
+							headers,
+							body: JSON.stringify({ id: declinedAsk.id, approved: false }),
+						})
+						const declinedRest = await readWireFrames(declinedLines, 'finish')
+						expect(refused.status).toBe(204)
+						expect(declinedRest[0]).toEqual({ category: 'tool', success: false })
+						expect(declinedRest.at(-1)).toEqual(
+							expect.objectContaining({ category: 'finish', content: 'Kept the notes.' }),
+						)
+						expect(written.calls).toHaveLength(1)
+
+						// A reader that cancels the body while an ask waits aborts the run, which settles
+						// partial and leaves its user turn as the thread's tail.
+						const aborted = createRecorder<AgentEventMap['abort']>()
+						const finished = createRecorder<AgentEventMap['finish']>()
+						ada.agent.emitter.on('abort', aborted.handler)
+						ada.agent.emitter.on('finish', finished.handler)
+						const cancelled = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers,
+							body: JSON.stringify({ content: 'Archive the old drafts.' }),
+						})
+						const cancelledLines = requireValue(cancelled.body, 'Missing cancelled body')
+							.pipeThrough(new TextDecoderStream())
+							.pipeThrough(new TransformStream(new LineSplitter()))
+							.getReader()
+						const cancelledAsk = (await readWireFrames(cancelledLines, 'ask')).at(-1)
+						if (cancelledAsk?.category !== 'ask') throw new Error('Missing cancelled ask frame')
+						await cancelledLines.cancel()
+						await waitForCondition('the cancelled run settled', () => finished.calls.length === 1)
+						const late = await fetch(`${origin}/answers`, {
+							method: 'POST',
+							headers,
+							body: JSON.stringify({ id: cancelledAsk.id, approved: true }),
+						})
+						expect(aborted.calls).toHaveLength(1)
+						expect(finished.calls.map(([result]) => result.partial)).toEqual([true])
+						expect(late.status).toBe(404)
+						expect(written.calls).toHaveLength(1)
+						expect(trip.messages().at(-1)).toEqual(
+							expect.objectContaining({ role: 'user', content: 'Archive the old drafts.' }),
+						)
+
+						// The next post appends its user turn after the kept one, and its request carries
+						// both user turns adjacent and in order.
+						const next = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers,
+							body: JSON.stringify({ content: 'Archive the drafts instead.' }),
+						})
+						const nextLines = requireValue(next.body, 'Missing next body')
+							.pipeThrough(new TextDecoderStream())
+							.pipeThrough(new TransformStream(new LineSplitter()))
+							.getReader()
+						expect((await readWireFrames(nextLines, 'finish')).at(-1)).toEqual(
+							expect.objectContaining({ category: 'finish', content: 'Archived the drafts.' }),
+						)
+						const tail = trip.messages().slice(-3)
+						const request = requireValue(scripted.calls.at(-1), 'Missing next request')
+						expect(tail.map(({ role, content }) => [role, content])).toEqual([
+							['user', 'Archive the old drafts.'],
+							['user', 'Archive the drafts instead.'],
+							['assistant', 'Archived the drafts.'],
+						])
+						expect(request.messages.slice(-2).map(({ role, content }) => [role, content])).toEqual([
+							['user', 'Archive the old drafts.'],
+							['user', 'Archive the drafts instead.'],
+						])
+						break
+					}
+					case 'principals': {
+						const ada = requireValue(sessions.get('ada'), 'Missing ada session')
+						const grace = requireValue(sessions.get('grace'), 'Missing grace session')
+						const adaPost = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers: createWireHeaders('ada'),
+							body: JSON.stringify({ content: 'Hi, I am Ada.' }),
+						})
+						const adaFrames = await readWireFrames(
+							requireValue(adaPost.body, 'Missing Ada body')
+								.pipeThrough(new TextDecoderStream())
+								.pipeThrough(new TransformStream(new LineSplitter()))
+								.getReader(),
+							'finish',
+						)
+						const gracePost = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers: createWireHeaders('grace'),
+							body: JSON.stringify({ content: 'Hi, I am Grace.' }),
+						})
+						const graceFrames = await readWireFrames(
+							requireValue(gracePost.body, 'Missing Grace body')
+								.pipeThrough(new TextDecoderStream())
+								.pipeThrough(new TransformStream(new LineSplitter()))
+								.getReader(),
+							'finish',
+						)
+						const adaTrip = requireValue(ada.threads.conversation('trip'), 'Missing Ada trip')
+						const graceTrip = requireValue(grace.threads.conversation('trip'), 'Missing Grace trip')
+						// One thread id names a distinct conversation per principal, holding its own turns.
+						expect(adaTrip).not.toBe(graceTrip)
+						expect(adaTrip.messages().map(({ role, content }) => [role, content])).toEqual([
+							['user', 'Hi, I am Ada.'],
+							['assistant', 'Noted, Ada.'],
+						])
+						expect(graceTrip.messages().map(({ role, content }) => [role, content])).toEqual([
+							['user', 'Hi, I am Grace.'],
+							['assistant', 'Noted, Grace.'],
+						])
+						expect([adaFrames.at(-1), graceFrames.at(-1)]).toEqual([
+							expect.objectContaining({ category: 'finish', content: 'Noted, Ada.' }),
+							expect.objectContaining({ category: 'finish', content: 'Noted, Grace.' }),
+						])
+						break
+					}
+					case 'overlap': {
+						const ada = requireValue(sessions.get('ada'), 'Missing ada session')
+						const first = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers: createWireHeaders('ada'),
+							body: JSON.stringify({ content: 'Book the flight.' }),
+						})
+						const firstLines = requireValue(first.body, 'Missing first body')
+							.pipeThrough(new TextDecoderStream())
+							.pipeThrough(new TransformStream(new LineSplitter()))
+							.getReader()
+						// The gated provider holds the first run open after its first delta.
+						expect(await readWireFrames(firstLines, 'token')).toEqual([
+							{ category: 'token', content: 'part' },
+						])
+						const trip = requireValue(ada.threads.conversation('trip'), 'Missing trip thread')
+						const before = trip.count
+						const overlap = await fetch(`${origin}/threads/trip`, {
+							method: 'POST',
+							headers: createWireHeaders('ada'),
+							body: JSON.stringify({ content: 'Book the hotel too.' }),
+						})
+						const after = trip.count
+						gate.resolve()
+						const settled = await readWireFrames(firstLines, 'finish')
+						// The refused run appended nothing, and the first run ends with one `finish`, last.
+						expect(overlap.status).toBe(409)
+						expect(after).toBe(before)
+						expect(settled.filter((frame) => frame.category === 'finish')).toEqual([
+							expect.objectContaining({ category: 'finish', content: 'full', partial: false }),
+						])
+						expect(settled.at(-1)?.category).toBe('finish')
+						expect(await readWireFrames(firstLines, 'finish')).toEqual([])
+						break
+					}
+				}
+			} finally {
+				gate.resolve()
+				await server.stop()
+			}
+		})
+
+		it('matches the server fences byte for byte', () => {
+			const source = requireValue(files['tests/guides.test.ts']).replaceAll('\r\n', '\n')
+			const guide = guideText.replaceAll('\r\n', '\n')
+			// The module-scope region runs from the line after the leading transcription comment to the
+			// command; each blank-line-separated block is one fence declaration with its own comment.
+			const first = source.indexOf("// The server and page fences' declarations")
+			const region = source.slice(first, source.indexOf('await new GuideCommand(')).split('\n')
+			const declarations = region
+				.slice(region.findIndex((line) => !line.startsWith('//')))
+				.join('\n')
+				.trim()
+				.split('\n\n')
+			// Each session table starts at its comment line and ends at the closing line of its loop.
+			const lines = source.split('\n')
+			const tables = lines.flatMap((line, index) => {
+				const indent = /^(\t+)\/\/ The session table: /.exec(line)?.[1]
+				if (indent === undefined) return []
+				const end = lines.findIndex((candidate, at) => at > index && candidate === `${indent}}`)
+				const block = lines.slice(index, end + 1)
+				return [block.map((part) => part.slice(indent.length)).join('\n')]
+			})
+			// Both fences' declarations and session tables are present, so neither population is empty.
+			const heads = [
+				'interface Session {',
+				'async function handle(',
+				'interface PageSession {',
+				'class LineSplitter ',
+			]
+			const maps = ['new Map<string, Session>()', 'new Map<string, PageSession>()']
+			expect(declarations.filter((declaration) => !guide.includes(declaration))).toEqual([])
+			expect(tables.filter((table) => !guide.includes(table))).toEqual([])
+			expect(heads.filter((head) => !declarations.some((part) => part.includes(head)))).toEqual([])
+			expect(maps.filter((map) => !tables.some((part) => part.includes(map)))).toEqual([])
 		})
 
 		it('decodes a scripted relay body through the fence’s browser half alone', async () => {

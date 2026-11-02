@@ -1,8 +1,17 @@
 import type { Infer } from '@orkestrel/contract'
 import type { ToolCall, ToolContext } from '@orkestrel/tool'
+import type { TokenUsage } from '@orkestrel/budget'
 import type { Message } from '@src/core'
-import { messageShape, toolCallShape } from '@src/core'
-import { createContract } from '@orkestrel/contract'
+import { messageShape, providerResultShape, tokenUsageShape, toolCallShape } from '@src/core'
+import {
+	arrayShape,
+	booleanShape,
+	createContract,
+	numberShape,
+	objectShape,
+	optionalShape,
+	stringShape,
+} from '@orkestrel/contract'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 describe('wire shapes', () => {
@@ -35,5 +44,22 @@ describe('wire shapes', () => {
 		const call = { id: '1', name: 'lookup', arguments: {}, context: { caller: 'private context' } }
 		expect(contract.is(call)).toBe(false)
 		expect(contract.parse(call)).toEqual({ id: '1', name: 'lookup', arguments: {} })
+	})
+	it('infers a token usage wire projection and leaves the provider result schema unchanged', () => {
+		expectTypeOf<Infer<typeof tokenUsageShape>>().toExtend<TokenUsage>()
+		expectTypeOf<TokenUsage>().toExtend<Infer<typeof tokenUsageShape>>()
+		const contract = createContract(tokenUsageShape)
+		expect(contract.is({ prompt: 3, completion: 2, total: 5 })).toBe(true)
+		expect(contract.is({ prompt: 3, completion: 2, total: 5, cached: 1 })).toBe(false)
+		const inline = objectShape({
+			content: stringShape(),
+			thinking: optionalShape(stringShape()),
+			tools: optionalShape(arrayShape(toolCallShape)),
+			usage: optionalShape(
+				objectShape({ prompt: numberShape(), completion: numberShape(), total: numberShape() }),
+			),
+			truncated: optionalShape(booleanShape()),
+		})
+		expect(createContract(providerResultShape).schema).toEqual(createContract(inline).schema)
 	})
 })

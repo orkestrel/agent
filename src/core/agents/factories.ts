@@ -8,6 +8,7 @@ import type {
 	AgentRegistryOptions,
 	AgentResult,
 	AgentRunnerOptions,
+	ApproverInterface,
 	AuthorityInterface,
 	AuthorityOptions,
 	ChannelInterface,
@@ -20,6 +21,7 @@ import { Agent } from './Agent.js'
 import { AgentFanout } from './AgentFanout.js'
 import { Channel } from './Channel.js'
 import { Authority } from './Authority.js'
+import { Approver } from './Approver.js'
 import { AgentRegistry } from './AgentRegistry.js'
 import { extractQueueOptions, handleAgentQueueJob } from './helpers.js'
 
@@ -37,7 +39,7 @@ import { extractQueueOptions, handleAgentQueueJob } from './helpers.js'
  * on a genuine provider / tool error). The `scheduler` paces between turns; tool
  * iteration is capped at `limit`. Default: `DEFAULT_AGENT_LIMIT`. Tools are advertised
  * structurally through `context.tools.definitions()`. Two observation surfaces: the
- * {@link AgentChunk} stream (pull — per-token content) and a typed `emitter` (push —
+ * {@link AgentChunk} stream (pull — per-token content, usage, `ask`, and `tool` chunks) and a typed `emitter` (push —
  * lifecycle + `usage` / `tool` / `deny` for fire-and-forget observers).
  *
  * @param provider - The {@link ProviderInterface} the loop drives each turn
@@ -130,6 +132,32 @@ export function createChannel<T>(): ChannelInterface<T> {
  */
 export function createAuthority(options?: AuthorityOptions): AuthorityInterface {
 	return new Authority(options)
+}
+
+/**
+ * Creates an approver — an {@link ApproverInterface} that holds a server's waiting asks between
+ * the run that asked them and the page that answers them.
+ *
+ * @remarks
+ * Wire its bound `ask` as the authority's handler, project the run through
+ * `agentStreamToFrames(stream, approver)`, and settle each `ask` frame with `answer`. One approver
+ * serves one principal: an answer settles only an ask this approver holds.
+ *
+ * @returns A working {@link ApproverInterface} with no waiting ask
+ *
+ * @example
+ * ```ts
+ * const approver = createApprover()
+ * const authority = createAuthority({ rules, ask: approver.ask })
+ * const agent = createAgent(provider, { tools, authority })
+ * const stream = agent.stream({ prompt: { content: 'Tidy the notes.' } })
+ * for await (const frame of agentStreamToFrames(stream, approver)) {
+ * 	if (frame.category === 'ask') approver.answer({ id: frame.id, approved: true })
+ * }
+ * ```
+ */
+export function createApprover(): ApproverInterface {
+	return new Approver()
 }
 
 /**

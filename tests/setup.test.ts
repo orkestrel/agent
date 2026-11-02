@@ -1,4 +1,16 @@
 import {
+	answerLedgerKey,
+	buildLedgerBenchOptions,
+	buildLedgerBlock,
+	buildLedgerPrefix,
+	computeTextDigest,
+	createCorrectionJudge,
+	extractLedgerOrder,
+	LEDGER_BENCH_DESK,
+	renderLedgerPositions,
+	seedLedgerPrefix,
+} from './setup.js'
+import {
 	admitsRelayCredential,
 	buildLedgerTailScenario,
 	MEASURE_CALLS,
@@ -46,14 +58,15 @@ import type { ToolDefinition } from '@orkestrel/tool'
 import {
 	Channel,
 	createAgent,
+	createAuthority,
 	estimateRequest,
 	ProviderAbortError,
 	providerRequestContract,
 	REFUSED_RELAY_STATUS,
 } from '@src/core'
-import { createRecorder } from '@orkestrel/test'
+import { collect, createRecorder } from '@orkestrel/test'
 import {
-	createApprover,
+	createScriptedApprover,
 	createAuthorityContext,
 	createMessage,
 	computeUsageTotal,
@@ -80,7 +93,12 @@ import {
 	createFailingScheduler,
 } from './setup.js'
 import {
+	AGENT_WIRE_CASES,
+	AGENT_WIRE_FRAMES,
+	AGENT_WIRE_RULES,
+	authenticateWire,
 	CANARY_BUILD_SOURCES,
+	CANARY_FRAME_SOURCES,
 	CANARY_INGRESS_SOURCES,
 	CANARY_LEDGER_SOURCES,
 	CANARY_SENTINELS,
@@ -91,13 +109,31 @@ import {
 	RECORDED_COMPACTION_REQUEST,
 	RECORDED_FIRST_REQUEST,
 	RECORDED_LATE_REQUEST,
+	REFUSED_WIRE_ANSWERS,
+	REFUSED_WIRE_FRAMES,
+	REFUSED_WIRE_PROMPTS,
+	RENDERED_ARGUMENTS,
+	createAskAgent,
 	createCanaryJudge,
+	createGuardAgent,
+	createWireDecision,
+	createWireHeaders,
 	extractLedgerRecords,
+	readWireFrames,
 	seedCanaryContext,
 	seedCompactionArm,
 	serveCanaryDesk,
 	serveIngressCanary,
 	serveRecordsDesk,
+	verifyWire,
+} from './setup.js'
+import {
+	measureChannelCell,
+	measureChannelPushes,
+	measureGeneration,
+	measureLargestPush,
+	measureLateDrain,
+	measurePacedDrain,
 } from './setup.js'
 import {
 	Classifier,
@@ -243,7 +279,7 @@ describe('agent scenario infrastructure', () => {
 			call: { id: 'c1', name: 'read', arguments: { path: 'note' } },
 		})
 		const deferred = Promise.resolve(true)
-		const approver = createApprover([true, deferred])
+		const approver = createScriptedApprover([true, deferred])
 		const context = createAuthorityContext('write')
 		const decision = { zone: 'sensitive', verdict: 'ask' } as const
 		const signal = new AbortController().signal
@@ -1180,6 +1216,9 @@ describe('system boundary canary fixtures', () => {
 		expect(Object.keys(CANARY_SENTINELS)).toEqual(
 			expect.arrayContaining([...CANARY_INGRESS_SOURCES]),
 		)
+		expect(Object.keys(CANARY_SENTINELS)).toEqual(expect.arrayContaining([...CANARY_FRAME_SOURCES]))
+		expect(new Set(CANARY_FRAME_SOURCES).size).toBe(CANARY_FRAME_SOURCES.length)
+		expect(CANARY_FRAME_SOURCES).not.toContain('body')
 		expect(CANARY_BUILD_SOURCES).not.toContain('system')
 		expect(CANARY_LEDGER_SOURCES).not.toContain('system')
 		expect(CANARY_INGRESS_SOURCES).not.toContain('system')
@@ -1322,6 +1361,190 @@ describe('system boundary canary fixtures', () => {
 				{ ...copy, id: 'late', content: 'Later.\n\n## Request\nAgain.' },
 			]),
 		).toBe('Later.')
+	})
+})
+
+describe('agent wire fixtures', () => {
+	it('names refused prompts, each title distinct, each one member beside a content text or alone', () => {
+		const titles = REFUSED_WIRE_PROMPTS.map(([title]) => title)
+		const textless = REFUSED_WIRE_PROMPTS.filter(
+			([, prompt]) =>
+				typeof prompt !== 'object' ||
+				prompt === null ||
+				!('content' in prompt) ||
+				typeof prompt.content !== 'string',
+		).map(([title]) => title)
+
+		expect(new Set(titles).size).toBe(titles.length)
+		expect(textless).toEqual(['images without content'])
+		for (const [, prompt] of REFUSED_WIRE_PROMPTS) {
+			const keys = typeof prompt === 'object' && prompt !== null ? Object.keys(prompt) : []
+			expect(keys.filter((key) => key !== 'content')).toHaveLength(1)
+		}
+	})
+
+	it('creates a guard agent that advertises read and scripts a call no registered tool carries', () => {
+		const guard = createGuardAgent('ask', 'erase')
+
+		expect(guard.call).toEqual({ id: 'g1', name: 'erase', arguments: {} })
+		expect(guard.agent.context.tools.definitions().map((definition) => definition.name)).toEqual([
+			'read',
+		])
+		expect(guard.agent.context.messages.messages().map((message) => message.content)).toEqual([
+			'Tidy the folder.',
+		])
+		expect([guard.evaluated.calls, guard.entered.calls, guard.executed.calls]).toEqual([[], [], []])
+		expect(guard.provider.calls).toEqual([])
+	})
+
+	it('keeps a given guard handler unentered for the unadvertised call', async () => {
+		const handler = createScriptedApprover([false])
+		const guard = createGuardAgent('ask', 'erase', handler.ask)
+
+		await guard.agent.generate()
+
+		expect([guard.evaluated.calls, guard.entered.calls, handler.calls]).toEqual([[], [], []])
+	})
+
+	it('names one exact frame per arm and finish layer, each title distinct', () => {
+		const titles = AGENT_WIRE_FRAMES.map(([title]) => title)
+
+		expect(new Set(titles).size).toBe(titles.length)
+		expect(new Set(AGENT_WIRE_FRAMES.map(([, frame]) => frame.category))).toEqual(
+			new Set(['token', 'think', 'tool', 'usage', 'ask', 'finish', 'error']),
+		)
+		expect(
+			AGENT_WIRE_FRAMES.filter(([, frame]) => frame.category === 'tool').map(
+				([, frame]) => frame.category === 'tool' && frame.success,
+			),
+		).toEqual([true, false])
+		expect(
+			AGENT_WIRE_FRAMES.filter(([, frame]) => frame.category === 'finish').map(
+				([, frame]) => frame.category === 'finish' && frame.layer,
+			),
+		).toEqual([undefined, 'budget', 'meter', 'model'])
+	})
+
+	it('names refused frames and answers, each title distinct', () => {
+		for (const table of [REFUSED_WIRE_FRAMES, REFUSED_WIRE_ANSWERS]) {
+			const titles = table.map(([title]) => title)
+
+			expect(new Set(titles).size).toBe(titles.length)
+		}
+	})
+
+	it('names rendered arguments whose text parses back to them, each title distinct', () => {
+		const titles = RENDERED_ARGUMENTS.map(([title]) => title)
+
+		expect(new Set(titles).size).toBe(titles.length)
+		for (const [, value, text] of RENDERED_ARGUMENTS) {
+			expect(JSON.parse(text)).toEqual(value)
+		}
+	})
+
+	it('creates an ask agent whose write call reaches the handler', async () => {
+		const handler = createScriptedApprover([true])
+		const asked = createAskAgent(handler.ask, { arguments: { path: 'b.txt' }, id: 'w2' })
+
+		expect(asked.call).toEqual({ id: 'w2', name: 'write', arguments: { path: 'b.txt' } })
+		expect(await asked.agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(handler.calls.map(([context, decision]) => [context.call, decision])).toEqual([
+			[asked.call, { zone: 'files', verdict: 'ask' }],
+		])
+		expect(asked.executed.calls).toEqual([[{ path: 'b.txt' }]])
+		expect(asked.tools.tool('write')).toBeDefined()
+		expect(asked.provider.calls).toHaveLength(2)
+	})
+
+	it('names the page-wire cases, each title distinct and at most 40 characters', () => {
+		const titles = AGENT_WIRE_CASES.map(([title]) => title)
+
+		expect(new Set(titles).size).toBe(titles.length)
+		expect(titles.filter((title) => title.length > 40)).toEqual([])
+		expect(AGENT_WIRE_CASES.map(([, scenario]) => scenario)).toEqual([
+			'wire',
+			'principals',
+			'overlap',
+		])
+	})
+
+	it('holds one rule that asks for every call in the files zone', () => {
+		const call = { id: 'w1', name: 'write', arguments: { path: 'notes/a.md' } }
+		const authority = createAuthority({ rules: AGENT_WIRE_RULES })
+
+		expect(AGENT_WIRE_RULES).toHaveLength(1)
+		expect(authority.evaluate({ call })).toEqual({ zone: 'files', verdict: 'ask' })
+	})
+
+	it('authenticates and verifies only the headers createWireHeaders writes', () => {
+		const trusted = new Request('http://wire.test/answers', {
+			method: 'POST',
+			headers: createWireHeaders('ada'),
+		})
+		const foreign = new Request('http://wire.test/answers', {
+			method: 'POST',
+			headers: { ...createWireHeaders('ada'), origin: 'https://other.example' },
+		})
+		const forged = new Request('http://wire.test/answers', {
+			method: 'POST',
+			headers: { ...createWireHeaders('ada'), 'x-csrf-token': 'csrf-other' },
+		})
+		const anonymous = new Request('http://wire.test/answers', { method: 'POST' })
+
+		expect([trusted, foreign, forged, anonymous].map(authenticateWire)).toEqual([
+			'ada',
+			'ada',
+			'ada',
+			undefined,
+		])
+		expect([trusted, foreign, forged, anonymous].map(verifyWire)).toEqual([
+			true,
+			false,
+			false,
+			false,
+		])
+	})
+
+	it('creates a decision that reports each asked id and answers with the approval', async () => {
+		const asked = Promise.withResolvers<string>()
+		const decide = createWireDecision(asked, Promise.resolve(false))
+
+		expect(await decide('a1')).toBe(false)
+		expect(await asked.promise).toBe('a1')
+	})
+
+	it('reads frames up to the first frame of a category or the end of the body', async () => {
+		const frames = [
+			{ category: 'token', content: 'Archived.' },
+			{ category: 'finish', content: 'Archived.', partial: false },
+			{ category: 'error' },
+		]
+		const reader = new ReadableStream<string>({
+			start: (controller) => {
+				for (const frame of frames) controller.enqueue(JSON.stringify(frame))
+				controller.close()
+			},
+		}).getReader()
+
+		expect(await readWireFrames(reader, 'finish')).toEqual([
+			{ category: 'token', content: 'Archived.' },
+			{ category: 'finish', content: 'Archived.', partial: false },
+		])
+		expect(await readWireFrames(reader, 'finish')).toEqual([{ category: 'error' }])
+		expect(await readWireFrames(reader, 'finish')).toEqual([])
+	})
+
+	it('refuses a frame line the frame contract refuses', async () => {
+		const lines = new ReadableStream<string>({
+			start: (controller) => {
+				controller.enqueue('{"category":"deny"}')
+				controller.close()
+			},
+		}).getReader()
+
+		await expect(readWireFrames(lines, 'finish')).rejects.toThrow(
+			'refused frame line: {"category":"deny"}',
+		)
 	})
 })
 
@@ -2775,5 +2998,305 @@ describe('RecoveringProvider', () => {
 		await expect(provider.generate(request, signal)).rejects.toBe(failure)
 		expect(await provider.generate(request, signal)).toEqual({ content: 'Booked.' })
 		expect(provider.calls.map((call) => call.messages)).toEqual([request])
+	})
+})
+
+describe('channel and generation measures', () => {
+	it('times pushes and keeps each value', async () => {
+		const created = createRecorder<[Channel<number>]>()
+		const reading = measureChannelPushes(
+			() => {
+				const channel = new Channel<number>()
+				created.handler(channel)
+				return channel
+			},
+			{ size: 3, rounds: 2 },
+		)
+		expect(Number.isFinite(reading)).toBe(true)
+		expect(reading).toBeGreaterThanOrEqual(0)
+		expect(created.count).toBe(2)
+		const drained = await Promise.all(created.calls.map(([channel]) => collect(channel.drain())))
+		expect(drained).toEqual([
+			[0, 1, 2],
+			[0, 1, 2],
+		])
+	})
+
+	it('times the largest push', async () => {
+		const created = createRecorder<[Channel<number>]>()
+		const reading = measureLargestPush(() => {
+			const channel = new Channel<number>()
+			created.handler(channel)
+			return channel
+		}, 3)
+		expect(Number.isFinite(reading)).toBe(true)
+		expect(reading).toBeGreaterThanOrEqual(0)
+		const [channel] = requireValue(created.calls[0])
+		expect(created.count).toBe(1)
+		expect(await collect(channel.drain())).toEqual([0, 1, 2])
+	})
+
+	it('times a paced drain to the end', async () => {
+		const created = createRecorder<[Channel<number>]>()
+		const reading = await measurePacedDrain(
+			() => {
+				const channel = new Channel<number>()
+				created.handler(channel)
+				return channel
+			},
+			{ size: 3, rounds: 1 },
+		)
+		expect(Number.isFinite(reading)).toBe(true)
+		expect(reading).toBeGreaterThanOrEqual(0)
+		const [channel] = requireValue(created.calls[0])
+		expect(await collect(channel.drain())).toEqual([])
+	})
+
+	it('times a late drain to the end', async () => {
+		const created = createRecorder<[Channel<number>]>()
+		const reading = await measureLateDrain(
+			() => {
+				const channel = new Channel<number>()
+				created.handler(channel)
+				return channel
+			},
+			{ size: 3, rounds: 1 },
+		)
+		expect(Number.isFinite(reading)).toBe(true)
+		expect(reading).toBeGreaterThanOrEqual(0)
+		const [channel] = requireValue(created.calls[0])
+		expect(await collect(channel.drain())).toEqual([])
+	})
+
+	it('times one generation', async () => {
+		const provider = createScriptedProvider(
+			[{ result: { content: 'abc' }, deltas: ['a', 'b', 'c'] }],
+			{ repeat: false },
+		)
+		const reading = await measureGeneration(provider)
+		expect(Number.isFinite(reading)).toBe(true)
+		expect(reading).toBeGreaterThanOrEqual(0)
+		expect(provider.started).toBe(1)
+	})
+
+	it('times a cell of each workload', async () => {
+		const readings = await Promise.all([
+			measureChannelCell({
+				title: 'pushes',
+				workload: 'pushes',
+				size: 3,
+				rounds: 1,
+				warmups: 0,
+				samples: 1,
+			}),
+			measureChannelCell({
+				title: 'paces',
+				workload: 'paces',
+				size: 3,
+				rounds: 1,
+				warmups: 0,
+				samples: 1,
+			}),
+			measureChannelCell({
+				title: 'drains',
+				workload: 'drains',
+				size: 3,
+				rounds: 1,
+				warmups: 0,
+				samples: 1,
+			}),
+			measureChannelCell({
+				title: 'largest',
+				workload: 'largest',
+				size: 3,
+				rounds: 1,
+				warmups: 0,
+				samples: 1,
+			}),
+			measureChannelCell({
+				title: 'generates',
+				workload: 'generates',
+				size: 3,
+				rounds: 1,
+				warmups: 0,
+				samples: 1,
+			}),
+		])
+		expect(readings).toHaveLength(5)
+		expect(readings.every((reading) => Number.isFinite(reading) && reading >= 0)).toBe(true)
+	})
+})
+
+describe('ledger bench builders', () => {
+	it('builds a block of eight messages whose odd correction-arm block corrects the previous refund', () => {
+		const corrected = buildLedgerBlock(1, 'correction')
+		expect(corrected.map((message) => message.role)).toEqual([
+			'user',
+			'user',
+			'user',
+			'user',
+			'assistant',
+			'tool',
+			'assistant',
+			'user',
+		])
+		expect(corrected[2]?.content).toBe(
+			'[Source 1-c] Correction: the refund for OR-1000 is $1.75, not $0.50.',
+		)
+		expect(buildLedgerBlock(1, 'control')[2]?.content).toBe('[Source 1-c] Order OR-1001 is packed.')
+		expect(buildLedgerBlock(0, 'correction')[2]?.content).toBe(
+			'[Source 0-c] Order OR-1000 is packed.',
+		)
+		expect(corrected[4]?.calls).toEqual([
+			{ id: 'call-1', name: 'lookup', arguments: { id: 'OR-1001' } },
+		])
+	})
+
+	it('builds a prefix two messages short of its length, marking each block request and weighting only the correction arm', () => {
+		const prefix = buildLedgerPrefix(21, 'correction')
+		const history = prefix.snapshot.conversation.messages
+		const contents = new Map(history.map((message) => [message.id, message.content]))
+		expect(history).toHaveLength(19)
+		expect(prefix.snapshot.requests.map((id) => contents.get(id))).toEqual([
+			'What is the status of OR-1000?',
+			'What is the status of OR-1001?',
+		])
+		expect([...prefix.corrections].map((id) => contents.get(id))).toEqual([
+			'[Source 1-c] Correction: the refund for OR-1000 is $1.75, not $0.50.',
+		])
+		expect(history.at(-1)?.content).toBe('[Source F-2] Order OR-1002 note 2.')
+		expect(prefix.snapshot.notes).toEqual([])
+		expect(prefix.snapshot.failures).toEqual([])
+		expect(buildLedgerPrefix(21, 'control').corrections).toEqual(new Set())
+	})
+
+	it('answers each filing key from the correction ids and the pair answers', () => {
+		const corrections = new Set(['a'])
+		const pairs = { amends: 0.25, supersedes: 0.75 }
+		expect(answerLedgerKey('["category","a"]', corrections, pairs)).toEqual({
+			form: 'choice',
+			probabilities: { correction: 1 },
+		})
+		expect(answerLedgerKey('["category","b"]', corrections, pairs)).toEqual({
+			form: 'choice',
+			probabilities: { fact: 1 },
+		})
+		expect(answerLedgerKey('["topic","b","orders"]', corrections, pairs)).toEqual({
+			form: 'noul',
+			noul: 1,
+		})
+		expect(answerLedgerKey('["amends","a","b"]', corrections, pairs)).toEqual({
+			form: 'noul',
+			noul: 0.25,
+		})
+		expect(answerLedgerKey('["supersedes","a","b"]', corrections, pairs)).toEqual({
+			form: 'noul',
+			noul: 0.75,
+		})
+		expect(() => answerLedgerKey('["other"]', corrections, pairs)).toThrow(
+			'no ledger phase answers ["other"]',
+		)
+	})
+
+	it('creates a correction judge that records each key it is asked and reports the bench model', async () => {
+		const asked = createRecorder<readonly [key: string]>()
+		const judge = createCorrectionJudge(asked, new Set(['a']), { amends: 0, supersedes: 1 })
+		const result = await judge.ask(
+			{
+				state: 'user: Correction.',
+				questions: {
+					'["category","a"]': LEDGER_QUESTIONS.category,
+					'["supersedes","b","a"]': LEDGER_QUESTIONS.supersedes,
+				},
+			},
+			new AbortController().signal,
+		)
+		expect(judge.model).toBe('bench')
+		expect(result).toEqual({
+			model: 'bench',
+			answers: {
+				'["category","a"]': { form: 'choice', probabilities: { correction: 1 } },
+				'["supersedes","b","a"]': { form: 'noul', noul: 1 },
+			},
+		})
+		expect(asked.calls).toEqual([['["category","a"]'], ['["supersedes","b","a"]']])
+	})
+
+	it('extracts the order a lookup named, owned by its customer', () => {
+		expect(extractLedgerOrder({ id: 'OR-1' })).toEqual({
+			ids: ['OR-1'],
+			owners: [{ id: 'OR-1', names: ['Customer OR-1'] }],
+		})
+		expect(extractLedgerOrder({ id: 1 })).toBeUndefined()
+		expect(extractLedgerOrder({})).toBeUndefined()
+	})
+
+	it('builds bench options whose topics skip requests unless requested', () => {
+		const judge = createCorrectionJudge(createRecorder(), new Set(), { amends: 0, supersedes: 0 })
+		const requested = buildLedgerBenchOptions(judge, true)
+		const timed = buildLedgerBenchOptions(judge, false, buildLedgerPrefix(10, 'control').snapshot)
+		expect(requested.topics).toBe(LEDGER_BENCH_DESK.topics)
+		expect(timed.topics).toEqual([
+			{
+				name: 'orders',
+				criterion: 'Orders, delivery, refunds, ownership and follow-up obligations',
+				requested: false,
+			},
+		])
+		expect(requested.thresholds).toEqual({
+			category: 0.7,
+			topic: 0.7,
+			correction: 0.5,
+			amends: 0.7,
+			supersedes: 0.7,
+		})
+		expect('snapshot' in requested).toBe(false)
+		expect(timed.snapshot?.conversation.messages).toHaveLength(8)
+		expect(requested.lookups?.[0]?.read({ id: 'OR-1' }, 'No record')).toEqual(
+			extractLedgerOrder({ id: 'OR-1' }),
+		)
+	})
+
+	it('seeds a prefix whose correction arm asks amends and whose control arm asks none', async () => {
+		const weighted = await seedLedgerPrefix(18, 'correction')
+		const plain = await seedLedgerPrefix(18, 'control')
+		for (const seed of [weighted, plain]) {
+			expect(seed.snapshot.conversation.messages).toHaveLength(18)
+			expect(seed.snapshot.conversation.judgments?.length ?? 0).toBeGreaterThan(0)
+			expect(seed.readings.map((reading) => reading.outcome)).toContain('resolved')
+			expect(
+				seed.readings.filter(
+					(reading) => reading.outcome !== 'resolved' && reading.outcome !== 'cached',
+				),
+			).toEqual([])
+		}
+		expect(weighted.corrections).toBe(1)
+		expect(plain.corrections).toBe(0)
+		expect(weighted.readings.some((reading) => reading.phase === 'amends')).toBe(true)
+		expect(plain.readings.some((reading) => reading.phase === 'amends')).toBe(false)
+	})
+
+	it('renders a value with each message id written as its position', () => {
+		const conversation = createConversation()
+		const [first, second] = conversation.add([
+			{ role: 'user', content: 'One.' },
+			{ role: 'user', content: 'Two.' },
+		])
+		expect(
+			renderLedgerPositions(
+				{ ids: [requireValue(second).id, requireValue(first).id], other: 'x' },
+				conversation.messages(),
+			),
+		).toBe('{"ids":["#1","#0"],"other":"x"}')
+		expect(renderLedgerPositions({ other: 'x' }, [])).toBe('{"other":"x"}')
+	})
+
+	it('computes the SHA-256 digest of a text', async () => {
+		expect(await computeTextDigest('abc')).toBe(
+			'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+		)
+		expect(await computeTextDigest('')).toBe(
+			'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+		)
 	})
 })
