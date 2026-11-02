@@ -49,7 +49,7 @@ rc-u10 writes the records into a built copy of the request turn: `${records}\n\n
 - Workspace text leaves `system` because the model edits workspace files through a tool (`guides/agent.md` § Giving the model documents to read), and memo text leaves it because the model writes memos (O11).
 - Memos before workspace: a memo write invalidates the cached workspace text after it, and the other order invalidates memos on every file write (`designs/context.md` § AgentContext).
 - The calibration pass sends the built head: `system`, then the context message, then `view()`. rc-u9's pricing fix covers calibration.
-- Moving memos and workspace into the request turn waits for D32; the context-message layout reading belongs to rc-s2's `studies/context` study under D32's trigger, and rc-a10 and M3 add none (O48).
+- Moving memos and workspace into the request turn waits for D32; the context-message layout reading belongs to a model-driven run on the smallest local model under D32's trigger, which rc-t1's brief owes on its own driver, because rc-s2's `studies/context` study is scripted and refuses a provider (`plan.md` O115), and rc-a10 and M3 add none (O48).
 
 ## Literal strings
 
