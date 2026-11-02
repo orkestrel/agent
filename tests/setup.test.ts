@@ -147,8 +147,10 @@ import {
 	createSystemOneJudge,
 	ConversationManager,
 	createConversation,
+	createMemoManager,
 	createMemoryConversationStore,
 	isConversationSnapshot,
+	isMemoSnapshot,
 	isProviderAbortError,
 	MESSAGE_ROLES,
 	ThinkSplitter,
@@ -188,7 +190,8 @@ import {
 	exerciseConversationStoreRoundTrip,
 	exerciseConversationStoreTwoIds,
 	exerciseConversationStoreUpsert,
-	plantConversationRow,
+	buildMemoSnapshot,
+	plantSnapshotRow,
 	RecordedBody,
 	RecordedProvider,
 	RecordedTransport,
@@ -1829,20 +1832,48 @@ describe('createRecordedJudge', () => {
 	})
 })
 
-describe('plantConversationRow', () => {
-	it('stores malformed opaque snapshot rows on the supplied driver and closes for reopening', async () => {
+describe('plantSnapshotRow', () => {
+	it('stores a row in each named table', async () => {
 		const driver = createMemoryDriver()
-		const row = { id: 'unreadable', snapshot: { id: 'unreadable', messages: 'malformed' } }
-		await plantConversationRow(driver, row)
+		const conversationRow = {
+			id: 'unreadable',
+			snapshot: { id: 'unreadable', messages: 'malformed' },
+		}
+		const memoRow = { id: 'unreadable', snapshot: { id: 'unreadable', memos: 'malformed' } }
+		await plantSnapshotRow(driver, 'conversations', conversationRow)
+		await plantSnapshotRow(driver, 'memos', memoRow)
+		const columns = { id: stringShape(), snapshot: rawShape({}) }
 		const database = createDatabase({
 			driver,
-			tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
+			tables: { conversations: columns, memos: columns },
 		})
 		try {
-			expect(await database.table('conversations').get('unreadable')).toEqual(row)
+			expect(await database.table('conversations').get('unreadable')).toEqual(conversationRow)
+			expect(await database.table('memos').get('unreadable')).toEqual(memoRow)
 		} finally {
 			await database.close()
 		}
+	})
+})
+
+describe('buildMemoSnapshot', () => {
+	it('builds a memo set of the given size', () => {
+		const snapshot = buildMemoSnapshot(5, 'ada')
+
+		expect(snapshot.id).toBe('ada')
+		expect(snapshot.memos).toHaveLength(5)
+		expect(new Set(snapshot.memos.map((memo) => memo.id)).size).toBe(5)
+		expect(snapshot.memos.every((memo) => memo.origin !== undefined)).toBe(true)
+		expect(isMemoSnapshot(snapshot)).toBe(true)
+		expect(
+			createMemoManager({ snapshot })
+				.history('topic-0')
+				.map((memo) => memo.content),
+		).toEqual([
+			'Revision 0: keep replies to customer CU-1000 under 120 words. It holds because they read on a phone. Apply it to every reply in their threads.',
+			'Revision 1: keep replies to customer CU-1000 under 120 words. It holds because they read on a phone. Apply it to every reply in their threads.',
+		])
+		expect(buildMemoSnapshot(3).id).toBe('ada')
 	})
 })
 

@@ -17,7 +17,7 @@ import {
 	createStubSummarizer,
 	JUDGMENT_RECORD,
 	JUDGMENT_SNAPSHOT,
-	plantConversationRow,
+	plantSnapshotRow,
 	renderRecap,
 	seedConversation,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
@@ -519,7 +519,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 
 	it('open(id) resolves undefined for a stored judgment that is not finite', async () => {
 		const driver = createMemoryDriver()
-		await plantConversationRow(driver, {
+		await plantSnapshotRow(driver, 'conversations', {
 			id: JUDGMENT_SNAPSHOT.id,
 			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ ...JUDGMENT_RECORD, time: Number.NaN }] },
 		})
@@ -686,7 +686,7 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 describe('ConversationManager — open reads a 0.0.29 snapshot without its conversation summary', () => {
 	it('narrows the persisted row, hydrates sections and tail, and drops the summary from the next snapshot', async () => {
 		const driver = createMemoryDriver()
-		await plantConversationRow(driver, {
+		await plantSnapshotRow(driver, 'conversations', {
 			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
 			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
 		})

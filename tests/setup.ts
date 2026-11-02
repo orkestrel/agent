@@ -221,6 +221,9 @@ import type {
 	ConversationManagerInterface,
 	ConversationSnapshot,
 	ConversationSnapshotRow,
+	MemoSnapshot,
+	MemoSnapshotRow,
+	MemoStoreInterface,
 	Section,
 	SystemOneJudgeOptions,
 	ConversationStoreInterface,
@@ -274,6 +277,9 @@ import {
 	createAuthority,
 	createChannel,
 	createConversation,
+	createDatabaseMemoStore,
+	createMemoManager,
+	createMemoryMemoStore,
 	createScope,
 	InstructionManager,
 	JudgeError,
@@ -4007,27 +4013,29 @@ export function createRecordedJudge(options: RecordedJudgeOptions = {}): Recorde
 }
 
 /**
- * Plants an opaque snapshot row through a real database over the supplied driver.
+ * Plants an opaque snapshot row in the named table through a real database over the supplied driver.
  *
- * @param driver - The driver shared with the conversation store under test
+ * @param driver - The driver shared with the store under test
+ * @param table - The store table to write: `'conversations'` or `'memos'`
  * @param row - The row to persist, including malformed or older snapshot shapes
  * @returns A promise that settles after the row is stored and the database closes
  * @example
  * ```ts
  * // ... driver setup omitted
- * await plantConversationRow(driver, { id: 'unreadable', snapshot: { id: 'unreadable' } })
+ * await plantSnapshotRow(driver, 'memos', { id: 'unreadable', snapshot: { id: 'unreadable' } })
  * ```
  */
-export async function plantConversationRow(
+export async function plantSnapshotRow(
 	driver: DriverInterface,
-	row: ConversationSnapshotRow,
+	table: 'conversations' | 'memos',
+	row: ConversationSnapshotRow | MemoSnapshotRow,
 ): Promise<void> {
 	const database = createDatabase({
 		driver,
-		tables: { conversations: { id: stringShape(), snapshot: rawShape({}) } },
+		tables: { [table]: { id: stringShape(), snapshot: rawShape({}) } },
 	})
 	try {
-		await database.table('conversations').set(row)
+		await database.table(table).set(row)
 	} finally {
 		await database.close()
 	}
@@ -4624,6 +4632,38 @@ export const MALFORMED_MEMO_SNAPSHOTS: ReadonlyArray<readonly [string, unknown]>
 		},
 	],
 ])
+
+/**
+ * Builds a memo set of `count` revisions through a real memo manager, two revisions per name, each with an origin.
+ *
+ * @param count - The number of revisions
+ * @param id - The memo set id
+ * @returns The manager's snapshot, oldest revision first
+ * @example
+ * ```ts
+ * const snapshot = buildMemoSnapshot(4, 'ada')
+ * ```
+ */
+export function buildMemoSnapshot(count: number, id = 'ada'): MemoSnapshot {
+	const memos = createMemoManager({ id })
+	for (const index of Array.from({ length: count }).keys()) {
+		const customer = 1000 + Math.floor(index / 2)
+		memos.add({
+			name: `topic-${Math.floor(index / 2)}`,
+			description: `Reply rules for customer CU-${customer}.`,
+			content: `Revision ${index}: keep replies to customer CU-${customer} under 120 words. It holds because they read on a phone. Apply it to every reply in their threads.`,
+			origin: { conversation: `thread-CU-${customer}`, message: `message-${index}` },
+		})
+	}
+	return memos.snapshot()
+}
+
+/** Lists each memo store factory the memo store contract runs, with its label. */
+export const MEMO_STORE_FACTORIES: ReadonlyArray<readonly [string, () => MemoStoreInterface]> =
+	Object.freeze([
+		['MemoryMemoStore', createMemoryMemoStore],
+		['DatabaseMemoStore', createDatabaseMemoStore],
+	])
 
 /** Lists the skill manager events recorded by its tests. */
 export const SKILL_EVENTS = Object.freeze(['add', 'remove', 'clear'] as const)

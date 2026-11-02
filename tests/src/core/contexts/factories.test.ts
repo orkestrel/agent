@@ -2,9 +2,11 @@ import type { InstructionInterface, Memo, ScopeInterface, Skill } from '@src/cor
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
 	createAgentContext,
+	createDatabaseMemoStore,
 	createInstruction,
 	createInstructionManager,
 	createMemoManager,
+	createMemoryMemoStore,
 	createScope,
 	createScopeManager,
 	createSkillManager,
@@ -15,8 +17,10 @@ import {
 	ScopeManager,
 	SkillManager,
 } from '@src/core'
+import { createMemoryDriver } from '@orkestrel/database'
 import { describe, expect, it } from 'vitest'
 import { createRecorder } from '@orkestrel/test'
+import { buildMemoSnapshot, MEMO_STORE_FACTORIES } from '../../../setup.js'
 
 describe('createInstruction', () => {
 	it('returns an Instruction carrying the input, with the priority defaulted to 0', () => {
@@ -212,6 +216,88 @@ describe('createMemoManager', () => {
 		const restored = createMemoManager({ snapshot: source.snapshot() })
 
 		expect(restored.snapshot()).toEqual(source.snapshot())
+	})
+})
+
+describe.each(MEMO_STORE_FACTORIES)('%s memo store', (_label, create) => {
+	it('round trips every revision', async () => {
+		const store = create()
+		const snapshot = buildMemoSnapshot(4, 'ada')
+
+		await store.set(snapshot)
+
+		expect(await store.get('ada')).toEqual(snapshot)
+	})
+
+	it('replaces a set stored under its id', async () => {
+		const store = create()
+		const second = buildMemoSnapshot(2, 'ada')
+
+		await store.set(buildMemoSnapshot(4, 'ada'))
+		await store.set(second)
+
+		expect(await store.get('ada')).toEqual(second)
+	})
+
+	it('drops a set on delete', async () => {
+		const store = create()
+
+		await store.set(buildMemoSnapshot(4, 'ada'))
+		expect(await store.get('ada')).toBeDefined()
+		await store.delete('ada')
+
+		expect(await store.get('ada')).toBeUndefined()
+	})
+
+	it('ignores a delete of an absent id', async () => {
+		await expect(create().delete('never-stored')).resolves.toBeUndefined()
+	})
+
+	it('reads an absent id as undefined', async () => {
+		expect(await create().get('never-stored')).toBeUndefined()
+	})
+
+	it('keeps two ids apart', async () => {
+		const store = create()
+		const beta = buildMemoSnapshot(2, 'beta')
+
+		await store.set(buildMemoSnapshot(4, 'alpha'))
+		await store.set(beta)
+		await store.delete('alpha')
+
+		expect(await store.get('alpha')).toBeUndefined()
+		expect(await store.get('beta')).toEqual(beta)
+	})
+})
+
+describe('createMemoryMemoStore', () => {
+	it('returns an independent store per call', async () => {
+		const first = createMemoryMemoStore()
+		const second = createMemoryMemoStore()
+
+		await first.set(buildMemoSnapshot(4, 'ada'))
+
+		expect(await second.get('ada')).toBeUndefined()
+	})
+})
+
+describe('createDatabaseMemoStore', () => {
+	it('stores through the supplied driver', async () => {
+		const driver = createMemoryDriver()
+		const snapshot = buildMemoSnapshot(4, 'ada')
+
+		await createDatabaseMemoStore(driver).set(snapshot)
+
+		expect(await createDatabaseMemoStore(driver).get('ada')).toEqual(snapshot)
+	})
+
+	it('defaults to a fresh memory driver', async () => {
+		const first = createDatabaseMemoStore()
+		const second = createDatabaseMemoStore()
+
+		await first.set(buildMemoSnapshot(4, 'ada'))
+
+		expect(await second.get('ada')).toBeUndefined()
 	})
 })
 

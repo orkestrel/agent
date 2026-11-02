@@ -603,6 +603,62 @@ export interface MemoManagerInterface {
 }
 
 /**
+ * Persists a {@link MemoSnapshot} by its memo set id — the async `get` / `set` / `delete`
+ * primitives, holding no expiry, the memo twin of {@link
+ * import('../conversations/types.js').ConversationStoreInterface}.
+ *
+ * @remarks
+ * The store keeps the whole memo set, every revision oldest first, as one snapshot per id, as
+ * every fleet store keeps one value per id: the in-memory
+ * {@link import('./stores/MemoryMemoStore.js').MemoryMemoStore} and its driver-pluggable twin
+ * {@link import('./stores/DatabaseMemoStore.js').DatabaseMemoStore} (the snapshot as one opaque
+ * JSON column) share this one interface. Restoring is a caller concern: a host passes a resolved
+ * snapshot to `createMemoManager({ snapshot })`.
+ *
+ * Every primitive is async, so a database round trip fits the same shape as the memory one. The
+ * snapshot carries its own id, so `set` takes no separate id. A stored memo set lives until an
+ * explicit `delete`.
+ */
+export interface MemoStoreInterface {
+	/**
+	 * Resolves the stored snapshot for `id`, or `undefined` if none is stored.
+	 *
+	 * @param id - The memo set id to resolve (a {@link MemoSnapshot.id})
+	 * @returns The stored snapshot, or `undefined` if absent
+	 */
+	get(id: string): Promise<MemoSnapshot | undefined>
+	/**
+	 * Inserts or replaces a snapshot under its own `snapshot.id`.
+	 *
+	 * @param snapshot - The snapshot to store, keyed by its `id`
+	 */
+	set(snapshot: MemoSnapshot): Promise<void>
+	/**
+	 * Drops a snapshot by id; an absent id is a no-op.
+	 *
+	 * @param id - The memo set id to drop
+	 */
+	delete(id: string): Promise<void>
+}
+
+/**
+ * Represents one row of the table a {@link
+ * import('./stores/DatabaseMemoStore.js').DatabaseMemoStore} persists — a memo set `id` plus its
+ * {@link MemoSnapshot} held as one opaque JSON column, read back as `unknown` and narrowed on
+ * `get`.
+ *
+ * @remarks
+ * The `snapshot` column is a `rawShape`, so the row type stays flat and reads back as `unknown`;
+ * the store narrows it with {@link import('./validators.js').isMemoSnapshot}. `id` mirrors
+ * {@link MemoSnapshot.id}, the primary key, so a `set` writes `{ id: snapshot.id, snapshot }`.
+ */
+export interface MemoSnapshotRow {
+	readonly id: string
+	/** Holds the whole {@link MemoSnapshot} as one opaque JSON blob, read back as `unknown` and narrowed on `get`. */
+	readonly snapshot: unknown
+}
+
+/**
  * Holds one skill: a name and a description the index shows, the instructions loading adds, and
  * bundled files.
  *

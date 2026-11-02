@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	buildConversationSnapshot,
 	JUDGMENT_RECORD,
-	plantConversationRow,
+	plantSnapshotRow,
 	exerciseConversationStoreDeleteAbsent,
 	exerciseConversationStoreDeleteThenAbsent,
 	exerciseConversationStoreGetAbsent,
@@ -43,7 +43,7 @@ describe('DatabaseConversationStore', () => {
 
 	it('refuses a malformed judgments member read from its real table', async () => {
 		const driver = createMemoryDriver()
-		await plantConversationRow(driver, {
+		await plantSnapshotRow(driver, 'conversations', {
 			id: JUDGMENT_SNAPSHOT.id,
 			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ id: 'broken' }] },
 		})
@@ -154,7 +154,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		// it at the read boundary, so the store resolves ABSENT: hydrate mints a fresh thread
 		// instead of replaying (or throwing on) the poisoned call.
 		const driver = createMemoryDriver()
-		await plantConversationRow(driver, {
+		await plantSnapshotRow(driver, 'conversations', {
 			id: 'poisoned',
 			snapshot: {
 				id: 'poisoned',
@@ -178,7 +178,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 
 	it('a TAMPERED row (a non-string call) resolves UNDEFINED from get (fail-closed)', async () => {
 		const driver = createMemoryDriver()
-		await plantConversationRow(driver, {
+		await plantSnapshotRow(driver, 'conversations', {
 			id: 'poisoned',
 			snapshot: {
 				id: 'poisoned',
@@ -212,7 +212,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 	it('a row whose snapshot names another id resolves UNDEFINED from get', async () => {
 		const driver = createMemoryDriver()
 		const snapshot = await buildConversationSnapshot('b')
-		await plantConversationRow(driver, { id: 'a', snapshot })
+		await plantSnapshotRow(driver, 'conversations', { id: 'a', snapshot })
 		const store = createDatabaseConversationStore(driver)
 
 		expect(await store.get('a')).toBeUndefined()
@@ -223,7 +223,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		'a judgment time of %s resolves UNDEFINED from get, so no hydration throws',
 		async (time) => {
 			const driver = createMemoryDriver()
-			await plantConversationRow(driver, {
+			await plantSnapshotRow(driver, 'conversations', {
 				id: JUDGMENT_SNAPSHOT.id,
 				snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ ...JUDGMENT_RECORD, time }] },
 			})

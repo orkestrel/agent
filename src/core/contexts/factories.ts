@@ -7,6 +7,8 @@ import type {
 	InstructionManagerOptions,
 	MemoManagerInterface,
 	MemoManagerOptions,
+	MemoSnapshotRow,
+	MemoStoreInterface,
 	ScopeInput,
 	ScopeInterface,
 	ScopeManagerInterface,
@@ -14,12 +16,17 @@ import type {
 	SkillManagerInterface,
 	SkillManagerOptions,
 } from './types.js'
+import type { DriverInterface, TableInterface } from '@orkestrel/database'
+import { rawShape, stringShape } from '@orkestrel/contract'
+import { createDatabase, createMemoryDriver } from '@orkestrel/database'
 import { Instruction } from './instructions/Instruction.js'
 import { InstructionManager } from './instructions/InstructionManager.js'
 import { MemoManager } from './memos/MemoManager.js'
 import { Scope } from './scopes/Scope.js'
 import { ScopeManager } from './scopes/ScopeManager.js'
 import { SkillManager } from './skills/SkillManager.js'
+import { MemoryMemoStore } from './stores/MemoryMemoStore.js'
+import { DatabaseMemoStore } from './stores/DatabaseMemoStore.js'
 import { AgentContext } from './AgentContext.js'
 
 /**
@@ -160,6 +167,76 @@ export function createScopeManager(options?: ScopeManagerOptions): ScopeManagerI
  */
 export function createMemoManager(options?: MemoManagerOptions): MemoManagerInterface {
 	return new MemoManager(options)
+}
+
+/**
+ * Creates the in-memory memo store — a {@link MemoStoreInterface} backed by a process-lifetime map,
+ * the default twin of {@link createDatabaseMemoStore}.
+ *
+ * @remarks
+ * The snapshot is already plain JSON data, so the memory tier needs no encoding. `get` / `set` /
+ * `delete` are async (the same shape a durable backend fits), and a stored memo set lives until an
+ * explicit `delete`. Its driver-pluggable twin is {@link createDatabaseMemoStore} (the snapshot as
+ * one opaque JSON column over a `databases` table). Restoring stays a caller concern: read a
+ * snapshot back and pass it to `createMemoManager({ snapshot })`.
+ *
+ * @returns A memory-backed {@link MemoStoreInterface}
+ *
+ * @example
+ * ```ts
+ * import { createMemoManager, createMemoryMemoStore } from '@orkestrel/agent'
+ *
+ * const store = createMemoryMemoStore()
+ * const memos = createMemoManager({ id: 'ada' })
+ * memos.add({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' })
+ * await store.set(memos.snapshot())              // store the memo set
+ * const snapshot = await store.get('ada')
+ * ```
+ */
+export function createMemoryMemoStore(): MemoStoreInterface {
+	return new MemoryMemoStore()
+}
+
+/**
+ * Creates a {@link DatabaseMemoStore} over any {@link DriverInterface} — the durable, driver-pluggable
+ * backing for a memo set, holding each snapshot as one opaque JSON column in a `memos` table.
+ *
+ * @remarks
+ * Builds a one-table database (`memos`, keyed by `id`) over the supplied driver, the snapshot held
+ * as one opaque JSON column — the column map is `{ id; snapshot }` where `snapshot` is a `rawShape`
+ * (a JSON blob). The snapshot is already a complete, self-contained, pure-JSON payload, so storing
+ * it whole is lossless and keeps the row type flat (the column reads back as `unknown`, narrowed on
+ * `get` by {@link import('./validators.js').isMemoSnapshot}). Default driver:
+ * {@link createMemoryDriver}, so the store also works in memory out of the box; pass a server
+ * `createJSONDriver` / `createSQLiteDriver` (or a browser IndexedDB driver) for a persistent one —
+ * the durability is the driver's job, the store engine is shared. It swaps in behind
+ * {@link MemoStoreInterface} without touching the manager.
+ *
+ * @param driver - The storage backend the snapshots persist to. Default: {@link createMemoryDriver}
+ * @returns A {@link MemoStoreInterface} over the driver
+ *
+ * @example
+ * ```ts
+ * import { createDatabaseMemoStore, createMemoManager } from '@orkestrel/agent'
+ * import { createMemoryDriver } from '@orkestrel/database'
+ *
+ * const store = createDatabaseMemoStore(createMemoryDriver()) // a durable driver swaps in here
+ * const memos = createMemoManager({ id: 'ada' })
+ * memos.add({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' })
+ * await store.set(memos.snapshot())              // store the memo set (one JSON column)
+ * const snapshot = await store.get('ada')
+ * ```
+ */
+export function createDatabaseMemoStore(
+	driver: DriverInterface = createMemoryDriver(),
+): MemoStoreInterface {
+	// The snapshot is stored as one opaque JSON column (`rawShape`), so the row infers flat —
+	// `{ id: string; snapshot: unknown }` = `MemoSnapshotRow` — and the revisions' snapshot shape
+	// never forces a contract `Infer`.
+	const columns = { id: stringShape(), snapshot: rawShape({}) }
+	const database = createDatabase({ driver, tables: { memos: columns } })
+	const table: TableInterface<MemoSnapshotRow> = database.table('memos')
+	return new DatabaseMemoStore(table)
 }
 
 /**
