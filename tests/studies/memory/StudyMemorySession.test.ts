@@ -2397,34 +2397,7 @@ describe('recording declarations of a memory session', () => {
 	})
 })
 
-describe('the moving and sham settings of a memory session', () => {
-	it('carries goal one as messages in goal two under moving, and an off control does not', async () => {
-		const trial: MemoryTrialFixture = {
-			arm: 'records',
-			responses: buildMemorySeedResponses('records'),
-			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 2),
-			settings: STUDY_MEMORY_SEED_SETTINGS,
-		}
-		const moving = await runMemoryTrial({
-			...trial,
-			settings: { ...STUDY_MEMORY_SEED_SETTINGS, moving: true },
-		})
-		const off = await runMemoryTrial(trial)
-		expect([moving.failure, off.failure]).toEqual([undefined, undefined])
-		const carried = readMemoryFirstChat(moving, 'correction')
-		const seeded = readMemoryFirstChat(off, 'correction')
-		expect(carried).toContain('Repair handoff')
-		expect(seeded).toContain('Repair handoff')
-		const exchange = expect.objectContaining({
-			messages: expect.arrayContaining([
-				expect.objectContaining({ role: 'user', content: 'Look up order-1' }),
-				expect.objectContaining({ role: 'assistant', content: 'Initial handoff' }),
-			]),
-		})
-		expect(parseJSON(carried ?? '')).toEqual(exchange)
-		expect(parseJSON(seeded ?? '')).not.toEqual(exchange)
-	}, 60000)
-
+describe('the sham setting of a memory session', () => {
 	it('appends one newline to the records system under sham and moves no other byte', async () => {
 		const trial: MemoryTrialFixture = {
 			arm: 'records',
@@ -2463,28 +2436,21 @@ describe('the moving and sham settings of a memory session', () => {
 		)
 	}, 60000)
 
-	it('sends the control bytes on a compaction arm under moving and a full arm under moving or sham', async () => {
-		for (const [arm, changes] of [
-			['compaction', [{ moving: true }]],
-			['full', [{ moving: true }, { sham: true }]],
-		] as const) {
-			const trial: MemoryTrialFixture = {
-				arm,
-				responses: buildMemorySeedResponses(arm),
-				goals: STUDY_MEMORY_SEED_GOALS,
-				settings: STUDY_MEMORY_SEED_SETTINGS,
-			}
-			const control = await runMemoryTrial(trial)
-			expect(control.failure).toBeUndefined()
-			expect(control.requests.length).toBeGreaterThan(2)
-			for (const change of changes) {
-				const treated = await runMemoryTrial({
-					...trial,
-					settings: { ...STUDY_MEMORY_SEED_SETTINGS, ...change },
-				})
-				expect(treated.failure).toBeUndefined()
-				expect(treated.requests).toEqual(control.requests)
-			}
+	it('sends the control bytes on a full arm under sham', async () => {
+		const trial: MemoryTrialFixture = {
+			arm: 'full',
+			responses: buildMemorySeedResponses('full'),
+			goals: STUDY_MEMORY_SEED_GOALS,
+			settings: STUDY_MEMORY_SEED_SETTINGS,
 		}
+		const control = await runMemoryTrial(trial)
+		expect(control.failure).toBeUndefined()
+		expect(control.requests.length).toBeGreaterThan(2)
+		const treated = await runMemoryTrial({
+			...trial,
+			settings: { ...STUDY_MEMORY_SEED_SETTINGS, sham: true },
+		})
+		expect(treated.failure).toBeUndefined()
+		expect(treated.requests).toEqual(control.requests)
 	}, 60000)
 })

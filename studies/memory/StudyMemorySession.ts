@@ -214,7 +214,6 @@ export class StudyMemorySession implements StudySessionInterface {
 					},
 				],
 				...(settings?.correction === undefined ? {} : { correction: settings.correction }),
-				...(settings?.moving === undefined ? {} : { moving: settings.moving }),
 				...(seed?.ledger === undefined ? {} : { snapshot: seed.ledger }),
 				agent: {
 					limit: 8,

@@ -36,8 +36,6 @@ export interface StudyMemoryOptions {
 	readonly correction?: LedgerCorrectionOptions | undefined
 	/** Writes this value over the `seed` of every role's sampling. */
 	readonly seed?: number | undefined
-	/** Mirrors `LedgerOptions.moving`; forwarded only in the records arm. */
-	readonly moving?: boolean | undefined
 	/** Appends one newline to the Ledger's `system` value; read only in the records arm. */
 	readonly sham?: boolean | undefined
 }

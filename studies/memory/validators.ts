@@ -73,27 +73,15 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'metadata',
 						'correction',
 						'seed',
-						'moving',
 						'sham',
 					].includes(key),
 			)
 		)
 			return false
-		const {
-			gauge,
-			observe,
-			checkpoints,
-			rolling,
-			version,
-			metadata,
-			correction,
-			seed,
-			moving,
-			sham,
-		} = value
+		const { gauge, observe, checkpoints, rolling, version, metadata, correction, seed, sham } =
+			value
 		if (rolling !== undefined && !isBoolean(rolling)) return false
 		if (seed !== undefined && !isNonNegativeInteger(seed)) return false
-		if (moving !== undefined && !isBoolean(moving)) return false
 		if (sham !== undefined && !isBoolean(sham)) return false
 		if (version !== undefined && !isNonEmptyString(version)) return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false

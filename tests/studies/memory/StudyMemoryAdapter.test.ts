@@ -71,7 +71,6 @@ describe('memory declaration and mechanical evidence', () => {
 		for (const [name, change] of [
 			['repeat', { seed: 1 }],
 			['sham', { sham: true }],
-			['moving', { moving: true }],
 			['rolling', { rolling: true }],
 		] as const) {
 			const profile = parseJSON(await readFile(`studies/memory/profiles/${name}.json`, 'utf8'))
