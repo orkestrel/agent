@@ -32,13 +32,14 @@ Every id is numbered for life and never reused. A retired id stays retired.
 
 | Prefix | Names | Home |
 | --- | --- | --- |
-| `rc-` | a unit, from the consultations' sequence (`rc-p1`, `rc-u1`, `rc-a14`, `rc-u10`, `rc-d1`, and the rest of `plan.md` § Sequence; the retired `rc-a6`, `rc-p3`, and `rc-e1` in `plan.md` § Sequence, Retired ids; the deferred `rc-t1` in `plan.md` § Deferred); the kind after `rc-` names the unit's sort, and `rc-st` names a unit in `@orkestrel/study` (`rc-st1`, `rc-st2`, `rc-st3`) | `plan.md` § Sequence |
+| `rc-` | a unit, from the consultations' sequence (`rc-p1`, `rc-u1`, `rc-a14`, `rc-u10`, `rc-d1`, and the rest of `plan.md` § Sequence; the retired `rc-a6`, `rc-p3`, and `rc-e1` in `plan.md` § Sequence, Retired ids; the deferred `rc-t1` in `plan.md` § Deferred); the kind after `rc-` names the unit's sort, `rc-st` names a unit in `@orkestrel/study` (`rc-st1`, `rc-st2`, `rc-st3`), and `rc-nm` names the names unit (`rc-nm1`) | `plan.md` § Sequence |
 | `O` | an Orchestrator ruling (`O1`, `O2`, …) | `plan.md` § Rulings |
 | `F` | a fact the Orchestrator verified (`F1`, `F2`, …) | `plan.md` § Rulings |
 | `C` | an external research claim (`C01`, `C02`, …) | `research/evidence.md` |
 | `D` | a deferral with its reopen trigger (`D1`, `D2`, …) | `plan.md` § Deferred |
 | `Q` | a decision only the user can make (`Q1`, `Q2`, …) | `plan.md` § Decisions |
 | `R` | a browser and server boundary remedy (`R1`, `R2`, …) | `designs/boundary.md` § Mistakes |
+| `N`, `W` | a ruling of one read-only consultation: `N1` to `N5` on burst 49, `W1` to `W7` on the questions the morning report of 2026-11-03 left | `plan.md` § Rulings, O158 and O161 |
 
 - Ids from the closed boost campaign, such as `U45` and `R5b`, keep their meaning there and are cited with the commit that holds them; a bare `R` id in this folder names a boundary remedy.
 - The 0.0.32 ledger fixes are named by what they do, never as `D1` or `D2`, because those ids are this campaign's deferrals.

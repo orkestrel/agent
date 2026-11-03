@@ -102,10 +102,11 @@ export interface LedgerOptions {
 - A `limit` that is not a nonnegative safe integer throws `LedgerError('LIMIT')`.
 - The cap is a resource boundary, never a quality verdict. A cap can hide a true supersession older than the cap; the guide states that limit.
 - When rc-p1 (b) shows the pair count at its longest length far beyond its shortest, rc-u6's review proposes a default.
+- The user's word of 2026-11-03 removes the cap: no reading names an L, and `LedgerCorrectionOptions` stays as `narrow`'s home. The guide states the absent bound (`plan.md` O161, W4; rc-u28).
 
 ### Pair narrowing
 
-`rc-a11` narrows eligibility on top of the cap. Under the switch, a correction is compared with an earlier message only when today's eligibility admits the pair and the two messages share a registry entity or a literal by `extractLiterals`, so the topic-only pair is the one dropped and `limit` counts only narrow-eligible messages. The recency cut of the frontier, K, and its O(K) are not built (T67): K drops a live member whatever it could file, no reading sizes it, and `correction.limit` is the recency cut that rc-a11's comparison reads. It is an experiment because it changes classification; its gate is the prior campaign's R5b reopen condition (`designs/measurement.md` § Gates, row rc-a11). A default-off switch on `LedgerCorrectionOptions` gates the narrowing while the experiment runs, so an off arm runs on the same build; rc-a11's brief names it, and either verdict deletes it.
+`rc-a11` narrows eligibility on top of the cap. Under the switch, a correction is compared with an earlier message only when today's eligibility admits the pair and the two messages share a registry entity or a literal by `extractLiterals`, so the topic-only pair is the one dropped and `limit` counts only narrow-eligible messages. The recency cut of the frontier, K, and its O(K) are not built (T67): K drops a live member whatever it could file, no reading sizes it, and `correction.limit` is the recency cut that rc-a11's comparison reads. Its gate is the prior campaign's R5b reopen condition (`designs/measurement.md` § Gates, row rc-a11), read on 2026-11-03 on O164's reading. By the user's word of that day it ships as the measured option `LedgerCorrectionOptions.narrow`, default false, which let an off arm run on the same build; the option's hole is a contract fact the guide states, and D90 and D91 hold the scenario and the reshape that would change it (`plan.md` O161, W2).
 
 ### Grouped asks
 
@@ -160,7 +161,7 @@ run           | this run's turns                                                
 - An exchange is a request and its final reply, never notes, calls, or tool messages. Before the first request completes, the seed serves.
 - The tail fills to the tail share; when the next exchange would pass that share, the tail drains to half. Draining in batches keeps the tail's leading bytes identical between drains, so a prefix cache survives between drains. A tail that slides by one exchange would invalidate the prefix on every request.
 - The cache claim depends on rc-u10: while the records precede the tail inside the `system` message, draining buys no prefix reuse.
-- A default-off switch on `LedgerOptions` gates the tail while the experiment runs; rc-a7's brief names it, and either verdict deletes it.
+- A default-off switch on `LedgerOptions` gated the tail while the experiment ran. The gate failed and the switch was deleted as `c7e1d12e`; the seed tail stays (`plan.md` O163).
 - The frozen-tail census motivates the change (`research/evidence.md` § Prior-campaign readings). The prior campaign's R1 moving tail could act but was stripped with no quality grade (`7ada8b77:.orkestrel/agent/plan.md` § Removed experiments).
 - Recall listing assistant replies is the fallback (D15).
 
