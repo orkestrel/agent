@@ -18,9 +18,6 @@ import type {
 	StudyOllamaReplayInterface,
 } from '@orkestrel/study/server'
 
-/** Names where the records arm's request copy puts the records block: in the `system` message after a blank line, in the `system` message after a newline, or in a `user` message of its own. */
-export type StudyMemoryLayout = 'system' | 'tight' | 'separate'
-
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
@@ -37,8 +34,6 @@ export interface StudyMemoryOptions {
 	readonly metadata?: StudyOllamaMetadata | undefined
 	/** Mirrors `LedgerOptions.correction`; forwarded only in the records arm. */
 	readonly correction?: LedgerCorrectionOptions | undefined
-	/** Moves the records block out of the request copy into the layout's place; read only in the records arm. */
-	readonly layout?: StudyMemoryLayout | undefined
 	/** Writes this value over the `seed` of every role's sampling. */
 	readonly seed?: number | undefined
 }

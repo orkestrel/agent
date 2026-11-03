@@ -2,7 +2,7 @@ import { isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, parseStudyProfile, parseStudyScenario } from '@orkestrel/study'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { createStudyAdapter, isStudyMemoryOptions } from '../../../studies/memory/index.js'
+import { createStudyAdapter } from '../../../studies/memory/index.js'
 import {
 	buildCustodyManifest,
 	buildMemoryCriterion,
@@ -63,31 +63,6 @@ describe('memory declaration and mechanical evidence', () => {
 				profile: buildMemoryProfile({ url, settings: { ...settings, checkpoints: [...declared] } }),
 			}),
 		).toThrow(/horizon of 3/)
-	})
-
-	it('declares each transport profile as q2 with only its named differences', async () => {
-		const stems = ['system', 'repeat', 'sham', 'separate'] as const
-		const named = {
-			system: { layout: 'system' },
-			repeat: { layout: 'system', seed: 1 },
-			sham: { layout: 'tight' },
-			separate: { layout: 'separate' },
-		}
-		const texts = await Promise.all(
-			['q2', ...stems].map((stem) => readFile(`studies/memory/profiles/${stem}.json`, 'utf8')),
-		)
-		const [base, ...arms] = texts.map((text) => parseStudyProfile(parseJSON(text)))
-		if (base === undefined || !isRecord(base.settings)) throw new Error('Missing q2 settings')
-		// The on arm is q2 itself, which declares neither member.
-		expect(Object.keys(base.settings)).not.toContain('layout')
-		expect(Object.keys(base.settings)).not.toContain('seed')
-		expect(arms).toHaveLength(stems.length)
-		for (const [index, stem] of stems.entries()) {
-			const arm = arms[index]
-			if (arm === undefined) throw new Error(`Missing ${stem} profile`)
-			expect(arm).toEqual({ ...base, name: stem, settings: { ...base.settings, ...named[stem] } })
-			expect(isStudyMemoryOptions(arm.settings)).toBe(true)
-		}
 	})
 
 	it('reads one goal into progress', () => {

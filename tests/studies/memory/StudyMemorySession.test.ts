@@ -1,7 +1,7 @@
 import type { MemoryTrialFixture } from '../../setupStudy.js'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { isArray, isRecord, isString, parseJSON } from '@orkestrel/contract'
+import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
 import {
 	isStudyError,
@@ -2363,104 +2363,4 @@ describe('recording declarations of a memory session', () => {
 			await server.close()
 		}
 	})
-})
-
-describe('records layout of a memory session', () => {
-	const closing = 'Check BW-5512.'
-	// Eight long arrivals leave the older ones outside the Ledger's tail, so the closing request carries a records block.
-	const arrivals = Array.from({ length: 8 }, (_, index) => ({
-		id: `a${index + 1}`,
-		content: `Order BW-5512 note ${index + 1}: ${'Brightwater parcel waits at the depot. '.repeat(23)}`,
-	}))
-	const goals = [
-		{ id: 'opening', input: { prompt: 'Open the handoff for BW-5512.', arrivals, records: [] } },
-		{ id: 'closure', input: { prompt: closing, arrivals: [], records: [] } },
-	]
-	// The two calibration calls and the opening request's own first chat each read about the opening estimate, so the gauge scale stays near 1 and the older arrivals fall outside the tail.
-	const calibration = [1, 2, 3].map(() => ({
-		path: '/api/chat',
-		body: buildMemoryReply({ prompt: 2000 }),
-	}))
-	const base = { observe: true, checkpoints: ['closure'] }
-	const room = { context: 4096, output: 512, safety: 128 }
-
-	it('moves the block of the closing request and leaves the end-of-goal checkpoint alone', async () => {
-		const layouts = [undefined, 'system', 'tight', 'separate'] as const
-		const results = await Promise.all(
-			layouts.map((layout) =>
-				runMemoryTrial({
-					arm: 'records',
-					responses: calibration,
-					goals,
-					room,
-					settings: layout === undefined ? base : { ...base, layout },
-				}),
-			),
-		)
-		for (const result of results) expect(result.failure).toBeUndefined()
-		const chats = results.map((result) => {
-			const body = parseJSON(readMemoryFirstChat(result, 'closure') ?? '')
-			return isRecord(body) && isArray(body.messages) ? body.messages : []
-		})
-		const [control, system, tight, separate] = chats
-		const desk = control?.at(0)
-		const copy = control?.at(-1)
-		if (
-			!isRecord(desk) ||
-			!isString(desk.content) ||
-			!isRecord(copy) ||
-			!isString(copy.content) ||
-			control === undefined
-		)
-			throw new Error('The control sent no closing request')
-		// The negative control: with no layout the block sits in the request copy ahead of the heading.
-		const suffix = `\n\n## Request\n${closing}`
-		expect(copy.content.endsWith(suffix)).toBe(true)
-		const block = copy.content.slice(0, copy.content.length - suffix.length)
-		expect(block).not.toBe('')
-		expect(desk.role).toBe('system')
-		const inner = control.slice(1, -1)
-		expect(system).toEqual([
-			{ ...desk, content: `${desk.content}\n\n${block}` },
-			...inner,
-			{ ...copy, content: closing },
-		])
-		expect(tight).toEqual([
-			{ ...desk, content: `${desk.content}\n${block}` },
-			...inner,
-			{ ...copy, content: closing },
-		])
-		expect(separate).toEqual([
-			desk,
-			...inner,
-			{ role: 'user', content: block },
-			{ ...copy, content: `## Request\n${closing}` },
-		])
-		// Each trial draws its own ids and clock, so the comparison numbers ids by first occurrence and clears the times.
-		const checkpoints = results.map((result) => {
-			const seen = new Map<string, number>()
-			return JSON.stringify(readMemorySealedCheckpoint(result.evidence, 'closure'))
-				.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, (id) => {
-					seen.set(id, seen.get(id) ?? seen.size)
-					return `id-${String(seen.get(id))}`
-				})
-				.replace(/"time":\d+/g, '"time":0')
-		})
-		expect(checkpoints[0]).toContain('"time":0')
-		for (const checkpoint of checkpoints.slice(1)) expect(checkpoint).toBe(checkpoints[0])
-	}, 60000)
-
-	it('sends the compaction arm the same bytes under a layout', async () => {
-		const settings = { ...STUDY_MEMORY_SETTINGS, ...base }
-		const control = await runMemoryTrial({ arm: 'compaction', responses: [], goals, settings })
-		const moved = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [],
-			goals,
-			settings: { ...settings, layout: 'system' },
-		})
-		expect(control.failure).toBeUndefined()
-		expect(moved.failure).toBeUndefined()
-		expect(moved.requests).toEqual(control.requests)
-	}, 60000)
 })

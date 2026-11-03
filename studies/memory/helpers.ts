@@ -18,7 +18,6 @@ import type {
 import type {
 	StudyMemoryArm,
 	StudyMemoryCompaction,
-	StudyMemoryLayout,
 	StudyMemoryObservation,
 	StudyMemoryProvenance,
 	StudyMemoryCarriageInput,
@@ -30,7 +29,6 @@ import type {
 import { isArray, isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
 import {
-	STUDY_MEMORY_HEADING,
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_REPEAT,
 	STUDY_MEMORY_SAMPLING,
@@ -204,60 +202,6 @@ export function buildStudyMemoryRoles(
 				}
 			: {}),
 	}
-}
-
-/**
- * Moves the records block out of a chat request's request copy into the layout's place.
- * @remarks
- * The request copy is the last `user` message whose content ends with the request heading and the prompt and holds text before it; that text is the records block. A body whose messages hold no such copy comes back as it arrived.
- * @param body - The chat request body as the agent role sent it.
- * @param prompt - The goal's prompt, which the Ledger wrote after the request heading.
- * @param layout - Where the block goes: `system` appends it to the first message after a blank line, `tight` after a newline, and `separate` leaves that message alone and puts the block in a `user` message ahead of the request.
- * @returns The body with the block moved, members in their parsed order, or `body` itself when no message matches.
- * @throws StudyError - FAULT when the body is no chat request or its first message is no `system` message.
- */
-export function buildStudyMemoryLayout(
-	body: string,
-	prompt: string,
-	layout: StudyMemoryLayout,
-): string {
-	const value = parseJSON(body)
-	if (!isRecord(value) || !isArray(value.messages))
-		throw new StudyError('FAULT', 'Memory request body is no chat request')
-	const messages: readonly unknown[] = value.messages
-	const [first] = messages
-	if (!isRecord(first) || first.role !== 'system' || typeof first.content !== 'string')
-		throw new StudyError('FAULT', 'Memory request holds no system message at index 0')
-	const suffix = `${STUDY_MEMORY_HEADING}${prompt}`
-	const index = messages.findLastIndex(
-		(message) =>
-			isRecord(message) &&
-			message.role === 'user' &&
-			typeof message.content === 'string' &&
-			message.content.length > suffix.length &&
-			message.content.endsWith(suffix),
-	)
-	const found = messages[index]
-	if (!isRecord(found) || typeof found.content !== 'string') return body
-	const block = found.content.slice(0, found.content.length - suffix.length)
-	const head = layout === 'tight' ? '\n' : '\n\n'
-	return JSON.stringify({
-		...value,
-		messages:
-			layout === 'separate'
-				? messages.flatMap((message, position) =>
-						position === index
-							? [
-									{ role: 'user', content: block },
-									{ ...found, content: `## Request\n${prompt}` },
-								]
-							: [message],
-					)
-				: messages.map((message, position) => {
-						if (position === 0) return { ...first, content: `${first.content}${head}${block}` }
-						return position === index ? { ...found, content: prompt } : message
-					}),
-	})
 }
 
 /** Reads one declared target against the memory mechanism predicates while leaving meaning for blind labels. @param target - The declared pair with its retained attempt and evidence rows. @returns The attributable mechanical reading citing the retained attempt and zero-based evidence rows. */

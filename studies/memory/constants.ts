@@ -15,8 +15,6 @@ export const STUDY_MEMORY_ENTRIES = 64
 /** Pins the prospective desk instructions independently of held-out labels. */
 export const STUDY_MEMORY_SYSTEM =
 	'You operate a support desk. Preserve source attribution, corrections, obligations and handoffs. Use lookup when reference records are needed. Answer the current request from the available conversation and references.'
-/** Pins the heading `buildRequestMessage` writes between the records block and the request, blank line included. */
-export const STUDY_MEMORY_HEADING = '\n\n## Request\n'
 /** Pins the final user instruction every compaction summary request ends with. */
 export const STUDY_MEMORY_SUMMARY =
 	'Summarize the conversation while preserving source identifiers, corrections, unresolved obligations and handoffs.'
