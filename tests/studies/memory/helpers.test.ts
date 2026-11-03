@@ -212,7 +212,7 @@ describe('memory declaration and mechanical evidence', () => {
 			options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_SAMPLING_PINS.agent },
 			think: false,
 			strict: false,
-			length: false,
+			length: true,
 		}
 		expect(buildStudyMemoryRoles(profile, 'full')).toEqual({ agent })
 		// Compaction alone declares the summary role and the strict native flags on every chat role.
@@ -226,7 +226,7 @@ describe('memory declaration and mechanical evidence', () => {
 				length: false,
 			},
 		})
-		// Records alone declares the one-token judge, which may finish on length and sends no strict fields.
+		// Records alone declares the one-token judge, which sends no strict fields.
 		expect(buildStudyMemoryRoles(profile, 'records')).toEqual({
 			agent,
 			judge: {

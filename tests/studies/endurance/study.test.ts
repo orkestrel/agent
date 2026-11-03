@@ -252,6 +252,8 @@ describe('prospective public endurance declarations', () => {
 		const provider = q2.provider
 		if (provider === undefined) throw new Error('Missing q2 provider')
 		expect(q2.bounds.goal.calls).toBe(512)
+		// A reply at the output allowance fits one request: 136 B per chunk is goal 53's reply, 1014630 B over 7496 chunks, and 46120 B is the largest recorded request, compaction ev-03-2.
+		expect(q2.bounds.request.bytes).toBeGreaterThan(q2.room.output * 136 + 46120)
 		expect(provider.digest.model).toMatch(/^[0-9a-f]{64}$/)
 		// The one-variable comparison with the larger model holds the same room and the same roots.
 		expect(q2.room).toEqual(q4.room)

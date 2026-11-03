@@ -164,7 +164,7 @@ export function buildStudyMemoryRoles(
 			},
 			think: room.think,
 			strict: compaction,
-			length: false,
+			length: true,
 		},
 		...(compaction
 			? {

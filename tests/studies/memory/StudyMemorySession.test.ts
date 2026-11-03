@@ -1,8 +1,14 @@
 import type { MemoryTrialFixture } from '../../setupStudy.js'
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
-import { isStudyError, readStudyFailure, validateStudyInputs } from '@orkestrel/study'
+import {
+	isStudyError,
+	parseStudyProfile,
+	readStudyFailure,
+	validateStudyInputs,
+} from '@orkestrel/study'
 import {
 	isStudyMemoryProvider,
 	isStudyMemoryRuntime,
@@ -28,6 +34,7 @@ import {
 	countMemoryPairs,
 	createMemoryContext,
 	createMemoryServer,
+	executeMemoryGoals,
 	listMemoryKeys,
 	loadMemoryInputs,
 	readMemoryAdmission,
@@ -392,6 +399,71 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			])
 			expect(fixture.evidence.filter((row) => row.event === 'result')).toEqual([])
 			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
+		} finally {
+			await session.close()
+			fixture.close()
+			await server.close()
+		}
+	})
+
+	it('executes an agent reply cut at the output allowance under the q2 byte bound', async () => {
+		const q2 = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8')),
+		)
+		// Each streamed row is 136 B, the chunk size goal 53's cut reply read.
+		const chunk = `${JSON.stringify({
+			model: 'model',
+			created_at: '2026-11-03T05:00:00.0000000Z',
+			message: { role: 'assistant', content: 'a'.repeat(17) },
+			done: false,
+		})}\n`
+		const server = await createMemoryServer([
+			...STUDY_MEMORY_CALIBRATION,
+			{
+				path: '/api/chat',
+				body: `${chunk.repeat(q2.room.output - 1)}${buildMemoryReply({
+					content: '',
+					reason: 'length',
+					completion: q2.room.output,
+				})}`,
+			},
+		])
+		const base = buildMemoryProfile({ url: server.url, room: q2.room, duration: 15000 })
+		const profile = {
+			...base,
+			bounds: {
+				...base.bounds,
+				request: { ...base.bounds.request, bytes: q2.bounds.request.bytes },
+			},
+		}
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+			{ id: 'cut', scenario: 'public', arm: 'records', repetition: 0 },
+			fixture.context.signal,
+		)
+		try {
+			const result = await executeMemoryGoals(
+				session,
+				[{ id: 'opening', input: { prompt: 'Write the sheet', arrivals: [], records: [] } }],
+				fixture.context,
+			)
+			// The stop is read first so that a refusal names its layer and id.
+			expect(result.failure && readStudyFailure(result.failure.error).stop).toBeUndefined()
+			expect(result.failure).toBeUndefined()
+			const results = readMemoryEvents(fixture.evidence, 'result')
+			expect(results).toEqual([expect.objectContaining({ partial: false })])
+			expect(results[0]?.content).toHaveLength(17 * (q2.room.output - 1))
+			const wire = readMemoryEvents(fixture.evidence, 'wire')
+				.filter((row) => row.role === 'agent')
+				.at(-1)
+			expect(wire).toMatchObject({ finish: 'length', completion: q2.room.output })
+			// The reply outgrows the bound the failing run held, 1048576 B.
+			expect(wire?.bytes).toBeGreaterThan(1048576)
+			expect(readMemoryEvents(fixture.evidence, 'stop')).toEqual([])
+			// A nonempty cut reply takes no cue pass: the calibration pair and the reply are every chat request.
+			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(
+				STUDY_MEMORY_CALIBRATION.length + 1,
+			)
 		} finally {
 			await session.close()
 			fixture.close()
@@ -1740,7 +1812,7 @@ describe('passive observation of actual memory requests', () => {
 	it('retains the snapshot of a selected goal whose model later fails', async () => {
 		const result = await runMemoryTrial({
 			arm: 'full',
-			responses: [{ path: '/api/chat', body: buildMemoryReply({ reason: 'length' }) }],
+			responses: [{ path: '/api/chat', body: buildMemoryReply({ completion: 513 }) }],
 			goals,
 			settings: { observe: true, checkpoints: ['opening'] },
 		})

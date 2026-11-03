@@ -182,7 +182,7 @@
 			"duration": 360000,
 			"calls": 1,
 			"tokens": 19968,
-			"bytes": 1048576
+			"bytes": 2097152
 		},
 		"goal": {
 			"duration": 900000,
