@@ -26,6 +26,7 @@ import {
 	collectNames,
 	collectRegistry,
 	collectAmendments,
+	collectLedgerExchanges,
 	computeThinking,
 	resolvePredict,
 	findLedgerCall,
@@ -43,6 +44,7 @@ import {
 	renderLedgerRecord,
 	renderLookupCall,
 	renderStub,
+	selectLedgerWindow,
 	selectRecords,
 	splitResultLines,
 	splitSentences,
@@ -64,6 +66,7 @@ import {
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
 	LEDGER_OWNER_PROJECTION,
+	LEDGER_WINDOW_CASES,
 	buildLedgerLine,
 	replaceLedgerRecord,
 } from '../../../setup.js'
@@ -2229,5 +2232,84 @@ describe('fitSlope', () => {
 		groups[0] = [buildGaugeCall(100, 100, 1), buildGaugeCall(200, 200, 1)]
 		groups[2] = [buildGaugeCall(100, 150, 1), buildGaugeCall(300, 350, 1)]
 		expect(captureError(() => fitSlope(groups))).toBeInstanceOf(TypeError)
+	})
+})
+
+describe('the moving tail leaves', () => {
+	it('pairs each marked request with its final reply and nothing else', () => {
+		const arrival = buildLedgerMessage('arrival', 'user', 'An arrival before the requests.')
+		const asked = buildLedgerMessage('asked', 'user', 'First request.')
+		const call = {
+			...buildLedgerMessage('call', 'assistant', 'Reading the account.'),
+			calls: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }],
+		}
+		const result = { ...buildLedgerMessage('result', 'tool', 'Account BW-20931.'), call: 'read' }
+		const draft = buildLedgerMessage('draft', 'assistant', 'A draft reply.')
+		const digest = buildLedgerMessage('digest', 'user', 'Results of your lookups.')
+		const cue = buildLedgerMessage('cue', 'user', 'Give your complete answer.')
+		const answer = buildLedgerMessage('answer', 'assistant', 'The final reply.')
+		const unanswered = buildLedgerMessage('unanswered', 'user', 'A request with no reply.')
+		const pending = {
+			...buildLedgerMessage('pending', 'assistant', 'Reading again.'),
+			calls: [{ id: 'again', name: 'lookup', arguments: { id: 'BW-20931' } }],
+		}
+		const blank = buildLedgerMessage('blank', 'user', 'A request with an empty reply.')
+		const empty = buildLedgerMessage('empty', 'assistant', ' \n ')
+		const later = buildLedgerMessage('later', 'user', 'A later request.')
+		const interleaved = buildLedgerMessage('interleaved', 'user', 'An arrival inside the exchange.')
+		const closing = buildLedgerMessage('closing', 'assistant', 'The later reply.')
+		const request = buildLedgerMessage('request', 'user', 'The request in flight.')
+		const after = buildLedgerMessage('after', 'assistant', 'A reply after the request in flight.')
+		const messages = [
+			arrival,
+			asked,
+			call,
+			result,
+			draft,
+			digest,
+			cue,
+			answer,
+			unanswered,
+			pending,
+			blank,
+			empty,
+			later,
+			interleaved,
+			closing,
+			request,
+			after,
+		]
+		const requests = new Set([asked, unanswered, blank, later, request].map(({ id }) => id))
+		const notes = new Set([digest.id, cue.id])
+
+		expect(
+			collectLedgerExchanges(messages, request, requests, notes).map(([ask, reply]) => [
+				ask.id,
+				reply.id,
+			]),
+		).toEqual([
+			['asked', 'answer'],
+			['later', 'closing'],
+		])
+	})
+
+	it('reads no pair before a marked request, from a note, or for an absent request', () => {
+		const asked = buildLedgerMessage('asked', 'user', 'A request.')
+		const reply = buildLedgerMessage('reply', 'assistant', 'A reply.')
+		const request = buildLedgerMessage('request', 'user', 'The request in flight.')
+		const requests = new Set(['asked', 'request'])
+		const messages = [asked, reply, request]
+
+		expect(collectLedgerExchanges([], request, requests, new Set())).toEqual([])
+		expect(collectLedgerExchanges([request], request, requests, new Set())).toEqual([])
+		expect(collectLedgerExchanges([asked, reply], request, requests, new Set())).toEqual([])
+		expect(collectLedgerExchanges(messages, request, new Set(), new Set())).toEqual([])
+		expect(collectLedgerExchanges(messages, request, requests, new Set(['asked']))).toEqual([])
+		expect(collectLedgerExchanges(messages, request, requests, new Set(['reply']))).toEqual([])
+		expect(collectLedgerExchanges(messages, request, requests, new Set())).toEqual([[asked, reply]])
+	})
+
+	it.each(LEDGER_WINDOW_CASES)('selects the window: $title', ({ costs, cap, start }) => {
+		expect(selectLedgerWindow(costs, cap)).toBe(start)
 	})
 })

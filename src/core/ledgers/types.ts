@@ -282,9 +282,9 @@ export type LedgerAgentOptions = Pick<
 >
 
 /**
- * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
- * context capacity, and the optional first-pass thinking, lookups, gauge, shares, snapshot, and
- * recall, correction, and agent bounds.
+ * Configures a ledger: its judge, filing wording and cutoffs, desk topics, model context capacity,
+ * optional first-pass thinking, lookups, gauge, shares, snapshot, and bounds, and the `moving` experiment
+ * switch a verdict deletes.
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
@@ -325,6 +325,12 @@ export interface LedgerOptions {
 	readonly agent?: LedgerAgentOptions
 	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none, because a `gauge` option wins over `snapshot.gauge`. */
 	readonly snapshot?: LedgerSnapshot
+	/**
+	 * Selects the tail, as an experiment switch a verdict deletes.
+	 * If `true`, the tail holds the most recent completed exchanges, draining to half when an exchange
+	 * would pass the tail share; if `false`, it holds the seed. Default: `false`.
+	 */
+	readonly moving?: boolean
 }
 
 /**

@@ -59,6 +59,7 @@ import {
 	buildLedgerRenderContext,
 	buildRecallMessage,
 	buildRequestMessage,
+	collectLedgerExchanges,
 	collectProjectionIds,
 	extractWords,
 	findLedgerCut,
@@ -80,6 +81,7 @@ import {
 	renderLedgerRecord,
 	renderLookupCall,
 	renderStub,
+	selectLedgerWindow,
 	selectRecords,
 	splitResultLines,
 	splitTopic,
@@ -1067,6 +1069,26 @@ export class Ledger implements LedgerInterface {
 		input: LedgerProjectionInput,
 		scan: LedgerScan,
 	): readonly Message[] {
+		if (this.#options.moving === true) {
+			const pairs = collectLedgerExchanges(
+				input.messages,
+				request,
+				this.#requests,
+				this.#annotations,
+			)
+			if (pairs.length > 0) {
+				const costs = pairs.map((pair) => this.#price(stripThinking(pair, this.#replay)))
+				const start = selectLedgerWindow(costs, cap)
+				const kept = costs.slice(start)
+				// The oldest kept pairs leave for this request alone: the next request's fold reads `costs` whole.
+				const room = cap - this.#price(stripThinking([request], this.#replay))
+				const fit = kept.reduce(
+					(state, cost) => (state.sum > room ? { at: state.at + 1, sum: state.sum - cost } : state),
+					{ at: start, sum: kept.reduce((sum, cost) => sum + cost, 0) },
+				)
+				return [...pairs.slice(fit.at).flat(), request]
+			}
+		}
 		const first = input.messages.findIndex((message) => this.#requests.has(message.id))
 		const seed = input.messages.slice(
 			0,

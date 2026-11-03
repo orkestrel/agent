@@ -20,7 +20,7 @@ import type {
 import type { ToolCall } from '@orkestrel/tool'
 import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { extractLiterals, renderJSON } from '../helpers.js'
+import { extractLiterals, hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 import {
 	LEDGER_OWNER_PREFIX,
@@ -1392,4 +1392,89 @@ export function buildLines(
 		}
 		return [party === undefined ? line : { ...line, party }]
 	})
+}
+
+/**
+ * Collects the completed exchanges before a request, for the `moving` experiment switch a verdict deletes.
+ *
+ * @remarks
+ * A pair holds a message whose id is in `requests` and the last following `assistant` message before
+ * the next marked request that holds no calls and whose trimmed content is not empty. A request with
+ * no such reply yields no pair. Notes, calls, tool messages, and unmarked `user` arrivals enter no pair.
+ *
+ * @param messages - The conversation's messages, in order
+ * @param request - The request in flight; only the messages before it are read, and an absent request reads none
+ * @param requests - The ids of the marked requests
+ * @param notes - The ids of the ledger's notes
+ * @returns The request and final reply of each completed exchange, in conversation order
+ *
+ * @example
+ * ```ts
+ * const asked: Message = { id: 'asked', role: 'user', content: 'Check BW-5512.' }
+ * const reply: Message = { id: 'reply', role: 'assistant', content: 'It shipped.' }
+ * const next: Message = { id: 'next', role: 'user', content: 'Check BW-20931.' }
+ * collectLedgerExchanges([asked, reply, next], next, new Set(['asked', 'next']), new Set()) // [[asked, reply]]
+ * ```
+ */
+export function collectLedgerExchanges(
+	messages: readonly Message[],
+	request: Message,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): ReadonlyArray<readonly [Message, Message]> {
+	const end = messages.findIndex((message) => message.id === request.id)
+	const before = end < 0 ? [] : messages.slice(0, end)
+	const marked = [...before.entries()].filter(
+		([, message]) => requests.has(message.id) && !notes.has(message.id),
+	)
+	return marked.flatMap(([at, message], position): ReadonlyArray<readonly [Message, Message]> => {
+		const reply = before
+			.slice(at + 1, marked[position + 1]?.[0] ?? before.length)
+			.findLast(
+				(one) =>
+					one.role === 'assistant' &&
+					!notes.has(one.id) &&
+					!hasCalls(one) &&
+					one.content.trim() !== '',
+			)
+		return reply === undefined ? [] : [[message, reply]]
+	})
+}
+
+/**
+ * Selects the first exchange a tail keeps, for the `moving` experiment switch a verdict deletes.
+ *
+ * @remarks
+ * The fold keeps exchanges until their sum passes `cap`, then drops the oldest until the sum is at or
+ * under half of `cap`, so the kept exchanges stay the same between drains. It reads `costs` and `cap`
+ * alone, so a ledger derives the same index from a hydrated conversation, and an exchange over `cap`
+ * leaves an empty window.
+ *
+ * @param costs - The price of each completed exchange, in conversation order; the request in flight holds no entry
+ * @param cap - The price the tail can hold
+ * @returns The index of the first exchange kept; `costs.length` for an empty window
+ *
+ * @example
+ * ```ts
+ * selectLedgerWindow([4, 4, 4], 10) // 2
+ * ```
+ */
+export function selectLedgerWindow(costs: readonly number[], cap: number): number {
+	return costs.reduce(
+		(window, cost, at) => {
+			const sum = window.sum + cost
+			return sum > cap
+				? costs
+						.slice(window.start, at + 1)
+						.reduce(
+							(drained, oldest) =>
+								drained.sum > cap / 2
+									? { start: drained.start + 1, sum: drained.sum - oldest }
+									: drained,
+							{ start: window.start, sum },
+						)
+				: { start: window.start, sum }
+		},
+		{ start: 0, sum: 0 },
+	).start
 }
