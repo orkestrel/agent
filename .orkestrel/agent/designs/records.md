@@ -105,7 +105,7 @@ export interface LedgerOptions {
 
 ### Pair narrowing
 
-`rc-a11` narrows eligibility on top of the cap: an earlier message is eligible only when it shares a registry id with the correction (a topic alone no longer admits it), and only the most recent K live members of that id's frontier are asked. Per-correction cost becomes O(K). It is an experiment because it changes classification; its gate is the prior campaign's R5b reopen condition (`designs/measurement.md` § Gates, row rc-a11). A default-off switch on `LedgerCorrectionOptions` gates the narrowing while the experiment runs, so an off arm runs on the same build; rc-a11's brief names it, and either verdict deletes it.
+`rc-a11` narrows eligibility on top of the cap. Under the switch, a correction is compared with an earlier message only when today's eligibility admits the pair and the two messages share a registry entity or a literal by `extractLiterals`, so the topic-only pair is the one dropped and `limit` counts only narrow-eligible messages. The recency cut of the frontier, K, and its O(K) are not built (T67): K drops a live member whatever it could file, no reading sizes it, and `correction.limit` is the recency cut that rc-a11's comparison reads. It is an experiment because it changes classification; its gate is the prior campaign's R5b reopen condition (`designs/measurement.md` § Gates, row rc-a11). A default-off switch on `LedgerCorrectionOptions` gates the narrowing while the experiment runs, so an off arm runs on the same build; rc-a11's brief names it, and either verdict deletes it.
 
 ### Grouped asks
 
