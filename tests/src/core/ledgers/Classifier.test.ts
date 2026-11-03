@@ -990,135 +990,7 @@ describe('Classifier', () => {
 		])
 	})
 
-	it('asks pairs of the latest messages only', async () => {
-		const seeded = createConversation()
-		seeded.add(buildCorrectionSeed(6))
-		const snapshot = seeded.snapshot()
-		for (const limit of [1, 4]) {
-			const conversation = createConversation({ snapshot })
-			const messages = conversation.messages()
-			const correction = requireValue(messages.at(-1))
-			const classifier = new Classifier(
-				buildClassifierOptions({
-					conversation,
-					judge: createPhraseJudge([], ['Correction:']),
-					topics: [LEDGER_REFUNDS_TOPIC],
-					entities: (text) => extractLiterals(text).ids,
-					correction: { limit },
-				}),
-			)
-			const result = await classifier.classify(new Set(), new AbortController().signal)
-			// Every pair passes `amends`, so each kept statement asks `amends`, then `supersedes`.
-			expect(
-				result.readings
-					.filter((reading) => reading.phase === 'amends' || reading.phase === 'supersedes')
-					.map((reading) => reading.key),
-			).toEqual(
-				messages
-					.slice(-1 - limit, -1)
-					.flatMap((earlier) => [
-						JSON.stringify(['amends', earlier.id, correction.id]),
-						JSON.stringify(['supersedes', earlier.id, correction.id]),
-					]),
-			)
-		}
-	})
-
-	it('asks one amends per kept message', async () => {
-		const seeded = createConversation()
-		seeded.add(buildCorrectionSeed(6))
-		const snapshot = seeded.snapshot()
-		for (const limit of [1, 4]) {
-			const conversation = createConversation({ snapshot })
-			const messages = conversation.messages()
-			const correction = requireValue(messages.at(-1))
-			const classifier = new Classifier(
-				buildClassifierOptions({
-					conversation,
-					judge: createPhraseJudge([]),
-					topics: [LEDGER_REFUNDS_TOPIC],
-					entities: (text) => extractLiterals(text).ids,
-					correction: { limit },
-				}),
-			)
-			const result = await classifier.classify(new Set(), new AbortController().signal)
-			expect(result.readings.filter((reading) => reading.phase === 'supersedes')).toEqual([])
-			expect(
-				result.readings
-					.filter((reading) => reading.phase === 'amends')
-					.map((reading) => reading.key),
-			).toEqual(
-				messages
-					.slice(-1 - limit, -1)
-					.map((earlier) => JSON.stringify(['amends', earlier.id, correction.id])),
-			)
-		}
-	})
-
-	it('files alike when the limit covers all', async () => {
-		const seeded = createConversation()
-		seeded.add(buildCorrectionSeed(6))
-		const snapshot = seeded.snapshot()
-		const filings: Array<{
-			readonly readings: readonly ReadingSummary[]
-			readonly judgments: readonly string[]
-			readonly classification: unknown
-		}> = []
-		for (const limit of [undefined, 6, 7]) {
-			const classifier = new Classifier(
-				buildClassifierOptions({
-					conversation: createConversation({ snapshot }),
-					judge: createPhraseJudge([], ['Correction:']),
-					topics: [LEDGER_REFUNDS_TOPIC],
-					entities: (text) => extractLiterals(text).ids,
-					...(limit === undefined ? {} : { correction: { limit } }),
-				}),
-			)
-			const result = await classifier.classify(new Set(), new AbortController().signal)
-			filings.push({
-				readings: summarizeReadings(result.readings),
-				judgments: result.judgments,
-				// Spreading each set and map keeps its iteration order in the comparison.
-				classification: Object.entries(classifier.classification()).map(([name, value]) => [
-					name,
-					[...value],
-				]),
-			})
-		}
-		const [unset, ...capped] = filings
-		const amends = requireValue(unset).judgments.filter((key) => key.startsWith('["amends"'))
-		expect(amends).toHaveLength(6)
-		for (const filing of capped) expect(filing).toEqual(unset)
-	})
-
-	it('asks no pair question at limit 0', async () => {
-		const seeded = createConversation()
-		seeded.add(buildCorrectionSeed(6))
-		const snapshot = seeded.snapshot()
-		const summaries: Array<readonly ReadingSummary[]> = []
-		for (const limit of [undefined, 0]) {
-			const classifier = new Classifier(
-				buildClassifierOptions({
-					conversation: createConversation({ snapshot }),
-					judge: createPhraseJudge([], ['Correction:']),
-					topics: [LEDGER_REFUNDS_TOPIC],
-					entities: (text) => extractLiterals(text).ids,
-					...(limit === undefined ? {} : { correction: { limit } }),
-				}),
-			)
-			const result = await classifier.classify(new Set(), new AbortController().signal)
-			summaries.push(summarizeReadings(result.readings))
-		}
-		const [unset, capped] = summaries
-		expect(requireValue(unset).some((reading) => reading.phase === 'amends')).toBe(true)
-		expect(capped).toEqual(
-			requireValue(unset).filter(
-				(reading) => reading.phase === 'category' || reading.phase === 'topic',
-			),
-		)
-	})
-
-	it('asks a pair per statement with no limit', async () => {
+	it('asks a pair per statement, uncapped', async () => {
 		const asked: number[] = []
 		for (const count of [1, 4, 6, 9]) {
 			const conversation = createConversation()
@@ -1137,7 +1009,7 @@ describe('Classifier', () => {
 		expect(asked).toEqual([1, 4, 6, 9])
 	})
 
-	it('counts only eligible earlier messages', async () => {
+	it('asks only the eligible earlier messages', async () => {
 		const seed = buildCorrectionSeed(3)
 		const conversation = createConversation()
 		// A statement sharing no id or topic and a quiet statement sharing both sit before the correction.
@@ -1157,11 +1029,9 @@ describe('Classifier', () => {
 				topics: [LEDGER_REFUNDS_TOPIC],
 				assign: (message) => (message.id === quiet.id ? 'chatter' : undefined),
 				entities: (text) => extractLiterals(text).ids,
-				correction: { limit: 3 },
 			}),
 		)
 		const result = await classifier.classify(new Set(), new AbortController().signal)
-		// The limit equals the three statements, so counting either later message would drop the first.
 		expect(
 			result.readings
 				.filter((reading) => reading.phase === 'amends' || reading.phase === 'supersedes')
@@ -1176,7 +1046,7 @@ describe('Classifier', () => {
 		)
 	})
 
-	describe('under the narrow switch', () => {
+	describe('under the narrow option', () => {
 		const whole = buildLedgerMessage('whole', 'user', 'Odile Marlow called.')
 		const call: Message = {
 			...buildLedgerMessage('call', 'assistant', ''),
@@ -1364,36 +1234,6 @@ describe('Classifier', () => {
 			for (const filing of rest) expect(filing).toEqual(unset)
 		})
 
-		it('counts only the narrow-eligible messages against the limit', async () => {
-			const asks: Array<readonly unknown[]> = []
-			for (const correction of [
-				{ limit: 2 },
-				{ limit: 1, narrow: true },
-				{ limit: 2, narrow: true },
-				{ limit: 3, narrow: true },
-				{ limit: 4, narrow: true },
-				{ limit: 0, narrow: true },
-			]) {
-				const judge = new RecordingJudge()
-				const classifier = new Classifier({
-					...options,
-					conversation: createConversation({ snapshot }),
-					judge,
-					correction,
-				})
-				await classifier.classify(new Set(), new AbortController().signal)
-				asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
-			}
-			expect(asks).toEqual([
-				['["amends","number","later"]', '["amends","desk","later"]'],
-				['["amends","number","later"]'],
-				['["amends","call","later"]', '["amends","number","later"]'],
-				['["amends","whole","later"]', '["amends","call","later"]', '["amends","number","later"]'],
-				['["amends","whole","later"]', '["amends","call","later"]', '["amends","number","later"]'],
-				[],
-			])
-		})
-
 		it('asks no pair for a correction sharing no entity and no literal, and none for an empty near set', async () => {
 			const asks: Array<readonly unknown[]> = []
 			for (const [earlier, weight, content] of [
@@ -1427,6 +1267,35 @@ describe('Classifier', () => {
 				}
 			}
 			expect(asks).toEqual([['["amends","desk","lone"]'], [], [], []])
+		})
+
+		it('asks a same-topic pair with different numbers unset and not under narrow', async () => {
+			const stated = buildLedgerMessage('stated', 'user', 'The refund limit is 500.')
+			const replaced = buildLedgerMessage('replaced', 'user', 'No, the refund limit is 600.')
+			const asks: Array<readonly unknown[]> = []
+			for (const correction of [undefined, { narrow: true }]) {
+				const conversation = createConversation({
+					snapshot: { id: 'replaced', sections: [], messages: [stated, replaced] },
+				})
+				conversation.judgments.add(buildLedgerJudgment(stated))
+				conversation.judgments.add(
+					buildLedgerJudgment(replaced, {
+						answer: { form: 'choice', probabilities: { correction: 1 } },
+					}),
+				)
+				for (const message of [stated, replaced])
+					conversation.judgments.add(buildLedgerTopicJudgment(message, LEDGER_REFUNDS_TOPIC, 1))
+				const judge = new RecordingJudge()
+				const classifier = new Classifier({
+					...options,
+					conversation,
+					judge,
+					...(correction === undefined ? {} : { correction }),
+				})
+				await classifier.classify(new Set(), new AbortController().signal)
+				asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
+			}
+			expect(asks).toEqual([['["amends","stated","replaced"]'], []])
 		})
 
 		it('reads each message once per call for its entities, and never a quiet message', async () => {

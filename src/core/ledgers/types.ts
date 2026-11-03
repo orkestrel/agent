@@ -120,18 +120,15 @@ export interface LedgerRecallOptions {
 }
 
 /**
- * Bounds the pair questions the ledger asks about each correction.
+ * Narrows the pair questions the ledger asks about each correction.
  *
  * @remarks
- * `limit` caps the earlier messages one correction is compared against, most recent first; it must
- * be a nonnegative safe integer. Default: no cap. A cap bounds judge calls and is no verdict, so a
- * supersession older than the cap is never filed. `narrow` is an experiment switch a verdict deletes.
- * If `true`, a correction compares only the earlier messages the unset rule admits that also share a
+ * `narrow` is a measured option that asks fewer pair questions at the risk of a missed filing. If
+ * `true`, a correction compares only the earlier messages the unset rule admits that also share a
  * registry entity or a literal with it, so a topic alone admits no pair and a true filing outside
  * that set is never asked; if `false`, the unset rule applies. Default: `false`.
  */
 export interface LedgerCorrectionOptions {
-	readonly limit?: number
 	readonly narrow?: boolean
 }
 
@@ -686,7 +683,7 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
 
 /**
  * Configures a classifier: the conversation it files, the judge and the wording it asks with, the
- * desk topics, the cutoffs, the ledger's handlers, and the optional correction bound and scheduler.
+ * desk topics, the cutoffs, the ledger's handlers, and the optional correction filter and scheduler.
  *
  * @remarks
  * `assign` decides the category of a message the ledger wrote or a tool returned, without a
@@ -694,9 +691,9 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
  * While it pairs corrections, the `classify` method reads each message's quiet flag and near set at
  * most once per call and reuses them for every later correction, so a change to the conversation,
  * its judgments, or the judge's model made while the call waits on the judge or a host turn reaches
- * the next call. `correction` caps the earlier messages each correction's pair questions compare,
- * most recent first, and its `narrow` member keeps only those sharing a registry entity or a literal
- * with the correction, reading each message's literals at most once per call. `scheduler` paces the
+ * the next call. The `narrow` member of `correction` keeps only the earlier messages sharing a
+ * registry entity or a literal with the correction, reading each message's literals at most once
+ * per call. `scheduler` paces the
  * filing: before a step, when the `LEDGER_SLICE` constant's milliseconds have run since the last host turn, the call awaits the scheduler's `yield` method. With
  * no scheduler, the call takes no host turn and reads no added clock.
  */
@@ -920,7 +917,7 @@ export type LedgerErrorCode =
 	| 'SHARE'
 	/** Reports an invalid capacity or a generation cap that is not a nonnegative safe integer less than capacity. */
 	| 'CAPACITY'
-	/** Reports a recall limit, a correction limit, or an agent limit that is not a nonnegative safe integer. */
+	/** Reports a recall limit or an agent limit that is not a nonnegative safe integer. */
 	| 'LIMIT'
 	/** Reports a topic with an empty name or a name another topic carries. */
 	| 'TOPIC'

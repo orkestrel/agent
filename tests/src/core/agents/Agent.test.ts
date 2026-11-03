@@ -4704,6 +4704,7 @@ describe('Agent — strict window admission', () => {
 
 		await expect(agent.generate()).rejects.toMatchObject({
 			code: 'WINDOW',
+			message: 'the request measures 5 against a window of 5 and this run folds no further',
 			context: { agent: agent.id, consumed: 5, max: 5 },
 		})
 
@@ -4740,6 +4741,7 @@ describe('Agent — strict window admission', () => {
 
 		await expect(agent.generate()).rejects.toMatchObject({
 			code: 'WINDOW',
+			message: 'the request measures 35 against a window of 6 and this run folds no further',
 			context: { agent: agent.id, consumed: 35, max: 6 },
 		})
 

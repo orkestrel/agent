@@ -146,7 +146,7 @@ export function validateStudyMemoryCheckpoints(
 			)
 }
 
-/** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room; a `seed` setting replaces the pinned sampling seed of every role it declares. @param arm - The treatment; only compaction declares the summary role and the strict native flags, and only records declares the one-token judge. @returns The agent role, plus the summary role for compaction and the judge role for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */
+/** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room. @param arm - The treatment; only compaction declares the summary role and the strict native flags, and only records declares the one-token judge. @returns The agent role, plus the summary role for compaction and the judge role for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */
 export function buildStudyMemoryRoles(
 	profile: StudyProfile,
 	arm: StudyMemoryArm,
@@ -154,22 +154,13 @@ export function buildStudyMemoryRoles(
 	const { provider, room } = profile
 	if (provider === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 	const compaction = arm === 'compaction'
-	const seed = isStudyMemoryOptions(profile.settings) ? profile.settings.seed : undefined
-	const sampling =
-		seed === undefined
-			? STUDY_MEMORY_SAMPLING
-			: {
-					agent: { ...STUDY_MEMORY_SAMPLING.agent, seed },
-					summary: { ...STUDY_MEMORY_SAMPLING.summary, seed },
-					judge: { ...STUDY_MEMORY_SAMPLING.judge, seed },
-				}
 	return {
 		agent: {
 			model: provider.model,
 			options: {
 				num_ctx: room.context,
 				num_predict: room.output,
-				...sampling.agent,
+				...STUDY_MEMORY_SAMPLING.agent,
 			},
 			think: room.think,
 			strict: compaction,
@@ -182,7 +173,7 @@ export function buildStudyMemoryRoles(
 						options: {
 							num_ctx: room.context,
 							num_predict: readStudyMemoryRecap(room),
-							...sampling.summary,
+							...STUDY_MEMORY_SAMPLING.summary,
 						},
 						think: false,
 						strict: true,
@@ -194,7 +185,7 @@ export function buildStudyMemoryRoles(
 			? {
 					judge: {
 						model: readStudyMemoryJudge(provider),
-						options: { num_ctx: room.context, num_predict: 1, ...sampling.judge },
+						options: { num_ctx: room.context, num_predict: 1, ...STUDY_MEMORY_SAMPLING.judge },
 						think: false,
 						strict: false,
 						length: true,

@@ -27,18 +27,6 @@ describe('memory declaration and mechanical evidence', () => {
 			['all members', { gauge, observe: true, checkpoints: names.slice(0, 12) }],
 			['more checkpoints than the former cap', { observe: true, checkpoints: names }],
 			['undefined members', { gauge: undefined, observe: undefined, checkpoints: undefined }],
-			['rolling true', { gauge, rolling: true }],
-			['rolling false', { gauge, rolling: false }],
-			['rolling alone', { rolling: true }],
-			['rolling beside observation', { gauge, rolling: true, observe: true, checkpoints: ['a'] }],
-			['undefined rolling', { gauge, rolling: undefined }],
-			['zero seed', { seed: 0 }],
-			['positive seed', { seed: 1 }],
-			['seed beside gauge', { gauge, seed: 7 }],
-			['undefined seed', { seed: undefined }],
-			['sham true', { sham: true }],
-			['sham false', { sham: false }],
-			['undefined sham', { sham: undefined }],
 		]
 		const refused: ReadonlyArray<readonly [string, unknown]> = [
 			['undefined', undefined],
@@ -73,23 +61,7 @@ describe('memory declaration and mechanical evidence', () => {
 			['duplicate checkpoint', { observe: true, checkpoints: ['a', 'a'] }],
 			['long checkpoint', { observe: true, checkpoints: ['x'.repeat(129)] }],
 			['non-text checkpoint', { observe: true, checkpoints: [1] }],
-			['text rolling', { gauge, rolling: 'true' }],
-			['numeric rolling', { gauge, rolling: 1 }],
-			['null rolling', { gauge, rolling: null }],
-			['array rolling', { gauge, rolling: [true] }],
-			['cased rolling key', { gauge, Rolling: true }],
-			['sections beside rolling', { gauge, rolling: true, sections: 2 }],
-			['negative seed', { seed: -1 }],
-			['fractional seed', { seed: 1.5 }],
-			['NaN seed', { seed: Number.NaN }],
-			['infinite seed', { seed: Number.POSITIVE_INFINITY }],
-			['text seed', { seed: '1' }],
-			['null seed', { seed: null }],
-			['cased seed key', { Seed: 1 }],
-			['text sham', { sham: 'true' }],
-			['numeric sham', { sham: 1 }],
-			['null sham', { sham: null }],
-			['cased sham key', { Sham: true }],
+			['rolling key', { gauge, rolling: true }],
 		]
 		for (const [label, value] of accepted)
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, true])
@@ -97,28 +69,25 @@ describe('memory declaration and mechanical evidence', () => {
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, false])
 	})
 
-	it('admits version, metadata, and a correction limit', () => {
+	it('admits version, metadata, and a correction', () => {
 		const metadata = { calls: 8192, bytes: 67108864, duration: 600000 }
 		for (const settings of [
 			{ version: '0.40.13' },
 			{ metadata },
 			{ correction: {} },
-			{ correction: { limit: 0 } },
-			{ correction: { limit: 8 } },
-			{ version: '0.40.13', metadata, correction: { limit: 8 } },
+			{ version: '0.40.13', metadata, correction: { narrow: true } },
 		])
 			expect([settings, isStudyMemoryOptions(settings)]).toEqual([settings, true])
 	})
 
-	it('admits a boolean narrow beside the correction limit and refuses any other', () => {
-		for (const correction of [{ narrow: true }, { narrow: false }, { limit: 13, narrow: true }])
+	it('admits a boolean narrow and refuses any other', () => {
+		for (const correction of [{ narrow: true }, { narrow: false }])
 			expect([correction, isStudyMemoryOptions({ correction })]).toEqual([correction, true])
 		for (const correction of [
 			{ narrow: 'true' },
 			{ narrow: 1 },
 			{ narrow: null },
-			{ limit: 13, narrow: 'true' },
-			{ limit: -1, narrow: true },
+			{ limit: 13 },
 			{ Narrow: true },
 		])
 			expect([correction, isStudyMemoryOptions({ correction })]).toEqual([correction, false])

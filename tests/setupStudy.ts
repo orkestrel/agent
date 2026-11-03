@@ -637,14 +637,6 @@ export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
 		settings: Object.freeze({ metadata: Object.freeze({ calls: 0, bytes: 1, duration: 1 }) }),
 	}),
 	Object.freeze({
-		name: 'negative correction limit',
-		settings: Object.freeze({ correction: Object.freeze({ limit: -1 }) }),
-	}),
-	Object.freeze({
-		name: 'fractional correction limit',
-		settings: Object.freeze({ correction: Object.freeze({ limit: 1.5 }) }),
-	}),
-	Object.freeze({
 		name: 'unknown correction member',
 		settings: Object.freeze({ correction: Object.freeze({ other: 1 }) }),
 	}),
@@ -1063,31 +1055,6 @@ export function buildMemorySummaryGoals(
 						if (length < 12 || index > 9) throw new Error('Invalid summary arrival length')
 						return { id: `a${index}`, content: 'x'.repeat(length - 12) }
 					}),
-				),
-				records: Object.freeze([]),
-			}),
-		}),
-	])
-}
-
-/**
- * Builds two goals that each fold once under STUDY_MEMORY_SUMMARY_ROOM and the identity gauge: the
- * small counted goal, then seven more 1200-character arrivals and a prompt. Each goal's agent window
- * overflows, so a Compaction trial sends summary, agent, summary, agent in that order.
- * @returns Two public goals whose arrival ids are distinct.
- */
-export function buildMemoryRollingGoals(): readonly StudyGoal[] {
-	return Object.freeze([
-		...buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.small, 400),
-		Object.freeze({
-			id: 'second',
-			input: Object.freeze({
-				prompt: 'Retain later obligations',
-				arrivals: Object.freeze(
-					Array.from({ length: 7 }, (_, index) => ({
-						id: `b${index}`,
-						content: 'x'.repeat(1188),
-					})),
 				),
 				records: Object.freeze([]),
 			}),
@@ -2173,23 +2140,6 @@ export interface MemoryCaptureFixture {
 export const STUDY_MEMORY_CALIBRATION: readonly MemoryWireFixture[] = Object.freeze([
 	Object.freeze({ path: '/api/chat', body: buildMemoryReply() }),
 	Object.freeze({ path: '/api/chat', body: buildMemoryReply() }),
-])
-
-/** Pins one goal of three statements and one correction, so a correction has three earlier messages to pair with. */
-export const STUDY_MEMORY_CORRECTION_GOALS: readonly StudyGoal[] = Object.freeze([
-	Object.freeze({
-		id: 'opening',
-		input: Object.freeze({
-			prompt: 'Report the order count',
-			arrivals: Object.freeze([
-				{ id: 'first', content: 'The order count is one.' },
-				{ id: 'second', content: 'The order count is two.' },
-				{ id: 'third', content: 'The order count is three.' },
-				{ id: 'fix', content: 'Correction: the order count is four.' },
-			]),
-			records: Object.freeze([]),
-		}),
-	}),
 ])
 
 /**

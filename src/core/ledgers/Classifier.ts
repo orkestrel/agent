@@ -238,20 +238,10 @@ export class Classifier implements ClassifierInterface {
 				continue
 			const near = this.#readNear(later, nears, entities)
 			if (near.size === 0) continue
-			const limit = this.#options.correction?.limit
-			const kept =
-				limit === undefined
-					? undefined
-					: this.#collectKept(messages, later, near, limit, quiets, nears, entities, literals)
 			for (const earlier of messages) {
 				if (earlier.id === later.id) break
 				if (this.#spent()) await this.#turn(signal)
-				if (
-					kept === undefined
-						? !this.#eligible(earlier, later, near, quiets, nears, entities, literals)
-						: !kept.has(earlier.id)
-				)
-					continue
+				if (!this.#eligible(earlier, later, near, quiets, nears, entities, literals)) continue
 				const spec = this.#buildPair('amends', earlier.id, later.id)
 				results.push(await this.#ask(spec, 'amends', signal, results))
 				if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
@@ -440,7 +430,7 @@ export class Classifier implements ClassifierInterface {
 	// Reports whether a correction is compared against an earlier message: the message is not quiet
 	// and its near set shares a member with the correction's, and under `narrow` the two also share a
 	// registry entity or a literal. The quiet flag is read first, so a quiet message's near set is
-	// never read, and with the switch unset no literal is read here.
+	// never read, and with `narrow` unset no literal is read here.
 	#eligible(
 		earlier: Message,
 		later: Message,
@@ -456,29 +446,6 @@ export class Classifier implements ClassifierInterface {
 			(this.#options.correction?.narrow !== true ||
 				this.#sharesEntityOrLiteral(earlier, later, entities, literals))
 		)
-	}
-
-	// Collects the ids of the most recent eligible messages before a correction, walking back from it
-	// until the set holds `limit` of them.
-	#collectKept(
-		messages: readonly Message[],
-		later: Message,
-		near: ReadonlySet<string>,
-		limit: number,
-		quiets: Map<string, boolean>,
-		nears: Map<string, ReadonlySet<string>>,
-		entities: Map<string, ReadonlySet<string>>,
-		literals: Map<string, LiteralSet>,
-	): ReadonlySet<string> {
-		const kept = new Set<string>()
-		if (limit === 0) return kept
-		const position = messages.findIndex((message) => message.id === later.id)
-		for (const earlier of messages.slice(0, position).toReversed()) {
-			if (!this.#eligible(earlier, later, near, quiets, nears, entities, literals)) continue
-			kept.add(earlier.id)
-			if (kept.size === limit) break
-		}
-		return kept
 	}
 
 	async #ask(

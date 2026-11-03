@@ -27,7 +27,6 @@ import {
 	buildMemoryProfile,
 	buildMemoryRecording,
 	buildMemoryReply,
-	buildMemoryRollingGoals,
 	buildMemorySeedLedger,
 	buildMemorySeedResponses,
 	buildMemorySummaryGoals,
@@ -55,7 +54,6 @@ import {
 	totalMemoryUsage,
 	STUDY_MEMORY_CALIBRATION,
 	STUDY_MEMORY_CONTEXT_KEYS,
-	STUDY_MEMORY_CORRECTION_GOALS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
 	STUDY_MEMORY_EVENT_KEYS,
 	STUDY_MEMORY_OBSERVED_EVENTS,
@@ -729,127 +727,6 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			fixture.close()
 			await server.close()
 		}
-	})
-
-	it('rolls repeated Compaction summaries into one recap that covers the prior recap and the new live slice', async () => {
-		const responses = ['Recap one', 'Answer one', 'Recap two', 'Answer two'].map((content) => ({
-			path: '/api/chat',
-			body: buildMemoryReply({ content }),
-		}))
-		const trial: MemoryTrialFixture = {
-			arm: 'compaction',
-			responses,
-			goals: buildMemoryRollingGoals(),
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-			settings: { ...STUDY_MEMORY_SETTINGS, observe: true },
-		}
-		const rolling = await runMemoryTrial({
-			...trial,
-			settings: { ...STUDY_MEMORY_SETTINGS, observe: true, rolling: true },
-		})
-		const control = await runMemoryTrial(trial)
-
-		for (const result of [rolling, control]) {
-			expect(result.failure).toBeUndefined()
-			const chats = result.requests.filter((request) => request.path === '/api/chat')
-			expect(chats.map((request) => request.body.includes('Summarize the conversation'))).toEqual([
-				true,
-				false,
-				true,
-				false,
-			])
-		}
-		const rollingChats = rolling.requests.filter((request) => request.path === '/api/chat')
-		const controlChats = control.requests.filter((request) => request.path === '/api/chat')
-		const framed = '[Summary of earlier messages] '
-
-		// The second summary digests the framed first recap and the new slice, never the folded originals.
-		expect(rollingChats[2]?.body).toContain(`${framed}Recap one`)
-		expect(rollingChats[2]?.body).toContain('[Source a7]')
-		expect(rollingChats[2]?.body).toContain('[Source b5]')
-		expect(rollingChats[2]?.body).not.toContain('[Source a0]')
-		expect(rollingChats[2]?.body).not.toContain('[Source b6]')
-		// The next agent request carries the single newest recap and the live arrival.
-		expect(rollingChats[3]?.body).toContain(`${framed}Recap two`)
-		expect(rollingChats[3]?.body).not.toContain('Recap one')
-		expect(rollingChats[3]?.body).toContain('[Source b6]')
-		// The second summary names the prior recap among its sources beside the slice.
-		const [, rolled] = readMemoryEvents(rolling.evidence, 'summary').map((row) =>
-			Array.isArray(row.sources) ? row.sources.length : -1,
-		)
-		const [, appended] = readMemoryEvents(control.evidence, 'summary').map((row) =>
-			Array.isArray(row.sources) ? row.sources.length : -1,
-		)
-		expect(appended).toBeGreaterThan(0)
-		expect(rolled).toBe(Number(appended) + 1)
-
-		// The captured second summary dispatch names its first history member as the first section's recap.
-		const dispatched = readMemoryEvents(rolling.evidence, 'context').filter(
-			(row) => row.stage === 'dispatch',
-		)
-		const summaryDispatches = dispatched.filter((row) => row.role === 'summary')
-		const agentDispatches = dispatched.filter((row) => row.role === 'agent')
-		expect([summaryDispatches.length, agentDispatches.length]).toEqual([2, 2])
-		const secondOrigins = readMemoryOrigins(summaryDispatches[1]?.origins)
-		expect(secondOrigins.at(-1)).toEqual({ origin: 'instructions', source: 'summary' })
-		const recap = secondOrigins[0]
-		expect(recap?.origin).toBe('summary')
-		expect(recap?.source).toBeDefined()
-		const [, secondSummary] = readMemoryEvents(rolling.evidence, 'summary')
-		const covered = Array.isArray(secondSummary?.sources) ? secondSummary.sources : []
-		expect(covered[0]).toBe(recap?.source)
-		expect(covered).toContain(recap?.source)
-		// The slice the second summary covers keeps its arrival provenance.
-		expect(secondOrigins).toContainEqual({ origin: 'arrival', source: 'a7' })
-		expect(secondOrigins).toContainEqual({ origin: 'arrival', source: 'b5' })
-		// The first agent request already named that recap; the last names the single new one and the live input.
-		expect(readMemoryOrigins(agentDispatches[0]?.origins)).toContainEqual(recap)
-		const lastOrigins = readMemoryOrigins(agentDispatches[1]?.origins)
-		expect(lastOrigins).toContainEqual({ origin: 'arrival', source: 'b6' })
-		expect(lastOrigins).toContainEqual({ origin: 'input', source: 'second' })
-		expect(lastOrigins.filter((entry) => entry.origin === 'summary')).toHaveLength(1)
-		expect(lastOrigins).not.toContainEqual(recap)
-
-		// The default stays append-only: the second summary sees no recap and the agent sees both.
-		expect(controlChats[2]?.body).not.toContain('Recap one')
-		expect(controlChats[3]?.body).toContain(`${framed}Recap one`)
-		expect(controlChats[3]?.body).toContain(`${framed}Recap two`)
-	})
-
-	it('keeps wire bytes identical for rolling false or omitted, and for a non-Compaction arm given rolling', async () => {
-		const goals = buildMemoryRollingGoals()
-		const room = STUDY_MEMORY_SUMMARY_ROOM
-		const omitted = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [],
-			goals,
-			room,
-			settings: STUDY_MEMORY_SETTINGS,
-		})
-		const disabled = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [],
-			goals,
-			room,
-			settings: { ...STUDY_MEMORY_SETTINGS, rolling: false },
-		})
-		const full = await runMemoryTrial({ arm: 'full', responses: [], goals: [WINDOW_GOAL] })
-		const ignored = await runMemoryTrial({
-			arm: 'full',
-			responses: [],
-			goals: [WINDOW_GOAL],
-			settings: { rolling: true },
-		})
-
-		expect([omitted.failure, disabled.failure, full.failure, ignored.failure]).toEqual([
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-		])
-		expect(omitted.requests.length).toBeGreaterThan(2)
-		expect(disabled.requests).toEqual(omitted.requests)
-		expect(ignored.requests).toEqual(full.requests)
 	})
 
 	it('latches http failures before subsequent dispatch', async () => {
@@ -2267,23 +2144,6 @@ describe('repeated and denied tool calls', () => {
 		expect(readMemoryEvents(records.evidence, 'denial', 'opening')).toEqual([denial])
 	})
 
-	it('forwards the correction limit', async () => {
-		// Each statement reads as a fact and the last arrival as a correction; the default reply answers every pair yes.
-		const trial: MemoryTrialFixture = {
-			arm: 'records',
-			responses: ['A', 'A', 'A', 'C'].map(buildMemoryVerdict),
-			goals: STUDY_MEMORY_CORRECTION_GOALS,
-		}
-		const limited = await runMemoryTrial({ ...trial, settings: { correction: { limit: 1 } } })
-		const unset = await runMemoryTrial({ ...trial, settings: { correction: {} } })
-		const absent = await runMemoryTrial(trial)
-		expect(limited.failure).toBeUndefined()
-		expect(unset.failure).toBeUndefined()
-		expect(countMemoryPairs(limited.requests)).toBe(2)
-		expect(countMemoryPairs(unset.requests)).toBe(6)
-		expect(unset.requests).toEqual(absent.requests)
-	})
-
 	it('forwards the narrow switch', async () => {
 		// Every message shares the topic, and the first statement alone shares a number with the correction.
 		const trial: MemoryTrialFixture = {
@@ -2397,60 +2257,21 @@ describe('recording declarations of a memory session', () => {
 	})
 })
 
-describe('the sham setting of a memory session', () => {
-	it('appends one newline to the records system under sham and moves no other byte', async () => {
-		const trial: MemoryTrialFixture = {
+describe('the system of a memory session', () => {
+	it('sends the study system on a records session', async () => {
+		const run = await runMemoryTrial({
 			arm: 'records',
 			responses: buildMemorySeedResponses('records'),
 			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 2),
 			settings: STUDY_MEMORY_SEED_SETTINGS,
-		}
-		const sham = await runMemoryTrial({
-			...trial,
-			settings: { ...STUDY_MEMORY_SEED_SETTINGS, sham: true },
 		})
-		const control = await runMemoryTrial(trial)
-		expect([sham.failure, control.failure]).toEqual([undefined, undefined])
-		expect(parseJSON(readMemoryFirstChat(control, 'opening') ?? '')).toEqual(
+		expect(run.failure).toBeUndefined()
+		expect(parseJSON(readMemoryFirstChat(run, 'opening') ?? '')).toEqual(
 			expect.objectContaining({
 				messages: expect.arrayContaining([
 					expect.objectContaining({ role: 'system', content: STUDY_MEMORY_SYSTEM }),
 				]),
 			}),
 		)
-		expect(parseJSON(readMemoryFirstChat(sham, 'opening') ?? '')).toEqual(
-			expect.objectContaining({
-				messages: expect.arrayContaining([
-					expect.objectContaining({ role: 'system', content: `${STUDY_MEMORY_SYSTEM}\n` }),
-				]),
-			}),
-		)
-		expect(sham.requests).toEqual(
-			control.requests.map((request) => ({
-				...request,
-				body: request.body.replace(
-					JSON.stringify(STUDY_MEMORY_SYSTEM),
-					JSON.stringify(`${STUDY_MEMORY_SYSTEM}\n`),
-				),
-			})),
-		)
-	}, 60000)
-
-	it('sends the control bytes on a full arm under sham', async () => {
-		const trial: MemoryTrialFixture = {
-			arm: 'full',
-			responses: buildMemorySeedResponses('full'),
-			goals: STUDY_MEMORY_SEED_GOALS,
-			settings: STUDY_MEMORY_SEED_SETTINGS,
-		}
-		const control = await runMemoryTrial(trial)
-		expect(control.failure).toBeUndefined()
-		expect(control.requests.length).toBeGreaterThan(2)
-		const treated = await runMemoryTrial({
-			...trial,
-			settings: { ...STUDY_MEMORY_SEED_SETTINGS, sham: true },
-		})
-		expect(treated.failure).toBeUndefined()
-		expect(treated.requests).toEqual(control.requests)
 	}, 60000)
 })

@@ -826,7 +826,7 @@ export class Agent implements AgentInterface {
 		if (this.#strict && window.exhausted) {
 			throw new AgentError(
 				'WINDOW',
-				`the request measures ${window.consumed} against a window of ${window.max} and cannot shrink`,
+				`the request measures ${window.consumed} against a window of ${window.max} and this run folds no further`,
 				{ context: { agent: this.#id, consumed: window.consumed, max: window.max } },
 			)
 		}

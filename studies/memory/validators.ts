@@ -17,7 +17,6 @@ import {
 	isBoolean,
 	isFiniteNumber,
 	isNonEmptyString,
-	isNonNegativeInteger,
 	isObject,
 	isRecord,
 	isString,
@@ -64,32 +63,14 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		if (
 			Object.keys(value).some(
 				(key) =>
-					![
-						'gauge',
-						'observe',
-						'checkpoints',
-						'rolling',
-						'version',
-						'metadata',
-						'correction',
-						'seed',
-						'sham',
-					].includes(key),
+					!['gauge', 'observe', 'checkpoints', 'version', 'metadata', 'correction'].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, rolling, version, metadata, correction, seed, sham } =
-			value
-		if (rolling !== undefined && !isBoolean(rolling)) return false
-		if (seed !== undefined && !isNonNegativeInteger(seed)) return false
-		if (sham !== undefined && !isBoolean(sham)) return false
+		const { gauge, observe, checkpoints, version, metadata, correction } = value
 		if (version !== undefined && !isNonEmptyString(version)) return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
-		if (
-			correction !== undefined &&
-			!recordOf({ limit: isNonNegativeInteger, narrow: isBoolean }, true)(correction)
-		)
-			return false
+		if (correction !== undefined && !recordOf({ narrow: isBoolean }, true)(correction)) return false
 		if (gauge !== undefined) {
 			if (
 				!isRecord(gauge) ||

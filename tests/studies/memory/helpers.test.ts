@@ -279,35 +279,6 @@ describe('memory declaration and mechanical evidence', () => {
 			})
 	})
 
-	it('writes a declared seed over the seed of every role it declares', () => {
-		const url = 'http://127.0.0.1:7'
-		const budgets = { agent: 512, summary: 256, judge: 1 }
-		const seeded = buildMemoryProfile({ url, settings: { ...STUDY_MEMORY_SETTINGS, seed: 7 } })
-		const pinned = buildMemoryProfile({ url, settings: STUDY_MEMORY_SETTINGS })
-		for (const arm of ['records', 'compaction'] as const) {
-			const roles = buildStudyMemoryRoles(seeded, arm)
-			const declared = (['agent', 'summary', 'judge'] as const).filter(
-				(role) => roles[role] !== undefined,
-			)
-			expect(declared).toEqual(arm === 'records' ? ['agent', 'judge'] : ['agent', 'summary'])
-			for (const role of declared)
-				expect(roles[role]?.options).toEqual({
-					num_ctx: 32768,
-					num_predict: budgets[role],
-					...STUDY_MEMORY_SAMPLING_PINS[role],
-					seed: 7,
-				})
-			// With no seed declared, every role holds its pin.
-			for (const role of declared)
-				expect(buildStudyMemoryRoles(pinned, arm)[role]?.options).toEqual({
-					num_ctx: 32768,
-					num_predict: budgets[role],
-					...STUDY_MEMORY_SAMPLING_PINS[role],
-				})
-		}
-		expect(buildStudyMemoryRoles(seeded, 'full').agent?.options).toMatchObject({ seed: 7 })
-	})
-
 	it('refuses a recording profile with no version or metadata', () => {
 		const profile = buildMemoryRecording('http://127.0.0.1:7')
 		const { version, metadata } = STUDY_MEMORY_RECORDING.settings

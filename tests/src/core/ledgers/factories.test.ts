@@ -94,17 +94,7 @@ describe('createLedger', () => {
 			}),
 		).not.toThrow()
 	})
-	it('refuses each bad correction limit', () => {
-		const options = buildLedgerOptions({ topics: [], lookups: [] })
-		for (const value of LEDGER_INVALID_LIMITS)
-			expect(() =>
-				createLedger(createScriptedProvider([]), { ...options, correction: { limit: value } }),
-			).toThrow(expect.objectContaining({ code: 'LIMIT' }))
-		expect(
-			createLedger(createScriptedProvider([]), { ...options, correction: { limit: 0 } }),
-		).toBeInstanceOf(Ledger)
-	})
-	it('forwards the narrow switch through the factory', async () => {
+	it('forwards the narrow option through the factory', async () => {
 		const ledger = createLedger(
 			createScriptedProvider([{ content: 'Noted.' }]),
 			buildGuideLedgerOptions({

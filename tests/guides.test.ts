@@ -1802,46 +1802,9 @@ await new GuideCommand({
 			)
 		})
 
-		it('caps correction pairs as the guide says', async () => {
-			const { buildCorrectionSeed } = await import('./setup.js')
-			const conversation = createConversation()
-			conversation.add(buildCorrectionSeed(6))
-			const messages = conversation.messages()
-			const correction = requireValue(messages.at(-1))
-			const limit = 2
-			const classifier = new Classifier({
-				conversation,
-				judge: createPhraseJudge([], ['Correction:']),
-				questions: LEDGER_QUESTIONS,
-				topics: [LEDGER_REFUNDS_TOPIC],
-				thresholds: LEDGER_DESK_THRESHOLDS,
-				assign: () => undefined,
-				entities: (text) => barrel.extractLiterals(text).ids,
-				correction: { limit },
-			})
-			const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
-
-			// Every pair passes `amends`, so each kept statement asks `amends`, then `supersedes`.
-			expect(
-				filed.readings
-					.filter((reading) => reading.phase === 'amends' || reading.phase === 'supersedes')
-					.map((reading) => reading.key),
-			).toEqual(
-				messages
-					.slice(-1 - limit, -1)
-					.flatMap((earlier) => [
-						JSON.stringify(['amends', earlier.id, correction.id]),
-						JSON.stringify(['supersedes', earlier.id, correction.id]),
-					]),
-			)
-			expect(guideText).toContain(
-				'The `limit` member of the `correction` option caps the earlier messages one correction is compared against, the most recent eligible ones first, so a correction asks at most twice that many pair questions; with no `limit`, the ledger asks about every eligible earlier message.',
-			)
-		})
-
 		it('narrows correction pairs as the guide says', async () => {
 			const asks: Array<readonly string[]> = []
-			for (const correction of [{}, { narrow: true }, { narrow: true, limit: 0 }]) {
+			for (const correction of [{}, { narrow: true }]) {
 				const conversation = createConversation()
 				const [desk, account, shared, later] = conversation.add([
 					{ role: 'user', content: 'The refund desk stayed open.' },
@@ -1876,14 +1839,17 @@ await new GuideCommand({
 			}
 
 			// The desk message shares only the topic; the account shares an entity, and the amount a number.
-			expect(asks).toEqual([['desk', 'account', 'shared'], ['account', 'shared'], []])
+			expect(asks).toEqual([
+				['desk', 'account', 'shared'],
+				['account', 'shared'],
+			])
 			expect(guideText).toContain(
-				'The `narrow` member of the `correction` option, an experiment switch a verdict deletes, keeps only the eligible earlier messages that also share a registry entity with the correction or an id or a number in their content, so a desk topic alone admits no pair, a correction with no id, owner, or desk topic still asks no pair, and a `limit` counts only those messages.',
+				'The `narrow` member of the `correction` option keeps only the eligible earlier messages that also share a registry entity with the correction or an id or a number in their content, so a desk topic alone admits no pair, and a correction with no id, owner, or desk topic still asks no pair.',
 			)
 			expect(guideText).toContain(
-				'The `narrow` member can hide one too: the ledger never compares an earlier message that shares only a desk topic with the correction, so a supersession on a pair sharing no registry entity and no id or number is never filed.',
+				'The ledger never compares an earlier message that shares only a desk topic with the correction, so a supersession on a pair sharing no registry entity and no id or number is never filed.',
 			)
-			expect(guideText).toContain('| `LedgerCorrectionOptions` | interface | `{ limit?, narrow? }`')
+			expect(guideText).toContain('| `LedgerCorrectionOptions` | interface | `{ narrow? }`')
 		})
 
 		it('fits the tail inside the tail share of the prompt budget less the overhead cost, as the plan claims', async () => {

@@ -26,18 +26,12 @@ export interface StudyMemoryOptions {
 	readonly observe?: boolean | undefined
 	/** Names observation checkpoints and requires `observe: true`. */
 	readonly checkpoints?: readonly string[] | undefined
-	/** Rolls each compaction into one section covering the prior recaps; forwarded only in the compaction arm. */
-	readonly rolling?: boolean | undefined
 	/** Declares the bare serving version a recording requires, equal to the profile's daemon version. */
 	readonly version?: string | undefined
 	/** Bounds the metadata passes a recording declares; absent, the unrecorded default bounds them. */
 	readonly metadata?: StudyOllamaMetadata | undefined
 	/** Mirrors `LedgerOptions.correction`; forwarded only in the records arm. */
 	readonly correction?: LedgerCorrectionOptions | undefined
-	/** Writes this value over the `seed` of every role's sampling. */
-	readonly seed?: number | undefined
-	/** Appends one newline to the Ledger's `system` value; read only in the records arm. */
-	readonly sham?: boolean | undefined
 }
 
 /** Holds one role's pinned sampling values, each key written as its Ollama wire name. */
