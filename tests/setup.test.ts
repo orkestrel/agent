@@ -2162,7 +2162,7 @@ describe('checkLedgerProjection', () => {
 			records: [
 				{
 					key: 'owner:BW-20931',
-					title: 'Brightwater Studio (account BW-20931)',
+					title: 'Brightwater Studio (BW-20931)',
 					members: ['tool-a'],
 					lines: [
 						{

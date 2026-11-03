@@ -783,7 +783,7 @@ export function matchEntities(
  * 	entities: new Map([['user-1', ['BW-20931']]]),
  * 	classification: { quiet: new Set(), categories: new Map(), topics: new Map(), amendments: new Map(), supersessions: new Map() },
  * })
- * // projection.records[0].title === 'Brightwater Studio (account BW-20931)'
+ * // projection.records[0].title === 'Brightwater Studio (BW-20931)'
  * ```
  */
 export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
@@ -822,11 +822,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 			const owner = key.slice(LEDGER_OWNER_PREFIX.length)
 			const holder = input.owners.get(owner)?.[0]
 			const title =
-				key === LEDGER_RULES_KEY
-					? 'Rules'
-					: holder === undefined
-						? `account ${owner}`
-						: `${holder} (account ${owner})`
+				key === LEDGER_RULES_KEY ? 'Rules' : holder === undefined ? owner : `${holder} (${owner})`
 			const first = position.get(ids[0] ?? '') ?? 0
 			return {
 				first,
@@ -947,7 +943,7 @@ export function renderLedgerRecord(
  *
  * @example
  * ```ts
- * renderLedgerPinned({ title: 'Odile Marlow (account OM-30418)', lines: [] }) // '### Odile Marlow (account OM-30418)'
+ * renderLedgerPinned({ title: 'Odile Marlow (OM-30418)', lines: [] }) // '### Odile Marlow (OM-30418)'
  * ```
  */
 export function renderLedgerPinned(
@@ -999,11 +995,11 @@ export function buildLedgerRenderContext(
 }
 
 /**
- * Renders source framing and unresolved amendment scope at a source's first retained line.
+ * Renders a source's reference and its later changes at the source's first retained line.
  * @param line - The retained occurrence to annotate
  * @param context - Actual complete sources, first occurrences, local references, and accepted amendment edges
- * @returns Source framing and truthful inclusion notes, or empty text for an unrelated or repeated occurrence
- * @throws {LedgerError} Thrown when the context holds no reference for the annotated source or a fully included amender (code `'REQUEST'`)
+ * @returns The source's reference and its later-change notes, or empty text for an unrelated or repeated occurrence
+ * @throws {LedgerError} Thrown when the context holds no reference for the annotated source or a fully included amender (code `'REFERENCE'`)
  *
  * @example
  * ```ts
@@ -1024,17 +1020,12 @@ export function renderLedgerAnnotation(line: LedgerLine, context: LedgerRenderCo
 	)
 		throw new LedgerError('REFERENCE', 'Ledger rendering requires retained source references')
 	return [
-		`[Ledger source ${context.references.get(line.source)}]`,
-		...included.map(
-			(pair) =>
-				`Accepted later amendment [Ledger source ${context.references.get(pair.later)}] is fully included in these records. Sentence scope is unresolved.`,
-		),
+		`[${context.references.get(line.source)}]`,
+		...included.map((pair) => ` Changed later by [${context.references.get(pair.later)}].`),
 		...(amendments.some((pair) => !context.complete.has(pair.later))
-			? [
-					'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
-				]
+			? [' A later change is not shown.']
 			: []),
-	].join('\n')
+	].join('')
 }
 
 /**

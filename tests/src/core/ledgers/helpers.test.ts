@@ -1296,6 +1296,58 @@ describe('collectAmendments', () => {
 })
 
 describe('amendment rendering', () => {
+	it.each([
+		{
+			form: 'included',
+			retained: ['earlier', 'second'],
+			amendments: [{ earlier: 'earlier', later: 'second' }],
+			annotated: 'earlier',
+			expected: '[1] Changed later by [2].',
+		},
+		{
+			form: 'not included',
+			retained: ['earlier'],
+			amendments: [{ earlier: 'earlier', later: 'second' }],
+			annotated: 'earlier',
+			expected: '[1] A later change is not shown.',
+		},
+		{
+			form: 'mixed',
+			retained: ['earlier', 'second'],
+			amendments: [
+				{ earlier: 'earlier', later: 'second' },
+				{ earlier: 'earlier', later: 'third' },
+			],
+			annotated: 'earlier',
+			expected: '[1] Changed later by [2]. A later change is not shown.',
+		},
+		{
+			form: 'endpoint',
+			retained: ['earlier', 'second'],
+			amendments: [{ earlier: 'earlier', later: 'second' }],
+			annotated: 'second',
+			expected: '[2]',
+		},
+		{
+			form: 'two included',
+			retained: ['earlier', 'second', 'third'],
+			amendments: [
+				{ earlier: 'earlier', later: 'second' },
+				{ earlier: 'earlier', later: 'third' },
+			],
+			annotated: 'earlier',
+			expected: '[1] Changed later by [2]. Changed later by [3].',
+		},
+	])('pins the bytes of the $form annotation', ({ retained, amendments, annotated, expected }) => {
+		const lines = retained.map((id) => buildLedgerLine(id, 0, `Text of ${id}.`))
+		const messages = ['earlier', 'second', 'third'].map((id) =>
+			buildLedgerMessage(id, 'user', `Text of ${id}.`),
+		)
+		const context = buildLedgerRenderContext(messages, lines, amendments)
+		const line = requireValue(lines.find((candidate) => candidate.source === annotated))
+		expect(renderLedgerAnnotation(line, context)).toBe(expected)
+	})
+
 	it('assigns distinct local references in first retained occurrence order across duplicate interleaved lines', () => {
 		const messages = ['omitted', 'first', 'second', 'third'].map((id) =>
 			buildLedgerMessage(id, 'user', 'Equal.'),
@@ -1317,10 +1369,8 @@ describe('amendment rendering', () => {
 		])
 		expect(context.references.has('omitted')).toBe(false)
 		expect(context.first.get('first')).toBe(first)
-		expect(renderLedgerAnnotation(first, context)).toBe(
-			'[Ledger source 2]\nAccepted later amendment [Ledger source 3] is fully included in these records. Sentence scope is unresolved.',
-		)
-		expect(renderLedgerAnnotation(second, context)).toBe('[Ledger source 3]')
+		expect(renderLedgerAnnotation(first, context)).toBe('[2] Changed later by [3].')
+		expect(renderLedgerAnnotation(second, context)).toBe('[3]')
 		expect(renderLedgerAnnotation(repeated, context)).toBe('')
 		const reordered = buildLedgerRenderContext(
 			messages,
@@ -1338,7 +1388,7 @@ describe('amendment rendering', () => {
 			['second', '2'],
 		])
 		expect(renderLedgerRecord({ title: 'Rules', lines: [first, second] }, trimmed)).toBe(
-			'## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\n- Equal.\n[Ledger source 2]\n- Equal.',
+			'## Rules\n[1] Changed later by [2].\n- Equal.\n[2]\n- Equal.',
 		)
 	})
 
@@ -1346,7 +1396,7 @@ describe('amendment rendering', () => {
 		const earlier = buildLedgerLine(
 			'earlier',
 			0,
-			'[Ledger source 42] [Source authored-id] Accepted later amendment [authored-id].',
+			'[42] Changed later by [authored-id]. A later change is not shown.',
 		)
 		const correction = buildLedgerLine('later', 0, 'Correction.')
 		const messages = [
@@ -1382,16 +1432,12 @@ describe('amendment rendering', () => {
 		const amendments = [{ earlier: 'earlier', later: 'later' }]
 		const complete = buildLedgerRenderContext(messages, [earlier, later, end], amendments)
 		expect([...complete.complete]).toEqual(['later'])
-		expect(renderLedgerAnnotation(earlier, complete)).toBe(
-			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
-		)
-		expect(renderLedgerAnnotation(later, complete)).toBe('[Ledger source 2]')
+		expect(renderLedgerAnnotation(earlier, complete)).toBe('[1] Changed later by [2].')
+		expect(renderLedgerAnnotation(later, complete)).toBe('[2]')
 		expect(renderLedgerAnnotation(end, complete)).toBe('')
 		const partial = buildLedgerRenderContext(messages, [earlier, later, later], amendments)
 		expect([...partial.complete]).toEqual([])
-		expect(renderLedgerAnnotation(earlier, partial)).toBe(
-			'[Ledger source 1]\nAccepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
-		)
+		expect(renderLedgerAnnotation(earlier, partial)).toBe('[1] A later change is not shown.')
 		expect(renderLedgerAnnotation(later, partial)).toBe('')
 		const absent = buildLedgerRenderContext(messages, [earlier], amendments)
 		expect(renderLedgerAnnotation(earlier, absent)).toBe(renderLedgerAnnotation(earlier, partial))
@@ -1416,9 +1462,9 @@ describe('amendment rendering', () => {
 		const trimmed = buildLedgerRenderContext(messages, [original, correction], amendments)
 		const rendered = renderLedgerRecord({ title: 'Rules', lines: [original, correction] }, trimmed)
 		expect(rendered).toContain(
-			'[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\nAccepted later amendment text is not fully included in these records. Sentence scope is unresolved.\n- Original.',
+			'[1] Changed later by [2]. A later change is not shown.\n- Original.',
 		)
-		expect(rendered).toContain('[Ledger source 2]\n- Correction.')
+		expect(rendered).toContain('[2]\n- Correction.')
 		expect(rendered).not.toContain('hidden-owner-secret')
 		expect(rendered).not.toContain('Foreign owner secret')
 		const removed = buildLedgerRenderContext(messages, [correction], amendments)
@@ -1563,8 +1609,8 @@ describe('buildRecords', () => {
 	it('projects the desk scenario into owner records ordered by first member, then the rules record', () => {
 		const built = buildRecords(createLedgerDesk())
 		expect(built.records.map((record) => [record.key, record.title, record.members])).toEqual([
-			['owner:OM-30418', 'Odile Marlow (account OM-30418)', ['user-02']],
-			['owner:BW-20931', 'Brightwater Studio (account BW-20931)', ['user-03', 'tool-02']],
+			['owner:OM-30418', 'Odile Marlow (OM-30418)', ['user-02']],
+			['owner:BW-20931', 'Brightwater Studio (BW-20931)', ['user-03', 'tool-02']],
 			['rules', 'Rules', ['user-01', 'user-04']],
 		])
 		expect(built.records.map((record) => record.lines.map((line) => line.text))).toEqual([
@@ -1591,7 +1637,19 @@ describe('buildRecords', () => {
 			messages: [buildLedgerMessage('user-a', 'user', 'Order for BW-20931 is late.')],
 			entities: { 'user-a': ['BW-20931'] },
 		})
-		expect(buildRecords(input).records.map((record) => record.title)).toEqual(['account BW-20931'])
+		expect(buildRecords(input).records.map((record) => record.title)).toEqual(['BW-20931'])
+	})
+
+	it('pins the bytes of both owner title forms', () => {
+		const named = buildRecords(createLedgerDesk()).records.map((record) => record.title)
+		expect(named[0]).toBe('Odile Marlow (OM-30418)')
+		expect(named[1]).toBe('Brightwater Studio (BW-20931)')
+		const bare = buildLedgerInput({
+			owners: { 'BW-20931': [] },
+			messages: [buildLedgerMessage('user-a', 'user', 'Order for BW-20931 is late.')],
+			entities: { 'user-a': ['BW-20931'] },
+		})
+		expect(buildRecords(bare).records[0]?.title).toBe('BW-20931')
 	})
 
 	it('lists a live message that no record placed as an orphan', () => {
@@ -1803,7 +1861,7 @@ describe('selectRecords', () => {
 		expect(views).toEqual([
 			{
 				...projection.records[0],
-				title: 'Brightwater Studio (account BW-5512); Brightwater Studio (account BW-20931)',
+				title: 'Brightwater Studio (BW-5512); Brightwater Studio (BW-20931)',
 			},
 			projection.records[2],
 		])
@@ -1842,7 +1900,7 @@ describe('selectRecords', () => {
 		expect(views.map((record) => record.key)).toEqual(['owner:BW-20931', 'rules'])
 		expect(views[0]).toEqual({
 			...LEDGER_OWNER_PROJECTION.records[1],
-			title: 'Brightwater Studio (account BW-20931); Brightwater Studio (account BW-5512)',
+			title: 'Brightwater Studio (BW-20931); Brightwater Studio (BW-5512)',
 		})
 	})
 
@@ -1959,7 +2017,7 @@ describe('selectRecords', () => {
 
 describe('renderLedgerRecord and renderLedgerPinned', () => {
 	const view: Pick<LedgerRecord, 'title' | 'lines'> = {
-		title: 'Odile Marlow (account OM-30418)',
+		title: 'Odile Marlow (OM-30418)',
 		lines: [
 			{
 				text: 'The caller is Odile Marlow.',
@@ -1980,10 +2038,10 @@ describe('renderLedgerRecord and renderLedgerPinned', () => {
 
 	it('renders a heading and one list item per line', () => {
 		expect(renderLedgerRecord(view)).toBe(
-			'## Odile Marlow (account OM-30418)\n- The caller is Odile Marlow.\n- Dana Whitcombe: She approved it.',
+			'## Odile Marlow (OM-30418)\n- The caller is Odile Marlow.\n- Dana Whitcombe: She approved it.',
 		)
 		expect(renderLedgerPinned(view)).toBe(
-			'### Odile Marlow (account OM-30418)\n- The caller is Odile Marlow.\n- Dana Whitcombe: She approved it.',
+			'### Odile Marlow (OM-30418)\n- The caller is Odile Marlow.\n- Dana Whitcombe: She approved it.',
 		)
 	})
 
@@ -1996,7 +2054,7 @@ describe('renderLedgerRecord and renderLedgerPinned', () => {
 		const views = selectRecords(buildRecords(createLedgerDesk()), createLedgerRequest())
 		expect(views.map((record) => renderLedgerRecord(record)).join('\n\n')).toBe(
 			[
-				'## Brightwater Studio (account BW-20931)',
+				'## Brightwater Studio (BW-20931)',
 				'- The shift lead is Dana Whitcombe.',
 				'- Dana Whitcombe: She approved the refund of $148.50 for order BW-5512.',
 				'- Order BW-5512 for account BW-20931 (Brightwater Studio): linen set, total $148.50.',

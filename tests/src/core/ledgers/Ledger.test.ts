@@ -178,7 +178,7 @@ describe('Ledger', () => {
 		)
 		await ledger.respond('Check Odile Marlow and Brightwater Studio.')
 		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toBe(
-			'## Records\n### Brightwater Studio (account BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n\n### Odile Marlow (account OM-30418)\n- Odile Marlow paid in full.',
+			'## Records\n### Brightwater Studio (BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n\n### Odile Marlow (OM-30418)\n- Odile Marlow paid in full.',
 		)
 	})
 
@@ -198,7 +198,7 @@ describe('Ledger', () => {
 			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
 			await ledger.respond('Check Brightwater Studio.')
 			const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
-			expect(text.includes('[Ledger source 1]')).toBe(sentences > 2)
+			expect(text.includes('[1]')).toBe(sentences > 2)
 			expect(text.includes(earlier.id)).toBe(false)
 			expect(text.includes('Account BW-20931: Brightwater Studio.')).toBe(sentences === 4)
 			expect(text.includes('Ben may collect BW-20931.')).toBe(sentences > 2)
@@ -206,19 +206,11 @@ describe('Ledger', () => {
 			expect(text.includes('confirms the scheduled pickup time with the account holder.')).toBe(
 				sentences > 0,
 			)
-			expect(text.split('Sentence scope is unresolved.')).toHaveLength(sentences > 2 ? 2 : 1)
-			expect(
-				text.includes(
-					'Accepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
-				),
-			).toBe(sentences > 2)
-			expect(text.includes('[Ledger source 2]')).toBe(sentences > 2)
+			expect(text.split('Changed later by')).toHaveLength(sentences > 2 ? 2 : 1)
+			expect(text.includes('[1] Changed later by [2].')).toBe(sentences > 2)
+			expect(text.includes('\n[2]\n- For BW-20931 revoke Ada permission.')).toBe(sentences > 2)
 			expect(text.includes(later.id)).toBe(false)
-			expect(
-				text.includes(
-					'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
-				),
-			).toBe(false)
+			expect(text.includes('A later change is not shown.')).toBe(false)
 			expect(ledger.conversation.message(earlier.id)?.content).toBe(fixture.earlier)
 			expect(ledger.conversation.message(later.id)?.content).toBe(fixture.later)
 		},
@@ -261,10 +253,7 @@ describe('Ledger', () => {
 		expect(one?.identity).not.toBe(two?.identity)
 		expect(one?.text).toBe(two?.text)
 		expect(one?.body).toBe(two?.body)
-		expect(one?.text).toContain('[Ledger source 1]')
-		expect(one?.text).toContain(
-			'Accepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
-		)
+		expect(one?.text).toContain('[1] Changed later by [2].')
 	})
 
 	it('retains amended earlier text and withholds a superseded amender from the records', async () => {
@@ -296,9 +285,7 @@ describe('Ledger', () => {
 		await ledger.respond('Check codes.')
 		const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 		expect(text).toContain('- Code MX-4471.\n- Code MX-4471 remains pending.')
-		expect(text).toContain(
-			'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
-		)
+		expect(text).toContain('A later change is not shown.')
 		expect(text).not.toContain(first.id)
 		expect(text).not.toContain(first.content)
 		expect(ledger.conversation.message(first.id)?.content).toBe(first.content)
@@ -1529,7 +1516,7 @@ describe('Ledger', () => {
 		expect(result.passes).toHaveLength(1)
 		const first = requireValue(provider.calls[0])
 		const records = extractLedgerRecords(first.messages)
-		expect(records).toContain('## Records\n### Brightwater Studio (account BW-20931)')
+		expect(records).toContain('## Records\n### Brightwater Studio (BW-20931)')
 		expect(first.messages.find((message) => message.role === 'tool')?.content).toContain(
 			'result shown under Records below',
 		)
@@ -2336,6 +2323,13 @@ describe('Ledger', () => {
 		})
 	})
 
+	it('pins the bytes of the cue and results notes', () => {
+		expect(LEDGER_NOTES.cue).toBe(
+			'Give your complete answer to the request now, from what you already have.',
+		)
+		expect(LEDGER_NOTES.results).toBe('Your lookups and recalls in this request returned:')
+	})
+
 	it('recalls joined topics with lookup leads and stops a repeated recall irrespective of category', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
@@ -2383,6 +2377,13 @@ describe('Ledger', () => {
 		)?.description
 		expect(description).not.toMatch(/handle/)
 		expect(description?.match(LEDGER_HANDLE) ?? []).toEqual([])
+		expect(description).toBe(
+			'Recall what the full conversation record holds on a topic: an owner name, an id, or one of the topics refunds. Returns source lines, newest first.',
+		)
+		const parameters = provider.calls[0]?.tools?.find((tool) => tool.name === 'recall')?.parameters
+		expect(JSON.stringify(parameters)).toBe(
+			'{"type":"object","properties":{"topic":{"type":"string","description":"An owner name, an id, or a topic"}},"required":["topic"]}',
+		)
 	})
 
 	it('closes recall at its limit and when the provider leaves insufficient room', async () => {
@@ -2502,7 +2503,7 @@ describe('Ledger', () => {
 		const result = await ledger.respond('Review the desk.')
 		expect(result.passes).toHaveLength(2)
 		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toContain(
-			`## Rules\n[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\n- Refunds over $200 require approval.`,
+			`## Rules\n[1] Changed later by [2].\n- Refunds over $200 require approval.`,
 		)
 		for (const call of provider.calls)
 			expect(extractLedgerRecords(call.messages)).toContain('Use code MX-4471.')
@@ -2666,7 +2667,7 @@ describe('Ledger', () => {
 				)
 		}
 		await ledger.respond('Check Mira receipt.')
-		const expected = `[Ledger source 1]\nAccepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.\n${source.content}\n[Ledger source 2]\n${correction.content}`
+		const expected = `[1] Changed later by [2].\n${source.content}\n[2]\n${correction.content}`
 		const records = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 		expect(records).toContain(expected)
 		expect(
@@ -2906,7 +2907,7 @@ describe('Ledger', () => {
 		'trims an owner record oldest first and $title',
 		async ({ kept: keepsNewer }) => {
 			const fixture = LEDGER_TRIM_ORDER_FIXTURE
-			const expected = `## Records\n### Brightwater Studio (account BW-20931)\n${[fixture.correction, ...(keepsNewer ? [fixture.newer] : [])].map((line) => `- ${line}`).join('\n')}`
+			const expected = `## Records\n### Brightwater Studio (BW-20931)\n${[fixture.correction, ...(keepsNewer ? [fixture.newer] : [])].map((line) => `- ${line}`).join('\n')}`
 			const capacity =
 				Math.ceil(
 					estimateMessages([
@@ -2936,7 +2937,7 @@ describe('Ledger', () => {
 	it('trims ruled lines inside one owner record oldest first', async () => {
 		const fixture = LEDGER_TRIM_RULED_FIXTURE
 		const expected = `## Records
-### Brightwater Studio (account BW-20931)
+### Brightwater Studio (BW-20931)
 - ${fixture.second}`
 		const capacity =
 			Math.ceil(
@@ -2981,9 +2982,7 @@ describe('Ledger', () => {
 		'stops at the first fitting cut of an amended record $title',
 		async ({ lines }) => {
 			const fixture = LEDGER_TRIM_FLIP_FIXTURE
-			const expected = ['## Records', '### Brightwater Studio (account BW-20931)', ...lines].join(
-				'\n',
-			)
+			const expected = ['## Records', '### Brightwater Studio (BW-20931)', ...lines].join('\n')
 			const capacity =
 				Math.ceil(
 					estimateMessages([
@@ -3024,14 +3023,13 @@ describe('Ledger', () => {
 		expect(whole).toBe(
 			[
 				'## Records',
-				'### Brightwater Studio (account BW-20931)',
+				'### Brightwater Studio (BW-20931)',
 				'- Account BW-20931: Brightwater Studio.',
-				'[Ledger source 2]',
-				'Accepted later amendment [Ledger source 3] is fully included in these records. Sentence scope is unresolved.',
+				'[2] Changed later by [3].',
 				'- Code BW-20931 leaves from the north dock today.',
 				'- The north dock opens at nine on every weekday.',
 				'- The dock foreman signs each release sheet here.',
-				'[Ledger source 3]',
+				'[3]',
 				'- Code BW-20931 leaves from the south dock instead.',
 				'- The south dock opens at ten on every weekday.',
 				'- The yard clerk signs each release sheet there.',
@@ -3184,7 +3182,7 @@ describe('Ledger — head pricing', () => {
 		const instruction = 'Read the whole refund note before you answer the desk. '.repeat(12)
 		const instructions = createInstructionManager()
 		instructions.add({ name: 'desk', content: instruction })
-		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const expected = `## Records\n### Brightwater Studio (BW-20931)\n- ${fixture.correction}`
 		const capacity =
 			Math.ceil(
 				estimateMessages([
@@ -3284,7 +3282,7 @@ describe('Ledger — head pricing', () => {
 			},
 		})
 		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
-		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const expected = `## Records\n### Brightwater Studio (BW-20931)\n- ${fixture.correction}`
 		const capacity =
 			Math.ceil(
 				estimateMessages([
@@ -3316,7 +3314,7 @@ describe('Ledger — head pricing', () => {
 				createFile({ path: 'scan.png', content: createBinaryContent('U0NBTg==', 'image/png') }),
 			],
 		})
-		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const expected = `## Records\n### Brightwater Studio (BW-20931)\n- ${fixture.correction}`
 		const capacity =
 			Math.ceil(
 				(estimateMessages([
@@ -3346,7 +3344,7 @@ describe('Ledger — head pricing', () => {
 		const instruction = 'Read the whole refund note before you answer the desk. '.repeat(12)
 		const instructions = createInstructionManager()
 		instructions.add({ name: 'desk', content: instruction })
-		const expected = `## Records\n### Brightwater Studio (account BW-20931)\n- ${fixture.correction}`
+		const expected = `## Records\n### Brightwater Studio (BW-20931)\n- ${fixture.correction}`
 		const capacity =
 			Math.ceil(
 				estimateMessages([

@@ -80,8 +80,8 @@ export const LEDGER_QUESTIONS: LedgerQuestion = Object.freeze({
  * message.
  */
 export const LEDGER_NOTES: LedgerNote = Object.freeze({
-	cue: '[Desk] Give your complete answer now as your final message, from what you already have.',
-	results: '[Desk] What your lookups and recalls returned in this request:',
+	cue: 'Give your complete answer to the request now, from what you already have.',
+	results: 'Your lookups and recalls in this request returned:',
 	repeat:
 		'You already have this result earlier in this request; give your complete answer now as your final message.',
 	closure:

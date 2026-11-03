@@ -3559,7 +3559,7 @@ export const RECORDED_FIRST_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object
 	{
 		role: 'user',
 		content:
-			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
+			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
 	},
 ])
 
@@ -3576,12 +3576,11 @@ export const RECORDED_ANSWER_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Objec
 	{
 		role: 'user',
 		content:
-			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
+			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
 	},
 	{
 		role: 'user',
-		content:
-			'[Desk] Give your complete answer now as your final message, from what you already have.',
+		content: 'Give your complete answer to the request now, from what you already have.',
 	},
 ])
 
@@ -3618,7 +3617,7 @@ export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.
 	{
 		role: 'user',
 		content:
-			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio again.',
+			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio again.',
 	},
 ])
 
@@ -5282,7 +5281,7 @@ export const LEDGER_PRESERVATION_FIXTURE = Object.freeze({
 		{ capacity: 60, sentences: 0 },
 		{ capacity: 78, sentences: 1 },
 		{ capacity: 88, sentences: 2 },
-		{ capacity: 134, sentences: 3 },
+		{ capacity: 106, sentences: 3 },
 		{ capacity: 145, sentences: 4 },
 	]),
 })
@@ -5292,7 +5291,7 @@ export const LEDGER_OWNER_PROJECTION: LedgerProjection = Object.freeze({
 	records: Object.freeze([
 		...['BW-5512', 'BW-20931'].map((id) => ({
 			key: `owner:${id}`,
-			title: `Brightwater Studio (account ${id})`,
+			title: `Brightwater Studio (${id})`,
 			members: ['shared-a', 'shared-b'],
 			lines: [
 				buildLedgerLine('shared-a', 0, 'Brightwater Studio ordered glazed lanterns.'),
@@ -5329,13 +5328,13 @@ export const LEDGER_OWNER_RENDER_CASES = Object.freeze([
 		title: 'renders equal-member owners once under both titles',
 		capacity: 4096,
 		records:
-			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
+			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
 	},
 	{
 		title: 'trims the merged owner record by its oldest line',
-		capacity: 80,
+		capacity: 74,
 		records:
-			'## Records\n### Brightwater Studio (account order:BW-5512); Brightwater Studio (account customer:BW-20931)\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
+			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
 	},
 ])
 
@@ -5372,12 +5371,11 @@ export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
 		{
 			title: 'after the seed, with the later source whole',
 			lines: [
-				'[Ledger source 1]',
-				'Accepted later amendment [Ledger source 2] is fully included in these records. Sentence scope is unresolved.',
+				'[1] Changed later by [2].',
 				'- Code BW-20931 leaves from the north dock today.',
 				'- The north dock opens at nine on every weekday.',
 				'- The dock foreman signs each release sheet here.',
-				'[Ledger source 2]',
+				'[2]',
 				'- Code BW-20931 leaves from the south dock instead.',
 				'- The south dock opens at ten on every weekday.',
 				'- The yard clerk signs each release sheet there.',
@@ -5386,8 +5384,7 @@ export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
 		{
 			title: 'at the flip, with the later source short one line',
 			lines: [
-				'[Ledger source 1]',
-				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'[1] A later change is not shown.',
 				'- Code BW-20931 leaves from the north dock today.',
 				'- The north dock opens at nine on every weekday.',
 				'- The dock foreman signs each release sheet here.',
@@ -5398,8 +5395,7 @@ export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
 		{
 			title: 'past the flip, with one line of the later source left',
 			lines: [
-				'[Ledger source 1]',
-				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'[1] A later change is not shown.',
 				'- Code BW-20931 leaves from the north dock today.',
 				'- The north dock opens at nine on every weekday.',
 				'- The dock foreman signs each release sheet here.',
@@ -5409,8 +5405,7 @@ export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
 		{
 			title: 'with the later source gone',
 			lines: [
-				'[Ledger source 1]',
-				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'[1] A later change is not shown.',
 				'- Code BW-20931 leaves from the north dock today.',
 				'- The north dock opens at nine on every weekday.',
 				'- The dock foreman signs each release sheet here.',
@@ -5419,8 +5414,7 @@ export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
 		{
 			title: 'with the earlier source short one line',
 			lines: [
-				'[Ledger source 1]',
-				'Accepted later amendment text is not fully included in these records. Sentence scope is unresolved.',
+				'[1] A later change is not shown.',
 				'- The north dock opens at nine on every weekday.',
 				'- The dock foreman signs each release sheet here.',
 			],

@@ -1666,7 +1666,7 @@ await new GuideCommand({
 			expect(second.content).toBe('Yes. Refunds over $100 need a manager.')
 			expect(copies).toEqual([
 				'## Rules\n- Refunds over $100 need a manager.\n\n## Request\nCan Brightwater Studio get a refund on order BW-5512?',
-				'## Records\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nDoes the Brightwater Studio refund need a manager?',
+				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nDoes the Brightwater Studio refund need a manager?',
 			])
 			// Every scripted reply was taken: two calibration calls and three turns.
 			expect(replies.next()).toEqual({ done: true, value: undefined })
@@ -1699,7 +1699,7 @@ await new GuideCommand({
 				"// '## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nCan Brightwater Studio get a refund on order BW-5512?' — no lookup has named an owner yet",
 			)
 			expect(guideText).toContain(
-				"// '## Records\\n### Brightwater Studio (account BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?'",
+				"// '## Records\\n### Brightwater Studio (BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?'",
 			)
 		})
 
@@ -1765,7 +1765,7 @@ await new GuideCommand({
 			expect(third.content).toBe(answer)
 			expect(replies.next()).toEqual({ done: true, value: undefined })
 			expect(copies).toEqual([
-				'## Records\n### Brightwater Studio (account BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nIs the Brightwater Studio refund approved yet?',
+				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nIs the Brightwater Studio refund approved yet?',
 			])
 			expect(uninterrupted).toEqual(copies)
 			expect(guideText).toContain(
@@ -1786,7 +1786,7 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain("third.content // 'Not yet. A manager must approve it.'")
 			expect(guideText).toContain(
-				"// '## Records\\n### Brightwater Studio (account BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
+				"// '## Records\\n### Brightwater Studio (BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
 			)
 		})
 
@@ -2059,7 +2059,7 @@ await new GuideCommand({
 				].join('\n'),
 			)
 			expect(guideText).toContain(
-				"It lists the earlier messages and lookup readings that match a topic (an owner name, an id, or a desk topic) with their stored content, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
+				"It lists the earlier messages and lookup readings that match a topic (an owner name, an id, or a topic) with their stored content, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
 			)
 		})
 

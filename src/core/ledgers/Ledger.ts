@@ -213,11 +213,11 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Recall what the full conversation record holds on a topic: an owner name, an id, or one of the desk topics ${renderTopicNames(options.topics)}. Returns source lines, newest first.`,
+				description: `Recall what the full conversation record holds on a topic: an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. Returns source lines, newest first.`,
 				parameters: {
 					type: 'object',
 					properties: {
-						topic: { type: 'string', description: 'An owner name, an id, or a desk topic' },
+						topic: { type: 'string', description: 'An owner name, an id, or a topic' },
 					},
 					required: ['topic'],
 				},
