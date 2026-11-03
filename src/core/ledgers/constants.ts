@@ -110,10 +110,7 @@ export const DEFAULT_RECALL_LIMIT = 2
  * Sets the 5 milliseconds a paced classifier files between host turns.
  *
  * @remarks
- * Time, not a count of steps, so a slice on a slow device is the same 5 milliseconds. The long-task
- * target at 400 messages on this project's host is 12.5 milliseconds, and the first task also holds
- * the scan and the view copy, so the slice leaves 7.5 milliseconds for those and for a step that
- * overruns it.
+ * Time, not a count of steps, so a slice on a slow device is the same 5 milliseconds.
  */
 export const LEDGER_SLICE = 5
 

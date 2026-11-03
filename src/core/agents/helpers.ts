@@ -47,7 +47,7 @@ import { isNonNegativeSafeInteger } from '../validators.js'
  * non-finite usage number, a throwing getter, or a malformed or revoked proxy.
  *
  * @remarks
- * This is a total hostile-boundary projection. Each structural field is captured once
+ * This is a total projection that reads untrusted input. Each structural field is captured once
  * through Contract's sanctioned exception boundary, so conforming accessors and inherited
  * properties are supported while a throwing getter or revoked proxy returns `undefined`.
  * Present usage counts must be finite numbers; negative and fractional values are preserved,

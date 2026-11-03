@@ -83,7 +83,7 @@ import { isProviderAbortError } from '../providers/index.js'
  *   yielding each content delta as a `token` chunk and charging its estimate to the
  *   `allowance` when one is set; reconcile the turn's usage against the `budget`, before a
  *   genuine provider error rejects the run too, and yield a `usage` chunk; if the model
- *   requested tools, yield an `ask` chunk per asked call once its approver is entered,
+ *   requested tools, yield an `ask` chunk per asked call after its approver is entered,
  *   append the assistant turn, pass them to the tool manager's `execute`
  *   method, yield a `tool` chunk per call, append each tool result message, and continue;
  *   otherwise append the final assistant message and stop. The run's content,
@@ -509,7 +509,7 @@ export class Agent implements AgentInterface {
 				tools.definitions(),
 				(definition) => definition.name,
 			)
-			// The instance each advertised name holds now: every decision of this turn applies to it.
+			// The instance each advertised name holds at this point: every decision of this turn applies to it.
 			const held = new Map(
 				advertised.map((definition) => [definition.name, tools.tool(definition.name)]),
 			)
@@ -660,7 +660,7 @@ export class Agent implements AgentInterface {
 		allowance: BudgetInterface<TokenUsage> | undefined,
 	) {
 		// Read before any reconcile: an abort seen here landed while the call ran, and a charge that
-		// trips a bound below cannot turn a genuine failure into a partial.
+		// trips a bound later in this method cannot turn a genuine failure into a partial.
 		const interrupted = abort.signal.aborted
 		// The abort partial of an interrupted call is the only carrier of its reasoning and usage; the
 		// streamed deltas already hold its content. A genuine failure contributes no usage.

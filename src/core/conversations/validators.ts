@@ -29,7 +29,7 @@ import { isJudgeQuestion } from '../validators.js'
  * @remarks
  * Roles belong to MessageRole, image elements are strings, `thinking` is a string, and `call` is a string on any
  * role, as the flat Message type admits. Tool arguments may carry non-JSON values, as the
- * domain type permits; the message wire contract is narrower. Unreadable fields and hostile
+ * domain type permits; the message wire contract is narrower. Unreadable fields and untrusted
  * inputs return false.
  *
  * @param value - The unknown message candidate
@@ -122,7 +122,7 @@ export const isJudgment: Guard<Judgment> = unionOf(
  * assertion.
  *
  * @remarks
- * A total guard (it never throws — adversarial input, a throwing getter included, returns
+ * A total guard (it never throws — untrusted input, a throwing getter included, returns
  * `false`). It checks the shape of the section: a record with a `string` `id`, a `string`
  * `summary`, and a dense `messages` array every element of which is a valid {@link Message}
  * record ({@link isMessage}); a sparse `messages` array is refused. Enough to safely impose
@@ -153,7 +153,7 @@ export function isSection(value: unknown): value is Section {
  * analogue of {@link import('@orkestrel/workspace').isWorkspaceSnapshot}.
  *
  * @remarks
- * A total guard (it never throws — adversarial input returns `false`). It checks the shape of the
+ * A total guard (it never throws — untrusted input returns `false`). It checks the shape of the
  * snapshot: a `string` `id`, a `sections` array every element of which is a valid
  * {@link Section} ({@link isSection}), a `messages` array every element of which is a
  * valid {@link Message} ({@link isMessage}), and optional valid `judgments` — enough to safely

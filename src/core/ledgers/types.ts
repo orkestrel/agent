@@ -551,7 +551,7 @@ export interface LedgerInterface {
 	 * call while a `respond` or `calibrate` call is in flight throws, because an entered, unanswered
 	 * request would hydrate as a dangling request; a direct agent run is not refused.
 	 *
-	 * @returns The snapshot, each id list in conversation order and `gauge` present once the ledger holds one
+	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	snapshot(): LedgerSnapshot

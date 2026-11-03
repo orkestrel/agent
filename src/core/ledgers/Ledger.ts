@@ -292,7 +292,7 @@ export class Ledger implements LedgerInterface {
 
 	/**
 	 * Serializes the conversation, the marked ids, and the gauge into a snapshot a later ledger hydrates from.
-	 * @returns The snapshot, each id list in conversation order and `gauge` present once the ledger holds one
+	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	snapshot(): LedgerSnapshot {
@@ -449,7 +449,7 @@ export class Ledger implements LedgerInterface {
 		})
 	}
 
-	// The live `respond` call's request once it has entered its message; a run during the call's
+	// The live `respond` call's request after it has entered its message; a run during the call's
 	// calibration reaches none. A refusal on every add caps the registry at one request.
 	#current(): LedgerRequest | undefined {
 		const [request] = this.#live
@@ -687,7 +687,7 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// Returns the held scan while the conversation keeps its message ids in order; otherwise holds,
-	// in its place, a scan of the conversation as it reads now, so one plan never mixes the two.
+	// in its place, a scan of the conversation as it reads at this call, so one plan never mixes the two.
 	#rescan(): LedgerScan {
 		const messages = this.#conversation.messages()
 		const [held] = this.#scans

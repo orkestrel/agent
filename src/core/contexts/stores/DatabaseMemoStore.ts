@@ -82,7 +82,7 @@ export class DatabaseMemoStore implements MemoStoreInterface {
 	 * `{ id, snapshot }`.
 	 *
 	 * @param snapshot - The snapshot to store, keyed by its `id`
-	 * @returns A promise that resolves once the row is written
+	 * @returns A promise that resolves after the row is written
 	 */
 	async set(snapshot: MemoSnapshot): Promise<void> {
 		await this.#table.set({ id: snapshot.id, snapshot })
@@ -92,7 +92,7 @@ export class DatabaseMemoStore implements MemoStoreInterface {
 	 * Drops a snapshot by id; an absent id is a no-op (no throw).
 	 *
 	 * @param id - The memo set id to drop
-	 * @returns A promise that resolves once the row is gone
+	 * @returns A promise that resolves after the row is gone
 	 */
 	async delete(id: string): Promise<void> {
 		await this.#table.remove(id)

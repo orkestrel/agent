@@ -370,7 +370,7 @@ export function requireSummary(summary: string): string {
 export function raceSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
 	if (signal === undefined) return promise
 	return new Promise<T>((resolve, reject) => {
-		// Aborting `settled` removes the abort listener once the promise settles.
+		// Aborting `settled` removes the abort listener after the promise settles.
 		const settled = new AbortController()
 		if (signal.aborted) reject(signal.reason)
 		else {

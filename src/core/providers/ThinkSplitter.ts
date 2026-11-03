@@ -90,7 +90,7 @@ export class ThinkSplitter implements ThinkSplitterInterface {
 	}
 
 	// Walk the pending text, yielding each clean content piece in order and routing reasoning to
-	// `#thinking`; return once the remainder is undecided and held for the next delta. A piece is
+	// `#thinking`; return when the remainder is undecided and held for the next delta. A piece is
 	// yielded only after `#opened` is set, so the reclassification below never meets one.
 	*#surface(): Generator<string, void> {
 		for (;;) {

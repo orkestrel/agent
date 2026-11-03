@@ -80,7 +80,7 @@ export class RelayProvider extends AgentProvider {
 	 *
 	 * @param request - The domain conversation and call configuration
 	 * @returns The validated wire request
-	 * @throws {ProviderError} Thrown when the snapshot cannot be taken — a hostile read or a
+	 * @throws {ProviderError} Thrown when the snapshot cannot be taken — a throwing read or a
 	 * value outside JSON — carrying that failure as its `cause`, and when the snapshot the
 	 * projection produced is not a valid wire request
 	 */

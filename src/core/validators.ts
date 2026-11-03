@@ -15,7 +15,7 @@ import {
  * Checks whether a value is a judge entry: a string, a JSON record, or a JSON array.
  *
  * @remarks
- * Total: a cycle, a non-JSON member, a class instance, and a hostile input return false. `null`
+ * Total: a cycle, a non-JSON member, a class instance, and an untrusted input return false. `null`
  * is not an entry; a criteria guard admits it where the protocol keeps it.
  *
  * @param value - The unknown entry candidate
@@ -37,7 +37,7 @@ export function isJudgeEntry(value: unknown): value is JudgeEntry {
  * Checks whether a value is a well-formed judge question of the choice, score, or noul form.
  *
  * @remarks
- * Total: a hostile input returns false. A choice needs at least 2 options and a score at least 2
+ * Total: an untrusted input returns false. A choice needs at least 2 options and a score at least 2
  * levels, because the confidence formula divides by the candidate count; a description or a level
  * can be `null`. `instructions` and noul `criteria` are omitted when absent and never `null`.
  * Server limits on option, level, and question counts are left to the server.

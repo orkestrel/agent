@@ -36,7 +36,7 @@ export function isPositiveSafeInteger(value: unknown): value is number {
  * dense arrays of strings. Each request and note id must name a `user` message of
  * `conversation.messages` and each failure id a `tool` message, so an id only a section original
  * holds is refused. A `gauge`, when present, must hold a finite `scale` greater than 0 and a finite
- * `overhead` of at least 0. Unknown members are admitted. Unreadable members and hostile inputs
+ * `overhead` of at least 0. Unknown members are admitted. Unreadable members and untrusted inputs
  * return false. The guard is structural: it admits a conversation holding a stored `system` role
  * or a repeated id, which `requireConversationSnapshot` and the `Conversation` constructor then
  * refuse as the stored-data check a ledger's hydrate runs.

@@ -49,7 +49,7 @@ export function isSystemOneResponse(value: unknown): value is SystemOneResponse 
  * score, each probability a finite number in [0, 1]. The `choice`, `score`, `confidence`, and
  * `legend` members are carried unchecked, because the wire never reads them, so a value this
  * guard accepts can hold any value in those members. Distribution sums are not constrained;
- * values are never normalized. Hostile reads return false.
+ * values are never normalized. A read that throws returns false.
  *
  * @param value - The unknown answer candidate
  * @returns True if the type and the distribution satisfy the wire contract; false otherwise

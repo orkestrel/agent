@@ -9,7 +9,7 @@ import type { FileInput, FileInterface, WorkspaceManagerInterface } from '@orkes
  * Names the machine-readable condition a {@link import('./errors.js').ContextError} reports.
  *
  * @remarks
- * `'SNAPSHOT'`: a `snapshot` option that `isMemoSnapshot` refuses once copied through JSON.
+ * `'SNAPSHOT'`: a `snapshot` option that `isMemoSnapshot` refuses after it is copied through JSON.
  */
 export type ContextErrorCode = 'SNAPSHOT'
 
