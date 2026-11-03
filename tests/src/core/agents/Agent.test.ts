@@ -39,13 +39,14 @@ import {
 	createIndependentGatedProvider,
 	createSharedGatedProvider,
 	createSecondTurnFailureProvider,
+	createDeafScheduler,
 	createFailingScheduler,
 	createForeignSignal,
 	createRecordedBudget,
 	createRecordedTool,
 	FailingProvider,
 } from '../../../setup.js'
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
 import { attempt, isContractError, parseJSONAs, parseJSONValue } from '@orkestrel/contract'
 import { createBudget, createTokenBudget, isBudgetError } from '@orkestrel/budget'
@@ -2610,6 +2611,29 @@ describe('Agent — scheduler edge cases', () => {
 		expect(agent.status).toBe('error')
 	})
 
+	it('a turn boundary on a scheduler that ignores its signal still ends on abort', async () => {
+		const tools = createToolManager()
+		tools.add(createLoopTool())
+		const gate = Promise.withResolvers<void>()
+		onTestFinished(() => gate.resolve())
+		const scheduler = createDeafScheduler(gate)
+		const provider = createScriptedProvider(
+			Array.from({ length: 6 }, () => ({
+				result: { content: 'turn', tools: [createToolCall({ id: 'c', name: 'loop' })] },
+			})),
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools, scheduler, limit: 6 })
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const pending = agent.generate()
+		await scheduler.reached
+		agent.abort('the operator stopped the run')
+		expect(await pending).toEqual({ content: 'turn', partial: true })
+		expect(agent.status).toBe('done')
+		expect(scheduler.yields).toBe(1)
+		expect(provider.calls).toHaveLength(1)
+	})
+
 	it('with no scheduler the inter-turn yield is skipped cleanly (the ?. path)', async () => {
 		const tools = createToolManager()
 		tools.add(createAddTool())
@@ -2617,7 +2641,7 @@ describe('Agent — scheduler edge cases', () => {
 			[{ result: { content: '', tools: [createToolCall()] } }, { result: { content: 'done' } }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		// No scheduler option → `this.#scheduler?.yield(...)` is a no-op; multi-turn still works.
+		// No scheduler option → the inter-turn yield is skipped; multi-turn still works.
 		const agent = createAgent(provider, { tools })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
@@ -4753,6 +4777,78 @@ describe('Agent — strict window admission', () => {
 		expect(agent.status).toBe('error')
 	})
 
+	it('strict window: a fault listener that cancels during a failed fold settles partial, not error', async () => {
+		const failure = new Error('summarizer failure')
+		const controller = new AbortController()
+		const conversations = createConversationManager({
+			summarize: async () => {
+				throw failure
+			},
+			keep: 0,
+		})
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'q'.repeat(200) },
+			{ role: 'user', content: 'hi' },
+		])
+		const provider = createAnswerProvider()
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const errors = createRecorder<AgentEventMap['error']>()
+		const agent = createAgent(provider, {
+			conversations,
+			window: createBudget({ max: 10, consumer: estimateRequest }),
+			limit: 5,
+			strict: true,
+			signal: controller.signal,
+			on: { fault: faults.handler, error: errors.handler },
+		})
+		agent.emitter.on('fault', () => controller.abort('the operator closed the ticket'))
+
+		const result = await agent.generate()
+
+		expect(result.partial).toBe(true)
+		expect(faults.calls).toEqual([[failure]])
+		expect(errors.calls).toEqual([])
+		expect(provider.started).toBe(0)
+		expect(agent.status).toBe('done')
+	})
+
+	it('lenient window: a fault listener that cancels during a failed fold dispatches nothing', async () => {
+		const failure = new Error('summarizer failure')
+		const controller = new AbortController()
+		const conversations = createConversationManager({
+			summarize: async () => {
+				throw failure
+			},
+			keep: 0,
+		})
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'q'.repeat(200) },
+			{ role: 'user', content: 'hi' },
+		])
+		const provider = createAnswerProvider()
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const errors = createRecorder<AgentEventMap['error']>()
+		const agent = createAgent(provider, {
+			conversations,
+			window: createBudget({ max: 10, consumer: estimateRequest }),
+			limit: 5,
+			strict: false,
+			signal: controller.signal,
+			on: { fault: faults.handler, error: errors.handler },
+		})
+		agent.emitter.on('fault', () => controller.abort('the operator closed the ticket'))
+
+		const result = await agent.generate()
+
+		expect(result.partial).toBe(true)
+		expect(faults.calls).toEqual([[failure]])
+		expect(errors.calls).toEqual([])
+		expect(provider.started).toBe(0)
+		expect(agent.status).toBe('done')
+	})
+
 	it('strict window: a cancel during the fold settles partial, not WINDOW, with no fault and zero provider calls', async () => {
 		const controller = new AbortController()
 		const summarized = createRecorder<[readonly Message[]]>()
@@ -6755,6 +6851,41 @@ describe('Agent — authority ask', () => {
 		expect(agent.context.messages.messages()).toEqual([seed])
 	})
 
+	it('ordering 3: a deny listener that aborts at the instance check appends no assistant turn and runs nothing', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(['read', 'other'].map((name) => createRecordedTool(name, executed)))
+		const provider = createScriptedProvider(
+			[
+				{
+					result: {
+						content: 'working',
+						tools: [
+							createToolCall({ id: 'r1', name: 'read' }),
+							createToolCall({ id: 'o1', name: 'other' }),
+						],
+					},
+				},
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({
+				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
+				ask: () => {
+					tools.add(createRecordedTool('read', executed))
+					return true
+				},
+			}),
+		})
+		agent.emitter.on('deny', () => agent.abort('deny listener ended the run'))
+		const seed = agent.context.messages.add({ role: 'user', content: 'go' })
+		expect(await agent.generate()).toMatchObject({ content: 'working', partial: true })
+		expect(executed.calls).toEqual([])
+		expect(agent.context.messages.messages()).toEqual([seed])
+	})
+
 	it('ordering 4: an abort between approval and dispatch skips execution', async () => {
 		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const order = createRecorder<[name: AgentEventName]>()
@@ -6851,6 +6982,194 @@ describe('Agent — authority ask', () => {
 		expect(provider.calls[1]?.messages.at(-1)?.content).toBe(
 			'"write" did not run: it needs approval and none was given. Do not call it again; tell the user it needs approval.',
 		)
+	})
+
+	it("ordering 4: a call allowed on the synchronous pass is denied when its tool is replaced during another call's ask", async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const other = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const decisions = createRecorder<[entry: string]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add([
+			createRecordedTool('read', original),
+			createRecordedTool('other', other, 'ran other'),
+		])
+		const read = createToolCall({ id: 'r1', name: 'read' })
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [read, createToolCall({ id: 'o1', name: 'other' })] } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({
+				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
+				ask: () => {
+					tools.add(createRecordedTool('read', replaced))
+					return true
+				},
+			}),
+			on: { deny: denied.handler },
+		})
+		agent.emitter.on('allow', (call) => decisions.handler(`allow ${call.name}`))
+		agent.emitter.on('deny', (call) => decisions.handler(`deny ${call.name}`))
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(original.calls).toEqual([])
+		expect(replaced.calls).toEqual([])
+		expect(other.calls).toEqual([[{}]])
+		expect(denied.calls).toEqual([[read, 'read changed after its decision', undefined]])
+		expect(decisions.calls.map(([entry]) => entry)).toEqual([
+			'allow read',
+			'allow other',
+			'deny read',
+		])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([
+			'"read" did not run: it is not allowed. Do not call it again; answer with what you have.',
+			'ran other',
+		])
+	})
+
+	it("ordering 4: an approval given before another call's ask does not run a replacement added during that ask", async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const other = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add([
+			createRecordedTool('write', original),
+			createRecordedTool('other', other, 'ran other'),
+		])
+		const provider = createScriptedProvider(
+			[
+				{
+					result: {
+						content: '',
+						tools: [
+							createToolCall({ id: 'w1', name: 'write' }),
+							createToolCall({ id: 'o1', name: 'other' }),
+						],
+					},
+				},
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({
+				rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
+				ask: ({ call }) => {
+					if (call.name === 'other') tools.add(createRecordedTool('write', replaced))
+					return true
+				},
+			}),
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(original.calls).toEqual([])
+		expect(replaced.calls).toEqual([])
+		expect(other.calls).toEqual([[{}]])
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([
+			'"write" did not run: it is not allowed. Do not call it again; answer with what you have.',
+			'ran other',
+		])
+	})
+
+	it.each([
+		{ label: 'allowed on the synchronous pass', rules: ['other'] },
+		{ label: 'approved before that ask', rules: ['read', 'other'] },
+	])(
+		"ordering 4: a call $label is denied when its tool is removed during another call's ask",
+		async ({ rules }) => {
+			const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+			const other = createRecorder<[Readonly<Record<string, unknown>>]>()
+			const denied = createRecorder<AgentEventMap['deny']>()
+			const tools = createToolManager()
+			tools.add([
+				createRecordedTool('read', original),
+				createRecordedTool('other', other, 'ran other'),
+			])
+			const read = createToolCall({ id: 'r1', name: 'read' })
+			const provider = createScriptedProvider(
+				[
+					{ result: { content: '', tools: [read, createToolCall({ id: 'o1', name: 'other' })] } },
+					{ result: { content: 'done' } },
+				],
+				AGENT_SCRIPT_OPTIONS,
+			)
+			const agent = createAgent(provider, {
+				tools,
+				authority: createAuthority({
+					rules: [{ match: ({ call }) => rules.includes(call.name), zone: 'z', verdict: 'ask' }],
+					ask: ({ call }) => {
+						if (call.name === 'other') tools.remove('read')
+						return true
+					},
+				}),
+				on: { deny: denied.handler },
+			})
+			expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+			expect(original.calls).toEqual([])
+			expect(other.calls).toEqual([[{}]])
+			expect(denied.calls).toEqual([[read, 'read changed after its decision', undefined]])
+			expect(
+				provider.calls[1]?.messages
+					.filter((message) => message.role === 'tool')
+					.map((message) => message.content),
+			).toEqual([
+				'"read" did not run: it is not allowed. Do not call it again; answer with what you have.',
+				'ran other',
+			])
+		},
+	)
+
+	it("ordering 4: a call whose same instance is re-added during another call's ask still runs", async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const other = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const instance = createRecordedTool('read', original, 'ran read')
+		const tools = createToolManager()
+		tools.add([instance, createRecordedTool('other', other, 'ran other')])
+		const provider = createScriptedProvider(
+			[
+				{
+					result: {
+						content: '',
+						tools: [
+							createToolCall({ id: 'r1', name: 'read' }),
+							createToolCall({ id: 'o1', name: 'other' }),
+						],
+					},
+				},
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({
+				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
+				ask: () => {
+					tools.remove('read')
+					tools.add(instance)
+					return true
+				},
+			}),
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(original.calls).toEqual([[{}]])
+		expect(other.calls).toEqual([[{}]])
+		expect(denied.calls).toEqual([])
 	})
 
 	it('ordering 5: tools.execute receives allowed and approved calls in call order', async () => {
@@ -7324,6 +7643,261 @@ describe('Agent — authority ask', () => {
 		expect(provider.calls[1]?.messages.at(-1)?.content).toBe(
 			'"write" did not run: it needs approval and none was given. Do not call it again; tell the user it needs approval.',
 		)
+	})
+
+	it("ordering 9: a consequential instance added during another call's ask never runs without an ask", async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const other = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const entered = createRecorder<[name: string]>()
+		const tools = createToolManager()
+		tools.add([
+			createRecordedTool('read', original),
+			createRecordedTool('other', other, 'ran other'),
+		])
+		const read = createToolCall({ id: 'r1', name: 'read' })
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [read, createToolCall({ id: 'o1', name: 'other' })] } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({
+				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
+				ask: ({ call }) => {
+					entered.handler(call.name)
+					if (call.name === 'other') {
+						tools.add(
+							createTool({
+								name: 'read',
+								annotations: { consequential: true },
+								execute: (args) => {
+									replaced.handler(args)
+									return 'ran the replacement'
+								},
+							}),
+						)
+					}
+					return true
+				},
+			}),
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(entered.calls).toEqual([['other']])
+		expect(replaced.calls).toEqual([])
+		expect(original.calls).toEqual([])
+		expect(other.calls).toEqual([[{}]])
+		expect(denied.calls).toEqual([[read, 'read changed after its decision', undefined]])
+	})
+
+	it('ordering 9: a consequential instance added from a usage listener never runs without an ask', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const approver = createScriptedApprover([true])
+		const tools = createToolManager()
+		tools.add(createRecordedTool('read', original))
+		const call = createToolCall({ name: 'read' })
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [call], usage: AGENT_USAGE } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({ rules: [], ask: approver.ask }),
+			on: {
+				deny: denied.handler,
+				usage: () => {
+					tools.add(
+						createTool({
+							name: 'read',
+							annotations: { consequential: true },
+							execute: (args) => {
+								replaced.handler(args)
+								return 'ran the replacement'
+							},
+						}),
+					)
+				},
+			},
+		})
+		expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
+		expect(replaced.calls).toEqual([])
+		expect(original.calls).toEqual([])
+		expect(approver.calls).toEqual([])
+		expect(denied.calls).toEqual([[call, 'read changed after its decision', undefined]])
+	})
+
+	it('ordering 9: a consequential instance added during the provider stream never runs without an ask', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const approver = createScriptedApprover([true])
+		const tools = createToolManager()
+		tools.add(createRecordedTool('read', original))
+		const call = createToolCall({ name: 'read' })
+		const provider = createScriptedProvider(
+			[{ result: { content: 'working', tools: [call] } }, { result: { content: 'done' } }],
+			{
+				...AGENT_SCRIPT_OPTIONS,
+				// The stream replaces the tool on the turn that names it, before it returns the call.
+				chunk: (content) => {
+					if (content === 'working') {
+						tools.add(
+							createTool({
+								name: 'read',
+								annotations: { consequential: true },
+								execute: (args) => {
+									replaced.handler(args)
+									return 'ran the replacement'
+								},
+							}),
+						)
+					}
+					return [content]
+				},
+			},
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({ rules: [], ask: approver.ask }),
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
+		expect(replaced.calls).toEqual([])
+		expect(original.calls).toEqual([])
+		expect(approver.calls).toEqual([])
+		expect(denied.calls).toEqual([[call, 'read changed after its decision', undefined]])
+		expect(provider.calls[1]?.messages.at(-1)?.content).toBe(
+			'"read" did not run: it is not allowed. Do not call it again; answer with what you have.',
+		)
+	})
+
+	it('ordering 9: a consequential instance added during a fold never runs without an ask', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const approver = createScriptedApprover([true])
+		const tools = createToolManager()
+		tools.add(createRecordedTool('read', original))
+		const call = createToolCall({ name: 'read' })
+		const conversations = createConversationManager({
+			summarize: async () => {
+				tools.add(
+					createTool({
+						name: 'read',
+						annotations: { consequential: true },
+						execute: (args) => {
+							replaced.handler(args)
+							return 'ran the replacement'
+						},
+					}),
+				)
+				return 'digest'
+			},
+			keep: 0,
+		})
+		conversations.add().add([
+			{ role: 'user', content: 'q'.repeat(4000) },
+			{ role: 'user', content: 'hi' },
+		])
+		const provider = createScriptedProvider(
+			[{ result: { content: 'working', tools: [call] } }, { result: { content: 'done' } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			conversations,
+			window: createBudget<ProviderRequest>({ max: 300, consumer: estimateRequest }),
+			authority: createAuthority({ rules: [], ask: approver.ask }),
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
+		expect(replaced.calls).toEqual([])
+		expect(original.calls).toEqual([])
+		expect(approver.calls).toEqual([])
+		expect(denied.calls).toEqual([[call, 'read changed after its decision', undefined]])
+	})
+
+	it('ordering 4: a tool a deny listener replaces after its check is denied too', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const approver = createScriptedApprover([])
+		const tools = createToolManager()
+		tools.add(['read', 'write'].map((name) => createRecordedTool(name, original)))
+		const read = createToolCall({ id: 'r1', name: 'read' })
+		const write = createToolCall({ id: 'w1', name: 'write' })
+		const provider = createScriptedProvider(
+			[{ result: { content: 'working', tools: [read, write] } }, { result: { content: 'done' } }],
+			{
+				...AGENT_SCRIPT_OPTIONS,
+				chunk: (content) => {
+					if (content === 'working') tools.add(createRecordedTool('write', replaced))
+					return [content]
+				},
+			},
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: createAuthority({ rules: [], ask: approver.ask }),
+			on: { deny: denied.handler },
+		})
+		const late = createRecordedTool('read', replaced)
+		agent.emitter.on('deny', () => tools.add(late))
+		expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
+		expect(original.calls).toEqual([])
+		expect(replaced.calls).toEqual([])
+		expect(denied.calls).toEqual([
+			[write, 'write changed after its decision', undefined],
+			[read, 'read changed after its decision', undefined],
+		])
+	})
+
+	it('ordering 3: a cancel in an ask leaves a replaced allowed tool with no deny event', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const controller = new AbortController()
+		const tools = createToolManager()
+		tools.add(['read', 'other'].map((name) => createRecordedTool(name, executed)))
+		const provider = createScriptedProvider(
+			[
+				{
+					result: {
+						content: 'working',
+						tools: [
+							createToolCall({ id: 'r1', name: 'read' }),
+							createToolCall({ id: 'o1', name: 'other' }),
+						],
+					},
+				},
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			signal: controller.signal,
+			authority: createAuthority({
+				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
+				ask: () => {
+					tools.add(createRecordedTool('read', executed))
+					controller.abort('stop')
+					return true
+				},
+			}),
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toMatchObject({ content: 'working', partial: true })
+		expect(executed.calls).toEqual([])
+		expect(denied.calls).toEqual([])
 	})
 
 	it.each([

@@ -7,7 +7,7 @@ import type {
 	JudgmentInput,
 	Message,
 } from '../types.js'
-import { attempt, isArray, isRecord } from '@orkestrel/contract'
+import { attempt, isArray, isRecord, isString } from '@orkestrel/contract'
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 import { ConversationError } from './errors.js'
 import { isConversationSnapshot, isJudgment } from './validators.js'
@@ -331,7 +331,7 @@ export function requireKeep(keep: number): number {
  *
  * @param summary - The summarizer digest to check
  * @returns The digest unchanged
- * @throws ConversationError Thrown when the trimmed digest is empty (code `'SUMMARY'`)
+ * @throws ConversationError Thrown when the digest is not a string or its trimmed text is empty (code `'SUMMARY'`)
  *
  * @example
  * ```ts
@@ -340,7 +340,7 @@ export function requireKeep(keep: number): number {
  * ```
  */
 export function requireSummary(summary: string): string {
-	if (summary.trim() === '') {
+	if (!isString(summary) || summary.trim() === '') {
 		throw new ConversationError('SUMMARY', 'a summarizer digest must carry non-whitespace text')
 	}
 	return summary

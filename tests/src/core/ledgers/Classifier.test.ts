@@ -3,7 +3,7 @@ import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
 import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { Classifier } from '../../../../src/core/ledgers/Classifier.js'
 import {
 	DETERMINISTIC_JUDGE_ERROR,
@@ -24,6 +24,7 @@ import {
 	buildLedgerTopicJudgment,
 	buildAttemptSummaries,
 	CLASSIFIER_PINNED_ASKS,
+	createDeafScheduler,
 	createFailingScheduler,
 	createGatedScheduler,
 	createLedgerJudge,
@@ -1477,6 +1478,25 @@ describe('Classifier', () => {
 		expect(result.fault).toBe(reason)
 		expect(result.attempts).toEqual([])
 		expect(judge.requests).toEqual([])
+	})
+
+	it('a scheduler that ignores its signal still ends on abort', async () => {
+		const conversation = createConversation()
+		conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		const judge = new SilentJudge()
+		const gate = Promise.withResolvers<void>()
+		onTestFinished(() => gate.resolve())
+		const scheduler = createDeafScheduler(gate)
+		const classifier = new Classifier(buildClassifierOptions({ conversation, judge, scheduler }))
+		const caller = new AbortController()
+		const reason = new Error('stopped')
+		const pending = classifier.classify(new Set(), caller.signal)
+		await scheduler.reached
+		caller.abort(reason)
+		const result = await pending
+		expect(result.fault).toBe(reason)
+		expect(judge.requests).toEqual([])
+		expect(scheduler.yields).toBe(1)
 	})
 
 	it('a scheduler fault returns the fault', async () => {

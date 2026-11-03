@@ -486,12 +486,14 @@ export class Agent implements AgentInterface {
 			// Observe each turn begin (the turn index). The emitter isolates a listener throw, so it
 			// can't perturb the turn that immediately follows.
 			this.#emitter.emit('turn', index)
-			// Pace between expensive turns — never before the first. A scheduler honours the signal by
-			// rejecting a pending yield on abort, so a cancel landing at the turn boundary surfaces here
-			// as a throw; it stops the turn like any cancel, while a genuine scheduler fault propagates.
-			if (index > 0) {
+			// Pace between expensive turns — never before the first. The yield is raced against the run
+			// signal, so a scheduler that ignores it still ends on a cancel; a cancel landing at the turn
+			// boundary surfaces here as a throw and stops the turn like any cancel, while a genuine
+			// scheduler fault propagates.
+			const scheduler = this.#scheduler
+			if (index > 0 && scheduler !== undefined) {
 				try {
-					await this.#scheduler?.yield({ signal: abort.signal })
+					await raceSignal(scheduler.yield({ signal: abort.signal }), abort.signal)
 				} catch (error) {
 					if (!abort.signal.aborted) throw error
 				}
@@ -506,6 +508,10 @@ export class Agent implements AgentInterface {
 				names,
 				tools.definitions(),
 				(definition) => definition.name,
+			)
+			// The instance each advertised name holds now: every decision of this turn applies to it.
+			const held = new Map(
+				advertised.map((definition) => [definition.name, tools.tool(definition.name)]),
 			)
 			const definitions = advertised.length > 0 ? advertised : undefined
 			// Admit the request: compose it once from the replay-filtered messages and this turn's tool
@@ -562,11 +568,12 @@ export class Agent implements AgentInterface {
 				}
 			} else if (result.tools !== undefined && result.tools.length > 0) {
 				const admittedCalls = filterAllowList(names, result.tools, (call) => call.name)
-				const authorization = this.#authorize(tools, result.tools, admittedCalls, advertised)
+				const authorization = this.#authorize(result.tools, admittedCalls, advertised, held)
 				// The ask pass runs only for an asked call, so a turn with no `ask` verdict adds no `await`.
 				if (authorization.asked.length > 0 && !abort.signal.aborted) {
 					yield* this.#approve(tools, authorization, abort.signal)
 				}
+				if (!abort.signal.aborted) this.#confirm(tools, authorization)
 				if (abort.signal.aborted) {
 					turns.push({ ...settled, outcome: 'cancel', partial: true })
 					continue
@@ -817,6 +824,9 @@ export class Agent implements AgentInterface {
 		if (abort.signal.aborted)
 			return { dispatch: undefined, messages, spent: undefined, futile: false }
 		this.#emitter.emit('fault', error)
+		// A fault listener can cancel the run synchronously; the cancel then wins over strict, as in #reject.
+		if (abort.signal.aborted)
+			return { dispatch: undefined, messages, spent: undefined, futile: false }
 		if (this.#strict) throw error
 		return { dispatch: composed, messages, spent: undefined, futile: false }
 	}
@@ -892,15 +902,19 @@ export class Agent implements AgentInterface {
 
 	// Evaluate policy and emit each verdict before the run's final pre-dispatch abort guard, in call
 	// order with no `await`: policy callbacks and decision listeners can cancel the run synchronously.
-	// Only an `allow` verdict enters the allowed map; an asked call is queued with the instance the
-	// registry holds for its name, so an approval of a tool replaced during the ask is refused.
+	// Only an `allow` verdict enters the allowed map, seated with the instance the turn held when it
+	// advertised the call; an asked call is queued with that same instance, so a decision applies to
+	// that instance alone and a tool replaced later is refused.
 	#authorize(
-		tools: ToolManagerInterface,
 		calls: readonly ToolCall[],
 		admitted: readonly ToolCall[],
 		advertised: readonly ToolDefinition[],
+		held: ReadonlyMap<string, ToolInterface | undefined>,
 	) {
-		const allowed = new Map<number, ToolCall>()
+		const allowed = new Map<
+			number,
+			{ readonly call: ToolCall; readonly tool: ToolInterface | undefined }
+		>()
 		const denials = new Map<number, ToolResult>()
 		const asked: Array<{
 			readonly index: number
@@ -917,10 +931,10 @@ export class Agent implements AgentInterface {
 			}
 			const decision = decided.value
 			if (decision.verdict === 'allow') {
-				allowed.set(index, call)
+				allowed.set(index, { call, tool: held.get(call.name) })
 				this.#emitter.emit('allow', call, decision)
 			} else if (decision.verdict === 'ask') {
-				asked.push({ index, call, decision, tool: tools.tool(call.name) })
+				asked.push({ index, call, decision, tool: held.get(call.name) })
 			} else {
 				denials.set(index, denyCall(call, decision.reason))
 				this.#emitter.emit('deny', call, decision.reason, decision)
@@ -983,12 +997,15 @@ export class Agent implements AgentInterface {
 	// settles, and races each answer against the run signal. Each call's `ask` chunk is yielded after
 	// its handler is entered and before its answer is awaited, so a reader that sees the chunk finds
 	// the ask registered. An abort returns at once, so the pending call emits nothing further and no
-	// later handler is entered; `raceSignal` absorbs a late settle. An approval of a tool the registry
-	// replaced during the ask is denied as unanswered.
+	// later handler is entered; `raceSignal` absorbs a late settle. An approval of a tool that is no
+	// longer the turn's held instance is denied as unanswered; any other approval seats that instance.
 	async *#approve(
 		tools: ToolManagerInterface,
 		authorization: {
-			readonly allowed: Map<number, ToolCall>
+			readonly allowed: Map<
+				number,
+				{ readonly call: ToolCall; readonly tool: ToolInterface | undefined }
+			>
 			readonly denials: Map<number, ToolResult>
 			readonly asked: ReadonlyArray<{
 				readonly index: number
@@ -1032,7 +1049,7 @@ export class Agent implements AgentInterface {
 			const outcome = await raceSignal(answer, signal).catch(() => undefined)
 			if (outcome === undefined || signal.aborted) return
 			if (outcome.approved && tools.tool(call.name) === tool) {
-				authorization.allowed.set(index, call)
+				authorization.allowed.set(index, { call, tool })
 				this.#emitter.emit('allow', call, decision)
 			} else {
 				authorization.denials.set(index, denyCall(call, outcome.note))
@@ -1041,22 +1058,49 @@ export class Agent implements AgentInterface {
 		}
 	}
 
+	// Denies each allowed call whose tool is no longer the turn's held instance, with no `await` and
+	// before the pre-dispatch abort guard, so a `deny` listener that cancels here stores nothing. The
+	// compare is by identity, so a host that re-adds the same instance still runs.
+	#confirm(
+		tools: ToolManagerInterface,
+		authorization: {
+			readonly allowed: Map<
+				number,
+				{ readonly call: ToolCall; readonly tool: ToolInterface | undefined }
+			>
+			readonly denials: Map<number, ToolResult>
+		},
+	): void {
+		for (const [index, { call, tool }] of authorization.allowed) {
+			if (tools.tool(call.name) === tool) continue
+			authorization.allowed.delete(index)
+			authorization.denials.set(index, denyCall(call, AUTHORITY_NOTES.denied))
+			this.#emitter.emit('deny', call, `${call.name} changed after its decision`, undefined)
+			// A deny listener can change a tool this walk already read, so walk them all again.
+			this.#confirm(tools, authorization)
+			return
+		}
+	}
+
 	// Carry cancellation into entered handlers, then merge executed results and denials
-	// in call order. An all-denied turn costs no tool run. The allowed calls are rebuilt in call
+	// in call order. An all-denied turn costs no tool run. The allowed entries are rebuilt in call
 	// order, because approved calls join the map after the synchronous pass and `execute` starts
-	// its batch in entry order.
+	// its batch in entry order; each entry passed `#confirm`, so only its call is read.
 	async #dispatch(
 		tools: ToolManagerInterface,
 		calls: readonly ToolCall[],
 		signal: AbortSignal,
 		authorization: {
-			readonly allowed: ReadonlyMap<number, ToolCall>
+			readonly allowed: ReadonlyMap<
+				number,
+				{ readonly call: ToolCall; readonly tool: ToolInterface | undefined }
+			>
 			readonly denials: ReadonlyMap<number, ToolResult>
 		},
 	): Promise<readonly ToolResult[]> {
 		const { allowed, denials } = authorization
 		const entries = [...allowed].sort(([left], [right]) => left - right)
-		const batch = entries.map(([, call]) => call)
+		const batch = entries.map(([, { call }]) => call)
 		const executed = batch.length > 0 ? await tools.execute(batch, { signal }) : []
 		// Denials and executed results never share an index.
 		const results = new Map<number, ToolResult>([

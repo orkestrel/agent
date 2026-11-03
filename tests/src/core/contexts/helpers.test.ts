@@ -105,9 +105,19 @@ describe('renderIndexEntry — one memo or skill index line', () => {
 		)
 	})
 
-	it('renders a description verbatim, a line break and an empty text included', () => {
-		expect(renderIndexEntry({ name: 'tone', description: 'Short.\nPlain.' })).toBe(
-			'- tone: Short.\nPlain.',
+	it('renders a name or description holding a line break as one line', () => {
+		const breaks = ['\n', '\r\n', '\v', '\f', '\u0085', '\u2028', '\u2029', '\n\n\r\n\u2028']
+		for (const text of breaks) {
+			expect(renderIndexEntry({ name: 'tone', description: `Short.${text}Plain.` })).toBe(
+				'- tone: Short. Plain.',
+			)
+			expect(renderIndexEntry({ name: `to${text}ne`, description: 'Short.' })).toBe(
+				'- to ne: Short.',
+			)
+		}
+		// Other whitespace is the host's text and stays.
+		expect(renderIndexEntry({ name: 'tone', description: 'Short.\t  Plain.' })).toBe(
+			'- tone: Short.\t  Plain.',
 		)
 		expect(renderIndexEntry({ name: 'tone', description: '' })).toBe('- tone: ')
 	})

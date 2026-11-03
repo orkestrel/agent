@@ -2574,6 +2574,46 @@ export function createGatedScheduler(gate: PromiseWithResolvers<void>): GatedSch
 	return new GatedScheduler(gate)
 }
 
+/**
+ * Counts each yield and holds it on a test's gate, never reading its signal, so an abort leaves the
+ * yield pending until the gate resolves; delay resolves without a timer.
+ */
+export class DeafScheduler implements GatedSchedulerInterface {
+	readonly #gate: PromiseWithResolvers<void>
+	readonly #reached = Promise.withResolvers<void>()
+	#yields = 0
+
+	constructor(gate: PromiseWithResolvers<void>) {
+		this.#gate = gate
+	}
+
+	get yields(): number {
+		return this.#yields
+	}
+
+	get reached(): Promise<void> {
+		return this.#reached.promise
+	}
+
+	async yield(): Promise<void> {
+		this.#yields += 1
+		this.#reached.resolve()
+		await this.#gate.promise
+	}
+
+	async delay(): Promise<void> {}
+}
+
+/**
+ * Creates a scheduler boundary fixture that parks each yield on a test's gate and ignores its signal.
+ *
+ * @param gate - The gate each yield waits on; a test resolves it in cleanup, so no yield stays parked
+ * @returns A scheduler that reports each yield and when the first one parked
+ */
+export function createDeafScheduler(gate: PromiseWithResolvers<void>): GatedSchedulerInterface {
+	return new DeafScheduler(gate)
+}
+
 // Store scenarios share this host-independent battery so each backend exercises the same snapshots.
 
 /**

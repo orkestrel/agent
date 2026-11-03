@@ -15,7 +15,7 @@ import {
 	requireSectionsCap,
 	requireSummary,
 } from '@src/core'
-import { captureError, waitForDelay } from '@orkestrel/test'
+import { captureError, invokeUnchecked, waitForDelay } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	BLANK_DIGESTS,
@@ -167,6 +167,18 @@ describe('requireSummary', () => {
 	it.each(BLANK_DIGESTS)('throws the SUMMARY code for the blank digest %j', (digest) => {
 		expect(() => requireSummary(digest)).toThrow(ConversationError)
 		expect(() => requireSummary(digest)).toThrow(expect.objectContaining({ code: 'SUMMARY' }))
+	})
+
+	it.each([
+		{ label: 'undefined', digest: undefined },
+		{ label: '42', digest: 42 },
+		{ label: 'null', digest: null },
+		{ label: 'an object whose trim returns text', digest: { trim: () => 'x' } },
+	])('throws the SUMMARY code for the non-string digest $label', ({ digest }) => {
+		// `invokeUnchecked` is the cast: a foreign summarizer's result the `string` parameter does not admit.
+		const refused = captureError(() => invokeUnchecked(undefined, requireSummary, [digest]))
+		expect(refused).toBeInstanceOf(ConversationError)
+		expect(refused).toMatchObject({ code: 'SUMMARY' })
 	})
 })
 

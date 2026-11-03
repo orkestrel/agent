@@ -198,8 +198,8 @@ export function intersectKeys(
  * the memo and skill managers.
  *
  * @remarks
- * Pure and total. The `name` and `description` render verbatim, so a `description` holding a
- * line break renders across lines.
+ * Pure and total. A run of line-break code points in the name or the description renders as one
+ * space, so the entry is one line.
  *
  * @param entry - The memo or skill whose `name` and `description` the line shows
  * @returns The index line
@@ -213,5 +213,5 @@ export function intersectKeys(
  * ```
  */
 export function renderIndexEntry(entry: Pick<Memo, 'name' | 'description'>): string {
-	return `- ${entry.name}: ${entry.description}`
+	return `- ${entry.name}: ${entry.description}`.replace(/[\n\v\f\r\u0085\u2028\u2029]+/g, ' ')
 }

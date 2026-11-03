@@ -11,6 +11,7 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { errorToMessage, isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
+import { raceSignal } from '../conversations/index.js'
 import { isJudgeAbortError } from '../errors.js'
 import { extractLiterals, matchesJudgment, renderJSON, sumUsage } from '../helpers.js'
 import { isJudgeError } from '../providers/errors.js'
@@ -262,9 +263,11 @@ export class Classifier implements ClassifierInterface {
 		return this.#options.scheduler !== undefined && performance.now() - this.#slice >= LEDGER_SLICE
 	}
 
-	// Hands the host a turn, which a caller abort rejects, and opens the next slice.
+	// Hands the host a turn, raced against the signal so an abort ends it, and opens the next slice.
 	async #turn(signal: AbortSignal): Promise<void> {
-		await this.#options.scheduler?.yield({ signal })
+		const scheduler = this.#options.scheduler
+		if (scheduler === undefined) return
+		await raceSignal(scheduler.yield({ signal }), signal)
 		this.#slice = performance.now()
 	}
 

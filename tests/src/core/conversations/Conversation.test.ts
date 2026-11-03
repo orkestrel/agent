@@ -26,6 +26,7 @@ import {
 	captureError,
 	createRecorder,
 	createRecorders,
+	invokeUnchecked,
 	requireValue,
 	roundTripJSON,
 	waitForCondition,
@@ -1204,6 +1205,54 @@ describe('Conversation — a blank digest is refused (SUMMARY)', () => {
 			expect.objectContaining({ code: 'SUMMARY' }),
 		)
 		expect(conversation.sections).toEqual([])
+	})
+
+	it('refuses a non-string digest and commits nothing', async () => {
+		const conversation = new Conversation({
+			// `invokeUnchecked` is the cast: a foreign summarizer's result the `string` return does not admit.
+			summarize: async () => invokeUnchecked<string>(undefined, () => ({ trim: () => 'x' }), []),
+		})
+		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
+			conversation.emitter,
+			['compact', 'collapse'],
+		)
+		conversation.add([
+			{ role: 'user', content: 'u1' },
+			{ role: 'assistant', content: 'a1' },
+			{ role: 'user', content: 'u2' },
+		])
+
+		await expect(conversation.compact()).rejects.toThrow(
+			expect.objectContaining({ code: 'SUMMARY' }),
+		)
+
+		expect(conversation.sections).toEqual([])
+		expect(conversation.messages().map(({ content }) => content)).toEqual(['u1', 'a1', 'u2'])
+		expect(events.compact.calls).toEqual([])
+		expect(events.collapse.calls).toEqual([])
+		expect(isConversationSnapshot(conversation.snapshot())).toBe(true)
+	})
+
+	it('refuses a non-string merge digest with SUMMARY, keeping the appended section', async () => {
+		const digests = new ScriptedReads<string | number>(['one', 'two', 'three', 42], 'merged')
+		const conversation = new Conversation({
+			// `invokeUnchecked` is the cast: a foreign summarizer's result the `string` return does not admit.
+			summarize: async () => invokeUnchecked<string>(digests, digests.read, []),
+			sections: 2,
+		})
+
+		conversation.add({ role: 'assistant', content: 'round-1' })
+		await conversation.compact()
+		conversation.add({ role: 'assistant', content: 'round-2' })
+		await conversation.compact()
+		conversation.add({ role: 'assistant', content: 'round-3' })
+
+		await expect(conversation.compact()).rejects.toThrow(
+			expect.objectContaining({ code: 'SUMMARY' }),
+		)
+
+		expect(conversation.sections.map(({ summary }) => summary)).toEqual(['one', 'two', 'three'])
+		expect(isConversationSnapshot(conversation.snapshot())).toBe(true)
 	})
 
 	it('rejects a blank cumulative digest, keeping the prior section and its slice live', async () => {

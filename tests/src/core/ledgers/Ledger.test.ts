@@ -41,7 +41,7 @@ import {
 	waitForCondition,
 	waitForEvent,
 } from '@orkestrel/test'
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import {
 	LEDGER_BENCH_MODEL,
 	LEDGER_REPLAY_FIXTURE,
@@ -58,6 +58,7 @@ import {
 	computeLedgerErrorCode,
 	createFailingScheduler,
 	createGatedProvider,
+	createDeafScheduler,
 	createGatedScheduler,
 	createLedgerReplay,
 	createPacedLedger,
@@ -4334,6 +4335,26 @@ describe('Ledger — host turns', () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
 		const gate = Promise.withResolvers<void>()
 		const scheduler = createGatedScheduler(gate)
+		const { ledger, asked } = createPacedLedger(
+			seed.snapshot,
+			[{ content: 'Noted.' }, { content: 'Noted again.' }],
+			scheduler,
+		)
+		const caller = new AbortController()
+		const pending = ledger.respond('What is the status of OR-1000?', caller.signal)
+		await scheduler.reached
+		caller.abort('stopped')
+		expect((await pending).partial).toBe(true)
+		expect(asked.count).toBe(0)
+		gate.resolve()
+		expect((await ledger.respond('What is open on the desk?')).partial).toBe(false)
+	})
+
+	it('a scheduler that ignores its signal leaves the ledger free after an abort', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const gate = Promise.withResolvers<void>()
+		onTestFinished(() => gate.resolve())
+		const scheduler = createDeafScheduler(gate)
 		const { ledger, asked } = createPacedLedger(
 			seed.snapshot,
 			[{ content: 'Noted.' }, { content: 'Noted again.' }],

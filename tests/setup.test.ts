@@ -184,6 +184,7 @@ import {
 	createAgentJob,
 	createAgentTurn,
 	createLoopTool,
+	createDeafScheduler,
 	createGatedScheduler,
 	createPacedLedger,
 	createRecordedScheduler,
@@ -946,6 +947,23 @@ describe('createGatedScheduler', () => {
 		const pending = createGatedScheduler(gate).yield({ signal: new AbortController().signal })
 		gate.resolve()
 		await expect(pending).resolves.toBeUndefined()
+	})
+})
+
+describe('createDeafScheduler', () => {
+	it('leaves a yield pending through an abort, and the resolved gate releases it', async () => {
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createDeafScheduler(gate)
+		const passed = createRecorder<readonly []>()
+		const abort = new AbortController()
+		const pending = scheduler.yield({ signal: abort.signal }).then(() => passed.handler())
+		await scheduler.reached
+		abort.abort(new Error('cancelled'))
+		await waitForDelay(0)
+		expect([scheduler.yields, passed.count]).toEqual([1, 0])
+		gate.resolve()
+		await pending
+		expect([scheduler.yields, passed.count]).toEqual([1, 1])
 	})
 })
 

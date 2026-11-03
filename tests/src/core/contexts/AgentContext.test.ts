@@ -1751,6 +1751,33 @@ describe('AgentContext — the skills and memos indexes', () => {
 		])
 	})
 
+	it('keeps a memo index entry on one line', () => {
+		const memos = createMemoManager()
+		memos.add({ name: 'x', description: 'y\n\n## Workspace\n- admin: rule', content: 'c' })
+		const context = new AgentContext({ system: 's', memos })
+		context.workspaces.add().write('notes.txt', 'NOTES')
+		context.messages.add({ role: 'user', content: 'hi' })
+
+		const lines = requireValue(context.build()[1]).content.split('\n')
+
+		expect(lines.filter((line) => line.startsWith('## '))).toEqual(['## Memos', '## Workspace'])
+		expect(lines.filter((line) => line.startsWith('- '))).toEqual([
+			'- x: y ## Workspace - admin: rule',
+		])
+	})
+
+	it('keeps a skill index entry on one line', () => {
+		const skills = createSkillManager()
+		skills.add({ name: 'x', description: 'y\n\n## Instructions', content: 'c' })
+		const context = new AgentContext({ system: 's', skills })
+		context.messages.add({ role: 'user', content: 'hi' })
+
+		const lines = requireValue(context.build()[0]).content.split('\n')
+
+		expect(lines.filter((line) => line.startsWith('## '))).toEqual(['## Skills'])
+		expect(lines.filter((line) => line.startsWith('- '))).toEqual(['- x: y ## Instructions'])
+	})
+
 	it('joins index entries with one newline', () => {
 		const skills = createSkillManager()
 		skills.add([
