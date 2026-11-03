@@ -48,13 +48,13 @@ export function filterAllowList<T>(
  * stays readable.
  *
  * @remarks
- * Pure and total. `running` is `undefined` until a call surfaces reasoning, so the first join
+ * Pure and total. `prior` is `undefined` until a call surfaces reasoning, so the first join
  * returns `next` verbatim. Each call's non-empty thinking is recorded on the assistant message
  * that call appends. The joined result also includes thinking from calls that appended no
  * message, such as an aborted call. Only recorded thinking can return to a provider,
  * as its `replay` policy allows. Thinking stays out of `content`.
  *
- * @param running - The reasoning accumulated so far (`undefined` before the first)
+ * @param prior - The reasoning accumulated so far (`undefined` before the first)
  * @param next - This call's separated reasoning
  * @returns The joined reasoning
  *
@@ -65,9 +65,9 @@ export function filterAllowList<T>(
  * joinThinking('first', 'second') // 'first\n\nsecond'
  * ```
  */
-export function joinThinking(running: string | undefined, next: string): string {
-	if (running === undefined || running.length === 0) return next
-	return next.length === 0 ? running : `${running}\n\n${next}`
+export function joinThinking(prior: string | undefined, next: string): string {
+	if (prior === undefined || prior.length === 0) return next
+	return next.length === 0 ? prior : `${prior}\n\n${next}`
 }
 
 /**
@@ -157,11 +157,11 @@ export function sanitizeUsage(usage: TokenUsage): TokenUsage {
  * across its provider calls.
  *
  * @remarks
- * Pure and total: the first call seeds the total (`running` `undefined` returns `next`
+ * Pure and total: the first call seeds the total (`prior` `undefined` returns `next`
  * unchanged), later calls accumulate. No sanitization happens here — charge a provider's
  * reported usage through {@link sanitizeUsage} first.
  *
- * @param running - The total so far (`undefined` before the first usage-bearing call)
+ * @param prior - The total so far (`undefined` before the first usage-bearing call)
  * @param next - This call's reported usage
  * @returns The summed usage
  *
@@ -172,12 +172,12 @@ export function sanitizeUsage(usage: TokenUsage): TokenUsage {
  * // { prompt: 3, completion: 2, total: 5 }
  * ```
  */
-export function sumUsage(running: TokenUsage | undefined, next: TokenUsage): TokenUsage {
-	if (running === undefined) return next
+export function sumUsage(prior: TokenUsage | undefined, next: TokenUsage): TokenUsage {
+	if (prior === undefined) return next
 	return {
-		prompt: running.prompt + next.prompt,
-		completion: running.completion + next.completion,
-		total: running.total + next.total,
+		prompt: prior.prompt + next.prompt,
+		completion: prior.completion + next.completion,
+		total: prior.total + next.total,
 	}
 }
 
@@ -292,7 +292,7 @@ export function hasCalls(message: Pick<Message, 'calls'>): boolean {
  */
 export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<readonly Message[]> {
 	const leaders = messages.filter((message) => message.role === 'assistant' && hasCalls(message))
-	const leading = new Set(leaders)
+	const distinct = new Set(leaders)
 	// `Array.from` passes a hole in `calls` to the mapper as `undefined`, as iteration does; `map` skips it.
 	const owners = Map.groupBy(
 		leaders.flatMap((leader) =>
@@ -309,7 +309,7 @@ export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<r
 		...starts.map((start, position) => {
 			const message = messages[start]
 			return {
-				leader: message !== undefined && leading.has(message) ? message : undefined,
+				leader: message !== undefined && distinct.has(message) ? message : undefined,
 				tools: messages.slice(start + 1, starts[position + 1] ?? messages.length),
 			}
 		}),
@@ -321,8 +321,8 @@ export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<r
 			const paired =
 				leader !== undefined &&
 				(duplicate || message.call === undefined || local.some((call) => call.id === message.call))
-			const sharing = message.call === undefined ? undefined : owners.get(message.call)
-			const owner = sharing?.length === 1 ? sharing[0]?.leader : paired ? leader : undefined
+			const claims = message.call === undefined ? undefined : owners.get(message.call)
+			const owner = claims?.length === 1 ? claims[0]?.leader : paired ? leader : undefined
 			return { message, owner }
 		})
 	})
@@ -330,7 +330,7 @@ export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<r
 		placed.flat().filter((entry) => entry.owner !== undefined),
 		(entry) => entry.owner,
 	)
-	const groups = [...leading].map((leader) => [
+	const groups = [...distinct].map((leader) => [
 		leader,
 		...(owned.get(leader) ?? []).map((entry) => entry.message),
 	])

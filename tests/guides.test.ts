@@ -127,7 +127,7 @@ await new GuideCommand({
 		AgentJudge,
 		AgentProvider,
 		Classifier,
-		computeReading,
+		measureAnswer,
 		createAgent,
 		createConversation,
 		createConversationManager,
@@ -2072,7 +2072,7 @@ await new GuideCommand({
 				].join('\n'),
 			)
 			expect(guideText).toContain(
-				"It lists the earlier messages and lookup readings that match a topic (an owner name, an id, or a topic) with their stored content, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
+				"It lists the earlier messages and lookup findings that match a topic (an owner name, an id, or a topic) with their stored content, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
 			)
 		})
 
@@ -2573,7 +2573,7 @@ await new GuideCommand({
 			expect(records).toContain('- Order BW-5512 for account BW-20931: Brightwater Studio.')
 			expect(records).not.toContain('Order bw-5512')
 			expect(guideText).toContain(
-				"For a lookup, the repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which reading replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second reading replaces the first in the records.",
+				"For a lookup, the repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which finding replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second finding replaces the first in the records.",
 			)
 		})
 
@@ -2726,7 +2726,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('retires a record message only through a replacing reading or a quiet filing and never by request count, as the no-retirement limit claims', async () => {
+		it('retires a record message only through a replacing finding or a quiet filing and never by request count, as the no-retirement limit claims', async () => {
 			const rule = 'Refunds over $100 need a manager.'
 			const caller = 'Brightwater Studio called twice about order BW-5512.'
 			const provider = createScriptedProvider([
@@ -2809,7 +2809,7 @@ await new GuideCommand({
 				expect(records).not.toContain(caller)
 			}
 			expect(guideText).toContain(
-				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later reading of the same lookup replaces it, or a later answer files it quiet.',
+				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later finding of the same lookup replaces it, or a later answer files it quiet.',
 			)
 		})
 
@@ -2847,10 +2847,10 @@ await new GuideCommand({
 				listed,
 				new Map([[listed, 'Order BW-5512 for account BW-20931: Brightwater Studio.']]),
 			)
-			expect(request.listing(listed)?.get(listed)).toBe(
+			expect(request.lines(listed)?.get(listed)).toBe(
 				'Order BW-5512 for account BW-20931: Brightwater Studio.',
 			)
-			expect(request.listing('Refunds over $100 need a manager.')).toBeUndefined()
+			expect(request.lines('Refunds over $100 need a manager.')).toBeUndefined()
 			expect(guideText).toContain(
 				"request.usage // { prompt: 82, completion: 10, total: 92 } — the selection's usage and the call's",
 			)
@@ -4522,7 +4522,7 @@ await new GuideCommand({
 					AbortSignal.timeout(30_000),
 				)
 				const readings = Object.fromEntries(
-					Object.entries(result.answers).map(([id, answer]) => [id, computeReading(answer)]),
+					Object.entries(result.answers).map(([id, answer]) => [id, measureAnswer(answer)]),
 				)
 
 				// One POST to the origin plus SYSTEM_ONE_PATH carried every question, and its body is the
@@ -4573,7 +4573,7 @@ await new GuideCommand({
 				"criteria: { billing: 'Payments and refunds', bug: 'Software errors', account: null },",
 			)
 			expect(guideText).toContain(
-				'Object.entries(result.answers).map(([id, answer]) => [id, computeReading(answer)]),',
+				'Object.entries(result.answers).map(([id, answer]) => [id, measureAnswer(answer)]),',
 			)
 			expect(guideText).toContain("result.model // 'tev1:0.8b' — the model the server named")
 			expect(guideText).toContain('result.usage // { prompt: 975, completion: 4, total: 979 }')
@@ -4699,25 +4699,23 @@ await new GuideCommand({
 
 		it('derives each reading from the stored distribution alone (the derived-reading clause)', () => {
 			// A tie names the first candidate in enumeration order, and a noul of exactly 0.5 names false.
-			expect(computeReading({ form: 'choice', probabilities: { billing: 0.5, bug: 0.5 } })).toEqual(
-				{
-					winner: 'billing',
-					probability: 0.5,
-					confidence: 0,
-				},
-			)
-			expect(computeReading({ form: 'noul', noul: 0.5 })).toEqual({
+			expect(measureAnswer({ form: 'choice', probabilities: { billing: 0.5, bug: 0.5 } })).toEqual({
+				winner: 'billing',
+				probability: 0.5,
+				confidence: 0,
+			})
+			expect(measureAnswer({ form: 'noul', noul: 0.5 })).toEqual({
 				winner: 'false',
 				probability: 0.5,
 				confidence: 0,
 			})
-			expect(computeReading({ form: 'noul', noul: 0.25 })).toEqual({
+			expect(measureAnswer({ form: 'noul', noul: 0.25 })).toEqual({
 				winner: 'false',
 				probability: 0.75,
 				confidence: 0.5,
 			})
 			// (0.7 - 1/3) / (1 - 1/3) = 0.55 for a choice over three options.
-			const choice = computeReading({
+			const choice = measureAnswer({
 				form: 'choice',
 				probabilities: { billing: 0.7, bug: 0.2, account: 0.1 },
 			})
@@ -4726,7 +4724,7 @@ await new GuideCommand({
 			expect(choice).not.toHaveProperty('score')
 			// A score whose mass sits far from its winner clamps its confidence at 0; its expected level
 			// is 0 * 0.25 + 1 * 0.25 + 2 * 0.5.
-			expect(computeReading({ form: 'score', probabilities: [0.25, 0.25, 0.5] })).toEqual({
+			expect(measureAnswer({ form: 'score', probabilities: [0.25, 0.25, 0.5] })).toEqual({
 				winner: '2',
 				probability: 0.5,
 				confidence: 0,
@@ -4734,7 +4732,7 @@ await new GuideCommand({
 			})
 			// Both formulas divide by the candidate count, so a single candidate is a protocol failure.
 			const single = captureError(() =>
-				computeReading({ form: 'choice', probabilities: { bug: 1 } }),
+				measureAnswer({ form: 'choice', probabilities: { bug: 1 } }),
 			)
 			expect(single).toBeInstanceOf(JudgeError)
 			expect(single).toMatchObject({
@@ -5033,7 +5031,7 @@ await new GuideCommand({
 					},
 				})
 				expect(result).not.toHaveProperty('refusals')
-				expect(computeReading(requireValue(result.answers.severity)).score).toBeCloseTo(0.9919, 4)
+				expect(measureAnswer(requireValue(result.answers.severity)).score).toBeCloseTo(0.9919, 4)
 			}
 
 			// A System One server answers from the supplied options alone, so an answer it cannot have

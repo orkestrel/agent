@@ -30,7 +30,7 @@ import { renderCauseChain } from './helpers.js'
  * ```ts
  * const classifier = new Classifier(options)
  * await classifier.classify(new Set(), signal)
- * const filing = classifier.classification()
+ * const classification = classifier.classification()
  * ```
  */
 export class Classifier implements ClassifierInterface {

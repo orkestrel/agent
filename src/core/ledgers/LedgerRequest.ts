@@ -37,7 +37,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	#passes: readonly LedgerPass[] = []
 	#readings: readonly ClassifierReading[] = []
 	#admitted: ReadonlySet<string> = new Set()
-	#listings: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map()
+	#listed: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map()
 	#recalls = 0
 	#closed = false
 
@@ -174,10 +174,10 @@ export class LedgerRequest implements LedgerRequestInterface {
 	}
 
 	list(result: string, lines: ReadonlyMap<string, string>): void {
-		this.#listings = new Map([...this.#listings, [result, lines]])
+		this.#listed = new Map([...this.#listed, [result, lines]])
 	}
 
-	listing(result: string): ReadonlyMap<string, string> | undefined {
-		return this.#listings.get(result)
+	lines(result: string): ReadonlyMap<string, string> | undefined {
+		return this.#listed.get(result)
 	}
 }

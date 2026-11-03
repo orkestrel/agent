@@ -190,7 +190,7 @@ import type {
 	LedgerClassification,
 	LedgerInterface,
 	LedgerLine,
-	LedgerLookupReading,
+	LedgerLookupFinding,
 	LedgerLookupResult,
 	LedgerOptions,
 	LedgerProjection,
@@ -3017,7 +3017,7 @@ export const CANARY_SENTINELS = Object.freeze({
 	user: 'canaryuser',
 	tool: 'canarytool',
 	workspace: 'canaryworkspace',
-	reading: 'canaryreading',
+	finding: 'canaryreading',
 	rule: 'canaryrule',
 	summary: 'canarysummary',
 	assistant: 'canaryassistant',
@@ -3052,7 +3052,7 @@ export const CANARY_BUILD_SOURCES = Object.freeze([
 export const CANARY_LEDGER_SOURCES = Object.freeze([
 	'user',
 	'tool',
-	'reading',
+	'finding',
 	'rule',
 	'assistant',
 	'judge',
@@ -4787,7 +4787,7 @@ export interface LedgerProjectionSource {
 	readonly exclusions?: readonly string[]
 	readonly owners?: Readonly<Record<string, readonly string[]>>
 	readonly messages?: readonly Message[]
-	readonly readings?: readonly LedgerLookupReading[]
+	readonly findings?: readonly LedgerLookupFinding[]
 	readonly entities?: Readonly<Record<string, readonly string[]>>
 	readonly classification?: LedgerClassificationInput
 }
@@ -4822,7 +4822,7 @@ export function buildLedgerInput(parts: LedgerProjectionSource = {}): LedgerProj
 		exclusions: parts.exclusions ?? [],
 		owners: new Map(Object.entries(parts.owners ?? {})),
 		messages: parts.messages ?? [],
-		readings: parts.readings ?? [],
+		findings: parts.findings ?? [],
 		entities: new Map(Object.entries(parts.entities ?? {})),
 		classification: buildLedgerClassification(parts.classification),
 	}
@@ -4841,22 +4841,22 @@ export function buildLedgerMessage(id: string, role: Message['role'], content: s
 }
 
 /**
- * Builds a lookup reading for a tool message.
+ * Builds a lookup finding for a tool message.
  *
  * @param id - The tool message id
  * @param name - The lookup tool name
  * @param values - The arguments of the call
  * @param text - The result text
  * @param result - What the handler read; undefined for a lookup that found nothing
- * @returns The reading
+ * @returns The finding
  */
-export function buildLedgerReading(
+export function buildLedgerFinding(
 	id: string,
 	name: string,
 	values: Readonly<Record<string, unknown>>,
 	text: string,
 	result?: LedgerLookupResult,
-): LedgerLookupReading {
+): LedgerLookupFinding {
 	return { id, name, arguments: values, text, result }
 }
 
@@ -4913,15 +4913,15 @@ export function createLedgerDesk(): LedgerProjectionInput {
 			buildLedgerMessage('user-05', 'user', 'Thanks, that is all for now.'),
 			buildLedgerMessage('user-06', 'user', 'Can you check the refund for Brightwater Studio?'),
 		],
-		readings: [
-			buildLedgerReading(
+		findings: [
+			buildLedgerFinding(
 				'tool-01',
 				'lookup_order',
 				{ id: 'bw-5512' },
 				'Order BW-5512 for account BW-20931 (Brightwater Studio): linen set, total $140.00.',
 				found,
 			),
-			buildLedgerReading(
+			buildLedgerFinding(
 				'tool-02',
 				'lookup_order',
 				{ id: ' BW-5512 ' },
@@ -5119,18 +5119,18 @@ export function checkLedgerProjection(
 	const supersessions = new Set(
 		[...classification.supersessions].flatMap(([id, laters]) => (laters.length > 0 ? [id] : [])),
 	)
-	const lookups = new Map(input.readings.map((reading) => [reading.id, reading]))
+	const lookups = new Map(input.findings.map((finding) => [finding.id, finding]))
 	const replaced = new Set(
 		[...lookups.values()]
-			.filter((reading) =>
+			.filter((finding) =>
 				[...lookups.values()].some(
 					(later) =>
-						(byId.get(later.id)?.at ?? -1) > (byId.get(reading.id)?.at ?? -1) &&
+						(byId.get(later.id)?.at ?? -1) > (byId.get(finding.id)?.at ?? -1) &&
 						computeLedgerIdentity(later.name, later.arguments) ===
-							computeLedgerIdentity(reading.name, reading.arguments),
+							computeLedgerIdentity(finding.name, finding.arguments),
 				),
 			)
-			.map((reading) => reading.id),
+			.map((finding) => finding.id),
 	)
 	const live = new Set(
 		[...byId.values()]
@@ -5207,7 +5207,7 @@ export function checkLedgerProjection(
 			),
 	)
 
-	const links = linkOwners(input.readings, input.owners)
+	const links = linkOwners(input.findings, input.owners)
 	const earlierSides = new Map(
 		[
 			...Map.groupBy(
@@ -7344,7 +7344,7 @@ export async function serveCanaryDesk(): Promise<CanaryDesk> {
 		{
 			role: 'tool',
 			call: 'seed',
-			content: `Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50 to ${CANARY_SENTINELS.reading}.`,
+			content: `Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50 to ${CANARY_SENTINELS.finding}.`,
 		},
 	])
 	await ledger.respond(

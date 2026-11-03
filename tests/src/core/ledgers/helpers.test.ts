@@ -1,7 +1,7 @@
 import type {
 	GaugeCall,
 	LedgerLine,
-	LedgerLookupReading,
+	LedgerLookupFinding,
 	LedgerOwner,
 	LedgerRecord,
 } from '../../../../src/core/ledgers/types.js'
@@ -56,7 +56,7 @@ import {
 	LEDGER_EMPTY_FOUND,
 	buildLedgerInput,
 	buildLedgerMessage,
-	buildLedgerReading,
+	buildLedgerFinding,
 	checkLedgerProjection,
 	createLedgerDesk,
 	createLedgerRequest,
@@ -454,7 +454,7 @@ describe('normalizeArgument', () => {
 		const spelled = ' bw-20931 '
 		const links = linkOwners(
 			[
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-1',
 					'lookup_customer',
 					{ account: spelled },
@@ -513,14 +513,14 @@ describe('linkOwners', () => {
 	it('links an owner argument to itself and another id to the one owner its text names', () => {
 		const links = linkOwners(
 			[
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-1',
 					'lookup_order',
 					{ id: 'bw-5512' },
 					'Order BW-5512 for account BW-20931 (Brightwater Studio).',
 					LEDGER_EMPTY_FOUND,
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-2',
 					'lookup_order',
 					{ account: 'OM-30418' },
@@ -539,14 +539,14 @@ describe('linkOwners', () => {
 	it('leaves an argument unlinked when its text names no owner or several', () => {
 		const links = linkOwners(
 			[
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-1',
 					'lookup_order',
 					{ id: 'BW-5512' },
 					'Order BW-5512 has no owner.',
 					LEDGER_EMPTY_FOUND,
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-2',
 					'lookup_order',
 					{ id: 'BW-5513' },
@@ -559,23 +559,23 @@ describe('linkOwners', () => {
 		expect(links.size).toBe(0)
 	})
 
-	it('skips an empty reading and lets a later reading overwrite an earlier link', () => {
+	it('skips an empty finding and lets a later finding overwrite an earlier link', () => {
 		const links = linkOwners(
 			[
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-1',
 					'lookup_order',
 					{ id: 'BW-5512' },
 					'Order BW-5512 for BW-20931.',
 					LEDGER_EMPTY_FOUND,
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-2',
 					'lookup_order',
 					{ id: 'BW-5512' },
 					'Order BW-5512 for OM-30418.',
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-3',
 					'lookup_order',
 					{ id: 'BW-5512' },
@@ -591,7 +591,7 @@ describe('linkOwners', () => {
 	it('ignores an argument that is no id', () => {
 		const links = linkOwners(
 			[
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-1',
 					'lookup_order',
 					{ id: 'five', n: 5 },
@@ -604,9 +604,9 @@ describe('linkOwners', () => {
 		expect(links.size).toBe(0)
 	})
 
-	it('refuses a hole in the reading list, as a for…of visits it as an undefined reading', () => {
-		const readings: LedgerLookupReading[] = []
-		readings[1] = buildLedgerReading(
+	it('refuses a hole in the finding list, as a for…of visits it as an undefined finding', () => {
+		const findings: LedgerLookupFinding[] = []
+		findings[1] = buildLedgerFinding(
 			'tool-1',
 			'lookup_customer',
 			{ account: 'BW-20931' },
@@ -614,18 +614,18 @@ describe('linkOwners', () => {
 			LEDGER_EMPTY_FOUND,
 		)
 		const held = new Map([['BW-20931', ['Brightwater Studio']]])
-		expect(captureError(() => linkOwners(readings, held))).toBeInstanceOf(TypeError)
+		expect(captureError(() => linkOwners(findings, held))).toBeInstanceOf(TypeError)
 	})
 })
 
 describe('collectRegistry', () => {
 	it('collects every id and each owner name in the order read', () => {
 		const registry = collectRegistry([
-			buildLedgerReading('tool-1', 'lookup_customer', { account: 'BW-20931' }, 'text', {
+			buildLedgerFinding('tool-1', 'lookup_customer', { account: 'BW-20931' }, 'text', {
 				ids: ['BW-20931', 'BW-5512'],
 				owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
 			}),
-			buildLedgerReading('tool-2', 'lookup_customer', { account: 'BW-20931' }, 'text', {
+			buildLedgerFinding('tool-2', 'lookup_customer', { account: 'BW-20931' }, 'text', {
 				ids: [],
 				owners: [
 					{
@@ -643,16 +643,16 @@ describe('collectRegistry', () => {
 		})
 	})
 
-	it('learns nothing from an empty reading', () => {
+	it('learns nothing from an empty finding', () => {
 		const registry = collectRegistry([
-			buildLedgerReading('tool-1', 'lookup_order', { id: 'BW-5512' }, 'No record.'),
+			buildLedgerFinding('tool-1', 'lookup_order', { id: 'BW-5512' }, 'No record.'),
 		])
 		expect(registry.ids.size + registry.owners.size).toBe(0)
 	})
 
 	it('trims a name and drops one without a letter', () => {
 		const registry = collectRegistry([
-			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+			buildLedgerFinding('tool-1', 'lookup_customer', {}, 'text', {
 				ids: [],
 				owners: [{ id: 'OM-30418', names: ['  Odile Marlow ', '1234', ' '] }],
 			}),
@@ -660,29 +660,29 @@ describe('collectRegistry', () => {
 		expect(registry.owners.get('OM-30418')).toEqual(['Odile Marlow'])
 	})
 
-	it('refuses a hole in the reading list, as a for…of visits it as an undefined reading', () => {
-		const readings: LedgerLookupReading[] = []
-		readings[1] = buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+	it('refuses a hole in the finding list, as a for…of visits it as an undefined finding', () => {
+		const findings: LedgerLookupFinding[] = []
+		findings[1] = buildLedgerFinding('tool-1', 'lookup_customer', {}, 'text', {
 			ids: ['BW-20931'],
 			owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
 		})
-		expect(captureError(() => collectRegistry(readings))).toBeInstanceOf(TypeError)
+		expect(captureError(() => collectRegistry(findings))).toBeInstanceOf(TypeError)
 	})
 
-	it('refuses a hole in a reading owner list, as a for…of visits it as an undefined owner', () => {
+	it('refuses a hole in a finding owner list, as a for…of visits it as an undefined owner', () => {
 		const owners: LedgerOwner[] = []
 		owners[1] = { id: 'BW-20931', names: ['Brightwater Studio'] }
-		const readings = [
-			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', { ids: ['BW-20931'], owners }),
+		const findings = [
+			buildLedgerFinding('tool-1', 'lookup_customer', {}, 'text', { ids: ['BW-20931'], owners }),
 		]
-		expect(captureError(() => collectRegistry(readings))).toBeInstanceOf(TypeError)
+		expect(captureError(() => collectRegistry(findings))).toBeInstanceOf(TypeError)
 	})
 })
 
 describe('buildLedgerIndex', () => {
 	it('indexes each name, its words, and their needles, keeping the registry ids set', () => {
 		const registry = collectRegistry([
-			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+			buildLedgerFinding('tool-1', 'lookup_customer', {}, 'text', {
 				ids: ['BW-5512'],
 				owners: [
 					{ id: 'BW-20931', names: ['Brightwater Studio'] },
@@ -822,7 +822,7 @@ describe('normalizeWord', () => {
 describe('matchEntities', () => {
 	const index = buildLedgerIndex(
 		collectRegistry([
-			buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+			buildLedgerFinding('tool-1', 'lookup_customer', {}, 'text', {
 				ids: ['BW-5512'],
 				owners: [
 					{ id: 'BW-20931', names: ['Brightwater Studio'] },
@@ -860,7 +860,7 @@ describe('matchEntities', () => {
 	it('reads a name that holds pattern characters as text', () => {
 		const odd = buildLedgerIndex(
 			collectRegistry([
-				buildLedgerReading('tool-1', 'lookup_customer', {}, 'text', {
+				buildLedgerFinding('tool-1', 'lookup_customer', {}, 'text', {
 					ids: [],
 					owners: [{ id: 'BW-20931', names: ['A+B (Studio)'] }],
 				}),
@@ -961,28 +961,28 @@ describe('collectLive', () => {
 		])
 	})
 
-	it('lets an empty reading replace the earlier result of the same call (R5a)', () => {
+	it('lets an empty finding replace the earlier result of the same call (R5a)', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage('tool-a', 'tool', 'Order BW-5512: total $10.00.'),
 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-5512.'),
 				buildLedgerMessage('tool-c', 'tool', 'Order BW-5513: total $12.00.'),
 			],
-			readings: [
-				buildLedgerReading(
+			findings: [
+				buildLedgerFinding(
 					'tool-a',
 					'lookup_order',
 					{ id: 'BW-5512' },
 					'Order BW-5512: total $10.00.',
 					LEDGER_EMPTY_FOUND,
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-b',
 					'lookup_order',
 					{ id: 'bw-5512' },
 					'No record of order BW-5512.',
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-c',
 					'lookup_order',
 					{ id: 'BW-5513' },
@@ -1000,9 +1000,9 @@ describe('collectLive', () => {
 				buildLedgerMessage('tool-a', 'tool', 'one'),
 				buildLedgerMessage('tool-b', 'tool', 'two'),
 			],
-			readings: [
-				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, 'one', LEDGER_EMPTY_FOUND),
-				buildLedgerReading('tool-b', 'lookup_order', { id: 'BW-5513' }, 'two', LEDGER_EMPTY_FOUND),
+			findings: [
+				buildLedgerFinding('tool-a', 'lookup_order', { id: 'BW-5512' }, 'one', LEDGER_EMPTY_FOUND),
+				buildLedgerFinding('tool-b', 'lookup_order', { id: 'BW-5513' }, 'two', LEDGER_EMPTY_FOUND),
 			],
 		})
 		expect(collectLive(input)).toEqual(['tool-a', 'tool-b'])
@@ -1014,15 +1014,15 @@ describe('collectLive', () => {
 				buildLedgerMessage('tool-a', 'tool', 'one'),
 				buildLedgerMessage('tool-b', 'tool', 'two'),
 			],
-			readings: [
-				buildLedgerReading(
+			findings: [
+				buildLedgerFinding(
 					'tool-a',
 					'lookup_order',
 					{ id: 'BW-5512', opts: { a: 1, b: { c: 2, d: 3 } } },
 					'one',
 					LEDGER_EMPTY_FOUND,
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-b',
 					'lookup_order',
 					{ opts: { b: { d: 3, c: 2 }, a: 1 }, id: 'BW-5512' },
@@ -1034,7 +1034,7 @@ describe('collectLive', () => {
 		expect(collectLive(input)).toEqual(['tool-b'])
 	})
 
-	it('leaves out a tool message with no reading and an assistant message', () => {
+	it('leaves out a tool message with no finding and an assistant message', () => {
 		const input = buildLedgerInput({
 			messages: [
 				buildLedgerMessage('tool-a', 'tool', 'text'),
@@ -1047,7 +1047,7 @@ describe('collectLive', () => {
 
 describe('placeMember', () => {
 	const desk = createLedgerDesk()
-	const links = linkOwners(desk.readings, desk.owners)
+	const links = linkOwners(desk.findings, desk.owners)
 
 	it('joins the owner records the entities name, directly or through a link', () => {
 		expect([...placeMember(desk, links, new Map(), 'user-03', new Set())]).toEqual([
@@ -1063,10 +1063,8 @@ describe('placeMember', () => {
 	})
 
 	it('joins where the earlier side of an amendment pair joins', () => {
-		const amending = new Map([['user-04', ['user-03']]])
-		expect([...placeMember(desk, links, amending, 'user-04', new Set())]).toEqual([
-			'owner:BW-20931',
-		])
+		const amended = new Map([['user-04', ['user-03']]])
+		expect([...placeMember(desk, links, amended, 'user-04', new Set())]).toEqual(['owner:BW-20931'])
 	})
 
 	it('stops at a cycle of amendment pairs and leaves a message with no category as an orphan', () => {
@@ -1585,7 +1583,7 @@ describe('buildLines', () => {
 })
 
 describe('buildRecords', () => {
-	it('retains successful readings whose bigint arguments have no lookup identity', () => {
+	it('retains successful findings whose bigint arguments have no lookup identity', () => {
 		const text = 'Account BW-20931 (Brightwater Studio): balance $10.00.'
 		const input = buildLedgerInput({
 			owners: LEDGER_DESK_OWNERS,
@@ -1593,9 +1591,9 @@ describe('buildRecords', () => {
 				buildLedgerMessage('tool-a', 'tool', text),
 				buildLedgerMessage('tool-b', 'tool', text),
 			],
-			readings: [
-				buildLedgerReading('tool-a', 'lookup', { key: 1n }, text, LEDGER_EMPTY_FOUND),
-				buildLedgerReading('tool-b', 'lookup', { key: 2n }, text, LEDGER_EMPTY_FOUND),
+			findings: [
+				buildLedgerFinding('tool-a', 'lookup', { key: 1n }, text, LEDGER_EMPTY_FOUND),
+				buildLedgerFinding('tool-b', 'lookup', { key: 2n }, text, LEDGER_EMPTY_FOUND),
 			],
 			entities: { 'tool-a': ['BW-20931'], 'tool-b': ['BW-20931'] },
 		})
@@ -1685,7 +1683,7 @@ describe('buildRecords', () => {
 		])
 	})
 
-	it('takes a lookup result out of every record when an empty reading replaces it (R5a)', () => {
+	it('takes a lookup result out of every record when an empty finding replaces it (R5a)', () => {
 		const text = 'Order BW-5512 for account BW-20931 (Brightwater Studio): total $10.00.'
 		const input = buildLedgerInput({
 			owners: LEDGER_DESK_OWNERS,
@@ -1693,9 +1691,9 @@ describe('buildRecords', () => {
 				buildLedgerMessage('tool-a', 'tool', text),
 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-5512.'),
 			],
-			readings: [
-				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
-				buildLedgerReading(
+			findings: [
+				buildLedgerFinding('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
+				buildLedgerFinding(
 					'tool-b',
 					'lookup_order',
 					{ id: 'BW-5512' },
@@ -1710,7 +1708,7 @@ describe('buildRecords', () => {
 		expect(checkLedgerProjection(built, input)).toEqual([])
 	})
 
-	it('keeps the earlier result when the later reading is a different call', () => {
+	it('keeps the earlier result when the later finding is a different call', () => {
 		const text = 'Order BW-5512 for account BW-20931 (Brightwater Studio): total $10.00.'
 		const input = buildLedgerInput({
 			owners: LEDGER_DESK_OWNERS,
@@ -1718,9 +1716,9 @@ describe('buildRecords', () => {
 				buildLedgerMessage('tool-a', 'tool', text),
 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-9999.'),
 			],
-			readings: [
-				buildLedgerReading('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
-				buildLedgerReading(
+			findings: [
+				buildLedgerFinding('tool-a', 'lookup_order', { id: 'BW-5512' }, text, LEDGER_EMPTY_FOUND),
+				buildLedgerFinding(
 					'tool-b',
 					'lookup_order',
 					{ id: 'BW-9999' },
@@ -1766,15 +1764,15 @@ describe('buildRecords', () => {
 				buildLedgerMessage('tool-a', 'tool', text),
 				buildLedgerMessage('tool-b', 'tool', text),
 			],
-			readings: [
-				buildLedgerReading(
+			findings: [
+				buildLedgerFinding(
 					'tool-a',
 					'lookup_order',
 					{ id: 'BW-5512', opts: { a: 1, b: 2 } },
 					text,
 					LEDGER_EMPTY_FOUND,
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-b',
 					'lookup_order',
 					{ opts: { b: 2, a: 1 }, id: 'BW-5512' },

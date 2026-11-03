@@ -179,8 +179,8 @@ export type LedgerLookupHandler = (
  * not be named `recall`, and no two lookups can share a tool name.
  * The repeat stop compares the tool name and canonical arguments without normalizing strings.
  * The projection uses {@link identifyLookup}, which trims and uppercases top-level string
- * arguments when deciding which reading replaces an earlier one.
- * A throwing `read` handler makes the lookup failed: it files as chatter and replaces no reading.
+ * arguments when deciding which finding replaces an earlier one.
+ * A throwing `read` handler makes the lookup failed: it files as chatter and replaces no finding.
  * A seed tool message with no recorded result counts as a successful lookup.
  * The ledger calls the `read` handler at most once for each lookup result in each selection and in
  * each `recall` call. It calls the handler again in a selection whose conversation changes while the
@@ -198,9 +198,9 @@ export interface LedgerLookup {
  * @remarks
  * `id` is the tool message's id, `name` and `arguments` come from the call it answers, and `text`
  * is the result text. `result` is what the lookup's handler read, undefined for a lookup that found
- * nothing; an empty reading still replaces an earlier reading of the same call.
+ * nothing; an empty finding still replaces an earlier finding of the same call.
  */
-export interface LedgerLookupReading {
+export interface LedgerLookupFinding {
 	readonly id: string
 	readonly name: string
 	readonly arguments: Readonly<Record<string, unknown>>
@@ -475,7 +475,7 @@ export interface LedgerRequestInterface {
 	 * @param result - The recall result text
 	 * @returns Each listed lookup line mapped to its stored first line, or undefined when no recall returned `result`
 	 */
-	listing(result: string): ReadonlyMap<string, string> | undefined
+	lines(result: string): ReadonlyMap<string, string> | undefined
 }
 
 /**
@@ -645,7 +645,7 @@ export interface LedgerProjection {
  * @remarks
  * `system` is the system text, whose names never serve as a party. `exclusions` lists the message ids
  * no record places, such as requests and ledger notes. `owners` maps each owner id to its names.
- * `readings` lists the lookup results in conversation order, and `entities` maps a message id to
+ * `findings` lists the lookup results in conversation order, and `entities` maps a message id to
  * the registry ids its text names.
  */
 export interface LedgerProjectionInput {
@@ -653,7 +653,7 @@ export interface LedgerProjectionInput {
 	readonly exclusions: readonly string[]
 	readonly owners: ReadonlyMap<string, readonly string[]>
 	readonly messages: readonly Message[]
-	readonly readings: readonly LedgerLookupReading[]
+	readonly findings: readonly LedgerLookupFinding[]
 	readonly entities: ReadonlyMap<string, readonly string[]>
 	readonly classification: LedgerClassification
 }

@@ -1,9 +1,9 @@
 import type {
+	AnswerMeasure,
 	FailureRead,
 	ProviderOptions,
 	ProviderRequest,
 	ProviderResult,
-	Reading,
 	RelayOptions,
 	RelayRefusal,
 	SystemOneAnswer,
@@ -284,14 +284,14 @@ export async function* readChunks(
  * (code `PROTOCOL`), because the confidence formulas divide by the candidate count
  * @example
  * ```ts
- * computeReading({ form: 'choice', probabilities: { billing: 0.88, technical: 0.12, sales: 0 } })
+ * measureAnswer({ form: 'choice', probabilities: { billing: 0.88, technical: 0.12, sales: 0 } })
  * // { winner: 'billing', probability: 0.88, confidence: 0.82 } to 2 decimals
- * computeReading({ form: 'score', probabilities: [0, 0.57, 0.43] })
+ * measureAnswer({ form: 'score', probabilities: [0, 0.57, 0.43] })
  * // { winner: '1', probability: 0.57, confidence: 0.355, score: 1.43 } to 3 decimals
- * computeReading({ form: 'noul', noul: 0.5 }) // { winner: 'false', probability: 0.5, confidence: 0 }
+ * measureAnswer({ form: 'noul', noul: 0.5 }) // { winner: 'false', probability: 0.5, confidence: 0 }
  * ```
  */
-export function computeReading(answer: JudgeAnswer): Reading {
+export function measureAnswer(answer: JudgeAnswer): AnswerMeasure {
 	if (answer.form === 'noul') {
 		const yes = answer.noul > 0.5
 		return {

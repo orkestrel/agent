@@ -5,7 +5,7 @@ import type {
 	LedgerCategory,
 	LedgerIndex,
 	LedgerLine,
-	LedgerLookupReading,
+	LedgerLookupFinding,
 	LedgerLookupState,
 	LedgerPlanGroup,
 	LedgerProjection,
@@ -385,7 +385,7 @@ export function collectNames(text: string): readonly string[] {
  * Normalizes a lookup argument string to the spelling that lookup identity and owner linking compare.
  *
  * @remarks
- * {@link identifyLookup} and {@link linkOwners} read an argument through this one form, so a reading
+ * {@link identifyLookup} and {@link linkOwners} read an argument through this one form, so a finding
  * a later lookup replaces and the owner link of its argument agree on the spelling.
  *
  * @param value - The string argument a lookup call carried
@@ -442,14 +442,14 @@ export function renderLookupCall(name: string, args: Readonly<Record<string, unk
 }
 
 /**
- * Identifies a lookup reading for projection by its tool name and normalized arguments.
+ * Identifies a lookup finding for projection by its tool name and normalized arguments.
  *
  * @remarks
  * Two calls share an identity whatever the key order of their arguments at any depth. A top-level
  * string argument passes through {@link normalizeArgument} first, so `"lh-1 "` and `"LH-1"` name one call.
  * The ledger's repeat stop instead compares the tool name and canonical arguments without this
  * string normalization, so those argument spellings remain distinct within a request.
- * An uncanonicalizable call has no identity and neither replaces nor is replaced by another reading.
+ * An uncanonicalizable call has no identity and neither replaces nor is replaced by another finding.
  *
  * @param name - The tool name
  * @param args - The arguments the call carried
@@ -480,10 +480,10 @@ export function identifyLookup(
  *
  * @remarks
  * An owner argument links to itself. Any other id-shaped argument links to the single owner id its
- * reading's text names. An empty reading links nothing, and a later reading overwrites an earlier
+ * finding's text names. An empty finding links nothing, and a later finding overwrites an earlier
  * link of the same argument.
  *
- * @param readings - The lookup readings in conversation order
+ * @param findings - The lookup findings in conversation order
  * @param owners - The owners keyed by id
  * @returns The owner id of each linked argument id; an argument whose text names no owner or several is absent
  *
@@ -496,17 +496,17 @@ export function identifyLookup(
  * ```
  */
 export function linkOwners(
-	readings: readonly LedgerLookupReading[],
+	findings: readonly LedgerLookupFinding[],
 	owners: ReadonlyMap<string, readonly string[]>,
 ): ReadonlyMap<string, string> {
 	// A later pair of the same argument overwrites an earlier one, as the `Map` constructor does. The
-	// spread visits a hole in `readings` as an undefined reading, as iteration does; `flatMap` skips it.
+	// spread visits a hole in `findings` as an undefined finding, as iteration does; `flatMap` skips it.
 	return new Map(
-		[...readings].flatMap((reading) => {
-			if (reading.result === undefined) return []
-			const named = [...extractLiterals(reading.text).ids].filter((id) => owners.has(id))
+		[...findings].flatMap((finding) => {
+			if (finding.result === undefined) return []
+			const named = [...extractLiterals(finding.text).ids].filter((id) => owners.has(id))
 			const [only] = named
-			return Object.values(reading.arguments)
+			return Object.values(finding.arguments)
 				.filter(isString)
 				.map((value) => normalizeArgument(value))
 				.filter((subject) => extractLiterals(subject).ids.has(subject))
@@ -519,13 +519,13 @@ export function linkOwners(
 }
 
 /**
- * Collects the ids and the owner names the lookup readings named.
+ * Collects the ids and the owner names the lookup findings named.
  *
  * @remarks
- * Every reading counts, a replaced one included, because an id a lookup named stays registered.
- * An empty reading names nothing. An owner name is trimmed, and a name without a letter is dropped.
+ * Every finding counts, a replaced one included, because an id a lookup named stays registered.
+ * An empty finding names nothing. An owner name is trimmed, and a name without a letter is dropped.
  *
- * @param readings - The lookup readings in conversation order
+ * @param findings - The lookup findings in conversation order
  * @returns The registry: every id named, and each owner's names in the order read
  *
  * @example
@@ -536,11 +536,11 @@ export function linkOwners(
  * // registry.owners is Map { 'BW-20931' => ['Brightwater Studio'] }
  * ```
  */
-export function collectRegistry(readings: readonly LedgerLookupReading[]): LedgerRegistry {
-	// The spread and `Array.from` visit a hole in `readings` or in an owner list as an undefined
+export function collectRegistry(findings: readonly LedgerLookupFinding[]): LedgerRegistry {
+	// The spread and `Array.from` visit a hole in `findings` or in an owner list as an undefined
 	// entry, as iteration does; `flatMap` and `map` skip it.
-	const results = [...readings].flatMap((reading) =>
-		reading.result === undefined ? [] : [reading.result],
+	const results = [...findings].flatMap((finding) =>
+		finding.result === undefined ? [] : [finding.result],
 	)
 	return {
 		ids: new Set(
@@ -753,9 +753,9 @@ export function matchEntities(
  *
  * @remarks
  * Each line is a sentence of a live message, verbatim except that a sentence that opens with a pronoun opens with its party and a colon. A message is live when it is a user message,
- * or a tool message whose reading is the last reading of its call, and the input neither excludes it nor
- * files it quiet or replaced. A reading with an undefined `result` still replaces the earlier
- * reading of the same call, so the earlier result leaves every record.
+ * or a tool message whose finding is the last finding of its call, and the input neither excludes it nor
+ * files it quiet or replaced. A finding with an undefined `result` still replaces the earlier
+ * finding of the same call, so the earlier result leaves every record.
  *
  * A live message joins the owner records its entities name, directly or through a linked lookup
  * argument. A message that names no owner joins where its earlier side of an amendment pair joins,
@@ -769,7 +769,7 @@ export function matchEntities(
  * is read as the party. This is a documented limit: the prefix carries
  * the follow-up facts the records exist for.
  *
- * @param input - The messages, readings, entities, and classification to project
+ * @param input - The messages, findings, entities, and classification to project
  * @returns The records with owner records ordered by their first member and the rules record last, the accepted amendments, and the live message ids no record placed
  *
  * @example
@@ -779,7 +779,7 @@ export function matchEntities(
  * 	exclusions: [],
  * 	owners: new Map([['BW-20931', ['Brightwater Studio']]]),
  * 	messages: [{ id: 'user-1', role: 'user', content: 'Brightwater Studio asked for a refund.' }],
- * 	readings: [],
+ * 	findings: [],
  * 	entities: new Map([['user-1', ['BW-20931']]]),
  * 	classification: { quiet: new Set(), categories: new Map(), topics: new Map(), amendments: new Map(), supersessions: new Map() },
  * })
@@ -790,8 +790,8 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 	const position = new Map(input.messages.map((message, at) => [message.id, at]))
 	const byId = new Map(input.messages.map((message) => [message.id, message]))
 	const live = collectLive(input)
-	const links = linkOwners(input.readings, input.owners)
-	const amending = new Map(
+	const links = linkOwners(input.findings, input.owners)
+	const amended = new Map(
 		[
 			...Map.groupBy(
 				[...input.classification.amendments].flatMap(([earlier, laters]) =>
@@ -808,7 +808,7 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 	const settled = new Map<string, ReadonlySet<string>>()
 	const placements = live.map((id) => ({
 		id,
-		keys: placeMember(input, links, amending, id, new Set(), settled),
+		keys: placeMember(input, links, amended, id, new Set(), settled),
 	}))
 	const orphans = placements.filter((placement) => placement.keys.size === 0).map(({ id }) => id)
 	const members = Map.groupBy(
@@ -1178,13 +1178,13 @@ export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | 
  * Collects the ids of the live messages in conversation order.
  *
  * @remarks
- * A message is live when it is a user message, or a tool message whose reading is the last reading of its
- * call, and the input neither excludes it nor files it quiet or replaced. A reading replaces any
- * earlier reading of the same call, an empty one included, so an empty lookup leaves the earlier
- * result out of every record. A reading with no canonical identity stays live as its own source
+ * A message is live when it is a user message, or a tool message whose finding is the last finding of its
+ * call, and the input neither excludes it nor files it quiet or replaced. A finding replaces any
+ * earlier finding of the same call, an empty one included, so an empty lookup leaves the earlier
+ * result out of every record. A finding with no canonical identity stays live as its own source
  * and participates in no replacement.
  *
- * @param input - The messages, readings, and classification to read
+ * @param input - The messages, findings, and classification to read
  * @returns The live message ids
  *
  * @example
@@ -1196,23 +1196,23 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
 	const { classification } = input
 	const excluded = new Set(input.exclusions)
 	const position = new Map(input.messages.map((message, at) => [message.id, at]))
-	const readings = input.readings.filter((reading) => position.has(reading.id))
+	const findings = input.findings.filter((finding) => position.has(finding.id))
 	const identities = new Map(
-		readings.map((reading) => [reading.id, identifyLookup(reading.name, reading.arguments)]),
+		findings.map((finding) => [finding.id, identifyLookup(finding.name, finding.arguments)]),
 	)
 	const current = new Set(
-		readings
+		findings
 			.filter(
-				(reading) =>
-					reading.result !== undefined &&
-					!readings.some(
+				(finding) =>
+					finding.result !== undefined &&
+					!findings.some(
 						(later) =>
-							identities.get(reading.id) !== undefined &&
-							(position.get(later.id) ?? -1) > (position.get(reading.id) ?? -1) &&
-							identities.get(later.id) === identities.get(reading.id),
+							identities.get(finding.id) !== undefined &&
+							(position.get(later.id) ?? -1) > (position.get(finding.id) ?? -1) &&
+							identities.get(later.id) === identities.get(finding.id),
 					),
 			)
-			.map((reading) => reading.id),
+			.map((finding) => finding.id),
 	)
 	return [...new Map(input.messages.map((message) => [message.id, message])).values()]
 		.filter(
@@ -1247,10 +1247,10 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
  *
  * @param input - The owners, entities, and classification to read
  * @param links - The owner of each linked lookup argument, from {@link linkOwners}
- * @param amending - The earlier sides of each message's amendment pairs
+ * @param amended - The earlier sides of each message's amendment pairs
  * @param id - The message id
  * @param seen - The ids already visited, which stops a cycle of amendment pairs
- * @param settled - The placements already walked for the same `input`, `links`, and `amending`; the walk adds to it. Default: no map, so every call walks
+ * @param settled - The placements already walked for the same `input`, `links`, and `amended`; the walk adds to it. Default: no map, so every call walks
  * @returns The record keys, empty when the message is an orphan
  *
  * @example
@@ -1261,7 +1261,7 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
 export function placeMember(
 	input: LedgerProjectionInput,
 	links: ReadonlyMap<string, string>,
-	amending: ReadonlyMap<string, readonly string[]>,
+	amended: ReadonlyMap<string, readonly string[]>,
 	id: string,
 	seen: ReadonlySet<string>,
 	settled?: Map<string, ReadonlySet<string>>,
@@ -1273,7 +1273,7 @@ export function placeMember(
 		return owner === undefined ? [] : [`${LEDGER_OWNER_PREFIX}${owner}`]
 	})
 	const owned = owners.length > 0
-	const sides = owned ? [] : (amending.get(id) ?? []).filter((side) => side !== id)
+	const sides = owned ? [] : (amended.get(id) ?? []).filter((side) => side !== id)
 	const earlier = sides.filter((side) => !seen.has(side))
 	const category = input.classification.categories.get(id)
 	const ruled =
@@ -1281,7 +1281,7 @@ export function placeMember(
 	const keys = new Set([
 		...owners,
 		...earlier.flatMap((side) => [
-			...placeMember(input, links, amending, side, new Set([...seen, id]), settled),
+			...placeMember(input, links, amended, side, new Set([...seen, id]), settled),
 		]),
 		...(ruled ? [LEDGER_RULES_KEY] : []),
 	])

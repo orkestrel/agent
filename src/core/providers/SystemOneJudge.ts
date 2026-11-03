@@ -17,7 +17,7 @@ import { JudgeError } from './errors.js'
  *
  * @example Asking a System One server a choice, a noul, and a score
  * ```ts
- * import { computeReading, createSystemOneJudge } from '@orkestrel/agent'
+ * import { measureAnswer, createSystemOneJudge } from '@orkestrel/agent'
  *
  * const judge = createSystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
  * const result = await judge.ask(
@@ -47,7 +47,7 @@ import { JudgeError } from './errors.js'
  * 	AbortSignal.timeout(30_000),
  * )
  * const readings = Object.fromEntries(
- * 	Object.entries(result.answers).map(([id, answer]) => [id, computeReading(answer)]),
+ * 	Object.entries(result.answers).map(([id, answer]) => [id, measureAnswer(answer)]),
  * )
  * result.model // 'tev1:0.8b' — the model the server named
  * result.usage // { prompt: 975, completion: 4, total: 979 }

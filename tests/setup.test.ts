@@ -221,7 +221,7 @@ import {
 	buildLedgerClassification,
 	buildLedgerInput,
 	buildLedgerMessage,
-	buildLedgerReading,
+	buildLedgerFinding,
 	checkLedgerProjection,
 	createLedgerDesk,
 	createLedgerRequest,
@@ -2109,7 +2109,7 @@ describe('checkLedgerProjection', () => {
 				...input.messages,
 				buildLedgerMessage('user-07', 'user', 'The code rotates again on Friday.'),
 			],
-			readings: input.readings,
+			findings: input.findings,
 			entities: Object.fromEntries(input.entities),
 			classification: {
 				quiet: [...input.classification.quiet],
@@ -2137,15 +2137,15 @@ describe('checkLedgerProjection', () => {
 				buildLedgerMessage('tool-a', 'tool', 'Order BW-5512 for account BW-20931: total $10.00.'),
 				buildLedgerMessage('tool-b', 'tool', 'No record of order BW-5512.'),
 			],
-			readings: [
-				buildLedgerReading(
+			findings: [
+				buildLedgerFinding(
 					'tool-a',
 					'lookup_order',
 					{ id: 'BW-5512' },
 					'Order BW-5512 for account BW-20931: total $10.00.',
 					{ ids: ['BW-5512'], owners: [] },
 				),
-				buildLedgerReading(
+				buildLedgerFinding(
 					'tool-b',
 					'lookup_order',
 					{ id: 'BW-5512' },
@@ -2184,7 +2184,7 @@ describe('checkLedgerProjection', () => {
 describe('ledger builders', () => {
 	it('builds empty collections from no parts', () => {
 		const empty = buildLedgerInput()
-		expect([empty.system, empty.exclusions, empty.messages, empty.readings]).toEqual([
+		expect([empty.system, empty.exclusions, empty.messages, empty.findings]).toEqual([
 			'',
 			[],
 			[],

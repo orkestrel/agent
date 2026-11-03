@@ -1,6 +1,6 @@
 import type { JudgeInterface, JudgeRequest } from '@src/core'
 import {
-	computeReading,
+	measureAnswer,
 	createSystemOneJudge,
 	isJudgeError,
 	JudgeError,
@@ -70,10 +70,10 @@ describe('SystemOneJudge', () => {
 		expect(request.headers.get('content-type')).toBe('application/json')
 		expect(request.headers.get('authorization')).toBe('Bearer fixture-key')
 		expect(await request.json()).toEqual(SYSTEM_ONE_TEV1_REQUEST)
-		const choice = computeReading(requireValue(result.answers.label))
+		const choice = measureAnswer(requireValue(result.answers.label))
 		expect(choice.winner).toBe('bug')
 		expect(choice.confidence).toBeCloseTo(0.9536, 4)
-		expect(computeReading(requireValue(result.answers.severity)).score).toBeCloseTo(0.99192, 5)
+		expect(measureAnswer(requireValue(result.answers.severity)).score).toBeCloseTo(0.99192, 5)
 	})
 
 	it('preserves the recorded object state and instructions across the request', async () => {

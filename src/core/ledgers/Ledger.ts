@@ -10,7 +10,7 @@ import type {
 	LedgerGauge,
 	LedgerInterface,
 	LedgerLine,
-	LedgerLookupReading,
+	LedgerLookupFinding,
 	LedgerOptions,
 	LedgerProjection,
 	LedgerProjectionInput,
@@ -352,8 +352,8 @@ export class Ledger implements LedgerInterface {
 					createScope({
 						name: 'answer',
 						tools: [],
-						select: async (conversation, message, selecting) => {
-							const selection = await this.#select(conversation, message, selecting)
+						select: async (conversation, message, runSignal) => {
+							const selection = await this.#select(conversation, message, runSignal)
 							if (selection.fault !== undefined) return selection
 							return {
 								...selection,
@@ -516,10 +516,10 @@ export class Ledger implements LedgerInterface {
 			: undefined
 	}
 
-	#readLookups(messages: readonly Message[]): readonly LedgerLookupReading[] {
+	#readLookups(messages: readonly Message[]): readonly LedgerLookupFinding[] {
 		this.#flush()
 		return collectToolGroups(messages).flatMap((group) =>
-			group.slice(1).flatMap((message): LedgerLookupReading[] => {
+			group.slice(1).flatMap((message): LedgerLookupFinding[] => {
 				const call = findLedgerCall(group, message)
 				const lookup = this.#options.lookups?.find((one) => one.tool.name === call?.name)
 				if (
@@ -528,18 +528,18 @@ export class Ledger implements LedgerInterface {
 					this.#results.get(message.id)?.success === false
 				)
 					return []
-				const reading = attempt(() => lookup.read(call.arguments, message.content))
-				if (!reading.success) {
+				const read = attempt(() => lookup.read(call.arguments, message.content))
+				if (!read.success) {
 					// Caches the failed read, so no later reading calls its handler again.
 					this.#results.set(message.id, {
 						success: false,
 						id: call.id,
 						name: call.name,
-						error: isError(reading.error) ? reading.error.message : String(reading.error),
+						error: isError(read.error) ? read.error.message : String(read.error),
 					})
 					return []
 				}
-				const result = reading.value
+				const result = read.value
 				return [
 					{
 						id: message.id,
@@ -575,7 +575,7 @@ export class Ledger implements LedgerInterface {
 			exclusions: [...this.#requests, ...this.#annotations],
 			owners: scan.registry.owners,
 			messages: scan.messages,
-			readings: scan.readings,
+			findings: scan.findings,
 			entities: new Map(
 				scan.messages.map((message) => [
 					message.id,
@@ -611,12 +611,12 @@ export class Ledger implements LedgerInterface {
 			? message.content
 			: lines.map((line) => sentences[line.sentence] ?? '').join(' ')
 		if (text === '') return ''
-		const reading = scan.reading(id)
+		const finding = scan.finding(id)
 		return [
 			...lines.map((line) => renderLedgerAnnotation(line, context)),
-			message.role !== 'tool' || reading === undefined
+			message.role !== 'tool' || finding === undefined
 				? text
-				: `${renderLookupCall(reading.name, reading.arguments)}: ${text}`,
+				: `${renderLookupCall(finding.name, finding.arguments)}: ${text}`,
 		]
 			.filter((part) => part !== '')
 			.join('\n')
@@ -730,11 +730,11 @@ export class Ledger implements LedgerInterface {
 	// the filing completed before it.
 	#refuse(
 		error: unknown,
-		filing: Omit<ClassifierResult, 'readings'>,
+		filed: Omit<ClassifierResult, 'readings'>,
 		conversation: ConversationInterface,
 	): Selection {
 		return {
-			...filing,
+			...filed,
 			messages: conversation.view(),
 			fault: isError(error) ? error : new Error(String(error)),
 		}
@@ -753,7 +753,7 @@ export class Ledger implements LedgerInterface {
 	#plan(request: Message, scan: LedgerScan): Pick<Selection, 'messages'> {
 		const { input, projection } = this.#project(scan)
 		const registry = scan.registry
-		const links = linkOwners(input.readings, registry.owners)
+		const links = linkOwners(input.findings, registry.owners)
 		const near = new Set([
 			...matchEntities(scan.index, request.content, true),
 			...this.#classifier.topics(request.id),
@@ -861,7 +861,7 @@ export class Ledger implements LedgerInterface {
 		)
 		const rules = records.find((record) => record.key === LEDGER_RULES_KEY)
 		const owned = records.filter((record) => record.key !== LEDGER_RULES_KEY)
-		const rulings = new Set(
+		const ruledSources = new Set(
 			[...new Map(owned.flatMap((record) => record.lines).map((line) => [line.source, line.role]))]
 				.filter(([source, role]) => this.#ruled(source, role))
 				.map(([source]) => source),
@@ -875,8 +875,8 @@ export class Ledger implements LedgerInterface {
 			...owned
 				.toReversed()
 				.flatMap((record) => [
-					...record.lines.filter((line) => !rulings.has(line.source)),
-					...record.lines.filter((line) => rulings.has(line.source)),
+					...record.lines.filter((line) => !ruledSources.has(line.source)),
+					...record.lines.filter((line) => ruledSources.has(line.source)),
 				]),
 		]
 		const mapped = ordered.map((unit) => ({
@@ -1141,7 +1141,7 @@ export class Ledger implements LedgerInterface {
 	#renderTailStub(message: Message, scan: LedgerScan, shown?: ReadonlySet<string>): Message {
 		const group = scan.group(message.id)
 		const call = group === undefined ? undefined : findLedgerCall(group, message)
-		const reading = scan.reading(message.id)
+		const finding = scan.finding(message.id)
 		const hidden = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'hidden')
 		const visible = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'shown')
 		return {
@@ -1151,7 +1151,7 @@ export class Ledger implements LedgerInterface {
 				call?.arguments ?? {},
 				this.#results.get(message.id)?.success === false
 					? 'failed'
-					: reading?.result === undefined
+					: finding?.result === undefined
 						? 'empty'
 						: shown === undefined
 							? hidden.length > visible.length
@@ -1252,17 +1252,17 @@ export class Ledger implements LedgerInterface {
 					.map((message) => [message.id, message]),
 			)
 			const matched = new Set(searches.flatMap((search) => [...search.matched]))
-			const wordings = searches.filter(
+			const unmatched = searches.filter(
 				(search) => search.matched.size === 0 && search.words.length > 0,
 			)
 			// Newest first; each item's amenders are claimed by it, so an older item never lists them again.
-			const listing = [...listable.values()].reverse().reduce<{
+			const gathered = [...listable.values()].reverse().reduce<{
 				readonly done: ReadonlySet<string>
 				readonly listed: readonly string[]
 				readonly recalled: ReadonlyMap<string, string>
 			}>(
 				(state, message) => {
-					const reading = scan.reading(message.id)
+					const finding = scan.finding(message.id)
 					const topics = new Set([
 						...(input.entities.get(message.id) ?? []),
 						...this.#classifier.topics(message.id),
@@ -1275,12 +1275,12 @@ export class Ledger implements LedgerInterface {
 					])
 					const onTopic =
 						(message.role === 'tool'
-							? reading?.result !== undefined
+							? finding?.result !== undefined
 							: !hasCalls(message) && !this.#classifier.quiet(message.id)) &&
 						[...matched].some((match) => topics.has(match))
 					const worded =
-						(message.role === 'tool' ? reading !== undefined : message.role === 'user') &&
-						wordings.some((search) =>
+						(message.role === 'tool' ? finding !== undefined : message.role === 'user') &&
+						unmatched.some((search) =>
 							search.words.every((word) => message.content.toLowerCase().includes(word)),
 						)
 					if (!onTopic && !worded) return state
@@ -1291,7 +1291,7 @@ export class Ledger implements LedgerInterface {
 					).flatMap((id) => {
 						const source = listable.get(id)
 						if (source === undefined) return []
-						const lookup = scan.reading(id)
+						const lookup = scan.finding(id)
 						const text =
 							lookup === undefined
 								? source.content
@@ -1324,10 +1324,10 @@ export class Ledger implements LedgerInterface {
 				{ done: new Set(), listed: [], recalled: new Map() },
 			)
 			const result =
-				listing.listed.length === 0
+				gathered.listed.length === 0
 					? `nothing on "${topic}"; recall ${guidance}`
-					: cutListing(listing.listed, room)
-			request?.list(result, listing.recalled)
+					: cutListing(gathered.listed, room)
+			request?.list(result, gathered.recalled)
 			return result
 		} finally {
 			if (added) this.#scans.delete(scan)
@@ -1342,12 +1342,12 @@ export class Ledger implements LedgerInterface {
 				this.#collectAfter(entered).flatMap((message) => {
 					const result = this.#results.get(message.id)
 					if (message.role !== 'tool' || result?.success !== true) return []
-					const listing = result.name === 'recall'
-					if (listing && /^nothing on /.test(message.content)) return []
-					const recalled = listing ? request.listing(message.content) : undefined
+					const recalled = result.name === 'recall'
+					if (recalled && /^nothing on /.test(message.content)) return []
+					const stored = recalled ? request.lines(message.content) : undefined
 					return splitResultLines(message.content)
-						.filter((line) => !listing || !matchesCutLine(line))
-						.map((line) => recalled?.get(line) ?? line)
+						.filter((line) => !recalled || !matchesCutLine(line))
+						.map((line) => stored?.get(line) ?? line)
 				}),
 			),
 		]

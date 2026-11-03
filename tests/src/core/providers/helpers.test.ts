@@ -6,7 +6,7 @@ import {
 	MAX_ERROR_BODY_LENGTH,
 	buildJudgeResult,
 	buildProviderResult,
-	computeReading,
+	measureAnswer,
 	extractSystemOneAnswer,
 	extractSystemOneUsage,
 	isSystemOneAnswer,
@@ -326,9 +326,9 @@ describe('readChunks — streamed decoded text', () => {
 	})
 })
 
-describe('computeReading — the measures derived from a judge answer', () => {
+describe('measureAnswer — the measures derived from a judge answer', () => {
 	it('reads the recorded tev1 choice with the published choice confidence', () => {
-		const reading = computeReading(TEV1_CHOICE)
+		const reading = measureAnswer(TEV1_CHOICE)
 		expect(reading.winner).toBe('bug')
 		expect(reading.probability).toBeCloseTo(0.969, 3)
 		expect(reading.confidence).toBeCloseTo(0.9536, 4)
@@ -336,7 +336,7 @@ describe('computeReading — the measures derived from a judge answer', () => {
 	})
 
 	it('reads the recorded tev1 score as its expected level and spread confidence', () => {
-		const reading = computeReading(TEV1_SCORE)
+		const reading = measureAnswer(TEV1_SCORE)
 		expect(reading.winner).toBe('1')
 		expect(reading.probability).toBe(0.9494108750977565)
 		expect(reading.score).toBeCloseTo(0.99192, 5)
@@ -345,56 +345,56 @@ describe('computeReading — the measures derived from a judge answer', () => {
 	})
 
 	it('reproduces the TypeSafe documented choice and score examples', () => {
-		const choice = computeReading({
+		const choice = measureAnswer({
 			form: 'choice',
 			probabilities: { billing: 0.88, technical: 0.12, sales: 0 },
 		})
 		expect(choice).toMatchObject({ winner: 'billing', probability: 0.88 })
 		expect(choice.confidence).toBeCloseTo(0.82, 2)
-		const score = computeReading({ form: 'score', probabilities: [0, 0.95, 0.05] })
+		const score = measureAnswer({ form: 'score', probabilities: [0, 0.95, 0.05] })
 		expect(score.winner).toBe('1')
 		expect(score.score).toBeCloseTo(1.05, 10)
 		// The documented 0.92 is the formula's 0.925 shown at two decimals, half a unit away.
 		expect(score.confidence).toBeCloseTo(0.925, 10)
 		expect(Math.abs(score.confidence - 0.92)).toBeLessThanOrEqual(0.005 + Number.EPSILON)
-		const spread = computeReading({ form: 'score', probabilities: [0, 0.57, 0.43] })
+		const spread = measureAnswer({ form: 'score', probabilities: [0, 0.57, 0.43] })
 		expect(spread.confidence).toBeCloseTo(0.355, 3)
 		expect(spread.score).toBeCloseTo(1.43, 10)
 	})
 
 	it('clamps a score confidence at zero when the spread passes the even spread', () => {
-		const reading = computeReading({ form: 'score', probabilities: [0.34, 0, 0.33, 0.33] })
+		const reading = measureAnswer({ form: 'score', probabilities: [0.34, 0, 0.33, 0.33] })
 		expect(reading.winner).toBe('0')
 		expect(reading.confidence).toBe(0)
 	})
 
 	it('reads a noul over false then true with the confidence |2p - 1|', () => {
-		expect(computeReading(TEV1_NOUL)).toEqual({
+		expect(measureAnswer(TEV1_NOUL)).toEqual({
 			winner: 'true',
 			probability: 0.9978973674111222,
 			confidence: expect.closeTo(0.995794734822244, 12),
 		})
-		expect(computeReading({ form: 'noul', noul: 0.5 })).toEqual({
+		expect(measureAnswer({ form: 'noul', noul: 0.5 })).toEqual({
 			winner: 'false',
 			probability: 0.5,
 			confidence: 0,
 		})
-		const no = computeReading({ form: 'noul', noul: 0.25 })
+		const no = measureAnswer({ form: 'noul', noul: 0.25 })
 		expect(no).toEqual({ winner: 'false', probability: 0.75, confidence: 0.5 })
 	})
 
 	it('names the first of two equal candidates in enumeration order', () => {
-		const choice = computeReading({
+		const choice = measureAnswer({
 			form: 'choice',
 			probabilities: { refund: 0.4, replace: 0.4, other: 0.2 },
 		})
 		expect(choice.winner).toBe('refund')
-		const reversed = computeReading({
+		const reversed = measureAnswer({
 			form: 'choice',
 			probabilities: { replace: 0.4, refund: 0.4, other: 0.2 },
 		})
 		expect(reversed.winner).toBe('replace')
-		expect(computeReading({ form: 'score', probabilities: [0.2, 0.4, 0.4] }).winner).toBe('1')
+		expect(measureAnswer({ form: 'score', probabilities: [0.2, 0.4, 0.4] }).winner).toBe('1')
 	})
 
 	it('refuses a choice or score answer with fewer than two candidates', () => {
@@ -403,7 +403,7 @@ describe('computeReading — the measures derived from a judge answer', () => {
 			{ form: 'choice', probabilities: {} },
 			{ form: 'score', probabilities: [1] },
 		] satisfies readonly JudgeAnswer[]) {
-			const error = captureError(() => computeReading(answer))
+			const error = captureError(() => measureAnswer(answer))
 			expect(isJudgeError(error)).toBe(true)
 			expect(error).toMatchObject({ code: 'PROTOCOL', status: undefined })
 		}
@@ -413,7 +413,7 @@ describe('computeReading — the measures derived from a judge answer', () => {
 		const probabilities: number[] = []
 		probabilities[0] = 0.2
 		probabilities[2] = 0.8
-		expect(captureError(() => computeReading({ form: 'score', probabilities }))).toBeInstanceOf(
+		expect(captureError(() => measureAnswer({ form: 'score', probabilities }))).toBeInstanceOf(
 			TypeError,
 		)
 	})

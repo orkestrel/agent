@@ -1,22 +1,22 @@
 import type { Message } from '../types.js'
-import type { LedgerIndex, LedgerLookupReading, LedgerRegistry } from './types.js'
+import type { LedgerIndex, LedgerLookupFinding, LedgerRegistry } from './types.js'
 import { collectToolGroups } from '../helpers.js'
 import { buildLedgerIndex, collectRegistry } from './helpers.js'
 
 /**
- * Holds what one read of a ledger's conversation yields: the messages, the lookup readings, the
+ * Holds what one read of a ledger's conversation yields: the messages, the lookup findings, the
  * tool groups, the registry with its index, and each message's position.
  *
  * @remarks
  * A `Ledger` builds one scan for a selection or a `recall` call from the conversation's messages and
- * the lookup readings it read for them, and reads these values from the scan in place of reading the
+ * the lookup findings it read for them, and reads these values from the scan in place of reading the
  * conversation and the lookups again, so no public signature names this class. The scan computes
  * every value when it is built, never changes one, and reads no lookup itself.
  */
 export class LedgerScan {
 	readonly #messages: readonly Message[]
-	readonly #readings: readonly LedgerLookupReading[]
-	readonly #lookups: ReadonlyMap<string, LedgerLookupReading>
+	readonly #findings: readonly LedgerLookupFinding[]
+	readonly #lookups: ReadonlyMap<string, LedgerLookupFinding>
 	readonly #groups: ReadonlyMap<string, readonly Message[]>
 	readonly #positions: ReadonlyMap<string, number>
 	readonly #first: number | undefined
@@ -27,18 +27,18 @@ export class LedgerScan {
 	 * Computes the scan's values from one read of the conversation.
 	 *
 	 * @param messages - The conversation's messages as the read returned them
-	 * @param readings - The lookup readings of those messages, in conversation order
+	 * @param findings - The lookup findings of those messages, in conversation order
 	 * @param requests - The ids of the ledger's request messages
-	 * @throws {TypeError} Thrown when a reading's owner list or an owner's name list holds a hole
+	 * @throws {TypeError} Thrown when a finding's owner list or an owner's name list holds a hole
 	 */
 	constructor(
 		messages: readonly Message[],
-		readings: readonly LedgerLookupReading[],
+		findings: readonly LedgerLookupFinding[],
 		requests: ReadonlySet<string>,
 	) {
 		this.#messages = messages
-		this.#readings = readings
-		this.#lookups = new Map(readings.map((reading) => [reading.id, reading]))
+		this.#findings = findings
+		this.#lookups = new Map(findings.map((finding) => [finding.id, finding]))
 		// Reversed, so a message that two groups held would map to the first, as a search finds it.
 		this.#groups = new Map(
 			collectToolGroups(messages)
@@ -48,7 +48,7 @@ export class LedgerScan {
 		this.#positions = new Map(messages.map((message, at) => [message.id, at]))
 		const first = messages.findIndex((message) => requests.has(message.id))
 		this.#first = first < 0 ? undefined : first
-		this.#registry = collectRegistry(readings)
+		this.#registry = collectRegistry(findings)
 		this.#index = buildLedgerIndex(this.#registry)
 	}
 
@@ -62,18 +62,18 @@ export class LedgerScan {
 	}
 
 	/**
-	 * Returns the lookup readings of the scanned messages.
+	 * Returns the lookup findings of the scanned messages.
 	 *
-	 * @returns One reading per successful lookup result, in conversation order
+	 * @returns One finding per successful lookup result, in conversation order
 	 */
-	get readings(): readonly LedgerLookupReading[] {
-		return this.#readings
+	get findings(): readonly LedgerLookupFinding[] {
+		return this.#findings
 	}
 
 	/**
-	 * Returns the registry the readings name.
+	 * Returns the registry the findings name.
 	 *
-	 * @returns The ids and owner names the readings named
+	 * @returns The ids and owner names the findings named
 	 */
 	get registry(): LedgerRegistry {
 		return this.#registry
@@ -98,12 +98,12 @@ export class LedgerScan {
 	}
 
 	/**
-	 * Reads the lookup reading of a tool message.
+	 * Reads the lookup finding of a tool message.
 	 *
 	 * @param id - The tool message's id
-	 * @returns The reading, or undefined when the message has no successful lookup reading
+	 * @returns The finding, or undefined when the message has no successful lookup finding
 	 */
-	reading(id: string): LedgerLookupReading | undefined {
+	finding(id: string): LedgerLookupFinding | undefined {
 		return this.#lookups.get(id)
 	}
 

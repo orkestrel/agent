@@ -158,10 +158,10 @@ describe('LedgerRequest', () => {
 	it('lists the stored first lines of a recall result by its text', () => {
 		const request = new LedgerRequest('Check.')
 		const lines = new Map([['lookup {"id":"BW-20931"}: Account BW-20931.', 'Account BW-20931.']])
-		expect(request.listing('Account BW-20931.')).toBeUndefined()
+		expect(request.lines('Account BW-20931.')).toBeUndefined()
 		request.list('first result', new Map())
 		request.list('first result', lines)
-		expect(request.listing('first result')).toBe(lines)
-		expect(request.listing('other result')).toBeUndefined()
+		expect(request.lines('first result')).toBe(lines)
+		expect(request.lines('other result')).toBeUndefined()
 	})
 })

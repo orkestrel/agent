@@ -438,11 +438,11 @@ export class Agent implements AgentInterface {
 		const request = last?.role === 'user' ? last : undefined
 		// `#select` returns `undefined` when no handler is set, so the default path awaits nothing
 		// before the first provider request.
-		const selecting = this.#select(conversation, request, abort, budget)
+		const selection = this.#select(conversation, request, abort, budget)
 		const entry =
-			selecting === undefined
+			selection === undefined
 				? { messages: this.#build(conversation), usage: undefined }
-				: await selecting
+				: await selection
 		const tools = this.#context.tools
 		// The per-call options are fixed for the run, so every request carries this one snapshot;
 		// absent when neither preference is set.
@@ -661,8 +661,8 @@ export class Agent implements AgentInterface {
 			!provided.success && interrupted && isProviderAbortError(provided.error)
 				? provided.error.partial
 				: undefined
-		const reasoning = provided.success ? provided.value.thinking : partial?.thinking
-		const thinking = reasoning !== undefined && reasoning.length > 0 ? reasoning : undefined
+		const surfaced = provided.success ? provided.value.thinking : partial?.thinking
+		const thinking = surfaced !== undefined && surfaced.length > 0 ? surfaced : undefined
 		const content = streamed.join('')
 		const estimate = estimateTokens(content)
 		const reported = provided.success ? provided.value.usage : partial?.usage
@@ -781,11 +781,11 @@ export class Agent implements AgentInterface {
 				futile: latch,
 			}
 		}
-		const selecting = this.#select(conversation, request, abort, budget)
+		const selection = this.#select(conversation, request, abort, budget)
 		const rebuilt =
-			selecting === undefined
+			selection === undefined
 				? { messages: this.#build(conversation), usage: undefined }
-				: await selecting
+				: await selection
 		if (abort.signal.aborted) {
 			return {
 				dispatch: undefined,
