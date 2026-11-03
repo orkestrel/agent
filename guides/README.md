@@ -90,6 +90,12 @@ surface the `Agent`, `Conversation`, and observable agent-owned managers
 expose as `emitter`. It documents **that package's** surface, not anything
 sourced in this repo; it is kept here for the same reason.
 
+See [NDJSON](ndjson.md), a byte-identical mirror of the guide for
+`@orkestrel/ndjson` — a runtime dependency, the line parser `RelayProvider`
+reads a relay stream through by default. It documents **that package's**
+surface (`createNDJSONParser` and `NDJSONError`), not anything sourced in this
+repo; it is kept here for the same reason.
+
 See [Queue](queue.md), a byte-identical mirror of the guide for
 `@orkestrel/queue` — a runtime dependency, the bounded-concurrency, retrying,
 durable substrate `createAgentQueue` composes for many durable agent jobs. It

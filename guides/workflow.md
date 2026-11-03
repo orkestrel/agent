@@ -779,7 +779,7 @@ These invariants hold across `src/core` ↔ `workflow.md`:
 
 20. **Priority accepted but uniform.** `options.priority` is part of the contract, but a `setTimeout`-based default cannot act on urgency, so it treats every priority the same. It is accepted without error and does not change behavior; environment backends honour it.
 
-    The shared test `createRecordedScheduler` wraps one shipped `createScheduler` instance:
+    The shared test `createRecordingScheduler` wraps one shipped `createScheduler` instance:
     it counts a `yield` before delegating and delegates `delay` unchanged, preserving real
     asynchronous turns, timing, abort reasons, and cleanup rather than substituting behavior.
 
