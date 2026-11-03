@@ -1,6 +1,6 @@
 import type { StudyEvidence, StudyRubric } from '@orkestrel/study'
 import type { StudyGradeVerdict, StudyGradeTarget } from '@orkestrel/study/server'
-import type { StudyToolsAssertion, StudyToolsFile, StudyToolsReading } from './types.js'
+import type { StudyToolsAssertion, StudyToolsFile, StudyToolsCheck } from './types.js'
 import { isArray, isObject, isRecord } from '@orkestrel/contract'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
@@ -112,10 +112,10 @@ export function readStudyToolsPredicate(
 	assertion: StudyToolsAssertion,
 	goal: string,
 	evidence: readonly StudyEvidence[],
-): StudyToolsReading {
+): StudyToolsCheck {
 	if (assertion.observation === 'request') return readStudyToolsRequest(assertion, goal, evidence)
 	// Each relevant row that names the asserted subject yields one reading; the latest wins.
-	const readings = [...evidence.entries()].flatMap(([row, event]): readonly StudyToolsReading[] => {
+	const checks = [...evidence.entries()].flatMap(([row, event]): readonly StudyToolsCheck[] => {
 		if (event.goal !== goal || event.event !== assertion.observation) return []
 		const value = event.value
 		if (!isRecord(value)) throw new StudyError('EVIDENCE', 'Domain evidence is not a record')
@@ -174,10 +174,10 @@ export function readStudyToolsPredicate(
 			},
 		]
 	})
-	const latest = readings.at(-1)
+	const latest = checks.at(-1)
 	if (latest !== undefined && assertion.observation === 'tool' && assertion.count !== undefined)
 		return Object.freeze({
-			verdict: readings.length === assertion.count ? 'achieved' : 'unsuccessful',
+			verdict: checks.length === assertion.count ? 'achieved' : 'unsuccessful',
 			row: latest.row,
 		})
 	return Object.freeze(latest ?? { verdict: 'unknown', row: undefined })
@@ -199,7 +199,7 @@ export function readStudyToolsRequest(
 	assertion: Extract<StudyToolsAssertion, { readonly observation: 'request' }>,
 	goal: string,
 	evidence: readonly StudyEvidence[],
-): StudyToolsReading {
+): StudyToolsCheck {
 	const selected = [...evidence.entries()].filter(
 		([, event]) => event.goal === goal && event.event === 'provider',
 	)[assertion.at]
@@ -243,16 +243,16 @@ export function readStudyToolsGrade(target: StudyGradeTarget): StudyGradeVerdict
 	const { criterion, evidence } = target
 	if (!isStudyToolsAssertion(criterion.assertion))
 		throw new StudyError('CONFIG', 'Unsupported tools assertion')
-	const reading = readStudyToolsPredicate(criterion.assertion, criterion.goal, evidence)
+	const check = readStudyToolsPredicate(criterion.assertion, criterion.goal, evidence)
 	return {
-		verdict: reading.verdict,
+		verdict: check.verdict,
 		method: criterion.method === 'state' ? 'state' : 'trace',
 		reason:
-			reading.row === undefined
+			check.row === undefined
 				? 'No retained observation for the declared predicate'
-				: reading.verdict === 'achieved'
+				: check.verdict === 'achieved'
 					? 'Retained observation matches the independent predicate'
 					: 'Retained observation differs from the independent predicate',
-		references: reading.row === undefined ? [] : [{ file: 'evidence', row: reading.row }],
+		references: check.row === undefined ? [] : [{ file: 'evidence', row: check.row }],
 	}
 }

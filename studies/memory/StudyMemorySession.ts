@@ -71,7 +71,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	// The calls the compaction arm dispatched in this run, replaced on each admission as `LedgerRequest` replaces its own.
 	#repeats: ReadonlySet<string> = new Set()
 	#input: string | undefined
-	#closing: Promise<void> | undefined
+	#closed: Promise<void> | undefined
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
 	constructor(options: StudyMemorySessionOptions) {
@@ -138,7 +138,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			runtime: options.agent,
 			gauge,
 			enforced: gauge !== undefined,
-			record: (reading, request) => this.#trace.record(reading, request),
+			record: (measurement, request) => this.#trace.record(measurement, request),
 		})
 		const recap = compaction === undefined ? undefined : roles.summary
 		if (compaction !== undefined && recap === undefined)
@@ -286,7 +286,7 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Executes a public goal against preserved state and retains its observable product. @param goal - Public arrivals, request and references. @param context - Parent accounting and evidence. @returns Actual complete or partial content. */
 	async execute(goal: StudyGoal, context: StudyContext): Promise<StudyProduct> {
-		if (this.#closing !== undefined || this.#flights.size > 0)
+		if (this.#closed !== undefined || this.#flights.size > 0)
 			throw new StudyError('CONFIG', 'Memory session is closed or busy')
 		if (!isStudyMemoryInput(goal.input))
 			throw new StudyError('CONFIG', 'Malformed public memory input')
@@ -301,8 +301,8 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	/** Cancels native work and drains the actual agent before releasing managers. @returns Completion after session cleanup. */
 	close(): Promise<void> {
-		this.#closing ??= this.#dispose()
-		return this.#closing
+		this.#closed ??= this.#dispose()
+		return this.#closed
 	}
 
 	async #execute(

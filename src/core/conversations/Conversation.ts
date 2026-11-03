@@ -23,7 +23,7 @@ import {
 	requireConversationSnapshot,
 	requireKeep,
 	requireRole,
-	requireRolling,
+	requireCumulative,
 	requireSectionsCap,
 	requireSummary,
 } from './helpers.js'
@@ -66,7 +66,7 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   still the live entries after the summarizer settles, and `options.signal` rejects the call
  *   with its reason at once and commits nothing after the abort. A digest whose trimmed text is
  *   empty rejects with code `'SUMMARY'` and commits nothing.
- * - **Rolling.** With `rolling`, a fold makes one summarizer call over the framed recaps of all
+ * - **Cumulative.** With `cumulative`, a fold makes one summarizer call over the framed recaps of all
  *   prior sections then the slice, and replaces those sections with one that retains their
  *   originals then the slice. It emits `compact` once and never `collapse`, commits nothing when
  *   the call throws, aborts, or the slice or prior sections changed, and cannot combine with a
@@ -108,7 +108,7 @@ export class Conversation implements ConversationInterface {
 	readonly #cap: number | undefined
 	// Whether a fold replaces every prior section with one that digests their recaps and the slice.
 	// Never combined with a cap.
-	readonly #rolling: boolean
+	readonly #cumulative: boolean
 	// The compacted history, oldest → newest — each summarized slice retains its originals.
 	// Replaced on every change rather than mutated in place.
 	#sections: readonly Section[]
@@ -133,8 +133,8 @@ export class Conversation implements ConversationInterface {
 		this.#summarize = options?.summarize
 		this.#keep = requireKeep(options?.keep ?? DEFAULT_CONVERSATION_KEEP)
 		this.#cap = requireSectionsCap(options?.sections)
-		this.#rolling = options?.rolling ?? false
-		requireRolling(this.#rolling, this.#cap)
+		this.#cumulative = options?.cumulative ?? false
+		requireCumulative(this.#cumulative, this.#cap)
 		this.#sections = snapshot === undefined ? [] : [...snapshot.sections]
 		this.#messages = new Map(snapshot?.messages.map((message) => [message.id, message]))
 	}
@@ -217,7 +217,7 @@ export class Conversation implements ConversationInterface {
 			)
 		}
 		const cap = requireSectionsCap(options?.sections ?? this.#cap)
-		requireRolling(this.#rolling, cap)
+		requireCumulative(this.#cumulative, cap)
 		const keep = requireKeep(options?.keep ?? this.#keep)
 		const signal = options?.signal
 		signal?.throwIfAborted()
@@ -313,9 +313,9 @@ export class Conversation implements ConversationInterface {
 		const fold = first >= 0 && aligned <= first ? 0 : aligned
 		if (fold <= 0) return undefined
 		const slice = live.slice(0, fold)
-		// A rolling fold digests every prior recap (framed, oldest first) ahead of the slice in one
+		// A cumulative fold digests every prior recap (framed, oldest first) ahead of the slice in one
 		// call; the originals behind those recaps are never sent.
-		const prior = this.#rolling ? this.#sections : []
+		const prior = this.#cumulative ? this.#sections : []
 		const request = [...prior.map((one) => buildRecapMessage(one)), ...stripThinking(slice, 'none')]
 		const summary = await raceSignal(summarize(request, signal), signal)
 		signal?.throwIfAborted()
@@ -326,7 +326,7 @@ export class Conversation implements ConversationInterface {
 		// The recaps the digest covers must still be the sections held, or the replacement would drop
 		// a section it never summarized.
 		if (
-			this.#rolling &&
+			this.#cumulative &&
 			(this.#sections.length !== prior.length ||
 				!prior.every((one, index) => this.#sections[index] === one))
 		) {
@@ -335,10 +335,10 @@ export class Conversation implements ConversationInterface {
 		const section: Section = {
 			id: crypto.randomUUID(),
 			summary,
-			messages: this.#rolling ? [...prior.flatMap((one) => one.messages), ...slice] : slice,
+			messages: this.#cumulative ? [...prior.flatMap((one) => one.messages), ...slice] : slice,
 		}
 		for (const message of slice) this.#messages.delete(message.id)
-		this.#sections = this.#rolling ? [section] : [...this.#sections, section]
+		this.#sections = this.#cumulative ? [section] : [...this.#sections, section]
 		// Preserve the original sections if the merge fails by replacing them only after summarizing.
 		if (cap !== undefined && this.#sections.length > cap) {
 			const overflow = this.#sections.length - cap + 1

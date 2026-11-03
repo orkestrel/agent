@@ -33,7 +33,7 @@ import {
 	buildCustodyManifest,
 	buildMemoryGateJudgments,
 	buildMemoryGatePopulation,
-	buildMemoryGradingFixture,
+	buildMemoryGradeFixture,
 	buildMemoryLabelAnswers,
 	buildMemoryLabelFixture,
 	buildMemoryLabelLanes,
@@ -66,7 +66,7 @@ import {
 	buildMemoryCall,
 	buildMemoryCapture,
 	buildMemoryCriterion,
-	buildMemoryRecording,
+	buildMemoryRecordProfile,
 	buildMemorySeedControl,
 	buildMemorySeedResponses,
 	buildMemoryVerdict,
@@ -107,7 +107,7 @@ import {
 	runMemoryTrial,
 	totalMemoryUsage,
 	waitForMemoryListeners,
-	writeStudyInstallRecording,
+	writeStudyInstallRecord,
 	STUDY_MEMORY_CONTEXT_KEYS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
 	STUDY_MEMORY_INERT_EXCHANGES,
@@ -117,7 +117,7 @@ import {
 	STUDY_MEMORY_OBSERVED_EVENTS,
 	STUDY_MEMORY_OBSERVED_KEYS,
 	STUDY_MEMORY_OPTION_KEYS,
-	STUDY_MEMORY_RECORDING,
+	STUDY_MEMORY_RECORD,
 	STUDY_MEMORY_REFUSAL_KEYS,
 	STUDY_MEMORY_REPLAY_REFUSAL,
 	STUDY_MEMORY_SEED_SENTINEL,
@@ -162,20 +162,20 @@ describe('study declaration fixtures', () => {
 		expect(buildStudyAssessment(first.schedule).attempts).toEqual(
 			first.schedule.map((item) => item.id),
 		)
-		const grading = buildMemoryGradingFixture()
-		expect(grading.failure).toEqual({
+		const grade = buildMemoryGradeFixture()
+		expect(grade.failure).toEqual({
 			cause: 'capacity',
 			message: 'Output cap',
 			role: 'agent',
 			stop: { layer: 'model', id: 'num_predict', max: 512, consumed: 512 },
 		})
-		const scheduled = grading.manifest.schedule.map((item) => item.id)
-		expect(isStudyCustodyManifest(grading.manifest)).toBe(true)
-		expect(scheduled).toEqual([grading.complete.trial.id, grading.faulted.trial.id])
-		expect(grading.attempts.map((item) => item.trial.id)).toEqual(scheduled)
-		expect(Object.keys(grading.evidence)).toEqual(scheduled)
-		expect(grading.evidence[grading.complete.trial.id]).toBe(grading.complete.evidence)
-		expect(grading.rubric.criteria.map((item) => item.id)).toEqual([
+		const scheduled = grade.manifest.schedule.map((item) => item.id)
+		expect(isStudyCustodyManifest(grade.manifest)).toBe(true)
+		expect(scheduled).toEqual([grade.complete.trial.id, grade.faulted.trial.id])
+		expect(grade.attempts.map((item) => item.trial.id)).toEqual(scheduled)
+		expect(Object.keys(grade.evidence)).toEqual(scheduled)
+		expect(grade.evidence[grade.complete.trial.id]).toBe(grade.complete.evidence)
+		expect(grade.rubric.criteria.map((item) => item.id)).toEqual([
 			'operational',
 			'meaning',
 			'source',
@@ -433,7 +433,7 @@ describe('study install fixtures', () => {
 			settings: STUDY_MEMORY_SEED_SETTINGS,
 		})
 		expect(run.failure).toBeUndefined()
-		const base = buildMemoryRecording('http://127.0.0.1:1')
+		const base = buildMemoryRecordProfile('http://127.0.0.1:1')
 		if (base.provider === undefined) throw new Error('Missing recording provider')
 		// A judgment matches on its judge's model, so this seat re-asks every seated question: only the chat is scripted.
 		const requests = await readMemorySeedRequests({
@@ -471,7 +471,7 @@ describe('study install fixtures', () => {
 		if (second === undefined) throw new Error('Missing second goal')
 		// A closed origin stands in for the declared one, because the helper replaces it.
 		const profile = {
-			...buildMemoryRecording('http://127.0.0.1:1'),
+			...buildMemoryRecordProfile('http://127.0.0.1:1'),
 			settings: STUDY_MEMORY_SEED_SETTINGS,
 		}
 		for (const arm of ['records', 'compaction'] as const) {
@@ -1009,7 +1009,7 @@ describe('study install fixtures', () => {
 	})
 
 	it('declares recording on a built profile and on a scratch local profile, keeping its other members', () => {
-		const profile = buildMemoryRecording('http://127.0.0.1:7')
+		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
 		expect(profile.record).toEqual({ bytes: 4194304, calls: 256, duration: 60000 })
 		expect(profile.settings).toEqual({
 			version: 'fixture-1',
@@ -1017,14 +1017,14 @@ describe('study install fixtures', () => {
 		})
 		const scratch = createScratch({ prefix: 'study-recording-setup-' })
 		try {
-			expect(() => writeStudyInstallRecording(scratch)).toThrow('Missing authored memory profile')
+			expect(() => writeStudyInstallRecord(scratch)).toThrow('Missing authored memory profile')
 			scratch.write('studies/memory/profiles/local.json', '{"name":"local","settings":{"a":1}}')
-			writeStudyInstallRecording(scratch)
+			writeStudyInstallRecord(scratch)
 			expect(parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')).toEqual({
 				name: 'local',
-				record: STUDY_MEMORY_RECORDING.record,
+				record: STUDY_MEMORY_RECORD.record,
 				settings: {
-					...STUDY_MEMORY_RECORDING.settings,
+					...STUDY_MEMORY_RECORD.settings,
 					gauge: STUDY_MEMORY_SETTINGS.gauge,
 					observe: true,
 				},
@@ -1055,7 +1055,7 @@ describe('study install fixtures', () => {
 
 	it('builds a capture whose sink keeps each row and whose replay refuses each request', async () => {
 		const capture = buildMemoryCapture(
-			buildMemoryRecording('http://127.0.0.1:7'),
+			buildMemoryRecordProfile('http://127.0.0.1:7'),
 			{ id: 'captured', scenario: 'public', arm: 'full', repetition: 0 },
 			WINDOW_GOAL,
 		)
@@ -1621,7 +1621,7 @@ describe('memory gate reader', () => {
 			collectMemoryThirdRows(
 				map,
 				[1, 2, 3, 4],
-				[{ clause: open.clause, reading: open }],
+				[{ clause: open.clause, outcome: open }],
 				assignment,
 			),
 		).toEqual([1, 2])
@@ -1629,12 +1629,12 @@ describe('memory gate reader', () => {
 			collectMemoryThirdRows(
 				map,
 				[1, 2, 3, 4],
-				[{ clause: holds.clause, reading: holds }],
+				[{ clause: holds.clause, outcome: holds }],
 				assignment,
 			),
 		).toEqual([])
 		expect(
-			collectMemoryThirdRows(map, [2], [{ clause: open.clause, reading: open }], assignment),
+			collectMemoryThirdRows(map, [2], [{ clause: open.clause, outcome: open }], assignment),
 		).toEqual([2])
 	})
 

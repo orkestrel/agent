@@ -35,7 +35,7 @@ export interface StudyMemoryOptions {
 }
 
 /** Holds one role's pinned sampling values, each key written as its Ollama wire name. */
-export interface StudyMemorySampling {
+export interface StudyMemoryParameters {
 	readonly temperature: number
 	readonly seed: number
 	readonly top_k: number

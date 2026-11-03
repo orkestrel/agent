@@ -179,7 +179,7 @@ export interface StudyToolsFile {
 }
 
 /** Holds one independent predicate reading and its retained row attribution. */
-export interface StudyToolsReading {
+export interface StudyToolsCheck {
 	readonly verdict: StudyJudgment['verdict']
 	readonly row: number | undefined
 }

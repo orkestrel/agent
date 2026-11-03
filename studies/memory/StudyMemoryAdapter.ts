@@ -61,8 +61,8 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 	}
 	/** Reads one listed goal's rows into the line `study progress` lists. @param target - The trial, the goal, and exactly that goal's rows. @returns The goal's reading. */
 	progress(target: StudyProgressTarget): JSONValue {
-		const reading: unknown = readStudyMemoryProgress(target.evidence)
-		if (!isJSONValue(reading)) throw new StudyError('FAULT', 'Memory progress is not JSON')
-		return reading
+		const progress: unknown = readStudyMemoryProgress(target.evidence)
+		if (!isJSONValue(progress)) throw new StudyError('FAULT', 'Memory progress is not JSON')
+		return progress
 	}
 }

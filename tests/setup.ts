@@ -2356,7 +2356,7 @@ export function createStubSummarizer(): {
 
 /**
  * Creates an inert summarizer that records each request and digests it as `recap(<contents>)`,
- * so a rolling fold's input and output are both readable from the section summary.
+ * so a cumulative fold's input and output are both readable from the section summary.
  *
  * @returns The summarizer and the requests it received, oldest first
  */
@@ -8543,3 +8543,228 @@ export const JUDGMENT_EDGE_RECORDS: ReadonlyArray<readonly [string, unknown, boo
 		['a frozen record carrying the members', Object.freeze({ ...JUDGMENT_RECORD }), true],
 		['a record with a present usage of undefined', { ...JUDGMENT_RECORD, usage: undefined }, false],
 	])
+
+/** Records one name that breaks the -ing rule, with where it sits. */
+export interface ParticipleViolation {
+	readonly path: string
+	readonly line: number
+	readonly name: string
+	readonly word: string
+}
+
+/** Holds one source file the name scan reads: its repository path and its text. */
+export interface NameSource {
+	readonly path: string
+	readonly text: string
+}
+
+const BLANK_COMMENT = String.raw`//[^\n]*|/\*[\s\S]*?\*/`
+const BLANK_QUOTED = String.raw`'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"`
+const BLANK_REGEX = String.raw`(?<=[=(,:?&|!;{}[]\s*|\breturn\s+)/(?![/*])(?:[^/\\\n[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+/[a-z]*`
+const BLANK_TEMPLATE =
+	'`(?:[^`\\\\$]|\\\\[\\s\\S]|\\$(?!\\{)|\\$\\{(?:[^{}`]|`[^`]*`|\\{[^{}]*\\})*\\})*`'
+const BLANK_PATTERN = new RegExp(
+	[BLANK_COMMENT, BLANK_REGEX, BLANK_QUOTED, BLANK_TEMPLATE].join('|'),
+	'g',
+)
+
+/**
+ * Blanks every comment and string literal of a TypeScript text and keeps its length and line breaks.
+ *
+ * @remarks
+ * A line comment, a block comment, a regular expression literal, a quoted string and a template
+ * literal, delimiters included, become spaces, so a pattern scan over the result matches code alone
+ * and keeps each match at its own offset and line. A regular expression literal counts only after
+ * an operator, an opening bracket or `return`. A template placeholder holds at most one brace pair
+ * and one nested template.
+ *
+ * @param text - TypeScript source text
+ * @returns The text with comments and strings replaced by spaces
+ * @example
+ * ```ts
+ * blankSourceText("const a = 'x' // y") // 'const a =' followed by spaces
+ * ```
+ */
+export function blankSourceText(text: string): string {
+	return text.replace(BLANK_PATTERN, (match) => match.replace(/[^\n]/g, ' '))
+}
+
+/**
+ * Returns the last camel-case word of an identifier, in lower case.
+ *
+ * @remarks
+ * A leading `#`, `_` or `$` is dropped. An upper-case constant name splits at its underscores and
+ * takes the last segment.
+ *
+ * @param name - An identifier
+ * @returns The final word, lower-cased
+ * @example
+ * ```ts
+ * extractNameWord('ClassifierReading') // 'reading'
+ * extractNameWord('STUDY_MEMORY_SAMPLING') // 'sampling'
+ * ```
+ */
+export function extractNameWord(name: string): string {
+	const parts = name
+		.replace(/^[#_$]+/, '')
+		.split('_')
+		.filter(Boolean)
+	const segment = parts[parts.length - 1] ?? ''
+	return (segment.match(/[A-Z]?[a-z\d]+$|[A-Z]+$/)?.[0] ?? segment).toLowerCase()
+}
+
+const PARTICIPLE_NAME = String.raw`[A-Za-z_$][\w$]*`
+const PARTICIPLE_EXPORT = new RegExp(
+	String.raw`^[ \t]*export\s+(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class|const|let)\s+(${PARTICIPLE_NAME})`,
+	'gm',
+)
+const PARTICIPLE_FUNCTION = new RegExp(
+	String.raw`\bfunction\*?\s+(${PARTICIPLE_NAME})\s*(?:<[^()]*?>)?\s*\(`,
+	'g',
+)
+const PARTICIPLE_READONLY = new RegExp(
+	String.raw`\breadonly\s+(#?${PARTICIPLE_NAME})\s*[?!]?\s*[:=;]`,
+	'g',
+)
+const PARTICIPLE_FIELD = new RegExp(
+	String.raw`^[ \t]+(?:(?:static|readonly|declare|override|accessor|async|get|set)\s+)*\*?\s*(#${PARTICIPLE_NAME})\s*[?!]?\s*[:=;(<]`,
+	'gm',
+)
+const PARTICIPLE_METHOD = new RegExp(
+	String.raw`^\t(?:(?:static|async|get|set|override|abstract)\s+)*\*?(${PARTICIPLE_NAME})(?:<[^\n]*?>)?\(([^\n]*)$`,
+	'gm',
+)
+const PARTICIPLE_PARAMETER = new RegExp(
+	String.raw`^(\s*)(?:(?:readonly|override)\s+)*(?:\.\.\.)?(${PARTICIPLE_NAME})\s*(?:[?:=]|$)`,
+	'd',
+)
+
+const PARTICIPLE_LIST = String.raw`\((?:[^()]|\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))*\)`
+
+/**
+ * Lists the parameter names of the parameter list that opens at a parenthesis.
+ *
+ * @remarks
+ * Splits the list at its top-level commas, tracking brackets and angle brackets, and takes the
+ * leading identifier of each part. A destructured part names the keys of its type and is skipped.
+ * A list nested more than three parentheses deep yields nothing.
+ *
+ * @param text - TypeScript source text without comments or strings
+ * @param open - The offset of the opening parenthesis
+ * @returns Each parameter name with its offset, in order
+ * @example
+ * ```ts
+ * extractParameters('(a: number, b?: string)', 0) // [{ name: 'a', index: 1 }, { name: 'b', index: 12 }]
+ * ```
+ */
+export function extractParameters(
+	text: string,
+	open: number,
+): ReadonlyArray<{ readonly name: string; readonly index: number }> {
+	const matcher = new RegExp(PARTICIPLE_LIST, 'y')
+	matcher.lastIndex = open
+	const list = matcher.exec(text)?.[0] ?? ''
+	const chars = list.split('')
+	const depths: number[] = []
+	for (const [index, char] of chars.entries()) {
+		const opens = '([{<'.includes(char)
+		const closes = ')]}'.includes(char) || (char === '>' && chars[index - 1] !== '=')
+		depths.push((depths[index - 1] ?? 0) + (opens ? 1 : closes ? -1 : 0))
+	}
+	const cuts = chars.flatMap((char, index) => (char === ',' && depths[index] === 1 ? [index] : []))
+	const starts = [1, ...cuts.map((cut) => cut + 1)]
+	return starts.flatMap((start, order) => {
+		const match = PARTICIPLE_PARAMETER.exec(list.slice(start, cuts[order] ?? list.length - 1))
+		return match === null
+			? []
+			: [{ name: requireValue(match[2]), index: open + start + (match.indices?.[2]?.[0] ?? 0) }]
+	})
+}
+
+/**
+ * Lists the names a source text declares in the positions the -ing rule governs.
+ *
+ * @remarks
+ * Reads text with a pattern scan and no parser, over comment-free and string-free text. The
+ * positions are an exported interface, type, class or const; a function declaration and its
+ * parameter list; a `readonly` member; a `#` field or method; a method head one tab in, with its
+ * parameter list. A local variable is no position.
+ *
+ * @param text - TypeScript source text without comments or strings
+ * @returns Each declared name with its offset, in source order
+ * @example
+ * ```ts
+ * extractDeclaredNames('export interface FrameReading {}') // [{ name: 'FrameReading', index: 17 }]
+ * ```
+ */
+export function extractDeclaredNames(
+	text: string,
+): ReadonlyArray<{ readonly name: string; readonly index: number }> {
+	const names = new Map<number, string>()
+	const opens: number[] = []
+	for (const match of text.matchAll(PARTICIPLE_EXPORT)) {
+		const name = requireValue(match[1])
+		names.set(match.index + match[0].lastIndexOf(name), name)
+	}
+	for (const match of text.matchAll(PARTICIPLE_FUNCTION)) {
+		const name = requireValue(match[1])
+		names.set(match.index + match[0].indexOf(name), name)
+		opens.push(match.index + match[0].length - 1)
+	}
+	for (const match of text.matchAll(PARTICIPLE_READONLY)) {
+		const name = requireValue(match[1])
+		names.set(match.index + match[0].indexOf(name), name)
+	}
+	for (const match of text.matchAll(PARTICIPLE_FIELD)) {
+		const name = requireValue(match[1])
+		names.set(match.index + match[0].indexOf(name), name)
+	}
+	for (const match of text.matchAll(PARTICIPLE_METHOD)) {
+		const tail = requireValue(match[2])
+		const name = requireValue(match[1])
+		if (tail.trim() !== '' && !/\{\s*$/.test(tail) && !/\)\s*:\s*\S/.test(tail)) continue
+		names.set(match.index + match[0].indexOf(name), name)
+		opens.push(match.index + match[0].length - tail.length - 1)
+	}
+	for (const open of opens) {
+		for (const parameter of extractParameters(text, open)) {
+			names.set(parameter.index, parameter.name)
+		}
+	}
+	return [...names]
+		.map(([index, name]) => ({ name, index }))
+		.sort((left, right) => left.index - right.index)
+}
+
+/**
+ * Finds every declared name whose last word is an -ing word outside the allowed set.
+ *
+ * @remarks
+ * Takes the last camel-case word of each declared name and reads a plural of an -ing word as its
+ * singular, so `readings` is held to the rule `reading` is. A word of three letters or fewer is
+ * no -ing word. The allowed set holds lower-case words.
+ *
+ * @param sources - The source files to scan
+ * @param allowed - The lower-case words the rule keeps
+ * @returns Each violating name with its path and one-based line, in source order
+ * @example
+ * ```ts
+ * scanParticipleNames([{ path: 'a.ts', text: 'export type FoldMerging = string' }], new Set())
+ * // [{ path: 'a.ts', line: 1, name: 'FoldMerging', word: 'merging' }]
+ * ```
+ */
+export function scanParticipleNames(
+	sources: readonly NameSource[],
+	allowed: ReadonlySet<string>,
+): readonly ParticipleViolation[] {
+	return sources.flatMap((source) => {
+		const text = blankSourceText(source.text)
+		return extractDeclaredNames(text).flatMap(({ name, index }) => {
+			const word = extractNameWord(name)
+			const stem = word.endsWith('ings') ? word.slice(0, -1) : word
+			if (stem.length <= 3 || !stem.endsWith('ing') || allowed.has(stem)) return []
+			const line = text.slice(0, index).split('\n').length
+			return [{ path: source.path, line, name, word: stem }]
+		})
+	})
+}

@@ -18,7 +18,7 @@ import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
  * A `sections` cap (on {@link import('./types.js').ConversationOptions} /
  * {@link import('./types.js').ConversationManagerOptions} /
  * {@link import('./types.js').CompactOptions}) must be `>= 1`, and cannot combine with
- * `rolling` — either is a programmer error and throws this with `'SECTIONS'`. A `keep` on the same options must be a nonnegative
+ * `cumulative` — either is a programmer error and throws this with `'SECTIONS'`. A `keep` on the same options must be a nonnegative
  * safe integer — any other value is a programmer error and throws this with `'KEEP'`. A judgment
  * record or a judge request that JSON cannot carry, or whose copy fails its guard, is a
  * programmer error and throws this with `'JUDGMENT'`, its `context` naming the `question` id
@@ -31,7 +31,7 @@ import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
  * {@link isConversationError} and branch on `error.code`.
  */
 export class ConversationError extends Error {
-	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap, or a cap combined with `rolling`; `'JUDGMENT'`: a judgment or judge request that is not JSON; `'KEEP'`: a `keep` that is not a nonnegative safe integer; `'SUMMARY'`: a summarizer digest whose trimmed text is empty; `'ROLE'`: a stored or selected message whose role is not a `ConversationRole`; `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot` or repeats an id. */
+	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a sub-1 `sections` cap, or a cap combined with `cumulative`; `'JUDGMENT'`: a judgment or judge request that is not JSON; `'KEEP'`: a `keep` that is not a nonnegative safe integer; `'SUMMARY'`: a summarizer digest whose trimmed text is empty; `'ROLE'`: a stored or selected message whose role is not a `ConversationRole`; `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot` or repeats an id. */
 	readonly code: ConversationErrorCode
 	/** Holds the values that locate the failure, such as the `question` id of a malformed question, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined

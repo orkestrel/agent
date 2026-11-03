@@ -22,9 +22,9 @@ import {
 } from '../../../studies/memory/index.js'
 import {
 	buildMemoryCriterion,
-	buildMemoryGradingFixture,
+	buildMemoryGradeFixture,
 	buildMemoryProfile,
-	buildMemoryRecording,
+	buildMemoryRecordProfile,
 	MEMORY_CARRIAGE,
 	MEMORY_EVIDENCE,
 	MEMORY_LITERALS,
@@ -34,8 +34,8 @@ import {
 	readMemoryOrigins,
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
-	STUDY_MEMORY_RECORDING,
-	STUDY_MEMORY_SAMPLING_PINS,
+	STUDY_MEMORY_RECORD,
+	STUDY_MEMORY_PARAMETER_PINS,
 	STUDY_MEMORY_SETTINGS,
 } from '../../setupStudy.js'
 
@@ -209,7 +209,7 @@ describe('memory declaration and mechanical evidence', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const agent = {
 			model: 'model',
-			options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_SAMPLING_PINS.agent },
+			options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_PARAMETER_PINS.agent },
 			think: false,
 			strict: false,
 			length: true,
@@ -220,7 +220,7 @@ describe('memory declaration and mechanical evidence', () => {
 			agent: { ...agent, strict: true },
 			summary: {
 				model: 'model',
-				options: { num_ctx: 32768, num_predict: 256, ...STUDY_MEMORY_SAMPLING_PINS.summary },
+				options: { num_ctx: 32768, num_predict: 256, ...STUDY_MEMORY_PARAMETER_PINS.summary },
 				think: false,
 				strict: true,
 				length: false,
@@ -231,7 +231,7 @@ describe('memory declaration and mechanical evidence', () => {
 			agent,
 			judge: {
 				model: 'judge',
-				options: { num_ctx: 32768, num_predict: 1, ...STUDY_MEMORY_SAMPLING_PINS.judge },
+				options: { num_ctx: 32768, num_predict: 1, ...STUDY_MEMORY_PARAMETER_PINS.judge },
 				think: false,
 				strict: false,
 				length: true,
@@ -275,13 +275,13 @@ describe('memory declaration and mechanical evidence', () => {
 			expect(options).toEqual({
 				num_ctx: 32768,
 				num_predict: budgets[role],
-				...STUDY_MEMORY_SAMPLING_PINS[role],
+				...STUDY_MEMORY_PARAMETER_PINS[role],
 			})
 	})
 
 	it('refuses a recording profile with no version or metadata', () => {
-		const profile = buildMemoryRecording('http://127.0.0.1:7')
-		const { version, metadata } = STUDY_MEMORY_RECORDING.settings
+		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
+		const { version, metadata } = STUDY_MEMORY_RECORD.settings
 		const refusal = expect.objectContaining({
 			code: 'CONFIG',
 			message: 'Memory recording requires a declared version and metadata',
@@ -398,7 +398,7 @@ describe('memory declaration and mechanical evidence', () => {
 
 describe('memory mechanical grading over the shared traversal', () => {
 	it('reads each mechanism predicate with zero-based row citations and unknown for foreign assertions', () => {
-		const { complete, source, meaning } = buildMemoryGradingFixture()
+		const { complete, source, meaning } = buildMemoryGradeFixture()
 		const target = {
 			trial: complete.trial,
 			criterion: source,

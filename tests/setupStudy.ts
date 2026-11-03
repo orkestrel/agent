@@ -1288,12 +1288,12 @@ export function createMemoryContext(
 	profile: StudyProfile,
 	signal = new AbortController().signal,
 ): MemoryContextFixture {
-	const accounting = createStudyMeterFixture(profile.bounds, signal)
+	const meterFixture = createStudyMeterFixture(profile.bounds, signal)
 	const appended = createRecorder<readonly [row: StudyEvidence]>()
 	return {
 		context: {
 			signal,
-			meter: accounting.meter,
+			meter: meterFixture.meter,
 			evidence: {
 				append: async (row) => {
 					appended.handler(row)
@@ -1303,7 +1303,7 @@ export function createMemoryContext(
 		get evidence(): StudyEvidence[] {
 			return appended.calls.map(([row]) => row)
 		},
-		close: () => accounting.close(),
+		close: () => meterFixture.close(),
 	}
 }
 
@@ -1416,7 +1416,7 @@ export function buildCustodyManifest(
  * Builds a two-trial memory grading population over the `full` arm: one complete retained trial and one capacity-faulted trial.
  * @returns The profile, declaration, schedule, criteria, rubric, attempts and evidence the mechanical grading proofs share
  */
-export function buildMemoryGradingFixture(): MemoryGradingFixture {
+export function buildMemoryGradeFixture(): MemoryGradeFixture {
 	const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 	const definition: StudyDefinition = {
 		name: 'test',
@@ -1444,7 +1444,7 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 	const source = buildMemoryCriterion('source', 'trace', { observation: 'arrival', id: 'receipt' })
 	const lookup = buildMemoryCriterion('lookup', 'trace', { observation: 'lookup', id: 'record' })
 	const result = buildMemoryCriterion('result', 'state', { observation: 'result', partial: false })
-	const failure: MemoryGradingFixture['failure'] = {
+	const failure: MemoryGradeFixture['failure'] = {
 		cause: 'capacity',
 		message: 'Output cap',
 		role: 'agent',
@@ -1455,7 +1455,7 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 			consumed: profile.room.output,
 		},
 	}
-	const complete: MemoryGradingFixture['complete'] = {
+	const complete: MemoryGradeFixture['complete'] = {
 		trial: first,
 		attempt: {
 			trial: first,
@@ -1478,7 +1478,7 @@ export function buildMemoryGradingFixture(): MemoryGradingFixture {
 			{ event: 'arrival', goal: 'goal', value: { id: 'receipt' } },
 		],
 	}
-	const faulted: MemoryGradingFixture['faulted'] = {
+	const faulted: MemoryGradeFixture['faulted'] = {
 		trial: second,
 		attempt: {
 			trial: second,
@@ -1612,7 +1612,7 @@ export interface MemorySeedDifference {
 	readonly offset: number
 }
 /** Holds a sealed segment's comparison of its own recording with each seated checkpoint. */
-export interface MemorySeedReading {
+export interface MemorySeedResult {
 	/** Counts the checkpoints whose next goal the result holds. */
 	readonly compared: number
 	/** Counts those whose first agent request equals its recording, byte for byte. */
@@ -1680,7 +1680,7 @@ export interface MemoryNativeFixture {
 }
 
 /** Holds a two-trial mechanical grading population: one complete retained trial and one faulted trial, with one criterion per predicate family. */
-export interface MemoryGradingFixture {
+export interface MemoryGradeFixture {
 	readonly profile: StudyProfile
 	readonly definition: StudyDefinition
 	readonly manifest: StudyManifest
@@ -2052,11 +2052,11 @@ export const MEMORY_EVIDENCE: readonly StudyEvidence[] = Object.freeze([
 ])
 
 /**
- * Pins each role's sampling keys apart from `STUDY_MEMORY_SAMPLING`: agent and summary hold the 2B
+ * Pins each role's sampling keys apart from `STUDY_MEMORY_PARAMETERS`: agent and summary hold the 2B
  * digest's stored values under temperature 0 and seed 0, and the judge holds Ollama's v0.40.13
  * defaults under temperature 1 and seed 0, because the Mica digest stores no parameters.
  */
-export const STUDY_MEMORY_SAMPLING_PINS = Object.freeze({
+export const STUDY_MEMORY_PARAMETER_PINS = Object.freeze({
 	agent: Object.freeze({
 		temperature: 0,
 		seed: 0,
@@ -2100,7 +2100,7 @@ export const STUDY_MEMORY_OPTION_KEYS = Object.freeze([
 ])
 
 /** Pins a fixture recording: the sidecar bounds, and the version `MemoryServer` answers with the metadata bounds. */
-export const STUDY_MEMORY_RECORDING = Object.freeze({
+export const STUDY_MEMORY_RECORD = Object.freeze({
 	record: Object.freeze({ bytes: 4194304, calls: 256, duration: 60000 }),
 	settings: Object.freeze({
 		version: 'fixture-1',
@@ -2192,10 +2192,10 @@ export function buildMemoryVerdict(label: string): MemoryWireFixture {
  * @param url - The protocol fixture origin.
  * @returns The fixture profile with the recording bounds, version, and metadata.
  */
-export function buildMemoryRecording(url: string): StudyProfile {
+export function buildMemoryRecordProfile(url: string): StudyProfile {
 	return {
-		...buildMemoryProfile({ url, settings: STUDY_MEMORY_RECORDING.settings }),
-		record: STUDY_MEMORY_RECORDING.record,
+		...buildMemoryProfile({ url, settings: STUDY_MEMORY_RECORD.settings }),
+		record: STUDY_MEMORY_RECORD.record,
 	}
 }
 
@@ -2245,7 +2245,7 @@ export function buildMemoryCapture(
  * @returns Nothing after the profile is replaced.
  * @throws Error - Thrown when the workspace holds no authored local profile.
  */
-export function writeStudyInstallRecording(
+export function writeStudyInstallRecord(
 	scratch: ScratchInterface,
 	checkpoints: readonly string[] = [],
 ): void {
@@ -2256,10 +2256,10 @@ export function writeStudyInstallRecording(
 		path,
 		JSON.stringify({
 			...raw,
-			record: STUDY_MEMORY_RECORDING.record,
+			record: STUDY_MEMORY_RECORD.record,
 			settings: {
 				...STUDY_MEMORY_SETTINGS,
-				...STUDY_MEMORY_RECORDING.settings,
+				...STUDY_MEMORY_RECORD.settings,
 				observe: true,
 				...(checkpoints.length === 0 ? {} : { checkpoints }),
 			},
@@ -2681,7 +2681,7 @@ export async function readMemorySeedRequests(
 export async function compareMemorySeed(
 	directory: string,
 	profile: StudyProfile,
-): Promise<MemorySeedReading> {
+): Promise<MemorySeedResult> {
 	const result = await readStudyResult(directory)
 	if (result.status !== 'sealed') throw new Error('The seed comparison reads a sealed result')
 	const [trial, ...others] = result.manifest.schedule
@@ -2760,13 +2760,14 @@ export async function compareMemorySeed(
  * @returns The readings of the document's first trial, by goal, in listed order.
  * @throws Error - Thrown when the document holds no such trial.
  */
-export function readMemoryProgressReadings(stdout: string): ReadonlyMap<string, unknown> {
+export function readMemoryProgressRows(stdout: string): ReadonlyMap<string, unknown> {
 	const document = parseJSON(stdout)
 	const progress = isRecord(document) ? document.progress : undefined
 	const trials = isRecord(progress) ? progress.trials : undefined
 	const [trial] = arrayOf(isRecord)(trials) ? trials : []
 	if (trial === undefined || !arrayOf(isRecord)(trial.goals))
 		throw new Error('The progress document lists no trial')
+	// `reading` is Study's own member of a goal in the progress document, so it keeps its name.
 	return new Map(trial.goals.map((goal) => [String(goal.goal), goal.reading]))
 }
 
@@ -2833,7 +2834,7 @@ export async function executeMemorySeedChain(
 	arm: MemorySeedFixture['arm'],
 	directory: string,
 ): Promise<MemorySeedChainFixture> {
-	writeStudyInstallRecording(fixture.scratch, STUDY_MEMORY_GOALS)
+	writeStudyInstallRecord(fixture.scratch, STUDY_MEMORY_GOALS)
 	mkdirSync(directory, { recursive: true })
 	const trial = await readStudyInstallTrial(fixture, arm)
 	const first = join(directory, 'first')
@@ -2999,8 +3000,8 @@ export interface MemoryGateDecider {
 	readonly role: MemoryGateRole
 	readonly unknown: number
 }
-/** Holds a clause's reading over one gate's arms. */
-export interface MemoryGateReading {
+/** Holds a clause's outcome over one gate's arms. */
+export interface MemoryGateOutcome {
 	readonly verdict: MemoryGateVerdict
 	readonly counts: Readonly<Record<MemoryGateRole, MemoryGateCount>>
 	/** Holds N's range; undefined when the clause reads no N or an arm is unread. */
@@ -3011,7 +3012,7 @@ export interface MemoryGateReading {
 	readonly deciders: readonly MemoryGateDecider[]
 }
 /** Holds one hand-computed row of the gate reader's table. */
-export interface MemoryGateRow extends MemoryGateReading {
+export interface MemoryGateRow extends MemoryGateOutcome {
 	readonly name: string
 	readonly clause: MemoryGateClause
 }
@@ -3026,7 +3027,7 @@ export interface MemoryLabelNode {
 	readonly prompt: string
 }
 /** Holds what a transcript shows of one lane. */
-export interface MemoryTranscriptReading {
+export interface MemoryTranscriptResult {
 	/** Lists the lane's tool calls by name, in order. */
 	readonly tools: readonly string[]
 	/** Holds the milliseconds between its first and last stamped lines; undefined with none. */
@@ -3074,7 +3075,7 @@ export interface MemorySpread {
 	readonly median: number
 	readonly greatest: number
 }
-/** Holds one class's pilot reading for one engine. */
+/** Holds one class's pilot result for one engine. */
 export interface MemoryPilotClass {
 	readonly class: MemoryLabelClass
 	/** Holds the spread of the class's row text, in characters of its JSON. */
@@ -3086,8 +3087,8 @@ export interface MemoryPilotClass {
 	/** Counts those whose verdict differs when the receipts are added. */
 	readonly changed: number
 }
-/** Holds one engine's pilot reading, each rate beside the text it was read on. */
-export interface MemoryPilotReading {
+/** Holds one engine's pilot result, each rate beside the text it was read on. */
+export interface MemoryPilotResult {
 	/** Holds the milliseconds per goal-arm of the plain nodes. */
 	readonly wall: MemorySpread | undefined
 	/** Holds the characters of each plain node's prompt. */
@@ -3130,7 +3131,7 @@ export interface MemoryLabelPlan {
 /** Holds one clause with what it read. */
 export interface MemoryGateResult {
 	readonly clause: MemoryGateClause
-	readonly reading: MemoryGateReading
+	readonly outcome: MemoryGateOutcome
 }
 
 /** Holds the reason a disputed row's judgment states. */
@@ -3513,7 +3514,7 @@ export function buildMemoryGateJudgments(
 export function buildMemoryLabelFixture(
 	criteria: readonly string[] = ['goal-work', 'goal-completion'],
 ): MemoryLabelFixture {
-	const grading = buildMemoryGradingFixture()
+	const grade = buildMemoryGradeFixture()
 	const rubric: StudyRubric = {
 		version: '1',
 		criteria: criteria.map((id) =>
@@ -3523,8 +3524,8 @@ export function buildMemoryLabelFixture(
 	const result: StudySealedResult = {
 		status: 'sealed',
 		directory: 'fixture',
-		manifest: grading.manifest,
-		attempts: grading.attempts,
+		manifest: grade.manifest,
+		attempts: grade.attempts,
 		seal: { result: 'fixture-result', id: 'fixture-seal', files: [] },
 	}
 	const digest = hashStudyBytes('fixture rubric')
@@ -4189,13 +4190,13 @@ export function* listMemoryGateScores(
  * Computes a clause's verdict, N's range, and its reversal over every assignment of the unknowns, with N following its own arms.
  * @param arms - Each role's judgments under source ids, read by class from the criterion id
  * @param clause - The clause to read
- * @returns The reading
+ * @returns The outcome
  * @throws Error - Thrown when the arms the clause reads hold unequal class totals
  */
 export function computeMemoryGate(
 	arms: MemoryGatePopulation,
 	clause: MemoryGateClause,
-): MemoryGateReading {
+): MemoryGateOutcome {
 	const scored: MemoryLabelVerdict = clause.class === 'work' ? 'achieved' : 'unsuccessful'
 	const counts = buildMemoryGateRoles((role): MemoryGateCount => {
 		const held = arms[role].filter(
@@ -4330,22 +4331,22 @@ export function buildMemoryGatePopulation(
  * Collects the disputed rows a third lane can settle a gate with: those in the class and arm of an open clause's deciders.
  * @param map - The pool's map
  * @param disputes - The disputed rows
- * @param readings - Each clause with its reading
+ * @param results - Each clause with its outcome
  * @param assignment - The arm each role reads
  * @returns The rows, in dispute order
  */
 export function collectMemoryThirdRows(
 	map: MemoryLabelMap,
 	disputes: readonly number[],
-	readings: readonly MemoryGateResult[],
+	results: readonly MemoryGateResult[],
 	assignment: MemoryGateAssignment,
 ): readonly number[] {
 	return disputes.filter((row) => {
 		const link = map.links.find((entry) => entry.row === row)
-		return readings.some(
-			({ clause, reading }) =>
+		return results.some(
+			({ clause, outcome }) =>
 				link?.class === clause.class &&
-				reading.deciders.some((decider) => assignment[decider.role] === link.arm),
+				outcome.deciders.some((decider) => assignment[decider.role] === link.arm),
 		)
 	})
 }
@@ -4539,7 +4540,7 @@ export function extractMemoryHarness(journal: MemoryJournal): MemoryHarnessRepor
  * @returns The tool calls by name, and the milliseconds between its first and last stamped lines
  * @throws Error - Thrown when a line is not JSON
  */
-export function readMemoryTranscript(text: string): MemoryTranscriptReading {
+export function readMemoryTranscript(text: string): MemoryTranscriptResult {
 	const lines = text
 		.split('\n')
 		.filter((line) => line.trim().length > 0)
@@ -4575,14 +4576,14 @@ export function readMemoryTranscript(text: string): MemoryTranscriptReading {
  * Builds what a labeling run returned: a lane that called another tool or holds no transcript is discarded, one with no `rows` member is unread, and an answer for a row the node's own request does not show is dropped and counted.
  * @param nodes - The labeling nodes, prompts aside
  * @param journal - The run's journal
- * @param transcripts - Each started node's transcript reading, by agent id
+ * @param transcripts - Each started node's transcript result, by agent id
  * @param requests - The requests the nodes index
  * @returns The kept reads and the counts of the rest
  */
 export function buildMemoryLabelRun(
 	nodes: ReadonlyArray<Omit<MemoryLabelNode, 'prompt'>>,
 	journal: MemoryJournal,
-	transcripts: ReadonlyMap<string, MemoryTranscriptReading>,
+	transcripts: ReadonlyMap<string, MemoryTranscriptResult>,
 	requests: readonly MemoryLabelRequest[],
 ): MemoryLabelRun {
 	const labels = new Set(nodes.map((node) => node.label))
@@ -4657,19 +4658,19 @@ export function computeMemorySpread(values: readonly number[]): MemorySpread | u
 }
 
 /**
- * Computes one engine's pilot reading: the plain nodes' wall per goal-arm beside the text it was read on, and per class the achieved rows and the verdicts the receipts change.
+ * Computes one engine's pilot result: the plain nodes' wall per goal-arm beside the text it was read on, and per class the achieved rows and the verdicts the receipts change.
  * @param map - The pool's map
  * @param requests - The pool's requests
  * @param run - The labeling run
  * @param engine - The engine to read
- * @returns The reading
+ * @returns The result
  */
 export function computeMemoryPilot(
 	map: MemoryLabelMap,
 	requests: readonly MemoryLabelRequest[],
 	run: MemoryLabelRun,
 	engine: string,
-): MemoryPilotReading {
+): MemoryPilotResult {
 	const held = run.reads.filter((read) => read.node.engine === engine)
 	const plain = held.filter((read) => read.node.condition === 'plain')
 	const answers = collectMemoryLabelAnswers(plain.flatMap((read) => read.answers))

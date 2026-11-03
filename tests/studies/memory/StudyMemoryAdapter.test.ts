@@ -6,7 +6,7 @@ import { createStudyAdapter, isStudyMemoryOptions } from '../../../studies/memor
 import {
 	buildCustodyManifest,
 	buildMemoryCriterion,
-	buildMemoryGradingFixture,
+	buildMemoryGradeFixture,
 	buildMemoryProfile,
 	loadMemoryInputs,
 	omitMemoryAuxiliaries,
@@ -97,9 +97,9 @@ describe('memory declaration and mechanical evidence', () => {
 	it('omits cells for a goal without rows', () => {
 		const trial = { id: 'trial', scenario: 'public', arm: 'records', repetition: 0 }
 		const adapter = createStudyAdapter()
-		const reading = adapter.progress?.({ trial, goal: 'goal', evidence: [] })
-		expect(reading).toEqual({})
-		expect(isRecord(reading) && 'calls' in reading).toBe(false)
+		const progress = adapter.progress?.({ trial, goal: 'goal', evidence: [] })
+		expect(progress).toEqual({})
+		expect(isRecord(progress) && 'calls' in progress).toBe(false)
 		// A metadata body and a judge body hold no agent request, so the system cell stays absent.
 		expect(
 			adapter.progress?.({
@@ -204,7 +204,7 @@ describe('memory mechanical grading over the shared traversal', () => {
 		failure,
 		attempts,
 		evidence,
-	} = buildMemoryGradingFixture()
+	} = buildMemoryGradeFixture()
 
 	it('cites retained attempts and one-based rows, keeps unknowns empty and admits nonfault partial products', () => {
 		const judgments = adapter.grade({ manifest, rubric, attempts, evidence })

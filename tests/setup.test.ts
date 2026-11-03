@@ -159,7 +159,16 @@ import {
 	ThinkSplitter,
 } from '@src/core'
 import { requireValue, waitForDelay } from '@orkestrel/test'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import {
+	blankSourceText,
+	extractDeclaredNames,
+	extractNameWord,
+	extractParameters,
+	scanParticipleNames,
+} from './setup.js'
 import {
 	JUDGMENT_QUESTION,
 	buildCallsSnapshot,
@@ -3467,5 +3476,270 @@ describe('buildJudgmentRecords', () => {
 		expect(records.some((record) => Object.isFrozen(record))).toBe(false)
 		expect(records.some((record) => Object.isFrozen(record.sources))).toBe(false)
 		expect(buildJudgmentRecords(0)).toEqual([])
+	})
+})
+
+// The -ing words `.claude/rules/names.md` keeps, by the kind of -ing word each is. A plural reads as
+// its singular. Add a word only when one of the four kinds truly applies.
+const PARTICIPLE_KEPT = Object.freeze({
+	// A noun that carries no tense.
+	noun: [
+		'string',
+		'binding',
+		'finding',
+		'heading',
+		'warning',
+		'setting',
+		'listing',
+		'mapping',
+		'timing',
+	],
+	// A name that mirrors an external field: Ollama `message.thinking`, the Node `encoding` option.
+	mirror: ['encoding', 'thinking'],
+	// A lifecycle state that is in progress when it is read.
+	lifecycle: ['pending', 'running', 'stopping', 'waiting'],
+	// An adjective naming a condition that holds when it is read.
+	adjective: ['blocking', 'missing', 'remaining', 'existing', 'recurring'],
+})
+const PARTICIPLE_ALLOWED: ReadonlySet<string> = new Set(Object.values(PARTICIPLE_KEPT).flat())
+
+describe('blankSourceText', () => {
+	it('blanks a line comment and a string and keeps the length', () => {
+		expect(blankSourceText("const a = 'x' // y")).toBe('const a = '.padEnd(18))
+		expect(blankSourceText("'it\\'s' + 1")).toBe(' '.repeat(7) + ' + 1')
+	})
+
+	it('blanks a block comment and keeps every line break', () => {
+		const text = 'a /* x\ny */ b'
+		const blank = blankSourceText(text)
+		expect(blank).toHaveLength(text.length)
+		expect(blank.indexOf('\n')).toBe(text.indexOf('\n'))
+		expect(blank.replace(/\s/g, '')).toBe('ab')
+	})
+
+	it('blanks a template with its placeholders, nested template included', () => {
+		expect(blankSourceText('`a ${x} b`')).toBe(' '.repeat(10))
+		expect(blankSourceText('`${`inner`} x`; y')).toBe(' '.repeat(14) + '; y')
+		expect(blankSourceText('`${ {a: 1}.a } tail`; y')).toBe(' '.repeat(20) + '; y')
+	})
+
+	it('blanks a regular expression literal that holds a quote or a backtick', () => {
+		expect(blankSourceText("x = /['`]/g; y")).toBe('x = ' + ' '.repeat(7) + '; y')
+		expect(blankSourceText('a / b / c')).toBe('a / b / c')
+	})
+})
+
+describe('extractNameWord', () => {
+	it('takes the last word of a camel-case, upper-case or prefixed name in lower case', () => {
+		expect(
+			[
+				'ClassifierReading',
+				'STUDY_MEMORY_SAMPLING',
+				'#closing',
+				'_unused',
+				'readings',
+				'isString',
+				'CAPTURE_STAGE_LIMIT',
+				'a',
+			].map((name) => extractNameWord(name)),
+		).toEqual(['reading', 'sampling', 'closing', 'unused', 'readings', 'string', 'limit', 'a'])
+	})
+})
+
+describe('extractParameters', () => {
+	it('lists each named parameter and skips a destructured one and the types inside', () => {
+		const text =
+			'(a: number, ...rest: string[], { b, c }: Options, cb: (x: number, y: Map<string, number>) => void, d = 1) {}'
+		const parameters = extractParameters(text, 0)
+		expect(parameters.map((parameter) => parameter.name)).toEqual(['a', 'rest', 'cb', 'd'])
+		expect(parameters.every((parameter) => text.startsWith(parameter.name, parameter.index))).toBe(
+			true,
+		)
+	})
+})
+
+describe('extractDeclaredNames', () => {
+	it('lists the names at each declaration head and none from a local or a call', () => {
+		const text = [
+			'export interface FrameResult {',
+			'\treadonly framing?: boolean',
+			'\tstream(options?: Streamer): void',
+			'}',
+			'export function readFrame(source: string, framing = 1): void {',
+			'\tconst local = this.#hidden',
+			'}',
+			'export class Box {',
+			'\treadonly #hidden = 1',
+			'\tstatic async fetchOne(path: string): Promise<void> {',
+			'\t\tcalling(path)',
+			'\t}',
+			'}',
+		].join('\n')
+		expect(extractDeclaredNames(text).map((declared) => declared.name)).toEqual([
+			'FrameResult',
+			'framing',
+			'stream',
+			'options',
+			'readFrame',
+			'source',
+			'framing',
+			'Box',
+			'#hidden',
+			'fetchOne',
+			'path',
+		])
+	})
+})
+
+describe('scanParticipleNames', () => {
+	it('reports an exported interface, type, class, function and const head with its line', () => {
+		const text = [
+			'export interface FrameReading {}',
+			'export type FoldMerging = string',
+			'export class Pacing {}',
+			'export function readPacing(): void {}',
+			'export const SAMPLING = 1',
+		].join('\n')
+		const found = scanParticipleNames([{ path: 'a.ts', text }], new Set())
+		expect(found.map((violation) => [violation.line, violation.name, violation.word])).toEqual([
+			[1, 'FrameReading', 'reading'],
+			[2, 'FoldMerging', 'merging'],
+			[3, 'Pacing', 'pacing'],
+			[4, 'readPacing', 'pacing'],
+			[5, 'SAMPLING', 'sampling'],
+		])
+		expect(found.every((violation) => violation.path === 'a.ts')).toBe(true)
+	})
+
+	it('reports a readonly member and a plural of an -ing word', () => {
+		const text = [
+			'export interface Frame {',
+			'\treadonly rolling: boolean',
+			'\treadonly closing?: string',
+			'\treadonly readings: readonly string[]',
+			'}',
+		].join('\n')
+		expect(
+			scanParticipleNames([{ path: 'b.ts', text }], new Set()).map((violation) => [
+				violation.line,
+				violation.name,
+			]),
+		).toEqual([
+			[2, 'rolling'],
+			[3, 'closing'],
+			[4, 'readings'],
+		])
+	})
+
+	it('reports a # field and a # method', () => {
+		const text = [
+			'export class Box {',
+			'\t#closing = false',
+			'\treadonly #firing: number',
+			'\tasync #pacing(): Promise<void> {',
+			'\t}',
+			'}',
+		].join('\n')
+		expect(
+			scanParticipleNames([{ path: 'c.ts', text }], new Set()).map((violation) => [
+				violation.line,
+				violation.name,
+			]),
+		).toEqual([
+			[2, '#closing'],
+			[3, '#firing'],
+			[4, '#pacing'],
+		])
+	})
+
+	it('reports a method head and an interface method signature', () => {
+		const text = [
+			'export class Box {',
+			'\tfiring(): void {',
+			'\t}',
+			'\tstatic async *sampling(input: string) {',
+			'\t}',
+			'}',
+			'export interface Frame {',
+			'\tmerging(input: string): string',
+			'}',
+		].join('\n')
+		expect(
+			scanParticipleNames([{ path: 'd.ts', text }], new Set()).map((violation) => [
+				violation.line,
+				violation.name,
+			]),
+		).toEqual([
+			[2, 'firing'],
+			[4, 'sampling'],
+			[8, 'merging'],
+		])
+	})
+
+	it('reports a function, a generic function and a method parameter', () => {
+		const text = [
+			'export function sumUsage(prior: number, running: number): number {',
+			'\treturn prior + running',
+			'}',
+			'function pick<T extends Record<string, unknown>>(value: T, sampling: number): T {',
+			'\treturn value',
+			'}',
+			'export class Box {',
+			'\tfold(',
+			'\t\tprior: number,',
+			'\t\tleading: number,',
+			'\t): number {',
+			'\t}',
+			'}',
+		].join('\n')
+		expect(
+			scanParticipleNames([{ path: 'e.ts', text }], new Set()).map((violation) => [
+				violation.line,
+				violation.name,
+			]),
+		).toEqual([
+			[1, 'running'],
+			[4, 'sampling'],
+			[10, 'leading'],
+		])
+	})
+
+	it('reports no local, call, comment or string and no word the allowed set holds', () => {
+		const text = [
+			'/** An example: export interface FrameReading {} */',
+			"const label = 'readonly rolling: boolean'",
+			'export function readFrame(): void {',
+			'\tconst closing = 1',
+			'\tcalling(closing)',
+			'\tthis.#closing = 2',
+			'\tif (running) {',
+			'\t}',
+			'}',
+			'export interface Frame {',
+			'\treadonly settings: string',
+			'\treadonly findings: readonly string[]',
+			'\treadonly pending: boolean',
+			'}',
+		].join('\n')
+		const sources = [{ path: 'f.ts', text }]
+		expect(scanParticipleNames(sources, new Set(['setting', 'finding', 'pending']))).toEqual([])
+		expect(
+			scanParticipleNames(sources, new Set(['finding'])).map((violation) => violation.name),
+		).toEqual(['settings', 'pending'])
+	})
+
+	it('finds no -ing name in src/core or studies outside the kept set', () => {
+		const root = resolve('.')
+		const sources = ['src/core', 'studies'].flatMap((folder) =>
+			readdirSync(join(root, folder), { recursive: true, encoding: 'utf8' })
+				.filter((entry) => entry.endsWith('.ts'))
+				.map((entry) => ({
+					path: join(folder, entry).split(sep).join('/'),
+					text: readFileSync(join(root, folder, entry), 'utf8'),
+				})),
+		)
+		expect(sources.length).toBeGreaterThan(0)
+		expect(scanParticipleNames(sources, new Set()).length).toBeGreaterThan(0)
+		expect(scanParticipleNames(sources, PARTICIPLE_ALLOWED)).toEqual([])
 	})
 })

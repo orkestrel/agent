@@ -52,7 +52,7 @@ export class StudyToolsSession implements StudySessionInterface {
 	readonly #flights = new Set<Promise<StudyProduct>>()
 	// One instance per declared id, added once, because a same-id `add` replaces the registered one.
 	readonly #conversations = new Map<string, ConversationInterface>()
-	#closing: Promise<void> | undefined
+	#closed: Promise<void> | undefined
 
 	/**
 	 * Constructs the actual admitted Agent with real scratch tools and an explicit authority gate.
@@ -130,7 +130,7 @@ export class StudyToolsSession implements StudySessionInterface {
 	 * @throws StudyError - Thrown when the session is closed or already executing
 	 */
 	async execute(goal: StudyGoal, context: StudyContext): Promise<StudyProduct> {
-		if (this.#closing !== undefined || this.#live.size > 0)
+		if (this.#closed !== undefined || this.#live.size > 0)
 			throw new StudyError('CONFIG', 'Tools session is closed or already executing')
 		const flight = this.#executeGoal(goal, context)
 		this.#flights.add(flight)
@@ -146,8 +146,8 @@ export class StudyToolsSession implements StudySessionInterface {
 	 * @returns Completion after actual Agent work drains and scratch removal finishes
 	 */
 	close(): Promise<void> {
-		this.#closing ??= this.#dispose()
-		return this.#closing
+		this.#closed ??= this.#dispose()
+		return this.#closed
 	}
 
 	async #executeGoal(goal: StudyGoal, context: StudyContext): Promise<StudyProduct> {

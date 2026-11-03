@@ -25,7 +25,7 @@ import {
 	buildMemoryObservationGoals,
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
-	buildMemoryRecording,
+	buildMemoryRecordProfile,
 	buildMemoryReply,
 	buildMemorySeedLedger,
 	buildMemorySeedResponses,
@@ -73,7 +73,7 @@ import {
 	STUDY_MEMORY_PASSIVE_SETTINGS,
 	STUDY_MEMORY_RELEASE_GOALS,
 	STUDY_MEMORY_REPLAY_REFUSAL,
-	STUDY_MEMORY_SAMPLING_PINS,
+	STUDY_MEMORY_PARAMETER_PINS,
 	STUDY_MEMORY_SEED_GOALS,
 	STUDY_MEMORY_SEED_SETTINGS,
 	STUDY_MEMORY_SETTINGS,
@@ -890,7 +890,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				model: 'model',
 				stream: true,
 				think: false,
-				options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_SAMPLING_PINS.agent },
+				options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_PARAMETER_PINS.agent },
 			})
 			// Compaction adds only the two explicit native controls; every other member matches the plain request.
 			expect(Object.keys(windowed).toSorted()).toEqual(
@@ -2189,7 +2189,7 @@ describe('recording declarations of a memory session', () => {
 					ledger: undefined,
 					provider: ollama,
 					classifier: undefined,
-					profile: buildMemoryRecording('http://127.0.0.1:1'),
+					profile: buildMemoryRecordProfile('http://127.0.0.1:1'),
 					arm: 'full',
 					signal: new AbortController().signal,
 				}),
@@ -2226,7 +2226,7 @@ describe('recording declarations of a memory session', () => {
 
 	it('sends a recording through its sink and its replay and not to the daemon', async () => {
 		const server = await createMemoryServer()
-		const profile = buildMemoryRecording(server.url)
+		const profile = buildMemoryRecordProfile(server.url)
 		const fixture = createMemoryContext(profile)
 		const trial = { id: 'captured', scenario: 'public', arm: 'full', repetition: 0 }
 		const capture = buildMemoryCapture(profile, trial, WINDOW_GOAL)

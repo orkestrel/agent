@@ -1206,10 +1206,10 @@ describe('Conversation — a blank digest is refused (SUMMARY)', () => {
 		expect(conversation.sections).toEqual([])
 	})
 
-	it('rejects a blank rolling digest, keeping the prior section and its slice live', async () => {
+	it('rejects a blank cumulative digest, keeping the prior section and its slice live', async () => {
 		const digests = new ScriptedReads<string>(['first recap', '  \n'], 'unused')
 		const conversation = new Conversation({
-			rolling: true,
+			cumulative: true,
 			summarize: async () => digests.read(),
 		})
 		conversation.add([
@@ -1749,10 +1749,10 @@ describe('Conversation — keep must be a nonnegative safe integer', () => {
 	})
 })
 
-describe('Conversation — rolling folds', () => {
+describe('Conversation — cumulative folds', () => {
 	it('folds each round in one call over the prior recap then the new slice, leaving one section', async () => {
 		const stub = createRecapSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		const conversation = new Conversation({ summarize: stub.summarize, cumulative: true })
 		const events = createRecorders<ConversationEventMap, 'compact' | 'collapse'>(
 			conversation.emitter,
 			['compact', 'collapse'],
@@ -1796,7 +1796,7 @@ describe('Conversation — rolling folds', () => {
 
 	it('keeps the newest user exchange and its tool turns live', async () => {
 		const stub = createRecapSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		const conversation = new Conversation({ summarize: stub.summarize, cumulative: true })
 		conversation.add([
 			{ role: 'user', content: 'u1' },
 			{ role: 'assistant', content: 'a1' },
@@ -1828,7 +1828,7 @@ describe('Conversation — rolling folds', () => {
 		])
 	})
 
-	it('omitting rolling keeps appending sections with no prior recap in the request', async () => {
+	it('omitting cumulative keeps appending sections with no prior recap in the request', async () => {
 		const stub = createRecapSummarizer()
 		const conversation = new Conversation({ summarize: stub.summarize })
 		conversation.add([
@@ -1852,7 +1852,7 @@ describe('Conversation — rolling folds', () => {
 
 	it('makes no call and keeps the sections when no slice is eligible', async () => {
 		const stub = createRecapSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		const conversation = new Conversation({ summarize: stub.summarize, cumulative: true })
 		conversation.add([
 			{ role: 'user', content: 'u1' },
 			{ role: 'assistant', content: 'a1' },
@@ -1868,10 +1868,10 @@ describe('Conversation — rolling folds', () => {
 	})
 
 	it('commits nothing and emits nothing when the summarizer throws, then folds on retry', async () => {
-		const boom = new Error('rolling summarizer boom')
+		const boom = new Error('cumulative summarizer boom')
 		const throws = new ScriptedReads<boolean>([false, true], false)
 		const conversation = new Conversation({
-			rolling: true,
+			cumulative: true,
 			async summarize(messages) {
 				if (throws.read()) throw boom
 				return `recap of ${messages.length}`
@@ -1910,7 +1910,7 @@ describe('Conversation — rolling folds', () => {
 		const gate = Promise.withResolvers<string>()
 		const gated = new ScriptedReads<boolean>([false], true)
 		const conversation = new Conversation({
-			rolling: true,
+			cumulative: true,
 			async summarize() {
 				return gated.read() ? gate.promise : 'recap'
 			},
@@ -1933,7 +1933,7 @@ describe('Conversation — rolling folds', () => {
 		const reason = new Error('cancelled')
 
 		const pending = conversation.compact({ signal: controller.signal })
-		await waitForCondition('the rolling summarizer call', () => gated.reported.length === 2)
+		await waitForCondition('the cumulative summarizer call', () => gated.reported.length === 2)
 		controller.abort(reason)
 		await expect(pending).rejects.toBe(reason)
 		gate.resolve('late recap')
@@ -1950,7 +1950,7 @@ describe('Conversation — rolling folds', () => {
 		const gate = Promise.withResolvers<string>()
 		const gated = new ScriptedReads<boolean>([false], true)
 		const conversation = new Conversation({
-			rolling: true,
+			cumulative: true,
 			async summarize() {
 				return gated.read() ? gate.promise : 'recap'
 			},
@@ -1970,7 +1970,7 @@ describe('Conversation — rolling folds', () => {
 		])
 
 		const pending = conversation.compact()
-		await waitForCondition('the rolling summarizer call', () => gated.reported.length === 2)
+		await waitForCondition('the cumulative summarizer call', () => gated.reported.length === 2)
 		expect(conversation.remove(requireValue(dropped).id)).toBe(true)
 		gate.resolve('late recap')
 
@@ -1983,15 +1983,15 @@ describe('Conversation — rolling folds', () => {
 	})
 
 	it('refuses a sections cap at construction, per call, and from a manager default', async () => {
-		expect(() => new Conversation({ rolling: true, sections: 2 })).toThrow(
+		expect(() => new Conversation({ cumulative: true, sections: 2 })).toThrow(
 			expect.objectContaining({ code: 'SECTIONS' }),
 		)
-		expect(() => createConversationManager({ sections: 2 }).add({ rolling: true })).toThrow(
+		expect(() => createConversationManager({ sections: 2 }).add({ cumulative: true })).toThrow(
 			expect.objectContaining({ code: 'SECTIONS' }),
 		)
 
 		const stub = createRecapSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, rolling: true })
+		const conversation = new Conversation({ summarize: stub.summarize, cumulative: true })
 		conversation.add([
 			{ role: 'user', content: 'u1' },
 			{ role: 'assistant', content: 'a1' },
@@ -2009,7 +2009,7 @@ describe('Conversation — rolling folds', () => {
 		const stub = createRecapSummarizer()
 		const conversation = new Conversation({
 			summarize: stub.summarize,
-			rolling: true,
+			cumulative: true,
 			snapshot: {
 				id: 'hydrated',
 				sections: [

@@ -1,5 +1,5 @@
 import type { StudyOllamaMetadata } from '@orkestrel/study/server'
-import type { StudyMemorySampling } from './types.js'
+import type { StudyMemoryParameters } from './types.js'
 
 /** Bounds trial-wide metadata independently of model calls, tokens and bytes. */
 export const STUDY_MEMORY_METADATA: StudyOllamaMetadata = Object.freeze({
@@ -45,8 +45,8 @@ export const STUDY_MEMORY_LOOKUPS: readonly string[] = Object.freeze(['lookup'])
  * holds Ollama's v0.40.13 defaults under temperature 1 and seed 0, because the Mica digest stores no
  * parameters.
  */
-export const STUDY_MEMORY_SAMPLING: Readonly<
-	Record<'agent' | 'summary' | 'judge', StudyMemorySampling>
+export const STUDY_MEMORY_PARAMETERS: Readonly<
+	Record<'agent' | 'summary' | 'judge', StudyMemoryParameters>
 > = Object.freeze({
 	agent: Object.freeze({
 		temperature: 0,

@@ -11,7 +11,7 @@ import {
 	requireJudgment,
 	requireKeep,
 	requireRole,
-	requireRolling,
+	requireCumulative,
 	requireSectionsCap,
 	requireSummary,
 } from '@src/core'
@@ -367,18 +367,18 @@ describe('requireConversationSnapshot', () => {
 	})
 })
 
-describe('requireRolling', () => {
-	it('returns the switch unchanged when rolling has no cap, and when rolling is off with or without a cap', () => {
-		expect(requireRolling(true, undefined)).toBe(true)
-		expect(requireRolling(false, undefined)).toBe(false)
-		expect(requireRolling(false, 2)).toBe(false)
+describe('requireCumulative', () => {
+	it('returns the switch unchanged when cumulative has no cap, and when cumulative is off with or without a cap', () => {
+		expect(requireCumulative(true, undefined)).toBe(true)
+		expect(requireCumulative(false, undefined)).toBe(false)
+		expect(requireCumulative(false, 2)).toBe(false)
 	})
 
 	it.each([1, 2, 1.5, Number.POSITIVE_INFINITY, 0, Number.NaN])(
-		'throws the SECTIONS ConversationError for rolling beside the cap %s',
+		'throws the SECTIONS ConversationError for cumulative beside the cap %s',
 		(cap) => {
-			expect(() => requireRolling(true, cap)).toThrow(ConversationError)
-			expect(() => requireRolling(true, cap)).toThrow(
+			expect(() => requireCumulative(true, cap)).toThrow(ConversationError)
+			expect(() => requireCumulative(true, cap)).toThrow(
 				expect.objectContaining({ code: 'SECTIONS', context: { sections: cap } }),
 			)
 		},

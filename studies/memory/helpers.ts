@@ -31,7 +31,7 @@ import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
 import {
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_REPEAT,
-	STUDY_MEMORY_SAMPLING,
+	STUDY_MEMORY_PARAMETERS,
 } from './constants.js'
 import { isStudyMemoryAssertion, isStudyMemoryOptions, isStudyMemoryWire } from './validators.js'
 
@@ -160,7 +160,7 @@ export function buildStudyMemoryRoles(
 			options: {
 				num_ctx: room.context,
 				num_predict: room.output,
-				...STUDY_MEMORY_SAMPLING.agent,
+				...STUDY_MEMORY_PARAMETERS.agent,
 			},
 			think: room.think,
 			strict: compaction,
@@ -173,7 +173,7 @@ export function buildStudyMemoryRoles(
 						options: {
 							num_ctx: room.context,
 							num_predict: readStudyMemoryRecap(room),
-							...STUDY_MEMORY_SAMPLING.summary,
+							...STUDY_MEMORY_PARAMETERS.summary,
 						},
 						think: false,
 						strict: true,
@@ -185,7 +185,7 @@ export function buildStudyMemoryRoles(
 			? {
 					judge: {
 						model: readStudyMemoryJudge(provider),
-						options: { num_ctx: room.context, num_predict: 1, ...STUDY_MEMORY_SAMPLING.judge },
+						options: { num_ctx: room.context, num_predict: 1, ...STUDY_MEMORY_PARAMETERS.judge },
 						think: false,
 						strict: false,
 						length: true,

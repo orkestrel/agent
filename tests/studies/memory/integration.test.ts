@@ -29,12 +29,12 @@ import {
 	readMemoryControls,
 	readMemoryEvents,
 	readMemoryJudgeStates,
-	readMemoryProgressReadings,
+	readMemoryProgressRows,
 	readStudyInstallTrial,
 	runMemoryFailure,
 	runMemorySummary,
 	runMemoryTrial,
-	writeStudyInstallRecording,
+	writeStudyInstallRecord,
 	STUDY_MEMORY_ACTUAL_REFUSALS,
 	STUDY_MEMORY_GOALS,
 	STUDY_MEMORY_MODULES,
@@ -428,7 +428,7 @@ it('seals a recorded segment and grades it', async () => {
 		const server = await createMemoryServer()
 		try {
 			const fixture = createStudyInstallFixture(scratch, server.url)
-			writeStudyInstallRecording(scratch)
+			writeStudyInstallRecord(scratch)
 			const planned = await executeStudyInstall(fixture, ['check', 'capacity'])
 			expect(planned).toMatchObject({ code: 0 })
 			const plan = parseJSON(planned.stdout)
@@ -516,7 +516,7 @@ it('lists the adapter reading per goal', async () => {
 		const server = await createMemoryServer()
 		try {
 			const fixture = createStudyInstallFixture(scratch, server.url)
-			writeStudyInstallRecording(scratch, STUDY_MEMORY_GOALS)
+			writeStudyInstallRecord(scratch, STUDY_MEMORY_GOALS)
 			const trial = await readStudyInstallTrial(fixture, 'records')
 			const output = join(scratch.path, 'tmp', 'studies', 'progress')
 			const executed = await executeMemorySegment(
@@ -528,8 +528,8 @@ it('lists the adapter reading per goal', async () => {
 			const chats = server.requests.filter((request) => request.path === '/api/chat')
 			const read = await executeStudyInstall(fixture, ['progress', output, '--from', 'opening'])
 			expect(read).toMatchObject({ code: 0 })
-			const readings = readMemoryProgressReadings(read.stdout)
-			expect([...readings.keys()]).toEqual(['opening', 'correction'])
+			const progress = readMemoryProgressRows(read.stdout)
+			expect([...progress.keys()]).toEqual(['opening', 'correction'])
 			const result = await readStudyResult(output)
 			if (result.status !== 'sealed') throw new Error('The segment did not seal')
 			const evidence = (await collectStudyEvidence(result))[trial] ?? []
@@ -553,7 +553,7 @@ it('lists the adapter reading per goal', async () => {
 						: [],
 				)
 				expect(system).toHaveLength(1)
-				expect(readings.get(goal)).toMatchObject({
+				expect(progress.get(goal)).toMatchObject({
 					calls: { agent: expect.any(Number) },
 					partial: false,
 					system: { count: 1, bytes: new TextEncoder().encode(system[0]).byteLength },
@@ -652,7 +652,7 @@ it.each(['records', 'compaction'] as const)(
 					'closure',
 				])
 				expect(read).toMatchObject({ code: 0 })
-				expect(readMemoryProgressReadings(read.stdout).get('closure')).toMatchObject({
+				expect(readMemoryProgressRows(read.stdout).get('closure')).toMatchObject({
 					system: { count: expect.any(Number), bytes: expect.any(Number) },
 				})
 				const refused = await executeStudyInstall(
