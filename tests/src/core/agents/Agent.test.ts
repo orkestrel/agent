@@ -87,8 +87,8 @@ import {
 	CANARY_SENTINELS,
 	createCanaryMemos,
 	createCanarySkills,
-	createRecordingScheduler,
-	createRecordingSelection,
+	createRecordedScheduler,
+	createRecordedSelection,
 	createScriptedProvider,
 	createSeededToolManager,
 	createStubSummarizer,
@@ -254,7 +254,7 @@ describe('Agent — thinking replay', () => {
 			expect(requireValue(assistants[0]).calls).toEqual([createToolCall()])
 			expect(Object.hasOwn(requireValue(assistants[2]), 'thinking')).toBe(false)
 			expect(transport.requests).toHaveLength(3)
-			const opening = requireValue(
+			const firstRequest = requireValue(
 				parseJSONAs(await requireValue(transport.requests[0]).text(), providerRequestContract.is),
 			)
 			const followup = requireValue(
@@ -263,7 +263,9 @@ describe('Agent — thinking replay', () => {
 			const later = requireValue(
 				parseJSONAs(await requireValue(transport.requests[2]).text(), providerRequestContract.is),
 			)
-			expect(opening.messages.some((message) => Object.hasOwn(message, 'thinking'))).toBe(false)
+			expect(firstRequest.messages.some((message) => Object.hasOwn(message, 'thinking'))).toBe(
+				false,
+			)
 			expect(
 				followup.messages
 					.filter((message) => Object.hasOwn(message, 'thinking'))
@@ -1575,7 +1577,7 @@ describe('Agent — budget bound', () => {
 
 describe('Agent — scheduler pacing', () => {
 	it('yields between turns, not after the last', async () => {
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		const tools = createToolManager()
 		tools.add(createAddTool())
 		const provider = createScriptedProvider(
@@ -5017,7 +5019,7 @@ describe('Agent — normal usage sanitize', () => {
 
 describe('Agent — a selection handler shapes the prompt and never the tools', () => {
 	it('sends the system block plus the selected subset and hands the handler the request and the run signal', async () => {
-		const selection = createRecordingSelection({ keep: (message) => message.role === 'user' })
+		const selection = createRecordedSelection({ keep: (message) => message.role === 'user' })
 		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			system: 'You triage billing tickets.',
@@ -5048,7 +5050,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 
 	it('advertises the same definitions on every turn with a subset selection as without a handler', async () => {
 		expectTypeOf<keyof Selection>().toEqualTypeOf<'messages' | 'judgments' | 'usage' | 'fault'>()
-		const subset = createRecordingSelection({ keep: (message) => message.role === 'user' })
+		const subset = createRecordedSelection({ keep: (message) => message.role === 'user' })
 		const advertised = await Promise.all(
 			[undefined, subset.handler].map(async (select) => {
 				const tools = createToolManager()
@@ -5081,7 +5083,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 	})
 
 	it('keeps the scope-dispatch record when the handler drops every message but the request', async () => {
-		const drop = createRecordingSelection({ keep: (message, request) => message.id === request.id })
+		const drop = createRecordedSelection({ keep: (message, request) => message.id === request.id })
 		const records = await Promise.all(
 			[undefined, drop.handler].map(async (select) => {
 				const ran: string[] = []
@@ -5169,7 +5171,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 	})
 
 	it('runs the agent default under an answer-only scope and ends the run as the answer', async () => {
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const denied = createRecorder<AgentEventMap['deny']>()
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'refund', execute: () => 'refunded' }))
@@ -5197,7 +5199,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 	})
 
 	it('selects nothing when the conversation ends without a user message', async () => {
-		const selection = createRecordingSelection({ keep: () => false })
+		const selection = createRecordedSelection({ keep: () => false })
 		const selected = createRecorder<AgentEventMap['select']>()
 		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
@@ -5222,7 +5224,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 
 describe('Agent — the select event follows each select-site build', () => {
 	it('fires once at entry, before turn 0, with the handler selection', async () => {
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const order: string[] = []
 		const selected = createRecorder<AgentEventMap['select']>()
 		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
@@ -5271,7 +5273,7 @@ describe('Agent — the select event follows each select-site build', () => {
 	})
 
 	it('fires again after each compaction rebuild with the request captured at entry', async () => {
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const selected = createRecorder<AgentEventMap['select']>()
 		const conversations = createConversationManager({
 			summarize: createStubSummarizer().summarize,
@@ -5312,7 +5314,7 @@ describe('Agent — the select event follows each select-site build', () => {
 	})
 
 	it('fires after turn 0 begins when the first admission folds, before its provider call', async () => {
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const order: string[] = []
 		const conversations = createConversationManager({
 			summarize: createStubSummarizer().summarize,
@@ -5613,7 +5615,7 @@ describe('Agent — selection usage reaches the budget and the result, never a u
 		)
 		const agent = createAgent(provider, {
 			budget,
-			select: createRecordingSelection({ usage: SELECTION_USAGE }).handler,
+			select: createRecordedSelection({ usage: SELECTION_USAGE }).handler,
 			on: { usage: usages.handler },
 		})
 		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
@@ -5637,8 +5639,8 @@ describe('Agent — selection usage reaches the budget and the result, never a u
 describe('Agent — the handler resolves once per select site, scope first', () => {
 	it('applies a scope changed during the handler at the next select site only', async () => {
 		const gate = Promise.withResolvers<void>()
-		const first = createRecordingSelection()
-		const second = createRecordingSelection()
+		const first = createRecordedSelection()
+		const second = createRecordedSelection()
 		const selected = createRecorder<AgentEventMap['select']>()
 		const conversations = createConversationManager({
 			summarize: createStubSummarizer().summarize,
@@ -5682,8 +5684,8 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 	})
 
 	it('runs the default under a scope without a handler, the scope handler while active, and the default after apply(undefined)', async () => {
-		const fallback = createRecordingSelection()
-		const mode = createRecordingSelection()
+		const fallback = createRecordedSelection()
+		const mode = createRecordedSelection()
 		const provider = createScriptedProvider(
 			[{ content: 'first' }, { content: 'second' }, { content: 'third' }],
 			AGENT_SCRIPT_OPTIONS,
@@ -5709,20 +5711,20 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 	})
 
 	it('sends the no-handler request under a judging default when the mode carries a pass-through', async () => {
-		const judge = createRecordingSelection({
+		const judge = createRecordedSelection({
 			keep: (message, request) => message.id === request.id,
 		})
-		const passThrough = createRecordingSelection()
+		const passThrough = createRecordedSelection()
 		const bodies = await Promise.all(
-			[false, true].map(async (selecting) => {
+			[false, true].map(async (withSelect) => {
 				const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 				const agent = createAgent(provider, {
 					system: 'You triage billing tickets.',
 					scope: createScope({
 						name: 'verbatim',
-						...(selecting ? { select: passThrough.handler } : {}),
+						...(withSelect ? { select: passThrough.handler } : {}),
 					}),
-					...(selecting ? { select: judge.handler } : {}),
+					...(withSelect ? { select: judge.handler } : {}),
 				})
 				agent.context.messages.add([
 					{ role: 'user', content: 'The invoice total is wrong.' },
@@ -5741,7 +5743,7 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 	})
 
 	it('sends the recorded request through a pass-through mode handler', async () => {
-		const passThrough = createRecordingSelection()
+		const passThrough = createRecordedSelection()
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = seedFramedAgent(provider)
 		agent.context.apply(
@@ -5767,16 +5769,18 @@ describe('Agent — with no handler in either home the loop adds no await', () =
 		const plain = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(plain, { scope: createScope({ name: 'review', tools: [] }) })
 		agent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
-		const selecting = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
-		const selected = createAgent(selecting, { select: createRecordingSelection().handler })
+		const selectProvider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const selected = createAgent(selectProvider, { select: createRecordedSelection().handler })
 		selected.context.messages.add({ role: 'user', content: 'Invoice 42.' })
 
 		const runs = [agent.stream(), selected.stream()]
 
 		expect(plain.calls.map((call) => call.messages.at(-1)?.content)).toEqual(['Invoice 42.'])
-		expect(selecting.calls).toEqual([])
+		expect(selectProvider.calls).toEqual([])
 		await Promise.all(runs.map((run) => run.result))
-		expect(selecting.calls.map((call) => call.messages.at(-1)?.content)).toEqual(['Invoice 42.'])
+		expect(selectProvider.calls.map((call) => call.messages.at(-1)?.content)).toEqual([
+			'Invoice 42.',
+		])
 	})
 })
 
@@ -5941,11 +5945,11 @@ describe('Agent — turn records', () => {
 		])
 		const provider = createScriptedProvider([{ content: 'never' }], AGENT_SCRIPT_OPTIONS)
 		const selected = createRecorder<AgentEventMap['select']>()
-		const recording = createRecordingSelection({ usage: SELECTION_USAGE })
+		const recorded = createRecordedSelection({ usage: SELECTION_USAGE })
 		const agent = createAgent(provider, {
 			conversations,
 			window: createBudget({ max: 1, consumer: measureMessages }),
-			select: recording.handler,
+			select: recorded.handler,
 		})
 		// The second `select` is the compaction rebuild's; cancelling there stops the turn before its call.
 		const cancels = [false, true].values()
@@ -5955,8 +5959,8 @@ describe('Agent — turn records', () => {
 		})
 		const result = await agent.generate()
 		// The entry selection and the rebuild selection were each observed, and nothing selected after.
-		expect(recording.selections).toEqual([expect.any(Object), expect.any(Object)])
-		expect(selected.calls).toEqual(recording.selections.map((selection) => [selection]))
+		expect(recorded.selections).toEqual([expect.any(Object), expect.any(Object)])
+		expect(selected.calls).toEqual(recorded.selections.map((selection) => [selection]))
 		expect([...cancels]).toEqual([])
 		expect(provider.calls).toEqual([])
 		expect(result).toEqual({
@@ -5980,7 +5984,7 @@ describe('Agent — turn records', () => {
 
 		const selected = createAgent(
 			createScriptedProvider([{ content: 'done', usage: AGENT_USAGE }], AGENT_SCRIPT_OPTIONS),
-			{ select: createRecordingSelection({ usage: SELECTION_USAGE }).handler },
+			{ select: createRecordedSelection({ usage: SELECTION_USAGE }).handler },
 		)
 		selected.context.messages.add({ role: 'user', content: 'Invoice 42.' })
 		expect((await selected.generate()).usage).toEqual({ prompt: 35, completion: 9, total: 44 })
@@ -6242,12 +6246,12 @@ describe('Agent — three failure layers', () => {
 	})
 
 	it('names the budget for a selection charge, an outer budget, a linked parent, and two exhausted bounds', async () => {
-		const selecting = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+		const selectAgent = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
 			budget: createTokenBudget({ id: 'budget', max: 10, scope: 'total' }),
-			select: createRecordingSelection({ usage: SELECTION_USAGE }).handler,
+			select: createRecordedSelection({ usage: SELECTION_USAGE }).handler,
 		})
-		selecting.context.messages.add({ role: 'user', content: 'Invoice 42.' })
-		expect(await selecting.generate()).toEqual({
+		selectAgent.context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		expect(await selectAgent.generate()).toEqual({
 			content: '',
 			partial: true,
 			usage: SELECTION_USAGE,
@@ -6315,19 +6319,19 @@ describe('Agent — three failure layers', () => {
 		const shared = createTokenBudget({ max: 1_000_000 })
 		const held = createAgent(createGatedProvider(release))
 		held.context.messages.add({ role: 'user', content: 'hi' })
-		const holding = held.stream({ budget: shared })
+		const heldRun = held.stream({ budget: shared })
 		const refused = captureError(() => held.stream({ allowance: shared }))
 		expect(isAgentError(refused) ? refused.code : undefined).toBe('CONCURRENCY')
 		release.resolve()
-		await holding.result
+		await heldRun.result
 
 		const constructed = createTokenBudget({ max: 1_000 })
 		const run = createTokenBudget({ max: 1_000 })
-		const overriding = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
+		const overridden = createAgent(createScriptedProvider([story], AGENT_SCRIPT_OPTIONS), {
 			allowance: constructed,
 		})
-		overriding.context.messages.add({ role: 'user', content: 'Tell a story.' })
-		await overriding.generate({ allowance: run })
+		overridden.context.messages.add({ role: 'user', content: 'Tell a story.' })
+		await overridden.generate({ allowance: run })
 		expect([constructed.consumed, run.consumed]).toEqual([0, 4])
 	})
 
@@ -7579,11 +7583,11 @@ describe('Agent — run-bound conversation', () => {
 	})
 
 	it('hands select the bound thread mid-fold', async () => {
-		const summarizing = Promise.withResolvers<void>()
+		const entered = Promise.withResolvers<void>()
 		const release = Promise.withResolvers<void>()
 		const conversations = createConversationManager({
 			summarize: async (messages) => {
-				summarizing.resolve()
+				entered.resolve()
 				await release.promise
 				return `recap of ${messages.length}`
 			},
@@ -7599,7 +7603,7 @@ describe('Agent — run-bound conversation', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
@@ -7613,7 +7617,7 @@ describe('Agent — run-bound conversation', () => {
 		])
 
 		const run = agent.generate()
-		await summarizing.promise
+		await entered.promise
 		const second = conversations.add()
 		second.add({ role: 'user', content: 'Other thread.' })
 		conversations.switch(second.id)

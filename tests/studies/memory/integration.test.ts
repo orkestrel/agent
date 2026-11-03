@@ -534,7 +534,7 @@ it('lists the adapter reading per goal', async () => {
 			if (result.status !== 'sealed') throw new Error('The segment did not seal')
 			const evidence = (await collectStudyEvidence(result))[trial] ?? []
 			// The goals' agent bodies as the fixture took them, a mechanism the rows cannot reach.
-			const opening = evidence.filter(
+			const first = evidence.filter(
 				(row) =>
 					row.event === 'dispatch' &&
 					row.goal === 'opening' &&
@@ -543,7 +543,7 @@ it('lists the adapter reading per goal', async () => {
 			).length
 			for (const [goal, chat] of [
 				['opening', chats[0]],
-				['correction', chats[opening]],
+				['correction', chats[first]],
 			] as const) {
 				const body = parseJSON(chat?.body ?? '')
 				if (!isRecord(body) || !isArray(body.messages)) throw new Error('Missing chat body')

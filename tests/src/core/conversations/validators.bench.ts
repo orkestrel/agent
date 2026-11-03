@@ -55,7 +55,7 @@ it('hydrates the correction seed', { timeout: 300_000 }, async ({ bench, task })
 		createLedger(provider, options)
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const texts = new Set<string>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
@@ -64,7 +64,7 @@ it('hydrates the correction seed', { timeout: 300_000 }, async ({ bench, task })
 			const ledger = createLedger(provider, options)
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000)
+			samples.handler(wall, (spent.user + spent.system) / 1000)
 			texts.add(JSON.stringify(ledger.snapshot()))
 			return { overriddenDuration: wall }
 		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
@@ -80,14 +80,14 @@ it('hydrates the correction seed', { timeout: 300_000 }, async ({ bench, task })
 			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
 			repeat: 1,
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(7)
+	expect(samples.calls).toHaveLength(7)
 	expect(texts.size).toBe(1)
 	expect(asked.count).toBe(0)
 })
@@ -128,7 +128,7 @@ it('spins the correction hydrate to the gate', { timeout: 300_000 }, async ({ be
 		}
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number, region: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number, region: number]>()
 	const texts = new Set<string>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
@@ -142,7 +142,7 @@ it('spins the correction hydrate to the gate', { timeout: 300_000 }, async ({ be
 			}
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000, region)
+			samples.handler(wall, (spent.user + spent.system) / 1000, region)
 			texts.add(JSON.stringify(ledger.snapshot()))
 			return { overriddenDuration: wall }
 		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
@@ -158,16 +158,16 @@ it('spins the correction hydrate to the gate', { timeout: 300_000 }, async ({ be
 			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
 			repeat: 1,
 			factor,
-			regions: readings.calls.map(([, , region]) => region),
+			regions: samples.calls.map(([, , region]) => region),
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(7)
+	expect(samples.calls).toHaveLength(7)
 	expect(texts.size).toBe(1)
 	expect(asked.count).toBe(0)
 })
@@ -208,7 +208,7 @@ it('spins the correction hydrate past it', { timeout: 300_000 }, async ({ bench,
 		}
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number, region: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number, region: number]>()
 	const texts = new Set<string>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
@@ -222,7 +222,7 @@ it('spins the correction hydrate past it', { timeout: 300_000 }, async ({ bench,
 			}
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000, region)
+			samples.handler(wall, (spent.user + spent.system) / 1000, region)
 			texts.add(JSON.stringify(ledger.snapshot()))
 			return { overriddenDuration: wall }
 		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
@@ -238,16 +238,16 @@ it('spins the correction hydrate past it', { timeout: 300_000 }, async ({ bench,
 			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
 			repeat: 1,
 			factor,
-			regions: readings.calls.map(([, , region]) => region),
+			regions: samples.calls.map(([, , region]) => region),
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(7)
+	expect(samples.calls).toHaveLength(7)
 	expect(texts.size).toBe(1)
 	expect(asked.count).toBe(0)
 })
@@ -282,7 +282,7 @@ it('hydrates the control seed', { timeout: 300_000 }, async ({ bench, task }) =>
 		createLedger(provider, options)
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const texts = new Set<string>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
@@ -291,7 +291,7 @@ it('hydrates the control seed', { timeout: 300_000 }, async ({ bench, task }) =>
 			const ledger = createLedger(provider, options)
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000)
+			samples.handler(wall, (spent.user + spent.system) / 1000)
 			texts.add(JSON.stringify(ledger.snapshot()))
 			return { overriddenDuration: wall }
 		}).run({ iterations: 15, time: 0, warmup: false, throws: true }),
@@ -307,14 +307,14 @@ it('hydrates the control seed', { timeout: 300_000 }, async ({ bench, task }) =>
 			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
 			repeat: 1,
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(15)
+	expect(samples.calls).toHaveLength(15)
 	expect(texts.size).toBe(1)
 	expect(asked.count).toBe(0)
 })
@@ -355,7 +355,7 @@ it('spins the control hydrate to 1.05', { timeout: 300_000 }, async ({ bench, ta
 		}
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number, region: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number, region: number]>()
 	const texts = new Set<string>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
@@ -369,7 +369,7 @@ it('spins the control hydrate to 1.05', { timeout: 300_000 }, async ({ bench, ta
 			}
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000, region)
+			samples.handler(wall, (spent.user + spent.system) / 1000, region)
 			texts.add(JSON.stringify(ledger.snapshot()))
 			return { overriddenDuration: wall }
 		}).run({ iterations: 15, time: 0, warmup: false, throws: true }),
@@ -385,16 +385,16 @@ it('spins the control hydrate to 1.05', { timeout: 300_000 }, async ({ bench, ta
 			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
 			repeat: 1,
 			factor,
-			regions: readings.calls.map(([, , region]) => region),
+			regions: samples.calls.map(([, , region]) => region),
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(15)
+	expect(samples.calls).toHaveLength(15)
 	expect(texts.size).toBe(1)
 	expect(asked.count).toBe(0)
 })
@@ -435,7 +435,7 @@ it('spins the control hydrate past 1.05', { timeout: 300_000 }, async ({ bench, 
 		}
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number, region: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number, region: number]>()
 	const texts = new Set<string>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
@@ -449,7 +449,7 @@ it('spins the control hydrate past 1.05', { timeout: 300_000 }, async ({ bench, 
 			}
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000, region)
+			samples.handler(wall, (spent.user + spent.system) / 1000, region)
 			texts.add(JSON.stringify(ledger.snapshot()))
 			return { overriddenDuration: wall }
 		}).run({ iterations: 15, time: 0, warmup: false, throws: true }),
@@ -465,16 +465,16 @@ it('spins the control hydrate past 1.05', { timeout: 300_000 }, async ({ bench, 
 			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
 			repeat: 1,
 			factor,
-			regions: readings.calls.map(([, , region]) => region),
+			regions: samples.calls.map(([, , region]) => region),
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(15)
+	expect(samples.calls).toHaveLength(15)
 	expect(texts.size).toBe(1)
 	expect(asked.count).toBe(0)
 })
@@ -499,7 +499,7 @@ it('checks the correction ledger snapshot', { timeout: 300_000 }, async ({ bench
 		if (!isLedgerSnapshot(seed)) throw new Error('the guard refused the seed')
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const usage = process.cpuUsage()
@@ -507,7 +507,7 @@ it('checks the correction ledger snapshot', { timeout: 300_000 }, async ({ bench
 			if (!isLedgerSnapshot(seed)) throw new Error('the guard refused the seed')
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000)
+			samples.handler(wall, (spent.user + spent.system) / 1000)
 			return { overriddenDuration: wall }
 		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
 	)
@@ -521,14 +521,14 @@ it('checks the correction ledger snapshot', { timeout: 300_000 }, async ({ bench
 			seed: digest,
 			repeat: 1,
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(7)
+	expect(samples.calls).toHaveLength(7)
 })
 
 it('checks the control ledger snapshot', { timeout: 300_000 }, async ({ bench, task }) => {
@@ -553,7 +553,7 @@ it('checks the control ledger snapshot', { timeout: 300_000 }, async ({ bench, t
 			if (!isLedgerSnapshot(seed)) throw new Error(`the guard refused the seed in round ${round}`)
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const usage = process.cpuUsage()
@@ -562,7 +562,7 @@ it('checks the control ledger snapshot', { timeout: 300_000 }, async ({ bench, t
 				if (!isLedgerSnapshot(seed)) throw new Error(`the guard refused the seed in round ${round}`)
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000)
+			samples.handler(wall, (spent.user + spent.system) / 1000)
 			return { overriddenDuration: wall }
 		}).run({ iterations: 15, time: 0, warmup: false, throws: true }),
 	)
@@ -576,14 +576,14 @@ it('checks the control ledger snapshot', { timeout: 300_000 }, async ({ bench, t
 			seed: digest,
 			repeat: 40,
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(15)
+	expect(samples.calls).toHaveLength(15)
 })
 
 it('checks the realistic conversation', { timeout: 300_000 }, async ({ bench, task }) => {
@@ -615,7 +615,7 @@ it('checks the realistic conversation', { timeout: 300_000 }, async ({ bench, ta
 	const median = sorted[Math.floor(sorted.length / 2)] ?? 0
 	const repeat = Math.max(1, Math.ceil(100 / Math.max(median, Number.EPSILON)))
 	const rounds = Array.from({ length: repeat }, (_unused, round) => round)
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const usage = process.cpuUsage()
@@ -625,7 +625,7 @@ it('checks the realistic conversation', { timeout: 300_000 }, async ({ bench, ta
 					throw new Error(`the guard refused the seed in round ${round}`)
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000)
+			samples.handler(wall, (spent.user + spent.system) / 1000)
 			return { overriddenDuration: wall }
 		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
 	)
@@ -640,13 +640,13 @@ it('checks the realistic conversation', { timeout: 300_000 }, async ({ bench, ta
 			messages: seed.messages.length,
 			repeat,
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			perCall: readings.calls.map(([wall]) => wall / repeat),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			perCall: samples.calls.map(([wall]) => wall / repeat),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(7)
+	expect(samples.calls).toHaveLength(7)
 })

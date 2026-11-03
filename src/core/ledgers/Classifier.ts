@@ -3,7 +3,7 @@ import type {
 	ClassifierInterface,
 	ClassifierOptions,
 	ClassifierPhase,
-	ClassifierReading,
+	ClassifierAttempt,
 	ClassifierResult,
 	LedgerCategory,
 	LedgerClassification,
@@ -50,7 +50,7 @@ export class Classifier implements ClassifierInterface {
 	 * Asks the judge every question the filing still lacks, in the measured order.
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
-	 * @returns The judgment keys, summed usage, and one reading per logical question attempt, in asking order; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+	 * @returns The judgment keys, summed usage, and one attempt per logical question, in asking order; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
@@ -64,7 +64,7 @@ export class Classifier implements ClassifierInterface {
 		)
 		return {
 			judgments: results.flatMap((result) => result.judgments),
-			readings: results.flatMap((result) => result.readings),
+			attempts: results.flatMap((result) => result.attempts),
 			...(fault === undefined ? {} : { fault }),
 			...(usage === undefined ? {} : { usage }),
 		}
@@ -455,13 +455,13 @@ export class Classifier implements ClassifierInterface {
 		results: ClassifierResult[],
 	): Promise<ClassifierResult> {
 		if (this.#read(spec) !== undefined)
-			return { judgments: [spec.id], readings: [{ key: spec.id, phase, outcome: 'cached' }] }
+			return { judgments: [spec.id], attempts: [{ key: spec.id, phase, outcome: 'cached' }] }
 		const fingerprint = JSON.stringify(spec)
 		if (this.#failed.has(fingerprint))
-			return { judgments: [], readings: [{ key: spec.id, phase, outcome: 'skipped' }] }
+			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
 		signal.throwIfAborted()
 		if (spec.sources.some((id) => this.#options.conversation.message(id) === undefined))
-			return { judgments: [], readings: [{ key: spec.id, phase, outcome: 'skipped' }] }
+			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
 		const started = performance.now()
 		try {
 			const [judgment] = await this.#options.conversation.judgments.resolve(
@@ -470,19 +470,19 @@ export class Classifier implements ClassifierInterface {
 				spec.sources,
 				signal,
 			)
-			const readings: readonly ClassifierReading[] = [
+			const attempts: readonly ClassifierAttempt[] = [
 				{ key: spec.id, phase, outcome: 'resolved', duration: performance.now() - started },
 			]
 			return judgment === undefined
-				? { judgments: [], readings }
+				? { judgments: [], attempts }
 				: {
 						judgments: [spec.id],
 						...(judgment.usage === undefined ? {} : { usage: judgment.usage }),
-						readings,
+						attempts,
 					}
 		} catch (error) {
-			// A rejection records its reading in the pushed result alone, so the empty result returned under a live signal repeats none.
-			const readings: readonly ClassifierReading[] = [
+			// A rejection records its attempt in the pushed result alone, so the empty result returned under a live signal repeats none.
+			const attempts: readonly ClassifierAttempt[] = [
 				{
 					key: spec.id,
 					phase,
@@ -498,16 +498,16 @@ export class Classifier implements ClassifierInterface {
 							? [spec.id]
 							: [],
 					...(error.partial.usage === undefined ? {} : { usage: error.partial.usage }),
-					readings,
+					attempts,
 				})
-			else results.push({ judgments: [], readings })
+			else results.push({ judgments: [], attempts })
 			if (
 				(isJudgeError(error) && error.code === 'QUESTION') ||
 				DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error))
 			)
 				this.#failed.add(fingerprint)
 			if (signal.aborted) throw error
-			return { judgments: [], readings: [] }
+			return { judgments: [], attempts: [] }
 		}
 	}
 }

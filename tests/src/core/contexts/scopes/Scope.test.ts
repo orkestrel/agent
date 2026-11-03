@@ -1,7 +1,7 @@
 import type { ScopeInterface } from '@src/core'
 import { createScope, Scope } from '@src/core'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { createRecordingSelection, rejectSelection } from '../../../../setup.js'
+import { createRecordedSelection, rejectSelection } from '../../../../setup.js'
 
 // Scope is the named, immutable allow-list filter over a context's items — real
 // behavior, no mocks. Covers construction (a minted id + the per-category
@@ -183,7 +183,7 @@ describe('Scope — the selection handler travels with the scope', () => {
 	})
 
 	it('carries `select` when supplied and leaves it undefined when omitted', () => {
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const scope = createScope({
 			name: 'triage',
 			select: selection.handler,
@@ -220,7 +220,7 @@ describe('Scope — the selection handler travels with the scope', () => {
 		expectTypeOf<Parameters<ScopeInterface['narrow']>[0]>().not.toHaveProperty('description')
 		const parent = new Scope({ name: 'triage', select: rejectSelection })
 		// A widened value skips the excess-property check, so the runtime ignores the extra member.
-		const config = { tools: ['reply'], select: createRecordingSelection().handler }
+		const config = { tools: ['reply'], select: createRecordedSelection().handler }
 
 		const child = parent.narrow(config)
 

@@ -29,7 +29,7 @@ it('checks a memo set of 1000', { timeout: 300_000 }, async ({ bench, task }) =>
 				throw new Error(`the guard refused the memo set in round ${round}`)
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const usage = process.cpuUsage()
@@ -39,7 +39,7 @@ it('checks a memo set of 1000', { timeout: 300_000 }, async ({ bench, task }) =>
 					throw new Error(`the guard refused the memo set in round ${round}`)
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000)
+			samples.handler(wall, (spent.user + spent.system) / 1000)
 			return { overriddenDuration: wall }
 		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
 	)
@@ -53,14 +53,14 @@ it('checks a memo set of 1000', { timeout: 300_000 }, async ({ bench, task }) =>
 			seed: digest,
 			repeat: 40,
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(7)
+	expect(samples.calls).toHaveLength(7)
 })
 
 it('checks one memo per call', { timeout: 300_000 }, async ({ bench, task }) => {
@@ -80,7 +80,7 @@ it('checks one memo per call', { timeout: 300_000 }, async ({ bench, task }) => 
 		for (const memo of calls) if (!isMemo(memo)) throw new Error('the guard refused a memo')
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const usage = process.cpuUsage()
@@ -88,7 +88,7 @@ it('checks one memo per call', { timeout: 300_000 }, async ({ bench, task }) => 
 			for (const memo of calls) if (!isMemo(memo)) throw new Error('the guard refused a memo')
 			const wall = performance.now() - start
 			const spent = process.cpuUsage(usage)
-			readings.handler(wall, (spent.user + spent.system) / 1000)
+			samples.handler(wall, (spent.user + spent.system) / 1000)
 			return { overriddenDuration: wall }
 		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
 	)
@@ -102,12 +102,12 @@ it('checks one memo per call', { timeout: 300_000 }, async ({ bench, task }) => 
 			seed: digest,
 			repeat: 40_000,
 			warmups: warmups.calls.map(([wall]) => wall),
-			walls: readings.calls.map(([wall]) => wall),
-			cpus: readings.calls.map(([, cpu]) => cpu),
+			walls: samples.calls.map(([wall]) => wall),
+			cpus: samples.calls.map(([, cpu]) => cpu),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(7)
+	expect(samples.calls).toHaveLength(7)
 })

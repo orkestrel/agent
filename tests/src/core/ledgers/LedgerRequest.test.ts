@@ -1,4 +1,4 @@
-import type { ClassifierReading, Selection } from '@src/core'
+import type { ClassifierAttempt, Selection } from '@src/core'
 import { createConversation, DEFAULT_RECALL_LIMIT, LEDGER_NOTES, LedgerRequest } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { LEDGER_INVALID_LIMITS, computeLedgerErrorCode } from '../../../setup.js'
@@ -111,19 +111,19 @@ describe('LedgerRequest', () => {
 		expect(plain.calls).toEqual([{ estimate: 6, tools: 0, prompt: 9, completion: 4 }])
 	})
 
-	it('files readings in asking order and holds the last successful plan', () => {
+	it('files attempts in asking order and holds the last successful plan', () => {
 		const request = new LedgerRequest('Check.')
-		const first: ClassifierReading = {
+		const first: ClassifierAttempt = {
 			key: 'one',
 			phase: 'category',
 			outcome: 'resolved',
 			duration: 3,
 		}
-		const second: ClassifierReading = { key: 'two', phase: 'topic', outcome: 'cached' }
+		const second: ClassifierAttempt = { key: 'two', phase: 'topic', outcome: 'cached' }
 		const plan: Selection = { messages: [], judgments: ['one'] }
 		request.file([first], plan)
 		request.file([second])
-		expect(request.readings).toEqual([first, second])
+		expect(request.attempts).toEqual([first, second])
 		expect(request.plan).toBe(plan)
 	})
 

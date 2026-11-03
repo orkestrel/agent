@@ -117,12 +117,12 @@ describe('Gauge.rate', () => {
 	})
 
 	it('returns the scale when the fit slope is negative or zero', () => {
-		const falling = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
-		falling.observe([
+		const declined = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+		declined.observe([
 			{ estimate: 100, prompt: 300, tools: 0 },
 			{ estimate: 200, prompt: 200, tools: 0 },
 		])
-		expect(falling.rate([])).toBe(3)
+		expect(declined.rate([])).toBe(3)
 		const flat = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
 		flat.observe([
 			{ estimate: 100, prompt: 300, tools: 0 },

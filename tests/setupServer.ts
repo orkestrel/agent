@@ -17,7 +17,7 @@ import {
 	buildLedgerBenchOptions,
 	computeTextDigest,
 	createLedgerJudge,
-	createRecordingScheduler,
+	createRecordedScheduler,
 	createScriptedProvider,
 	LEDGER_BENCH_MODEL,
 	renderLedgerPositions,
@@ -72,13 +72,13 @@ export async function stopTimed(
 	release: () => void,
 ): Promise<number> {
 	release()
-	const closing = performance.now()
+	const start = performance.now()
 	await server.stop()
-	return performance.now() - closing
+	return performance.now() - start
 }
 
-/** Carries what a ledger bench heartbeat read: the largest gap, every gap in order, and its firings. */
-export interface LedgerPacing {
+/** Carries what a ledger bench heartbeat read: the largest gap, every gap in order, and its beats. */
+export interface LedgerHeartbeat {
 	readonly longest: number
 	readonly gaps: readonly number[]
 	readonly turns: number
@@ -86,9 +86,9 @@ export interface LedgerPacing {
 
 /**
  * Carries what one timed ledger bench request measured, from the agent's first `start` event to its
- * first `select` event. A sample of a paced cell also carries its heartbeat's {@link LedgerPacing}.
+ * first `select` event. A sample of a paced cell also carries its heartbeat's {@link LedgerHeartbeat}.
  */
-export interface LedgerSample extends Partial<LedgerPacing> {
+export interface LedgerSample extends Partial<LedgerHeartbeat> {
 	readonly wall: number
 	readonly cpu: number
 	readonly asked: number
@@ -209,7 +209,7 @@ export function addBusyWait(
  */
 export function createLedgerPace(pace: LedgerCellPace | undefined): SchedulerInterface | undefined {
 	if (pace === undefined) return undefined
-	return pace === 'node' ? createNodeScheduler() : createRecordingScheduler()
+	return pace === 'node' ? createNodeScheduler() : createRecordedScheduler()
 }
 
 /**
@@ -217,32 +217,32 @@ export function createLedgerPace(pace: LedgerCellPace | undefined): SchedulerInt
  * until the signal aborts. Each firing is a host turn the timed region gave up, which a recorder
  * around `yield` could not tell from a microtask.
  *
- * @param firings - The log each firing appends its clock reading to
+ * @param beats - The log each firing appends its clock reading to
  * @param signal - The signal that stops the chain
  */
 export function fireLedgerHeartbeat(
-	firings: RecorderInterface<readonly [at: number]>,
+	beats: RecorderInterface<readonly [at: number]>,
 	signal: AbortSignal,
 ): void {
 	if (signal.aborted) return
-	firings.handler(performance.now())
-	setImmediate(fireLedgerHeartbeat, firings, signal)
+	beats.handler(performance.now())
+	setImmediate(fireLedgerHeartbeat, beats, signal)
 }
 
 /**
  * Registers a heartbeat on an emitter: armed on `start`, stopped on `select`.
  *
  * @param emitter - The emitter to register on, such as an agent's
- * @param firings - The log the heartbeat appends to
+ * @param beats - The log the heartbeat appends to
  * @param heartbeat - The controller that stops the chain
  */
 export function addLedgerHeartbeat(
 	emitter: { on(event: 'start' | 'select', handler: () => void): void },
-	firings: RecorderInterface<readonly [at: number]>,
+	beats: RecorderInterface<readonly [at: number]>,
 	heartbeat: AbortController,
 ): void {
 	emitter.on('start', () => {
-		setImmediate(fireLedgerHeartbeat, firings, heartbeat.signal)
+		setImmediate(fireLedgerHeartbeat, beats, heartbeat.signal)
 	})
 	emitter.on('select', () => heartbeat.abort())
 }
@@ -252,18 +252,18 @@ export function addLedgerHeartbeat(
  * firing, the one gap and the longest are the wall.
  *
  * @param start - The clock at the `start` mark
- * @param firings - The clock at each firing, in order
+ * @param beats - The clock at each firing, in order
  * @param end - The clock at the `select` mark
  * @returns The largest gap, every gap in order, and the firing count
  */
-export function readLedgerPacing(
+export function readLedgerHeartbeat(
 	start: number,
-	firings: readonly number[],
+	beats: readonly number[],
 	end: number,
-): LedgerPacing {
-	const points = [start, ...firings]
+): LedgerHeartbeat {
+	const points = [start, ...beats]
 	const gaps = points.map((at, index) => (points[index + 1] ?? end) - at)
-	return { longest: Math.max(...gaps), gaps, turns: firings.length }
+	return { longest: Math.max(...gaps), gaps, turns: beats.length }
 }
 
 /**
@@ -273,7 +273,7 @@ export function readLedgerPacing(
  * @param snapshot - The seeded snapshot to hydrate from
  * @param wait - The busy wait in milliseconds, registered after the `start` mark; undefined registers none
  * @param pace - The scheduler to pass and the heartbeat to arm at the `start` mark; undefined does neither
- * @returns The wall and CPU time from the first `start` to the first `select`, the judge-call count, the event tallies, the reading outcomes, the digest of the position-labelled selection, and with a pace the heartbeat's pacing
+ * @returns The wall and CPU time from the first `start` to the first `select`, the judge-call count, the event tallies, the attempt outcomes, the digest of the position-labelled selection, and with a pace the heartbeat's pacing
  */
 export async function takeLedgerSample(
 	snapshot: LedgerSnapshot,
@@ -310,9 +310,9 @@ export async function takeLedgerSample(
 	ledger.agent.emitter.on('fault', () =>
 		marks.handler('fault', process.cpuUsage(), performance.now()),
 	)
-	const firings = createRecorder<readonly [at: number]>()
+	const beats = createRecorder<readonly [at: number]>()
 	const heartbeat = new AbortController()
-	if (pace !== undefined) addLedgerHeartbeat(ledger.agent.emitter, firings, heartbeat)
+	if (pace !== undefined) addLedgerHeartbeat(ledger.agent.emitter, beats, heartbeat)
 	const result = await ledger
 		.respond('What is the status of OR-1000?')
 		.finally(() => heartbeat.abort())
@@ -327,7 +327,7 @@ export async function takeLedgerSample(
 		selects: marks.calls.filter(([name]) => name === 'select').length,
 		faults: marks.calls.filter(([name]) => name === 'fault').length,
 		outcomes: Object.fromEntries(
-			[...Map.groupBy(result.readings, (reading) => reading.outcome)].map(
+			[...Map.groupBy(result.attempts, (attempt) => attempt.outcome)].map(
 				([outcome, group]) => [outcome, group.length] as const,
 			),
 		),
@@ -336,9 +336,9 @@ export async function takeLedgerSample(
 		),
 		...(pace === undefined
 			? {}
-			: readLedgerPacing(
+			: readLedgerHeartbeat(
 					startAt,
-					firings.calls.map(([at]) => at),
+					beats.calls.map(([at]) => at),
 					selectAt,
 				)),
 	}
@@ -428,7 +428,7 @@ export function readLedgerCell(
 
 /**
  * Checks that a ledger bench sample kept the bench's invariants: the judge never asked, one
- * `start`, one `select`, no `fault`, and every reading filed from cache.
+ * `start`, one `select`, no `fault`, and every attempt filed from cache.
  *
  * @param sample - The sample to check
  * @returns The same sample

@@ -16,13 +16,13 @@ import { createRecorder } from '@orkestrel/test'
 it.for(CHANNEL_BENCH_CELLS)('$title', { timeout: 120_000 }, async (cell, { bench }) => {
 	for (const warmup of Array.from({ length: cell.warmups }, () => cell))
 		await measureChannelCell(warmup)
-	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const samples = createRecorder<readonly [wall: number, cpu: number]>()
 	const measured = await measureOtherLoad(async () =>
 		bench(cell.title, {}, async () => {
 			const before = process.cpuUsage()
 			const wall = await measureChannelCell(cell)
 			const used = process.cpuUsage(before)
-			readings.handler(wall, (used.user + used.system) / 1000)
+			samples.handler(wall, (used.user + used.system) / 1000)
 		}).run({ time: 0, iterations: cell.samples, warmup: false, throws: true }),
 	)
 	console.log(
@@ -35,11 +35,11 @@ it.for(CHANNEL_BENCH_CELLS)('$title', { timeout: 120_000 }, async (cell, { bench
 			rounds: cell.rounds,
 			warmups: cell.warmups,
 			spin: cell.spin ?? 0,
-			readings: readings.calls.map(([wall, cpu]) => ({ wall, cpu })),
+			readings: samples.calls.map(([wall, cpu]) => ({ wall, cpu })),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(cell.samples)
+	expect(samples.calls).toHaveLength(cell.samples)
 })

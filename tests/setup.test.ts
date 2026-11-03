@@ -49,7 +49,7 @@ import {
 	createInvalidLedgerSnapshotCases,
 	createLedgerReplay,
 	createMalformedConversationCases,
-	RecoveringProvider,
+	RecoveryProvider,
 	serveLedgerHistory,
 	serveLedgerReplay,
 	translateLedgerIds,
@@ -74,7 +74,7 @@ import {
 	computeUsageTotal,
 	returnUndefined,
 	collectPaced,
-	CountingAgentResult,
+	AccessedAgentResult,
 	createInvalidAgentResultCases,
 	seedCompactionAgent,
 	requestConversation,
@@ -176,9 +176,9 @@ import {
 	createLoopTool,
 	createGatedScheduler,
 	createPacedLedger,
-	createRecordingScheduler,
+	createRecordedScheduler,
 	createRecordedJudge,
-	RecordingJudge,
+	SilentJudge,
 	buildProviderPartial,
 	createRefusingTransport,
 	createRelayRequest,
@@ -241,9 +241,9 @@ import {
 	measureRoom,
 	buildLedgerOptions,
 	buildClassifierOptions,
-	buildReadingSummaries,
+	buildAttemptSummaries,
 	CLASSIFIER_PINNED_ASKS,
-	summarizeReadings,
+	summarizeAttempts,
 	LEDGER_DESK_THRESHOLDS,
 	buildLedgerJudgment,
 	buildLedgerExchange,
@@ -251,7 +251,7 @@ import {
 	LEDGER_TRIM_ORDER_FIXTURE,
 	buildLedgerResponse,
 	createLedgerJudge,
-	SwitchingJudge,
+	SwitchableJudge,
 	buildDeliverySeed,
 	buildCorrectionSeed,
 	buildLedgerPairJudgment,
@@ -328,7 +328,7 @@ describe('agent scenario infrastructure', () => {
 	})
 
 	it('records each result getter and supplies hostile projection cases', () => {
-		const counted = new CountingAgentResult()
+		const counted = new AccessedAgentResult()
 		expect(counted.content).toBe('done')
 		expect(counted.thinking).toBe('reasoning')
 		expect(counted.partial).toBe(false)
@@ -479,15 +479,15 @@ describe('agent scenario infrastructure', () => {
 
 	it('supplies provider and scheduler failure boundaries', async () => {
 		const signal = new AbortController()
-		const throwing = createThrowingProvider('broken', 'prefix')
-		const stream = throwing.stream([], signal.signal)
+		const thrown = createThrowingProvider('broken', 'prefix')
+		const stream = thrown.stream([], signal.signal)
 		expect((await stream.next()).value).toEqual({ channel: 'content', text: 'prefix' })
 		await expect(stream.next()).rejects.toThrow('broken')
-		await expect(throwing.generate([], signal.signal)).rejects.toThrow('broken')
+		await expect(thrown.generate([], signal.signal)).rejects.toThrow('broken')
 		const failure = new ProviderAbortError({ content: 'x' })
-		const aborting = createAbortingResultProvider(signal, failure).stream([], signal.signal)
-		await aborting.next()
-		await expect(aborting.next()).rejects.toBe(failure)
+		const aborted = createAbortingResultProvider(signal, failure).stream([], signal.signal)
+		await aborted.next()
+		await expect(aborted.next()).rejects.toBe(failure)
 		expect(signal.signal.aborted).toBe(true)
 		const secondTurn = createSecondTurnFailureProvider()
 		expect(
@@ -753,14 +753,14 @@ describe('createScriptedProvider identity and recorders', () => {
 	it('records each call messages, tools, options and signal only under record', async () => {
 		const tools: readonly ToolDefinition[] = [{ name: 'add', description: 'adds' }]
 		const signal = AbortSignal.timeout(1_000)
-		const recording = createScriptedProvider([{ content: 'x' }], { recorded: true })
-		await recording.generate(messages, signal, tools, { think: true })
-		expect(recording.calls).toHaveLength(1)
-		expect(recording.calls[0]?.messages).toEqual(messages)
-		expect(recording.calls[0]?.tools).toEqual(tools)
-		expect(recording.calls[0]?.options).toEqual({ think: true })
+		const recorded = createScriptedProvider([{ content: 'x' }], { recorded: true })
+		await recorded.generate(messages, signal, tools, { think: true })
+		expect(recorded.calls).toHaveLength(1)
+		expect(recorded.calls[0]?.messages).toEqual(messages)
+		expect(recorded.calls[0]?.tools).toEqual(tools)
+		expect(recorded.calls[0]?.options).toEqual({ think: true })
 		// The LIVE signal is held, so a test can read which bound tripped after the call returned.
-		expect(recording.calls[0]?.signal).toBe(signal)
+		expect(recorded.calls[0]?.signal).toBe(signal)
 	})
 
 	it('records nothing unless record is set', async () => {
@@ -877,9 +877,9 @@ describe('createStubSummarizer', () => {
 	})
 })
 
-describe('createRecordingScheduler', () => {
+describe('createRecordedScheduler', () => {
 	it('counts each paced turn boundary and resolves its delay as a no-op', async () => {
-		for (const scheduler of [createRecordingScheduler(), new RecordedScheduler()]) {
+		for (const scheduler of [createRecordedScheduler(), new RecordedScheduler()]) {
 			expect(scheduler.yields).toBe(0)
 			await scheduler.yield()
 			await scheduler.yield()
@@ -889,7 +889,7 @@ describe('createRecordingScheduler', () => {
 	})
 
 	it('rejects with the signal reason on an aborted yield and paces nothing', async () => {
-		for (const scheduler of [createRecordingScheduler(), new RecordedScheduler()]) {
+		for (const scheduler of [createRecordedScheduler(), new RecordedScheduler()]) {
 			const reason = new Error('cancelled')
 			await expect(scheduler.yield({ signal: AbortSignal.abort(reason) })).rejects.toBe(reason)
 			expect(scheduler.yields).toBe(0)
@@ -897,8 +897,8 @@ describe('createRecordingScheduler', () => {
 	})
 
 	it('keeps one scheduler’s count apart from another’s', async () => {
-		const first = createRecordingScheduler()
-		const second = createRecordingScheduler()
+		const first = createRecordedScheduler()
+		const second = createRecordedScheduler()
 		await first.yield()
 		expect([first.yields, second.yields]).toEqual([1, 0])
 	})
@@ -1968,16 +1968,16 @@ describe('buildProviderPartial', () => {
 	})
 })
 
-describe('RecordingJudge', () => {
+describe('SilentJudge', () => {
 	it('records requests in order while preserving its empty-answer boundary', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const first = { state: 'first', questions: {} }
 		const second = { state: 'second', questions: {} }
 		expect(judge.requests).toEqual([])
 		expect(await judge.ask(first)).toEqual({ model: 'recording-model', answers: {} })
 		await judge.ask(second)
 		expect(judge.requests).toEqual([first, second])
-		expect(new RecordingJudge().requests).toEqual([])
+		expect(new SilentJudge().requests).toEqual([])
 	})
 })
 
@@ -2420,21 +2420,21 @@ describe('ledger setup leaves', () => {
 			() => Promise.resolve({ model: 'inner', answers: {} }),
 			'wrapped',
 		)
-		const switching = new SwitchingJudge(inner, 'A')
+		const switched = new SwitchableJudge(inner, 'A')
 		const request = { state: 'Refund.', questions: { first: JUDGMENT_QUESTION } }
-		expect([switching.id, switching.name, switching.model]).toEqual(['wrapped', 'wrapped', 'A'])
-		switching.use('B')
-		expect(switching.model).toBe('B')
-		await expect(switching.ask(request, new AbortController().signal)).resolves.toEqual({
+		expect([switched.id, switched.name, switched.model]).toEqual(['wrapped', 'wrapped', 'A'])
+		switched.use('B')
+		expect(switched.model).toBe('B')
+		await expect(switched.ask(request, new AbortController().signal)).resolves.toEqual({
 			model: 'inner',
 			answers: {},
 		})
-		expect(switching.model).toBe('B')
-		switching.use('A')
-		expect(switching.model).toBe('A')
+		expect(switched.model).toBe('B')
+		switched.use('A')
+		expect(switched.model).toBe('A')
 		expect(inner.model).toBe('wrapped')
 		expect(asked.calls).toEqual([['first']])
-		expect(new SwitchingJudge(inner).model).toBe('wrapped')
+		expect(new SwitchableJudge(inner).model).toBe('wrapped')
 	})
 })
 
@@ -2554,14 +2554,14 @@ describe('guide scenario fixtures', () => {
 		).toStrictEqual({ messages: hello, tools: [], options: { think: true } })
 	})
 	it('collects present reasoning strings in order without altering messages', () => {
-		const reasoning = [
+		const withThinking = [
 			{ id: 'a', role: 'assistant', content: '', thinking: 'first' },
 			{ id: 'b', role: 'user', content: 'next' },
 			{ id: 'c', role: 'assistant', content: '', thinking: '' },
 		] as const
-		expect(collectMessageThinking(reasoning)).toEqual(['first', ''])
+		expect(collectMessageThinking(withThinking)).toEqual(['first', ''])
 		expect(collectMessageThinking([])).toEqual([])
-		expect(reasoning[0].thinking).toBe('first')
+		expect(withThinking[0].thinking).toBe('first')
 	})
 	it('passes the configured body boundary through the real relay handler', async () => {
 		const upstream = createScriptedProvider([{ content: 'admitted' }])
@@ -2737,10 +2737,10 @@ describe('shared ledger builders', () => {
 		expect(filed).toContain(JSON.stringify(['supersedes', 'first', 'second']))
 	})
 
-	it('summarizes reading durations as absent, valid, or invalid and builds matching expectations', () => {
+	it('summarizes attempt durations as absent, valid, or invalid and builds matching expectations', () => {
 		const key = '["category","m1"]'
 		expect(
-			summarizeReadings([
+			summarizeAttempts([
 				{ key, phase: 'category', outcome: 'cached' },
 				{ key, phase: 'category', outcome: 'resolved', duration: 0 },
 				{ key, phase: 'category', outcome: 'failed', duration: 2.5 },
@@ -2749,10 +2749,10 @@ describe('shared ledger builders', () => {
 				{ key, phase: 'category', outcome: 'aborted', duration: Number.POSITIVE_INFINITY },
 			]).map((summary) => summary.duration),
 		).toEqual(['absent', 'valid', 'valid', 'invalid', 'invalid', 'invalid'])
-		expect(buildReadingSummaries([['topic', key]], 'skipped')).toEqual([
+		expect(buildAttemptSummaries([['topic', key]], 'skipped')).toEqual([
 			{ key, phase: 'topic', outcome: 'skipped', duration: 'absent' },
 		])
-		const resolved = buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'resolved')
+		const resolved = buildAttemptSummaries(CLASSIFIER_PINNED_ASKS, 'resolved')
 		expect(resolved).toHaveLength(CLASSIFIER_PINNED_ASKS.length)
 		expect(resolved.every((summary) => summary.duration === 'valid')).toBe(true)
 	})
@@ -2886,9 +2886,9 @@ describe('createRelayHop', () => {
 		})
 		expect(call.messages.slice(1)).toEqual(turns)
 		expect(call.tools).toEqual([lookup])
-		const refusing = createRelayHop({ provider: upstream })
+		const refusal = createRelayHop({ provider: upstream })
 		await expect(
-			refusing.generate(
+			refusal.generate(
 				[{ id: 's1', role: 'system', content: 'Answer in French.' }, ...turns],
 				new AbortController().signal,
 			),
@@ -3111,10 +3111,10 @@ describe('malformed conversation cases', () => {
 	})
 })
 
-describe('RecoveringProvider', () => {
+describe('RecoveryProvider', () => {
 	it('fails its first call, then replies and records it', async () => {
 		const failure = new Error('upstream unavailable')
-		const provider = new RecoveringProvider([{ content: 'Booked.' }], failure)
+		const provider = new RecoveryProvider([{ content: 'Booked.' }], failure)
 		const request: readonly Message[] = [{ id: 'm1', role: 'user', content: 'Book it.' }]
 		const signal = new AbortController().signal
 		await expect(provider.generate(request, signal)).rejects.toBe(failure)
@@ -3374,7 +3374,7 @@ describe('ledger bench builders', () => {
 		})
 		expect('snapshot' in requested).toBe(false)
 		expect(timed.snapshot?.conversation.messages).toHaveLength(8)
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		expect(requested.agent).toEqual({ limit: 8 })
 		expect(buildLedgerBenchOptions(judge, false, undefined, scheduler).agent).toEqual({
 			limit: 8,
@@ -3391,22 +3391,22 @@ describe('ledger bench builders', () => {
 		for (const seed of [weighted, plain]) {
 			expect(seed.snapshot.conversation.messages).toHaveLength(18)
 			expect(seed.snapshot.conversation.judgments?.length ?? 0).toBeGreaterThan(0)
-			expect(seed.readings.map((reading) => reading.outcome)).toContain('resolved')
+			expect(seed.attempts.map((attempt) => attempt.outcome)).toContain('resolved')
 			expect(
-				seed.readings.filter(
-					(reading) => reading.outcome !== 'resolved' && reading.outcome !== 'cached',
+				seed.attempts.filter(
+					(attempt) => attempt.outcome !== 'resolved' && attempt.outcome !== 'cached',
 				),
 			).toEqual([])
 		}
 		expect(weighted.corrections).toBe(1)
 		expect(plain.corrections).toBe(0)
-		expect(weighted.readings.some((reading) => reading.phase === 'amends')).toBe(true)
-		expect(plain.readings.some((reading) => reading.phase === 'amends')).toBe(false)
+		expect(weighted.attempts.some((attempt) => attempt.phase === 'amends')).toBe(true)
+		expect(plain.attempts.some((attempt) => attempt.phase === 'amends')).toBe(false)
 	})
 
 	it('creates a paced ledger whose cached request asks nothing', async () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		const { ledger, asked, selections } = createPacedLedger(
 			seed.snapshot,
 			[{ content: 'Noted.' }],

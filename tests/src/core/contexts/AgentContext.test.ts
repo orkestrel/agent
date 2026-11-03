@@ -21,7 +21,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	CANARY_BUILD_SOURCES,
 	CANARY_SENTINELS,
-	createRecordingSelection,
+	createRecordedSelection,
 	createStubSummarizer,
 	rejectSelection,
 	resolveSectionOpen,
@@ -1096,7 +1096,7 @@ describe('AgentContext — the active conversation as the message source', () =>
 	})
 
 	it('select() passes its conversation through', async () => {
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const conversations = new ConversationManager()
 		const context = new AgentContext({ conversations, select: selection.handler })
 		const conversation = context.messages
@@ -1296,7 +1296,7 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 	})
 
 	it('runs the default with the active conversation, the request, and the signal', async () => {
-		const selection = createRecordingSelection({ keep: (message) => message.role === 'user' })
+		const selection = createRecordedSelection({ keep: (message) => message.role === 'user' })
 		const context = new AgentContext({ select: selection.handler })
 		context.messages.add([
 			{ role: 'user', content: 'The invoice total is wrong.' },
@@ -1316,8 +1316,8 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 	})
 
 	it('runs the active scope handler over the default and the default again after `apply(undefined)`', async () => {
-		const fallback = createRecordingSelection()
-		const mode = createRecordingSelection()
+		const fallback = createRecordedSelection()
+		const mode = createRecordedSelection()
 		const context = new AgentContext({ select: fallback.handler })
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
 		const signal = new AbortController().signal
@@ -1938,7 +1938,7 @@ describe('AgentContext — the skills and memos indexes', () => {
 
 describe('AgentContext — select over a given conversation', () => {
 	it('selects over the conversation passed', async () => {
-		const selection = createRecordingSelection()
+		const selection = createRecordedSelection()
 		const conversations = new ConversationManager()
 		const passed = conversations.add()
 		const active = conversations.add()

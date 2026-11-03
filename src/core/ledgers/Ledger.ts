@@ -316,7 +316,7 @@ export class Ledger implements LedgerInterface {
 	 * When the answer pass rejects, `respond` rejects with that error. Every rejection leaves the ledger free for a later call.
 	 * @param content - The request text
 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
-	 * @returns The final pass, the usage of every pass, and the filing readings of this request alone
+	 * @returns The final pass, the usage of every pass, and the filing attempts of this request alone
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
@@ -385,7 +385,7 @@ export class Ledger implements LedgerInterface {
 				content: last.content,
 				partial: last.partial,
 				passes,
-				readings: request.readings,
+				attempts: request.attempts,
 				...(usage === undefined ? {} : { usage }),
 				...(parts.length === 0
 					? {}
@@ -703,7 +703,7 @@ export class Ledger implements LedgerInterface {
 		return scan
 	}
 
-	// Files a classification's readings into the request and plans the selection, falling back to
+	// Files a classification's attempts into the request and plans the selection, falling back to
 	// the conversation view when the filing faulted or planning threw.
 	#file(
 		classified: ClassifierResult,
@@ -711,12 +711,12 @@ export class Ledger implements LedgerInterface {
 		selected: Message,
 		message: Message,
 	): Selection {
-		const { readings, ...filed } = classified
+		const { attempts, ...filed } = classified
 		const planned = attempt(() => {
 			if (filed.fault !== undefined) throw filed.fault
 			return { ...this.#plan(selected, this.#rescan()), ...filed }
 		})
-		request.file(readings, planned.success ? planned.value : undefined)
+		request.file(attempts, planned.success ? planned.value : undefined)
 		if (!planned.success) return this.#refuse(planned.error, filed, this.#conversation)
 		return this.#annotations.has(message.id)
 			? {
@@ -730,7 +730,7 @@ export class Ledger implements LedgerInterface {
 	// the filing completed before it.
 	#refuse(
 		error: unknown,
-		filed: Omit<ClassifierResult, 'readings'>,
+		filed: Omit<ClassifierResult, 'attempts'>,
 		conversation: ConversationInterface,
 	): Selection {
 		return {

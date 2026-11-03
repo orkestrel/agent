@@ -346,11 +346,11 @@ describe('AgentJudge — HTTP and protocol failures', () => {
 			code: 'PROTOCOL',
 			message: 'judge error: answer label is missing',
 		})
-		const refusing = createRefusingTransport()
+		const refusal = createRefusingTransport()
 		const offline = new ScriptedJudge({
 			url: 'http://judge.test',
 			model: 'm',
-			fetch: refusing.fetch,
+			fetch: refusal.fetch,
 		})
 		const error: unknown = await offline
 			.ask(TEV1_REQUEST, new AbortController().signal)

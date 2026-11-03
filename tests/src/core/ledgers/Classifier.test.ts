@@ -1,4 +1,4 @@
-import type { ClassifierReading, JudgeAnswer, LedgerTopic, Message } from '@src/core'
+import type { ClassifierAttempt, JudgeAnswer, LedgerTopic, Message } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
 import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
@@ -22,22 +22,22 @@ import {
 	buildLedgerPairJudgment,
 	buildLedgerResponse,
 	buildLedgerTopicJudgment,
-	buildReadingSummaries,
+	buildAttemptSummaries,
 	CLASSIFIER_PINNED_ASKS,
 	createFailingScheduler,
 	createGatedScheduler,
 	createLedgerJudge,
 	createPhraseJudge,
-	createRecordingScheduler,
+	createRecordedScheduler,
 	LEDGER_DESK_THRESHOLDS,
 	LEDGER_REFUNDS_TOPIC,
-	type ReadingSummary,
+	type AttemptSummary,
 	RecordedTransport,
-	RecordingJudge,
+	SilentJudge,
 	ScriptedJudge,
 	SequentialSystemOneJudge,
-	summarizeReadings,
-	SwitchingJudge,
+	summarizeAttempts,
+	SwitchableJudge,
 } from '../../../setup.js'
 
 describe('Classifier', () => {
@@ -92,7 +92,7 @@ describe('Classifier', () => {
 					answer: { form: 'choice', probabilities: { correction: 1 } },
 				}),
 			)
-			const judge = new RecordingJudge()
+			const judge = new SilentJudge()
 			const classifier = new Classifier(
 				buildClassifierOptions({
 					conversation,
@@ -116,7 +116,7 @@ describe('Classifier', () => {
 			throw new JudgeError('QUESTION', 'refused question')
 		})
 		// The judge reports the model the loop below last set, `A` before any.
-		const judge = new SwitchingJudge(
+		const judge = new SwitchableJudge(
 			new SequentialSystemOneJudge({
 				url: 'http://judge.test',
 				model: 'A',
@@ -157,13 +157,13 @@ describe('Classifier', () => {
 		)
 		const first = await classifier.classify(new Set(), new AbortController().signal)
 		expect(first.judgments).toEqual([])
-		expect(summarizeReadings(first.readings)).toEqual([
+		expect(summarizeAttempts(first.attempts)).toEqual([
 			{ key, phase: 'category', outcome: 'failed', duration: 'valid' },
 		])
 		expect(judge.bodies).toHaveLength(1)
 		const second = await classifier.classify(new Set(), new AbortController().signal)
 		expect(second.judgments).toEqual([])
-		expect(summarizeReadings(second.readings)).toEqual([
+		expect(summarizeAttempts(second.attempts)).toEqual([
 			{ key, phase: 'category', outcome: 'skipped', duration: 'absent' },
 		])
 		expect(judge.bodies).toHaveLength(1)
@@ -224,7 +224,7 @@ describe('Classifier', () => {
 			}),
 		)
 		const result = await classifier.classify(new Set(['m4']), new AbortController().signal)
-		const { readings, ...filed } = result
+		const { attempts, ...filed } = result
 		expect(filed).toEqual({
 			judgments: [
 				'["category","m1"]',
@@ -240,12 +240,12 @@ describe('Classifier', () => {
 			],
 			usage: { prompt: 20, completion: 10, total: 30 },
 		})
-		expect(summarizeReadings(readings)).toEqual(
-			buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
+		expect(summarizeAttempts(attempts)).toEqual(
+			buildAttemptSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
 		)
-		expect(readings.map((reading) => reading.key)).toEqual(result.judgments)
+		expect(attempts.map((attempt) => attempt.key)).toEqual(result.judgments)
 		expect(transport.requests).toHaveLength(
-			readings.filter((reading) => reading.outcome === 'resolved').length,
+			attempts.filter((attempt) => attempt.outcome === 'resolved').length,
 		)
 		const category = requireValue(conversation.judgments.judgment('["category","m1"]'))
 		expect(category.id).toBe('["category","m1"]')
@@ -304,12 +304,12 @@ describe('Classifier', () => {
 		const repeat = await classifier.classify(new Set(['m4']), new AbortController().signal)
 		expect(repeat.judgments).toEqual(result.judgments)
 		expect(repeat.usage).toBeUndefined()
-		expect(summarizeReadings(repeat.readings)).toEqual(
-			buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'cached'),
+		expect(summarizeAttempts(repeat.attempts)).toEqual(
+			buildAttemptSummaries(CLASSIFIER_PINNED_ASKS, 'cached'),
 		)
-		expect(repeat.readings).not.toBe(readings)
-		expect(summarizeReadings(readings)).toEqual(
-			buildReadingSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
+		expect(repeat.attempts).not.toBe(attempts)
+		expect(summarizeAttempts(attempts)).toEqual(
+			buildAttemptSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
 		)
 		expect(transport.requests).toHaveLength(10)
 	})
@@ -317,7 +317,7 @@ describe('Classifier', () => {
 	it('files a sorted tie by category order', () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund rules.' })
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
@@ -339,7 +339,7 @@ describe('Classifier', () => {
 	it('reads group sums and exact cutoffs, rejects stale records, and preserves canonical criteria order', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund rules.' })
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
@@ -424,7 +424,7 @@ describe('Classifier', () => {
 				],
 			},
 		})
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
@@ -511,8 +511,8 @@ describe('Classifier', () => {
 		const keys = [first, second].map((message) => JSON.stringify(['category', message.id]))
 		const initial = await classifier.classify(new Set(), new AbortController().signal)
 		expect(initial.judgments).toEqual([])
-		expect(summarizeReadings(initial.readings)).toEqual(
-			buildReadingSummaries(
+		expect(summarizeAttempts(initial.attempts)).toEqual(
+			buildAttemptSummaries(
 				keys.map((key) => ['category', key] as const),
 				'failed',
 			),
@@ -520,7 +520,7 @@ describe('Classifier', () => {
 		expect(transport.requests).toHaveLength(2)
 		const retried = await classifier.classify(new Set(), new AbortController().signal)
 		expect(retried.judgments).toEqual([])
-		expect(summarizeReadings(retried.readings)).toEqual([
+		expect(summarizeAttempts(retried.attempts)).toEqual([
 			{ key: keys[0], phase: 'category', outcome: 'skipped', duration: 'absent' },
 			{ key: keys[1], phase: 'category', outcome: 'failed', duration: 'valid' },
 		])
@@ -568,7 +568,7 @@ describe('Classifier', () => {
 		expect(result.fault).toBeInstanceOf(JudgeAbortError)
 		expect(result.judgments).toEqual([JSON.stringify(['category', conversation.messages()[0]?.id])])
 		expect(result.usage).toEqual({ prompt: 50, completion: 1, total: 51 })
-		expect(summarizeReadings(result.readings)).toEqual([
+		expect(summarizeAttempts(result.attempts)).toEqual([
 			{
 				key: JSON.stringify(['category', conversation.messages()[0]?.id]),
 				phase: 'category',
@@ -590,11 +590,11 @@ describe('Classifier', () => {
 			judgments: [],
 			fault: expect.objectContaining({ name: 'AbortError' }),
 		})
-		expect(refused.readings).toEqual([])
+		expect(refused.attempts).toEqual([])
 		expect(transport.requests).toHaveLength(2)
 	})
 
-	it('records no reading for a question the abort preceded and keeps the completed one', async () => {
+	it('records no attempt for a question the abort preceded and keeps the completed one', async () => {
 		const conversation = createConversation()
 		const messages = conversation.add([
 			{ role: 'user', content: 'First statement.' },
@@ -622,7 +622,7 @@ describe('Classifier', () => {
 		expect(result.judgments).toEqual([JSON.stringify(['category', requireValue(messages[0]).id])])
 		expect(result.usage).toEqual({ prompt: 4, completion: 1, total: 5 })
 		expect(asked.calls.map(([key]) => key)).toEqual(result.judgments)
-		expect(summarizeReadings(result.readings)).toEqual([
+		expect(summarizeAttempts(result.attempts)).toEqual([
 			{
 				key: JSON.stringify(['category', requireValue(messages[0]).id]),
 				phase: 'category',
@@ -638,7 +638,7 @@ describe('Classifier', () => {
 			{ role: 'user', content: 'First statement.' },
 			{ role: 'user', content: 'Second statement.' },
 		])
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
@@ -653,18 +653,18 @@ describe('Classifier', () => {
 			['topic', JSON.stringify(['topic', one, 'refunds'])],
 			['topic', JSON.stringify(['topic', two, 'refunds'])],
 		] as const
-		const rounds: Array<readonly ClassifierReading[]> = []
+		const rounds: Array<readonly ClassifierAttempt[]> = []
 		for (const round of [1, 2]) {
 			const result = await classifier.classify(new Set(), new AbortController().signal)
 			expect(result.judgments).toEqual([])
-			expect(summarizeReadings(result.readings)).toEqual(buildReadingSummaries(asks, 'resolved'))
-			rounds.push(result.readings)
+			expect(summarizeAttempts(result.attempts)).toEqual(buildAttemptSummaries(asks, 'resolved'))
+			rounds.push(result.attempts)
 			expect(judge.requests).toHaveLength(round * asks.length)
 		}
 		expect(
 			rounds
 				.flat()
-				.filter((reading) => ['resolved', 'failed', 'aborted'].includes(reading.outcome)),
+				.filter((attempt) => ['resolved', 'failed', 'aborted'].includes(attempt.outcome)),
 		).toHaveLength(judge.requests.length)
 		expect(judge.requests.map((request) => Object.keys(request.questions))).toEqual(
 			[...asks, ...asks].map(([, key]) => [key]),
@@ -677,7 +677,7 @@ describe('Classifier', () => {
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
-				judge: new RecordingJudge(),
+				judge: new SilentJudge(),
 				topics: [],
 				assign: () => {
 					throw fault
@@ -686,7 +686,7 @@ describe('Classifier', () => {
 		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
-			readings: [],
+			attempts: [],
 			fault,
 		})
 	})
@@ -698,7 +698,7 @@ describe('Classifier', () => {
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
-				judge: new RecordingJudge(),
+				judge: new SilentJudge(),
 				topics: [],
 				assign: () => {
 					throw refusal
@@ -712,13 +712,13 @@ describe('Classifier', () => {
 	})
 
 	it('files nothing and asks nothing for an empty conversation', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const classifier = new Classifier(
 			buildClassifierOptions({ conversation: createConversation(), judge }),
 		)
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
-			readings: [],
+			attempts: [],
 		})
 		expect(judge.requests).toEqual([])
 		expect(classifier.classification()).toEqual({
@@ -771,7 +771,7 @@ describe('Classifier', () => {
 				messages.slice(0, 2).map((message) => JSON.stringify(['category', message.id])),
 			)
 			expect(result.usage).toEqual({ prompt: 44, completion: 2, total: 46 })
-			expect(summarizeReadings(result.readings)).toEqual([
+			expect(summarizeAttempts(result.attempts)).toEqual([
 				{
 					key: requireValue(result.judgments[0]),
 					phase: 'category',
@@ -810,7 +810,7 @@ describe('Classifier', () => {
 		const result = await classifier.classify(new Set(), new AbortController().signal)
 		expect(result.judgments).toEqual([])
 		expect(result.fault).toBeUndefined()
-		expect(summarizeReadings(result.readings)).toEqual(
+		expect(summarizeAttempts(result.attempts)).toEqual(
 			conversation.messages().map((message) => ({
 				key: JSON.stringify(['category', message.id]),
 				phase: 'category',
@@ -857,7 +857,7 @@ describe('Classifier', () => {
 		const classifier = new Classifier(
 			buildClassifierOptions({
 				conversation,
-				judge: new RecordingJudge(),
+				judge: new SilentJudge(),
 				topics: [refunds],
 				assign: (message) =>
 					message.role === 'tool' ? 'fact' : message.id === noise.id ? 'distractor' : undefined,
@@ -879,7 +879,7 @@ describe('Classifier', () => {
 		])
 		const phrase = createPhraseJudge([], ['Correction:'])
 		// The judge reports the model the case last set, `A` before any.
-		const judge = new SwitchingJudge(
+		const judge = new SwitchableJudge(
 			createLedgerJudge(
 				createRecorder<readonly [key: string]>(),
 				(request) => phrase.ask(request, new AbortController().signal),
@@ -1004,7 +1004,7 @@ describe('Classifier', () => {
 				}),
 			)
 			const result = await classifier.classify(new Set(), new AbortController().signal)
-			asked.push(result.readings.filter((reading) => reading.phase === 'amends').length)
+			asked.push(result.attempts.filter((attempt) => attempt.phase === 'amends').length)
 		}
 		expect(asked).toEqual([1, 4, 6, 9])
 	})
@@ -1033,9 +1033,9 @@ describe('Classifier', () => {
 		)
 		const result = await classifier.classify(new Set(), new AbortController().signal)
 		expect(
-			result.readings
-				.filter((reading) => reading.phase === 'amends' || reading.phase === 'supersedes')
-				.map((reading) => reading.key),
+			result.attempts
+				.filter((attempt) => attempt.phase === 'amends' || attempt.phase === 'supersedes')
+				.map((attempt) => attempt.key),
 		).toEqual(
 			messages
 				.slice(0, 3)
@@ -1097,7 +1097,7 @@ describe('Classifier', () => {
 		it('drops a topic-only pair, keeps the entity and shared-literal pairs, and leaves a refused literal pair unasked', async () => {
 			const asks: Array<readonly unknown[]> = []
 			for (const correction of [undefined, { narrow: true }]) {
-				const judge = new RecordingJudge()
+				const judge = new SilentJudge()
 				const classifier = new Classifier({
 					...options,
 					conversation: createConversation({ snapshot }),
@@ -1120,7 +1120,7 @@ describe('Classifier', () => {
 
 		it('keeps the whole and call pairs, files nothing on amends alone, and files both on supersedes', async () => {
 			const conversation = createConversation({ snapshot })
-			const judge = new RecordingJudge()
+			const judge = new SilentJudge()
 			const classifier = new Classifier({
 				...options,
 				conversation,
@@ -1149,7 +1149,7 @@ describe('Classifier', () => {
 		})
 
 		it('asks fewer questions over a burst holding one true supersession and files the same classification', async () => {
-			const filings: Array<{
+			const filedRecords: Array<{
 				readonly asked: readonly string[]
 				readonly classification: unknown
 			}> = []
@@ -1175,7 +1175,7 @@ describe('Classifier', () => {
 					...(correction === undefined ? {} : { correction }),
 				})
 				await classifier.classify(new Set(), new AbortController().signal)
-				filings.push({
+				filedRecords.push({
 					asked: asked.calls.map(([key]) => key),
 					// Spreading each set and map keeps its iteration order in the comparison.
 					classification: Object.entries(classifier.classification()).map(([name, value]) => [
@@ -1184,7 +1184,7 @@ describe('Classifier', () => {
 					]),
 				})
 			}
-			const [unset, narrow] = filings
+			const [unset, narrow] = filedRecords
 			expect(requireValue(unset).asked).toEqual([
 				'["amends","whole","later"]',
 				'["supersedes","whole","later"]',
@@ -1206,13 +1206,13 @@ describe('Classifier', () => {
 		})
 
 		it('reads alike with narrow false and with no narrow', async () => {
-			const filings: Array<{
+			const filedRecords: Array<{
 				readonly requests: readonly unknown[]
-				readonly readings: readonly ReadingSummary[]
+				readonly attempts: readonly AttemptSummary[]
 				readonly classification: unknown
 			}> = []
 			for (const correction of [undefined, {}, { narrow: false }]) {
-				const judge = new RecordingJudge()
+				const judge = new SilentJudge()
 				const classifier = new Classifier({
 					...options,
 					conversation: createConversation({ snapshot }),
@@ -1220,18 +1220,18 @@ describe('Classifier', () => {
 					...(correction === undefined ? {} : { correction }),
 				})
 				const result = await classifier.classify(new Set(), new AbortController().signal)
-				filings.push({
+				filedRecords.push({
 					requests: judge.requests,
-					readings: summarizeReadings(result.readings),
+					attempts: summarizeAttempts(result.attempts),
 					classification: Object.entries(classifier.classification()).map(([name, value]) => [
 						name,
 						[...value],
 					]),
 				})
 			}
-			const [unset, ...rest] = filings
+			const [unset, ...rest] = filedRecords
 			expect(requireValue(unset).requests).toHaveLength(4)
-			for (const filing of rest) expect(filing).toEqual(unset)
+			for (const record of rest) expect(record).toEqual(unset)
 		})
 
 		it('asks no pair for a correction sharing no entity and no literal, and none for an empty near set', async () => {
@@ -1255,7 +1255,7 @@ describe('Classifier', () => {
 					conversation.judgments.add(
 						buildLedgerTopicJudgment(correction, LEDGER_REFUNDS_TOPIC, weight),
 					)
-					const judge = new RecordingJudge()
+					const judge = new SilentJudge()
 					const classifier = new Classifier({
 						...options,
 						conversation,
@@ -1285,7 +1285,7 @@ describe('Classifier', () => {
 				)
 				for (const message of [stated, replaced])
 					conversation.judgments.add(buildLedgerTopicJudgment(message, LEDGER_REFUNDS_TOPIC, 1))
-				const judge = new RecordingJudge()
+				const judge = new SilentJudge()
 				const classifier = new Classifier({
 					...options,
 					conversation,
@@ -1303,7 +1303,7 @@ describe('Classifier', () => {
 			const classifier = new Classifier({
 				...options,
 				conversation: createConversation({ snapshot }),
-				judge: new RecordingJudge(),
+				judge: new SilentJudge(),
 				correction: { narrow: true },
 				entities: (text, partial) => {
 					texts.handler(text)
@@ -1324,7 +1324,7 @@ describe('Classifier', () => {
 			{ role: 'user', content: 'Refund AB-12 is 20.' },
 			{ role: 'user', content: 'Refund CD-34 is 30.' },
 		])
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		// The judge waits past a slice, so the second question opens with the slice spent.
 		const classifier = new Classifier(
 			buildClassifierOptions({
@@ -1346,10 +1346,10 @@ describe('Classifier', () => {
 		conversation.judgments.add(
 			conversation.messages().map((message) => buildLedgerJudgment(message)),
 		)
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		const classifier = new Classifier(buildClassifierOptions({ conversation, scheduler }))
 		const result = await classifier.classify(new Set(), new AbortController().signal)
-		expect(result.readings).toHaveLength(200)
+		expect(result.attempts).toHaveLength(200)
 		expect(scheduler.yields).toBeGreaterThan(0)
 		expect(scheduler.yields).toBeLessThan(200)
 	})
@@ -1376,7 +1376,7 @@ describe('Classifier', () => {
 		setTimeout(fired.handler, 0)
 		const result = await classifier.classify(new Set(), new AbortController().signal)
 		expect(fired.count).toBe(0)
-		expect(result.readings.map((reading) => reading.outcome)).toEqual(['cached'])
+		expect(result.attempts.map((attempt) => attempt.outcome)).toEqual(['cached'])
 	})
 
 	it('asks the same questions when paced', async () => {
@@ -1386,7 +1386,7 @@ describe('Classifier', () => {
 		const phrase = createPhraseJudge([], ['Correction:'])
 		const plainAsked = createRecorder<readonly [key: string]>()
 		const pacedAsked = createRecorder<readonly [key: string]>()
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		const plain = new Classifier(
 			buildClassifierOptions({
 				conversation: createConversation({ snapshot }),
@@ -1417,7 +1417,7 @@ describe('Classifier', () => {
 		expect(scheduler.yields).toBeGreaterThan(0)
 		expect(plainAsked.count).toBeGreaterThan(0)
 		expect(pacedAsked.calls).toEqual(plainAsked.calls)
-		expect(summarizeReadings(stepped.readings)).toEqual(summarizeReadings(unpaced.readings))
+		expect(summarizeAttempts(stepped.attempts)).toEqual(summarizeAttempts(unpaced.attempts))
 		expect(stepped.judgments).toEqual(unpaced.judgments)
 	})
 
@@ -1452,9 +1452,9 @@ describe('Classifier', () => {
 			[JSON.stringify(['topic', kept.id, LEDGER_REFUNDS_TOPIC.name])],
 		])
 		expect(
-			result.readings
-				.filter((reading) => reading.key.includes(removed.id))
-				.map((reading) => [reading.phase, reading.outcome]),
+			result.attempts
+				.filter((attempt) => attempt.key.includes(removed.id))
+				.map((attempt) => [attempt.phase, attempt.outcome]),
 		).toEqual([
 			['category', 'skipped'],
 			['topic', 'skipped'],
@@ -1465,7 +1465,7 @@ describe('Classifier', () => {
 	it('an abort during a turn asks nothing more', async () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const scheduler = createGatedScheduler(Promise.withResolvers<void>())
 		const classifier = new Classifier(buildClassifierOptions({ conversation, judge, scheduler }))
 		const caller = new AbortController()
@@ -1475,20 +1475,20 @@ describe('Classifier', () => {
 		caller.abort(reason)
 		const result = await pending
 		expect(result.fault).toBe(reason)
-		expect(result.readings).toEqual([])
+		expect(result.attempts).toEqual([])
 		expect(judge.requests).toEqual([])
 	})
 
 	it('a scheduler fault returns the fault', async () => {
 		const conversation = createConversation()
 		conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const classifier = new Classifier(
 			buildClassifierOptions({ conversation, judge, scheduler: createFailingScheduler() }),
 		)
 		const result = await classifier.classify(new Set(), new AbortController().signal)
 		expect(result.fault?.message).toBe('scheduler fault')
-		expect(result.readings).toEqual([])
+		expect(result.attempts).toEqual([])
 		expect(judge.requests).toEqual([])
 	})
 })

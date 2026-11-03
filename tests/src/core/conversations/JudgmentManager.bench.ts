@@ -18,7 +18,7 @@ import { createRecorder, requireValue } from '@orkestrel/test'
 // are reported and never gate.
 
 // The measured readings of every cell.
-const READINGS = 15
+const SAMPLE_COUNT = 15
 
 // The correction seed's judgment count, and the control seed's.
 const CORRECTION_COUNT = 51_106
@@ -54,7 +54,7 @@ it('reads 51106 judgments by id', { timeout: CELL_TIMEOUT }, async ({ bench, tas
 		2
 	const repeat = Math.max(1, Math.ceil(REPEAT.floor / median))
 	const rounds = Array.from({ length: repeat }, (_unused, round) => round)
-	const readings = createRecorder<readonly [wall: number]>()
+	const samples = createRecorder<readonly [wall: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const start = performance.now()
@@ -63,9 +63,9 @@ it('reads 51106 judgments by id', { timeout: CELL_TIMEOUT }, async ({ bench, tas
 					if (manager.judgment(id) === undefined)
 						throw new Error(`the store lost ${id} in round ${round}`)
 			const wall = performance.now() - start
-			readings.handler(wall)
+			samples.handler(wall)
 			return { overriddenDuration: wall }
-		}).run({ iterations: READINGS, time: 0, warmup: false, throws: true }),
+		}).run({ iterations: SAMPLE_COUNT, time: 0, warmup: false, throws: true }),
 	)
 	console.log(
 		JSON.stringify({
@@ -80,13 +80,13 @@ it('reads 51106 judgments by id', { timeout: CELL_TIMEOUT }, async ({ bench, tas
 			repeat,
 			operations: repeat * records.length,
 			warmups: warmups.calls.map(([wall]) => wall),
-			readings: readings.calls.map(([wall]) => wall),
+			readings: samples.calls.map(([wall]) => wall),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(READINGS)
+	expect(samples.calls).toHaveLength(SAMPLE_COUNT)
 })
 
 it('hydrates 51106 judgments', { timeout: CELL_TIMEOUT }, async ({ bench, task }) => {
@@ -102,16 +102,16 @@ it('hydrates 51106 judgments', { timeout: CELL_TIMEOUT }, async ({ bench, task }
 			throw new Error('the store lost a record')
 		warmups.handler(performance.now() - start)
 	}
-	const readings = createRecorder<readonly [wall: number]>()
+	const samples = createRecorder<readonly [wall: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const start = performance.now()
 			if (new JudgmentManager(records).count !== records.length)
 				throw new Error('the store lost a record')
 			const wall = performance.now() - start
-			readings.handler(wall)
+			samples.handler(wall)
 			return { overriddenDuration: wall }
-		}).run({ iterations: READINGS, time: 0, warmup: false, throws: true }),
+		}).run({ iterations: SAMPLE_COUNT, time: 0, warmup: false, throws: true }),
 	)
 	console.log(
 		JSON.stringify({
@@ -126,13 +126,13 @@ it('hydrates 51106 judgments', { timeout: CELL_TIMEOUT }, async ({ bench, task }
 			repeat: 1,
 			operations: 1,
 			warmups: warmups.calls.map(([wall]) => wall),
-			readings: readings.calls.map(([wall]) => wall),
+			readings: samples.calls.map(([wall]) => wall),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(READINGS)
+	expect(samples.calls).toHaveLength(SAMPLE_COUNT)
 })
 
 it('hydrates 1804 judgments', { timeout: CELL_TIMEOUT }, async ({ bench, task }) => {
@@ -156,7 +156,7 @@ it('hydrates 1804 judgments', { timeout: CELL_TIMEOUT }, async ({ bench, task })
 		2
 	const repeat = median < REPEAT.below ? Math.ceil(REPEAT.floor / median) : 1
 	const rounds = Array.from({ length: repeat }, (_unused, round) => round)
-	const readings = createRecorder<readonly [wall: number]>()
+	const samples = createRecorder<readonly [wall: number]>()
 	const measured = await measureOtherLoad(() =>
 		bench(task.name, { async: false, retainSamples: true }, () => {
 			const start = performance.now()
@@ -164,9 +164,9 @@ it('hydrates 1804 judgments', { timeout: CELL_TIMEOUT }, async ({ bench, task })
 				if (new JudgmentManager(records).count !== records.length)
 					throw new Error(`the store lost a record in round ${round}`)
 			const wall = performance.now() - start
-			readings.handler(wall)
+			samples.handler(wall)
 			return { overriddenDuration: wall }
-		}).run({ iterations: READINGS, time: 0, warmup: false, throws: true }),
+		}).run({ iterations: SAMPLE_COUNT, time: 0, warmup: false, throws: true }),
 	)
 	console.log(
 		JSON.stringify({
@@ -181,11 +181,11 @@ it('hydrates 1804 judgments', { timeout: CELL_TIMEOUT }, async ({ bench, task })
 			repeat,
 			operations: repeat,
 			warmups: warmups.calls.map(([wall]) => wall),
-			readings: readings.calls.map(([wall]) => wall),
+			readings: samples.calls.map(([wall]) => wall),
 			load: measured.load,
 			mean: measured.value.latency.mean,
 			rme: measured.value.latency.rme,
 		}),
 	)
-	expect(readings.calls).toHaveLength(READINGS)
+	expect(samples.calls).toHaveLength(SAMPLE_COUNT)
 })

@@ -251,10 +251,10 @@ describe('sumUsage — the running token total across a turn', () => {
 	})
 
 	it('never mutates either input', () => {
-		const running = createTokenUsage({ prompt: 2, completion: 1, total: 3 })
+		const current = createTokenUsage({ prompt: 2, completion: 1, total: 3 })
 		const next = createTokenUsage({ prompt: 1, completion: 1, total: 2 })
-		sumUsage(running, next)
-		expect(running).toEqual({ prompt: 2, completion: 1, total: 3 })
+		sumUsage(current, next)
+		expect(current).toEqual({ prompt: 2, completion: 1, total: 3 })
 		expect(next).toEqual({ prompt: 1, completion: 1, total: 2 })
 	})
 })

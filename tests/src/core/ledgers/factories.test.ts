@@ -108,7 +108,7 @@ describe('createLedger', () => {
 		])
 		const result = await ledger.respond('Is the refund for account BW-20931 settled?')
 		expect(
-			result.readings.filter((reading) => reading.phase === 'amends').map((reading) => reading.key),
+			result.attempts.filter((attempt) => attempt.phase === 'amends').map((attempt) => attempt.key),
 		).toEqual([JSON.stringify(['amends', account?.id, later?.id])])
 	})
 	it('rejects empty or duplicate topics and duplicate or reserved lookup names', () => {

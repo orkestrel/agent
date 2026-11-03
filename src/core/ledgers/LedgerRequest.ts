@@ -1,7 +1,7 @@
 import type { Selection } from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
 import type { Message } from '../types.js'
-import type { ClassifierReading, GaugeCall, LedgerRequestInterface } from './types.js'
+import type { ClassifierAttempt, GaugeCall, LedgerRequestInterface } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { canonicalStringify } from '@orkestrel/contract'
 import { isNonNegativeSafeInteger } from '../validators.js'
@@ -11,7 +11,7 @@ import { computeThinking } from './helpers.js'
 import { LedgerPass } from './LedgerPass.js'
 
 /**
- * Holds what one ledger request keeps while it is served: its message, its filing readings and
+ * Holds what one ledger request keeps while it is served: its message, its filing attempts and
  * plan, the gauge calls of its passes, and its repeat and recall stops.
  *
  * @remarks
@@ -35,7 +35,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	#message: Message | undefined
 	#plan: Selection | undefined
 	#passes: readonly LedgerPass[] = []
-	#readings: readonly ClassifierReading[] = []
+	#attempts: readonly ClassifierAttempt[] = []
 	#admitted: ReadonlySet<string> = new Set()
 	#listed: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map()
 	#recalls = 0
@@ -110,12 +110,12 @@ export class LedgerRequest implements LedgerRequestInterface {
 	}
 
 	/**
-	 * Returns the filing readings of the request's planning selections.
+	 * Returns the filing attempts of the request's planning selections.
 	 *
-	 * @returns The readings in asking order
+	 * @returns The attempts in asking order
 	 */
-	get readings(): readonly ClassifierReading[] {
-		return this.#readings
+	get attempts(): readonly ClassifierAttempt[] {
+		return this.#attempts
 	}
 
 	enter(conversation: ConversationInterface): Message {
@@ -151,8 +151,8 @@ export class LedgerRequest implements LedgerRequestInterface {
 		pass.think(computeThinking(message, completion))
 	}
 
-	file(readings: readonly ClassifierReading[], plan?: Selection): void {
-		this.#readings = [...this.#readings, ...readings]
+	file(attempts: readonly ClassifierAttempt[], plan?: Selection): void {
+		this.#attempts = [...this.#attempts, ...attempts]
 		if (plan !== undefined) this.#plan = plan
 	}
 

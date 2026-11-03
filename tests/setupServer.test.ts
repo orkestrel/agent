@@ -22,7 +22,7 @@ import {
 	measureOtherLoad,
 	readHostTimes,
 	readLedgerCell,
-	readLedgerPacing,
+	readLedgerHeartbeat,
 	runLedgerCell,
 	stopTimed,
 	takeLedgerSample,
@@ -112,12 +112,12 @@ describe('stopTimed', () => {
 		const reply = fetch('http://127.0.0.1:' + port + '/parked').then((response) => response.text())
 		await waitForCondition('the request parked on the gate', () => entered.calls.length === 1)
 		expect(entered.calls).toEqual([[]])
-		const opening = performance.now()
+		const start = performance.now()
 		const elapsed = await stopTimed(server, () => {
 			released.handler()
 			gate.resolve()
 		})
-		const outer = performance.now() - opening
+		const outer = performance.now() - start
 		expect(released.calls).toEqual([[]])
 		expect(await reply).toBe('parked')
 		expect(server.status).toBe('stopped')
@@ -148,9 +148,9 @@ describe('addBusyWait', () => {
 		addBusyWait({ on: (event, handler) => registered.handler(event, handler) }, 20)
 		expect(registered.calls.map(([event]) => event)).toEqual(['start'])
 		const [, handler] = requireValue(registered.calls[0])
-		const opening = performance.now()
+		const start = performance.now()
 		handler()
-		expect(performance.now() - opening).toBeGreaterThanOrEqual(20)
+		expect(performance.now() - start).toBeGreaterThanOrEqual(20)
 	})
 })
 
@@ -168,63 +168,63 @@ describe('createLedgerPace', () => {
 
 describe('fireLedgerHeartbeat', () => {
 	it('records the clock and re-arms on each host turn until its signal aborts', async () => {
-		const firings = createRecorder<readonly [at: number]>()
+		const beats = createRecorder<readonly [at: number]>()
 		const heartbeat = new AbortController()
-		fireLedgerHeartbeat(firings, heartbeat.signal)
-		expect(firings.count).toBe(1)
+		fireLedgerHeartbeat(beats, heartbeat.signal)
+		expect(beats.count).toBe(1)
 		await waitForImmediate()
 		await waitForImmediate()
-		expect(firings.count).toBeGreaterThanOrEqual(2)
-		const ats = firings.calls.map(([at]) => at)
+		expect(beats.count).toBeGreaterThanOrEqual(2)
+		const ats = beats.calls.map(([at]) => at)
 		expect(ats).toEqual(ats.toSorted((left, right) => left - right))
 		heartbeat.abort()
-		const stopped = firings.count
+		const stopped = beats.count
 		await waitForImmediate()
 		await waitForImmediate()
-		expect(firings.count).toBe(stopped)
+		expect(beats.count).toBe(stopped)
 	})
 
 	it('records nothing on an aborted signal', () => {
-		const firings = createRecorder<readonly [at: number]>()
-		fireLedgerHeartbeat(firings, AbortSignal.abort())
-		expect(firings.count).toBe(0)
+		const beats = createRecorder<readonly [at: number]>()
+		fireLedgerHeartbeat(beats, AbortSignal.abort())
+		expect(beats.count).toBe(0)
 	})
 })
 
 describe('addLedgerHeartbeat', () => {
 	it('arms no firing before start, fires after a host turn, and stops on select', async () => {
 		const registered = createRecorder<readonly [event: string, handler: () => void]>()
-		const firings = createRecorder<readonly [at: number]>()
+		const beats = createRecorder<readonly [at: number]>()
 		const heartbeat = new AbortController()
 		addLedgerHeartbeat(
 			{ on: (event, handler) => registered.handler(event, handler) },
-			firings,
+			beats,
 			heartbeat,
 		)
 		const [, start] = requireValue(registered.calls.find(([event]) => event === 'start'))
 		const [, select] = requireValue(registered.calls.find(([event]) => event === 'select'))
 		await waitForImmediate()
-		expect(firings.count).toBe(0)
+		expect(beats.count).toBe(0)
 		start()
-		expect(firings.count).toBe(0)
+		expect(beats.count).toBe(0)
 		await waitForImmediate()
-		expect(firings.count).toBeGreaterThanOrEqual(1)
+		expect(beats.count).toBeGreaterThanOrEqual(1)
 		select()
 		expect(heartbeat.signal.aborted).toBe(true)
-		const stopped = firings.count
+		const stopped = beats.count
 		await waitForImmediate()
 		await waitForImmediate()
-		expect(firings.count).toBe(stopped)
+		expect(beats.count).toBe(stopped)
 	})
 })
 
-describe('readLedgerPacing', () => {
+describe('readLedgerHeartbeat', () => {
 	it('reads the gaps across start, each firing, and the end', () => {
-		expect(readLedgerPacing(10, [12, 17], 20)).toEqual({ longest: 5, gaps: [2, 5, 3], turns: 2 })
+		expect(readLedgerHeartbeat(10, [12, 17], 20)).toEqual({ longest: 5, gaps: [2, 5, 3], turns: 2 })
 	})
 
 	it('reads the wall as the one gap with no firing', () => {
-		expect(readLedgerPacing(10, [], 57)).toEqual({ longest: 47, gaps: [47], turns: 0 })
+		expect(readLedgerHeartbeat(10, [], 57)).toEqual({ longest: 47, gaps: [47], turns: 0 })
 	})
 })
 

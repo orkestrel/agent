@@ -554,13 +554,13 @@ describe('study install fixtures', () => {
 		const expected = Buffer.from('equal', 'utf8')
 		const generate = { path: '/api/generate', body: 'equal' }
 		const equal = { path: '/api/chat', body: 'equal' }
-		const differing = { path: '/api/chat', body: 'differing' }
+		const different = { path: '/api/chat', body: 'different' }
 		const summary = { path: '/api/chat', body: 'summary' }
-		expect(readMemoryControl(expected, [generate, differing])).toBe(true)
+		expect(readMemoryControl(expected, [generate, different])).toBe(true)
 		expect(readMemoryControl(expected, [])).toBe(false)
 		expect(readMemoryControl(expected, [generate])).toBe(false)
 		expect(readMemoryControl(expected, [equal])).toBe(false)
-		expect(readMemoryControl(expected, [differing])).toBe(true)
+		expect(readMemoryControl(expected, [different])).toBe(true)
 		expect(readMemoryControl(expected, [summary, equal])).toBe(false)
 	})
 

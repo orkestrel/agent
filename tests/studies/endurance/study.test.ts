@@ -220,24 +220,24 @@ describe('prospective public endurance declarations', () => {
 				[...records].toSorted(),
 			)
 		}
-		const opening = goals.find((goal) => goal.id === 'ev-01-1')
+		const first = goals.find((goal) => goal.id === 'ev-01-1')
 		const returned = goals.find((goal) => goal.id === 'ev-13-1')
-		const closing = goals.find((goal) => goal.id === 'ev-24-1')
+		const final = goals.find((goal) => goal.id === 'ev-24-1')
 		if (
-			opening === undefined ||
+			first === undefined ||
 			returned === undefined ||
-			closing === undefined ||
-			!isStudyMemoryInput(opening.input) ||
+			final === undefined ||
+			!isStudyMemoryInput(first.input) ||
 			!isStudyMemoryInput(returned.input) ||
-			!isStudyMemoryInput(closing.input)
+			!isStudyMemoryInput(final.input)
 		)
 			throw new Error('Missing chosen public facts')
-		expect(opening.input.records[0]?.content).toContain('paid $265.86; no refund posted')
+		expect(first.input.records[0]?.content).toContain('paid $265.86; no refund posted')
 		expect(returned.input.records[0]?.content).toContain('paid $260.35; 12% merchandise discount')
 		expect(returned.input.records[1]?.content).toContain(
 			'mara.ellison@repairguild.example; mara@alderbrook.example is retired',
 		)
-		expect(closing.input.records[0]?.content).toContain(
+		expect(final.input.records[0]?.content).toContain(
 			'submission WR-6212 accepted GD-7312 for $1, 200.00; $80.00 freight excluded; grant cash payment unconfirmed',
 		)
 	})

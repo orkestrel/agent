@@ -368,8 +368,13 @@ export class StudyMemorySession implements StudySessionInterface {
 					content: result.content,
 					partial: result.partial,
 					conversation: this.#conversation.id,
+					// Study reads the evidence key `readings`; the projection stays until Study renames it to `attempts`.
 					...(this.#observation.observe && this.#ledger !== undefined
-						? { readings: buildStudyAgentReadings(result) }
+						? {
+								readings: buildStudyAgentReadings({
+									readings: 'attempts' in result ? result.attempts : undefined,
+								}),
+							}
 						: {}),
 				},
 			})

@@ -13,7 +13,7 @@ import {
 import {
 	AGENT_USAGE,
 	createAddTool,
-	createRecordingScheduler,
+	createRecordedScheduler,
 	createScriptedProvider,
 	createTurnRegistry,
 	createLoopTool,
@@ -214,7 +214,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 	})
 
 	it('resolves a `scheduler` name and the rehydrated loop paces through it', async () => {
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		const provider = createScriptedProvider([
 			{ content: '', tools: [{ id: 'c1', name: 'loop', arguments: {} }] },
 			{ content: '', tools: [{ id: 'c2', name: 'loop', arguments: {} }] },

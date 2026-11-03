@@ -61,7 +61,7 @@ import {
 	createGatedScheduler,
 	createLedgerReplay,
 	createPacedLedger,
-	createRecordingScheduler,
+	createRecordedScheduler,
 	seedLedgerPrefix,
 	serveLedgerHistory,
 	serveLedgerReplay,
@@ -89,7 +89,7 @@ import {
 	RECORDED_FIRST_REQUEST,
 	RECORDED_LATE_REQUEST,
 	RecordedTransport,
-	RecordingJudge,
+	SilentJudge,
 	ScriptedReads,
 	SequentialSystemOneJudge,
 	createForeignSignal,
@@ -101,7 +101,7 @@ import {
 	seedLedgerTrimOrder,
 	serveCanaryDesk,
 	serveRecordsDesk,
-	summarizeReadings,
+	summarizeAttempts,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
@@ -126,7 +126,7 @@ describe('Ledger', () => {
 				],
 			}),
 		)
-		for (const [at, content] of fixture.readings.entries())
+		for (const [at, content] of fixture.findings.entries())
 			ledger.conversation.add(
 				buildLedgerExchange(content, `owner-${at}`, { id: fixture.owners[at]?.id }),
 			)
@@ -504,18 +504,18 @@ describe('Ledger', () => {
 		)
 	})
 
-	for (const pairing of ['mixed id-and-idless', 'repeated-id'] as const) {
-		it(`sends no unmatched call and reads each result under its own arguments for a ${pairing} group`, async () => {
+	for (const shape of ['mixed id-and-idless', 'repeated-id'] as const) {
+		it(`sends no unmatched call and reads each result under its own arguments for a ${shape} group`, async () => {
 			const options = buildLedgerOptions()
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-			const readings: Array<readonly [unknown, string]> = []
+			const findings: Array<readonly [unknown, string]> = []
 			const ledger = createLedger(provider, {
 				...options,
 				capacity: 32_768,
 				lookups: requireValue(options.lookups).map((lookup) => ({
 					...lookup,
 					read: (args, text) => {
-						readings.push([args.id, text])
+						findings.push([args.id, text])
 						return { ids: [String(args.id)], owners: [] }
 					},
 				})),
@@ -528,7 +528,7 @@ describe('Ledger', () => {
 					calls: [
 						{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } },
 						{
-							id: pairing === 'repeated-id' ? 'c1' : 'c2',
+							id: shape === 'repeated-id' ? 'c1' : 'c2',
 							name: 'lookup',
 							arguments: { id: 'LH-81660' },
 						},
@@ -537,7 +537,7 @@ describe('Ledger', () => {
 				{ role: 'tool', call: 'c1', content: 'Brightwater balance is $20.' },
 				{
 					role: 'tool',
-					...(pairing === 'repeated-id' ? { call: 'c1' } : {}),
+					...(shape === 'repeated-id' ? { call: 'c1' } : {}),
 					content: 'Lighthouse balance is $30.',
 				},
 			])
@@ -546,18 +546,18 @@ describe('Ledger', () => {
 			const calls = sent.flatMap((message) => message.calls ?? [])
 			const results = sent.filter((message) => message.role === 'tool')
 			expect(calls.map((call) => call.arguments.id)).toEqual(
-				pairing === 'repeated-id' ? ['BW-5512', 'LH-81660'] : ['BW-5512'],
+				shape === 'repeated-id' ? ['BW-5512', 'LH-81660'] : ['BW-5512'],
 			)
 			expect(results.map((message) => message.call)).toEqual(calls.map((call) => call.id))
-			expect(readings).toContainEqual(['BW-5512', 'Brightwater balance is $20.'])
+			expect(findings).toContainEqual(['BW-5512', 'Brightwater balance is $20.'])
 			expect([
 				...new Set(
-					readings.filter(([, text]) => text === 'Lighthouse balance is $30.').map(([id]) => id),
+					findings.filter(([, text]) => text === 'Lighthouse balance is $30.').map(([id]) => id),
 				),
-			]).toEqual(pairing === 'repeated-id' ? ['LH-81660'] : [])
-			expect(readings).not.toContainEqual(['BW-5512', 'Lighthouse balance is $30.'])
+			]).toEqual(shape === 'repeated-id' ? ['LH-81660'] : [])
+			expect(findings).not.toContainEqual(['BW-5512', 'Lighthouse balance is $30.'])
 			expect(results[1]?.content.includes('lookup {"id":"LH-81660"}')).toBe(
-				pairing === 'repeated-id' ? true : undefined,
+				shape === 'repeated-id' ? true : undefined,
 			)
 		})
 	}
@@ -612,7 +612,7 @@ describe('Ledger', () => {
 	})
 
 	it('faults a direct run during calibration', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const options = buildLedgerOptions({ judge })
 		const entered = Promise.withResolvers<void>()
 		const release = Promise.withResolvers<void>()
@@ -672,7 +672,7 @@ describe('Ledger', () => {
 	})
 
 	it('refuses a direct run during a request', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const options = buildLedgerOptions({ judge })
 		const entered = Promise.withResolvers<void>()
 		const release = Promise.withResolvers<void>()
@@ -745,7 +745,7 @@ describe('Ledger', () => {
 	})
 
 	it('faults direct agent generation without planning for the earlier request', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const options = buildLedgerOptions({ judge })
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, options)
@@ -834,7 +834,7 @@ describe('Ledger', () => {
 		)
 	})
 
-	it('recalls both seed readings of one lookup and lists each once in the answer note', async () => {
+	it('recalls both seed findings of one lookup and lists each once in the answer note', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
@@ -1909,14 +1909,14 @@ describe('Ledger', () => {
 			])
 			const result = await ledger.respond('Is the refund for account BW-20931 settled?')
 			asks.push(
-				result.readings
-					.filter((reading) => reading.phase === 'amends')
-					.map((reading) =>
-						reading.key === JSON.stringify(['amends', desk?.id, later?.id])
+				result.attempts
+					.filter((attempt) => attempt.phase === 'amends')
+					.map((attempt) =>
+						attempt.key === JSON.stringify(['amends', desk?.id, later?.id])
 							? 'desk'
-							: reading.key === JSON.stringify(['amends', account?.id, later?.id])
+							: attempt.key === JSON.stringify(['amends', account?.id, later?.id])
 								? 'account'
-								: reading.key,
+								: attempt.key,
 					),
 			)
 		}
@@ -2020,10 +2020,10 @@ describe('Ledger', () => {
 		const options = buildLedgerOptions()
 		const uncalibrated = buildUncalibratedOptions(options)
 		const reason = new Error('caller stopped calibration')
-		for (const responding of [false, true]) {
+		for (const respond of [false, true]) {
 			const ledger = createLedger(createScriptedProvider([{ content: '' }]), uncalibrated)
 			await expect(
-				responding
+				respond
 					? ledger.respond('Request.', AbortSignal.abort(reason))
 					: ledger.calibrate(AbortSignal.abort(reason)),
 			).rejects.toBe(reason)
@@ -2075,8 +2075,8 @@ describe('Ledger', () => {
 			usage: { prompt: 50, completion: 1, total: 51 },
 			fault,
 		})
-		expect(selection).not.toHaveProperty('readings')
-		expect(summarizeReadings(result.readings)).toEqual([
+		expect(selection).not.toHaveProperty('attempts')
+		expect(summarizeAttempts(result.attempts)).toEqual([
 			{
 				key: JSON.stringify(['category', request.id]),
 				phase: 'category',
@@ -2113,7 +2113,7 @@ describe('Ledger', () => {
 		expect(result.partial).toBe(true)
 		expect(result.passes).toHaveLength(1)
 		expect(provider.calls).toEqual([])
-		expect(summarizeReadings(result.readings)).toEqual([
+		expect(summarizeAttempts(result.attempts)).toEqual([
 			{
 				key: JSON.stringify(['category', requireValue(seeded[0]).id]),
 				phase: 'category',
@@ -2129,7 +2129,7 @@ describe('Ledger', () => {
 		])
 	})
 
-	it('returns the readings of its own request only and keeps direct agent selections out of them', async () => {
+	it('returns the attempts of its own request only and keeps direct agent selections out of them', async () => {
 		const options = buildLedgerOptions()
 		const transport: RecordedTransport = new RecordedTransport(async () => {
 			return buildLedgerResponse(requireValue(transport.requests.at(-1)))
@@ -2153,7 +2153,7 @@ describe('Ledger', () => {
 		const selections: Selection[] = []
 		ledger.agent.emitter.on('select', (selection) => selections.push(selection))
 		const earlier = await ledger.respond('Earlier request.')
-		expect(summarizeReadings(earlier.readings)).toEqual([
+		expect(summarizeAttempts(earlier.attempts)).toEqual([
 			{ key, phase: 'category', outcome: 'resolved', duration: 'valid' },
 		])
 		const direct = ledger.conversation.add({ role: 'user', content: 'Direct statement.' })
@@ -2162,7 +2162,7 @@ describe('Ledger', () => {
 		expect(isLedgerError(selections[1]?.fault)).toBe(true)
 		expect(transport.requests).toHaveLength(1)
 		const later = await ledger.respond('Later request.')
-		expect(summarizeReadings(later.readings)).toEqual([
+		expect(summarizeAttempts(later.attempts)).toEqual([
 			{ key, phase: 'category', outcome: 'cached', duration: 'absent' },
 			{
 				key: JSON.stringify(['category', direct.id]),
@@ -2171,10 +2171,10 @@ describe('Ledger', () => {
 				duration: 'valid',
 			},
 		])
-		expect(later.readings).not.toBe(earlier.readings)
-		expect(summarizeReadings(earlier.readings)).toHaveLength(1)
+		expect(later.attempts).not.toBe(earlier.attempts)
+		expect(summarizeAttempts(earlier.attempts)).toHaveLength(1)
 		expect(transport.requests).toHaveLength(2)
-		for (const selection of selections) expect(selection).not.toHaveProperty('readings')
+		for (const selection of selections) expect(selection).not.toHaveProperty('attempts')
 		expect(selections[0]?.judgments).toEqual([key])
 		expect(selections[2]?.judgments).toEqual([key, JSON.stringify(['category', direct.id])])
 	})
@@ -2202,8 +2202,8 @@ describe('Ledger', () => {
 		expect(ledger.gauge?.scale).toBe(200 / 30)
 	})
 
-	it('files failed lookups as chatter and preserves a successful seed reading after a reader throws', async () => {
-		const judge = new RecordingJudge()
+	it('files failed lookups as chatter and preserves a successful seed finding after a reader throws', async () => {
+		const judge = new SilentJudge()
 		const options = buildLedgerOptions({ judge })
 		const lookup = requireValue(options.lookups?.[0])
 		const provider = createScriptedProvider(
@@ -2416,7 +2416,7 @@ describe('Ledger', () => {
 	})
 
 	it('assigns notes, tool failures, calls, and generated answers without category questions', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const options = buildLedgerOptions({ judge })
 		const provider = createScriptedProvider([
 			{ content: '', tools: [{ id: 'one', name: 'lookup', arguments: { id: 'BW-20931' } }] },
@@ -3664,11 +3664,11 @@ describe('Ledger — snapshot and hydrate', () => {
 		const gate = Promise.withResolvers<void>()
 		const ledger = createLedger(createGatedProvider(gate), buildLedgerOptions())
 		const pending = ledger.respond('Held request.')
-		const responding = captureError(() => ledger.snapshot())
+		const fault = captureError(() => ledger.snapshot())
 		gate.resolve()
 		await pending
-		expect(isAgentError(responding)).toBe(true)
-		expect(responding).toMatchObject({ code: 'CONCURRENCY' })
+		expect(isAgentError(fault)).toBe(true)
+		expect(fault).toMatchObject({ code: 'CONCURRENCY' })
 		const request = requireValue(
 			ledger.conversation.messages().find((message) => message.content === 'Held request.'),
 		)
@@ -3684,10 +3684,10 @@ describe('Ledger — snapshot and hydrate', () => {
 			buildUncalibratedOptions(buildLedgerOptions()),
 		)
 		const measured = calibrating.calibrate(new AbortController().signal)
-		const measuring = captureError(() => calibrating.snapshot())
+		const calibrationFault = captureError(() => calibrating.snapshot())
 		const gauge = await measured
-		expect(isAgentError(measuring)).toBe(true)
-		expect(measuring).toMatchObject({ code: 'CONCURRENCY' })
+		expect(isAgentError(calibrationFault)).toBe(true)
+		expect(calibrationFault).toMatchObject({ code: 'CONCURRENCY' })
 		expect(calibrating.snapshot().gauge).toEqual(gauge)
 	})
 
@@ -3750,7 +3750,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			snapshot,
 		})
 		const result = await hydrated.respond('Next request.')
-		expect(summarizeReadings(result.readings)).toContainEqual({
+		expect(summarizeAttempts(result.attempts)).toContainEqual({
 			key,
 			phase: 'category',
 			outcome: 'cached',
@@ -3939,10 +3939,10 @@ describe('Ledger — snapshot and hydrate', () => {
 		expect({
 			keys: [firstKeys.length, secondKeys.length],
 			amends: [first, second].map(
-				(result) => result.readings.filter((reading) => reading.phase === 'amends').length,
+				(result) => result.attempts.filter((attempt) => attempt.phase === 'amends').length,
 			),
 			supersedes: [first, second].map(
-				(result) => result.readings.filter((reading) => reading.phase === 'supersedes').length,
+				(result) => result.attempts.filter((attempt) => attempt.phase === 'supersedes').length,
 			),
 			digest: await computeTextDigest(
 				renderLedgerPositions({ keys: [firstKeys, secondKeys], judgments }, to),
@@ -4280,7 +4280,7 @@ describe('Ledger — host turns', () => {
 	it('asks nothing on a removal during a turn', async () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
 		const removed = requireValue(seed.snapshot.conversation.messages[1])
-		for (const clearing of [false, true]) {
+		for (const cleared of [false, true]) {
 			const gate = Promise.withResolvers<void>()
 			const scheduler = createGatedScheduler(gate)
 			// The empty first reply opens the answer pass, whose selection reuses the request's plan.
@@ -4292,7 +4292,7 @@ describe('Ledger — host turns', () => {
 			const pending = ledger.respond('What is the status of OR-1000?')
 			await scheduler.reached
 			const before = ledger.conversation.count
-			if (clearing) ledger.conversation.clear()
+			if (cleared) ledger.conversation.clear()
 			else ledger.conversation.remove(removed.id)
 			gate.resolve()
 			const result = await pending
@@ -4300,12 +4300,12 @@ describe('Ledger — host turns', () => {
 			const [answer] = requireValue(selections.calls[1])
 			expect(asked.count).toBe(0)
 			expect(faulted.fault?.message).toBe(
-				`conversation ${ledger.conversation.id} changed during selection: ${before} messages before, ${clearing ? 0 : before - 1} after`,
+				`conversation ${ledger.conversation.id} changed during selection: ${before} messages before, ${cleared ? 0 : before - 1} after`,
 			)
 			expect(answer.messages.some((message) => message.id === removed.id)).toBe(false)
-			const gone = result.readings.filter((reading) => reading.key.includes(removed.id))
+			const gone = result.attempts.filter((attempt) => attempt.key.includes(removed.id))
 			expect(gone.length).toBeGreaterThan(0)
-			expect(gone.every((reading) => reading.outcome === 'skipped')).toBe(true)
+			expect(gone.every((attempt) => attempt.outcome === 'skipped')).toBe(true)
 		}
 	})
 
@@ -4326,8 +4326,8 @@ describe('Ledger — host turns', () => {
 		gate.resolve()
 		const result = await pending
 		expect(asked.calls).toEqual([[ahead]])
-		expect(result.readings.find((reading) => reading.key === ahead)?.outcome).toBe('resolved')
-		expect(result.readings.find((reading) => reading.key === refiled)?.outcome).toBe('cached')
+		expect(result.attempts.find((attempt) => attempt.key === ahead)?.outcome).toBe('resolved')
+		expect(result.attempts.find((attempt) => attempt.key === refiled)?.outcome).toBe('cached')
 	})
 
 	it('commits partial on an abort in a turn', async () => {
@@ -4365,7 +4365,7 @@ describe('Ledger — host turns', () => {
 
 	it('selects the same bytes when paced', async () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		const paced = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], scheduler)
 		const plain = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }])
 		await paced.ledger.respond('What is the status of OR-1000?')
@@ -4379,7 +4379,7 @@ describe('Ledger — host turns', () => {
 	})
 
 	it('paces the agent between turns', async () => {
-		const scheduler = createRecordingScheduler()
+		const scheduler = createRecordedScheduler()
 		// A conversation of the request alone reaches no filing step, so only the agent yields.
 		const ledger = createLedger(
 			createScriptedProvider([

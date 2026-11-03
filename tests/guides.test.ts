@@ -176,8 +176,8 @@ await new GuideCommand({
 		THINKING_REPLAY_CASES,
 		LEDGER_RECORDED_THINKING,
 		RELAY_REPLAY_CASES,
-		GUIDE_CLASSIFIER_READINGS,
-		GUIDE_REPLAY_READINGS,
+		GUIDE_CLASSIFIER_LINES,
+		GUIDE_REPLAY_LINES,
 		GUIDE_REPLAY_CLAIMS,
 		SYSTEM_ONE_USAGE_CASES,
 		SYSTEM_ONE_MODEL_CASES,
@@ -194,14 +194,14 @@ await new GuideCommand({
 		LEDGER_AMENDED_RULE,
 		LEDGER_AMENDED_STATEMENT,
 		LEDGER_AMENDED_CORRECTION,
-		LEDGER_AMENDED_READING,
+		LEDGER_AMENDED_TEXT,
 		serveAmendedDesk,
 		classifyLedgerCorrection,
 		exerciseThinkingReplay,
 		createBoundedRelay,
 		buildLedgerInput,
 		buildGuideLedgerOptions,
-		createRecordingSelection,
+		createRecordedSelection,
 		createScriptedProvider,
 		createStubSummarizer,
 		createToolCall,
@@ -1245,8 +1245,8 @@ await new GuideCommand({
 			)
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
-			const judged = createRecordingSelection()
-			const recent = createRecordingSelection()
+			const judged = createRecordedSelection()
+			const recent = createRecordedSelection()
 			// Plain data, as a JSON file holds it; the data names a policy because a file carries no function.
 			const MODES: ReadonlyArray<{
 				readonly name: string
@@ -1543,8 +1543,8 @@ await new GuideCommand({
 		})
 
 		it('keeps the user turn of a rejected run', async () => {
-			const { RecoveringProvider } = await import('./setup.js')
-			const provider = new RecoveringProvider(
+			const { RecoveryProvider } = await import('./setup.js')
+			const provider = new RecoveryProvider(
 				[{ content: 'The hotel is booked.' }],
 				new Error('upstream unavailable'),
 			)
@@ -1824,16 +1824,16 @@ await new GuideCommand({
 				})
 				const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
 				asks.push(
-					filed.readings
-						.filter((reading) => reading.phase === 'amends')
-						.map((reading) =>
-							reading.key === JSON.stringify(['amends', desk?.id, later?.id])
+					filed.attempts
+						.filter((attempt) => attempt.phase === 'amends')
+						.map((attempt) =>
+							attempt.key === JSON.stringify(['amends', desk?.id, later?.id])
 								? 'desk'
-								: reading.key === JSON.stringify(['amends', account?.id, later?.id])
+								: attempt.key === JSON.stringify(['amends', account?.id, later?.id])
 									? 'account'
-									: reading.key === JSON.stringify(['amends', shared?.id, later?.id])
+									: attempt.key === JSON.stringify(['amends', shared?.id, later?.id])
 										? 'shared'
-										: reading.key,
+										: attempt.key,
 						),
 				)
 			}
@@ -2068,7 +2068,7 @@ await new GuideCommand({
 				[
 					LEDGER_AMENDED_CORRECTION,
 					LEDGER_AMENDED_RULE,
-					`lookup_order {"id":"BW-5512"}: ${LEDGER_AMENDED_READING}`,
+					`lookup_order {"id":"BW-5512"}: ${LEDGER_AMENDED_TEXT}`,
 				].join('\n'),
 			)
 			expect(guideText).toContain(
@@ -2090,7 +2090,7 @@ await new GuideCommand({
 					LEDGER_AMENDED_STATEMENT,
 					LEDGER_AMENDED_RULE,
 					LEDGER_AMENDED_CORRECTION,
-					LEDGER_AMENDED_READING,
+					LEDGER_AMENDED_TEXT,
 				].join('\n'),
 			)
 			expect(guideText).toContain(
@@ -2241,7 +2241,7 @@ await new GuideCommand({
 			).toEqual(replied.map(({ role, content }) => [role, content]))
 
 			ledger.conversation.add({ role: 'user', content: 'Does the refund need two managers?' })
-			const asking = ledger.conversation.view()
+			const viewed = ledger.conversation.view()
 			await ledger.agent.generate()
 			const direct = requireValue(selections.calls[0]?.[0], 'Missing direct selection')
 			expect(isLedgerError(direct.fault)).toBe(true)
@@ -2252,7 +2252,7 @@ await new GuideCommand({
 				requireValue(provider.calls[2], 'Missing direct run')
 					.messages.slice(1)
 					.map(({ role, content }) => [role, content]),
-			).toEqual(asking.map(({ role, content }) => [role, content]))
+			).toEqual(viewed.map(({ role, content }) => [role, content]))
 			expect(asks.calls).toEqual(asked)
 
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
@@ -2906,7 +2906,7 @@ await new GuideCommand({
 				[JSON.stringify(['topic', rule.id, 'refunds'])],
 			])
 			expect(filed.judgments).toHaveLength(2)
-			expect(filed.readings.map((reading) => reading.outcome)).toEqual(['resolved', 'resolved'])
+			expect(filed.attempts.map((attempt) => attempt.outcome)).toEqual(['resolved', 'resolved'])
 			expect(classifier.category(rule.id)).toBe('rule')
 			expect(classifier.decisive(rule.id)).toBe(true)
 			expect(classifier.quiet(rule.id)).toBe(false)
@@ -2923,7 +2923,7 @@ await new GuideCommand({
 			gauge.observe(calls)
 			expect(gauge.scale).toBe(1.3)
 			// A fence comment that drifts from the value asserted earlier fails here, because each line must appear verbatim.
-			for (const line of GUIDE_CLASSIFIER_READINGS) expect(guideText).toContain(line)
+			for (const line of GUIDE_CLASSIFIER_LINES) expect(guideText).toContain(line)
 		})
 
 		it('empties the live tail and leaves the compacted sections (the conversation `clear` row)', async () => {
@@ -3077,7 +3077,7 @@ await new GuideCommand({
 			expect(replayMessages.filter((message) => 'thinking' in message).map(({ id }) => id)).toEqual(
 				['2', '4'],
 			)
-			for (const line of GUIDE_REPLAY_READINGS) expect(guideText).toContain(line)
+			for (const line of GUIDE_REPLAY_LINES) expect(guideText).toContain(line)
 		})
 
 		it('records each call’s thinking and sends back what the replay policy keeps at every call and estimate (the replay section)', async () => {
@@ -3460,7 +3460,7 @@ await new GuideCommand({
 		it('charges a budget-only run nothing while the provider streams and the allowance each delta (the bounds sentences)', async () => {
 			// The provider takes each reading after the loop has taken the delta before it, so a charge made
 			// while the call streams shows before the call returns.
-			const readings = createRecorder<readonly [label: string, consumed: number]>()
+			const samples = createRecorder<readonly [label: string, consumed: number]>()
 			const usage = { prompt: 3, completion: 5, total: 8 }
 			const solo = createTokenBudget({ max: 1_000, scope: 'completion' })
 			const shared = createTokenBudget({ max: 1_000, scope: 'completion' })
@@ -3468,19 +3468,19 @@ await new GuideCommand({
 				['budget only', solo, undefined],
 				['shared allowance', shared, shared],
 			] as const) {
-				const provider = createMeasuredGuideProvider(usage, budget, readings, label)
+				const provider = createMeasuredGuideProvider(usage, budget, samples, label)
 				const agent = createAgent(provider, {
 					budget,
 					...(allowance === undefined ? {} : { allowance }),
 				})
 				agent.context.messages.add({ role: 'user', content: 'Write a short story.' })
 				await agent.generate()
-				readings.handler(label, budget.consumed)
+				samples.handler(label, budget.consumed)
 			}
 
 			// Twenty characters estimate 5 tokens. The budget alone reads 0 until the call returns its
 			// usage; the shared allowance takes each delta's estimate as it streams.
-			expect(readings.calls).toEqual([
+			expect(samples.calls).toEqual([
 				['budget only', 0],
 				['budget only', 0],
 				['budget only', 5],
@@ -4987,7 +4987,7 @@ await new GuideCommand({
 
 			// Every body is built before the first call, so a refusal from `body` sends nothing.
 			const untouched = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
-			const refusing = new ScriptedJudge({
+			const refusal = new ScriptedJudge({
 				url: 'http://judge.test',
 				model: 'configured',
 				fetch: untouched.fetch,
@@ -4995,11 +4995,11 @@ await new GuideCommand({
 				answers: TEV1_ANSWERS,
 				refuse: 'severity',
 			})
-			await expect(refusing.ask(TEV1_REQUEST, signal)).rejects.toMatchObject({
+			await expect(refusal.ask(TEV1_REQUEST, signal)).rejects.toMatchObject({
 				code: 'QUESTION',
 				message: 'judge error: question severity is refused',
 			})
-			expect(refusing.bodies).toHaveLength(3)
+			expect(refusal.bodies).toHaveLength(3)
 			expect(untouched.requests).toHaveLength(0)
 		})
 

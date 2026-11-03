@@ -17,7 +17,7 @@ import {
 	JUDGMENT_RECORD,
 	JUDGMENT_USAGE,
 	createRecordedJudge,
-	RecordingJudge,
+	SilentJudge,
 	SequentialSystemOneJudge,
 	SYSTEM_ONE_JUDGE_REQUEST,
 	SYSTEM_ONE_JUDGE_OBJECT,
@@ -218,7 +218,7 @@ describe('JudgmentManager', () => {
 	it('checks cancellation before asking and leaves the store unchanged', async () => {
 		// The recording judge answers an aborted signal like any other, so a request it never
 		// received proves the manager's own check, not the engine's.
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const manager = new JudgmentManager()
 		await expect(
 			manager.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, [], AbortSignal.abort()),
@@ -228,7 +228,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('refuses a state JSON cannot carry with the JUDGMENT code before asking', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const manager = new JudgmentManager()
 		const state: JSONRecord = new Proxy(
 			{},
@@ -255,7 +255,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('refuses a malformed question with the JUDGMENT code naming the question, before asking', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const manager = new JudgmentManager()
 
 		await expect(
@@ -298,7 +298,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('returns every cached record under an aborted signal without asking', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const manager = new JudgmentManager()
 		const cached = manager.add({ ...JUDGMENT_INPUT, model: judge.model, sources: ['a'] })
 
@@ -314,7 +314,7 @@ describe('JudgmentManager', () => {
 	})
 
 	it('returns no records for an empty question set without asking', async () => {
-		const judge = new RecordingJudge()
+		const judge = new SilentJudge()
 		const manager = new JudgmentManager()
 
 		expect(

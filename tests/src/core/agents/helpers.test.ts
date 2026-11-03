@@ -11,7 +11,7 @@ import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import {
 	createAgentTurn,
 	createMessage,
-	CountingAgentResult,
+	AccessedAgentResult,
 	createInvalidAgentResultCases,
 	createMalformedConversationCases,
 	createRecordedBudget,
@@ -262,7 +262,7 @@ describe('agentResultToJSON', () => {
 	})
 
 	it('reads each result and usage field exactly once', () => {
-		const source = new CountingAgentResult()
+		const source = new AccessedAgentResult()
 
 		expect(agentResultToJSON(source)).toEqual({
 			content: 'done',

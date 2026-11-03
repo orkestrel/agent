@@ -140,7 +140,7 @@ export function createGuideOrderLookup(): LedgerLookup {
 export function createMeasuredGuideProvider(
 	usage: TokenUsage,
 	budget: BudgetInterface<TokenUsage>,
-	readings: RecorderInterface<readonly [label: string, consumed: number]>,
+	samples: RecorderInterface<readonly [label: string, consumed: number]>,
 	label: string,
 ): ProviderInterface {
 	return {
@@ -150,7 +150,7 @@ export function createMeasuredGuideProvider(
 		async *stream() {
 			for (const text of ['x'.repeat(20), 'x'.repeat(20)]) {
 				yield { channel: 'content', text }
-				readings.handler(label, budget.consumed)
+				samples.handler(label, budget.consumed)
 			}
 			return { content: 'x'.repeat(40), usage }
 		},
@@ -183,7 +183,7 @@ import type {
 	ClassifierOptions,
 	ClassifierOutcome,
 	ClassifierPhase,
-	ClassifierReading,
+	ClassifierAttempt,
 	GaugeCall,
 	GaugeOptions,
 	LedgerCategory,
@@ -986,12 +986,12 @@ export function createIndependentGatedProvider(
 
 /** Requests a tool then fails the following provider turn. */
 export function createSecondTurnFailureProvider(): ProviderInterface {
-	const tooling = new ScriptedReads([true], false)
+	const firstTurn = new ScriptedReads([true], false)
 	return {
 		id: 'fault',
 		name: 'fault',
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
-			if (tooling.read()) {
+			if (firstTurn.read()) {
 				yield { channel: 'content', text: '' }
 				return { content: '', tools: [createToolCall()] }
 			}
@@ -1107,7 +1107,7 @@ export function createMessage(content: string): Message {
 	return { id: 'm', role: 'user', content }
 }
 
-/** Names a result or usage member whose read a {@link CountingAgentResult} records. */
+/** Names a result or usage member whose read a {@link AccessedAgentResult} records. */
 export type AccessedMember =
 	| 'content'
 	| 'thinking'
@@ -1118,7 +1118,7 @@ export type AccessedMember =
 	| 'total'
 
 /** Records each usage member read while a result is projected. */
-export class CountingTokenUsage {
+export class AccessedTokenUsage {
 	readonly #accesses: RecorderInterface<readonly [member: AccessedMember]>
 
 	constructor(accesses: RecorderInterface<readonly [member: AccessedMember]>) {
@@ -1142,9 +1142,9 @@ export class CountingTokenUsage {
 }
 
 /** Records each result member read while a result is projected, in read order, on `accesses`. */
-export class CountingAgentResult {
+export class AccessedAgentResult {
 	readonly accesses = createRecorder<readonly [member: AccessedMember]>()
-	readonly #usage = new CountingTokenUsage(this.accesses)
+	readonly #usage = new AccessedTokenUsage(this.accesses)
 
 	get content(): string {
 		this.accesses.handler('content')
@@ -1156,7 +1156,7 @@ export class CountingAgentResult {
 		return 'reasoning'
 	}
 
-	get usage(): CountingTokenUsage {
+	get usage(): AccessedTokenUsage {
 		this.accesses.handler('usage')
 		return this.#usage
 	}
@@ -1169,12 +1169,12 @@ export class CountingAgentResult {
 
 /** Builds hostile and malformed result cases for total projection. */
 export function createInvalidAgentResultCases(): ReadonlyArray<readonly [string, unknown]> {
-	const throwingAccessor = { partial: false }
-	const throwingGetter = Proxy.revocable(() => 'done', {})
-	throwingGetter.revoke()
-	Object.defineProperty(throwingAccessor, 'content', {
+	const hostileAccessor = { partial: false }
+	const revokedGetter = Proxy.revocable(() => 'done', {})
+	revokedGetter.revoke()
+	Object.defineProperty(hostileAccessor, 'content', {
 		enumerable: true,
-		get: throwingGetter.proxy,
+		get: revokedGetter.proxy,
 	})
 
 	const usageAccessor = { content: 'done', partial: false, usage: { completion: 1, total: 2 } }
@@ -1189,7 +1189,7 @@ export function createInvalidAgentResultCases(): ReadonlyArray<readonly [string,
 	revokedRoot.revoke()
 	const getTrap = Proxy.revocable(() => undefined, {})
 	getTrap.revoke()
-	const throwingGet = new Proxy({}, { get: getTrap.proxy })
+	const revokedGet = new Proxy({}, { get: getTrap.proxy })
 	const revokedUsage = Proxy.revocable({ prompt: 1, completion: 1, total: 2 }, {})
 	const nestedRevoked = { content: 'done', usage: revokedUsage.proxy, partial: false }
 	revokedUsage.revoke()
@@ -1223,9 +1223,9 @@ export function createInvalidAgentResultCases(): ReadonlyArray<readonly [string,
 			},
 		],
 		['missing usage field', { content: 'done', usage: { prompt: 1, total: 2 }, partial: false }],
-		['throwing root accessor', throwingAccessor],
+		['throwing root accessor', hostileAccessor],
 		['nested usage accessor', usageAccessor],
-		['throwing get trap', throwingGet],
+		['throwing get trap', revokedGet],
 		['revoked root proxy', revokedRoot.proxy],
 		['revoked nested usage proxy', nestedRevoked],
 		['undefined input', undefined],
@@ -1632,7 +1632,7 @@ export class SequentialSystemOneJudge extends AgentJudge {
 }
 
 /** Records each request a resolver hands it and answers nothing, so a pre-ask check is observable. */
-export class RecordingJudge implements JudgeInterface {
+export class SilentJudge implements JudgeInterface {
 	readonly id = 'recording'
 	readonly name = 'recording'
 	readonly model = 'recording-model'
@@ -2394,13 +2394,13 @@ export type SelectionCall = readonly [
  *   request; omitted ⇒ the selection is `view()` unchanged (a pass-through).
  * - `usage` — the judge usage each returned selection reports; omitted ⇒ none.
  */
-export interface RecordingSelectionOptions {
+export interface RecordedSelectionOptions {
 	readonly keep?: (message: Message, request: Message) => boolean
 	readonly usage?: TokenUsage
 }
 
 /** Records the calls a selection handler fixture receives and the selections it returns. */
-export interface RecordingSelectionInterface {
+export interface RecordedSelectionInterface {
 	readonly handler: SelectionHandler
 	/** Each call's conversation, request, and signal, in call order. */
 	readonly calls: readonly SelectionCall[]
@@ -2412,19 +2412,19 @@ export interface RecordingSelectionInterface {
  * Creates a recording {@link SelectionHandler} that selects the messages of the conversation's
  * `view()` passing `keep`, or the whole `view()` when `keep` is omitted.
  *
- * @param options - The {@link RecordingSelectionOptions} (both optional; see its `@remarks`)
+ * @param options - The {@link RecordedSelectionOptions} (both optional; see its `@remarks`)
  * @returns The handler plus its live call and selection records
  *
  * @example
  * ```ts
  * // ... conversation, request, and signal setup omitted
- * const fixture = createRecordingSelection({ usage: SELECTION_USAGE })
+ * const fixture = createRecordedSelection({ usage: SELECTION_USAGE })
  * const selected = await fixture.handler(conversation, request, signal)
  * ```
  */
-export function createRecordingSelection(
-	options?: RecordingSelectionOptions,
-): RecordingSelectionInterface {
+export function createRecordedSelection(
+	options?: RecordedSelectionOptions,
+): RecordedSelectionInterface {
 	const recorder: RecorderInterface<SelectionCall> = createRecorder<SelectionCall>()
 	const selected = createRecorder<readonly [selection: Selection]>()
 	return {
@@ -2519,7 +2519,7 @@ export const SELECTION_FAULT_CASES: readonly SelectionFaultCase[] = Object.freez
 ])
 
 /** Records how many turn boundaries the `yield` method of a {@link SchedulerInterface} paced. */
-export interface RecordingSchedulerInterface extends SchedulerInterface {
+export interface RecordedSchedulerInterface extends SchedulerInterface {
 	/** How many times `yield` ran — the turn boundaries the loop paced through this scheduler. */
 	readonly yields: number
 }
@@ -2528,7 +2528,7 @@ export interface RecordingSchedulerInterface extends SchedulerInterface {
  * Counts each successful yield and resolves immediately. An aborted signal rejects with its
  * reason; delay resolves without a timer so loop tests isolate pacing.
  */
-export class RecordedScheduler implements RecordingSchedulerInterface {
+export class RecordedScheduler implements RecordedSchedulerInterface {
 	#yields = 0
 
 	get yields(): number {
@@ -2549,12 +2549,12 @@ export class RecordedScheduler implements RecordingSchedulerInterface {
  *
  * @returns A scheduler whose yields report successful turn boundaries
  */
-export function createRecordingScheduler(): RecordingSchedulerInterface {
+export function createRecordedScheduler(): RecordedSchedulerInterface {
 	return new RecordedScheduler()
 }
 
 /** Records each `yield` of a {@link SchedulerInterface} and reports when one parks on its gate. */
-export interface GatedSchedulerInterface extends RecordingSchedulerInterface {
+export interface GatedSchedulerInterface extends RecordedSchedulerInterface {
 	/** Settles when the first `yield` parks on the gate. */
 	readonly reached: Promise<void>
 }
@@ -5309,13 +5309,13 @@ export const LEDGER_OWNER_PROJECTION: LedgerProjection = Object.freeze({
 	orphans: [],
 })
 
-/** Supplies distinct lookup subjects whose shared name places both readings on both owners. */
+/** Supplies distinct lookup subjects whose shared name places both findings on both owners. */
 export const LEDGER_OWNER_FIXTURE = Object.freeze({
 	owners: Object.freeze([
 		{ id: 'order:BW-5512', names: ['Brightwater Studio'] },
 		{ id: 'customer:BW-20931', names: ['Brightwater Studio'] },
 	]),
-	readings: Object.freeze([
+	findings: Object.freeze([
 		'Brightwater Studio ordered glazed lanterns. Collection is Friday.',
 		'Brightwater Studio paid in full. Keep the receipt.',
 	]),
@@ -5338,7 +5338,7 @@ export const LEDGER_OWNER_RENDER_CASES = Object.freeze([
 	},
 ])
 
-/** Supplies the owner-record trim order: a seed reading, three user texts in conversation order, and whether each cut keeps the newer fact beside the correction. */
+/** Supplies the owner-record trim order: a seed finding, three user texts in conversation order, and whether each cut keeps the newer fact beside the correction. */
 export const LEDGER_TRIM_ORDER_FIXTURE = Object.freeze({
 	seed: 'Account BW-20931: Brightwater Studio.',
 	older: 'Brightwater Studio ordered 12 lanterns.',
@@ -5351,7 +5351,7 @@ export const LEDGER_TRIM_ORDER_FIXTURE = Object.freeze({
 	]),
 })
 
-/** Supplies the ruled-line trim order: a seed reading, two corrections in one owner record in conversation order, and the request. */
+/** Supplies the ruled-line trim order: a seed finding, two corrections in one owner record in conversation order, and the request. */
 export const LEDGER_TRIM_RULED_FIXTURE = Object.freeze({
 	seed: 'Account BW-20931: Brightwater Studio.',
 	first: 'Brightwater Studio moved the pickup to Monday.',
@@ -5359,7 +5359,7 @@ export const LEDGER_TRIM_RULED_FIXTURE = Object.freeze({
 	request: 'Check Brightwater Studio.',
 })
 
-/** Supplies the trim across an accepted amendment: a seed reading, a filed correction and the fact that amends it, three sentences each, then each cut of their owner record, whose second step removes the later source's first line and so turns the earlier source's note to the omission note. */
+/** Supplies the trim across an accepted amendment: a seed finding, a filed correction and the fact that amends it, three sentences each, then each cut of their owner record, whose second step removes the later source's first line and so turns the earlier source's note to the omission note. */
 export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
 	seed: 'Account BW-20931: Brightwater Studio.',
 	earlier:
@@ -5514,7 +5514,7 @@ export function replaceLedgerRecord(
  */
 export function buildLedgerOptions(overrides: Partial<LedgerOptions> = {}): LedgerOptions {
 	return {
-		judge: new RecordingJudge(),
+		judge: new SilentJudge(),
 		system: 'Serve the desk.',
 		questions: LEDGER_QUESTIONS,
 		thresholds: LEDGER_DESK_THRESHOLDS,
@@ -5552,7 +5552,7 @@ export function buildClassifierOptions(
 ): ClassifierOptions {
 	return {
 		conversation: createConversation(),
-		judge: new RecordingJudge(),
+		judge: new SilentJudge(),
 		questions: LEDGER_QUESTIONS,
 		topics: [],
 		thresholds: LEDGER_DESK_THRESHOLDS,
@@ -5614,16 +5614,16 @@ export function createLedgerJudge(
  *
  * @remarks
  * `id`, `name`, and `ask` forward to the wrapped judge. `model` reports the identity the last
- * {@link SwitchingJudge.use} set, or the constructor's `model` before any.
+ * {@link SwitchableJudge.use} set, or the constructor's `model` before any.
  *
  * @example
  * ```ts
- * const judge = new SwitchingJudge(inner, 'A')
+ * const judge = new SwitchableJudge(inner, 'A')
  * judge.use('B')
  * judge.model // 'B'
  * ```
  */
-export class SwitchingJudge implements JudgeInterface {
+export class SwitchableJudge implements JudgeInterface {
 	readonly #judge: JudgeInterface
 	#model: string
 
@@ -5667,8 +5667,8 @@ export const CLASSIFIER_PINNED_ASKS: ReadonlyArray<readonly [ClassifierPhase, st
 	['supersedes', '["supersedes","m1","m2"]'],
 ]
 
-/** Carries a classifier reading with its elapsed time reduced to whether it is absent, a finite nonnegative number, or anything else. */
-export interface ReadingSummary {
+/** Carries a classifier attempt with its elapsed time reduced to whether it is absent, a finite nonnegative number, or anything else. */
+export interface AttemptSummary {
 	readonly key: string
 	readonly phase: ClassifierPhase
 	readonly outcome: ClassifierOutcome
@@ -5676,21 +5676,21 @@ export interface ReadingSummary {
 }
 
 /**
- * Reduces classifier readings to values an exact comparison can hold without a timing threshold.
- * @param readings - The readings a classifier or ledger returned
- * @returns Each reading's key, phase, and outcome, with its duration classed as absent, valid, or invalid
+ * Reduces classifier attempts to values an exact comparison can hold without a timing threshold.
+ * @param attempts - The attempts a classifier or ledger returned
+ * @returns Each attempt's key, phase, and outcome, with its duration classed as absent, valid, or invalid
  */
-export function summarizeReadings(
-	readings: readonly ClassifierReading[],
-): readonly ReadingSummary[] {
-	return readings.map((reading) => ({
-		key: reading.key,
-		phase: reading.phase,
-		outcome: reading.outcome,
+export function summarizeAttempts(
+	attempts: readonly ClassifierAttempt[],
+): readonly AttemptSummary[] {
+	return attempts.map((entry) => ({
+		key: entry.key,
+		phase: entry.phase,
+		outcome: entry.outcome,
 		duration:
-			reading.duration === undefined
+			entry.duration === undefined
 				? 'absent'
-				: Number.isFinite(reading.duration) && reading.duration >= 0
+				: Number.isFinite(entry.duration) && entry.duration >= 0
 					? 'valid'
 					: 'invalid',
 	}))
@@ -5702,10 +5702,10 @@ export function summarizeReadings(
  * @param outcome - The outcome every question shares
  * @returns The expected summaries; a cached or skipped question has no duration and any other has a valid one
  */
-export function buildReadingSummaries(
+export function buildAttemptSummaries(
 	asks: ReadonlyArray<readonly [ClassifierPhase, string]>,
 	outcome: ClassifierOutcome,
-): readonly ReadingSummary[] {
+): readonly AttemptSummary[] {
 	return asks.map(([phase, key]) => ({
 		key,
 		phase,
@@ -6095,7 +6095,7 @@ export const LEDGER_AMENDED_STATEMENT = 'Refund forms go to the Northgate desk.'
 export const LEDGER_AMENDED_CORRECTION =
 	'Correction: Brightwater Studio uses code AA-12 in place of AA-10.'
 /** Supplies the seeded order lookup text. */
-export const LEDGER_AMENDED_READING =
+export const LEDGER_AMENDED_TEXT =
 	'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
 /**
  * Serves a request that recalls a desk topic and its amended owner record.
@@ -6132,7 +6132,7 @@ export async function serveAmendedDesk(): Promise<{
 			content: '',
 			calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
 		},
-		{ role: 'tool', call: 'seed', content: LEDGER_AMENDED_READING },
+		{ role: 'tool', call: 'seed', content: LEDGER_AMENDED_TEXT },
 		{ role: 'user', content: LEDGER_AMENDED_RULE },
 		{ role: 'assistant', content: LEDGER_AMENDED_STATEMENT },
 		{ role: 'user', content: LEDGER_AMENDED_CORRECTION },
@@ -6196,10 +6196,10 @@ export async function classifyLedgerCorrection(
 		entities: () => new Set(),
 	})
 	await classifier.classify(new Set(), AbortSignal.timeout(30_000))
-	const filing = classifier.classification()
+	const filedRecords = classifier.classification()
 	return {
-		amendments: filing.amendments.has(earlier.id),
-		supersessions: filing.supersessions.has(earlier.id),
+		amendments: filedRecords.amendments.has(earlier.id),
+		supersessions: filedRecords.supersessions.has(earlier.id),
 	}
 }
 /**
@@ -7053,10 +7053,10 @@ export const LEDGER_RECORDED_THINKING = Object.freeze([undefined, 'a'.repeat(800
 /** Supplies the relay replay cases scenario inputs. */
 export const RELAY_REPLAY_CASES: readonly ThinkingReplay[] = Object.freeze(['all', 'turn', 'none'])
 
-/** Supplies the guide classifier readings scenario inputs. */
-export const GUIDE_CLASSIFIER_READINGS = Object.freeze([
+/** Supplies the guide classifier lines scenario inputs. */
+export const GUIDE_CLASSIFIER_LINES = Object.freeze([
 	'filed.judgments.length // 2 — the category question and the refunds topic question',
-	"filed.readings.map((reading) => reading.outcome) // ['resolved', 'resolved'] — the judge answered both",
+	"filed.attempts.map((attempt) => attempt.outcome) // ['resolved', 'resolved'] — the judge answered both",
 	"classifier.category(rule.id) // 'rule'",
 	'classifier.decisive(rule.id) // true',
 	'classifier.quiet(rule.id) // false',
@@ -7069,8 +7069,8 @@ export const GUIDE_CLASSIFIER_READINGS = Object.freeze([
 	"gauge.scale // 1.3 — the first call's prompt less the overhead cost, over its estimate",
 ])
 
-/** Supplies the guide replay readings scenario inputs. */
-export const GUIDE_REPLAY_READINGS = Object.freeze([
+/** Supplies the guide replay lines scenario inputs. */
+export const GUIDE_REPLAY_LINES = Object.freeze([
 	"content: 'Yes, within 30 days.',",
 	"thinking: 'The window is 30 days.',",
 	"calls: [{ id: 'call-1', name: 'refund_order', arguments: { id: 'BW-5512' } }],",
@@ -7284,8 +7284,8 @@ export interface CanaryDesk {
  * path a ledger sends.
  *
  * @remarks
- * The seed holds a rule carrying the rule sentinel and a lookup reading, filed onto its owner,
- * carrying the reading sentinel; the system text carries the system sentinel and the judge is
+ * The seed holds a rule carrying the rule sentinel and a lookup finding, filed onto its owner,
+ * carrying the finding sentinel; the system text carries the system sentinel and the judge is
  * {@link createCanaryJudge}. The first request carries the user sentinel, and its first pass calls
  * a note lookup whose result carries the tool sentinel, under content carrying the assistant
  * sentinel, then ends empty, so an answer pass runs. A late request follows, then a direct
@@ -7371,7 +7371,7 @@ export interface RecordsDesk {
 }
 
 /**
- * Serves two requests over the {@link LEDGER_OWNER_FIXTURE} readings, the scenario
+ * Serves two requests over the {@link LEDGER_OWNER_FIXTURE} findings, the scenario
  * {@link RECORDED_FIRST_REQUEST}, {@link RECORDED_ANSWER_REQUEST}, and {@link RECORDED_LATE_REQUEST}
  * record.
  *
@@ -7405,7 +7405,7 @@ export async function serveRecordsDesk(): Promise<RecordsDesk> {
 	)
 	const selections = createRecorder<readonly [selection: Selection]>()
 	ledger.agent.emitter.on('select', selections.handler)
-	for (const [at, content] of fixture.readings.entries())
+	for (const [at, content] of fixture.findings.entries())
 		ledger.conversation.add(
 			buildLedgerExchange(content, `owner-${at}`, { id: fixture.owners[at]?.id }),
 		)
@@ -7475,7 +7475,7 @@ export function extractLedgerRecords(messages: readonly Message[]): string {
  * request's first pass reads the owner and ends empty, so an answer pass adds the results and cue
  * notes. The second history request's lookup throws `failure`, so its tool message carries that text,
  * which names the owner's account: unless the ledger marks it failed, the lookup reader files it as
- * an owner reading and it joins the owner's record. The request after the snapshot names the owner
+ * an owner finding and it joins the owner's record. The request after the snapshot names the owner
  * and calls only the lookup, because `recall` output reads the gauge observations no snapshot
  * carries.
  */
@@ -7695,10 +7695,10 @@ export function buildLedgerSnapshotRefusals(): ReadonlyArray<readonly [string, L
  */
 export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [string, unknown]> {
 	const seed = LEDGER_SNAPSHOT_SEED
-	const throwing: Record<string, unknown> = { ...seed }
+	const thrown: Record<string, unknown> = { ...seed }
 	const getter = Proxy.revocable(() => [], {})
 	getter.revoke()
-	Object.defineProperty(throwing, 'requests', { enumerable: true, get: getter.proxy })
+	Object.defineProperty(thrown, 'requests', { enumerable: true, get: getter.proxy })
 	const revoked = Proxy.revocable({ ...seed }, {})
 	revoked.revoke()
 	return Object.freeze<ReadonlyArray<readonly [string, unknown]>>([
@@ -7713,7 +7713,7 @@ export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [stri
 		['a failures list holding a number', { ...seed, failures: [1] }],
 		['a gauge that is a number', { ...seed, gauge: 2 }],
 		['a gauge missing its overhead', { ...seed, gauge: { scale: 2 } }],
-		['a throwing getter', throwing],
+		['a throwing getter', thrown],
 		['a revoked proxy', revoked.proxy],
 	])
 }
@@ -7778,10 +7778,10 @@ export function createMalformedConversationCases(): ReadonlyArray<readonly [stri
  *
  * @example
  * ```ts
- * const provider = new RecoveringProvider([{ content: 'Booked.' }], new Error('upstream unavailable'))
+ * const provider = new RecoveryProvider([{ content: 'Booked.' }], new Error('upstream unavailable'))
  * ```
  */
-export class RecoveringProvider extends ScriptedProvider {
+export class RecoveryProvider extends ScriptedProvider {
 	readonly #failure: Error
 	#failed = false
 	constructor(turns: readonly ScriptedTurn[], failure: Error) {
@@ -8091,11 +8091,11 @@ export interface LedgerPrefix {
 	readonly corrections: ReadonlySet<string>
 }
 
-/** Carries a seeded ledger bench prefix: the snapshot after one filed request, its correction count, and that request's readings. */
+/** Carries a seeded ledger bench prefix: the snapshot after one filed request, its correction count, and that request's attempts. */
 export interface LedgerSeed {
 	readonly snapshot: LedgerSnapshot
 	readonly corrections: number
-	readonly readings: readonly ClassifierReading[]
+	readonly attempts: readonly ClassifierAttempt[]
 }
 
 /** Carries a bench ledger over a seeded snapshot, with the recorders a paced-selection test reads. */
@@ -8337,7 +8337,7 @@ export function buildLedgerBenchOptions(
  *
  * @param length - The conversation length the seeded snapshot holds
  * @param arm - The history the prefix serves
- * @returns The snapshot after the request, its correction count, and the request's readings
+ * @returns The snapshot after the request, its correction count, and the request's attempts
  */
 export async function seedLedgerPrefix(length: number, arm: LedgerBenchArm): Promise<LedgerSeed> {
 	const prefix = buildLedgerPrefix(length, arm)
@@ -8353,7 +8353,7 @@ export async function seedLedgerPrefix(length: number, arm: LedgerBenchArm): Pro
 	return {
 		snapshot: ledger.snapshot(),
 		corrections: prefix.corrections.size,
-		readings: result.readings,
+		attempts: result.attempts,
 	}
 }
 

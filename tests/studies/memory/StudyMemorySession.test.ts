@@ -1354,7 +1354,7 @@ describe('passive observation of actual memory requests', () => {
 	)
 
 	it('keeps the failure outcome and admission identical when a malformed terminal fails the request', async () => {
-		const failing: MemoryTrialFixture = {
+		const failed: MemoryTrialFixture = {
 			arm: 'full',
 			responses: [
 				{
@@ -1364,8 +1364,8 @@ describe('passive observation of actual memory requests', () => {
 			],
 			goals: [{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }],
 		}
-		const off = await runMemoryTrial(failing)
-		const on = await runMemoryTrial({ ...failing, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
+		const off = await runMemoryTrial(failed)
+		const on = await runMemoryTrial({ ...failed, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
 		expect(off.failure).toBeDefined()
 		expect(readMemoryAdmission(on)).toEqual(readMemoryAdmission(off))
 		const [observed] = readMemoryEvents(on.evidence, 'failure')
@@ -1420,12 +1420,12 @@ describe('passive observation of actual memory requests', () => {
 			}),
 		)
 		const chats = result.requests.filter((request) => request.path === '/api/chat')
-		const opening = dispatches
+		const first = dispatches
 			.filter(
 				(row) => row.goal === 'opening' && isRecord(row.value) && row.value.path === '/api/chat',
 			)
 			.map((row) => (isRecord(row.value) ? row.value.body : undefined))
-		expect(opening).toEqual(chats.slice(0, 2).map((request) => request.body))
+		expect(first).toEqual(chats.slice(0, 2).map((request) => request.body))
 		expect(captured.some((body) => body === undefined)).toBe(true)
 		expect(captured.some((body) => typeof body === 'string')).toBe(true)
 	})
@@ -1526,8 +1526,8 @@ describe('passive observation of actual memory requests', () => {
 		expect(view).toContain('Correction: count is two.')
 		expect(view).toContain('Corrected handoff')
 		expect(view).not.toContain('Close handoff')
-		const closing = readMemoryCheckpoint(result.evidence, 'closure')
-		expect(JSON.stringify(closing)).toContain('Close handoff')
+		const final = readMemoryCheckpoint(result.evidence, 'closure')
+		expect(JSON.stringify(final)).toContain('Close handoff')
 		expect(parseJSON(JSON.stringify(value))).toEqual(value)
 	})
 
@@ -2043,7 +2043,7 @@ describe('passive observation of actual memory requests', () => {
 })
 
 describe('repeated and denied tool calls', () => {
-	const opening = STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1)
+	const first = STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1)
 	const lookup = buildMemoryCall('lookup', { id: 'order-1' })
 	const answer = { path: '/api/chat', body: buildMemoryReply({ content: 'Answered' }) }
 	const receipt = 'order-1: Owner\nConfirmed reference'
@@ -2053,7 +2053,7 @@ describe('repeated and denied tool calls', () => {
 		const result = await runMemoryTrial({
 			arm: 'compaction',
 			responses: [lookup, lookup, answer],
-			goals: opening,
+			goals: first,
 			settings: STUDY_MEMORY_SETTINGS,
 		})
 		expect(result.failure).toBeUndefined()
@@ -2093,7 +2093,7 @@ describe('repeated and denied tool calls', () => {
 				buildMemoryCall('lookup', { scope: 'desk', id: 'order-1' }),
 				answer,
 			],
-			goals: opening,
+			goals: first,
 			settings: STUDY_MEMORY_SETTINGS,
 		})
 		expect(result.failure).toBeUndefined()
@@ -2107,7 +2107,7 @@ describe('repeated and denied tool calls', () => {
 		const result = await runMemoryTrial({
 			arm: 'records',
 			responses: [...STUDY_MEMORY_CALIBRATION, lookup, lookup, answer],
-			goals: opening,
+			goals: first,
 		})
 		expect(result.failure).toBeUndefined()
 		expect(readMemoryEvents(result.evidence, 'lookup')).toEqual([{ id: 'order-1', found: true }])
@@ -2130,13 +2130,13 @@ describe('repeated and denied tool calls', () => {
 		const compaction = await runMemoryTrial({
 			arm: 'compaction',
 			responses: [absent, answer],
-			goals: opening,
+			goals: first,
 			settings: STUDY_MEMORY_SETTINGS,
 		})
 		const records = await runMemoryTrial({
 			arm: 'records',
 			responses: [...STUDY_MEMORY_CALIBRATION, absent, answer],
-			goals: opening,
+			goals: first,
 		})
 		expect(compaction.failure).toBeUndefined()
 		expect(records.failure).toBeUndefined()
