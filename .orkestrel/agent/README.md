@@ -40,6 +40,7 @@ Every id is numbered for life and never reused. A retired id stays retired.
 | `Q` | a decision only the user can make (`Q1`, `Q2`, …) | `plan.md` § Decisions |
 | `R` | a browser and server boundary remedy (`R1`, `R2`, …) | `designs/boundary.md` § Mistakes |
 | `N`, `W` | a ruling of one read-only consultation: `N1` to `N5` on burst 49, `W1` to `W7` on the questions the morning report of 2026-11-03 left | `plan.md` § Rulings, O158 and O161 |
+| `Y` | a ruling of the consultation of 2026-11-03 on the S8 briefs' open items, `Y1` to `Y65`, each verified at HEAD `942becd0` | `plan.md` § Rulings, O165 |
 
 - Ids from the closed boost campaign, such as `U45` and `R5b`, keep their meaning there and are cited with the commit that holds them; a bare `R` id in this folder names a boundary remedy.
 - The 0.0.32 ledger fixes are named by what they do, never as `D1` or `D2`, because those ids are this campaign's deferrals.
