@@ -46,14 +46,14 @@ import { JudgeError } from './errors.js'
  * 	},
  * 	AbortSignal.timeout(30_000),
  * )
- * const readings = Object.fromEntries(
+ * const measures = Object.fromEntries(
  * 	Object.entries(result.answers).map(([id, answer]) => [id, measureAnswer(answer)]),
  * )
  * result.model // 'tev1:0.8b' — the model the server named
  * result.usage // { prompt: 975, completion: 4, total: 979 }
- * readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to 4 decimals
- * readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to 4 decimals
- * readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to 4 decimals
+ * measures.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to 4 decimals
+ * measures.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to 4 decimals
+ * measures.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to 4 decimals
  * ```
  */
 export class SystemOneJudge extends AgentJudge {

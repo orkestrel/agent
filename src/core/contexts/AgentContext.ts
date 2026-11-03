@@ -70,7 +70,11 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   the last user message (a vision provider reads images off a user turn); when no user message
  *   exists the attachment is skipped. Built fresh each call (recomputed, never cached), so it
  *   always reflects the current managers / messages / scope / active workspace; it never mutates a
- *   manager or the stored messages.
+ *   manager or the stored messages. `build(selection)` adds at most one `system` message of its own
+ *   and reads the selection's messages as conversation parts without a role check; the select path
+ *   refuses a selected `system` role as a `'ROLE'` fault over `view()`; a host's direct
+ *   `build(selection)` is host-trusted, and a conversation a host implements itself whose `view()`
+ *   holds a `system` message is read as host-trusted too.
  * - **The active workspace, rendered by carrier — the sole document/image context.**
  *   `workspaces.active` (when set) has its {@link import('@orkestrel/workspace').FileInterface} values scope-filtered by `scope.files`,
  *   then split: text files fold into a dedicated `## Workspace` section (fenced reference blocks)

@@ -4606,13 +4606,13 @@ await new GuideCommand({
 			expect(guideText).toContain("result.model // 'tev1:0.8b' — the model the server named")
 			expect(guideText).toContain('result.usage // { prompt: 975, completion: 4, total: 979 }')
 			expect(guideText).toContain(
-				"readings.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to 4 decimals",
+				"measures.label // { winner: 'bug', probability: 0.9691, confidence: 0.9536 } to 4 decimals",
 			)
 			expect(guideText).toContain(
-				"readings.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to 4 decimals",
+				"measures.refund // { winner: 'true', probability: 0.9979, confidence: 0.9958 } to 4 decimals",
 			)
 			expect(guideText).toContain(
-				"readings.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to 4 decimals",
+				"measures.severity // { winner: '1', probability: 0.9494, confidence: 0.9241, score: 0.9919 } to 4 decimals",
 			)
 		})
 

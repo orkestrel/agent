@@ -14,9 +14,9 @@ export const DEFAULT_AUTHORITY_ZONE = 'default'
 
 /**
  * Holds the model-facing texts the loop writes after a tool name in a denial result — the
- * `denied` note for a deny with no reason, an evaluate throw, or an invalid decision; the
- * `refused` note for an ask the approver refused; and the `unanswered` note for an ask no
- * approver answered, frozen.
+ * `denied` note for a deny with no reason, an evaluate throw, an invalid decision, or a tool
+ * changed after its decision; the `refused` note for an ask the approver refused; and the
+ * `unanswered` note for an ask no approver answered, frozen.
  */
 export const AUTHORITY_NOTES: AuthorityNote = Object.freeze({
 	denied: 'it is not allowed. Do not call it again; answer with what you have.',

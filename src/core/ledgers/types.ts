@@ -275,7 +275,9 @@ export interface LedgerGauge {
  * ledger owns every other agent option: the conversation, the tools, the selection handler, and
  * the scope. One memo set can serve many ledgers of one principal, and the plan prices what these
  * libraries add to the head. `scheduler` also reaches the ledger's classifier, which hands the host
- * a turn while it files, so a page passes it to keep the filing out of one long task.
+ * a turn while it files, so a page passes it to keep the filing out of one long task. The classifier
+ * and the loop race its yield against the run signal, so a scheduler that ignores its signal still
+ * ends on a cancel.
  */
 export type LedgerAgentOptions = Pick<
 	AgentOptions,

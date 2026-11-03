@@ -64,8 +64,10 @@ import { JudgmentManager } from './JudgmentManager.js'
  *   the section, or `undefined` when nothing folds. A {@link ConversationError} is thrown when no
  *   `#summarize` was supplied. Calls run one at a time, a fold commits only when its messages are
  *   still the live entries after the summarizer settles, and `options.signal` rejects the call
- *   with its reason at once and commits nothing after the abort. A digest whose trimmed text is
- *   empty rejects with code `'SUMMARY'` and commits nothing.
+ *   with its reason at once and commits nothing after the abort. A digest that is not a string or
+ *   whose trimmed text is empty refuses the fold it would commit with `'SUMMARY'`; such a digest for
+ *   a capped merge refuses the merge and keeps the fold already committed, one section over the cap,
+ *   which the next sound merge collapses.
  * - **Cumulative.** With `cumulative`, a fold makes one summarizer call over the framed recaps of all
  *   prior sections then the slice, and replaces those sections with one that retains their
  *   originals then the slice. It emits `compact` once and never `collapse`, commits nothing when

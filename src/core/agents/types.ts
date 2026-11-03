@@ -240,19 +240,30 @@ export type AgentEventMap = {
 	 * calibrated without a failure.
 	 */
 	readonly usage: readonly [usage: TokenUsage, estimate: number]
-	/** Reports a call cleared for dispatch: a policy allow, or an asked call the approver approved. */
+	/**
+	 * Reports a call cleared for dispatch: a policy allow, or an asked call the approver approved.
+	 *
+	 * @remarks
+	 * An allow clears a call for the tool instance the registry held when the turn advertised it; if
+	 * that instance is replaced or removed before dispatch, a `deny` follows with the reason
+	 * `<name> changed after its decision` and no decision, so `deny` can follow that call's `allow`,
+	 * and neither instance runs. A tool handler that replaces a later tool in the same batch before
+	 * its first await is host code and is not re-checked.
+	 */
 	readonly allow: readonly [call: ToolCall, decision: AuthorityDecision]
 	/** Reports a call handed to the approver; `allow`, `deny`, or `abort` follows. */
 	readonly ask: readonly [call: ToolCall, decision: AuthorityDecision]
 	/**
 	 * Reports a call denied by scope or authority, before dispatch; `decision` is absent for a scope
 	 * miss, a call whose name no definition advertises this turn, a no-advertisement drop, an evaluate
-	 * throw, or an invalid decision.
+	 * throw, an invalid decision, or a cleared call whose tool instance changed before dispatch.
 	 * A turn advertising no tools drops each call with `no tool is advertised in the active scope`.
 	 * Otherwise a call excluded by the tool allow-list, or whose name no definition advertises this
 	 * turn, carries `<tool name> is not in the active scope` and produces a denial tool result and
 	 * message. Authority evaluates only admitted calls that name an advertised definition. `reason` is
-	 * the rule's `deny` reason, the thrown error's text, `invalid decision`, or `undefined`.
+	 * the rule's `deny` reason, the thrown error's text, `invalid decision`, `<tool name> changed after
+	 * its decision` for a cleared call whose tool instance changed before dispatch (the model reads the
+	 * `denied` note), or `undefined`. A cancel that ends the turn before dispatch emits no such `deny`.
 	 */
 	readonly deny: readonly [
 		call: ToolCall,
@@ -487,6 +498,7 @@ export interface ApproverInterface {
  *   `budget`'s. Pass the `budget` itself to share one ceiling. Omitted ⇒ no meter layer.
  * - `scheduler` — an optional {@link SchedulerInterface} that paces the loop —
  *   the loop calls its `yield` method between turns, so the host regains control between expensive provider calls.
+ *   The loop races that yield against the run signal, so a scheduler that ignores its signal still ends on a cancel.
  * - `signal` — an optional external `AbortSignal` whose abort cancels the turn (a
  *   partial result).
  * - `authority` — an optional {@link AuthorityInterface} that decides each scope-admitted call;
@@ -585,7 +597,13 @@ export interface AgentOptions {
 	 * measured for the `usage` event and charges nothing mid-stream.
 	 */
 	readonly allowance?: BudgetInterface<TokenUsage>
-	/** Paces the loop — the loop yields to it between turns so the host regains control. */
+	/**
+	 * Paces the loop — the loop yields to it between turns so the host regains control.
+	 *
+	 * @remarks
+	 * The loop races that yield against the run signal, so a scheduler that ignores its signal still
+	 * ends on a cancel.
+	 */
 	readonly scheduler?: SchedulerInterface
 	/** Carries an external cancel; its abort commits a partial result. */
 	readonly signal?: AbortSignal
@@ -713,6 +731,11 @@ export interface AgentRunOptions {
 	 * the `window`. A later `switch`, `open`, `remove`, `clear`, or same-id `add` on the registry
 	 * never moves the run, and the conversation needs no registration. Omitted ⇒ the conversation
 	 * active when `stream()` or `generate()` is called.
+	 *
+	 * @remarks
+	 * The guard compares conversation instances: two `Conversation` values opened from one stored
+	 * snapshot are distinct to it and run at once on an agent with no `window` and distinct budgets,
+	 * so a host opens each thread once and keys its thread registry by principal and thread.
 	 */
 	readonly conversation?: ConversationInterface
 	/**
@@ -743,7 +766,11 @@ export interface AgentRunOptions {
  *   streamed content remains in the partial result. Cancellation after entry is cooperative:
  *   the loop awaits a running handler even when it ignores the signal, records its tool message,
  *   and folds nothing before the run settles; the next run's pre-first-turn check compacts
- *   instead.
+ *   instead. The loop races a scheduler's yield, the approver's answer, and the summarizer against
+ *   the run signal, so one that ignores its signal still ends on a cancel; a provider stream, a
+ *   judge, a tool handler, and a selection handler are awaited until they settle, because each can
+ *   carry usage or finished work, so one that ignores its signal holds the run past a cancel or a
+ *   timeout, and on a ledger its held scan, until it returns.
  *   The agent supplies no caller identity.
  * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
  *   iteration is capped at `limit` so the loop always terminates.
@@ -801,7 +828,10 @@ export interface AgentInterface {
 	 * `ContractError` with code `'placement'`, synchronously — before the
 	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
 	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`. Each of those leaves
-	 * the run's conversation unchanged. A `signal` that `AbortSignal.any` refuses throws its
+	 * the run's conversation unchanged. The guard compares conversation instances: two `Conversation`
+	 * values opened from one stored snapshot are distinct to it and run at once on an agent with no
+	 * `window` and distinct budgets, so a host opens each thread once and keys its thread registry by
+	 * principal and thread. A `signal` that `AbortSignal.any` refuses throws its
 	 * `TypeError` the same way, before any deadline is armed, but after the `prompt` is appended, so
 	 * the prompt stays in the conversation.
 	 *

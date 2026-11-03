@@ -21,6 +21,10 @@ import type { ConversationSnapshot, ConversationStoreInterface } from '../types.
  * - **`get` resolves the persisted snapshot for an id**, or `undefined` if none is stored.
  * - **`set` inserts / replaces under the snapshot's own `id`** (no separate id param).
  * - **`delete` drops a snapshot by id**; an absent id is a no-op (no throw).
+ * - **`get` hands back the stored snapshot object itself**: its messages and sections are shared
+ *   with the store, so an edit to them changes what the next `get` returns, and its judgments are
+ *   frozen records, so a write to one throws `TypeError` in strict-mode code; copy a judgment
+ *   through `copyJSON` to migrate or redact it.
  *
  * The public surface is exactly `get` / `set` / `delete` — no extra members (the method
  * bijection with {@link ConversationStoreInterface}). Hydration is a caller concern: a
