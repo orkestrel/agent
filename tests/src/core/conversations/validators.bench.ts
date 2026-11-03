@@ -6,8 +6,10 @@ import {
 	LEDGER_BENCH_MODEL,
 } from '../../../setup.js'
 import { LEDGER_WARMUP, loadLedgerSeed, measureOtherLoad } from '../../../setupServer.js'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { createLedger, isLedgerSnapshot } from '@src/core'
+import { parseJSONAs } from '@orkestrel/contract'
+import { createLedger, isConversationSnapshot, isLedgerSnapshot } from '@src/core'
 import { expect, it } from 'vitest'
 import { createRecorder } from '@orkestrel/test'
 
@@ -582,4 +584,69 @@ it('checks the control ledger snapshot', { timeout: 300_000 }, async ({ bench, t
 		}),
 	)
 	expect(readings.calls).toHaveLength(15)
+})
+
+it('checks the realistic conversation', { timeout: 300_000 }, async ({ bench, task }) => {
+	// The text of a sealed segment of the records trial, read by rc-a10-u10's seed instrument (D76).
+	const seed = parseJSONAs(
+		readFileSync(
+			fileURLToPath(
+				new URL('../../../../tmp/probes/rc-a10-u10/conversation.json', import.meta.url),
+			),
+			'utf8',
+		),
+		isConversationSnapshot,
+	)
+	if (seed === undefined)
+		throw new Error('the realistic conversation holds no conversation snapshot')
+	const digest = await computeTextDigest(JSON.stringify(seed))
+	// One call is timed alone in the warmups; the reading then times K back-to-back calls, with K times the warmup median at least 100 ms (MM-3).
+	const warmups = createRecorder<readonly [wall: number]>()
+	while (
+		warmups.count < LEDGER_WARMUP.most &&
+		(warmups.count < LEDGER_WARMUP.least ||
+			warmups.calls.reduce((sum, [wall]) => sum + wall, 0) < LEDGER_WARMUP.wall)
+	) {
+		const start = performance.now()
+		if (!isConversationSnapshot(seed)) throw new Error('the guard refused the seed')
+		warmups.handler(performance.now() - start)
+	}
+	const sorted = warmups.calls.map(([wall]) => wall).sort((left, right) => left - right)
+	const median = sorted[Math.floor(sorted.length / 2)] ?? 0
+	const repeat = Math.max(1, Math.ceil(100 / Math.max(median, Number.EPSILON)))
+	const rounds = Array.from({ length: repeat }, (_unused, round) => round)
+	const readings = createRecorder<readonly [wall: number, cpu: number]>()
+	const measured = await measureOtherLoad(() =>
+		bench(task.name, { async: false, retainSamples: true }, () => {
+			const usage = process.cpuUsage()
+			const start = performance.now()
+			for (const round of rounds)
+				if (!isConversationSnapshot(seed))
+					throw new Error(`the guard refused the seed in round ${round}`)
+			const wall = performance.now() - start
+			const spent = process.cpuUsage(usage)
+			readings.handler(wall, (spent.user + spent.system) / 1000)
+			return { overriddenDuration: wall }
+		}).run({ iterations: 7, time: 0, warmup: false, throws: true }),
+	)
+	console.log(
+		JSON.stringify({
+			title: task.name,
+			pid: process.pid,
+			version: process.version,
+			v8: process.versions.v8,
+			flags: process.execArgv,
+			seed: digest,
+			messages: seed.messages.length,
+			repeat,
+			warmups: warmups.calls.map(([wall]) => wall),
+			walls: readings.calls.map(([wall]) => wall),
+			perCall: readings.calls.map(([wall]) => wall / repeat),
+			cpus: readings.calls.map(([, cpu]) => cpu),
+			load: measured.load,
+			mean: measured.value.latency.mean,
+			rme: measured.value.latency.rme,
+		}),
+	)
+	expect(readings.calls).toHaveLength(7)
 })

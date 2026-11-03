@@ -32,6 +32,13 @@ describe('memory declaration and mechanical evidence', () => {
 			['rolling alone', { rolling: true }],
 			['rolling beside observation', { gauge, rolling: true, observe: true, checkpoints: ['a'] }],
 			['undefined rolling', { gauge, rolling: undefined }],
+			['system layout', { layout: 'system' }],
+			['tight layout', { layout: 'tight' }],
+			['separate layout', { layout: 'separate' }],
+			['zero seed', { seed: 0 }],
+			['positive seed', { seed: 1 }],
+			['layout beside seed and gauge', { gauge, layout: 'separate', seed: 7 }],
+			['undefined layout and seed', { layout: undefined, seed: undefined }],
 		]
 		const refused: ReadonlyArray<readonly [string, unknown]> = [
 			['undefined', undefined],
@@ -72,6 +79,18 @@ describe('memory declaration and mechanical evidence', () => {
 			['array rolling', { gauge, rolling: [true] }],
 			['cased rolling key', { gauge, Rolling: true }],
 			['sections beside rolling', { gauge, rolling: true, sections: 2 }],
+			['other layout literal', { layout: 'inline' }],
+			['cased layout literal', { layout: 'System' }],
+			['null layout', { layout: null }],
+			['array layout', { layout: ['system'] }],
+			['cased layout key', { Layout: 'system' }],
+			['negative seed', { seed: -1 }],
+			['fractional seed', { seed: 1.5 }],
+			['NaN seed', { seed: Number.NaN }],
+			['infinite seed', { seed: Number.POSITIVE_INFINITY }],
+			['text seed', { seed: '1' }],
+			['null seed', { seed: null }],
+			['cased seed key', { Seed: 1 }],
 		]
 		for (const [label, value] of accepted)
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, true])

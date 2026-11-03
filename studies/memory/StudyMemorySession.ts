@@ -11,6 +11,7 @@ import type { StudyContext, StudyGoal, StudyProduct, StudySessionInterface } fro
 import type { StudyOllamaActivity } from '@orkestrel/study/server'
 import type {
 	StudyMemoryInput,
+	StudyMemoryLayout,
 	StudyMemoryProvenance,
 	StudyMemoryProvenanceSource,
 	StudyMemorySessionOptions,
@@ -40,6 +41,7 @@ import {
 	STUDY_MEMORY_TOPICS,
 } from './constants.js'
 import {
+	buildStudyMemoryLayout,
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
 	readStudyMemoryCompaction,
@@ -68,9 +70,13 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #flights = new Set<Promise<StudyProduct>>()
 	// A recording's declared goal range, so its preflight and postflight join the range's two ends.
 	readonly #goals: readonly string[] | undefined
+	// Where the records arm's agent requests carry the records block; absent leaves the request copy as the Ledger wrote it.
+	readonly #layout: StudyMemoryLayout | undefined
 	// The calls the compaction arm dispatched in this run, replaced on each admission as `LedgerRequest` replaces its own.
 	#repeats: ReadonlySet<string> = new Set()
 	#input: string | undefined
+	// The prompt of the goal in flight, which names the request copy a layout moves.
+	#prompt: string | undefined
 	#closing: Promise<void> | undefined
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
@@ -91,6 +97,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		const settings = isStudyMemoryOptions(options.profile.settings)
 			? options.profile.settings
 			: undefined
+		this.#layout = options.arm === 'records' ? settings?.layout : undefined
 		const recorded = options.profile.record !== undefined
 		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
 			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
@@ -133,7 +140,12 @@ export class StudyMemorySession implements StudySessionInterface {
 				url: provider.url,
 				timeout: options.profile.bounds.request.duration,
 				fetch: (input, init) =>
-					this.#transport.fetch('agent', input, init, this.#trace.canonical('agent')),
+					this.#transport.fetch(
+						'agent',
+						input,
+						this.#arrange(init),
+						this.#trace.canonical('agent'),
+					),
 			}),
 			runtime: options.agent,
 			gauge,
@@ -311,6 +323,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		input: StudyMemoryInput,
 		context: StudyContext,
 	): Promise<StudyProduct> {
+		this.#prompt = input.prompt
 		const activity = { goal, context, checkpoint: this.#checkpoint(goal, input) }
 		this.#transport.prepare(activity)
 		this.#trace.start(goal)
@@ -394,6 +407,13 @@ export class StudyMemorySession implements StudySessionInterface {
 				this.#transport.clear()
 			}
 		}
+	}
+
+	// Moves the records block of an agent request body into the declared layout; every other request keeps the settings it arrived with.
+	#arrange(init: RequestInit | undefined): RequestInit | undefined {
+		if (this.#layout === undefined || this.#prompt === undefined || typeof init?.body !== 'string')
+			return init
+		return { ...init, body: buildStudyMemoryLayout(init.body, this.#prompt, this.#layout) }
 	}
 
 	// Keys one dispatched call as `LedgerRequest` keys its own; the authority evaluates each call once.

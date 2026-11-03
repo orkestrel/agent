@@ -2,6 +2,7 @@ import type { Message } from '@orkestrel/agent'
 import type { StudyMemoryProvenance } from '../../../studies/memory/index.js'
 import { describe, expect, it } from 'vitest'
 import {
+	buildStudyMemoryLayout,
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
 	computeStudyMemoryCacheShares,
@@ -277,6 +278,138 @@ describe('memory declaration and mechanical evidence', () => {
 				num_predict: budgets[role],
 				...STUDY_MEMORY_SAMPLING_PINS[role],
 			})
+	})
+
+	it('writes a declared seed over the seed of every role it declares', () => {
+		const url = 'http://127.0.0.1:7'
+		const budgets = { agent: 512, summary: 256, judge: 1 }
+		const seeded = buildMemoryProfile({ url, settings: { ...STUDY_MEMORY_SETTINGS, seed: 7 } })
+		const pinned = buildMemoryProfile({ url, settings: STUDY_MEMORY_SETTINGS })
+		for (const arm of ['records', 'compaction'] as const) {
+			const roles = buildStudyMemoryRoles(seeded, arm)
+			const declared = (['agent', 'summary', 'judge'] as const).filter(
+				(role) => roles[role] !== undefined,
+			)
+			expect(declared).toEqual(arm === 'records' ? ['agent', 'judge'] : ['agent', 'summary'])
+			for (const role of declared)
+				expect(roles[role]?.options).toEqual({
+					num_ctx: 32768,
+					num_predict: budgets[role],
+					...STUDY_MEMORY_SAMPLING_PINS[role],
+					seed: 7,
+				})
+			// With no seed declared, every role holds its pin.
+			for (const role of declared)
+				expect(buildStudyMemoryRoles(pinned, arm)[role]?.options).toEqual({
+					num_ctx: 32768,
+					num_predict: budgets[role],
+					...STUDY_MEMORY_SAMPLING_PINS[role],
+				})
+		}
+		expect(buildStudyMemoryRoles(seeded, 'full').agent?.options).toMatchObject({ seed: 7 })
+	})
+
+	it('moves the records block of a request copy into the declared layout', () => {
+		const records = '## Records\n- Refund issued.'
+		const prompt = 'Check BW-5512.'
+		const system = { role: 'system', content: 'Desk.' }
+		const earlier = { role: 'user', content: 'Earlier.' }
+		const reply = { role: 'assistant', content: 'Noted.' }
+		const copy = { role: 'user', content: `${records}\n\n## Request\n${prompt}` }
+		const request = { role: 'user', content: prompt }
+		const body = JSON.stringify({
+			model: 'model',
+			messages: [system, earlier, reply, copy],
+			stream: true,
+		})
+		expect(buildStudyMemoryLayout(body, prompt, 'system')).toBe(
+			JSON.stringify({
+				model: 'model',
+				messages: [{ role: 'system', content: `Desk.\n\n${records}` }, earlier, reply, request],
+				stream: true,
+			}),
+		)
+		expect(buildStudyMemoryLayout(body, prompt, 'tight')).toBe(
+			JSON.stringify({
+				model: 'model',
+				messages: [{ role: 'system', content: `Desk.\n${records}` }, earlier, reply, request],
+				stream: true,
+			}),
+		)
+		expect(buildStudyMemoryLayout(body, prompt, 'separate')).toBe(
+			JSON.stringify({
+				model: 'model',
+				messages: [
+					system,
+					earlier,
+					reply,
+					{ role: 'user', content: records },
+					{ role: 'user', content: `## Request\n${prompt}` },
+				],
+				stream: true,
+			}),
+		)
+	})
+
+	it('leaves a request with no records block byte for byte', () => {
+		const prompt = 'Check BW-5512.'
+		const bare = JSON.stringify({
+			messages: [
+				{ role: 'system', content: 'Desk.' },
+				{ role: 'user', content: prompt },
+			],
+		})
+		// A copy that holds the heading and prompt but no text ahead of them holds no block either.
+		const headed = JSON.stringify({
+			messages: [
+				{ role: 'system', content: 'Desk.' },
+				{ role: 'user', content: `\n\n## Request\n${prompt}` },
+			],
+		})
+		// A copy for another prompt is no match.
+		const other = JSON.stringify({
+			messages: [
+				{ role: 'system', content: 'Desk.' },
+				{ role: 'user', content: '## Records\n- A.\n\n## Request\nAnother prompt.' },
+			],
+		})
+		for (const layout of ['system', 'tight', 'separate'] as const)
+			for (const body of [bare, headed, other])
+				expect(buildStudyMemoryLayout(body, prompt, layout)).toBe(body)
+	})
+
+	it('moves a request copy only at the suffix and only the last one', () => {
+		const prompt = 'Quote:\n\n## Request\nthen answer.'
+		const stale = { role: 'user', content: `## Records\n- Old.\n\n## Request\n${prompt}` }
+		const copy = { role: 'user', content: `## Records\n- New.\n\n## Request\n${prompt}` }
+		const system = { role: 'system', content: 'Desk.' }
+		const body = JSON.stringify({ messages: [system, stale, copy] })
+		// The heading inside the prompt stays with the prompt, and the earlier copy stays as it was.
+		expect(buildStudyMemoryLayout(body, prompt, 'system')).toBe(
+			JSON.stringify({
+				messages: [
+					{ role: 'system', content: 'Desk.\n\n## Records\n- New.' },
+					stale,
+					{ role: 'user', content: prompt },
+				],
+			}),
+		)
+	})
+
+	it('refuses a body that is no chat request or holds no system message first', () => {
+		const refusal = expect.objectContaining({ code: 'FAULT' })
+		const user = { role: 'user', content: 'Check BW-5512.' }
+		for (const body of [
+			'not json',
+			'[]',
+			'{}',
+			JSON.stringify({ messages: 'text' }),
+			JSON.stringify({ messages: [] }),
+			JSON.stringify({ messages: [user] }),
+			JSON.stringify({ messages: [user, { role: 'system', content: 'Desk.' }] }),
+			JSON.stringify({ messages: [{ role: 'system', content: 3 }, user] }),
+		])
+			expect(() => buildStudyMemoryLayout(body, 'Check BW-5512.', 'system')).toThrow(refusal)
 	})
 
 	it('refuses a recording profile with no version or metadata', () => {
