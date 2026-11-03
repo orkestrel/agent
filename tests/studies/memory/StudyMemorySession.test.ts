@@ -1701,7 +1701,7 @@ describe('passive observation of actual memory requests', () => {
 		).toHaveLength(1)
 	})
 
-	it('attaches logical classifier readings and the calibrated gauge without leaking into requests or products', async () => {
+	it('attaches logical classifier attempts and the calibrated gauge without leaking into requests or products', async () => {
 		const trial: MemoryTrialFixture = {
 			arm: 'records',
 			responses: [],
@@ -1729,13 +1729,13 @@ describe('passive observation of actual memory requests', () => {
 			off.requests.map((request) => request.path),
 		)
 		expect(totalMemoryUsage(on.usage)).toEqual(totalMemoryUsage(off.usage))
-		expect(readMemoryEvents(off.evidence, 'result').map((value) => 'readings' in value)).toEqual([
+		expect(readMemoryEvents(off.evidence, 'result').map((value) => 'attempts' in value)).toEqual([
 			false,
 			false,
 		])
-		const readings = readMemoryEvents(on.evidence, 'result').map((value) => value.readings)
-		expect(readings.every((entry) => Array.isArray(entry))).toBe(true)
-		const entries = readings.flatMap((entry) => (Array.isArray(entry) ? entry : []))
+		const attempts = readMemoryEvents(on.evidence, 'result').map((value) => value.attempts)
+		expect(attempts.every((entry) => Array.isArray(entry))).toBe(true)
+		const entries = attempts.flatMap((entry) => (Array.isArray(entry) ? entry : []))
 		expect(entries.length).toBeGreaterThan(0)
 		expect(
 			entries.every(
