@@ -44,7 +44,7 @@ import { isNonNegativeSafeInteger } from '../validators.js'
  * {@link AgentResult} — capturing each structural field once through a total boundary,
  * accepting conforming accessors and inherited properties, preserving finite negative and
  * fractional usage counts, dropping extras, and resolving `undefined` for a malformed field, a
- * non-finite usage number, a throwing getter, or a hostile or revoked proxy.
+ * non-finite usage number, a throwing getter, or a malformed or revoked proxy.
  *
  * @remarks
  * This is a total hostile-boundary projection. Each structural field is captured once
@@ -124,7 +124,7 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
  * Projects an unknown value onto a fresh, exact `TokenUsage` — capturing `prompt`, `completion`, and
  * `total` once each through a total boundary, preserving finite negative and fractional counts,
  * dropping extras, and resolving `undefined` for a non-object, a missing or non-finite count, a
- * throwing getter, or a hostile or revoked proxy.
+ * throwing getter, or a malformed or revoked proxy.
  *
  * @remarks
  * The capture runs inside Contract's sanctioned exception boundary, so conforming accessors and

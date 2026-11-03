@@ -284,8 +284,8 @@ export type LedgerAgentOptions = Pick<
 
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
- * context capacity, and the optional first-pass thinking, lookups, gauge, shares, snapshot, and
- * recall, correction, and agent bounds.
+ * context capacity, and the optional first-pass thinking, lookups, gauge, shares, snapshot, recall
+ * limit, correction filter, and agent options.
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date

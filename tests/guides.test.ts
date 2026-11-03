@@ -9,6 +9,7 @@ import type {
 	AgentJobInput,
 	ApproverInterface,
 	ConversationManagerInterface,
+	ConversationSnapshot,
 	JudgeAnswer,
 	JudgeRequest,
 	JudgeResult,
@@ -27,6 +28,7 @@ import type {
 	SelectionHandler,
 } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
+import type { ToolDefinition } from '@orkestrel/tool'
 import { GuideCommand } from '@orkestrel/guide/server'
 import { createNDJSONParser, isNDJSONError } from '@orkestrel/ndjson'
 import { readInventory } from '@orkestrel/test/server'
@@ -110,7 +112,7 @@ await new GuideCommand({
 		createGuideOrderLookup,
 		createMeasuredGuideProvider,
 	} = await import('./setup.js')
-	const { captureError, createRecorder, requireValue, waitForCondition } =
+	const { captureError, createRecorder, requireValue, waitForCondition, waitForDelay } =
 		await import('@orkestrel/test')
 	const { createAbort } = await import('@orkestrel/abort')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
@@ -4547,7 +4549,7 @@ await new GuideCommand({
 					},
 					AbortSignal.timeout(30_000),
 				)
-				const readings = Object.fromEntries(
+				const measures = Object.fromEntries(
 					Object.entries(result.answers).map(([id, answer]) => [id, measureAnswer(answer)]),
 				)
 
@@ -4557,17 +4559,17 @@ await new GuideCommand({
 				expect(result.model).toBe('tev1:0.8b')
 				expect(result.usage).toEqual({ prompt: 975, completion: 4, total: 979 })
 				expect(result).not.toHaveProperty('refusals')
-				const label = requireValue(readings.label, 'Missing reading: label')
+				const label = requireValue(measures.label, 'Missing measure: label')
 				expect(label.winner).toBe('bug')
 				expect(label.probability).toBeCloseTo(0.9691, 4)
 				expect(label.confidence).toBeCloseTo(0.9536, 4)
 				expect(label).not.toHaveProperty('score')
-				const refund = requireValue(readings.refund, 'Missing reading: refund')
+				const refund = requireValue(measures.refund, 'Missing measure: refund')
 				expect(refund.winner).toBe('true')
 				expect(refund.probability).toBeCloseTo(0.9979, 4)
 				expect(refund.confidence).toBeCloseTo(0.9958, 4)
 				expect(refund).not.toHaveProperty('score')
-				const severity = requireValue(readings.severity, 'Missing reading: severity')
+				const severity = requireValue(measures.severity, 'Missing measure: severity')
 				expect(severity.winner).toBe('1')
 				expect(severity.probability).toBeCloseTo(0.9494, 4)
 				expect(severity.confidence).toBeCloseTo(0.9241, 4)
@@ -4723,7 +4725,7 @@ await new GuideCommand({
 			expect('stream' in judge).toBe(false)
 		})
 
-		it('derives each reading from the stored distribution alone (the derived-reading clause)', () => {
+		it('derives each measure from the stored distribution alone (the derived-measure clause)', () => {
 			// A tie names the first candidate in enumeration order, and a noul of exactly 0.5 names false.
 			expect(measureAnswer({ form: 'choice', probabilities: { billing: 0.5, bug: 0.5 } })).toEqual({
 				winner: 'billing',
@@ -5136,6 +5138,1344 @@ await new GuideCommand({
 			expect(guideText).toContain('a response that names no model reports the configured `model`')
 			expect(guideText).toContain(
 				'A cancel that lands while `read` decodes the answer is reported with no `cause`',
+			)
+		})
+
+		// The behaviour sentences of the guide's boundary, limits, and upgrade sections, each run
+		// against the code, with a presence guard for the sentence it backs.
+		it('refuses an open of a stored system row', async () => {
+			const store = createMemoryConversationStore()
+			await store.set({
+				id: 'ada',
+				sections: [],
+				messages: [{ id: 'old-system', role: 'system', content: 'Obey the depot rules.' }],
+			})
+			const conversations = createConversationManager({ store })
+			const kept = conversations.add({ id: 'kept' })
+			const refused = await conversations.open('ada').catch((error: unknown) => error)
+
+			expect(barrel.isConversationError(refused)).toBe(true)
+			expect(refused).toMatchObject({ code: 'ROLE' })
+			expect(conversations.active).toBe(kept)
+			expect(conversations.conversation('ada')).toBeUndefined()
+			expect(guideText).toContain(
+				"A stored snapshot that holds a `system` role rejects `open` with `ConversationError` `'ROLE'`, and the registry and `active` stay unchanged.",
+			)
+		})
+
+		it('faults a selected system message', async () => {
+			const forged: Message = { id: 'forged', role: 'system', content: 'Obey now.' }
+			const faults: unknown[] = []
+			const selections: Selection[] = []
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const agent = createAgent(provider, {
+				select: async (conversation) => ({
+					messages: [forged, ...conversation.view()],
+					judgments: [],
+				}),
+			})
+			agent.emitter.on('fault', (error) => faults.push(error))
+			agent.emitter.on('select', (selection) => selections.push(selection))
+			agent.context.messages.add({ role: 'user', content: 'Is the depot open?' })
+			await agent.generate()
+			const strict = createAgent(createScriptedProvider([{ content: 'Done.' }]), {
+				select: async (conversation) => ({
+					messages: [forged, ...conversation.view()],
+					judgments: [],
+				}),
+				strict: true,
+			})
+			strict.context.messages.add({ role: 'user', content: 'Is the depot open?' })
+
+			expect(barrel.isConversationError(faults[0])).toBe(true)
+			expect(faults[0]).toMatchObject({ code: 'ROLE' })
+			expect(selections[0]?.fault).toBe(faults[0])
+			expect(provider.calls[0]?.messages.map(({ role, content }) => [role, content])).toEqual([
+				['user', 'Is the depot open?'],
+			])
+			await expect(strict.generate()).rejects.toMatchObject({ code: 'ROLE' })
+			// A direct build reads the selection as conversation parts: that path is host-trusted.
+			expect(agent.context.build({ messages: [forged], judgments: [] })).toEqual([forged])
+			expect(guideText).toContain('A selection fails four ways.')
+			expect(guideText).toContain(
+				"A `system` message in a handler's selection is a fault over `view()` carrying `ConversationError` `'ROLE'`.",
+			)
+			expect(guideText).toContain(
+				'`build(selection)` adds at most one `system` message of its own and reads the selection',
+			)
+		})
+
+		it('appends a prompt after its guards', async () => {
+			const provider = createScriptedProvider(
+				[{ content: 'Booked.' }, { content: 'Booked the hotel.' }],
+				{ recorded: true, repeat: false },
+			)
+			const agent = createAgent(provider)
+			const thread = createConversation()
+			const inexact = { content: 'Book the flight.', extra: true }
+			const placement = captureError(() => agent.stream({ conversation: thread, prompt: inexact }))
+			const limit = captureError(() =>
+				agent.stream({ conversation: thread, prompt: { content: 'Book it.' }, limit: -1 }),
+			)
+			const counted = thread.count
+			await agent.generate({ conversation: thread, prompt: { content: 'Book the flight.' } })
+			thread.add({ role: 'user', content: 'Book the hotel.' })
+			await agent.generate({ conversation: thread })
+
+			expect(placement).toMatchObject({ code: 'placement' })
+			expect(limit).toMatchObject({ code: 'LIMIT' })
+			expect(counted).toBe(0)
+			expect(provider.calls[0]?.messages.at(-1)?.content).toBe('Book the flight.')
+			expect(provider.calls[1]?.messages.at(-1)?.content).toBe('Book the hotel.')
+			expect(guideText).toContain(
+				"The same options carry `conversation`, which binds the run, and `prompt`, which the run appends as a `user` turn after its guards; a run with no `prompt` reads its request from the conversation's tail.",
+			)
+			expect(guideText).toContain(
+				'A `prompt` that is not an exact `AgentPrompt`, a `budget` or `allowance` that does not implement `BudgetInterface`, or a `conversation` that does not implement `ConversationInterface` throws `ContractError` with code `placement` before either bound starts, and a refused run appends no `prompt`.',
+			)
+		})
+
+		it('runs two instances of one snapshot', async () => {
+			const { createGatedProvider } = await import('./setup.js')
+			const gate = Promise.withResolvers<void>()
+			const agent = createAgent(createGatedProvider(gate))
+			const seed = createConversation()
+			seed.add({ role: 'user', content: 'Is the depot open?' })
+			const snapshot = seed.snapshot()
+			const first = createConversation({ snapshot })
+			const second = createConversation({ snapshot })
+			const one = agent.generate({ conversation: first })
+			const two = agent.generate({ conversation: second })
+			const refused = captureError(() => agent.generate({ conversation: first }))
+			gate.resolve()
+
+			expect(refused).toMatchObject({ code: 'CONCURRENCY' })
+			expect([(await one).content, (await two).content]).toEqual(['full', 'full'])
+			expect(guideText).toContain('The guard compares conversation instances')
+			expect(guideText).toContain(
+				'so a host opens each thread once and keys its thread registry by principal and thread.',
+			)
+		})
+
+		it('lays a request out as the table says', async () => {
+			const skills = barrel.createSkillManager()
+			skills.add({ name: 'review', description: 'Reviews a change.', content: 'List each defect.' })
+			const memos = barrel.createMemoManager()
+			memos.add({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' })
+			const provider = createScriptedProvider([{ content: 'Closed.' }], { recorded: true })
+			const stub = createStubSummarizer()
+			const conversations = createConversationManager({ summarize: stub.summarize })
+			const agent = createAgent(provider, {
+				system: 'You staff the depot.',
+				skills,
+				memos,
+				conversations,
+			})
+			agent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
+			agent.context.workspaces.add().write('notes.txt', 'Dock 4 is closed.')
+			const other = createConversation()
+			other.add({ role: 'user', content: 'Dock 4 closes at noon.' })
+			const block = other.reference({ label: 'planning', messages: other.messages() })
+			agent.context.messages.add([
+				{ role: 'user', content: block },
+				{ role: 'assistant', content: 'Noted.' },
+				{ role: 'user', content: 'Is dock 4 open?' },
+			])
+			await agent.generate()
+			const sent = requireValue(provider.calls[0], 'Missing request').messages
+			await agent.context.messages.compact({ keep: 0 })
+			agent.context.instructions.add({ name: 'skill:review', content: 'List each defect.' })
+			const loaded = agent.context.build()[0]?.content
+			agent.context.apply(createScope({ name: 'plain', instructions: ['tone'] }))
+
+			expect(sent.map(({ role }) => role)).toEqual(['system', 'user', 'user', 'assistant', 'user'])
+			expect(sent[0]?.content).toBe(
+				'You staff the depot.\n\n## Instructions\n\nBe terse.\n\n## Skills\n\n- review: Reviews a change.',
+			)
+			expect(sent[1]?.content).toContain(
+				'## Memos\n\n- tone: Prefers short replies.\n\n## Workspace',
+			)
+			expect(sent[1]?.content).toContain('File: notes.txt')
+			expect(sent[2]?.content).toBe(block)
+			expect(sent[4]?.content).toBe('Is dock 4 open?')
+			// The fold took the exchange and left the instruction in the head.
+			expect(stub.calls).toHaveLength(1)
+			expect(loaded).toContain('Be terse.')
+			expect(loaded).toContain('List each defect.')
+			expect(agent.context.build()[0]?.content).not.toContain('List each defect.')
+			expect(guideText).toContain('an instruction never folds')
+			expect(guideText).toContain(
+				'a host scope with an explicit `instructions` allow-list filters a loaded `skill:<name>` instruction',
+			)
+		})
+
+		it('binds page tools to shared definitions', async () => {
+			const { createRelayHop } = await import('./setup.js')
+			const PAGE_TOOLS: readonly ToolDefinition[] = [
+				{
+					name: 'read_selection',
+					description: 'Read the text the user selected on the page.',
+					parameters: { type: 'object', properties: {} },
+				},
+			]
+			const upstream = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'read-1', name: 'read_selection', arguments: {} }] },
+					{ content: 'You selected order BW-5512.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const browser = createRelayHop({
+				provider: upstream,
+				system: { text: 'You help on the Larkspur order page.' },
+				tools: { definitions: PAGE_TOOLS },
+			})
+			const tools = createToolManager()
+			tools.add(
+				PAGE_TOOLS.map((definition) =>
+					createTool({ ...definition, execute: () => 'Order BW-5512' }),
+				),
+			)
+			const agent = createAgent(browser, { tools })
+			agent.context.messages.add({ role: 'user', content: 'What did I select?' })
+			const result = await agent.generate({ schema: { type: 'object' } })
+
+			expect(result.content).toBe('You selected order BW-5512.')
+			expect(upstream.calls[0]?.messages.map(({ role, content }) => [role, content])).toEqual([
+				['system', 'You help on the Larkspur order page.'],
+				['user', 'What did I select?'],
+			])
+			expect(upstream.calls[0]?.tools?.map(({ name }) => name)).toEqual(['read_selection'])
+			expect(upstream.calls[0]?.options).toEqual({ schema: { type: 'object' } })
+			expect(upstream.calls[1]?.messages.at(-1)).toMatchObject({
+				role: 'tool',
+				content: 'Order BW-5512',
+			})
+			expect(guideText).toContain('export const PAGE_TOOLS: readonly ToolDefinition[] = [')
+			expect(guideText).toContain('createTool({ ...definition, execute: () => readSelection() })')
+			expect(guideText).toContain('tools: { definitions: PAGE_TOOLS },')
+			expect(guideText).toContain(
+				"The relay forwards the page's options (`think`, `schema`) and its history upstream under the operator's credential; the page chooses them, and Agent 0.0.35 applies no operator policy over them.",
+			)
+		})
+
+		it('answers 422 for an undeclared page tool', async () => {
+			const { createRelayHop } = await import('./setup.js')
+			const declared: ToolDefinition = { name: 'read_selection', description: 'Read it.' }
+			const undeclared: ToolDefinition = { name: 'export_order', description: 'Export it.' }
+			const messages: readonly Message[] = [{ id: '1', role: 'user', content: 'Export it.' }]
+			const upstream = createScriptedProvider([{ content: 'Exported.' }], { recorded: true })
+			const refused = await createRelayHop({
+				provider: upstream,
+				tools: { definitions: [declared] },
+			})
+				.generate(messages, createAbort().signal, [declared, undeclared])
+				.catch((error: unknown) => error)
+			const started = upstream.started
+			const admitted = await createRelayHop({
+				provider: upstream,
+				tools: { accept: true },
+			}).generate(messages, createAbort().signal, [undeclared])
+
+			expect(refused).toMatchObject({ code: 'HTTP', status: 422 })
+			expect(started).toBe(0)
+			expect(admitted.content).toBe('Exported.')
+			expect(upstream.calls[0]?.tools?.map(({ name }) => name)).toEqual(['export_order'])
+			expect(guideText).toContain('tools: { accept: true }')
+		})
+
+		it('needs system.accept for a page ledger', async () => {
+			const { createRelayHop } = await import('./setup.js')
+			const script = [
+				{ content: '', usage: { prompt: 160, completion: 0, total: 160 } },
+				{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+			]
+			const refused = await createLedger(
+				createRelayHop({
+					provider: createScriptedProvider(script, { repeat: false }),
+					tools: { accept: true },
+				}),
+				buildGuideLedgerOptions({ judge: createPhraseJudge([]) }),
+			)
+				.calibrate(AbortSignal.timeout(30_000))
+				.catch((error: unknown) => error)
+			const gauge = await createLedger(
+				createRelayHop({
+					provider: createScriptedProvider(script, { repeat: false }),
+					system: { accept: true },
+					tools: { accept: true },
+				}),
+				buildGuideLedgerOptions({ judge: createPhraseJudge([]) }),
+			).calibrate(AbortSignal.timeout(30_000))
+
+			expect(refused).toMatchObject({ code: 'HTTP', status: 422 })
+			expect(gauge.overhead).toBe(120)
+			expect(guideText).toContain('A page `Ledger` over a relay needs `system: { accept: true }`')
+		})
+
+		it('stops a run from a deny listener', async () => {
+			const ran: string[] = []
+			const tools = createToolManager()
+			tools.add(
+				['search', 'delete_order'].map((name) =>
+					createTool({
+						name,
+						execute: () => {
+							ran.push(name)
+							return name
+						},
+					}),
+				),
+			)
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'search-1', name: 'search', arguments: {} }] },
+					{ content: '', tools: [{ id: 'delete-1', name: 'delete_order', arguments: {} }] },
+					{ content: 'Never read.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const authority = barrel.createAuthority({
+				rules: [{ match: (context) => context.call.name === 'search', zone: 'read' }],
+				fallback: { zone: 'blocked', verdict: 'deny', reason: 'that tool is not on the list' },
+			})
+			const agent = createAgent(provider, { tools, authority })
+			agent.emitter.on('deny', (call, reason) => agent.abort(`${call.name}: ${reason}`))
+			agent.context.messages.add({ role: 'user', content: 'Delete order BW-5512.' })
+			const result = await agent.generate()
+
+			expect(ran).toEqual(['search'])
+			expect(provider.calls).toHaveLength(2)
+			expect(result.partial).toBe(true)
+			expect(guideText).toContain(
+				"agent.emitter.on('deny', (call, reason) => agent.abort(`${call.name}: ${reason}`))",
+			)
+			expect(guideText).toContain(
+				"fallback: { zone: 'blocked', verdict: 'deny', reason: 'that tool is not on the list' },",
+			)
+		})
+
+		it('relaxes the floor with an ask handler', async () => {
+			const ran: string[] = []
+			const tools = createToolManager()
+			tools.add(
+				createTool({
+					name: 'refund',
+					annotations: { consequential: true },
+					execute: () => {
+						ran.push('refund')
+						return 'refunded'
+					},
+				}),
+			)
+			const turns = [
+				{ content: '', tools: [{ id: 'refund-1', name: 'refund', arguments: {} }] },
+				{ content: 'Done.' },
+			]
+			const floor = createAgent(createScriptedProvider(turns, { repeat: false }), { tools })
+			floor.context.messages.add({ role: 'user', content: 'Refund order BW-5512.' })
+			await floor.generate()
+			const before = [...ran]
+			const relaxed = createAgent(createScriptedProvider(turns, { repeat: false }), {
+				tools,
+				authority: barrel.createAuthority({ ask: () => true }),
+			})
+			relaxed.context.messages.add({ role: 'user', content: 'Refund order BW-5512.' })
+			await relaxed.generate()
+
+			expect(before).toEqual([])
+			expect(ran).toEqual(['refund'])
+			expect(guideText).toContain('`ask: () => true` is the visible relaxation')
+		})
+
+		it('refuses a consequential lookup', async () => {
+			const executed: unknown[] = []
+			const denials: unknown[] = []
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'That lookup needs approval.' },
+					{
+						content: '',
+						tools: [{ id: 'c2', name: 'lookup_order', arguments: { id: 'BW-7741' } }],
+					},
+					{ content: 'It still needs approval.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: {
+								...LEDGER_ORDER_LOOKUP.tool,
+								annotations: { consequential: true },
+								execute: (args) => {
+									executed.push(args)
+									return 'Order found.'
+								},
+							},
+						},
+					],
+				}),
+			)
+			ledger.agent.emitter.on('deny', (call, reason, decision) =>
+				denials.push([call.name, reason, decision?.verdict]),
+			)
+			await ledger.respond('Can order BW-5512 get a refund?')
+			await ledger.respond('Can order BW-7741 get a refund?')
+
+			expect(executed).toEqual([])
+			expect(denials).toEqual([
+				['lookup_order', 'an asked call needs an approver and none is set', 'ask'],
+				['lookup_order', 'an asked call needs an approver and none is set', 'ask'],
+			])
+			expect(provider.calls[1]?.messages.findLast(({ role }) => role === 'tool')?.content).toBe(
+				`"lookup_order" did not run: ${barrel.AUTHORITY_NOTES.unanswered}`,
+			)
+			expect(guideText).toContain(
+				'A ledger lookup is a read; a tool whose call has a consequence is not a lookup, and a ledger refuses a `consequential` lookup at every call.',
+			)
+		})
+
+		it('round trips a memo set through JSON', () => {
+			const memos = barrel.createMemoManager({ id: 'ada' })
+			memos.add({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' })
+			const stored = JSON.stringify(memos.snapshot())
+			const parsed: unknown = JSON.parse(stored)
+			if (!barrel.isMemoSnapshot(parsed)) throw new Error('Not a memo snapshot')
+			const restored = barrel.createMemoManager({ snapshot: parsed })
+
+			expect(restored.id).toBe('ada')
+			expect(restored.memo('tone')?.description).toBe('Prefers short replies.')
+			expect(guideText).toContain('const stored = JSON.stringify(memos.snapshot())')
+			expect(guideText).toContain('if (!isMemoSnapshot(parsed))')
+			expect(guideText).toContain('const restored = createMemoManager({ snapshot: parsed })')
+		})
+
+		it('copies a frozen judgment to edit it', () => {
+			const conversation = createConversation()
+			const ticket = conversation.add({ role: 'user', content: 'I was charged twice.' })
+			const record = conversation.judgments.add({
+				id: 'refund',
+				question: { form: 'noul', instructions: 'Is a refund owed?' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'tev1:0.8b',
+				sources: [ticket.id],
+				state: ticket.content,
+			})
+			const write = captureError(() => Object.assign(record, { model: 'redacted' }))
+			const snapshot = conversation.snapshot()
+			const copy = barrel.copyJSON(record)
+			if (!barrel.isJudgment(copy)) throw new Error('Not a judgment')
+			const edited = { ...copy, model: 'redacted' }
+			const hydrated = createConversation({ snapshot: { ...snapshot, judgments: [edited] } })
+
+			expect(write).toBeInstanceOf(TypeError)
+			expect(Object.isFrozen(record.question)).toBe(true)
+			expect(conversation.judgments.judgment('refund')).toBe(record)
+			expect(conversation.judgments.judgments()).not.toBe(conversation.judgments.judgments())
+			expect(conversation.judgments.judgments()[0]).toBe(record)
+			expect(snapshot.judgments?.[0]).toBe(record)
+			expect(Object.isFrozen(edited)).toBe(false)
+			expect(hydrated.judgments.judgment('refund')?.model).toBe('redacted')
+			expect(Object.isFrozen(hydrated.judgments.judgment('refund'))).toBe(true)
+			expect(guideText).toContain(
+				'Hydrating takes an owned frozen copy and never touches its input.',
+			)
+		})
+
+		it('hands back the stored snapshot object', async () => {
+			const conversation = createConversation()
+			const ticket = conversation.add({ role: 'user', content: 'I was charged twice.' })
+			conversation.judgments.add({
+				id: 'refund',
+				question: { form: 'noul', instructions: 'Is a refund owed?' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'tev1:0.8b',
+				sources: [ticket.id],
+				state: ticket.content,
+			})
+			const store = createMemoryConversationStore()
+			const snapshot = conversation.snapshot()
+			await store.set(snapshot)
+			const stored = requireValue(await store.get(conversation.id), 'Missing snapshot')
+			Object.assign(requireValue(stored.messages[0], 'Missing message'), { content: 'Edited.' })
+			const again = requireValue(await store.get(conversation.id), 'Missing snapshot')
+			const judgment = requireValue(stored.judgments?.[0], 'Missing judgment')
+
+			expect(stored).toBe(snapshot)
+			expect(again.messages[0]?.content).toBe('Edited.')
+			expect(captureError(() => Object.assign(judgment, { model: 'x' }))).toBeInstanceOf(TypeError)
+			expect(guideText).toContain(
+				'`MemoryConversationStore.get` hands back the stored snapshot object itself',
+			)
+			expect(guideText).toContain('copy a judgment through `copyJSON` to migrate or redact it')
+		})
+
+		it('recovers a snapshot with a system row', async () => {
+			const judged = createConversation()
+			const ticket = judged.add({ role: 'user', content: 'Book it.' })
+			judged.judgments.add({
+				id: 'refund',
+				question: { form: 'noul', instructions: 'Is a refund owed?' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'tev1:0.8b',
+				sources: ['old-live'],
+				state: ticket.content,
+			})
+			const written: ConversationSnapshot = {
+				id: 'thread-1',
+				sections: [
+					{
+						id: 'section-1',
+						summary: 'Earlier recap.',
+						messages: [
+							{ id: 'old-section', role: 'system', content: 'Old rule.' },
+							{ id: 'kept-user', role: 'user', content: 'Is the depot open?' },
+						],
+					},
+					{
+						id: 'section-2',
+						summary: 'Only the row.',
+						messages: [{ id: 'lone', role: 'system', content: 'Lone rule.' }],
+					},
+				],
+				messages: [
+					{ id: 'old-live', role: 'system', content: 'Old live rule.' },
+					{ id: 'kept-live', role: 'user', content: 'Book it.' },
+				],
+				judgments: judged.judgments.judgments(),
+			}
+			const store = createMemoryConversationStore()
+			await store.set(written)
+			const conversations = createConversationManager({ store })
+			const refused = await conversations.open('thread-1').catch((error: unknown) => error)
+
+			const stored: unknown = await store.get('thread-1')
+			if (!barrel.isConversationSnapshot(stored)) throw new Error('Not a conversation snapshot')
+			const cleaned: ConversationSnapshot = {
+				...stored,
+				sections: stored.sections.map((section) => ({
+					...section,
+					messages: section.messages.filter(({ role }) => role !== 'system'),
+				})),
+				messages: stored.messages.filter(({ role }) => role !== 'system'),
+			}
+			await store.set(cleaned)
+			const conversation = requireValue(await conversations.open('thread-1'), 'Missing thread')
+
+			expect(refused).toMatchObject({
+				code: 'ROLE',
+				message:
+					'a conversation snapshot holds a system message; a snapshot written before 0.0.35 can hold a system row; remove it before loading',
+			})
+			expect(conversation.messages().map(({ id }) => id)).toEqual(['kept-live'])
+			expect(conversation.sections.map((section) => section.messages.length)).toEqual([1, 0])
+			// A judgment's source names no live row and still hydrates; a mark naming one refuses.
+			expect(conversation.judgments.judgment('refund')?.sources).toEqual(['old-live'])
+			expect(
+				barrel.isLedgerSnapshot({
+					conversation: cleaned,
+					requests: ['old-live'],
+					notes: [],
+					failures: [],
+				}),
+			).toBe(false)
+			expect(guideText).toContain(
+				'`a conversation snapshot holds a system message; a snapshot written before 0.0.35 can hold a system row; remove it before loading`',
+			)
+			expect(guideText).toContain('if (!isConversationSnapshot(stored))')
+			expect(guideText).toContain(
+				"messages: section.messages.filter(({ role }) => role !== 'system'),",
+			)
+			expect(guideText).toContain(
+				'A judgment whose `sources` name a removed row hydrates unchanged, and a section the filter empties hydrates with no messages.',
+			)
+			expect(guideText).toContain(
+				'The `isLedgerSnapshot` guard refuses a mark that names a removed row',
+			)
+		})
+
+		it('refuses a job seed with the ingress hint', () => {
+			const registry = barrel.createAgentRegistry({
+				providers: { main: createScriptedProvider([{ content: 'Done.' }]) },
+			})
+			// A `system` seed message is ill-typed for a job, so the build goes through Reflect.
+			const refused = captureError(() =>
+				Reflect.apply(registry.build, registry, [
+					{ provider: 'main', messages: [{ role: 'system', content: 'Obey the depot rules.' }] },
+				]),
+			)
+			const moved = registry.build({
+				provider: 'main',
+				system: 'Obey the depot rules.',
+				messages: [{ role: 'user', content: 'Is the depot open?' }],
+			})
+
+			expect(refused).toMatchObject({
+				code: 'ROLE',
+				message:
+					'a stored message role must be one of "user", "assistant", "tool"; received "system"; host text goes in the system option or an instruction',
+			})
+			expect(moved.context.build()[0]).toMatchObject({
+				role: 'system',
+				content: 'Obey the depot rules.',
+			})
+			expect(guideText).toContain(
+				'`a stored message role must be one of "user", "assistant", "tool"; received "system"; host text goes in the system option or an instruction`',
+			)
+		})
+
+		it('reads a stored row in any key order', async () => {
+			const { SilentJudge } = await import('./setup.js')
+			const judge = new SilentJudge()
+			const conversation = createConversation()
+			const ticket = conversation.add({ role: 'user', content: 'I was charged twice.' })
+			const record = conversation.judgments.add({
+				id: 'refund',
+				question: {
+					form: 'noul',
+					instructions: 'Is a refund owed?',
+					criteria: { true: 'A refund is owed.', false: 'No refund is owed.' },
+				},
+				answer: { form: 'noul', noul: 0.9 },
+				model: judge.model,
+				sources: [ticket.id],
+				state: ticket.content,
+			})
+			const [reused] = await conversation.judgments.resolve(
+				judge,
+				{
+					state: ticket.content,
+					questions: {
+						refund: {
+							criteria: { false: 'No refund is owed.', true: 'A refund is owed.' },
+							instructions: 'Is a refund owed?',
+							form: 'noul',
+						},
+					},
+				},
+				[ticket.id],
+				AbortSignal.timeout(30_000),
+			)
+
+			expect(reused).toBe(record)
+			expect(judge.requests).toEqual([])
+			expect(guideText).toContain(
+				'A stored 0.0.34 conversation row matches in any key order after upgrade, and a record dead under the text compare becomes live, with no migration.',
+			)
+		})
+
+		it('loads a skill at the next build site', async () => {
+			const body = 'List each defect with its line.'
+			const skills = barrel.createSkillManager()
+			skills.add({ name: 'review', description: 'Reviews a change.', content: body })
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'load-1', name: 'load_skill', arguments: { name: 'review' } }],
+					},
+					{ content: 'Loaded.' },
+					{ content: 'Reviewed.' },
+					{ content: 'Reviewed the other change.' },
+					{ content: 'Done.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const tools = createToolManager()
+			const conversations = createConversationManager()
+			const thread = conversations.add({ id: 'first' })
+			const agent = createAgent(provider, { tools, skills, conversations })
+			tools.add(
+				createTool({
+					name: 'load_skill',
+					execute: (args) => {
+						const skill = skills.skill(String(args.name))
+						if (skill === undefined) return 'no such skill'
+						agent.context.instructions.add({ name: `skill:${skill.name}`, content: skill.content })
+						return `loaded ${skill.name}`
+					},
+				}),
+			)
+			await agent.generate({ conversation: thread, prompt: { content: 'Review the diff.' } })
+			await agent.generate({ conversation: thread, prompt: { content: 'Review it again.' } })
+			const other = conversations.add({ id: 'second' })
+			await agent.generate({ conversation: other, prompt: { content: 'Review this one.' } })
+			agent.context.instructions.remove('skill:review')
+			await agent.generate({ conversation: other, prompt: { content: 'Review once more.' } })
+
+			// No fold: the load's own run keeps the head it built, and the next run carries the body.
+			expect(provider.calls.map((call) => call.messages[0]?.content.includes(body))).toEqual([
+				false,
+				false,
+				true,
+				true,
+				false,
+			])
+
+			const folded = createScriptedProvider(
+				[
+					{
+						content: 'x'.repeat(400),
+						tools: [{ id: 'load-2', name: 'load_skill', arguments: { name: 'review' } }],
+					},
+					{ content: 'Loaded.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const foldTools = createToolManager()
+			const foldThreads = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+				keep: 0,
+			})
+			// An earlier exchange gives the between-turns fold a slice before the run's request.
+			foldThreads.add().add([
+				{ role: 'user', content: 'Earlier question.' },
+				{ role: 'assistant', content: 'Earlier answer.' },
+			])
+			const foldAgent = createAgent(folded, {
+				tools: foldTools,
+				skills,
+				conversations: foldThreads,
+				// Message arithmetic is the claim, so the window projects the request's messages.
+				window: createBudget({
+					max: 60,
+					consumer: (request: ProviderRequest) => estimateMessages(request.messages),
+				}),
+			})
+			foldTools.add(
+				createTool({
+					name: 'load_skill',
+					execute: () => {
+						foldAgent.context.instructions.add({ name: 'skill:review', content: body })
+						return 'loaded review'
+					},
+				}),
+			)
+			await foldAgent.generate({ prompt: { content: 'Review the diff.' } })
+
+			// A fold on the turn after the load rebuilds the head, so that turn carries the body.
+			expect(foldThreads.active?.sections).toHaveLength(1)
+			expect(folded.calls.map((call) => call.messages[0]?.content.includes(body))).toEqual([
+				false,
+				true,
+			])
+			expect(guideText).toContain(
+				"A loaded body applies as any instruction added during a run does, at the next build site named under scope changes. A run whose next turn does not fold keeps the head it built, so the model holds the tool's acknowledgement and not the body until the next run; a turn that folds rebuilds the head and carries the body. A load then serves that agent's later runs in every conversation, until the host removes the instruction.",
+			)
+		})
+
+		it('sends an over-window request leniently', async () => {
+			const stub = createStubSummarizer()
+			const faults: unknown[] = []
+			const errors: unknown[] = []
+			const conversation = createConversation({ summarize: stub.summarize, keep: 2 })
+			conversation.add({ role: 'user', content: 'x'.repeat(4_000) })
+			const provider = createScriptedProvider([{ content: 'Answered.' }], { recorded: true })
+			const window = createBudget({ max: 100, consumer: estimateRequest })
+			const agent = createAgent(provider, { window })
+			agent.emitter.on('fault', (error) => faults.push(error))
+			agent.emitter.on('error', (error) => errors.push(error))
+			const result = await agent.generate({ conversation })
+
+			expect(provider.calls).toHaveLength(1)
+			expect(result).toMatchObject({ content: 'Answered.', partial: false })
+			expect(stub.calls).toEqual([])
+			expect(faults).toEqual([])
+			expect(errors).toEqual([])
+			expect(window.exhausted).toBe(true)
+			expect(window.consumed).toBe(
+				estimateRequest({ messages: requireValue(provider.calls[0], 'Missing call').messages }),
+			)
+			expect(guideText).toContain(
+				'The over-window prompt then proceeds to the provider, and the provider decides what happens past its window.',
+			)
+			expect(guideText).toContain(
+				"With `strict` false, the default, no error and no agent event marks that point: the loop sends the over-window request, and no reading covers the provider's behavior past its window.",
+			)
+			expect(guideText).toContain('only `strict` refuses a request still over the window.')
+		})
+
+		it('reads the window of the last request', async () => {
+			const measured: number[] = []
+			const tools = createToolManager()
+			tools.add(
+				createTool({
+					name: 'lookup',
+					description: 'Reads one ticket. '.repeat(400),
+					execute: () => 'ticket 7',
+				}),
+			)
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
+					{ content: 'Ticket 7 is open.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const conversation = createConversation({
+				summarize: createStubSummarizer().summarize,
+				keep: 2,
+			})
+			conversation.add({ role: 'user', content: 'Look up ticket 7.' })
+			const window = createBudget({
+				max: 200,
+				consumer: (request: ProviderRequest) => {
+					const estimate = estimateRequest(request)
+					measured.push(estimate)
+					return estimate
+				},
+			})
+			const agent = createAgent(provider, { tools, window })
+			// The tool's description puts the first request over the window; the scope drops it next.
+			agent.emitter.on('tool', () =>
+				agent.context.apply(createScope({ name: 'answer', tools: [] })),
+			)
+			await agent.generate({ conversation })
+
+			expect(provider.calls).toHaveLength(2)
+			expect(measured[0]).toBeGreaterThanOrEqual(200)
+			expect(measured.at(-1)).toBeLessThan(200)
+			expect(window.consumed).toBe(measured.at(-1))
+			expect(window.exhausted).toBe(false)
+			expect(guideText).toContain(
+				'The `consumed` and `exhausted` members of your `window` `Budget` read the last request the loop measured, so read them after a run, or set `strict`.',
+			)
+		})
+
+		it('refuses an over-window request strictly', async () => {
+			const stub = createStubSummarizer()
+			const conversation = createConversation({ summarize: stub.summarize, keep: 2 })
+			conversation.add({ role: 'user', content: 'x'.repeat(4_000) })
+			const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
+			const window = createBudget({ max: 100, consumer: estimateRequest })
+			const agent = createAgent(provider, { window, strict: true })
+			const refused = await agent.generate({ conversation }).catch((error: unknown) => error)
+
+			expect(barrel.isAgentError(refused)).toBe(true)
+			expect(refused).toMatchObject({
+				code: 'WINDOW',
+				message: `the request measures ${window.consumed} against a window of 100 and this run folds no further`,
+			})
+			expect(provider.calls).toEqual([])
+			expect(stub.calls).toEqual([])
+			expect(guideText).toContain(
+				"the run refused it with `AgentError` `'WINDOW'` before any dispatch.",
+			)
+		})
+
+		it('folds nothing with no eligible slice', async () => {
+			const sections = Array.from({ length: 8 }, (_unused, at): Section => ({
+				id: `section-${at}`,
+				summary: `Recap ${at}.`,
+				messages: [
+					{ id: `user-${at}`, role: 'user', content: `Ticket ${at} opened.` },
+					{ id: `reply-${at}`, role: 'assistant', content: `Ticket ${at} noted.` },
+				],
+			}))
+			const snapshot: ConversationSnapshot = {
+				id: 'desk',
+				sections,
+				messages: [
+					{ id: 'tail-1', role: 'user', content: 'Is the depot open?' },
+					{ id: 'tail-2', role: 'assistant', content: 'It is open.' },
+					{ id: 'tail-3', role: 'user', content: 'Book a slot.' },
+				],
+			}
+			const stub = createStubSummarizer()
+			const cumulative = createConversation({
+				snapshot,
+				summarize: stub.summarize,
+				keep: 2,
+				cumulative: true,
+			})
+			const capped = createConversation({
+				snapshot,
+				summarize: stub.summarize,
+				keep: 2,
+				sections: 4,
+			})
+			const nothing = [await cumulative.compact(), await capped.compact()]
+			const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
+			const agent = createAgent(provider, {
+				window: createBudget({ max: 1, consumer: estimateRequest }),
+				strict: true,
+			})
+			const first = await agent
+				.generate({ conversation: cumulative })
+				.catch((error: unknown) => error)
+			const retry = await agent
+				.generate({ conversation: cumulative })
+				.catch((error: unknown) => error)
+			const asked = stub.calls.length
+			await cumulative.compact({ keep: 0 })
+			await capped.compact({ keep: 0 })
+
+			expect(nothing).toEqual([undefined, undefined])
+			expect(first).toMatchObject({ code: 'WINDOW' })
+			expect(retry).toMatchObject({ code: 'WINDOW' })
+			expect(asked).toBe(0)
+			expect(provider.calls).toEqual([])
+			expect(cumulative.sections).toHaveLength(1)
+			expect(cumulative.sections[0]?.messages).toHaveLength(18)
+			expect(cumulative.messages().map(({ id }) => id)).toEqual(['tail-3'])
+			expect(capped.sections).toHaveLength(4)
+			expect(guideText).toContain(
+				'and a hydrated snapshot with several sections folds them all at the next fold that has an eligible slice',
+			)
+			expect(guideText).toContain('so `compact()` folds nothing and a strict retry refuses again')
+		})
+
+		it('asks a replaced value only when unset', async () => {
+			const asks: Array<readonly string[]> = []
+			const stated = barrel.extractLiterals('the refund limit is 500')
+			const later = barrel.extractLiterals('no, the refund limit is 600')
+			for (const correction of [{}, { narrow: true }]) {
+				const conversation = createConversation()
+				const [first, second] = conversation.add([
+					{ role: 'user', content: 'the refund limit is 500' },
+					{ role: 'user', content: 'no, the refund limit is 600' },
+				])
+				const classifier = new Classifier({
+					conversation,
+					judge: {
+						id: 'scripted',
+						name: 'scripted',
+						model: 'scripted',
+						ask: async (request) => ({
+							model: 'scripted',
+							answers: Object.fromEntries(
+								Object.entries(request.questions).map(([id, question]): [string, JudgeAnswer] => [
+									id,
+									question.form === 'choice'
+										? {
+												form: 'choice',
+												probabilities:
+													isString(request.state) && request.state.includes('no, the refund')
+														? { correction: 1 }
+														: { fact: 1 },
+											}
+										: { form: 'noul', noul: id.startsWith('["topic"') ? 0.9 : 0.1 },
+								]),
+							),
+						}),
+					},
+					questions: LEDGER_QUESTIONS,
+					topics: [LEDGER_REFUNDS_TOPIC],
+					thresholds: LEDGER_DESK_THRESHOLDS,
+					assign: () => undefined,
+					entities: () => new Set(),
+					correction,
+				})
+				const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+				asks.push(
+					filed.attempts
+						.filter((attempt) => attempt.phase === 'amends')
+						.map((attempt) =>
+							attempt.key === JSON.stringify(['amends', first?.id, second?.id])
+								? 'pair'
+								: attempt.key,
+						),
+				)
+			}
+
+			expect([...stated.numbers].some((number) => later.numbers.has(number))).toBe(false)
+			expect(asks).toEqual([['pair'], []])
+			expect(guideText).toContain(
+				'For example, "the refund limit is 500" then "no, the refund limit is 600" shares no literal, so with no shared registry entity `narrow` never asks about that pair, where the unset rule does.',
+			)
+		})
+
+		it('asks pair questions until an abort', async () => {
+			const counts: number[] = []
+			for (const earlier of [2, 4]) {
+				const conversation = createConversation()
+				conversation.add(
+					Array.from({ length: earlier }, (_unused, at): MessageInput => ({
+						role: 'user',
+						content: `A refund of ${at + 10} went out.`,
+					})),
+				)
+				conversation.add({ role: 'user', content: 'Correction: a refund of 10 stays open.' })
+				const filed = await new Classifier({
+					conversation,
+					judge: createPhraseJudge([]),
+					questions: LEDGER_QUESTIONS,
+					topics: [LEDGER_REFUNDS_TOPIC],
+					thresholds: LEDGER_DESK_THRESHOLDS,
+					assign: () => undefined,
+					entities: () => new Set(),
+				}).classify(new Set(), AbortSignal.timeout(30_000))
+				counts.push(filed.attempts.filter((attempt) => attempt.phase === 'amends').length)
+			}
+
+			const abort = new AbortController()
+			const inner = createPhraseJudge([])
+			const asked: string[] = []
+			const conversation = createConversation()
+			conversation.add(
+				Array.from({ length: 4 }, (_unused, at): MessageInput => ({
+					role: 'user',
+					content: `A refund of ${at + 10} went out.`,
+				})),
+			)
+			conversation.add({ role: 'user', content: 'Correction: a refund of 10 stays open.' })
+			const filed = await new Classifier({
+				conversation,
+				judge: {
+					id: inner.id,
+					name: inner.name,
+					model: inner.model,
+					ask: async (request, signal) => {
+						asked.push(...Object.keys(request.questions).filter((id) => id.startsWith('["amends"')))
+						if (asked.length === 2) {
+							abort.abort('the caller left')
+							throw signal.reason
+						}
+						return inner.ask(request, signal)
+					},
+				},
+				questions: LEDGER_QUESTIONS,
+				topics: [LEDGER_REFUNDS_TOPIC],
+				thresholds: LEDGER_DESK_THRESHOLDS,
+				assign: () => undefined,
+				entities: () => new Set(),
+			}).classify(new Set(), abort.signal)
+
+			expect(counts).toEqual([2, 4])
+			expect(
+				filed.attempts
+					.filter((attempt) => attempt.phase === 'amends')
+					.map((attempt) => attempt.outcome),
+			).toEqual(['resolved', 'aborted'])
+			expect(guideText).toContain("**Nothing caps a correction's pair questions.**")
+			expect(guideText).toContain("and the caller's abort signal ends them.")
+		})
+
+		it('refuses a second select during a filing', async () => {
+			const { createGatedScheduler, createPacedLedger, seedLedgerPrefix } =
+				await import('./setup.js')
+			const seed = await seedLedgerPrefix(18, 'correction')
+			const gate = Promise.withResolvers<void>()
+			const scheduler = createGatedScheduler(gate)
+			const { ledger } = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], scheduler)
+			const pending = ledger.respond('What is the status of OR-1000?')
+			await scheduler.reached
+			const messages = ledger.conversation.messages()
+			const request = requireValue(messages.at(-1), 'Missing request')
+			const earlier = requireValue(messages[0], 'Missing earlier message')
+			const signal = AbortSignal.timeout(30_000)
+			const same = await ledger.agent.context
+				.select(ledger.conversation, request, signal)
+				?.catch((error: unknown) => error)
+			const other = await ledger.agent.context.select(ledger.conversation, earlier, signal)
+			gate.resolve()
+
+			expect(barrel.isAgentError(same)).toBe(true)
+			expect(same).toMatchObject({ code: 'CONCURRENCY' })
+			expect(isLedgerError(other?.fault)).toBe(true)
+			expect(other?.fault).toMatchObject({ code: 'REQUEST' })
+			expect((await pending).content).toBe('Noted.')
+			expect(guideText).toContain(
+				"A direct `agent.context.select` for the same request during a paced filing's yield rejects with `AgentError` `'CONCURRENCY'`, and one for a message the call does not own returns a selection whose `fault` is `LedgerError` `'REQUEST'`.",
+			)
+		})
+
+		it('keeps a restored message member order', () => {
+			const written: Message = { content: 'Is the depot open?', role: 'user', id: 'first' }
+			const restored = createConversation({
+				snapshot: { id: 'desk', sections: [], messages: [written] },
+			})
+			const relayed = barrel.requestToRelay({ messages: restored.view() }).messages[0]
+
+			expect(Object.keys(requireValue(restored.view()[0], 'Missing message'))).toEqual([
+				'content',
+				'role',
+				'id',
+			])
+			expect(Object.keys(requireValue(relayed, 'Missing projection')).slice(0, 3)).toEqual([
+				'id',
+				'role',
+				'content',
+			])
+			expect(guideText).toContain(
+				'A restored message object keeps the member order its column returned',
+			)
+		})
+
+		it('enters a memo written between passes', async () => {
+			const memos = barrel.createMemoManager()
+			const note = 'Order BW-5512 was read.'
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: '' },
+					{ content: 'Order BW-5512 qualifies.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					gauge: { scale: 1, overhead: 0 },
+					agent: { memos },
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: {
+								...LEDGER_ORDER_LOOKUP.tool,
+								execute: (args) => {
+									memos.add({ name: 'order', description: note, content: note })
+									return `Order ${String(args.id)} for account BW-20931: Brightwater Studio.`
+								},
+							},
+						},
+					],
+				}),
+			)
+			const result = await ledger.respond('Is order BW-5512 refundable?')
+
+			expect(result.content).toBe('Order BW-5512 qualifies.')
+			expect(
+				provider.calls.map((call) => call.messages.some(({ content }) => content.includes(note))),
+			).toEqual([false, false, true])
+			expect(provider.calls[2]?.messages[0]?.content).toBe(provider.calls[0]?.messages[0]?.content)
+			expect(guideText).toContain(
+				"A memo written during a request's first pass, by a lookup or a host tool, enters the answer pass's context message unpriced",
+			)
+		})
+
+		it('keeps a fold when its merge digest fails', async () => {
+			const replies = ['Recap one.', '   ', 'Recap two.', 'Merged recap.'].values()
+			const conversation = createConversation({
+				summarize: async () => replies.next().value ?? 'Recap.',
+				sections: 1,
+				snapshot: {
+					id: 'desk',
+					sections: [
+						{
+							id: 'section-0',
+							summary: 'Recap zero.',
+							messages: [{ id: 'old', role: 'user', content: 'Ticket 3 opened.' }],
+						},
+					],
+					messages: [
+						{ id: 'tail-1', role: 'user', content: 'Is the depot open?' },
+						{ id: 'tail-2', role: 'assistant', content: 'It is open.' },
+						{ id: 'tail-3', role: 'user', content: 'Book a slot.' },
+					],
+				},
+			})
+			const refused = await conversation.compact({ keep: 0 }).catch((error: unknown) => error)
+			const over = conversation.sections.length
+			conversation.add([
+				{ role: 'assistant', content: 'Booked.' },
+				{ role: 'user', content: 'Thanks.' },
+			])
+			await conversation.compact({ keep: 0 })
+
+			expect(refused).toMatchObject({ code: 'SUMMARY' })
+			expect(over).toBe(2)
+			expect(conversation.sections.map(({ summary }) => summary)).toEqual(['Merged recap.'])
+			expect(guideText).toContain(
+				'such a digest for a capped merge refuses the merge and keeps the fold already committed, one section over the cap, which the next sound merge collapses.',
+			)
+		})
+
+		it('denies a tool replaced after its allow', async () => {
+			for (const replace of [true, false]) {
+				const ran: string[] = []
+				const events: unknown[] = []
+				const tools = createToolManager()
+				tools.add(
+					createTool({
+						name: 'refund',
+						execute: () => {
+							ran.push('first')
+							return 'refunded'
+						},
+					}),
+				)
+				const provider = createScriptedProvider(
+					[
+						{ content: '', tools: [{ id: 'refund-1', name: 'refund', arguments: {} }] },
+						{ content: 'Noted.' },
+					],
+					{ recorded: true, repeat: false },
+				)
+				const agent = createAgent(provider, { tools })
+				agent.emitter.on('allow', (call) => {
+					events.push(['allow', call.name])
+					tools.remove('refund')
+					if (replace) {
+						tools.add(
+							createTool({
+								name: 'refund',
+								execute: () => {
+									ran.push('second')
+									return 'refunded'
+								},
+							}),
+						)
+					}
+				})
+				agent.emitter.on('deny', (call, reason, decision) =>
+					events.push(['deny', call.name, reason, decision]),
+				)
+				agent.context.messages.add({ role: 'user', content: 'Refund order BW-5512.' })
+				await agent.generate()
+
+				expect(events).toEqual([
+					['allow', 'refund'],
+					['deny', 'refund', 'refund changed after its decision', undefined],
+				])
+				expect(ran).toEqual([])
+				expect(provider.calls[1]?.messages.findLast(({ role }) => role === 'tool')?.content).toBe(
+					`"refund" did not run: ${barrel.AUTHORITY_NOTES.denied}`,
+				)
+			}
+			expect(guideText).toContain(
+				'A call that `allow` cleared whose tool is replaced or removed before dispatch is denied too: the model reads the `denied` note of `AUTHORITY_NOTES`, and its `deny` event carries the reason `<name> changed after its decision` and no decision.',
+			)
+			expect(guideText).toContain(
+				'An allow clears a call for the tool instance the registry held when the turn advertised it',
+			)
+		})
+
+		it('ends on a cancel past a deaf scheduler', async () => {
+			const { createDeafScheduler } = await import('./setup.js')
+			const gate = Promise.withResolvers<void>()
+			const scheduler = createDeafScheduler(gate)
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
+			const agent = createAgent(
+				createScriptedProvider([
+					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
+					{ content: 'Never read.' },
+				]),
+				{ tools, scheduler },
+			)
+			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
+			const run = agent.stream()
+			await scheduler.reached
+			agent.abort('request ended')
+			const raced = await run.result
+			gate.resolve()
+
+			const held = Promise.withResolvers<string>()
+			const entered = Promise.withResolvers<void>()
+			const slowTools = createToolManager()
+			slowTools.add(
+				createTool({
+					name: 'slow',
+					execute: () => {
+						entered.resolve()
+						return held.promise
+					},
+				}),
+			)
+			const slow = createAgent(
+				createScriptedProvider([
+					{ content: '', tools: [{ id: 'slow-1', name: 'slow', arguments: {} }] },
+				]),
+				{ tools: slowTools },
+			)
+			slow.context.messages.add({ role: 'user', content: 'Run it.' })
+			const stream = slow.stream()
+			await entered.promise
+			slow.abort('request ended')
+			const settled: boolean[] = []
+			const observed = stream.result.then((result) => {
+				settled.push(true)
+				return result
+			})
+			await waitForDelay(20)
+			const early = settled.length
+			held.resolve('late')
+			const awaited = await observed
+
+			expect(raced.partial).toBe(true)
+			expect(early).toBe(0)
+			expect(awaited.partial).toBe(true)
+			expect(guideText).toContain(
+				"The loop races a scheduler's yield, the approver's answer, and the summarizer against the run signal",
+			)
+		})
+
+		it('reads an empty name on a guard constant', () => {
+			const conversation = createConversation()
+			const ticket = conversation.add({ role: 'user', content: 'I was charged twice.' })
+			const record = conversation.judgments.add({
+				id: 'refund',
+				question: { form: 'noul', instructions: 'Is a refund owed?' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'tev1:0.8b',
+				sources: [ticket.id],
+				state: ticket.content,
+			})
+
+			expect(barrel.isJudgment.name).toBe('')
+			expect(barrel.isMemo.name).toBe('')
+			expect(barrel.isJudgment(record)).toBe(true)
+			expect(barrel.isJudgment({ ...record, usage: undefined })).toBe(false)
+			expect(guideText).toContain(
+				'A judgment whose `usage` member is present with the value `undefined` is refused',
+			)
+			expect(guideText).toContain(
+				'`isJudgment` and `isMemo` are guard constants, so each reads an empty `.name`.',
+			)
+		})
+
+		it('renders an index entry as one line', () => {
+			const memos = barrel.createMemoManager()
+			const memo = memos.add({
+				name: 'tone\nhigh',
+				description: 'Prefers\r\nshort replies.',
+				content: 'Answer briefly.',
+			})
+
+			expect(memos.render(memo)).toBe('- tone high: Prefers short replies.')
+			expect(guideText).toContain(
+				'An index line is one line: a run of line-break code points in a memo or skill name or description renders as one space.',
+			)
+		})
+
+		it('keeps a heading inside a record line', async () => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge(['Refunds over']),
+					gauge: { scale: 1, overhead: 0 },
+				}),
+			)
+			ledger.conversation.add({
+				role: 'user',
+				content: 'Refunds over $100 need a ## Request approval.',
+			})
+			await ledger.respond('Does a $148.50 refund need a manager?')
+			const sent = requireValue(provider.calls[0], 'Missing request').messages
+
+			expect(sent.at(-1)?.content).toContain('need a ## Request approval')
+			expect(
+				sent.at(-1)?.content.endsWith('## Request\nDoes a $148.50 refund need a manager?'),
+			).toBe(true)
+			expect(sent[0]?.content).not.toContain('## Request approval')
+			expect(guideText).toContain(
+				"A record line and the request copy render a message's or a lookup's text verbatim",
 			)
 		})
 	})

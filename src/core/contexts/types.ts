@@ -448,7 +448,12 @@ export interface Memo {
 	readonly origin?: MemoOrigin
 }
 
-/** Names where a memo revision came from: a conversation and, optionally, one of its messages. */
+/**
+ * Names where a memo revision came from: a conversation and, optionally, one of its messages.
+ *
+ * @remarks
+ * A memo's origin is asserted by whoever wrote the revision and is not verified.
+ */
 export interface MemoOrigin {
 	/** Holds the id of the conversation the revision came from. */
 	readonly conversation: string

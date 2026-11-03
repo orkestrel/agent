@@ -26,6 +26,7 @@ npm install @orkestrel/agent
 The package targets the following runtime and module formats:
 
 - Node.js >= 22.18.0
+- A browser that provides the APIs the Agent guide's inlet table note names, in a secure context
 - Dual ESM + CommonJS builds (`import` and `require` both supported)
 
 ## Usage

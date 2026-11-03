@@ -79,10 +79,11 @@ package's own; see [Agent](agent.md).
 
 See [Database](database.md), a byte-identical mirror of the guide
 for `@orkestrel/database` — a runtime dependency, the storage layer
-`DatabaseConversationStore` persists a conversation snapshot over. It
-documents **that package's** surface (the database, tables, and driver layer),
-not anything sourced in this repo; it is kept here so a reader of this guide
-can see the persistence layer without leaving this guide set.
+`DatabaseConversationStore` persists a conversation snapshot over and
+`DatabaseMemoStore` persists a memo set over. It documents **that package's**
+surface (the database, tables, and driver layer), not anything sourced in this
+repo; it is kept here so a reader of this guide can see the persistence layer
+without leaving this guide set.
 
 See [Emitter](emitter.md), a byte-identical mirror of the guide
 for `@orkestrel/emitter` — a runtime dependency, the typed push-observation
