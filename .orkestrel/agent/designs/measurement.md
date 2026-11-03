@@ -376,6 +376,33 @@ Acceptance: every segment seals; the checkpoints validate; rc-a17's seed test ru
 
 Inputs: rc-a9 and the extension generate no input; each segment selects its trial, goals, and seed by `--trial`, `--goals`, and `--seed` from the closure its lineage froze for its arm's profile; its results and run records stay under `tmp/studies/`, never committed, and a closure sits in the `closures` directory beside the checkout, one subdirectory per lineage ordinal and arm profile, cited by its freeze digest and check fingerprint (O26, O30; `designs/runs.md` § Run shape; `plan.md` O108, O117).
 
+### Lineage 1 reading
+
+rc-a9's lineage 1 froze at `60ef77b7`, build digest `516301ea`, closure digest `89f4c9f9`, check fingerprint `f3948600`. It stands as evidence, and lineage 2 replaces it as the recording (`plan.md` O126). Spend, from `timing.durations.total` on every `wire` row: 13.81 of 60 model minutes, the stopped arm included.
+
+- Records arm: 24 goals in four sealed segments, seals `7ea1e731`, `151f1658`, `ad26b2a4`, and `055f2466`, reading 95.6, 171.4, 214.9, and 229.8 s, 711.7 s in all. 20 of 20 seed comparisons read byte-identical. At goal 24 the conversation holds 110 messages and 135361 bytes, 135 KB, the message spread reading median 577, p95 4832, and maximum 6189 characters, with the registry at 4 ids and 2 names beside `plan.md` O120's at most 12 names.
+- Compaction arm: ten goals, `ev-01-1` to `ev-03-2`, in 117.0 s with the stopped request, and no seal: the arm's eleventh agent request stopped at the Context room, prompt 12283 of 11776, with 10 checkpoints at 0 sections and no `summary` row. Its rows, its checkpoints, and the retained `ev-03-3` reply are the record of the failure.
+
+### Lineage 2 bars
+
+Written 2026-11-02, before lineage 2 runs, on lineage 1's 11 compaction agent rows and four records seals (`plan.md` O126). Compaction segment 1, `ev-01-1..ev-03-4`, holds the first fold at the arm's eleventh agent request, and it reads every bar.
+
+| Bar | Reads | On a miss |
+| --- | --- | --- |
+| B1 | `seal.json` present, exit 0, `study grade` exit 0, every goal of the segment, 0 failure rows, 0 stop rows | the segment stays unsealed, and a Context room or `WINDOW` stop goes to the fixture rung first, the user told |
+| B2 | at least one `dispatch` row with role `summary` precedes any Context room stop, and checkpoint rows after the fold hold sections at or over 1 | as B1 |
+| B3 | a boundary read: on every agent `wire` row, the `estimate` row's `projected` at or over the wire `prompt`, and `prompt` at or under 11776 | a sealed segment with an under-read and `prompt` at or under 11776 keeps the recording and reports the row with its live call count, because each live call costs about 23 to 52 tokens; the overhead rises only in a later lineage, when a row comes within reach of the ceiling |
+| B4 | every summary `wire` row finishes `stop` with completion under 2048, because `length: false` on that role turns 2048 into a capacity stop | a recap-allowance reading: raise `room.recap` in both `q2.json` and `q4.json`, opening lineage 3, because `tests/studies/endurance/study.test.ts`, case "pins the q2 subject and its bounds", asserts `q2.room` equal to `q4.room`, and update the `q4` room pin in that file at line 306 (`recap: 2048`, case "admits identical schedules and the pinned finite q4 profile while keeping semantics independently unknown") in the same change; no change under `src/` |
+| B5 | a reading, not a stop: the first agent request after each fold reads `prompt` at or under 11776 - 354 | over that and sealed, keep the segment and report the margin; a strict `WINDOW` refusal after the fold is a product reading, fixture rung first, the user told |
+| B6 | the segment at or under 5 model minutes, against a projection of 2.5 to 3.2: 11 agent requests, the 10 completed goals and the stopped `ev-03-3`, measured 117.0 s with no fold, and one fold adds about 20 to 25 s of prefill, about 5 s to prefill the rebuilt request, and up to 23 s of decode at 89.7 tokens per second | a re-projection before the next launch |
+| B7 | read before segment 2 launches: `compareMemorySeed` reads compared, equal, and whole alike, control over 0, and an empty difference list, the fold-first goal at the first checkpoint after the fold included | the chain stops for a ruling, under rc-a9's deviation classes; no comparison loosens |
+
+- Compaction segment 2, `ev-04-1..ev-06-4`: B1 to B5 again, and at or under 6 model minutes.
+- Records, four segments as lineage 1: B1 per segment; the seed test reads compared equal to equal on every checkpoint; at or under 15 model minutes against the measured 11.9.
+- The keep rule: a segment that seals through a fold is the recording even where B5 reads thin; revert only on B4 or an actual Context room stop.
+- Records run one time, last, on the closure whose compaction arm sealed through its folds. A compaction miss spends no records minutes, and an earlier compaction segment reruns on the next lineage.
+- Budget: lineage 2 projects at 18 to 21 model minutes, 32 to 35 cumulative, leaving about 25 for one lineage 3 compaction rerun on a B4 miss. A cap stop stays a budget stop, never a quality verdict.
+
 ## Screens
 
 `rc-a10` screens each unit under test on the rc-a9 recording. `designs/runs.md` owns how a screen runs: its segments and arm order (§ Segment plan), its stops and curtailment (§ Stops), the fixes checked while it runs, and its judge and pins (§ Replay and pins).
