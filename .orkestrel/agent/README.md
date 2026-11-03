@@ -17,6 +17,7 @@ The tracked record of the Agent records campaign: memos, skills, and durable lon
 | `ledger.md` | one row per dispatched unit and per user ruling on routing or scope |
 | `tenets.md` | the campaign's standing directives, each with its citation |
 | `audit.md` | the falsify round's durable verdict for Agent 0.0.35: the lanes and their terminal lines, the repairs with their readings, the per-claim table, each ruling with its reproduction, the outside findings, and the advisories |
+| `ollama.md` | rc-ol1's closing record: the candidate and pin, the gates, each live stage with its wall time, the control-token and page-yield readings, the review, the departures, and the writer's report, launch message, and brief verbatim |
 | `designs/records.md` | the ledger: source of truth, snapshot and hydrate, write cost, the records in the request turn, the moving tail, trim and head-pricing fixes, DeltaDB transfer |
 | `designs/compaction.md` | the recap role, the blank-digest refusal, the literal vocabulary, anchored recaps, rule retention, recall, repeat loops, compaction deferrals |
 | `designs/context.md` | memos, skills, their managers, stores, and tools, the `AgentContext` and ledger wiring |
