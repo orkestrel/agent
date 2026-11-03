@@ -14,7 +14,12 @@ import type { Message, ThinkingReplay } from '../types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
 import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
-import { ProviderAbortError, ProviderError } from './errors.js'
+import {
+	isProviderAbortError,
+	isProviderError,
+	ProviderAbortError,
+	ProviderError,
+} from './errors.js'
 import { ThinkSplitter } from './ThinkSplitter.js'
 import { buildProviderResult, readChunks, buildProviderHeaders, readFailure } from './helpers.js'
 import { joinThinking } from '../helpers.js'
@@ -29,6 +34,11 @@ import { joinThinking } from '../helpers.js'
  * `name`, `frame`, `encode`, `read`, and `finish`; the constructor takes the `split`
  * and `strict` switches to control reasoning separation and settled-result requirements.
  * The `replay` input names which stored thinking the agent and relay send back. Default: `'none'`.
+ * A throw from the framing seam (`parse`, or `finish`) becomes a `ProviderError` with the
+ * `PROTOCOL` code whose `cause` is the throw, unless it is already a `ProviderError` or
+ * `ProviderAbortError`, which reaches the caller unchanged. A throw from `read`, `frame`, or
+ * `clear` reaches the caller unchanged, and a framing throw that races a cancel is the `cause` of
+ * the `ProviderAbortError`.
  *
  * @example Writing a provider for a new wire
  * ```ts
@@ -208,7 +218,7 @@ export abstract class AgentProvider<
 			}
 			for await (const chunk of readChunks(response.body, combined)) {
 				combined.throwIfAborted()
-				for (const record of parser.parse(chunk)) {
+				for (const record of this.#parse(parser, chunk, combined)) {
 					const increment = this.read(record)
 					increments.push(increment)
 					if (increment.result === undefined) yield* this.#emit(increment, splitter, combined)
@@ -217,7 +227,7 @@ export abstract class AgentProvider<
 				}
 			}
 			combined.throwIfAborted()
-			for (const record of this.finish(parser)) {
+			for (const record of this.#finish(parser, combined)) {
 				const increment = this.read(record)
 				increments.push(increment)
 				if (increment.result === undefined) yield* this.#emit(increment, splitter, combined)
@@ -233,6 +243,30 @@ export abstract class AgentProvider<
 			return this.#assemble(splitter, increments)
 		} catch (error) {
 			throw this.#translate(error, combined, splitter, increments)
+		}
+	}
+
+	// A throw from parse becomes a PROTOCOL ProviderError unless cancelled or already a provider error.
+	#parse(
+		parser: ProviderParserInterface<TRecord>,
+		chunk: string,
+		combined: AbortSignal,
+	): readonly TRecord[] {
+		try {
+			return parser.parse(chunk)
+		} catch (error) {
+			if (combined.aborted || isProviderError(error) || isProviderAbortError(error)) throw error
+			throw new ProviderError('PROTOCOL', 'provider error: malformed wire record', { cause: error })
+		}
+	}
+
+	// A throw from finish becomes a PROTOCOL ProviderError unless cancelled or already a provider error.
+	#finish(parser: ProviderParserInterface<TRecord>, combined: AbortSignal): readonly TRecord[] {
+		try {
+			return this.finish(parser)
+		} catch (error) {
+			if (combined.aborted || isProviderError(error) || isProviderAbortError(error)) throw error
+			throw new ProviderError('PROTOCOL', 'provider error: malformed wire record', { cause: error })
 		}
 	}
 

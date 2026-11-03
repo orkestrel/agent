@@ -1591,9 +1591,9 @@ describe('agent wire fixtures', () => {
 			{ category: 'finish', content: 'Archived.', partial: false },
 			{ category: 'error' },
 		]
-		const reader = new ReadableStream<string>({
+		const reader = new ReadableStream<unknown>({
 			start: (controller) => {
-				for (const frame of frames) controller.enqueue(JSON.stringify(frame))
+				for (const frame of frames) controller.enqueue(frame)
 				controller.close()
 			},
 		}).getReader()
@@ -1607,14 +1607,14 @@ describe('agent wire fixtures', () => {
 	})
 
 	it('refuses a frame line the frame contract refuses', async () => {
-		const lines = new ReadableStream<string>({
+		const records = new ReadableStream<unknown>({
 			start: (controller) => {
-				controller.enqueue('{"category":"deny"}')
+				controller.enqueue({ category: 'deny' })
 				controller.close()
 			},
 		}).getReader()
 
-		await expect(readWireFrames(lines, 'finish')).rejects.toThrow(
+		await expect(readWireFrames(records, 'finish')).rejects.toThrow(
 			'refused frame line: {"category":"deny"}',
 		)
 	})

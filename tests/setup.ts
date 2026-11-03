@@ -287,7 +287,6 @@ import {
 	InstructionManager,
 	JudgeError,
 	ProviderAbortError,
-	ProviderError,
 	Scope,
 	createSystemOneJudge,
 	SystemOneJudge,
@@ -1783,35 +1782,6 @@ export function createScriptedProvider(
  */
 export function buildProviderPartial(content: string, thinking: string): ProviderResult {
 	return thinking.length > 0 ? { content, thinking } : { content }
-}
-
-/** Frames newline-delimited JSON records without replacing relay behavior. */
-export class RelayParser implements ProviderParserInterface {
-	#pending = ''
-	parse(chunk: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
-		this.#pending += chunk
-		const lines = this.#pending.split('\n')
-		this.#pending = lines.pop() ?? ''
-		return lines
-			.filter((line) => line.trim().length > 0)
-			.map((line) => {
-				const record = parseJSONAs(line, isRecord)
-				if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
-				return record
-			})
-	}
-	clear(): void {
-		this.#pending = ''
-	}
-}
-
-/**
- * Creates fresh NDJSON framing for a relay response.
- *
- * @returns A parser that frames newline-delimited JSON records
- */
-export function createParser(): ProviderParserInterface {
-	return new RelayParser()
 }
 
 /**
@@ -3320,24 +3290,26 @@ export function createWireDecision(
 }
 
 /**
- * Reads page-wire frames from a reader of the body's lines, up to and including the first frame of
+ * Reads page-wire frames from a reader of the body's records, up to and including the first frame of
  * the `last` category, or to the end of the body.
  *
- * @param lines - A reader of the body's lines
+ * @param records - A reader of the body's records
  * @param last - The category whose first frame ends the read
  * @returns The frames read, in order
- * @throws {Error} When the frame contract refuses a line
+ * @throws {Error} When the frame contract refuses a record
  */
 export async function readWireFrames(
-	lines: ReadableStreamDefaultReader<string>,
+	records: ReadableStreamDefaultReader<unknown>,
 	last: AgentFrame['category'],
 ): Promise<readonly AgentFrame[]> {
 	const frames: AgentFrame[] = []
 	for (;;) {
-		const line = await lines.read()
-		if (line.done) return frames
-		const frame = parseJSONAs(line.value, agentFrameContract.is)
-		if (frame === undefined) throw new Error(`refused frame line: ${line.value}`)
+		const record = await records.read()
+		if (record.done) return frames
+		const frame = record.value
+		if (!agentFrameContract.is(frame)) {
+			throw new Error(`refused frame line: ${JSON.stringify(record.value)}`)
+		}
 		frames.push(frame)
 		if (frame.category === last) return frames
 	}
@@ -6321,7 +6293,6 @@ export function createRelayHop(options: RelayHopOptions): RelayProvider {
 	})
 	return new RelayProvider({
 		url: options.url ?? 'http://relay.test/',
-		parser: createParser,
 		...(options.headers === undefined ? {} : { headers: options.headers }),
 		fetch: async (input, init) => {
 			const request =
@@ -7027,8 +6998,21 @@ export function buildGuideLedgerOptions(overrides: Partial<LedgerOptions> = {}):
 	})
 }
 
-/** Supplies invalid complete relay records for the documented strict parser. */
-export const RELAY_INVALID_RECORDS = Object.freeze(['invalid\n', '[]\n', 'null\n'])
+/** Supplies invalid relay bodies for the default strict parser, the last an unterminated line. */
+export const RELAY_INVALID_RECORDS = Object.freeze(['invalid\n', '[]\n', 'null\n', '{"channel":'])
+
+/**
+ * Supplies page bodies the page reader refuses, each with its `NDJSONError` code, or `undefined` for
+ * a record the frame contract refuses. The `finish` line after a bad line settles a reader that skips it.
+ */
+export const PAGE_REFUSED_BODIES: ReadonlyArray<
+	readonly [string, 'SYNTAX' | 'RECORD' | undefined]
+> = Object.freeze([
+	['invalid\n{"category":"finish","content":"Archived.","partial":false}\n', 'SYNTAX'],
+	['[]\n{"category":"finish","content":"Archived.","partial":false}\n', 'RECORD'],
+	['{"category":"deny"}\n', undefined],
+	['{"category":', 'SYNTAX'],
+])
 
 /** Supplies the ledger overhead cases scenario inputs. */
 export const LEDGER_OVERHEAD_CASES = Object.freeze([0, 200])

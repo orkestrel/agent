@@ -28,6 +28,7 @@ import type {
 } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
 import { GuideCommand } from '@orkestrel/guide/server'
+import { createNDJSONParser, isNDJSONError } from '@orkestrel/ndjson'
 import { readInventory } from '@orkestrel/test/server'
 import { createVitest } from 'vitest/node'
 
@@ -76,15 +77,14 @@ interface PageSession {
 	readonly approver: ApproverInterface
 }
 
-// Splits decoded text into lines, holding a partial line until its newline arrives.
-class LineSplitter implements Transformer<string, string> {
-	#pending = ''
-	transform(chunk: string, controller: TransformStreamDefaultController<string>): void {
-		const lines = `${this.#pending}${chunk}`.split('\n')
-		this.#pending = lines.pop() ?? ''
-		for (const line of lines) {
-			if (line.length > 0) controller.enqueue(line)
-		}
+// Frames decoded text through one strict parser, completing a last line that has no newline.
+class RecordSplitter implements Transformer<string, unknown> {
+	readonly #parser = createNDJSONParser({ strict: true })
+	transform(chunk: string, controller: TransformStreamDefaultController<unknown>): void {
+		for (const record of this.#parser.parse(chunk)) controller.enqueue(record)
+	}
+	flush(controller: TransformStreamDefaultController<unknown>): void {
+		for (const record of this.#parser.parse('\n')) controller.enqueue(record)
 	}
 }
 
@@ -127,6 +127,7 @@ await new GuideCommand({
 		AgentJudge,
 		AgentProvider,
 		Classifier,
+		isProviderError,
 		measureAnswer,
 		createAgent,
 		createConversation,
@@ -160,6 +161,7 @@ await new GuideCommand({
 		providerRequestContract,
 		RELAY_CONTENT_TYPE,
 		relayFrameContract,
+		RelayProvider,
 		RelayStream,
 		sanitizeToken,
 		stripThinking,
@@ -169,6 +171,8 @@ await new GuideCommand({
 	const {
 		AGENT_WIRE_CASES,
 		RELAY_INVALID_RECORDS,
+		RELAY_RESULT_FRAME,
+		createStreamingTransport,
 		createLedgerJudge,
 		LEDGER_OVERHEAD_CASES,
 		LEDGER_THINKING_CASES,
@@ -276,25 +280,6 @@ await new GuideCommand({
 		}
 		finish(_parser: ProviderParserInterface<string>): readonly string[] {
 			return []
-		}
-	}
-	// The browser relay fence uses this same strict record framing.
-	class RelayFrameParser implements ProviderParserInterface {
-		#pending = ''
-		parse(chunk: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
-			this.#pending += chunk
-			const lines = this.#pending.split(/\r\n|\n/)
-			this.#pending = lines.pop() ?? ''
-			return lines
-				.filter((line) => line.trim().length > 0)
-				.map((line) => {
-					const record = parseJSONAs(line, isRecord)
-					if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
-					return record
-				})
-		}
-		clear(): void {
-			this.#pending = ''
 		}
 	}
 
@@ -3785,7 +3770,6 @@ await new GuideCommand({
 				// and that status, and it leaves the upstream provider unentered.
 				const refused = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
-					parser: () => new RelayFrameParser(),
 					headers: () => ({ authorization: 'Bearer wrong' }),
 				}).generate(messages, createAbort().signal)
 				await expect(refused).rejects.toBeInstanceOf(ProviderError)
@@ -3800,7 +3784,6 @@ await new GuideCommand({
 				// the same script driven directly in this process answers what the relayed call answers.
 				const browser = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
-					parser: () => new RelayFrameParser(),
 					headers: () => ({ authorization: `Bearer ${bearer}` }),
 				})
 				const relayed = await browser.generate(messages, createAbort().signal)
@@ -3840,7 +3823,6 @@ await new GuideCommand({
 					const abort = createAbort()
 					const browser = createRelayProvider({
 						url: `http://127.0.0.1:${bound}/relay`,
-						parser: () => new RelayFrameParser(),
 						headers: () => ({ authorization: `Bearer ${bearer}` }),
 					})
 					const stream = browser.stream(messages, abort.signal)
@@ -4060,15 +4042,15 @@ await new GuideCommand({
 						if (!response.ok || response.body === null) {
 							throw new Error(`the run was refused: ${response.status}`)
 						}
-						const lines = response.body
+						const records = response.body
 							.pipeThrough(new TextDecoderStream())
-							.pipeThrough(new TransformStream(new LineSplitter()))
+							.pipeThrough(new TransformStream(new RecordSplitter()))
 							.getReader()
 						for (;;) {
-							const line = await lines.read()
-							if (line.done) throw new Error('the frames ended without finish or error')
-							const frame = parseJSONAs(line.value, agentFrameContract.is)
-							if (frame === undefined) throw new Error('a frame line was refused')
+							const record = await records.read()
+							if (record.done) throw new Error('the frames ended without finish or error')
+							const frame = record.value
+							if (!agentFrameContract.is(frame)) throw new Error('a frame line was refused')
 							if (frame.category === 'error') throw new Error('the run failed')
 							if (frame.category === 'finish') break
 							if (frame.category === 'token') render(frame.content)
@@ -4114,7 +4096,7 @@ await new GuideCommand({
 						})
 						const declinedLines = requireValue(declined.body, 'Missing declined body')
 							.pipeThrough(new TextDecoderStream())
-							.pipeThrough(new TransformStream(new LineSplitter()))
+							.pipeThrough(new TransformStream(new RecordSplitter()))
 							.getReader()
 						const declinedAsk = (await readWireFrames(declinedLines, 'ask')).at(-1)
 						if (declinedAsk?.category !== 'ask') throw new Error('Missing declined ask frame')
@@ -4144,7 +4126,7 @@ await new GuideCommand({
 						})
 						const cancelledLines = requireValue(cancelled.body, 'Missing cancelled body')
 							.pipeThrough(new TextDecoderStream())
-							.pipeThrough(new TransformStream(new LineSplitter()))
+							.pipeThrough(new TransformStream(new RecordSplitter()))
 							.getReader()
 						const cancelledAsk = (await readWireFrames(cancelledLines, 'ask')).at(-1)
 						if (cancelledAsk?.category !== 'ask') throw new Error('Missing cancelled ask frame')
@@ -4172,7 +4154,7 @@ await new GuideCommand({
 						})
 						const nextLines = requireValue(next.body, 'Missing next body')
 							.pipeThrough(new TextDecoderStream())
-							.pipeThrough(new TransformStream(new LineSplitter()))
+							.pipeThrough(new TransformStream(new RecordSplitter()))
 							.getReader()
 						expect((await readWireFrames(nextLines, 'finish')).at(-1)).toEqual(
 							expect.objectContaining({ category: 'finish', content: 'Archived the drafts.' }),
@@ -4201,7 +4183,7 @@ await new GuideCommand({
 						const adaFrames = await readWireFrames(
 							requireValue(adaPost.body, 'Missing Ada body')
 								.pipeThrough(new TextDecoderStream())
-								.pipeThrough(new TransformStream(new LineSplitter()))
+								.pipeThrough(new TransformStream(new RecordSplitter()))
 								.getReader(),
 							'finish',
 						)
@@ -4213,7 +4195,7 @@ await new GuideCommand({
 						const graceFrames = await readWireFrames(
 							requireValue(gracePost.body, 'Missing Grace body')
 								.pipeThrough(new TextDecoderStream())
-								.pipeThrough(new TransformStream(new LineSplitter()))
+								.pipeThrough(new TransformStream(new RecordSplitter()))
 								.getReader(),
 							'finish',
 						)
@@ -4244,7 +4226,7 @@ await new GuideCommand({
 						})
 						const firstLines = requireValue(first.body, 'Missing first body')
 							.pipeThrough(new TextDecoderStream())
-							.pipeThrough(new TransformStream(new LineSplitter()))
+							.pipeThrough(new TransformStream(new RecordSplitter()))
 							.getReader()
 						// The gated provider holds the first run open after its first delta.
 						expect(await readWireFrames(firstLines, 'token')).toEqual([
@@ -4303,13 +4285,44 @@ await new GuideCommand({
 				'interface Session {',
 				'async function handle(',
 				'interface PageSession {',
-				'class LineSplitter ',
+				'class RecordSplitter ',
 			]
 			const maps = ['new Map<string, Session>()', 'new Map<string, PageSession>()']
 			expect(declarations.filter((declaration) => !guide.includes(declaration))).toEqual([])
 			expect(tables.filter((table) => !guide.includes(table))).toEqual([])
 			expect(heads.filter((head) => !declarations.some((part) => part.includes(head)))).toEqual([])
 			expect(maps.filter((map) => !tables.some((part) => part.includes(map)))).toEqual([])
+		})
+
+		it('refuses malformed page frame lines', async () => {
+			const { PAGE_REFUSED_BODIES, readWireFrames } = await import('./setup.js')
+			for (const [body, code] of PAGE_REFUSED_BODIES) {
+				const records = requireValue(new Response(body).body)
+					.pipeThrough(new TextDecoderStream())
+					.pipeThrough(new TransformStream(new RecordSplitter()))
+					.getReader()
+				const refusal: unknown = await readWireFrames(records, 'finish').catch(
+					(error: unknown) => error,
+				)
+				if (code === undefined) {
+					expect(refusal).toMatchObject({ message: 'refused frame line: {"category":"deny"}' })
+				} else {
+					if (!isNDJSONError(refusal)) throw new Error(`no parser refusal for ${body}`)
+					expect(refusal.code).toBe(code)
+				}
+			}
+			const finish = { category: 'finish', content: 'Archived.', partial: false }
+			const unterminated = requireValue(new Response(JSON.stringify(finish)).body)
+				.pipeThrough(new TextDecoderStream())
+				.pipeThrough(new TransformStream(new RecordSplitter()))
+				.getReader()
+			expect(await readWireFrames(unterminated, 'finish')).toEqual([finish])
+			expect(guideText).toContain(
+				"if (!agentFrameContract.is(frame)) throw new Error('a frame line was refused')",
+			)
+			expect(guideText).toContain(
+				"if (record.done) throw new Error('the frames ended without finish or error')",
+			)
 		})
 
 		it('decodes a scripted relay body through the fence’s browser half alone', async () => {
@@ -4326,7 +4339,6 @@ await new GuideCommand({
 			const sent: Array<string | null> = []
 			const browser = createRelayProvider({
 				url: 'https://app.example/relay',
-				parser: () => new RelayFrameParser(),
 				headers: () => ({ authorization: `Bearer ${bearer}` }),
 				fetch: (input, init) => {
 					sent.push(new Request(input, init).headers.get('authorization'))
@@ -4364,11 +4376,24 @@ await new GuideCommand({
 			expect(upstream.started).toBe(1)
 		})
 
-		it('frames fragmented relay records and refuses malformed records with the documented parser', async () => {
-			const parser = new RelayFrameParser()
-			expect(parser.parse('{"channel":"content",')).toEqual([])
-			expect(parser.parse('"text":"hello"}\r')).toEqual([])
-			expect(parser.parse('\n\n')).toEqual([{ channel: 'content', text: 'hello' }])
+		it('refuses malformed relay lines by default', async () => {
+			const settled = RELAY_RESULT_FRAME.slice(0, -1)
+			const fragmented = createRelayProvider({
+				url: 'https://relay.test',
+				fetch: createStreamingTransport([
+					'{"channel":"content",',
+					'"text":"hello"}\r',
+					'\n\n',
+					`${settled}\r\n`,
+				]),
+			})
+			expect(await drainProvider(fragmented.stream([], new AbortController().signal))).toEqual({
+				deltas: [{ channel: 'content', text: 'hello' }],
+				result: { content: 'answer' },
+			})
+			const parser = new RelayProvider({ url: 'https://relay.test' }).frame()
+			expect(parser.parse('{"kept":')).toEqual([])
+			expect(parser.parse('true}\n')).toEqual([{ kept: true }])
 			parser.parse('{"unfinished":')
 			parser.clear()
 			expect(parser.parse('{"valid":true}\n')).toEqual([{ valid: true }])
@@ -4376,26 +4401,28 @@ await new GuideCommand({
 				const transport = new RecordedTransport(() => new Response(body))
 				const provider = createRelayProvider({
 					url: 'https://relay.test',
-					parser: () => new RelayFrameParser(),
 					fetch: transport.fetch,
 				})
-				await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
-					code: 'PROTOCOL',
-				})
+				const refusal: unknown = await provider
+					.generate([], new AbortController().signal)
+					.catch((error: unknown) => error)
+				if (!isProviderError(refusal)) throw new Error(`no provider error for ${body}`)
+				expect(refusal.code).toBe('PROTOCOL')
+				expect(isNDJSONError(refusal.cause)).toBe(true)
 				expect(transport.requests).toHaveLength(1)
 			}
-			const source = requireValue(files['tests/guides.test.ts']).replaceAll('\r\n', '\n')
-			const start = source.indexOf('\tclass RelayFrameParser implements')
-			const end = source.indexOf('\n\t}\n', start) + '\n\t}'.length
-			expect(start).toBeGreaterThan(0)
-			expect(end).toBeGreaterThan(start)
-			expect(guideText).toContain(
-				source
-					.slice(start, end)
-					.split(/\r\n|\n/)
-					.map((line) => line.slice(1))
-					.join('\n'),
-			)
+			// The decoder strips a byte-order mark at byte 0, so the trimmed line follows a complete line.
+			const trimmed = createRelayProvider({
+				url: 'https://relay.test',
+				fetch: createStreamingTransport([
+					'{"channel":"content","text":"hello"}\n',
+					`\u{FEFF}${settled}\u{A0}\n`,
+				]),
+			})
+			expect(await drainProvider(trimmed.stream([], new AbortController().signal))).toEqual({
+				deltas: [{ channel: 'content', text: 'hello' }],
+				result: { content: 'answer' },
+			})
 		})
 
 		it('carries the relay fence lines the transcription copies', () => {
@@ -4416,7 +4443,6 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain('const browser: ProviderInterface = createRelayProvider({')
 			expect(guideText).toContain("url: 'https://app.example/relay',")
-			expect(guideText).toContain('parser: () => new RelayFrameParser(),')
 		})
 
 		it('answers the wire-contract fence’s guard and projection readings', () => {

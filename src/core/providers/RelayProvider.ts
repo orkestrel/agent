@@ -5,6 +5,7 @@ import type {
 	RelayProviderOptions,
 } from './types.js'
 import { attempt, cloneJSONValue } from '@orkestrel/contract'
+import { createNDJSONParser } from '@orkestrel/ndjson'
 import { AgentProvider } from './AgentProvider.js'
 import { ProviderAbortError, ProviderError } from './errors.js'
 import { requestToRelay } from './helpers.js'
@@ -25,6 +26,9 @@ import { providerRequestContract, relayFrameContract } from './contracts.js'
  * signal is aborted.
  * Content is preserved verbatim, including literal thinking tags.
  * A refusal reaches the browser as a `ProviderError` instance with the `HTTP` code and status.
+ * Without a `parser` option each response frames through a fresh strict `@orkestrel/ndjson`
+ * parser, so a malformed or non-object line rejects the call with a `ProviderError` carrying the
+ * `PROTOCOL` code.
  * This is the browser end alone; {@link createRelay} mounts the server end.
  * The example of {@link createRelayProvider} is the browser half of that pair.
  *
@@ -32,13 +36,10 @@ import { providerRequestContract, relayFrameContract } from './contracts.js'
  * ```ts
  * import type { ProviderResult } from '@orkestrel/agent'
  * import { RelayProvider } from '@orkestrel/agent'
- * // The browser application supplies this parser dependency.
- * import { createNDJSONParser } from '@orkestrel/ndjson'
  *
  * export function ask(bearer: string, signal: AbortSignal): Promise<ProviderResult> {
  * 	const browser = new RelayProvider({
  * 		url: 'https://relay.example/relay',
- * 		parser: createNDJSONParser,
  * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
  * 	})
  * 	return browser.generate([{ id: 'ask', role: 'user', content: 'ping' }], signal)
@@ -46,7 +47,7 @@ import { providerRequestContract, relayFrameContract } from './contracts.js'
  * ```
  */
 export class RelayProvider extends AgentProvider {
-	readonly #parser: () => ProviderParserInterface
+	readonly #parser: (() => ProviderParserInterface) | undefined
 
 	constructor(options: RelayProviderOptions) {
 		const { url, timeout, fetch, headers, replay } = options
@@ -67,7 +68,7 @@ export class RelayProvider extends AgentProvider {
 
 	/** Creates fresh framing state for each response. */
 	frame(): ProviderParserInterface {
-		return this.#parser()
+		return this.#parser === undefined ? createNDJSONParser({ strict: true }) : this.#parser()
 	}
 
 	/**

@@ -656,7 +656,7 @@ result.content // the assembled answer, with any <think> span routed to result.t
 The engine's failures arrive as one error class. A `ProviderError` carries a machine-readable `code` and, for an HTTP failure alone, the response `status`; `isProviderError` narrows a caught value so a caller can branch on the code:
 
 - `'HTTP'` — a non-OK response. The message is `provider error: <status>`, with ` - <excerpt>` appended only when the response body carried text. The excerpt is read to at most `MAX_ERROR_BODY_LENGTH` bytes and the remainder of the body is cancelled, so a stalled error body can't hold the call open past its deadline.
-- `'PROTOCOL'` — a successful response with no body, a wire record the concrete provider refuses, or a `strict` stream that ended without a settled result.
+- `'PROTOCOL'` — a successful response with no body, a line the provider's framing refuses, a wire record the concrete provider refuses, or a `strict` stream that ended without a settled result.
 - `'PROVIDER'` — an upstream failure a relay reported in an `error` frame.
 
 A cancel isn't in that taxonomy: the call's own deadline and the caller's signal are folded into one bound, and a cancel throws `ProviderAbortError` carrying the partial assembled so far.
@@ -733,7 +733,6 @@ A browser must not hold a model credential, so this package ships the hop rather
 ```ts
 import type { ProviderInterface } from '@orkestrel/agent'
 import { createRelay, createRelayProvider } from '@orkestrel/agent'
-// ... RelayFrameParser from "Reaching the relay from the browser" omitted.
 
 declare const upstream: ProviderInterface // the server-side provider holding the credential
 
@@ -747,7 +746,6 @@ const handler = createRelay({
 // In the browser: a provider like any other, reached over that route.
 const browser = createRelayProvider({
 	url: 'https://app.example/relay',
-	parser: () => new RelayFrameParser(),
 	headers: () => ({ authorization: 'Bearer session-token' }),
 })
 ```
@@ -894,7 +892,7 @@ The following table lists the types the providers module declares:
 | `RelayOptions`            | interface | `{ provider, authorize, limit?, system?, tools? }`                                                                                                                                                                  | Configures the upstream provider, mandatory authorization, request byte limit, and request head policy.                                                                                                                                                                                                                                                                                                                                                      |
 | `RelayRefusalReason`      | type      | `'system' \| 'head' \| 'tool' \| 'mismatch'`                                                                                                                                                                        | Names why a relay refuses a request member.                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `RelayRefusal`            | interface | `{ reason, index, name? }`                                                                                                                                                                                          | Carries one refused request member and where it sits.                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `RelayProviderOptions`    | interface | `{ url, parser }`                                                                                                                                                                                                   | Configures a relay destination and its fresh structural parser factory.                                                                                                                                                                                                                                                                                                                                                                                      |
+| `RelayProviderOptions`    | interface | `{ url, parser? }`                                                                                                                                                                                                  | Configures a relay destination and an optional fresh parser factory.                                                                                                                                                                                                                                                                                                                                                                                         |
 | `RelayStreamOptions`      | interface | `{ provider, request, signal }`                                                                                                                                                                                     | Carries the upstream call and cancellation bound of a relay response stream.                                                                                                                                                                                                                                                                                                                                                                                 |
 | `ThinkSplitterInterface`  | interface | `{ content, thinking, split(), flush() }`                                                                                                                                                                           | Splits a thinking model's in-content `<think>…</think>` reasoning spans away from the answer, delta by delta with per-stream state, so a provider yields clean content alone and surfaces the reasoning as `ProviderResult.thinking`.                                                                                                                                                                                                                        |
 | `AgentJudgeInput`         | interface | `{ url, path?, model, batch? }`                                                                                                                                                                                     | Configures the judge engine's destination, identity, and call split.                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -2344,9 +2342,9 @@ When you compose `createAgent(browser, { tools })` in the page, the agent dispat
 
 A browser must never hold a model credential. Mount `createRelay` on your own server, where the credential already lives, and give the browser `createRelayProvider` pointed at that route: the browser drives a `ProviderInterface` like any other, and the credential never leaves the server. The handler is a plain `(request: Request) => Promise<Response>`, so any fetch-standard router mounts it — this composition mounts it on an `@orkestrel/router` dispatcher. Each half that follows runs in its own process: copy the server half into your server and the browser half into your browser bundle.
 
-The `@orkestrel/agent` package declares no dependency on a newline-delimited JSON parser, and no runtime dependency on a router or on a server adapter, so the browser application supplies a `ProviderParserInterface` implementation — the `RelayFrameParser` class following uses `parseJSONAs` and `isRecord` from the declared `@orkestrel/contract` dependency — and the server application supplies the router and the adapter. The `@orkestrel/router` and `@orkestrel/server` development dependencies this package declares serve the executed transcription of these fences (see [the `tests/guides.test.ts` parity test](../tests/guides.test.ts)). That transcription runs the server half and the browser half for real: it mounts the relay handler on the dispatcher route the server half declares, starts `@orkestrel/server` on a loopback listener, and drives the browser half against that listener over an HTTP hop in Node. The hop proves the round trip returning the upstream's settled result, the `405` with its `Allow: POST` header a `GET` to `/relay` answers, the `404` a `POST` to another path answers, the `401` a wrong bearer answers with the upstream provider unentered, and the upstream turn a disconnected reader cancels through the adapter's abort of the inbound request.
+The `@orkestrel/agent` package frames the relay's newline-delimited JSON through its `@orkestrel/ndjson` dependency and declares no runtime dependency on a router or on a server adapter, which the server application supplies. The `@orkestrel/router` and `@orkestrel/server` development dependencies this package declares serve the executed transcription of these fences (see [the `tests/guides.test.ts` parity test](../tests/guides.test.ts)). That transcription runs the server half and the browser half for real: it mounts the relay handler on the dispatcher route the server half declares, starts `@orkestrel/server` on a loopback listener, and drives the browser half against that listener over an HTTP hop in Node. The hop proves the round trip returning the upstream's settled result, the `405` with its `Allow: POST` header a `GET` to `/relay` answers, the `404` a `POST` to another path answers, the `401` a wrong bearer answers with the upstream provider unentered, and the upstream turn a disconnected reader cancels through the adapter's abort of the inbound request.
 
-The transcription substitutes where a test process differs from a deployment. The fence's `declare` placeholders become a scripted upstream provider and a fictional bearer, and the `messages` binding is typed as `readonly Message[]` rather than narrowed with `as const`. It transcribes the `RelayFrameParser` class and drives that same framing through the HTTP hop. The parser retains incomplete records across chunks, accepts LF and CRLF record terminators, ignores blank lines, and throws a `ProviderError` with code `PROTOCOL` for malformed JSON or a non-object record. Each provider call receives a fresh parser; `clear()` discards any buffered fragment. It adds `host: '127.0.0.1'` to the `createServer` call, because a test listener binds loopback where a deployed server binds every interface. It points the browser half's `url` option at that address and the port `await server.start()` resolved, in place of the fence's fixed public URL. It closes each case with `await server.stop()` — the fence's own call — rather than the `SIGTERM` listener, which a test process outlives. The byte-limit refusal stays a direct handler call. The `limit` option of the `createRelay` factory caps the body the relay reads, and the `limit` option of the `createServer` factory caps the `body()` read a middleware context makes. This composition registers no middleware, so the `limit` option of the `createServer` factory never applies to these bytes.
+The transcription substitutes where a test process differs from a deployment. The fence's `declare` placeholders become a scripted upstream provider and a fictional bearer, and the `messages` binding is typed as `readonly Message[]` rather than narrowed with `as const`. It drives the browser half's default strict parser through the HTTP hop. The parser retains incomplete records across chunks, accepts LF and CRLF record terminators, ignores blank lines, and trims each line before it parses it, so a line inside the stream wrapped in a byte-order mark or a no-break space parses, and the decoder removes a byte-order mark at the start of the stream before the parser reads it. A malformed or non-object line rejects the call with a `ProviderError` with code `PROTOCOL` whose `cause` is the `NDJSONError`. Each provider call receives a fresh parser; `clear()` discards any buffered fragment. It adds `host: '127.0.0.1'` to the `createServer` call, because a test listener binds loopback where a deployed server binds every interface. It points the browser half's `url` option at that address and the port `await server.start()` resolved, in place of the fence's fixed public URL. It closes each case with `await server.stop()` — the fence's own call — rather than the `SIGTERM` listener, which a test process outlives. The byte-limit refusal stays a direct handler call. The `limit` option of the `createRelay` factory caps the body the relay reads, and the `limit` option of the `createServer` factory caps the `body()` read a middleware context makes. This composition registers no middleware, so the `limit` option of the `createServer` factory never applies to these bytes.
 
 #### Mounting the relay on your server
 
@@ -2381,29 +2379,9 @@ The `serve` function is the entry a server runtime's adapter calls, and the adap
 #### Reaching the relay from the browser
 
 ```ts
-import type { ProviderInterface, ProviderParserInterface } from '@orkestrel/agent'
-import { createRelayProvider, ProviderError } from '@orkestrel/agent'
+import type { ProviderInterface } from '@orkestrel/agent'
+import { createRelayProvider } from '@orkestrel/agent'
 import { createAbort } from '@orkestrel/abort'
-import { isRecord, parseJSONAs } from '@orkestrel/contract'
-
-class RelayFrameParser implements ProviderParserInterface {
-	#pending = ''
-	parse(chunk: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
-		this.#pending += chunk
-		const lines = this.#pending.split(/\r\n|\n/)
-		this.#pending = lines.pop() ?? ''
-		return lines
-			.filter((line) => line.trim().length > 0)
-			.map((line) => {
-				const record = parseJSONAs(line, isRecord)
-				if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
-				return record
-			})
-	}
-	clear(): void {
-		this.#pending = ''
-	}
-}
 
 declare const bearer: string
 const abort = createAbort()
@@ -2411,7 +2389,6 @@ const messages = [{ id: '1', role: 'user', content: 'Say hello.' }] as const
 
 const browser: ProviderInterface = createRelayProvider({
 	url: 'https://app.example/relay',
-	parser: () => new RelayFrameParser(),
 	headers: () => ({ authorization: `Bearer ${bearer}` }),
 })
 const result = await browser.generate(messages, abort.signal) // a ProviderResult like a local provider's
@@ -2547,26 +2524,25 @@ const server = createServer({ dispatcher, state: () => undefined })
 await server.start()
 ```
 
-The page posts its prompt to its thread's path, reads the frames line by line, renders each `ask` frame's `name`, `zone`, and `arguments` as text before it posts its `AgentAnswer`, and treats a refused line or a body that ends without `finish` or `error` as a protocol error:
+The page posts its prompt to its thread's path, frames the body through one strict `@orkestrel/ndjson` parser, checks each record against `agentFrameContract`, renders each `ask` frame's `name`, `zone`, and `arguments` as text before it posts its `AgentAnswer`, and treats a thrown `NDJSONError`, a refused record, or a body that ends without `finish` or `error` as a protocol error:
 
 ```ts
 import type { AgentAnswer } from '@orkestrel/agent'
 import { agentFrameContract } from '@orkestrel/agent'
-import { parseJSONAs } from '@orkestrel/contract'
+import { createNDJSONParser } from '@orkestrel/ndjson'
 
 declare const token: string // the CSRF token the page holds for its session
 declare function render(text: string): void // writes text into the page, never markup
 declare function decide(id: string): Promise<boolean> // the user's answer to the ask
 
-// Splits decoded text into lines, holding a partial line until its newline arrives.
-class LineSplitter implements Transformer<string, string> {
-	#pending = ''
-	transform(chunk: string, controller: TransformStreamDefaultController<string>): void {
-		const lines = `${this.#pending}${chunk}`.split('\n')
-		this.#pending = lines.pop() ?? ''
-		for (const line of lines) {
-			if (line.length > 0) controller.enqueue(line)
-		}
+// Frames decoded text through one strict parser, completing a last line that has no newline.
+class RecordSplitter implements Transformer<string, unknown> {
+	readonly #parser = createNDJSONParser({ strict: true })
+	transform(chunk: string, controller: TransformStreamDefaultController<unknown>): void {
+		for (const record of this.#parser.parse(chunk)) controller.enqueue(record)
+	}
+	flush(controller: TransformStreamDefaultController<unknown>): void {
+		for (const record of this.#parser.parse('\n')) controller.enqueue(record)
 	}
 }
 
@@ -2579,15 +2555,15 @@ const response = await fetch('/threads/trip', {
 if (!response.ok || response.body === null) {
 	throw new Error(`the run was refused: ${response.status}`)
 }
-const lines = response.body
+const records = response.body
 	.pipeThrough(new TextDecoderStream())
-	.pipeThrough(new TransformStream(new LineSplitter()))
+	.pipeThrough(new TransformStream(new RecordSplitter()))
 	.getReader()
 for (;;) {
-	const line = await lines.read()
-	if (line.done) throw new Error('the frames ended without finish or error')
-	const frame = parseJSONAs(line.value, agentFrameContract.is)
-	if (frame === undefined) throw new Error('a frame line was refused')
+	const record = await records.read()
+	if (record.done) throw new Error('the frames ended without finish or error')
+	const frame = record.value
+	if (!agentFrameContract.is(frame)) throw new Error('a frame line was refused')
 	if (frame.category === 'error') throw new Error('the run failed')
 	if (frame.category === 'finish') break
 	if (frame.category === 'token') render(frame.content)
@@ -3228,8 +3204,8 @@ The following test files back this guide:
 - [`tests/src/core/contracts.test.ts`](../tests/src/core/contracts.test.ts) — the message contract's round trip and malformed paths, function-valued arguments accepted in the domain and refused on the wire, the `MESSAGE_GUARD_CASES` agreement between `isMessage` and `messageContract`, and seeded wire messages kept in the domain.
 - [`tests/src/core/shapers.test.ts`](../tests/src/core/shapers.test.ts) — the message, tool-call, and token usage wire shapes at the type level, with execution context kept off the wire, and the provider result schema unchanged by the shared usage shape.
 - [`tests/src/core/integration.test.ts`](../tests/src/core/integration.test.ts) — the in-process relay hop, its `422` refusal and server-written system turn, and provider-agnosticism, where a minimal provider drives the full loop and differently named providers swap in.
-- [`tests/src/core/providers/AgentProvider.test.ts`](../tests/src/core/providers/AgentProvider.test.ts) — the HTTP engine's request composition, stream assembly and settled results, bounded error body, header hook inside the cancellation bound, cancellation partials, cleanup on every exit, and isolation between concurrent calls.
-- [`tests/src/core/providers/RelayProvider.test.ts`](../tests/src/core/providers/RelayProvider.test.ts) — the browser end's owned request snapshot, wire refusals, frame mapping, remote abort reconstruction, and terminal-result recovery.
+- [`tests/src/core/providers/AgentProvider.test.ts`](../tests/src/core/providers/AgentProvider.test.ts) — the HTTP engine's request composition, stream assembly and settled results, bounded error body, header hook inside the cancellation bound, translation of a throw from the framing seam, cancellation partials, cleanup on every exit, and isolation between concurrent calls.
+- [`tests/src/core/providers/RelayProvider.test.ts`](../tests/src/core/providers/RelayProvider.test.ts) — the browser end's owned request snapshot, wire refusals, default strict framing, supplied parser factory, frame mapping, remote abort reconstruction, and terminal-result recovery.
 - [`tests/src/core/providers/RelayStream.test.ts`](../tests/src/core/providers/RelayStream.test.ts) — the relay response half's upstream replay policy, validated frames, fixed error message, backpressure, and inbound-abort finalization.
 - [`tests/src/core/providers/ThinkSplitter.test.ts`](../tests/src/core/providers/ThinkSplitter.test.ts) — the `ThinkSplitter` state machine.
 - [`tests/src/core/providers/AgentJudge.test.ts`](../tests/src/core/providers/AgentJudge.test.ts) — the judge engine's identity and request composition, refusals before inference, HTTP and protocol failures, header hook, and cancellation partials.

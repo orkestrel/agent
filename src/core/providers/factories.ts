@@ -149,34 +149,14 @@ export function createRelay(options: RelayOptions): RelayHandler {
  * This is the browser end alone. {@link createRelay} mounts the server end, and its example
  * is the server half this one pairs with.
  *
- * @param options - The endpoint, parser factory, and HTTP call configuration
+ * @param options - The endpoint, optional parser factory, and HTTP call configuration
  * @returns The relay provider behind the shared provider interface; construct
  * {@link RelayProvider} directly to reach its wire seams
  * @example Reaching the relay from the browser
  * ```ts
- * import type { ProviderInterface, ProviderParserInterface } from '@orkestrel/agent'
- * import { createRelayProvider, ProviderError } from '@orkestrel/agent'
+ * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { createRelayProvider } from '@orkestrel/agent'
  * import { createAbort } from '@orkestrel/abort'
- * import { isRecord, parseJSONAs } from '@orkestrel/contract'
- *
- * class RelayFrameParser implements ProviderParserInterface {
- * 	#pending = ''
- * 	parse(chunk: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
- * 		this.#pending += chunk
- * 		const lines = this.#pending.split(/\r\n|\n/)
- * 		this.#pending = lines.pop() ?? ''
- * 		return lines
- * 			.filter((line) => line.trim().length > 0)
- * 			.map((line) => {
- * 				const record = parseJSONAs(line, isRecord)
- * 				if (record === undefined) throw new ProviderError('PROTOCOL', 'invalid JSON record')
- * 				return record
- * 			})
- * 	}
- * 	clear(): void {
- * 		this.#pending = ''
- * 	}
- * }
  *
  * declare const bearer: string
  * const abort = createAbort()
@@ -184,7 +164,6 @@ export function createRelay(options: RelayOptions): RelayHandler {
  *
  * const browser: ProviderInterface = createRelayProvider({
  * 	url: 'https://app.example/relay',
- * 	parser: () => new RelayFrameParser(),
  * 	headers: () => ({ authorization: `Bearer ${bearer}` }),
  * })
  * const result = await browser.generate(messages, abort.signal) // a ProviderResult like a local provider's

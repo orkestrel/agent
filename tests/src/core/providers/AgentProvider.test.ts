@@ -10,7 +10,8 @@ import {
 	isProviderAbortError,
 	isProviderError,
 } from '@src/core'
-import { requireValue, waitForDelay } from '@orkestrel/test'
+import { createNDJSONParser, isNDJSONError } from '@orkestrel/ndjson'
+import { captureProduction, requireValue, waitForDelay } from '@orkestrel/test'
 import { describe, expect, it, vi } from 'vitest'
 import {
 	createRefusingTransport,
@@ -1111,5 +1112,161 @@ describe('AgentProvider — isolation between concurrent calls on one instance',
 		await expect(cancelled.next()).rejects.toMatchObject({ partial: { content: 'answer' } })
 		expect((await drainProvider(running)).result).toEqual({ content: 'answertail' })
 		expect(provider.parsers.every((parser) => parser.cleared)).toBe(true)
+	})
+})
+
+describe('AgentProvider — a throw from the framing seam', () => {
+	it('wraps a parse throw as PROTOCOL', async () => {
+		const failure = new Error('parse failed')
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['body']),
+			parser: () => ({
+				parse() {
+					throw failure
+				},
+				clear() {},
+			}),
+		})
+		const settled = await captureProduction(() =>
+			provider.generate([], new AbortController().signal),
+		)
+		if (settled.status === 'fulfilled') throw new Error('the parse throw resolved the call')
+		const refusal: unknown = settled.reason
+		if (!isProviderError(refusal)) throw new Error('the parse throw was not translated')
+		expect(refusal.code).toBe('PROTOCOL')
+		expect(refusal.message).toBe('provider error: malformed wire record')
+		expect(refusal.cause).toBe(failure)
+	})
+
+	it('wraps a finish throw as PROTOCOL', async () => {
+		const failure = new Error('finish failed')
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['body']),
+			parser: () => ({
+				parse(chunk: string) {
+					if (chunk === '\n') throw failure
+					return []
+				},
+				clear() {},
+			}),
+		})
+		const settled = await captureProduction(() =>
+			provider.generate([], new AbortController().signal),
+		)
+		if (settled.status === 'fulfilled') throw new Error('the finish throw resolved the call')
+		const refusal: unknown = settled.reason
+		if (!isProviderError(refusal)) throw new Error('the finish throw was not translated')
+		expect(refusal.code).toBe('PROTOCOL')
+		expect(refusal.message).toBe('provider error: malformed wire record')
+		expect(refusal.cause).toBe(failure)
+	})
+
+	it('passes a parser ProviderError through', async () => {
+		const failure = new ProviderError('PROVIDER', 'upstream refused')
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['body']),
+			parser: () => ({
+				parse() {
+					throw failure
+				},
+				clear() {},
+			}),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
+	})
+
+	it('passes a parser abort error through', async () => {
+		const failure = new ProviderAbortError({ content: 'partial' })
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['body']),
+			parser: () => ({
+				parse() {
+					throw failure
+				},
+				clear() {},
+			}),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
+	})
+
+	it('aborts a refusal that raced the cancel', async () => {
+		const abort = new AbortController()
+		const strict = createNDJSONParser({ strict: true })
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['[]\n']),
+			parser: () => ({
+				parse(chunk: string) {
+					abort.abort()
+					return strict.parse(chunk)
+				},
+				clear() {
+					strict.clear()
+				},
+			}),
+		})
+		const settled = await captureProduction(() => provider.generate([], abort.signal))
+		if (settled.status === 'fulfilled') throw new Error('the raced refusal resolved the call')
+		const refusal: unknown = settled.reason
+		if (!isProviderAbortError(refusal)) throw new Error('the raced refusal did not abort')
+		expect(isNDJSONError(refusal.cause)).toBe(true)
+	})
+
+	it('passes a finish ProviderError through', async () => {
+		const failure = new ProviderError('PROVIDER', 'upstream refused')
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['body']),
+			parser: () => ({
+				parse(chunk: string) {
+					if (chunk === '\n') throw failure
+					return []
+				},
+				clear() {},
+			}),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
+	})
+
+	it('passes a finish abort error through', async () => {
+		const failure = new ProviderAbortError({ content: 'partial' })
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['body']),
+			parser: () => ({
+				parse(chunk: string) {
+					if (chunk === '\n') throw failure
+					return []
+				},
+				clear() {},
+			}),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toBe(failure)
+	})
+
+	it('aborts a finish throw after the cancel', async () => {
+		const abort = new AbortController()
+		const failure = new Error('finish raced the cancel')
+		const provider = new RelayProvider({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport(['body']),
+			parser: () => ({
+				parse(chunk: string) {
+					if (chunk !== '\n') return []
+					abort.abort()
+					throw failure
+				},
+				clear() {},
+			}),
+		})
+		const settled = await captureProduction(() => provider.generate([], abort.signal))
+		if (settled.status === 'fulfilled') throw new Error('the raced finish resolved the call')
+		const refusal: unknown = settled.reason
+		if (!isProviderAbortError(refusal)) throw new Error('the raced finish did not abort')
+		expect(refusal.cause).toBe(failure)
 	})
 })

@@ -203,7 +203,13 @@ export interface ThinkSplitterInterface {
 
 /** Defines the structural framing seam supplied by a concrete provider. */
 export interface ProviderParserInterface<TRecord = Readonly<Record<string, unknown>>> {
-	/** Parses a decoded chunk into complete records. */
+	/**
+	 * Parses a decoded chunk into complete records.
+	 *
+	 * @remarks
+	 * The engine turns a throw from `parse` into a `ProviderError` with the `PROTOCOL` code whose
+	 * `cause` is the throw, unless the call was cancelled or the throw is already a provider error.
+	 */
 	parse(chunk: string): readonly TRecord[]
 	/** Clears retained framing state. */
 	clear(): void
@@ -385,11 +391,14 @@ export interface RelayStreamOptions {
 	readonly signal: AbortSignal
 }
 
-/** Configures a relay destination and its fresh structural parser factory. */
+/** Configures a relay destination and an optional fresh parser factory. */
 export interface RelayProviderOptions extends ProviderOptions {
 	readonly url: string
-	/** Creates a fresh parser for each relay response stream. */
-	readonly parser: () => ProviderParserInterface
+	/**
+	 * Creates a fresh parser for each relay response stream, in place of the default when supplied.
+	 * Default: a fresh strict `@orkestrel/ndjson` parser.
+	 */
+	readonly parser?: () => ProviderParserInterface
 }
 
 /**

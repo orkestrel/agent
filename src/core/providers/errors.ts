@@ -103,8 +103,10 @@ export function isProviderAbortError(value: unknown): value is ProviderAbortErro
  *
  * @remarks
  * The provider base throws this error for a non-OK HTTP response, a missing response
- * body, or a missing settled result when strict assembly is enabled. Concrete wire
- * decoders also use it for malformed records and relayed provider failures.
+ * body, or a missing settled result when strict assembly is enabled, and with code `'PROTOCOL'`
+ * when the framing seam's `parse` or `finish` throws anything but a provider error, with the throw
+ * as `cause`. Concrete wire decoders also use it for malformed records and relayed provider
+ * failures.
  * `status` is present only for an `HTTP` failure; other codes leave it undefined.
  */
 export class ProviderError extends Error {
