@@ -167,6 +167,7 @@ import {
 	extractDeclaredNames,
 	extractNameWord,
 	extractParameters,
+	PARTICIPLE_ALLOWED,
 	scanParticipleNames,
 } from './setup.js'
 import {
@@ -3478,30 +3479,6 @@ describe('buildJudgmentRecords', () => {
 		expect(buildJudgmentRecords(0)).toEqual([])
 	})
 })
-
-// The -ing words `.claude/rules/names.md` keeps, by the kind of -ing word each is. A plural reads as
-// its singular. Add a word only when one of the four kinds truly applies.
-const PARTICIPLE_KEPT = Object.freeze({
-	// A noun that carries no tense.
-	noun: [
-		'string',
-		'binding',
-		'finding',
-		'heading',
-		'warning',
-		'setting',
-		'listing',
-		'mapping',
-		'timing',
-	],
-	// A name that mirrors an external field: Ollama `message.thinking`, the Node `encoding` option.
-	mirror: ['encoding', 'thinking'],
-	// A lifecycle state that is in progress when it is read.
-	lifecycle: ['pending', 'running', 'stopping', 'waiting'],
-	// An adjective naming a condition that holds when it is read.
-	adjective: ['blocking', 'missing', 'remaining', 'existing', 'recurring'],
-})
-const PARTICIPLE_ALLOWED: ReadonlySet<string> = new Set(Object.values(PARTICIPLE_KEPT).flat())
 
 describe('blankSourceText', () => {
 	it('blanks a line comment and a string and keeps the length', () => {

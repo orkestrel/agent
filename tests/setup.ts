@@ -8613,6 +8613,32 @@ export function extractNameWord(name: string): string {
 	return (segment.match(/[A-Z]?[a-z\d]+$|[A-Z]+$/)?.[0] ?? segment).toLowerCase()
 }
 
+// The -ing words `.claude/rules/names.md` keeps, by the kind of -ing word each is. A plural reads as
+// its singular. Add a word only when one of the four kinds truly applies.
+export const PARTICIPLE_KEPT = Object.freeze({
+	// A noun that carries no tense.
+	noun: [
+		'string',
+		'binding',
+		'finding',
+		'heading',
+		'warning',
+		'setting',
+		'listing',
+		'mapping',
+		'timing',
+	],
+	// A name that mirrors an external field: Ollama `message.thinking`, the Node `encoding` option.
+	mirror: ['encoding', 'thinking'],
+	// A lifecycle state that is in progress when it is read.
+	lifecycle: ['pending', 'running', 'stopping', 'waiting'],
+	// An adjective naming a condition that holds when it is read.
+	adjective: ['blocking', 'missing', 'remaining', 'existing', 'recurring'],
+})
+export const PARTICIPLE_ALLOWED: ReadonlySet<string> = new Set(
+	Object.values(PARTICIPLE_KEPT).flat(),
+)
+
 const PARTICIPLE_NAME = String.raw`[A-Za-z_$][\w$]*`
 const PARTICIPLE_EXPORT = new RegExp(
 	String.raw`^[ \t]*export\s+(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class|const|let)\s+(${PARTICIPLE_NAME})`,

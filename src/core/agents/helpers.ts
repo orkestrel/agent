@@ -92,7 +92,7 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
 		const estimate = isObject(stop) ? Reflect.get(stop, 'estimate') : undefined
 		const spent = isObject(stop) ? Reflect.get(stop, 'usage') : undefined
 		const projectedSpent = spent === undefined ? undefined : tokenUsageToJSON(spent)
-		const readings = {
+		const measured = {
 			...(isFiniteNumber(estimate) ? { estimate } : {}),
 			...(projectedSpent === undefined ? {} : { usage: projectedSpent }),
 		}
@@ -102,9 +102,9 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
 			(spent !== undefined && projectedSpent === undefined)
 				? undefined
 				: ranked && isFiniteNumber(max) && isFiniteNumber(consumed)
-					? { layer, id, max, consumed, ...readings }
+					? { layer, id, max, consumed, ...measured }
 					: layer === 'model'
-						? { layer, id, ...readings }
+						? { layer, id, ...measured }
 						: undefined
 		if (stop !== undefined && projectedStop === undefined) return undefined
 
@@ -326,12 +326,12 @@ export function inferStop(
 	provider: string,
 	turn: AgentTurn | undefined,
 ): AgentStop | undefined {
-	const readings = {
+	const measured = {
 		...(turn?.estimate === undefined ? {} : { estimate: turn.estimate }),
 		...(turn?.usage === undefined ? {} : { usage: turn.usage }),
 	}
 	const interrupted = turn?.interrupted === true
-	if (!interrupted && turn?.truncated === true) return { layer: 'model', id: provider, ...readings }
+	if (!interrupted && turn?.truncated === true) return { layer: 'model', id: provider, ...measured }
 	if (!isBudgetError(reason)) return undefined
 	const metered =
 		allowance !== undefined &&
@@ -345,7 +345,7 @@ export function inferStop(
 		id: reason.context.id,
 		max: reason.context.max,
 		consumed: reason.context.consumed,
-		...readings,
+		...measured,
 	}
 }
 
