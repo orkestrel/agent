@@ -32,9 +32,9 @@
 			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
 		},
 		"daemon": {
-			"executable": "C:\\Users\\mikes\\scoop\\apps\\ollama-full\\0.40.13\\ollama.exe",
-			"digest": "c1cca2937421d78877d5961746d25e33acd62e194d881f90fb63dca7f3e10f41",
-			"version": "0.40.13",
+			"executable": "C:\\Users\\mikes\\WebstormProjects\\agent\\tmp\\studies\\runner\\ollama-0.40.14\\ollama.exe",
+			"digest": "14e0fff0449ce3c3a7fe9db8b8b32089274db5f835d4c99f5af7c32dcbf08981",
+			"version": "0.40.14",
 			"models": [
 				{
 					"name": "qwen3.5:2b-q4_K_M",
@@ -63,7 +63,7 @@
 	},
 	"settings": {
 		"observe": true,
-		"version": "0.40.13",
+		"version": "0.40.14",
 		"metadata": {
 			"calls": 8192,
 			"bytes": 67108864,
@@ -71,7 +71,7 @@
 		},
 		"gauge": {
 			"scale": 1,
-			"overhead": 354
+			"overhead": 352
 		},
 		"layout": "separate",
 		"checkpoints": [

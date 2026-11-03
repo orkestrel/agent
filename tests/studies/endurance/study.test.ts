@@ -273,7 +273,7 @@ describe('prospective public endurance declarations', () => {
 		const daemon = {
 			executable: process.execPath,
 			digest: 'a'.repeat(64),
-			version: '0.40.13',
+			version: '0.40.14',
 			models: [model, judge],
 		}
 		expect(isStudyProvider({ ...provider, daemon })).toBe(true)
