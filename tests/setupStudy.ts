@@ -6,6 +6,7 @@ import type {
 	StudyCriterion,
 	StudyDefinition,
 	StudyJudgment,
+	StudyLabels,
 	StudyManifest,
 	StudyScenario,
 	StudyTrial,
@@ -20,21 +21,27 @@ import type {
 	StudyExchangeRow,
 	StudyExchangeSinkInterface,
 	StudyOllamaReplayInterface,
+	StudySealedResult,
 	StudyValidation,
 } from '@orkestrel/study/server'
 import type { RecorderInterface } from '@orkestrel/test'
 import type { StudyAttempt, StudyFailure, StudyRole, StudyRubric } from '@orkestrel/study'
-import type { JSONValue } from '@orkestrel/contract'
+import type { Guard, JSONValue } from '@orkestrel/contract'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import {
 	arrayOf,
 	canonicalStringify,
 	cloneJSONValue,
 	isArray,
+	isBoolean,
+	isInteger,
 	isJSONValue,
 	isRecord,
 	isString,
+	literalOf,
+	objectOf,
 	parseJSON,
+	parseJSONAs,
 } from '@orkestrel/contract'
 import { createRecorder, waitForCondition } from '@orkestrel/test'
 import {
@@ -52,7 +59,9 @@ import {
 	STUDY_CHECKPOINT_EVENT,
 	StudyResultStore,
 	buildStudyExchangeDeclaration,
+	buildStudyPacket,
 	collectStudyEvidence,
+	hashStudyBytes,
 	readStudyDeclaration,
 	readStudyExchanges,
 	readStudyResult,
@@ -2888,5 +2897,1848 @@ export async function executeMemorySeedChain(
 		seeded,
 		boundary,
 		sent: server.requests.length,
+	}
+}
+
+/** Names the rubric classes of one goal, each its criterion id's suffix. */
+export type MemoryLabelClass = 'work' | 'completion' | 'facts' | 'obligations'
+/** Names a verdict a labeler or a judgment holds. */
+export type MemoryLabelVerdict = StudyJudgment['verdict']
+/** Names the prompt condition of a labeling node. */
+export type MemoryLabelCondition = 'plain' | 'receipts'
+/** Holds one sealed segment's retained packet and mapping bytes. */
+export interface MemoryLabelSegment {
+	/** Holds the sealed result's seal id, which the mapping names. */
+	readonly result: string
+	readonly arm: string
+	readonly packet: Uint8Array
+	readonly mapping: Uint8Array
+}
+/** Holds one authored fictional row that catches an inattentive lane. */
+export interface MemoryLabelControl {
+	readonly input: JSONValue
+	readonly product: JSONValue
+	readonly assertion: JSONValue
+	readonly verdict: MemoryLabelVerdict
+}
+/** Holds the one row text a labeler reads; a goal that failed holds no `product`. */
+export interface MemoryLabelRow {
+	readonly row: number
+	readonly input: JSONValue
+	readonly product?: JSONValue
+	readonly assertion: JSONValue
+}
+/** Holds the rows one fresh lane labels. */
+export interface MemoryLabelRequest {
+	readonly rows: readonly MemoryLabelRow[]
+}
+/** Links one neutral row to its packet identities and its source pair. */
+export interface MemoryLabelLink {
+	readonly row: number
+	/** Holds the index of the request that shows the row. */
+	readonly request: number
+	/** Holds the packet bytes' digest, which the row's labels bind. */
+	readonly packet: string
+	readonly result: string
+	readonly arm: string
+	readonly trial: string
+	readonly criterion: string
+	readonly source: { readonly trial: string; readonly criterion: string }
+	readonly goal: string
+	readonly class: MemoryLabelClass
+}
+/** Links one control's neutral row to the verdict its authored text states. */
+export interface MemoryLabelCheck {
+	readonly row: number
+	readonly request: number
+	readonly verdict: MemoryLabelVerdict
+}
+/** Holds what a lane must not see: each row's identity, and which rows are controls. */
+export interface MemoryLabelMap {
+	readonly links: readonly MemoryLabelLink[]
+	readonly checks: readonly MemoryLabelCheck[]
+}
+/** Holds a gate's labeling requests and their separate map. */
+export interface MemoryLabelPool {
+	readonly requests: readonly MemoryLabelRequest[]
+	readonly map: MemoryLabelMap
+}
+/** Holds one row a lane returned. */
+export interface MemoryLabelAnswer {
+	readonly row: number
+	readonly verdict: MemoryLabelVerdict
+	readonly reason: string
+	/** Holds whether the lane flagged the row's text as revealing its arm. */
+	readonly revealed?: boolean
+}
+/** Holds what one engine returned across its nodes. */
+export interface MemoryLabelLane {
+	readonly labeler: string
+	readonly rows: readonly MemoryLabelAnswer[]
+}
+/** Holds what a labels file states beside its judgments, and the lane that settles disputes. */
+export interface MemoryLabelOptions {
+	readonly created: string
+	readonly version: string
+	readonly third?: MemoryLabelLane
+}
+/** Holds the labels files of a pool and what their rows came to. */
+export interface MemoryLabelImport {
+	/** Holds one file per packet. */
+	readonly labels: readonly StudyLabels[]
+	/** Counts each lane's row that is absent or carries a blank reason, controls aside. */
+	readonly omitted: number
+	/** Lists the rows the labeling lanes disagree on, before any third lane. */
+	readonly disputes: readonly number[]
+	/** Counts, per lane in order, the controls it omitted or answered against the authored verdict. */
+	readonly missed: readonly number[]
+}
+/** Holds two lanes' agreement over one class. */
+export interface MemoryLabelAgreement {
+	readonly class: MemoryLabelClass
+	readonly count: number
+	readonly agreement: number
+	/** Holds Cohen's kappa over the three verdicts; undefined when chance agreement is 1. */
+	readonly kappa: number | undefined
+	/** Holds both-achieved over either-achieved; undefined when neither side holds an `achieved`. */
+	readonly overlap: number | undefined
+}
+/** Names an arm's place in a gate. */
+export type MemoryGateRole = 'treatment' | 'base' | 'repeat' | 'sham'
+/** Names what a gate clause asks of the treatment against the base. */
+export type MemoryGateRelationship = 'noninferior' | 'improves' | 'falls' | 'unadded'
+/** Names the verdict of a clause over every assignment of the unknowns. */
+export type MemoryGateVerdict = 'holds' | 'fails' | 'open' | 'unread'
+/** Holds one gate clause; `work` scores `achieved` and `completion` scores `unsuccessful`. */
+export interface MemoryGateClause {
+	readonly class: 'work' | 'completion'
+	readonly relationship: MemoryGateRelationship
+}
+/** Holds each role's judgments across its segments, under source ids. */
+export type MemoryGatePopulation = Readonly<Record<MemoryGateRole, readonly StudyJudgment[]>>
+/** Holds the arm name each role reads. */
+export type MemoryGateAssignment = Readonly<Record<MemoryGateRole, string>>
+/** Holds one integer score per role. */
+export type MemoryGateScore = Readonly<Record<MemoryGateRole, number>>
+/** Holds one arm's scored judgments, its unknown judgments, and its class total. */
+export interface MemoryGateCount {
+	readonly known: number
+	readonly unknown: number
+	readonly total: number
+}
+/** Holds the least and greatest noise over every assignment of the unknowns. */
+export interface MemoryGateNoise {
+	readonly least: number
+	readonly greatest: number
+}
+/** Names an arm whose unknowns can move an open clause, with how many it holds. */
+export interface MemoryGateDecider {
+	readonly role: MemoryGateRole
+	readonly unknown: number
+}
+/** Holds a clause's reading over one gate's arms. */
+export interface MemoryGateReading {
+	readonly verdict: MemoryGateVerdict
+	readonly counts: Readonly<Record<MemoryGateRole, MemoryGateCount>>
+	/** Holds N's range; undefined when the clause reads no N or an arm is unread. */
+	readonly noise: MemoryGateNoise | undefined
+	/** Holds the fewest judgments that must change to leave `holds` or `fails`, measured from the unknowns' range. */
+	readonly reversal: number | undefined
+	/** Lists the arms whose unknowns can decide an `open` clause. */
+	readonly deciders: readonly MemoryGateDecider[]
+}
+/** Holds one hand-computed row of the gate reader's table. */
+export interface MemoryGateRow extends MemoryGateReading {
+	readonly name: string
+	readonly clause: MemoryGateClause
+}
+/** Holds one generated labeling node, its prompt included. */
+export interface MemoryLabelNode {
+	readonly label: string
+	readonly request: number
+	readonly engine: string
+	readonly condition: MemoryLabelCondition
+	/** Counts the prompt's characters, so a rate names its text without holding it. */
+	readonly characters: number
+	readonly prompt: string
+}
+/** Holds what a transcript shows of one lane. */
+export interface MemoryTranscriptReading {
+	/** Lists the lane's tool calls by name, in order. */
+	readonly tools: readonly string[]
+	/** Holds the milliseconds between its first and last stamped lines; undefined with none. */
+	readonly wall: number | undefined
+}
+/** Holds one workflow node a journal started, with what it returned. */
+export interface MemoryJournalNode {
+	readonly agent: string
+	readonly label: string
+	/** Holds the node's return value; undefined when the journal holds none. */
+	readonly result: unknown
+}
+/** Holds the nodes of one workflow journal. */
+export interface MemoryJournal {
+	/** Counts the journal's `started` and `result` lines. */
+	readonly entries: number
+	readonly nodes: readonly MemoryJournalNode[]
+}
+/** Holds one kept labeling node's answers. */
+export interface MemoryLabelRead {
+	readonly node: Omit<MemoryLabelNode, 'prompt'>
+	readonly answers: readonly MemoryLabelAnswer[]
+	readonly wall: number | undefined
+}
+/** Holds what a labeling run's journal came to. */
+export interface MemoryLabelRun {
+	readonly reads: readonly MemoryLabelRead[]
+	/** Counts the labeling nodes whose return holds no `rows` member, the unstarted included. */
+	readonly unread: number
+	/** Counts the labeling nodes that called a tool other than `StructuredOutput`. */
+	readonly discarded: number
+	/** Counts the journal's nodes that no labeling node names. */
+	readonly foreign: number
+	/** Counts the answers kept nodes returned for a row their own request does not show, none of which is kept. */
+	readonly strayed: number
+}
+/** Holds what the first node reports a lane is given, the recorded limit on a lane's blindness. */
+export interface MemoryHarnessReport {
+	readonly tools: readonly string[]
+	readonly context: readonly string[]
+}
+/** Holds the least, median, and greatest of a set of readings. */
+export interface MemorySpread {
+	readonly least: number
+	readonly median: number
+	readonly greatest: number
+}
+/** Holds one class's pilot reading for one engine. */
+export interface MemoryPilotClass {
+	readonly class: MemoryLabelClass
+	/** Holds the spread of the class's row text, in characters of its JSON. */
+	readonly characters: MemorySpread | undefined
+	/** Counts the class's plain rows the engine answered. */
+	readonly count: number
+	/** Counts those it answered `achieved`. */
+	readonly achieved: number
+	/** Counts those whose verdict differs when the receipts are added. */
+	readonly changed: number
+}
+/** Holds one engine's pilot reading, each rate beside the text it was read on. */
+export interface MemoryPilotReading {
+	/** Holds the milliseconds per goal-arm of the plain nodes. */
+	readonly wall: MemorySpread | undefined
+	/** Holds the characters of each plain node's prompt. */
+	readonly characters: MemorySpread | undefined
+	/** Holds the milliseconds per 1000 prompt characters of the plain nodes. */
+	readonly rate: MemorySpread | undefined
+	readonly classes: readonly MemoryPilotClass[]
+}
+/** Holds a sealed population and the real packet bytes built over it. */
+export interface MemoryLabelFixture {
+	readonly result: StudySealedResult
+	readonly rubric: StudyRubric
+	readonly digest: string
+	readonly segment: MemoryLabelSegment
+}
+/** Holds one packet entry's pooling group, row text, and identities. */
+export interface MemoryLabelMember {
+	readonly group: string
+	readonly text: Omit<MemoryLabelRow, 'row'>
+	readonly link: Omit<MemoryLabelLink, 'row' | 'request'>
+}
+/** Holds one row before its number: a packet entry holds a `link`, and a control holds a `verdict`. */
+export interface MemoryLabelSeat {
+	readonly rank: string
+	readonly request: number
+	readonly text: Omit<MemoryLabelRow, 'row'>
+	readonly link?: Omit<MemoryLabelLink, 'row' | 'request'>
+	readonly verdict?: MemoryLabelVerdict
+}
+/** Holds one public evidence row a receipts prompt shows. */
+export interface MemoryLabelReceipt {
+	readonly event: string
+	readonly value: JSONValue
+}
+/** Holds what a pool wrapper keeps for its gate wrapper: the pool and its nodes, prompts aside. */
+export interface MemoryLabelPlan {
+	readonly pool: MemoryLabelPool
+	readonly nodes: ReadonlyArray<Omit<MemoryLabelNode, 'prompt'>>
+}
+/** Holds one clause with what it read. */
+export interface MemoryGateResult {
+	readonly clause: MemoryGateClause
+	readonly reading: MemoryGateReading
+}
+
+/** Holds the reason a disputed row's judgment states. */
+export const MEMORY_LABEL_DISPUTE = 'Labelers disagree'
+/** Holds the reason a row no lane settled reads under in a gate's arms. */
+export const MEMORY_LABEL_ABSENT = 'No lane labeled this row'
+/** Holds the reasoning effort of every labeling node. */
+export const MEMORY_LABEL_EFFORT = 'high'
+/** Lists the evidence events a goal's receipts hold; `wire`, `dispatch`, and `checkpoint` rows carry whole requests and state. */
+export const MEMORY_LABEL_RECEIPTS: readonly string[] = Object.freeze([
+	'arrival',
+	'lookup',
+	'result',
+	'summary',
+])
+/** Holds the first node's label, which a journal names it by. */
+export const MEMORY_LABEL_HARNESS_NODE = 'harness'
+/** Holds the first node's prompt, which holds no packet text and records what a lane is given. */
+export const MEMORY_LABEL_HARNESS =
+	'Return the name of every tool you hold, and name every instruction file, memory text, and other context loaded into this conversation. Call no tool except the structured answer.'
+/** Holds fictional controls whose product plainly meets or misses its assertion. */
+export const MEMORY_LABEL_CONTROLS: readonly MemoryLabelControl[] = Object.freeze([
+	Object.freeze({
+		input: { prompt: 'State the shelf that holds the blue lantern.' },
+		product: { value: { content: 'The blue lantern sits on shelf 14.' }, partial: false },
+		assertion: { criterion: 'The reply names shelf 14 as the blue lantern shelf.' },
+		verdict: 'achieved',
+	}),
+	Object.freeze({
+		input: { prompt: 'State the ferry that leaves at dawn.' },
+		product: { value: { content: 'The harbor office closes at noon.' }, partial: false },
+		assertion: { criterion: 'The reply names the ferry that leaves at dawn.' },
+		verdict: 'unsuccessful',
+	}),
+])
+/**
+ * Holds the gate reader's table, each row computed by hand: N = 2 x max(|repeat - base|, |sham - base|)
+ * at every assignment, and a reversal is the least L1 distance from the score box to a point that
+ * answers the other way, each score staying within 0 and its total.
+ */
+export const MEMORY_GATE_ROWS: readonly MemoryGateRow[] = Object.freeze([
+	{
+		// N = 2 x max(1, 1) = 2; 3 >= 1 and 4 >= 1. Cost 2 reaches N 0 with 3 >= 3, or t 1 with 1 >= 1; cost 3 reaches t 2 at N 0, or t 0 at N 2.
+		name: 'A, noninferior holds',
+		clause: { class: 'work', relationship: 'noninferior' },
+		counts: {
+			treatment: { known: 3, unknown: 1, total: 4 },
+			base: { known: 3, unknown: 0, total: 4 },
+			repeat: { known: 2, unknown: 0, total: 4 },
+			sham: { known: 4, unknown: 0, total: 4 },
+		},
+		verdict: 'holds',
+		noise: { least: 2, greatest: 2 },
+		reversal: 3,
+		deciders: [],
+	},
+	{
+		// N = 0; 0 >= 4 is false. Cost 1 leaves N at most 2 and 0 >= 1 false; repeat 2 gives N 4 and 0 >= 0, where the treatment alone needs 4.
+		name: 'noninferior fails, reversed by N',
+		clause: { class: 'work', relationship: 'noninferior' },
+		counts: {
+			treatment: { known: 0, unknown: 0, total: 4 },
+			base: { known: 4, unknown: 0, total: 4 },
+			repeat: { known: 4, unknown: 0, total: 4 },
+			sham: { known: 4, unknown: 0, total: 4 },
+		},
+		verdict: 'fails',
+		noise: { least: 0, greatest: 0 },
+		reversal: 2,
+		deciders: [],
+	},
+	{
+		// N = 0; treatment 3 to 6 against 6: 6 >= 6 is true and 3 >= 6 is false.
+		name: 'C, noninferior open on the treatment',
+		clause: { class: 'work', relationship: 'noninferior' },
+		counts: {
+			treatment: { known: 3, unknown: 3, total: 6 },
+			base: { known: 6, unknown: 0, total: 6 },
+			repeat: { known: 6, unknown: 0, total: 6 },
+			sham: { known: 6, unknown: 0, total: 6 },
+		},
+		verdict: 'open',
+		noise: { least: 0, greatest: 0 },
+		reversal: undefined,
+		deciders: [{ role: 'treatment', unknown: 3 }],
+	},
+	{
+		// Repeat 5 gives N 2 and 5 >= 4; repeat 6 gives N 0 and 5 >= 6 is false, so only the repeat arm's unknown decides.
+		name: 'noninferior open on N alone',
+		clause: { class: 'work', relationship: 'noninferior' },
+		counts: {
+			treatment: { known: 5, unknown: 0, total: 6 },
+			base: { known: 6, unknown: 0, total: 6 },
+			repeat: { known: 5, unknown: 1, total: 6 },
+			sham: { known: 6, unknown: 0, total: 6 },
+		},
+		verdict: 'open',
+		noise: { least: 0, greatest: 2 },
+		reversal: undefined,
+		deciders: [{ role: 'repeat', unknown: 1 }],
+	},
+	{
+		// Base 3 gives N 0 and 3 >= 3; base 4 gives N 2 and 3 >= 2. Taking N as an independent point reads 3 >= 4 and calls this open. Cost 1: t 2 at base 3, 2 >= 3 is false.
+		name: 'noninferior holds with N following its arms',
+		clause: { class: 'work', relationship: 'noninferior' },
+		counts: {
+			treatment: { known: 3, unknown: 0, total: 4 },
+			base: { known: 3, unknown: 1, total: 4 },
+			repeat: { known: 3, unknown: 0, total: 4 },
+			sham: { known: 3, unknown: 0, total: 4 },
+		},
+		verdict: 'holds',
+		noise: { least: 0, greatest: 2 },
+		reversal: 1,
+		deciders: [],
+	},
+	{
+		// N = 2 x max(0, 1) = 2; 6 > 5. Cost 1: t 5 and 5 > 5 is false.
+		name: 'B, improves holds',
+		clause: { class: 'work', relationship: 'improves' },
+		counts: {
+			treatment: { known: 6, unknown: 0, total: 6 },
+			base: { known: 3, unknown: 0, total: 6 },
+			repeat: { known: 3, unknown: 0, total: 6 },
+			sham: { known: 4, unknown: 0, total: 6 },
+		},
+		verdict: 'holds',
+		noise: { least: 2, greatest: 2 },
+		reversal: 1,
+		deciders: [],
+	},
+	{
+		// N = 2; 9 > 5. Every cost 1 point keeps base + N at most 7; sham 6 gives N 6 and 9 > 9 is false at cost 2, where the treatment alone needs 4.
+		name: 'improves holds, reversed by N',
+		clause: { class: 'work', relationship: 'improves' },
+		counts: {
+			treatment: { known: 9, unknown: 0, total: 9 },
+			base: { known: 3, unknown: 0, total: 9 },
+			repeat: { known: 3, unknown: 0, total: 9 },
+			sham: { known: 4, unknown: 0, total: 9 },
+		},
+		verdict: 'holds',
+		noise: { least: 2, greatest: 2 },
+		reversal: 2,
+		deciders: [],
+	},
+	{
+		// N = 0; 3 > 3 is false. Cost 1: t 4 and 4 > 3.
+		name: 'improves fails',
+		clause: { class: 'work', relationship: 'improves' },
+		counts: {
+			treatment: { known: 3, unknown: 0, total: 6 },
+			base: { known: 3, unknown: 0, total: 6 },
+			repeat: { known: 3, unknown: 0, total: 6 },
+			sham: { known: 3, unknown: 0, total: 6 },
+		},
+		verdict: 'fails',
+		noise: { least: 0, greatest: 0 },
+		reversal: 1,
+		deciders: [],
+	},
+	{
+		// N = 0; treatment 1 to 2 against 3. The distance runs from the range's top: t 4 is cost 2, and t 3 is 3 > 3, false.
+		name: 'improves fails, measured from the unknowns range',
+		clause: { class: 'work', relationship: 'improves' },
+		counts: {
+			treatment: { known: 1, unknown: 1, total: 5 },
+			base: { known: 3, unknown: 0, total: 5 },
+			repeat: { known: 3, unknown: 0, total: 5 },
+			sham: { known: 3, unknown: 0, total: 5 },
+		},
+		verdict: 'fails',
+		noise: { least: 0, greatest: 0 },
+		reversal: 2,
+		deciders: [],
+	},
+	{
+		// N = 0; treatment 3 to 5 against 3: 3 > 3 is false and 4 > 3 is true.
+		name: 'improves open',
+		clause: { class: 'work', relationship: 'improves' },
+		counts: {
+			treatment: { known: 3, unknown: 2, total: 6 },
+			base: { known: 3, unknown: 0, total: 6 },
+			repeat: { known: 3, unknown: 0, total: 6 },
+			sham: { known: 3, unknown: 0, total: 6 },
+		},
+		verdict: 'open',
+		noise: { least: 0, greatest: 0 },
+		reversal: undefined,
+		deciders: [{ role: 'treatment', unknown: 2 }],
+	},
+	{
+		// N = 2; 1 < 3. Cost 1: sham 3 gives N 4 and 1 < 1 is false, where the treatment alone needs t 3 at cost 2.
+		name: 'falls holds, reversed by N',
+		clause: { class: 'completion', relationship: 'falls' },
+		counts: {
+			treatment: { known: 1, unknown: 0, total: 6 },
+			base: { known: 5, unknown: 0, total: 6 },
+			repeat: { known: 5, unknown: 0, total: 6 },
+			sham: { known: 4, unknown: 0, total: 6 },
+		},
+		verdict: 'holds',
+		noise: { least: 2, greatest: 2 },
+		reversal: 1,
+		deciders: [],
+	},
+	{
+		// N = 0; 5 < 5 is false. Cost 1: t 4 and 4 < 5.
+		name: 'falls fails',
+		clause: { class: 'completion', relationship: 'falls' },
+		counts: {
+			treatment: { known: 5, unknown: 0, total: 6 },
+			base: { known: 5, unknown: 0, total: 6 },
+			repeat: { known: 5, unknown: 0, total: 6 },
+			sham: { known: 5, unknown: 0, total: 6 },
+		},
+		verdict: 'fails',
+		noise: { least: 0, greatest: 0 },
+		reversal: 1,
+		deciders: [],
+	},
+	{
+		// N = 0; treatment 3 to 5 against 5: 3 < 5 is true and 5 < 5 is false.
+		name: 'falls open',
+		clause: { class: 'completion', relationship: 'falls' },
+		counts: {
+			treatment: { known: 3, unknown: 2, total: 6 },
+			base: { known: 5, unknown: 0, total: 6 },
+			repeat: { known: 5, unknown: 0, total: 6 },
+			sham: { known: 5, unknown: 0, total: 6 },
+		},
+		verdict: 'open',
+		noise: { least: 0, greatest: 0 },
+		reversal: undefined,
+		deciders: [{ role: 'treatment', unknown: 2 }],
+	},
+	{
+		// No N; 1 <= 2. Cost 1 reaches 2 <= 2 or 1 <= 1; cost 2 reaches 3 <= 2. The repeat and sham arms hold no judgments and are not read.
+		name: 'unadded holds',
+		clause: { class: 'completion', relationship: 'unadded' },
+		counts: {
+			treatment: { known: 1, unknown: 0, total: 4 },
+			base: { known: 2, unknown: 0, total: 4 },
+			repeat: { known: 0, unknown: 0, total: 0 },
+			sham: { known: 0, unknown: 0, total: 0 },
+		},
+		verdict: 'holds',
+		noise: undefined,
+		reversal: 2,
+		deciders: [],
+	},
+	{
+		// As the preceding row: unequal totals compare only the arms the clause reads, so these totals of 5 and 2 throw nothing.
+		name: 'unadded ignores the totals of arms it does not read',
+		clause: { class: 'completion', relationship: 'unadded' },
+		counts: {
+			treatment: { known: 1, unknown: 0, total: 4 },
+			base: { known: 2, unknown: 0, total: 4 },
+			repeat: { known: 0, unknown: 0, total: 5 },
+			sham: { known: 0, unknown: 0, total: 2 },
+		},
+		verdict: 'holds',
+		noise: undefined,
+		reversal: 2,
+		deciders: [],
+	},
+	{
+		// Treatment 2 to 3 against 2: an unknown critical counts as possibly added.
+		name: 'D, unadded open',
+		clause: { class: 'completion', relationship: 'unadded' },
+		counts: {
+			treatment: { known: 2, unknown: 1, total: 3 },
+			base: { known: 2, unknown: 0, total: 3 },
+			repeat: { known: 0, unknown: 0, total: 0 },
+			sham: { known: 0, unknown: 0, total: 0 },
+		},
+		verdict: 'open',
+		noise: undefined,
+		reversal: undefined,
+		deciders: [{ role: 'treatment', unknown: 1 }],
+	},
+	{
+		// 3 <= 2 is false. Cost 1: t 2 or base 3.
+		name: 'unadded fails',
+		clause: { class: 'completion', relationship: 'unadded' },
+		counts: {
+			treatment: { known: 3, unknown: 0, total: 3 },
+			base: { known: 2, unknown: 0, total: 3 },
+			repeat: { known: 0, unknown: 0, total: 0 },
+			sham: { known: 0, unknown: 0, total: 0 },
+		},
+		verdict: 'fails',
+		noise: undefined,
+		reversal: 1,
+		deciders: [],
+	},
+	{
+		// The repeat arm holds no judgments, so N is unread and the gate is too.
+		name: 'noninferior unread on an empty repeat arm',
+		clause: { class: 'work', relationship: 'noninferior' },
+		counts: {
+			treatment: { known: 2, unknown: 0, total: 4 },
+			base: { known: 2, unknown: 0, total: 4 },
+			repeat: { known: 0, unknown: 0, total: 0 },
+			sham: { known: 2, unknown: 0, total: 4 },
+		},
+		verdict: 'unread',
+		noise: undefined,
+		reversal: undefined,
+		deciders: [],
+	},
+	{
+		// The base arm holds no judgments, and an unread arm reads before the unequal totals would throw.
+		name: 'unadded unread on an empty base arm',
+		clause: { class: 'completion', relationship: 'unadded' },
+		counts: {
+			treatment: { known: 1, unknown: 0, total: 4 },
+			base: { known: 0, unknown: 0, total: 0 },
+			repeat: { known: 0, unknown: 0, total: 0 },
+			sham: { known: 0, unknown: 0, total: 0 },
+		},
+		verdict: 'unread',
+		noise: undefined,
+		reversal: undefined,
+		deciders: [],
+	},
+])
+
+/**
+ * Builds one arm's judgments from its table counts, with one foreign-class and one mechanical row a score must not read.
+ * @param count - The arm's known and unknown counts and its class total
+ * @param clause - The clause whose class and scored verdict the rows take
+ * @returns The judgments the counts describe
+ */
+export function buildMemoryGateJudgments(
+	count: MemoryGateCount,
+	clause: MemoryGateClause,
+): readonly StudyJudgment[] {
+	const [scored, other]: readonly [MemoryLabelVerdict, MemoryLabelVerdict] =
+		clause.class === 'work' ? ['achieved', 'unsuccessful'] : ['unsuccessful', 'achieved']
+	const verdicts: readonly MemoryLabelVerdict[] = [
+		...Array.from({ length: count.known }, () => scored),
+		...Array.from({ length: count.unknown }, (): MemoryLabelVerdict => 'unknown'),
+		...Array.from({ length: count.total - count.known - count.unknown }, () => other),
+	]
+	return [
+		...verdicts.map((verdict, index): StudyJudgment => ({
+			trial: 'trial',
+			criterion: `ev-${String(index)}-${clause.class}`,
+			verdict,
+			method: 'model',
+			reason: 'A fixture verdict',
+			references: verdict === 'unknown' ? [] : ['fixture'],
+		})),
+		{
+			trial: 'trial',
+			criterion: 'ev-0-facts',
+			verdict: scored,
+			method: 'model',
+			reason: 'A foreign class',
+			references: ['fixture'],
+		},
+		{
+			trial: 'trial',
+			criterion: 'ev-0-receipt',
+			verdict: scored,
+			method: 'trace',
+			reason: 'A mechanical row',
+			references: ['fixture'],
+		},
+	]
+}
+
+/**
+ * Builds a sealed value over the grading fixture's two trials and its real packet bytes.
+ * @param criteria - The semantic criterion ids of the rubric. Default: one work and one completion criterion.
+ * @returns The sealed value, its rubric and digest, and the segment a pool reads
+ * @throws Error - Thrown when the rubric holds no semantic criterion
+ */
+export function buildMemoryLabelFixture(
+	criteria: readonly string[] = ['goal-work', 'goal-completion'],
+): MemoryLabelFixture {
+	const grading = buildMemoryGradingFixture()
+	const rubric: StudyRubric = {
+		version: '1',
+		criteria: criteria.map((id) =>
+			buildMemoryCriterion(id, 'semantic', { criterion: `Fictional assertion of ${id}` }),
+		),
+	}
+	const result: StudySealedResult = {
+		status: 'sealed',
+		directory: 'fixture',
+		manifest: grading.manifest,
+		attempts: grading.attempts,
+		seal: { result: 'fixture-result', id: 'fixture-seal', files: [] },
+	}
+	const digest = hashStudyBytes('fixture rubric')
+	const packet = buildStudyPacket(result, rubric, digest)
+	if (packet === undefined) throw new Error('The rubric holds no semantic criterion')
+	return {
+		result,
+		rubric,
+		digest,
+		segment: {
+			result: result.seal.id,
+			arm: 'full',
+			packet: packet.content,
+			mapping: packet.mapping,
+		},
+	}
+}
+
+/**
+ * Builds inert links, one per listed class, numbered from row 1.
+ * @param classes - Each row's class
+ * @param arm - The arm every link names. Default: records.
+ * @param first - The first link's row. Default: 1.
+ * @returns The map, which holds no check
+ */
+export function buildMemoryLabelMap(
+	classes: readonly MemoryLabelClass[],
+	arm = 'records',
+	first = 1,
+): MemoryLabelMap {
+	return {
+		checks: [],
+		links: classes.map((entry, index) => ({
+			row: first + index,
+			request: index,
+			packet: 'a'.repeat(64),
+			result: 'fixture-seal',
+			arm,
+			trial: `t-${String(first + index)}`,
+			criterion: `c-${String(first + index)}`,
+			source: { trial: `trial-${arm}`, criterion: `ev-${String(first + index)}-${entry}` },
+			goal: `ev-${String(first + index)}`,
+			class: entry,
+		})),
+	}
+}
+
+/**
+ * Builds a lane's answers from its verdicts, numbered from row 1.
+ * @param verdicts - Each row's verdict
+ * @returns The answers, each with a reason
+ */
+export function buildMemoryLabelAnswers(
+	verdicts: readonly MemoryLabelVerdict[],
+): readonly MemoryLabelAnswer[] {
+	return verdicts.map((verdict, index) => ({ row: index + 1, verdict, reason: 'A reason' }))
+}
+
+/**
+ * Renders a fictional workflow journal in the line shape of a finished run's `journal.jsonl`.
+ * @param nodes - The nodes it started, each with what it returned; an undefined result writes no `result` line
+ * @returns The journal's text
+ */
+export function renderMemoryJournalFixture(nodes: readonly MemoryJournalNode[]): string {
+	const lines = [
+		{ type: 'launched' },
+		...nodes.flatMap((node) => [
+			{
+				type: 'started',
+				key: `v2:${node.agent}`,
+				agentId: node.agent,
+				label: node.label,
+				phase: 'Label',
+			},
+			...(node.result === undefined
+				? []
+				: [
+						{
+							type: 'result',
+							key: `v2:${node.agent}`,
+							agentId: node.agent,
+							result: node.result,
+							toolsUsed: ['StructuredOutput'],
+						},
+					]),
+		]),
+	]
+	return `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`
+}
+
+/**
+ * Renders a fictional lane transcript in the line shape of a finished run's `agent-<id>.jsonl`; its request copy holds a tool name the audit must not read.
+ * @param tools - The tool calls its assistant lines hold
+ * @param start - The first line's timestamp
+ * @param end - The last line's timestamp
+ * @returns The transcript's text
+ */
+export function renderMemoryTranscriptFixture(
+	tools: readonly string[],
+	start: string,
+	end: string,
+): string {
+	const lines = [
+		{ type: 'user', timestamp: start, message: { role: 'user', content: 'A fictional prompt' } },
+		{ type: 'api-request-shape', timestamp: start, shape: 'fictional' },
+		{
+			type: 'api-request-blob',
+			message: { content: [{ type: 'tool_use', name: 'CopiedInRequest', input: {} }] },
+		},
+		...tools.map((name) => ({
+			type: 'assistant',
+			timestamp: start,
+			message: { role: 'assistant', content: [{ type: 'tool_use', id: 'x', name, input: {} }] },
+		})),
+		{ type: 'assistant', timestamp: start, message: { content: [{ type: 'text', text: 'done' }] } },
+		{ type: 'user', timestamp: end, message: { role: 'user', content: [{ type: 'tool_result' }] } },
+	]
+	return `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`
+}
+
+/** Lists the rubric classes in their reading order. */
+export const MEMORY_LABEL_CLASSES: readonly MemoryLabelClass[] = Object.freeze([
+	'work',
+	'completion',
+	'facts',
+	'obligations',
+])
+/** Lists the verdicts a labeler answers. */
+export const MEMORY_LABEL_VERDICTS: readonly MemoryLabelVerdict[] = Object.freeze([
+	'achieved',
+	'unsuccessful',
+	'unknown',
+])
+/** Lists a gate's roles in their reading order. */
+export const MEMORY_GATE_ROLES: readonly MemoryGateRole[] = Object.freeze([
+	'treatment',
+	'base',
+	'repeat',
+	'sham',
+])
+/** Holds a labeling node's answer schema; the `reason` pattern refuses a blank reason at the tool call. */
+export const MEMORY_LABEL_SCHEMA = Object.freeze({
+	type: 'object',
+	properties: {
+		rows: {
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					row: { type: 'integer' },
+					verdict: { type: 'string', enum: ['achieved', 'unsuccessful', 'unknown'] },
+					reason: { type: 'string', pattern: '\\S' },
+					revealed: { type: 'boolean' },
+				},
+				required: ['row', 'verdict', 'reason'],
+			},
+		},
+	},
+	required: ['rows'],
+})
+/** Holds the first node's answer schema. */
+export const MEMORY_LABEL_HARNESS_SCHEMA = Object.freeze({
+	type: 'object',
+	properties: {
+		tools: { type: 'array', items: { type: 'string' } },
+		context: { type: 'array', items: { type: 'string' } },
+	},
+	required: ['tools', 'context'],
+})
+
+/** Checks whether a value is one row a lane returned. */
+export const isMemoryLabelAnswer: Guard<MemoryLabelAnswer> = objectOf(
+	{
+		row: isInteger,
+		verdict: literalOf('achieved', 'unsuccessful', 'unknown'),
+		reason: isString,
+		revealed: isBoolean,
+	},
+	['revealed'],
+)
+/** Checks whether a value is the first node's report. */
+export const isMemoryHarnessReport: Guard<MemoryHarnessReport> = objectOf({
+	tools: arrayOf(isString),
+	context: arrayOf(isString),
+})
+/** Checks whether a value holds a retained packet's entries. */
+export const isMemoryPacket = objectOf({
+	entries: arrayOf(
+		objectOf(
+			{
+				trial: isString,
+				criterion: isString,
+				input: isJSONValue,
+				product: isJSONValue,
+				assertion: isJSONValue,
+			},
+			['product'],
+		),
+	),
+})
+/** Checks whether a value holds a retained mapping's result and links. */
+export const isMemoryMapping = objectOf({
+	result: isString,
+	entries: arrayOf(
+		objectOf({
+			trial: isString,
+			criterion: isString,
+			source: objectOf({ trial: isString, criterion: isString }),
+		}),
+	),
+})
+/** Checks whether a value is what a pool wrapper keeps for its gate wrapper. */
+export const isMemoryLabelPlan: Guard<MemoryLabelPlan> = objectOf({
+	pool: objectOf({
+		requests: arrayOf(
+			objectOf({
+				rows: arrayOf(
+					objectOf(
+						{ row: isInteger, input: isJSONValue, product: isJSONValue, assertion: isJSONValue },
+						['product'],
+					),
+				),
+			}),
+		),
+		map: objectOf({
+			links: arrayOf(
+				objectOf({
+					row: isInteger,
+					request: isInteger,
+					packet: isString,
+					result: isString,
+					arm: isString,
+					trial: isString,
+					criterion: isString,
+					source: objectOf({ trial: isString, criterion: isString }),
+					goal: isString,
+					class: literalOf('work', 'completion', 'facts', 'obligations'),
+				}),
+			),
+			checks: arrayOf(
+				objectOf({
+					row: isInteger,
+					request: isInteger,
+					verdict: literalOf('achieved', 'unsuccessful', 'unknown'),
+				}),
+			),
+		}),
+	}),
+	nodes: arrayOf(
+		objectOf({
+			label: isString,
+			request: isInteger,
+			engine: isString,
+			condition: literalOf('plain', 'receipts'),
+			characters: isInteger,
+		}),
+	),
+})
+
+/**
+ * Parses the plan a pool wrapper kept.
+ * @param text - The plan file's text
+ * @returns The plan, or undefined when the text is not JSON or holds another shape
+ */
+export function parseMemoryLabelPlan(text: string): MemoryLabelPlan | undefined {
+	return parseJSONAs(text, isMemoryLabelPlan)
+}
+
+/**
+ * Parses a criterion id's rubric class from its suffix.
+ * @param criterion - The criterion id
+ * @returns The class, or undefined when the id holds none
+ */
+export function parseMemoryLabelClass(criterion: string): MemoryLabelClass | undefined {
+	return MEMORY_LABEL_CLASSES.find((entry) => criterion.endsWith(`-${entry}`))
+}
+
+/**
+ * Computes the rank that orders one pooled key under one order.
+ * @param order - The order the rank moves with
+ * @param key - The pooled key
+ * @returns The rank's digest
+ */
+export function computeMemoryLabelRank(order: string, key: string): string {
+	return hashStudyBytes(`${order}\n${key}`)
+}
+
+/**
+ * Collects a segment's packet entries with their identities, refusing a mapping that does not cover its packet.
+ * @param segment - The segment's retained bytes
+ * @returns Each entry's group, row text, and link
+ * @throws Error - Thrown when the bytes are malformed, the mapping names another result or does not cover the packet, or a criterion holds no class
+ */
+export function collectMemoryLabelMembers(
+	segment: MemoryLabelSegment,
+): readonly MemoryLabelMember[] {
+	const decoder = new TextDecoder()
+	const packet = parseJSON(decoder.decode(segment.packet))
+	const mapping = parseJSON(decoder.decode(segment.mapping))
+	if (!isMemoryPacket(packet)) throw new Error(`The packet of ${segment.result} is malformed`)
+	if (!isMemoryMapping(mapping)) throw new Error(`The mapping of ${segment.result} is malformed`)
+	if (mapping.result !== segment.result)
+		throw new Error(`The mapping names ${mapping.result}, and its segment holds ${segment.result}`)
+	if (mapping.entries.length !== packet.entries.length)
+		throw new Error(`The mapping of ${segment.result} does not cover its packet`)
+	const digest = hashStudyBytes(segment.packet)
+	return packet.entries.map((entry): MemoryLabelMember => {
+		const source = mapping.entries.find(
+			(link) => link.trial === entry.trial && link.criterion === entry.criterion,
+		)?.source
+		if (source === undefined)
+			throw new Error(`The mapping of ${segment.result} does not cover its packet`)
+		const criterionClass = parseMemoryLabelClass(source.criterion)
+		if (criterionClass === undefined)
+			throw new Error(`Criterion ${source.criterion} holds no rubric class`)
+		const goal = source.criterion.slice(0, -(criterionClass.length + 1))
+		return {
+			group: `${segment.arm}/${segment.result}/${source.trial}/${goal}`,
+			text: {
+				input: entry.input,
+				...(entry.product === undefined ? {} : { product: entry.product }),
+				assertion: entry.assertion,
+			},
+			link: {
+				packet: digest,
+				result: segment.result,
+				arm: segment.arm,
+				trial: entry.trial,
+				criterion: entry.criterion,
+				source,
+				goal,
+				class: criterionClass,
+			},
+		}
+	})
+}
+
+/**
+ * Pools sealed packets into one request per goal-arm under neutral row numbers, every identity in a separate map.
+ * @param segments - Each segment's retained packet and mapping bytes
+ * @param order - The text the pool's order repeats for and moves with
+ * @param controls - The authored rows to seat among the requests, marked in the map alone
+ * @returns The requests and their map
+ * @throws Error - Thrown when a control holds no request to join, or a segment refuses per its members
+ */
+export function buildMemoryLabelPool(
+	segments: readonly MemoryLabelSegment[],
+	order: string,
+	controls: readonly MemoryLabelControl[],
+): MemoryLabelPool {
+	const members = segments.flatMap((segment) => collectMemoryLabelMembers(segment))
+	const groups = [...new Set(members.map((member) => member.group))]
+		.map((group) => ({ group, rank: computeMemoryLabelRank(order, group) }))
+		.toSorted((left, right) => (left.rank < right.rank ? -1 : 1))
+		.map((entry) => entry.group)
+	if (groups.length === 0 && controls.length > 0)
+		throw new Error('A control holds no request to join')
+	const seats: readonly MemoryLabelSeat[] = [
+		...members.map((member) => ({
+			rank: computeMemoryLabelRank(
+				order,
+				`${member.group}/${member.link.trial}/${member.link.criterion}`,
+			),
+			request: groups.indexOf(member.group),
+			text: member.text,
+			link: member.link,
+		})),
+		...controls.map((control, index) => {
+			const rank = computeMemoryLabelRank(order, `control/${String(index)}`)
+			return {
+				rank,
+				request: Number.parseInt(rank.slice(0, 8), 16) % groups.length,
+				text: { input: control.input, product: control.product, assertion: control.assertion },
+				verdict: control.verdict,
+			}
+		}),
+	]
+	const numbered = seats
+		.toSorted((left, right) =>
+			left.request === right.request
+				? left.rank < right.rank
+					? -1
+					: 1
+				: left.request - right.request,
+		)
+		.map((seat, index) => ({ ...seat, row: index + 1 }))
+	const seated = numbered.flatMap((seat) =>
+		seat.link === undefined ? [] : [{ ...seat.link, row: seat.row, request: seat.request }],
+	)
+	return {
+		requests: groups.map((_, request) => ({
+			rows: numbered
+				.filter((seat) => seat.request === request)
+				.map((seat) => ({ row: seat.row, ...seat.text })),
+		})),
+		map: {
+			links: seated,
+			checks: numbered.flatMap((seat) =>
+				seat.verdict === undefined
+					? []
+					: [{ row: seat.row, request: seat.request, verdict: seat.verdict }],
+			),
+		},
+	}
+}
+
+/**
+ * Renders a request's rows as JSON-encoded data under the instruction.
+ * @param request - The rows one lane labels
+ * @param instruction - The fixed instruction
+ * @param receipts - One goal-arm's public evidence rows, for the pilot's comparison
+ * @returns The prompt, each row and receipt on its own line
+ */
+export function buildMemoryLabelPrompt(
+	request: MemoryLabelRequest,
+	instruction: string,
+	receipts?: readonly MemoryLabelReceipt[],
+): string {
+	return [
+		instruction.trim(),
+		'',
+		'Rows, one JSON value per line:',
+		...request.rows.map((row) => JSON.stringify(row)),
+		...(receipts === undefined
+			? []
+			: [
+					'',
+					'Evidence the run recorded for these rows, one JSON value per line:',
+					...receipts.map((receipt) => JSON.stringify(receipt)),
+				]),
+	].join('\n')
+}
+
+/**
+ * Filters a trial's evidence to one goal's receipts, leaving out the rows that carry whole requests and state.
+ * @param evidence - The trial's evidence rows
+ * @param goal - The goal id
+ * @returns The goal's receipts, without their goal id
+ */
+export function filterMemoryReceipts(
+	evidence: readonly StudyEvidence[],
+	goal: string,
+): readonly MemoryLabelReceipt[] {
+	return evidence
+		.filter((entry) => entry.goal === goal && MEMORY_LABEL_RECEIPTS.includes(entry.event))
+		.map((entry) => ({ event: entry.event, value: entry.value }))
+}
+
+/**
+ * Collects a lane's answered rows by row number, leaving out a blank reason, which Study's parser refuses.
+ * @param rows - The rows the lane returned
+ * @returns Each usable answer under its row
+ */
+export function collectMemoryLabelAnswers(
+	rows: readonly MemoryLabelAnswer[],
+): ReadonlyMap<number, MemoryLabelAnswer> {
+	return new Map(
+		rows
+			.filter((entry) => entry.reason.trim().length > 0)
+			.map((entry): readonly [number, MemoryLabelAnswer] => [entry.row, entry]),
+	)
+}
+
+/**
+ * Builds one labels file per packet from each lane's rows, settling agreement, dispute, and a third lane's answer.
+ * @param map - The pool's map
+ * @param lanes - One or two labeling lanes
+ * @param options - The file fields and the lane that settles disputes
+ * @returns The files, with the omitted rows, the disputes, and each lane's missed controls
+ * @throws Error - Thrown on no lane or more than two, a row outside the map, a repeated row, or a third-lane row holding no dispute
+ */
+export function buildMemoryLabels(
+	map: MemoryLabelMap,
+	lanes: readonly MemoryLabelLane[],
+	options: MemoryLabelOptions,
+): MemoryLabelImport {
+	if (lanes.length === 0 || lanes.length > 2)
+		throw new Error(`An import takes one or two lanes, and it holds ${String(lanes.length)}`)
+	const everyLane = [...lanes, ...(options.third === undefined ? [] : [options.third])]
+	const known = new Set([...map.links, ...map.checks].map((entry) => entry.row))
+	for (const lane of everyLane) {
+		const foreign = lane.rows.find((entry) => !known.has(entry.row))
+		if (foreign !== undefined) throw new Error(`Row ${String(foreign.row)} is outside the map`)
+		const repeated = lane.rows.find(
+			(entry, index) => lane.rows.findIndex((other) => other.row === entry.row) !== index,
+		)
+		if (repeated !== undefined) throw new Error(`A lane repeats row ${String(repeated.row)}`)
+	}
+	const answers = lanes.map((lane) => collectMemoryLabelAnswers(lane.rows))
+	const disputes = map.links
+		.filter((link) => {
+			const held = answers.map((entry) => entry.get(link.row))
+			return !held.includes(undefined) && new Set(held.map((entry) => entry?.verdict)).size > 1
+		})
+		.map((link) => link.row)
+	const late = options.third?.rows.find((entry) => !disputes.includes(entry.row))
+	if (late !== undefined) throw new Error(`Row ${String(late.row)} holds no dispute to settle`)
+	const third = collectMemoryLabelAnswers(options.third?.rows ?? [])
+	const settled = map.links.flatMap((link) => {
+		const held = answers.map((entry) => entry.get(link.row))
+		const [first] = held
+		if (first === undefined || held.includes(undefined)) return []
+		const answer: Pick<MemoryLabelAnswer, 'verdict' | 'reason'> = disputes.includes(link.row)
+			? (third.get(link.row) ?? { verdict: 'unknown', reason: MEMORY_LABEL_DISPUTE })
+			: first
+		const judgment: StudyJudgment = {
+			trial: link.trial,
+			criterion: link.criterion,
+			verdict: answer.verdict,
+			method: 'model',
+			reason: answer.reason,
+			references: answer.verdict === 'unknown' ? [] : [link.packet],
+		}
+		return [{ packet: link.packet, judgment }]
+	})
+	const names = everyLane.map((lane) => lane.labeler).join('+')
+	return {
+		labels: [...new Set(map.links.map((link) => link.packet))].map((packet) => ({
+			packet,
+			labeler: lanes.length === 1 ? `${names} single-labeled` : names,
+			version: options.version,
+			created: options.created,
+			usage: [],
+			judgments: settled.filter((entry) => entry.packet === packet).map((entry) => entry.judgment),
+		})),
+		omitted: answers.flatMap((entry) => map.links.filter((link) => !entry.has(link.row))).length,
+		disputes,
+		missed: answers.map(
+			(entry) =>
+				map.checks.filter((check) => entry.get(check.row)?.verdict !== check.verdict).length,
+		),
+	}
+}
+
+/**
+ * Compares two lanes per class over the rows both answered, with controls aside.
+ * @param left - The first lane's rows
+ * @param right - The second lane's rows
+ * @param map - The pool's map
+ * @returns The agreement of each class that holds a shared row
+ */
+export function compareMemoryLabels(
+	left: readonly MemoryLabelAnswer[],
+	right: readonly MemoryLabelAnswer[],
+	map: MemoryLabelMap,
+): readonly MemoryLabelAgreement[] {
+	const lefts = collectMemoryLabelAnswers(left)
+	const rights = collectMemoryLabelAnswers(right)
+	return MEMORY_LABEL_CLASSES.flatMap((entry) => {
+		const pairs = map.links
+			.filter((link) => link.class === entry)
+			.flatMap((link) => {
+				const one = lefts.get(link.row)?.verdict
+				const two = rights.get(link.row)?.verdict
+				return one === undefined || two === undefined ? [] : [{ one, two }]
+			})
+		if (pairs.length === 0) return []
+		const count = pairs.length
+		const agreement = pairs.filter((pair) => pair.one === pair.two).length / count
+		const chance = MEMORY_LABEL_VERDICTS.reduce(
+			(sum, verdict) =>
+				sum +
+				(pairs.filter((pair) => pair.one === verdict).length / count) *
+					(pairs.filter((pair) => pair.two === verdict).length / count),
+			0,
+		)
+		const either = pairs.filter((pair) => pair.one === 'achieved' || pair.two === 'achieved')
+		const both = either.filter((pair) => pair.one === pair.two)
+		return [
+			{
+				class: entry,
+				count,
+				agreement,
+				kappa: chance === 1 ? undefined : (agreement - chance) / (1 - chance),
+				overlap: either.length === 0 ? undefined : both.length / either.length,
+			},
+		]
+	})
+}
+
+/**
+ * Builds one value per gate role.
+ * @param read - Reads a role's value
+ * @returns The record of each role's value
+ */
+export function buildMemoryGateRoles<T>(
+	read: (role: MemoryGateRole) => T,
+): Readonly<Record<MemoryGateRole, T>> {
+	return {
+		treatment: read('treatment'),
+		base: read('base'),
+		repeat: read('repeat'),
+		sham: read('sham'),
+	}
+}
+
+/**
+ * Lists the roles a relationship reads.
+ * @param relationship - The clause's relationship
+ * @returns The roles whose arms the clause reads; `unadded` reads no noise arm
+ */
+export function listMemoryGateRoles(
+	relationship: MemoryGateRelationship,
+): readonly MemoryGateRole[] {
+	return relationship === 'unadded' ? ['treatment', 'base'] : MEMORY_GATE_ROLES
+}
+
+/**
+ * Computes N from one assignment of the scores: twice the larger distance of `repeat` and `sham` from `base`.
+ * @param score - The assignment
+ * @returns The noise at that assignment
+ */
+export function computeMemoryGateNoise(score: MemoryGateScore): number {
+	return 2 * Math.max(Math.abs(score.repeat - score.base), Math.abs(score.sham - score.base))
+}
+
+/**
+ * Checks whether a relationship holds at one assignment of the scores.
+ * @param relationship - The clause's relationship
+ * @param score - The assignment
+ * @returns True if the relationship holds there; false otherwise
+ */
+export function matchesMemoryGate(
+	relationship: MemoryGateRelationship,
+	score: MemoryGateScore,
+): boolean {
+	const noise = computeMemoryGateNoise(score)
+	if (relationship === 'noninferior') return score.treatment >= score.base - noise
+	if (relationship === 'improves') return score.treatment > score.base + noise
+	if (relationship === 'falls') return score.treatment < score.base - noise
+	return score.treatment <= score.base
+}
+
+/**
+ * Builds the integers of one inclusive range.
+ * @param least - The lowest integer
+ * @param most - The highest integer
+ * @returns The integers in order
+ */
+export function buildMemoryGateRange(least: number, most: number): readonly number[] {
+	return Array.from({ length: most - least + 1 }, (_, index) => least + index)
+}
+
+/**
+ * Lists every integer assignment inside a box lazily, because a reversal search walks far more points than it keeps.
+ * @param least - Each role's lowest score
+ * @param most - Each role's highest score
+ * @yields Each assignment
+ */
+export function* listMemoryGateScores(
+	least: MemoryGateScore,
+	most: MemoryGateScore,
+): Generator<MemoryGateScore> {
+	for (const treatment of buildMemoryGateRange(least.treatment, most.treatment))
+		for (const base of buildMemoryGateRange(least.base, most.base))
+			for (const repeat of buildMemoryGateRange(least.repeat, most.repeat))
+				for (const sham of buildMemoryGateRange(least.sham, most.sham))
+					yield { treatment, base, repeat, sham }
+}
+
+/**
+ * Computes a clause's verdict, N's range, and its reversal over every assignment of the unknowns, with N following its own arms.
+ * @param arms - Each role's judgments under source ids, read by class from the criterion id
+ * @param clause - The clause to read
+ * @returns The reading
+ * @throws Error - Thrown when the arms the clause reads hold unequal class totals
+ */
+export function computeMemoryGate(
+	arms: MemoryGatePopulation,
+	clause: MemoryGateClause,
+): MemoryGateReading {
+	const scored: MemoryLabelVerdict = clause.class === 'work' ? 'achieved' : 'unsuccessful'
+	const counts = buildMemoryGateRoles((role): MemoryGateCount => {
+		const held = arms[role].filter(
+			(entry) => parseMemoryLabelClass(entry.criterion) === clause.class,
+		)
+		return {
+			known: held.filter((entry) => entry.verdict === scored).length,
+			unknown: held.filter((entry) => entry.verdict === 'unknown').length,
+			total: held.length,
+		}
+	})
+	const read = listMemoryGateRoles(clause.relationship)
+	if (read.some((role) => counts[role].total === 0))
+		return { verdict: 'unread', counts, noise: undefined, reversal: undefined, deciders: [] }
+	if (new Set(read.map((role) => counts[role].total)).size > 1)
+		throw new Error(
+			`The read arms hold unequal class totals: ${read.map((role) => `${role} ${String(counts[role].total)}`).join(', ')}`,
+		)
+	const least = buildMemoryGateRoles((role) => (read.includes(role) ? counts[role].known : 0))
+	const most = buildMemoryGateRoles((role) =>
+		read.includes(role) ? counts[role].known + counts[role].unknown : 0,
+	)
+	const holds = listMemoryGateScores(least, most).some((score) =>
+		matchesMemoryGate(clause.relationship, score),
+	)
+	const fails = listMemoryGateScores(least, most).some(
+		(score) => !matchesMemoryGate(clause.relationship, score),
+	)
+	const noise =
+		clause.relationship === 'unadded'
+			? undefined
+			: {
+					least: listMemoryGateScores(least, most).reduce(
+						(found, score) => Math.min(found, computeMemoryGateNoise(score)),
+						Number.POSITIVE_INFINITY,
+					),
+					greatest: listMemoryGateScores(least, most).reduce(
+						(found, score) => Math.max(found, computeMemoryGateNoise(score)),
+						0,
+					),
+				}
+	if (holds && fails)
+		return {
+			verdict: 'open',
+			counts,
+			noise,
+			reversal: undefined,
+			deciders: read
+				.filter(
+					(role) =>
+						counts[role].unknown > 0 &&
+						listMemoryGateScores(least, most).some(
+							(score) =>
+								matchesMemoryGate(clause.relationship, score) !==
+								matchesMemoryGate(clause.relationship, { ...score, [role]: least[role] }),
+						),
+				)
+				.map((role) => ({ role, unknown: counts[role].unknown })),
+		}
+	const zero = buildMemoryGateRoles(() => 0)
+	const limit = buildMemoryGateRoles((role) => (read.includes(role) ? counts[role].total : 0))
+	return {
+		verdict: holds ? 'holds' : 'fails',
+		counts,
+		noise,
+		reversal: listMemoryGateScores(zero, limit)
+			.filter((score) => matchesMemoryGate(clause.relationship, score) !== holds)
+			.reduce(
+				(found, score) =>
+					Math.min(
+						found,
+						read.reduce(
+							(sum, role) => sum + Math.max(0, least[role] - score[role], score[role] - most[role]),
+							0,
+						),
+					),
+				Number.POSITIVE_INFINITY,
+			),
+		deciders: [],
+	}
+}
+
+/**
+ * Collects a pool's judgments by their packet and neutral ids.
+ * @param labels - The pool's labels files
+ * @returns Each judgment under its key
+ */
+export function collectMemoryLabelJudgments(
+	labels: readonly StudyLabels[],
+): ReadonlyMap<string, StudyJudgment> {
+	return new Map(
+		labels.flatMap((file) =>
+			file.judgments.map((judgment): readonly [string, StudyJudgment] => [
+				`${file.packet}/${judgment.trial}/${judgment.criterion}`,
+				judgment,
+			]),
+		),
+	)
+}
+
+/**
+ * Builds each role's judgments under source ids from a pool's labels; a row no file holds reads `unknown`.
+ * @param map - The pool's map
+ * @param labels - The pool's labels files
+ * @param assignment - The arm each role reads
+ * @returns The population a gate reads
+ */
+export function buildMemoryGatePopulation(
+	map: MemoryLabelMap,
+	labels: readonly StudyLabels[],
+	assignment: MemoryGateAssignment,
+): MemoryGatePopulation {
+	const judgments = collectMemoryLabelJudgments(labels)
+	return buildMemoryGateRoles((role) =>
+		map.links
+			.filter((link) => link.arm === assignment[role])
+			.map((link): StudyJudgment => {
+				const judgment = judgments.get(`${link.packet}/${link.trial}/${link.criterion}`)
+				return {
+					trial: link.source.trial,
+					criterion: link.source.criterion,
+					verdict: judgment?.verdict ?? 'unknown',
+					method: 'model',
+					reason: judgment?.reason ?? MEMORY_LABEL_ABSENT,
+					references: judgment?.references ?? [],
+				}
+			}),
+	)
+}
+
+/**
+ * Collects the disputed rows a third lane can settle a gate with: those in the class and arm of an open clause's deciders.
+ * @param map - The pool's map
+ * @param disputes - The disputed rows
+ * @param readings - Each clause with its reading
+ * @param assignment - The arm each role reads
+ * @returns The rows, in dispute order
+ */
+export function collectMemoryThirdRows(
+	map: MemoryLabelMap,
+	disputes: readonly number[],
+	readings: readonly MemoryGateResult[],
+	assignment: MemoryGateAssignment,
+): readonly number[] {
+	return disputes.filter((row) => {
+		const link = map.links.find((entry) => entry.row === row)
+		return readings.some(
+			({ clause, reading }) =>
+				link?.class === clause.class &&
+				reading.deciders.some((decider) => assignment[decider.role] === link.arm),
+		)
+	})
+}
+
+/**
+ * Collects the rows a spot check reads: scored rows of a clause's class and arms first, then that class and those arms, then the rest.
+ * @param map - The pool's map
+ * @param labels - The pool's labels files
+ * @param clauses - The gate's clauses
+ * @param assignment - The arm each role reads
+ * @param count - The most rows to draw
+ * @returns The rows, deciding rows first
+ */
+export function collectMemorySpotRows(
+	map: MemoryLabelMap,
+	labels: readonly StudyLabels[],
+	clauses: readonly MemoryGateClause[],
+	assignment: MemoryGateAssignment,
+	count: number,
+): readonly number[] {
+	const judgments = collectMemoryLabelJudgments(labels)
+	return map.links
+		.map((link) => {
+			const read = clauses.filter(
+				(clause) =>
+					clause.class === link.class &&
+					listMemoryGateRoles(clause.relationship).some((role) => assignment[role] === link.arm),
+			)
+			const verdict = judgments.get(`${link.packet}/${link.trial}/${link.criterion}`)?.verdict
+			const scored = read.some(
+				(clause) => verdict === (clause.class === 'work' ? 'achieved' : 'unsuccessful'),
+			)
+			return { row: link.row, rank: scored ? 0 : read.length > 0 ? 1 : 2 }
+		})
+		.toSorted((left, right) => left.rank - right.rank || left.row - right.row)
+		.slice(0, count)
+		.map((entry) => entry.row)
+}
+
+/**
+ * Parses a gate's clause list from its command text, in the form `work:noninferior,completion:unadded`.
+ * @param text - The command text
+ * @returns The clauses, or undefined when an entry names no known class and relationship
+ */
+export function parseMemoryGateClauses(text: string): readonly MemoryGateClause[] | undefined {
+	const entries = text.split(',')
+	const clauses = entries.flatMap((entry): readonly MemoryGateClause[] => {
+		const [name, relationship] = entry.split(':')
+		return (name === 'work' || name === 'completion') &&
+			(relationship === 'noninferior' ||
+				relationship === 'improves' ||
+				relationship === 'falls' ||
+				relationship === 'unadded')
+			? [{ class: name, relationship }]
+			: []
+	})
+	return clauses.length === entries.length ? clauses : undefined
+}
+
+/**
+ * Parses a gate's role assignment from its command text, in the form `treatment=on,base=off,repeat=again,sham=shuffled`.
+ * @param text - The command text
+ * @returns The assignment, or undefined when a role holds no arm
+ */
+export function parseMemoryGateAssignment(text: string): MemoryGateAssignment | undefined {
+	const found = new Map(
+		text.split(',').map((entry): readonly [string, string] => {
+			const [role, arm] = entry.split('=')
+			return [role ?? '', arm ?? '']
+		}),
+	)
+	return MEMORY_GATE_ROLES.every((role) => (found.get(role) ?? '') !== '')
+		? buildMemoryGateRoles((role) => found.get(role) ?? '')
+		: undefined
+}
+
+/**
+ * Builds one neutral node per request per engine per condition; `receipts` adds the second condition.
+ * @param requests - The pool's requests
+ * @param engines - Each lane's model alias
+ * @param instruction - The fixed instruction
+ * @param receipts - Each request's public evidence rows, by request index
+ * @returns The nodes, each holding its prompt
+ */
+export function buildMemoryLabelNodes(
+	requests: readonly MemoryLabelRequest[],
+	engines: readonly string[],
+	instruction: string,
+	receipts?: ReadonlyArray<readonly MemoryLabelReceipt[]>,
+): readonly MemoryLabelNode[] {
+	const conditions: readonly MemoryLabelCondition[] =
+		receipts === undefined ? ['plain'] : ['plain', 'receipts']
+	return conditions
+		.flatMap((condition) =>
+			engines.flatMap((engine) =>
+				requests.map((request, index) => ({
+					request: index,
+					engine,
+					condition,
+					prompt: buildMemoryLabelPrompt(
+						request,
+						instruction,
+						condition === 'plain' ? undefined : (receipts?.[index] ?? []),
+					),
+				})),
+			),
+		)
+		.map((node, index) => ({
+			...node,
+			label: `node-${String(index + 1)}`,
+			characters: node.prompt.length,
+		}))
+}
+
+/**
+ * Renders a labeling workflow script, prompts as JSON string literals: one node with no packet text, then one fresh node per entry, returning counts alone.
+ * @param gate - The gate's name
+ * @param nodes - The labeling nodes
+ * @returns The script's text
+ */
+export function renderMemoryLabelScript(gate: string, nodes: readonly MemoryLabelNode[]): string {
+	return [
+		`export const meta = { name: ${JSON.stringify(`rc-s3-${gate}`)}, description: "Labels one gate's rows in fresh nodes and returns counts", phases: [{ title: "Harness" }, { title: "Label" }] }`,
+		`const schema = ${JSON.stringify(MEMORY_LABEL_SCHEMA)}`,
+		`const nodes = [`,
+		...nodes.map(
+			(node) =>
+				`${JSON.stringify({ label: node.label, model: node.engine, prompt: node.prompt })},`,
+		),
+		`]`,
+		`phase("Harness")`,
+		`const harness = await agent(${JSON.stringify(MEMORY_LABEL_HARNESS)}, { label: ${JSON.stringify(MEMORY_LABEL_HARNESS_NODE)}, phase: "Harness", model: ${JSON.stringify(nodes[0]?.engine)}, effort: ${JSON.stringify(MEMORY_LABEL_EFFORT)}, schema: ${JSON.stringify(MEMORY_LABEL_HARNESS_SCHEMA)} })`,
+		`phase("Label")`,
+		`const returned = await parallel(nodes.map((node) => () => agent(node.prompt, { label: node.label, phase: "Label", model: node.model, effort: ${JSON.stringify(MEMORY_LABEL_EFFORT)}, schema })))`,
+		`return { harness: harness === null ? 0 : 1, requests: nodes.length, answers: returned.filter((entry) => entry !== null && Array.isArray(entry.rows)).length }`,
+		'',
+	].join('\n')
+}
+
+/**
+ * Reads a workflow journal's started nodes, each with its latest return value.
+ * @param text - The journal's text
+ * @returns The nodes and the count of `started` and `result` lines
+ * @throws Error - Thrown when a line is not a journal line
+ */
+export function readMemoryJournal(text: string): MemoryJournal {
+	const lines = text
+		.split('\n')
+		.filter((line) => line.trim().length > 0)
+		.map((line, index) => {
+			const parsed = parseJSON(line)
+			if (!isRecord(parsed) || !isString(parsed.type))
+				throw new Error(`The journal holds an unreadable line ${String(index + 1)}`)
+			return parsed
+		})
+	const named = lines.flatMap((line) =>
+		isString(line.agentId) ? [{ type: line.type, id: line.agentId, line }] : [],
+	)
+	const results = new Map(
+		named
+			.filter((entry) => entry.type === 'result')
+			.map((entry): readonly [string, unknown] => [entry.id, entry.line.result]),
+	)
+	const labels = new Map(
+		named
+			.filter((entry) => entry.type === 'started')
+			.map((entry): readonly [string, string] => [
+				entry.id,
+				isString(entry.line.label) ? entry.line.label : '',
+			]),
+	)
+	return {
+		entries: lines.filter((line) => line.type === 'started' || line.type === 'result').length,
+		nodes: [...labels].map(([id, label]) => ({ agent: id, label, result: results.get(id) })),
+	}
+}
+
+/**
+ * Extracts the first node's report from a journal, the one return it can print, because that node holds no packet text.
+ * @param journal - The run's journal
+ * @returns The report, or undefined when the journal holds no such node or it returned another shape
+ */
+export function extractMemoryHarness(journal: MemoryJournal): MemoryHarnessReport | undefined {
+	const result = journal.nodes.findLast((node) => node.label === MEMORY_LABEL_HARNESS_NODE)?.result
+	return isMemoryHarnessReport(result) ? result : undefined
+}
+
+/**
+ * Reads a lane transcript's own tool calls and wall, ignoring the request copies its other lines hold.
+ * @param text - The transcript's text
+ * @returns The tool calls by name, and the milliseconds between its first and last stamped lines
+ * @throws Error - Thrown when a line is not JSON
+ */
+export function readMemoryTranscript(text: string): MemoryTranscriptReading {
+	const lines = text
+		.split('\n')
+		.filter((line) => line.trim().length > 0)
+		.map((line, index) => {
+			const parsed = parseJSON(line)
+			if (parsed === undefined)
+				throw new Error(`The transcript holds an unreadable line ${String(index + 1)}`)
+			return parsed
+		})
+	const stamps = lines.flatMap((line) =>
+		isRecord(line) && isString(line.timestamp) ? [Date.parse(line.timestamp)] : [],
+	)
+	const first = stamps.at(0)
+	const last = stamps.at(-1)
+	return {
+		tools: lines.flatMap((line) =>
+			isRecord(line) &&
+			line.type === 'assistant' &&
+			isRecord(line.message) &&
+			isArray(line.message.content)
+				? line.message.content.flatMap((block: unknown) =>
+						isRecord(block) && block.type === 'tool_use' && isString(block.name)
+							? [block.name]
+							: [],
+					)
+				: [],
+		),
+		wall: first === undefined || last === undefined ? undefined : last - first,
+	}
+}
+
+/**
+ * Builds what a labeling run returned: a lane that called another tool or holds no transcript is discarded, one with no `rows` member is unread, and an answer for a row the node's own request does not show is dropped and counted.
+ * @param nodes - The labeling nodes, prompts aside
+ * @param journal - The run's journal
+ * @param transcripts - Each started node's transcript reading, by agent id
+ * @param requests - The requests the nodes index
+ * @returns The kept reads and the counts of the rest
+ */
+export function buildMemoryLabelRun(
+	nodes: ReadonlyArray<Omit<MemoryLabelNode, 'prompt'>>,
+	journal: MemoryJournal,
+	transcripts: ReadonlyMap<string, MemoryTranscriptReading>,
+	requests: readonly MemoryLabelRequest[],
+): MemoryLabelRun {
+	const labels = new Set(nodes.map((node) => node.label))
+	const found = nodes.flatMap((node) => {
+		const entry = journal.nodes.findLast((other) => other.label === node.label)
+		return entry === undefined ? [] : [{ node, entry, transcript: transcripts.get(entry.agent) }]
+	})
+	const kept = found.filter(
+		({ transcript }) =>
+			transcript !== undefined && transcript.tools.every((name) => name === 'StructuredOutput'),
+	)
+	const returned = kept.flatMap(({ node, entry, transcript }) =>
+		isRecord(entry.result) && isArray(entry.result.rows)
+			? [
+					{
+						node,
+						answers: entry.result.rows.filter(isMemoryLabelAnswer),
+						wall: transcript?.wall,
+					},
+				]
+			: [],
+	)
+	const reads = returned.map((read) => ({
+		...read,
+		answers: read.answers.filter(
+			(answer) => requests[read.node.request]?.rows.some((row) => row.row === answer.row) === true,
+		),
+	}))
+	return {
+		reads,
+		unread: nodes.length - found.length + kept.length - reads.length,
+		discarded: found.length - kept.length,
+		foreign: journal.nodes.filter((entry) => !labels.has(entry.label)).length,
+		strayed:
+			returned.flatMap((read) => read.answers).length -
+			reads.flatMap((read) => read.answers).length,
+	}
+}
+
+/**
+ * Builds one lane per engine from a run's kept rows of one condition.
+ * @param run - The labeling run
+ * @param condition - The condition to read
+ * @returns Each engine's lane, in the run's order
+ */
+export function buildMemoryLabelLanes(
+	run: MemoryLabelRun,
+	condition: MemoryLabelCondition,
+): readonly MemoryLabelLane[] {
+	const reads = run.reads.filter((read) => read.node.condition === condition)
+	return [...new Set(reads.map((read) => read.node.engine))].map((labeler) => ({
+		labeler,
+		rows: reads.filter((read) => read.node.engine === labeler).flatMap((read) => read.answers),
+	}))
+}
+
+/**
+ * Computes the least, median, and greatest of a set of readings.
+ * @param values - The readings
+ * @returns The spread, or undefined with no reading
+ */
+export function computeMemorySpread(values: readonly number[]): MemorySpread | undefined {
+	const sorted = values.toSorted((left, right) => left - right)
+	const middle = Math.floor(sorted.length / 2)
+	const least = sorted.at(0)
+	const greatest = sorted.at(-1)
+	const upper = sorted.at(middle)
+	const lower = sorted.at(middle - 1)
+	if (least === undefined || greatest === undefined || upper === undefined || lower === undefined)
+		return undefined
+	return { least, median: sorted.length % 2 === 0 ? (lower + upper) / 2 : upper, greatest }
+}
+
+/**
+ * Computes one engine's pilot reading: the plain nodes' wall per goal-arm beside the text it was read on, and per class the achieved rows and the verdicts the receipts change.
+ * @param map - The pool's map
+ * @param requests - The pool's requests
+ * @param run - The labeling run
+ * @param engine - The engine to read
+ * @returns The reading
+ */
+export function computeMemoryPilot(
+	map: MemoryLabelMap,
+	requests: readonly MemoryLabelRequest[],
+	run: MemoryLabelRun,
+	engine: string,
+): MemoryPilotReading {
+	const held = run.reads.filter((read) => read.node.engine === engine)
+	const plain = held.filter((read) => read.node.condition === 'plain')
+	const answers = collectMemoryLabelAnswers(plain.flatMap((read) => read.answers))
+	const receipts = collectMemoryLabelAnswers(
+		held.filter((read) => read.node.condition === 'receipts').flatMap((read) => read.answers),
+	)
+	const sizes = new Map(
+		requests.flatMap((request) =>
+			request.rows.map((row): readonly [number, number] => [row.row, JSON.stringify(row).length]),
+		),
+	)
+	const timed = plain.flatMap(({ node, wall }) => (wall === undefined ? [] : [{ node, wall }]))
+	return {
+		wall: computeMemorySpread(timed.map((read) => read.wall)),
+		characters: computeMemorySpread(plain.map((read) => read.node.characters)),
+		rate: computeMemorySpread(
+			timed
+				.filter((read) => read.node.characters > 0)
+				.map((read) => read.wall / (read.node.characters / 1000)),
+		),
+		classes: MEMORY_LABEL_CLASSES.map((entry) => {
+			const links = map.links.filter((link) => link.class === entry && answers.has(link.row))
+			return {
+				class: entry,
+				characters: computeMemorySpread(links.map((link) => sizes.get(link.row) ?? 0)),
+				count: links.length,
+				achieved: links.filter((link) => answers.get(link.row)?.verdict === 'achieved').length,
+				changed: links.filter((link) => {
+					const other = receipts.get(link.row)
+					return other !== undefined && other.verdict !== answers.get(link.row)?.verdict
+				}).length,
+			}
+		}),
 	}
 }
