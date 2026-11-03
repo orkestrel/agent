@@ -15,10 +15,10 @@ Compaction and the ledger share exactly two seams: `extractLiterals` and `Litera
 | recaps omit literals | not built: rc-e1 stopped at L0 and is retired (O32, O75) | none |
 | rule retention over rounds | documentation, instrument later | rc-d1; D3 |
 | rolling omission persists | no mechanism: anchors were not built, and no second one is planned (O75) | none |
-| accumulation until `WINDOW` | no change; the two-section cap stays excluded | none |
+| accumulation until `WINDOW` | no change, with no reading beside it for the smallest model: on `q2` (the 2B model, `keep: 2`, `strict`, prompt room 11776) the arm sealed through goal 32 and refused at goal 36 of 96 after eight folds, the figures in `designs/measurement.md` § Recording, Extension reading, and the rolling evidence is mixed and predates rc-u1, so the cell stays open until D89 reads it (`plan.md` O154, C6); the two-section cap stays excluded, and `rolling` cannot combine with a cap | none |
 | cache-safe summarizer call | deferred | D1 |
 | masking old tool results | deferred | D2 |
-| recall over folded originals | study-only experiment, after rc-a9 | rc-a5 |
+| recall over folded originals | study-only experiment, after rc-a9; unreached at goal 32 on lineage 3 (`plan.md` O154, D87) | rc-a5 |
 | repeated identical lookups | an authority rule in the Study arm; no core switch | rc-s1; D5 |
 
 ## Recap role
@@ -103,6 +103,7 @@ export interface ConversationOptions {
 - It targets closures without evidence and fabricated completions in the compaction arm (`research/evidence.md` § Prior-campaign readings, c1 results). Its known cost is re-acquisition (C06).
 - It runs after rc-a9's reading, with one compaction experiment on the GPU at a time.
 - Promote it into `src/` only for a second consumer.
+- It is unreached. The compaction arm refused at goal 36, so no compaction row holds goal 48, no seed exists, and the wiring never lands (`plan.md` O154, C1, C2). D87 holds the trigger for a later lineage, and D88 holds the one slice left at the strata reached.
 
 ## Repeat loops
 
@@ -121,7 +122,10 @@ The plain agent loop lacks the ledger's repeat stop, and the compaction arm reco
 
 ## Guide drifts
 
-rc-d1 corrects two drifts in `guides/agent.md`:
+rc-d1 corrects three drifts in `guides/agent.md`:
 
 - The guide says automatic compaction never folds existing sections; `rolling` and a `sections` cap fold them.
 - The guide shows `consumer: estimateMessages`; the loop consumes a `ProviderRequest`, and the option remarks name `estimateRequest`.
+- The `rolling` folds bullet says a hydrated snapshot with several sections folds them all at the next `compact()`; that holds only when the fold has an eligible slice. Under `keep: 2` at the `WINDOW` stop of goal 36 the live tail is `[u,a,u]`, so `compact()` folds nothing and a strict retry refuses again; the sections merge at `compact({ keep: 0 })` or at the admission of a later run whose new prompt leaves an eligible slice.
+
+rc-d1 also adds one sentence under the compaction contract, in the form of `plan.md` O154, C5: the floor on `q2`, the two bounds (a `sections` cap and `rolling`, which cannot combine), the `WINDOW` stop under `strict` only, and the corrected continuation. Its guide proof case covers the no-slice branch, read from the fixture rung.
