@@ -14,10 +14,10 @@ The order is `agent/tenets.md` § Release, and each version bumps from what the 
 | --- | --- | --- | --- | --- |
 | `@orkestrel/ndjson` | 0.0.15 | bump | a dependency Agent's release adds, ahead of Agent | landed 2026-11-01 |
 | `@orkestrel/agent` | 0.0.35 | bump | runtime set adds `@orkestrel/ndjson` ^0.0.15, which the 0.0.34 manifest does not name; `compare.js --tarball` against the tarball rc-ol1 proved reads exit 0 with 4 published files, 0 added, 0 removed, and 0 changed | published 2026-11-03, registry-confirmed, `main` pushed at `ce059cfe` |
-| `@orkestrel/ollama` | 0.0.29 | bump | runtime ranges move; comparison owed at its visit | open, second |
-| `@orkestrel/toolbox` | served plus one | bump | runtime `@orkestrel/agent` range moves; pin only, because its census reads no consumer of the renamed names (the word `Reading` in a comment at `tests/policy.test.ts` line 932 is the one hit; Y33) | open, second |
-| `@orkestrel/study` | served plus one | bump | runtime `@orkestrel/agent` and `@orkestrel/ollama` ranges move; comparison owed at its visit | open, third |
-| Agent's trailing development dependencies | the § Close the wave sweep names them | ruled per package | § Close the wave | open, last |
+| `@orkestrel/ollama` | 0.0.29 | bump | runtime ranges move, `dist` moved | published 2026-11-03, `main` pushed at `6f8b522` |
+| `@orkestrel/toolbox` | 0.0.24 | bump | runtime `@orkestrel/agent` range moves, `dist` same; pin only, because its census reads no consumer of the renamed names (the word `Reading` in a comment at `tests/policy.test.ts` line 932 is the one hit; Y33) | published 2026-11-03, `main` pushed at `464e737` |
+| `@orkestrel/study` | 0.0.10 | bump | runtime `@orkestrel/agent` and `@orkestrel/ollama` ranges move, and `buildStudyAgentAttempts` renames a public function | published 2026-11-03, `main` pushed at `ecb81e4` |
+| Agent's trailing development dependencies | `@orkestrel/ollama` ^0.0.29 and `@orkestrel/study` ^0.0.10 | no bump, `compare.js` reads 0 changed | § Close the wave; the sweep lists no trailing range in the release's packages | re-pinned as `dc0fec6f` |
 
 `@orkestrel/mcp` holds no place in the order and takes no release (`agent/plan.md` § Release).
 
@@ -27,4 +27,4 @@ The order is `agent/tenets.md` § Release, and each version bumps from what the 
 
 ## Standing readings
 
-`test:studies` fails exactly `loads the actual q4 native topology with two distinct captured Agent occurrences` (`tests/studies/memory/integration.test.ts`) from the install of `fb653af8` until Agent's closing development re-pin. `agent/plan.md` § Release holds the cause and the acceptance that closes it.
+`test:studies`'s one known failure closed at Agent's closing development re-pin: 161 pass in full, and `npm ls @orkestrel/ndjson --all` lists one 0.0.15. RELEASE: LANDED.

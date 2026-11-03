@@ -87,6 +87,10 @@ Claim 4 read BROKEN on the review, with no Release bar item met: no page or serv
 
 `tests/service/browser.test.ts`, `tests/service/OllamaDaemon.test.ts`, `test:distribution`, mcp's fixture, Toolbox, and Study; W6's CPU throttle and `normalizeWord`'s fold in a browser (D86); V1 to V5. L0b read one token of 13 on one model. L0's kinds ran on the 4B model only. W6 ran the correction arm with no control-arm history. No timing of the escape's cost ran, because the unit claims none.
 
+## The wave visit, V1 to V5
+
+V1: the registry served Agent 0.0.35 with its tarball answering 200, Agent's `main` was pushed, and Ollama v0.40.14 and client 0.6.4 had not moved. V2: `wave.js --visit` exit 0 on every step but the two that report, `pins` and `compare`, with commits `2737a71` and `46f68e9`; one Agent 0.0.35 and one ndjson 0.0.15. Its 11 `pins` hits sit in other packages' mirrored guides, so none moved. V3: the substitutions pass read no hit to reword, and `scaffold surface` read exit 0. V4: the detach form was proven first, reading Node 22.23.4, and ran `launch.js` and `chain.js` from Agent's copy of the same scaffold 0.0.122, a departure from the brief's path because the chain's `npm ci` replaces Ollama's `node_modules`. Steps: `ci` 3.6 s, `clean` 0.2 s, `format:check` 0.4 s, `lint:check` 1.0 s, `check` 1.7 s, `build` 5.2 s, `test:src` 19.0 s, `test:setup` 27.1 s, `test:policy` 7.5 s, `test:config` 11.5 s, `test:guides` 3.2 s, `test:conformance` 1.7 s, `test:distribution` 12.0 s, and `test:service` 391.2 s with 87 passed in 16 files, 485.3 s in all against the 28000 s cap. V5: `Release 0.0.29`, `6f8b522`, uploaded with the user's code and pushed. The holder stayed up through the chain and stopped on its stop file. `agent/tmp/probes/hold-daemon.ts` stays until the campaign's close.
+
 ## The writer's report, verbatim
 
 FINAL rc-ol1: the writer's part of the unit is finished. This report states implementation status only, and acceptance is yours. Every test, gate, mutation and live run below is your run. I ran only owned-file format, lint and type checks.
