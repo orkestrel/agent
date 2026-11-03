@@ -13,7 +13,7 @@ The order is `agent/tenets.md` § Release, and each version bumps from what the 
 | Package | Version | Bump | Evidence | Round |
 | --- | --- | --- | --- | --- |
 | `@orkestrel/ndjson` | 0.0.15 | bump | a dependency Agent's release adds, ahead of Agent | landed 2026-11-01 |
-| `@orkestrel/agent` | 0.0.35 | bump | runtime set adds `@orkestrel/ndjson` ^0.0.15, which the 0.0.34 manifest does not name; the rebuilt dist's comparison is owed at the release commit step | open, first |
+| `@orkestrel/agent` | 0.0.35 | bump | runtime set adds `@orkestrel/ndjson` ^0.0.15, which the 0.0.34 manifest does not name; `compare.js --tarball` against the tarball rc-ol1 proved reads exit 0 with 4 published files, 0 added, 0 removed, and 0 changed | release commit written, the upload is the user's |
 | `@orkestrel/ollama` | 0.0.29 | bump | runtime ranges move; comparison owed at its visit | open, second |
 | `@orkestrel/toolbox` | served plus one | bump | runtime `@orkestrel/agent` range moves; pin only, because its census reads no consumer of the renamed names (the word `Reading` in a comment at `tests/policy.test.ts` line 932 is the one hit; Y33) | open, second |
 | `@orkestrel/study` | served plus one | bump | runtime `@orkestrel/agent` and `@orkestrel/ollama` ranges move; comparison owed at its visit | open, third |
