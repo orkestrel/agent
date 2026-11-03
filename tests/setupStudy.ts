@@ -397,8 +397,8 @@ console.log(JSON.stringify({
  * @remarks
  * Create one per test. A scripted reply is consumed by the next request for its path while it heads
  * the script; `metadata` answers a metadata path ahead of its default; any other request is answered
- * by default. The script and the request log are replaced and appended by this entity alone, and its
- * getters return copies.
+ * by default, repeating the model it names as a daemon does. The script and the request log are
+ * replaced and appended by this entity alone, and its getters return copies.
  */
 export class MemoryServer implements MemoryServerFixture {
 	readonly #server: Server
@@ -454,7 +454,8 @@ export class MemoryServer implements MemoryServerFixture {
 		const chunks: Buffer[] = []
 		for await (const chunk of request)
 			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-		this.#requests.push({ path: request.url ?? '', body: Buffer.concat(chunks).toString('utf8') })
+		const body = Buffer.concat(chunks).toString('utf8')
+		this.#requests.push({ path: request.url ?? '', body })
 		const [next, ...rest] = this.#pending
 		const metadata = this.#metadata.get(request.url ?? '')
 		if (metadata !== undefined && next?.path !== request.url) {
@@ -494,7 +495,7 @@ export class MemoryServer implements MemoryServerFixture {
 		if (request.url === '/api/generate') {
 			response.end(
 				JSON.stringify({
-					model: 'judge',
+					model: readMemoryModel(body, 'judge'),
 					done: true,
 					done_reason: 'length',
 					response: 'A',
@@ -513,7 +514,7 @@ export class MemoryServer implements MemoryServerFixture {
 			)
 			return
 		}
-		response.end(buildMemoryReply())
+		response.end(buildMemoryReply({ model: readMemoryModel(body, 'model') }))
 	}
 }
 
@@ -532,9 +533,20 @@ export async function createMemoryServer(
 	return server
 }
 
+/**
+ * Reads the model a request body names, which a daemon's reply repeats.
+ * @param body - The request body.
+ * @param fallback - The model read when the body names none.
+ * @returns The named model, or the fallback.
+ */
+export function readMemoryModel(body: string, fallback: string): string {
+	const value = parseJSON(body)
+	return isRecord(value) && isString(value.model) ? value.model : fallback
+}
+
 /** Builds inert protocol output consumed by the actual Ollama package. */
 export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
-	return `${JSON.stringify({ model: 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }), ...options.timing })}\n`
+	return `${JSON.stringify({ model: options.model ?? 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }), ...options.timing })}\n`
 }
 
 /** Pins inert daemon timing wire fields: raw nanoseconds and one cached prompt count. */
@@ -1579,6 +1591,7 @@ export interface MemoryProfileFixture {
 }
 /** Holds an inert model reply fixture; `timing` adds raw daemon fields to the terminal row. */
 export interface MemoryReplyFixture {
+	readonly model?: string
 	readonly content?: string
 	readonly reason?: string
 	readonly prompt?: number

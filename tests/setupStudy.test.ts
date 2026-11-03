@@ -88,6 +88,7 @@ import {
 	readMemoryEvents,
 	readMemoryFirstChat,
 	readMemoryJudgeStates,
+	readMemoryModel,
 	readMemoryModels,
 	readMemoryOrigins,
 	readMemoryParts,
@@ -398,6 +399,72 @@ describe('study install fixtures', () => {
 			await Promise.all([server.close(), bare.close()])
 		}
 	})
+
+	it('repeats the model a request names in a default reply, as a daemon does', async () => {
+		expect(readMemoryModel('{"model":"org/agent:q4"}', 'model')).toBe('org/agent:q4')
+		expect(readMemoryModel('{"model":1}', 'model')).toBe('model')
+		expect(readMemoryModel('', 'judge')).toBe('judge')
+		const server = await createMemoryServer()
+		try {
+			for (const [path, fallback] of [
+				['/api/chat', 'model'],
+				['/api/generate', 'judge'],
+			] as const) {
+				const named = await fetch(`${server.url}${path}`, {
+					method: 'POST',
+					body: '{"model":"org/agent:q4"}',
+				})
+				expect(parseJSON(await named.text())).toMatchObject({ model: 'org/agent:q4' })
+				const bare = await fetch(`${server.url}${path}`, { method: 'POST' })
+				expect(parseJSON(await bare.text())).toMatchObject({ model: fallback })
+			}
+		} finally {
+			await server.close()
+		}
+	})
+
+	it('serves a seat past its recorded replies on two real model names', async () => {
+		const [, second] = STUDY_MEMORY_OBSERVATION_GOALS
+		if (second === undefined) throw new Error('Missing second goal')
+		const run = await runMemoryTrial({
+			arm: 'records',
+			responses: buildMemorySeedResponses('records'),
+			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		})
+		expect(run.failure).toBeUndefined()
+		const base = buildMemoryRecording('http://127.0.0.1:1')
+		if (base.provider === undefined) throw new Error('Missing recording provider')
+		// A judgment matches on its judge's model, so this seat re-asks every seated question: only the chat is scripted.
+		const requests = await readMemorySeedRequests({
+			arm: 'records',
+			profile: {
+				...base,
+				settings: STUDY_MEMORY_SEED_SETTINGS,
+				provider: { ...base.provider, model: 'org/agent:q4', judge: 'org/judge:q4' },
+			},
+			seed: readMemoryCheckpoint(run.evidence, 'opening'),
+			goal: second,
+			replies: [
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({ model: 'org/agent:q4', content: 'Corrected handoff' }),
+				},
+			],
+			metadata: {
+				'/api/tags': JSON.stringify({
+					models: [
+						{ name: 'org/agent:q4', digest: 'a'.repeat(64) },
+						{ name: 'org/judge:q4', digest: 'b'.repeat(64) },
+					],
+				}),
+			},
+		})
+		const models = readMemoryModels(requests)
+		expect(models.filter((model) => model === 'org/judge:q4').length).toBeGreaterThan(1)
+		expect(models.at(-1)).toBe('org/agent:q4')
+		await waitForMemoryListeners()
+	}, 60000)
 
 	it('reads the seeded requests', async () => {
 		const [, second] = STUDY_MEMORY_OBSERVATION_GOALS
