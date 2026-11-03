@@ -36,6 +36,12 @@ describe('memory declaration and mechanical evidence', () => {
 			['positive seed', { seed: 1 }],
 			['seed beside gauge', { gauge, seed: 7 }],
 			['undefined seed', { seed: undefined }],
+			['moving true', { moving: true }],
+			['moving false', { moving: false }],
+			['undefined moving', { moving: undefined }],
+			['sham true', { sham: true }],
+			['sham false', { sham: false }],
+			['undefined sham', { sham: undefined }],
 		]
 		const refused: ReadonlyArray<readonly [string, unknown]> = [
 			['undefined', undefined],
@@ -83,6 +89,14 @@ describe('memory declaration and mechanical evidence', () => {
 			['text seed', { seed: '1' }],
 			['null seed', { seed: null }],
 			['cased seed key', { Seed: 1 }],
+			['text moving', { moving: 'true' }],
+			['numeric moving', { moving: 1 }],
+			['null moving', { moving: null }],
+			['cased moving key', { Moving: true }],
+			['text sham', { sham: 'true' }],
+			['numeric sham', { sham: 1 }],
+			['null sham', { sham: null }],
+			['cased sham key', { Sham: true }],
 		]
 		for (const [label, value] of accepted)
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, true])
@@ -101,6 +115,20 @@ describe('memory declaration and mechanical evidence', () => {
 			{ version: '0.40.13', metadata, correction: { limit: 8 } },
 		])
 			expect([settings, isStudyMemoryOptions(settings)]).toEqual([settings, true])
+	})
+
+	it('admits a boolean narrow beside the correction limit and refuses any other', () => {
+		for (const correction of [{ narrow: true }, { narrow: false }, { limit: 13, narrow: true }])
+			expect([correction, isStudyMemoryOptions({ correction })]).toEqual([correction, true])
+		for (const correction of [
+			{ narrow: 'true' },
+			{ narrow: 1 },
+			{ narrow: null },
+			{ limit: 13, narrow: 'true' },
+			{ limit: -1, narrow: true },
+			{ Narrow: true },
+		])
+			expect([correction, isStudyMemoryOptions({ correction })]).toEqual([correction, false])
 	})
 
 	it('checks each admitted capability its treatments invoke and tolerates a hostile namespace', () => {

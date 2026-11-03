@@ -193,7 +193,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			)
 			this.#ledger = options.ledger.createLedger(observer, {
 				judge,
-				system: STUDY_MEMORY_SYSTEM,
+				system: settings?.sham === true ? `${STUDY_MEMORY_SYSTEM}\n` : STUDY_MEMORY_SYSTEM,
 				topics: STUDY_MEMORY_TOPICS,
 				questions: options.ledger.LEDGER_QUESTIONS,
 				thresholds: STUDY_MEMORY_THRESHOLDS,
@@ -214,6 +214,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					},
 				],
 				...(settings?.correction === undefined ? {} : { correction: settings.correction }),
+				...(settings?.moving === undefined ? {} : { moving: settings.moving }),
 				...(seed?.ledger === undefined ? {} : { snapshot: seed.ledger }),
 				agent: {
 					limit: 8,

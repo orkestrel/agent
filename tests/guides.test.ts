@@ -1839,6 +1839,53 @@ await new GuideCommand({
 			)
 		})
 
+		it('narrows correction pairs as the guide says', async () => {
+			const asks: Array<readonly string[]> = []
+			for (const correction of [{}, { narrow: true }, { narrow: true, limit: 0 }]) {
+				const conversation = createConversation()
+				const [desk, account, shared, later] = conversation.add([
+					{ role: 'user', content: 'The refund desk stayed open.' },
+					{ role: 'user', content: 'Account BW-20931 asked about a refund.' },
+					{ role: 'user', content: 'A refund of 20 went out.' },
+					{ role: 'user', content: 'Correction: account BW-20931 gets a refund of 20.' },
+				])
+				const classifier = new Classifier({
+					conversation,
+					judge: createPhraseJudge([]),
+					questions: LEDGER_QUESTIONS,
+					topics: [LEDGER_REFUNDS_TOPIC],
+					thresholds: LEDGER_DESK_THRESHOLDS,
+					assign: () => undefined,
+					entities: (text) => barrel.extractLiterals(text).ids,
+					correction,
+				})
+				const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
+				asks.push(
+					filed.readings
+						.filter((reading) => reading.phase === 'amends')
+						.map((reading) =>
+							reading.key === JSON.stringify(['amends', desk?.id, later?.id])
+								? 'desk'
+								: reading.key === JSON.stringify(['amends', account?.id, later?.id])
+									? 'account'
+									: reading.key === JSON.stringify(['amends', shared?.id, later?.id])
+										? 'shared'
+										: reading.key,
+						),
+				)
+			}
+
+			// The desk message shares only the topic; the account shares an entity, and the amount a number.
+			expect(asks).toEqual([['desk', 'account', 'shared'], ['account', 'shared'], []])
+			expect(guideText).toContain(
+				'The `narrow` member of the `correction` option, an experiment switch a verdict deletes, keeps only the eligible earlier messages that also share a registry entity with the correction or an id or a number in their content, so a desk topic alone admits no pair, a correction with no id, owner, or desk topic still asks no pair, and a `limit` counts only those messages.',
+			)
+			expect(guideText).toContain(
+				'The `narrow` member can hide one too: the ledger never compares an earlier message that shares only a desk topic with the correction, so a supersession on a pair sharing no registry entity and no id or number is never filed.',
+			)
+			expect(guideText).toContain('| `LedgerCorrectionOptions` | interface | `{ limit?, narrow? }`')
+		})
+
 		it('fits the tail inside the tail share of the prompt budget less the overhead cost, as the plan claims', async () => {
 			const capacity = 600
 			const measured: Array<readonly [overhead: number, tail: number]> = []

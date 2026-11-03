@@ -1940,6 +1940,35 @@ describe('Ledger', () => {
 				]),
 		)
 	})
+	it('forwards the narrow switch', async () => {
+		const asks: Array<readonly string[]> = []
+		for (const correction of [{}, { narrow: true }]) {
+			const ledger = new Ledger(
+				createScriptedProvider([{ content: 'Noted.' }]),
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([], ['Correction:']),
+					correction,
+				}),
+			)
+			const [desk, account, later] = ledger.conversation.add([
+				{ role: 'user', content: 'The refund desk stayed open.' },
+				...buildCorrectionSeed(1),
+			])
+			const result = await ledger.respond('Is the refund for account BW-20931 settled?')
+			asks.push(
+				result.readings
+					.filter((reading) => reading.phase === 'amends')
+					.map((reading) =>
+						reading.key === JSON.stringify(['amends', desk?.id, later?.id])
+							? 'desk'
+							: reading.key === JSON.stringify(['amends', account?.id, later?.id])
+								? 'account'
+								: reading.key,
+					),
+			)
+		}
+		expect(asks).toEqual([['desk', 'account'], ['account']])
+	})
 
 	it('holds calibration admission until it settles and releases it after success or failure', async () => {
 		const options = buildLedgerOptions()

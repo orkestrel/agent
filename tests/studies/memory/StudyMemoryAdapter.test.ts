@@ -2,7 +2,7 @@ import { isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, parseStudyProfile, parseStudyScenario } from '@orkestrel/study'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { createStudyAdapter } from '../../../studies/memory/index.js'
+import { createStudyAdapter, isStudyMemoryOptions } from '../../../studies/memory/index.js'
 import {
 	buildCustodyManifest,
 	buildMemoryCriterion,
@@ -63,6 +63,34 @@ describe('memory declaration and mechanical evidence', () => {
 				profile: buildMemoryProfile({ url, settings: { ...settings, checkpoints: [...declared] } }),
 			}),
 		).toThrow(/horizon of 3/)
+	})
+
+	it('declares each lineage arm as q2 with one named settings difference', async () => {
+		const q2 = parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8'))
+		if (!isRecord(q2) || !isRecord(q2.settings)) throw new Error('Missing q2 settings')
+		for (const [name, change] of [
+			['repeat', { seed: 1 }],
+			['sham', { sham: true }],
+			['moving', { moving: true }],
+			['rolling', { rolling: true }],
+		] as const) {
+			const profile = parseJSON(await readFile(`studies/memory/profiles/${name}.json`, 'utf8'))
+			expect(profile).toEqual({ ...q2, name, settings: { ...q2.settings, ...change } })
+			expect(isStudyMemoryOptions(parseStudyProfile(profile).settings)).toBe(true)
+		}
+	})
+
+	it('declares the narrow and limit arms as q2 with one correction setting', async () => {
+		const q2 = parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8'))
+		if (!isRecord(q2) || !isRecord(q2.settings)) throw new Error('Missing q2 settings')
+		for (const [name, correction] of [
+			['narrow', { narrow: true }],
+			['limit', { limit: 13 }],
+		] as const) {
+			const profile = parseJSON(await readFile(`studies/memory/profiles/${name}.json`, 'utf8'))
+			expect(profile).toEqual({ ...q2, name, settings: { ...q2.settings, correction } })
+			expect(isStudyMemoryOptions(parseStudyProfile(profile).settings)).toBe(true)
+		}
 	})
 
 	it('reads one goal into progress', () => {

@@ -1,4 +1,4 @@
-import type { ClassifierReading, LedgerTopic } from '@src/core'
+import type { ClassifierReading, JudgeAnswer, LedgerTopic, Message } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
 import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
@@ -1174,6 +1174,279 @@ describe('Classifier', () => {
 					JSON.stringify(['supersedes', earlier.id, correction.id]),
 				]),
 		)
+	})
+
+	describe('under the narrow switch', () => {
+		const whole = buildLedgerMessage('whole', 'user', 'Odile Marlow called.')
+		const call: Message = {
+			...buildLedgerMessage('call', 'assistant', ''),
+			calls: [{ id: 'lookup', name: 'lookup', arguments: { owner: 'OM-12' } }],
+		}
+		const number = buildLedgerMessage('number', 'user', 'The refund desk shut at 1730.')
+		const desk = buildLedgerMessage('desk', 'user', 'The refund desk stayed open.')
+		const refused = buildLedgerMessage('refused', 'user', 'The parcel left at 1730.')
+		const quiet = buildLedgerMessage('quiet', 'user', 'Odile Marlow chatted at 1730.')
+		const later = buildLedgerMessage('later', 'user', 'Odile Marlow moved the refund to 1730.')
+		const index = buildLedgerIndex({
+			ids: new Set(['OM-12']),
+			owners: new Map([['OM-12', ['Odile Marlow']]]),
+		})
+		const seeded = createConversation({
+			snapshot: {
+				id: 'narrow',
+				sections: [],
+				messages: [whole, call, number, desk, refused, quiet, later],
+			},
+		})
+		// The category and topic rows sit recorded, so `judge.requests` holds only the pair questions.
+		for (const [message, weight] of [
+			[whole, 0],
+			[number, 1],
+			[desk, 1],
+			[refused, 0],
+			[later, 1],
+		] as const) {
+			seeded.judgments.add(
+				buildLedgerJudgment(message, {
+					answer: {
+						form: 'choice',
+						probabilities: message === later ? { correction: 1 } : { fact: 1 },
+					},
+				}),
+			)
+			seeded.judgments.add(buildLedgerTopicJudgment(message, LEDGER_REFUNDS_TOPIC, weight))
+		}
+		const snapshot = seeded.snapshot()
+		const options = buildClassifierOptions({
+			topics: [LEDGER_REFUNDS_TOPIC],
+			assign: (message) =>
+				message.id === 'quiet' ? 'chatter' : message.id === 'call' ? 'fact' : undefined,
+			entities: (text, partial) => matchEntities(index, text, partial),
+		})
+
+		it('drops a topic-only pair, keeps the entity and shared-literal pairs, and leaves a refused literal pair unasked', async () => {
+			const asks: Array<readonly unknown[]> = []
+			for (const correction of [undefined, { narrow: true }]) {
+				const judge = new RecordingJudge()
+				const classifier = new Classifier({
+					...options,
+					conversation: createConversation({ snapshot }),
+					judge,
+					...(correction === undefined ? {} : { correction }),
+				})
+				await classifier.classify(new Set(), new AbortController().signal)
+				asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
+			}
+			expect(asks).toEqual([
+				[
+					'["amends","whole","later"]',
+					'["amends","call","later"]',
+					'["amends","number","later"]',
+					'["amends","desk","later"]',
+				],
+				['["amends","whole","later"]', '["amends","call","later"]', '["amends","number","later"]'],
+			])
+		})
+
+		it('keeps the whole and call pairs, files nothing on amends alone, and files both on supersedes', async () => {
+			const conversation = createConversation({ snapshot })
+			const judge = new RecordingJudge()
+			const classifier = new Classifier({
+				...options,
+				conversation,
+				judge,
+				correction: { narrow: true },
+			})
+			await classifier.classify(new Set(), new AbortController().signal)
+			expect(judge.requests.map((request) => Object.keys(request.questions)[0])).toEqual([
+				'["amends","whole","later"]',
+				'["amends","call","later"]',
+				'["amends","number","later"]',
+			])
+			for (const earlier of [whole, call])
+				conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 0.8))
+			expect(classifier.classification().amendments.size).toBe(0)
+			for (const earlier of [whole, call])
+				conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0.8))
+			const filed = classifier.classification()
+			expect(filed.amendments).toEqual(
+				new Map([
+					['whole', ['later']],
+					['call', ['later']],
+				]),
+			)
+			expect(filed.supersessions).toEqual(filed.amendments)
+		})
+
+		it('asks fewer questions over a burst holding one true supersession and files the same classification', async () => {
+			const filings: Array<{
+				readonly asked: readonly string[]
+				readonly classification: unknown
+			}> = []
+			for (const correction of [undefined, { narrow: true }]) {
+				const asked = createRecorder<readonly [key: string]>()
+				const classifier = new Classifier({
+					...options,
+					conversation: createConversation({ snapshot }),
+					judge: createLedgerJudge(
+						asked,
+						(request) =>
+							Promise.resolve({
+								model: 'recording-model',
+								answers: Object.fromEntries(
+									Object.keys(request.questions).map((key): readonly [string, JudgeAnswer] => [
+										key,
+										{ form: 'noul', noul: key.includes('"whole"') ? 1 : 0.1 },
+									]),
+								),
+							}),
+						'recording-model',
+					),
+					...(correction === undefined ? {} : { correction }),
+				})
+				await classifier.classify(new Set(), new AbortController().signal)
+				filings.push({
+					asked: asked.calls.map(([key]) => key),
+					// Spreading each set and map keeps its iteration order in the comparison.
+					classification: Object.entries(classifier.classification()).map(([name, value]) => [
+						name,
+						[...value],
+					]),
+				})
+			}
+			const [unset, narrow] = filings
+			expect(requireValue(unset).asked).toEqual([
+				'["amends","whole","later"]',
+				'["supersedes","whole","later"]',
+				'["amends","call","later"]',
+				'["amends","number","later"]',
+				'["amends","desk","later"]',
+			])
+			expect(requireValue(narrow).asked).toEqual([
+				'["amends","whole","later"]',
+				'["supersedes","whole","later"]',
+				'["amends","call","later"]',
+				'["amends","number","later"]',
+			])
+			expect(requireValue(narrow).classification).toEqual(requireValue(unset).classification)
+			expect(requireValue(narrow).classification).toContainEqual([
+				'supersessions',
+				[['whole', ['later']]],
+			])
+		})
+
+		it('reads alike with narrow false and with no narrow', async () => {
+			const filings: Array<{
+				readonly requests: readonly unknown[]
+				readonly readings: readonly ReadingSummary[]
+				readonly classification: unknown
+			}> = []
+			for (const correction of [undefined, {}, { narrow: false }]) {
+				const judge = new RecordingJudge()
+				const classifier = new Classifier({
+					...options,
+					conversation: createConversation({ snapshot }),
+					judge,
+					...(correction === undefined ? {} : { correction }),
+				})
+				const result = await classifier.classify(new Set(), new AbortController().signal)
+				filings.push({
+					requests: judge.requests,
+					readings: summarizeReadings(result.readings),
+					classification: Object.entries(classifier.classification()).map(([name, value]) => [
+						name,
+						[...value],
+					]),
+				})
+			}
+			const [unset, ...rest] = filings
+			expect(requireValue(unset).requests).toHaveLength(4)
+			for (const filing of rest) expect(filing).toEqual(unset)
+		})
+
+		it('counts only the narrow-eligible messages against the limit', async () => {
+			const asks: Array<readonly unknown[]> = []
+			for (const correction of [
+				{ limit: 2 },
+				{ limit: 1, narrow: true },
+				{ limit: 2, narrow: true },
+				{ limit: 3, narrow: true },
+				{ limit: 4, narrow: true },
+				{ limit: 0, narrow: true },
+			]) {
+				const judge = new RecordingJudge()
+				const classifier = new Classifier({
+					...options,
+					conversation: createConversation({ snapshot }),
+					judge,
+					correction,
+				})
+				await classifier.classify(new Set(), new AbortController().signal)
+				asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
+			}
+			expect(asks).toEqual([
+				['["amends","number","later"]', '["amends","desk","later"]'],
+				['["amends","number","later"]'],
+				['["amends","call","later"]', '["amends","number","later"]'],
+				['["amends","whole","later"]', '["amends","call","later"]', '["amends","number","later"]'],
+				['["amends","whole","later"]', '["amends","call","later"]', '["amends","number","later"]'],
+				[],
+			])
+		})
+
+		it('asks no pair for a correction sharing no entity and no literal, and none for an empty near set', async () => {
+			const asks: Array<readonly unknown[]> = []
+			for (const [earlier, weight, content] of [
+				[desk, 1, 'The refund stays open.'],
+				[number, 0, 'Nothing moved at 1730.'],
+			] as const) {
+				const correction = buildLedgerMessage('lone', 'user', content)
+				for (const arm of [undefined, { narrow: true }]) {
+					const conversation = createConversation({
+						snapshot: { id: 'lone', sections: [], messages: [earlier, correction] },
+					})
+					conversation.judgments.add(buildLedgerJudgment(earlier))
+					conversation.judgments.add(
+						buildLedgerJudgment(correction, {
+							answer: { form: 'choice', probabilities: { correction: 1 } },
+						}),
+					)
+					conversation.judgments.add(buildLedgerTopicJudgment(earlier, LEDGER_REFUNDS_TOPIC, 1))
+					conversation.judgments.add(
+						buildLedgerTopicJudgment(correction, LEDGER_REFUNDS_TOPIC, weight),
+					)
+					const judge = new RecordingJudge()
+					const classifier = new Classifier({
+						...options,
+						conversation,
+						judge,
+						...(arm === undefined ? {} : { correction: arm }),
+					})
+					await classifier.classify(new Set(), new AbortController().signal)
+					asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
+				}
+			}
+			expect(asks).toEqual([['["amends","desk","lone"]'], [], [], []])
+		})
+
+		it('reads each message once per call for its entities, and never a quiet message', async () => {
+			const texts = createRecorder<readonly [text: string]>()
+			const classifier = new Classifier({
+				...options,
+				conversation: createConversation({ snapshot }),
+				judge: new RecordingJudge(),
+				correction: { narrow: true },
+				entities: (text, partial) => {
+					texts.handler(text)
+					return matchEntities(index, text, partial)
+				},
+			})
+			await classifier.classify(new Set(), new AbortController().signal)
+			const read = texts.calls.map(([text]) => text)
+			expect(read).toHaveLength(6)
+			expect(new Set(read).size).toBe(6)
+			expect(read).not.toContain(quiet.content)
+		})
 	})
 
 	it('yields once a slice is spent', async () => {

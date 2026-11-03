@@ -1,4 +1,4 @@
-import type { ChoiceAnswer, Judgment, JudgmentInput, Message } from '../types.js'
+import type { ChoiceAnswer, Judgment, JudgmentInput, LiteralSet, Message } from '../types.js'
 import type {
 	ClassifierInterface,
 	ClassifierOptions,
@@ -166,11 +166,8 @@ export class Classifier implements ClassifierInterface {
 					this.#options.thresholds[head]
 			)
 				return []
-			const own = extractLiterals(before.content)
-			const other = extractLiterals(after.content)
 			return head === 'amends' &&
-				![...own.ids].some((id) => other.ids.has(id)) &&
-				![...own.numbers].some((number) => other.numbers.has(number))
+				!this.#sharesLiteral(extractLiterals(before.content), extractLiterals(after.content))
 				? []
 				: [{ head, earlier, later }]
 		})
@@ -230,6 +227,8 @@ export class Classifier implements ClassifierInterface {
 			}
 		}
 		const nears = new Map<string, ReadonlySet<string>>()
+		const entities = new Map<string, ReadonlySet<string>>()
+		const literals = new Map<string, LiteralSet>()
 		for (const later of asked) {
 			if (
 				later.role !== 'user' ||
@@ -237,18 +236,20 @@ export class Classifier implements ClassifierInterface {
 					this.#options.thresholds.correction
 			)
 				continue
-			const near = this.#readNear(later, nears)
+			const near = this.#readNear(later, nears, entities)
 			if (near.size === 0) continue
 			const limit = this.#options.correction?.limit
 			const kept =
 				limit === undefined
 					? undefined
-					: this.#collectKept(messages, later, near, limit, quiets, nears)
+					: this.#collectKept(messages, later, near, limit, quiets, nears, entities, literals)
 			for (const earlier of messages) {
 				if (earlier.id === later.id) break
 				if (this.#spent()) await this.#turn(signal)
 				if (
-					kept === undefined ? !this.#eligible(earlier, near, quiets, nears) : !kept.has(earlier.id)
+					kept === undefined
+						? !this.#eligible(earlier, later, near, quiets, nears, entities, literals)
+						: !kept.has(earlier.id)
 				)
 					continue
 				const spec = this.#buildPair('amends', earlier.id, later.id)
@@ -353,26 +354,53 @@ export class Classifier implements ClassifierInterface {
 		return categories.reduce((sum, category) => sum + (answer?.probabilities[category] ?? 0), 0)
 	}
 
-	#collectNear(message: Message): ReadonlySet<string> {
+	#collectEntities(message: Message): ReadonlySet<string> {
 		const argumentsText =
 			message.calls === undefined
 				? undefined
 				: renderJSON(message.calls.map((call) => call.arguments))
-		const text =
-			argumentsText === undefined ? message.content : `${message.content} ${argumentsText}`
+		return this.#options.entities(
+			argumentsText === undefined ? message.content : `${message.content} ${argumentsText}`,
+			false,
+		)
+	}
+
+	// Reads a message's registry entities from this call's memo, collecting them on the first read.
+	#readEntities(message: Message, entities: Map<string, ReadonlySet<string>>): ReadonlySet<string> {
+		const known = entities.get(message.id)
+		if (known !== undefined) return known
+		const found = this.#collectEntities(message)
+		entities.set(message.id, found)
+		return found
+	}
+
+	#collectNear(message: Message, entities: Map<string, ReadonlySet<string>>): ReadonlySet<string> {
 		return new Set([
-			...this.#options.entities(text, false),
+			...this.#readEntities(message, entities),
 			...(this.#options.assign(message) === undefined ? this.topics(message.id) : []),
 		])
 	}
 
 	// Reads a message's near set from this call's memo, collecting it on the first read.
-	#readNear(message: Message, nears: Map<string, ReadonlySet<string>>): ReadonlySet<string> {
+	#readNear(
+		message: Message,
+		nears: Map<string, ReadonlySet<string>>,
+		entities: Map<string, ReadonlySet<string>>,
+	): ReadonlySet<string> {
 		const known = nears.get(message.id)
 		if (known !== undefined) return known
-		const near = this.#collectNear(message)
+		const near = this.#collectNear(message, entities)
 		nears.set(message.id, near)
 		return near
+	}
+
+	// Reads a message's literals from this call's memo, extracting them on the first read.
+	#readLiterals(message: Message, literals: Map<string, LiteralSet>): LiteralSet {
+		const known = literals.get(message.id)
+		if (known !== undefined) return known
+		const found = extractLiterals(message.content)
+		literals.set(message.id, found)
+		return found
 	}
 
 	// Reads a message's quiet flag from this call's memo, reading it on the first request.
@@ -384,18 +412,49 @@ export class Classifier implements ClassifierInterface {
 		return quiet
 	}
 
+	// Reports whether two texts' literals share an id or a number.
+	#sharesLiteral(own: LiteralSet, other: LiteralSet): boolean {
+		return (
+			[...own.ids].some((id) => other.ids.has(id)) ||
+			[...own.numbers].some((number) => other.numbers.has(number))
+		)
+	}
+
+	// Reports whether two messages share a registry entity, topics excluded, or a literal of their content.
+	#sharesEntityOrLiteral(
+		earlier: Message,
+		later: Message,
+		entities: Map<string, ReadonlySet<string>>,
+		literals: Map<string, LiteralSet>,
+	): boolean {
+		const near = this.#readEntities(later, entities)
+		return (
+			[...this.#readEntities(earlier, entities)].some((entity) => near.has(entity)) ||
+			this.#sharesLiteral(
+				this.#readLiterals(earlier, literals),
+				this.#readLiterals(later, literals),
+			)
+		)
+	}
+
 	// Reports whether a correction is compared against an earlier message: the message is not quiet
-	// and its near set shares a member with the correction's. The quiet flag is read first, so a
-	// quiet message's near set is never read.
+	// and its near set shares a member with the correction's, and under `narrow` the two also share a
+	// registry entity or a literal. The quiet flag is read first, so a quiet message's near set is
+	// never read, and with the switch unset no literal is read here.
 	#eligible(
 		earlier: Message,
+		later: Message,
 		near: ReadonlySet<string>,
 		quiets: Map<string, boolean>,
 		nears: Map<string, ReadonlySet<string>>,
+		entities: Map<string, ReadonlySet<string>>,
+		literals: Map<string, LiteralSet>,
 	): boolean {
 		return (
 			!this.#readQuiet(earlier.id, quiets) &&
-			[...this.#readNear(earlier, nears)].some((topic) => near.has(topic))
+			[...this.#readNear(earlier, nears, entities)].some((topic) => near.has(topic)) &&
+			(this.#options.correction?.narrow !== true ||
+				this.#sharesEntityOrLiteral(earlier, later, entities, literals))
 		)
 	}
 
@@ -408,12 +467,14 @@ export class Classifier implements ClassifierInterface {
 		limit: number,
 		quiets: Map<string, boolean>,
 		nears: Map<string, ReadonlySet<string>>,
+		entities: Map<string, ReadonlySet<string>>,
+		literals: Map<string, LiteralSet>,
 	): ReadonlySet<string> {
 		const kept = new Set<string>()
 		if (limit === 0) return kept
 		const position = messages.findIndex((message) => message.id === later.id)
 		for (const earlier of messages.slice(0, position).toReversed()) {
-			if (!this.#eligible(earlier, near, quiets, nears)) continue
+			if (!this.#eligible(earlier, later, near, quiets, nears, entities, literals)) continue
 			kept.add(earlier.id)
 			if (kept.size === limit) break
 		}

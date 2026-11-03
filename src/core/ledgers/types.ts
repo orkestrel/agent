@@ -125,10 +125,14 @@ export interface LedgerRecallOptions {
  * @remarks
  * `limit` caps the earlier messages one correction is compared against, most recent first; it must
  * be a nonnegative safe integer. Default: no cap. A cap bounds judge calls and is no verdict, so a
- * supersession older than the cap is never filed.
+ * supersession older than the cap is never filed. `narrow` is an experiment switch a verdict deletes.
+ * If `true`, a correction compares only the earlier messages the unset rule admits that also share a
+ * registry entity or a literal with it, so a topic alone admits no pair and a true filing outside
+ * that set is never asked; if `false`, the unset rule applies. Default: `false`.
  */
 export interface LedgerCorrectionOptions {
 	readonly limit?: number
+	readonly narrow?: boolean
 }
 
 /**
@@ -697,8 +701,9 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
  * most once per call and reuses them for every later correction, so a change to the conversation,
  * its judgments, or the judge's model made while the call waits on the judge or a host turn reaches
  * the next call. `correction` caps the earlier messages each correction's pair questions compare,
- * most recent first. `scheduler` paces the filing: before a step, when the `LEDGER_SLICE` constant's
- * milliseconds have run since the last host turn, the call awaits the scheduler's `yield` method. With
+ * most recent first, and its `narrow` member keeps only those sharing a registry entity or a literal
+ * with the correction, reading each message's literals at most once per call. `scheduler` paces the
+ * filing: before a step, when the `LEDGER_SLICE` constant's milliseconds have run since the last host turn, the call awaits the scheduler's `yield` method. With
  * no scheduler, the call takes no host turn and reads no added clock.
  */
 export interface ClassifierOptions {

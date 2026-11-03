@@ -13,6 +13,7 @@ import {
 	isStudyMemoryProvider,
 	isStudyMemoryRuntime,
 	STUDY_MEMORY_REPEAT,
+	STUDY_MEMORY_SYSTEM,
 	StudyMemoryDriver,
 	StudyMemorySession,
 } from '../../../studies/memory/index.js'
@@ -2282,6 +2283,37 @@ describe('repeated and denied tool calls', () => {
 		expect(countMemoryPairs(unset.requests)).toBe(6)
 		expect(unset.requests).toEqual(absent.requests)
 	})
+
+	it('forwards the narrow switch', async () => {
+		// Every message shares the topic, and the first statement alone shares a number with the correction.
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: ['A', 'A', 'A', 'C'].map(buildMemoryVerdict),
+			goals: [
+				{
+					id: 'opening',
+					input: {
+						prompt: 'Report the order count',
+						arrivals: [
+							{ id: 'first', content: 'The order count is 12.' },
+							{ id: 'second', content: 'The order count is two.' },
+							{ id: 'third', content: 'The order count is three.' },
+							{ id: 'fix', content: 'Correction: the order count is 12 and four.' },
+						],
+						records: [],
+					},
+				},
+			],
+		}
+		const narrow = await runMemoryTrial({ ...trial, settings: { correction: { narrow: true } } })
+		const off = await runMemoryTrial({ ...trial, settings: { correction: { narrow: false } } })
+		const absent = await runMemoryTrial(trial)
+		expect(narrow.failure).toBeUndefined()
+		expect(off.failure).toBeUndefined()
+		expect(countMemoryPairs(narrow.requests)).toBe(2)
+		expect(countMemoryPairs(off.requests)).toBe(6)
+		expect(off.requests).toEqual(absent.requests)
+	})
 })
 
 describe('recording declarations of a memory session', () => {
@@ -2363,4 +2395,96 @@ describe('recording declarations of a memory session', () => {
 			await server.close()
 		}
 	})
+})
+
+describe('the moving and sham settings of a memory session', () => {
+	it('carries goal one as messages in goal two under moving, and an off control does not', async () => {
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: buildMemorySeedResponses('records'),
+			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 2),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		}
+		const moving = await runMemoryTrial({
+			...trial,
+			settings: { ...STUDY_MEMORY_SEED_SETTINGS, moving: true },
+		})
+		const off = await runMemoryTrial(trial)
+		expect([moving.failure, off.failure]).toEqual([undefined, undefined])
+		const carried = readMemoryFirstChat(moving, 'correction')
+		const seeded = readMemoryFirstChat(off, 'correction')
+		expect(carried).toContain('Repair handoff')
+		expect(seeded).toContain('Repair handoff')
+		const exchange = expect.objectContaining({
+			messages: expect.arrayContaining([
+				expect.objectContaining({ role: 'user', content: 'Look up order-1' }),
+				expect.objectContaining({ role: 'assistant', content: 'Initial handoff' }),
+			]),
+		})
+		expect(parseJSON(carried ?? '')).toEqual(exchange)
+		expect(parseJSON(seeded ?? '')).not.toEqual(exchange)
+	}, 60000)
+
+	it('appends one newline to the records system under sham and moves no other byte', async () => {
+		const trial: MemoryTrialFixture = {
+			arm: 'records',
+			responses: buildMemorySeedResponses('records'),
+			goals: STUDY_MEMORY_SEED_GOALS.slice(0, 2),
+			settings: STUDY_MEMORY_SEED_SETTINGS,
+		}
+		const sham = await runMemoryTrial({
+			...trial,
+			settings: { ...STUDY_MEMORY_SEED_SETTINGS, sham: true },
+		})
+		const control = await runMemoryTrial(trial)
+		expect([sham.failure, control.failure]).toEqual([undefined, undefined])
+		expect(parseJSON(readMemoryFirstChat(control, 'opening') ?? '')).toEqual(
+			expect.objectContaining({
+				messages: expect.arrayContaining([
+					expect.objectContaining({ role: 'system', content: STUDY_MEMORY_SYSTEM }),
+				]),
+			}),
+		)
+		expect(parseJSON(readMemoryFirstChat(sham, 'opening') ?? '')).toEqual(
+			expect.objectContaining({
+				messages: expect.arrayContaining([
+					expect.objectContaining({ role: 'system', content: `${STUDY_MEMORY_SYSTEM}\n` }),
+				]),
+			}),
+		)
+		expect(sham.requests).toEqual(
+			control.requests.map((request) => ({
+				...request,
+				body: request.body.replace(
+					JSON.stringify(STUDY_MEMORY_SYSTEM),
+					JSON.stringify(`${STUDY_MEMORY_SYSTEM}\n`),
+				),
+			})),
+		)
+	}, 60000)
+
+	it('sends the control bytes on a compaction arm under moving and a full arm under moving or sham', async () => {
+		for (const [arm, changes] of [
+			['compaction', [{ moving: true }]],
+			['full', [{ moving: true }, { sham: true }]],
+		] as const) {
+			const trial: MemoryTrialFixture = {
+				arm,
+				responses: buildMemorySeedResponses(arm),
+				goals: STUDY_MEMORY_SEED_GOALS,
+				settings: STUDY_MEMORY_SEED_SETTINGS,
+			}
+			const control = await runMemoryTrial(trial)
+			expect(control.failure).toBeUndefined()
+			expect(control.requests.length).toBeGreaterThan(2)
+			for (const change of changes) {
+				const treated = await runMemoryTrial({
+					...trial,
+					settings: { ...STUDY_MEMORY_SEED_SETTINGS, ...change },
+				})
+				expect(treated.failure).toBeUndefined()
+				expect(treated.requests).toEqual(control.requests)
+			}
+		}
+	}, 60000)
 })

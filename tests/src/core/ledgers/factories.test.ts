@@ -5,8 +5,11 @@ import { createTool } from '@orkestrel/tool'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	LEDGER_INVALID_LIMITS,
+	buildCorrectionSeed,
+	buildGuideLedgerOptions,
 	buildLedgerOptions,
 	createEmptyLedgerLookup,
+	createPhraseJudge,
 	createScriptedProvider,
 } from '../../../setup.js'
 
@@ -100,6 +103,23 @@ describe('createLedger', () => {
 		expect(
 			createLedger(createScriptedProvider([]), { ...options, correction: { limit: 0 } }),
 		).toBeInstanceOf(Ledger)
+	})
+	it('forwards the narrow switch through the factory', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Noted.' }]),
+			buildGuideLedgerOptions({
+				judge: createPhraseJudge([], ['Correction:']),
+				correction: { narrow: true },
+			}),
+		)
+		const [, account, later] = ledger.conversation.add([
+			{ role: 'user', content: 'The refund desk stayed open.' },
+			...buildCorrectionSeed(1),
+		])
+		const result = await ledger.respond('Is the refund for account BW-20931 settled?')
+		expect(
+			result.readings.filter((reading) => reading.phase === 'amends').map((reading) => reading.key),
+		).toEqual([JSON.stringify(['amends', account?.id, later?.id])])
 	})
 	it('rejects empty or duplicate topics and duplicate or reserved lookup names', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })
