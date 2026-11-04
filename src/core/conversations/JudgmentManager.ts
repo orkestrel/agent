@@ -1,7 +1,6 @@
 import type { JudgmentManagerInterface } from './types.js'
 import type { JudgeInterface, JudgeRequest, Judgment, JudgmentInput } from '../types.js'
-import { isArray, isRecord } from '@orkestrel/contract'
-import { describeFaults } from '@orkestrel/tool'
+import { describeFaults, isArray, isRecord } from '@orkestrel/contract'
 import { ConversationError } from './errors.js'
 import { buildJudgments, requireJudgeResult, requireJudgment } from './helpers.js'
 import { copyJSON, freezeJSON } from '../cloners.js'

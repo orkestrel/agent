@@ -32,6 +32,7 @@ import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
 import { createTokenMeter } from '@orkestrel/budget'
 import {
+	describeFaults,
 	attempt,
 	ContractError,
 	errorToMessage,
@@ -42,7 +43,6 @@ import {
 } from '@orkestrel/contract'
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
-import { describeFaults } from '@orkestrel/tool'
 import { AgentContext } from '../contexts/index.js'
 import { raceSignal } from '../conversations/index.js'
 import { AUTHORITY_NOTES, DEFAULT_AGENT_LIMIT, SCOPE_NOTE } from './constants.js'

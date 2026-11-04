@@ -12,12 +12,28 @@ import { createHostileValues } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	approveEvery,
+	OWNED_CONTRACT_CASES,
 	JUDGE_ANSWER_FIXTURES,
 	JUDGE_ANSWER_REFUSALS,
 	JUDGE_QUESTION_FIXTURES,
 	JUDGE_QUESTION_REFUSALS,
 	TEV1_REQUEST,
 } from '../../setup.js'
+
+describe('owned contract and guard carriage', () => {
+	it.each(OWNED_CONTRACT_CASES)(
+		'$name: identity projection holds both ways on the canonical value',
+		({ wire, guard, positive, negative }) => {
+			expect(wire.is(positive)).toBe(true)
+			expect(guard(positive)).toBe(true)
+			expect(wire.is(negative)).toBe(false)
+			expect(guard(negative)).toBe(false)
+			const parsed = wire.parse(positive)
+			expect(wire.is(parsed)).toBe(true)
+			expect(guard(parsed)).toBe(true)
+		},
+	)
+})
 
 describe('isJudgeEntry — the text or JSON a judge reads', () => {
 	it('accepts a string, a JSON record, a null-prototype record, and a JSON array', () => {

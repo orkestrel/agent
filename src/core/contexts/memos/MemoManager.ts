@@ -8,14 +8,13 @@ import type {
 	MemoSnapshot,
 } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import { isArray } from '@orkestrel/contract'
+import { describeFaults, isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { copyJSON } from '../../cloners.js'
 import { removeEntries } from '../../helpers.js'
 import { MEMO_SECTION_HEADER } from '../constants.js'
 import { ContextError } from '../errors.js'
 import { renderIndexEntry } from '../helpers.js'
-import { describeFaults } from '@orkestrel/tool'
 import { memoSnapshotContract } from '../contracts.js'
 import { isMemoSnapshot } from '../validators.js'
 

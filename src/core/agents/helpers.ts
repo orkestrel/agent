@@ -25,6 +25,7 @@ import type { QueueContext, QueueOptions } from '@orkestrel/queue'
 import type { ToolCall, ToolDefinition, ToolResult } from '@orkestrel/tool'
 import { isBudget, isBudgetAmount, isBudgetError } from '@orkestrel/budget'
 import {
+	describeFaults,
 	attempt,
 	canonicalStringify,
 	ContractError,
@@ -39,7 +40,6 @@ import {
 	preview,
 	schemaToShape,
 } from '@orkestrel/contract'
-import { describeFaults } from '@orkestrel/tool'
 import { AUTHORITY_NOTES, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentError, AgentJobError } from './errors.js'
 import { isConversation } from '../conversations/index.js'

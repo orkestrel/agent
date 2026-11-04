@@ -1,3 +1,92 @@
+import * as contractPairs from '@src/core'
+
+/** Pairs owned contracts with structural guards and canonical controls. */
+export const OWNED_CONTRACT_CASES = Object.freeze([
+	{
+		name: 'judgment',
+		wire: contractPairs.judgmentContract,
+		guard: contractPairs.isJudgment,
+		positive: {
+			id: 'j',
+			question: { form: 'noul', instructions: 'Assess it' },
+			model: 'judge',
+			sources: [],
+			state: 'state',
+			time: 0,
+			answer: { form: 'noul', noul: 0.5 },
+		},
+		negative: { id: 'j', time: 0 },
+	},
+	{
+		name: 'message',
+		wire: contractPairs.messageContract,
+		guard: contractPairs.isMessage,
+		positive: { id: 'm', role: 'user', content: 'hello' },
+		negative: { id: 'm', role: 'user' },
+	},
+	{
+		name: 'message input',
+		wire: contractPairs.messageInputContract,
+		guard: contractPairs.isMessageInput,
+		positive: { role: 'user', content: 'hello' },
+		negative: { role: 'user' },
+	},
+	{
+		name: 'answer',
+		wire: contractPairs.judgeAnswerContract,
+		guard: contractPairs.isJudgeAnswer,
+		positive: { form: 'noul', noul: 0.5 },
+		negative: { form: 'noul', noul: 2 },
+	},
+	{
+		name: 'question',
+		wire: contractPairs.judgeQuestionContract,
+		guard: contractPairs.isJudgeQuestion,
+		positive: { form: 'noul', instructions: 'Assess it' },
+		negative: { form: 'unknown' },
+	},
+	{
+		name: 'section',
+		wire: contractPairs.sectionContract,
+		guard: contractPairs.isSection,
+		positive: { id: 's', summary: 'Summary', messages: [] },
+		negative: { id: 's', messages: [] },
+	},
+	{
+		name: 'conversation snapshot',
+		wire: contractPairs.conversationSnapshotContract,
+		guard: contractPairs.isConversationSnapshot,
+		positive: { id: 'c', sections: [], messages: [] },
+		negative: { id: 'c', sections: 'invalid', messages: [] },
+	},
+	{
+		name: 'memo',
+		wire: contractPairs.memoContract,
+		guard: contractPairs.isMemo,
+		positive: { id: 'm', name: 'tone', description: 'Style', content: 'Brief', time: 0 },
+		negative: { id: 'm', time: 0 },
+	},
+	{
+		name: 'memo snapshot',
+		wire: contractPairs.memoSnapshotContract,
+		guard: contractPairs.isMemoSnapshot,
+		positive: { id: 'm', memos: [] },
+		negative: { id: 'm', memos: {} },
+	},
+	{
+		name: 'ledger snapshot',
+		wire: contractPairs.ledgerSnapshotContract,
+		guard: contractPairs.isLedgerSnapshot,
+		positive: {
+			conversation: { id: 'c', sections: [], messages: [] },
+			requests: [],
+			notes: [],
+			failures: [],
+		},
+		negative: { requests: [], notes: [], failures: [] },
+	},
+])
+
 /** Builds the default fact answer for a ledger protocol response. */
 export function buildLedgerFactAnswer(): unknown {
 	return {

@@ -24,6 +24,7 @@ import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolContext, ToolResult } from '@orkestrel/tool'
 import { createAbort } from '@orkestrel/abort'
 import {
+	describeFaults,
 	attempt,
 	isError,
 	isFiniteNumber,
@@ -31,7 +32,7 @@ import {
 	objectShape,
 	stringShape,
 } from '@orkestrel/contract'
-import { createTool, createToolManager, describeFaults } from '@orkestrel/tool'
+import { createTool, createToolManager } from '@orkestrel/tool'
 import { createAgent, createAuthority } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
 import { estimateMessages } from '../agents/helpers.js'

@@ -11,8 +11,15 @@ import type {
 	Refusal,
 } from '../types.js'
 import type { ContractInterface } from '@orkestrel/contract'
-import { attempt, isArray, isJSONValue, isRecord, isString, preview } from '@orkestrel/contract'
-import { describeFaults } from '@orkestrel/tool'
+import {
+	describeFaults,
+	attempt,
+	isArray,
+	isJSONValue,
+	isRecord,
+	isString,
+	preview,
+} from '@orkestrel/contract'
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 import { ConversationError } from './errors.js'
 import { isConversationSnapshot, isJudgment, isMessageInput } from './validators.js'

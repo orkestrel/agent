@@ -8,8 +8,15 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { AuditFault, JSONSchema } from '@orkestrel/contract'
-import { describeFaults } from '@orkestrel/tool'
-import { attempt, isArray, isFiniteNumber, isRecord, isString, preview } from '@orkestrel/contract'
+import {
+	describeFaults,
+	attempt,
+	isArray,
+	isFiniteNumber,
+	isRecord,
+	isString,
+	preview,
+} from '@orkestrel/contract'
 
 /**
  * Filters a list of members by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
