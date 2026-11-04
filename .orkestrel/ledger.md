@@ -25,3 +25,5 @@
 | 2026-11-04 | `reason`, `qualifier`, `rater`, `interpret`, and the viewer's removal | the `learn` session, `opus` | each package's commits |
 | 2026-11-04 | `reason` review | `reviewer` on `sonnet`; `reviewer` on `astra` | fix rows in `reason` |
 | 2026-11-04 | The user's realignment: Codex-family engines are the default for every new unit, Claude only when needed, and follow `AGENTS.md`, its rules, and `.agents/` strictly. Verbatim: "going forward use the codex models as much as you can, it should be our default instead of claude so that we can save on usage. You can still use claude models but when they are needed." | user | `plan.md` § Sequence |
+| 2026-11-04 | The user's word on `contract`: no deferrals, in parallel, into the same version bump | user | `plan.md` § Goal and exit criterion |
+| 2026-11-04 | Door and fault text in `contract`: one design pass | `analyst` on `astra` | open |
