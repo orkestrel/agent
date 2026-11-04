@@ -1485,11 +1485,14 @@ describe('AgentContext — build(selection) folds the selected messages in place
 		)
 	})
 
-	it('folds an empty selection to the system and context messages alone', () => {
-		const context = seedWorkspaceContext()
+	it('folds an empty selection to the system and context messages alone, and refuses one with images to carry', () => {
+		const error = captureError(() => seedWorkspaceContext().build({ messages: [], judgments: [] }))
+		const context = new AgentContext({ system: 'sys' })
+		context.workspaces.add().write('notes.txt', 'KEPT FILE')
 
 		const built = context.build({ messages: [], judgments: [] })
 
+		expect(isContextError(error) && error.code).toBe('IMAGES')
 		expect(built.map((message) => message.role)).toEqual(['system', 'user'])
 		expect(built[1]?.content).toContain('KEPT FILE')
 	})

@@ -22,6 +22,7 @@ import {
 	isAgentError,
 	isConversationError,
 	isLedgerError,
+	JudgeError,
 	isLedgerSnapshot,
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
@@ -3447,6 +3448,24 @@ describe('Ledger — strict by default', () => {
 		},
 	)
 
+	it('holds a refused question under strict: false, so the next respond asks it no more', async () => {
+		const failure = new JudgeError('QUESTION', 'judge error: refused before inference')
+		const asked = createRecorder<readonly [key: string]>()
+		const ledger = createLedger(createScriptedProvider([{ content: 'Nine.' }]), {
+			...buildLedgerOptions({
+				judge: createLedgerJudge(asked, () => Promise.reject(failure), 'scripted'),
+				topics: [],
+			}),
+			agent: { strict: false },
+		})
+		ledger.conversation.add({ role: 'user', content: 'The depot opens at nine.' })
+		await ledger.respond('When does it open?')
+		const first = asked.count
+		await ledger.respond('When does it open?')
+		expect(first).toBeGreaterThan(0)
+		expect(asked.count).toBe(first)
+	})
+
 	it('rejects respond on a selection failure, and the rejection leaves the ledger free', async () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
 		const { ledger } = createPacedLedger(
@@ -3483,6 +3502,31 @@ describe('Ledger — strict by default', () => {
 		ledger.conversation.remove(removed.id)
 		gate.resolve()
 		await expect(pending).rejects.toThrow('changed during selection')
+	})
+
+	it('calibrates with an image workspace over an empty conversation, sending no image', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
+				{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
+			],
+			{ recorded: true },
+		)
+		const workspaces = createWorkspaceManager()
+		workspaces.add({
+			seed: [
+				createFile({ path: 'scan.png', content: createBinaryContent('U0NBTg==', 'image/png') }),
+			],
+		})
+		const ledger = createLedger(
+			provider,
+			buildUncalibratedOptions(buildLedgerOptions({ agent: { workspaces } })),
+		)
+		await ledger.calibrate(new AbortController().signal)
+		const sent = provider.calls.flatMap((call) => call.messages)
+		expect(provider.calls).toHaveLength(2)
+		expect(sent.flatMap((message) => message.images ?? [])).toEqual([])
+		expect(sent.map((message) => message.role)).not.toContain('user')
 	})
 
 	it('refuses a direct agent run outside a request', async () => {

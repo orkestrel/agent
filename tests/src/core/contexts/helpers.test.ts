@@ -216,10 +216,12 @@ describe('attachUserImages — the image payload on a conversation last user tur
 		expect(isContextError(error) && error.code).toBe('IMAGES')
 	})
 
-	it('returns an empty conversation unchanged, because a head-only build holds no turn to refuse', () => {
+	it('refuses image data over an empty conversation, which holds no turn to carry it', () => {
 		const empty: readonly Message[] = []
+		const error = captureError(() => attachUserImages(empty, ['payload']))
 
-		expect(attachUserImages(empty, ['payload'])).toBe(empty)
+		expect(isContextError(error) && error.code).toBe('IMAGES')
+		expect(attachUserImages(empty, [])).toBe(empty)
 	})
 
 	it('merges after a user turn own images, through attachImages', () => {

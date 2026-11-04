@@ -52,6 +52,12 @@ describe('isLedgerSnapshot', () => {
 		expect(isLedgerSnapshot(free)).toBe(true)
 	})
 
+	it('reads a dangling request as the guard refusing what its shape cannot state', () => {
+		const dangling = { ...LEDGER_SNAPSHOT_SEED, requests: ['absent'] }
+		expect(ledgerSnapshotContract.is(dangling)).toBe(true)
+		expect(isLedgerSnapshot(dangling)).toBe(false)
+	})
+
 	it('refuses each malformed, mis-marked, or hostile value without throwing', () => {
 		const cases = createInvalidLedgerSnapshotCases()
 		expect(cases.map(([title, value]) => [title, isLedgerSnapshot(value)])).toEqual(

@@ -430,12 +430,16 @@ export class Ledger implements LedgerInterface {
 
 	async #measureGauge(signal: AbortSignal): Promise<LedgerGauge> {
 		try {
+			// The empty turn stands where the request will, so a workspace's images have a user turn to
+			// read, and it leaves with them: calibration prices text.
 			const messages = stripThinking(
-				[
-					...this.#agent.context.build({ messages: [], judgments: [] }),
-					...this.#conversation.view(),
-					{ id: 'calibration', role: 'user', content: '' },
-				],
+				this.#agent.context.build({
+					messages: [
+						...this.#conversation.view(),
+						{ id: 'calibration', role: 'user', content: '' },
+					],
+					judgments: [],
+				}),
 				this.#replay,
 			).slice(0, -1)
 			const priced = await this.#provider.generate(
