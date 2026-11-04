@@ -60,6 +60,7 @@ import {
 } from '@orkestrel/contract'
 import { createBudget, createTokenBudget, isBudgetError } from '@orkestrel/budget'
 import { CLOSED_PARAMETERS, createTool, createToolManager } from '@orkestrel/tool'
+import { createBinaryContent, createFile } from '@orkestrel/workspace'
 import {
 	agentChunkToFrame,
 	agentResultToJSON,
@@ -81,6 +82,7 @@ import {
 	isConversationError,
 	isProviderAbortError,
 	isProviderError,
+	isContextError,
 	ProviderAbortError,
 	ProviderError,
 	providerRequestContract,
@@ -89,6 +91,8 @@ import {
 } from '@src/core'
 import {
 	createForeignAgent,
+	createShiftingDelta,
+	createShiftingTool,
 	AGENT_AUTHORITY,
 	abandonSelection,
 	createAddTool,
@@ -2811,6 +2815,20 @@ describe('Agent — the provider-result door', () => {
 		expect(isProviderError(error) && error.message).toContain('channel')
 	})
 
+	it('reads a delta once, so what the check read is what the run consumes', async () => {
+		const { delta, reads } = createShiftingDelta('valid', 47)
+		const tokens = createRecorder<[content: unknown]>()
+		const agent = createForeignAgent({ content: 'valid' }, [delta])
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const stream = agent.stream()
+		for await (const chunk of stream.events) {
+			if (chunk.category === 'token') tokens.handler(chunk.content)
+		}
+		expect(tokens.calls).toEqual([['valid']])
+		expect(reads.reported).toEqual(['valid'])
+		expect((await stream.result).content).toBe('valid')
+	})
+
 	it('bills the estimate when a settled result reports no usage', async () => {
 		const budget = createTokenBudget({ max: 1000, scope: 'total' })
 		const agent = createForeignAgent(
@@ -2822,6 +2840,25 @@ describe('Agent — the provider-result door', () => {
 		const result = await agent.generate()
 		expect(result.usage).toBeUndefined()
 		expect(budget.consumed).toBe(10)
+	})
+})
+
+describe('Agent — workspace images', () => {
+	it('refuses an image-only workspace over an empty conversation before the provider', async () => {
+		const provider = createScriptedProvider(
+			[{ result: { content: 'never' } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { system: 'Read the scan.' })
+		agent.context.workspaces.add({
+			seed: [
+				createFile({ path: 'scan.png', content: createBinaryContent('U0NBTg==', 'image/png') }),
+			],
+		})
+		await expect(agent.generate()).rejects.toSatisfy(
+			(error: unknown) => isContextError(error) && error.code === 'IMAGES',
+		)
+		expect(provider.calls).toEqual([])
 	})
 })
 
@@ -7665,6 +7702,208 @@ describe('Agent — authority ask', () => {
 		expect(original.calls).toEqual([[{}]])
 		expect(other.calls).toEqual([[{}]])
 		expect(denied.calls).toEqual([])
+	})
+
+	it('ordering 4: a later call whose tool an earlier handler of the batch replaced is refused, and neither instance runs', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		const shifting = createShiftingTool('read', original)
+		tools.add([
+			createTool({
+				name: 'change',
+				strict: false,
+				execute: () => {
+					tools.add(
+						createTool({
+							name: 'read',
+							strict: false,
+							annotations: { consequential: true },
+							execute: (args) => {
+								replaced.handler(args)
+								return 'ran the replacement'
+							},
+						}),
+					)
+					return 'changed'
+				},
+			}),
+			shifting.tool,
+		])
+		const read = createToolCall({ id: 'r1', name: 'read' })
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [createToolCall({ id: 'c1', name: 'change' }), read] } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(original.calls).toEqual([])
+		expect(replaced.calls).toEqual([])
+		expect(denied.calls).toEqual(
+			original.calls.length === 0 ? [[read, 'read changed after its decision', undefined]] : [],
+		)
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([
+			'changed',
+			original.calls.length === 0
+				? '"read" did not run: it is not allowed. Do not call it again; answer with what you have.'
+				: 'ran',
+		])
+	})
+
+	it('ordering 4: a later call whose tool an earlier handler of the batch removed is refused', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		const shifting = createShiftingTool('read', original)
+		tools.add([
+			createTool({
+				name: 'change',
+				strict: false,
+				execute: () => {
+					tools.remove('read')
+					return 'changed'
+				},
+			}),
+			shifting.tool,
+		])
+		const read = createToolCall({ id: 'r1', name: 'read' })
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [createToolCall({ id: 'c1', name: 'change' }), read] } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(original.calls).toEqual([])
+		expect(replaced.calls).toEqual([])
+		expect(denied.calls).toEqual(
+			original.calls.length === 0 ? [[read, 'read changed after its decision', undefined]] : [],
+		)
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([
+			'changed',
+			original.calls.length === 0
+				? '"read" did not run: it is not allowed. Do not call it again; answer with what you have.'
+				: 'ran',
+		])
+	})
+
+	it('ordering 4: a later call whose tool an earlier handler annotated consequential is refused', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		const shifting = createShiftingTool('read', original)
+		tools.add([
+			createTool({
+				name: 'change',
+				strict: false,
+				execute: () => {
+					shifting.raise()
+					return 'changed'
+				},
+			}),
+			shifting.tool,
+		])
+		const read = createToolCall({ id: 'r1', name: 'read' })
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [createToolCall({ id: 'c1', name: 'change' }), read] } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(original.calls).toEqual([])
+		expect(replaced.calls).toEqual([])
+		expect(denied.calls).toEqual(
+			original.calls.length === 0 ? [[read, 'read changed after its decision', undefined]] : [],
+		)
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([
+			'changed',
+			original.calls.length === 0
+				? '"read" did not run: it is not allowed. Do not call it again; answer with what you have.'
+				: 'ran',
+		])
+	})
+
+	it('ordering 4: a later call whose tool an earlier handler re-added as the same instance still runs', async () => {
+		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		const shifting = createShiftingTool('read', original)
+		tools.add([
+			createTool({
+				name: 'change',
+				strict: false,
+				execute: () => {
+					tools.add(shifting.tool)
+					return 'changed'
+				},
+			}),
+			shifting.tool,
+		])
+		const read = createToolCall({ id: 'r1', name: 'read' })
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: '', tools: [createToolCall({ id: 'c1', name: 'change' }), read] } },
+				{ result: { content: 'done' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { deny: denied.handler },
+		})
+		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
+		expect(original.calls).toEqual([[{}]])
+		expect(replaced.calls).toEqual([])
+		expect(denied.calls).toEqual(
+			original.calls.length === 0 ? [[read, 'read changed after its decision', undefined]] : [],
+		)
+		expect(
+			provider.calls[1]?.messages
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content),
+		).toEqual([
+			'changed',
+			original.calls.length === 0
+				? '"read" did not run: it is not allowed. Do not call it again; answer with what you have.'
+				: 'ran',
+		])
 	})
 
 	it('ordering 5: tools.execute receives allowed and approved calls in call order', async () => {

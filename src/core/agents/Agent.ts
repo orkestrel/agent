@@ -71,8 +71,8 @@ import {
 } from '../helpers.js'
 import {
 	isProviderAbortError,
-	isProviderDelta,
 	ProviderError,
+	readProviderDelta,
 	requireProviderResult,
 } from '../providers/index.js'
 
@@ -598,7 +598,7 @@ export class Agent implements AgentInterface {
 				if (authorization.asked.length > 0 && !abort.signal.aborted) {
 					yield* this.#approve(tools, authorization, abort.signal)
 				}
-				if (!abort.signal.aborted) this.#confirm(tools, authorization)
+				if (!abort.signal.aborted) this.#confirm(tools, authorization, advertised)
 				if (abort.signal.aborted) {
 					turns.push({ ...settled, outcome: 'cancel', partial: true })
 					continue
@@ -609,7 +609,13 @@ export class Agent implements AgentInterface {
 					calls: result.tools,
 					...recorded,
 				})
-				const results = await this.#dispatch(tools, result.tools, abort.signal, authorization)
+				const results = await this.#dispatch(
+					tools,
+					result.tools,
+					abort.signal,
+					authorization,
+					advertised,
+				)
 				// Each dispatched call's tool message, appended per step of a loop that yields.
 				const replies: Message[] = []
 				for (const [position, call] of result.tools.entries()) {
@@ -1095,9 +1101,30 @@ export class Agent implements AgentInterface {
 		}
 	}
 
-	// Denies each allowed call whose tool is no longer the turn's held instance, with no `await` and
-	// before the pre-dispatch abort guard, so a `deny` listener that cancels here stores nothing. The
-	// compare is by identity, so a host that re-adds the same instance still runs.
+	// Whether a call's tool is no longer what its decision cleared: the instance the turn held, with the
+	// `consequential` annotation the turn advertised, which is what the floor read. The compare is by
+	// identity, so a host that re-adds the same instance still runs. The tool is foreign, so a read that
+	// throws counts as a change.
+	#changed(
+		tools: ToolManagerInterface,
+		call: ToolCall,
+		tool: ToolInterface | undefined,
+		advertised: readonly ToolDefinition[],
+	): boolean {
+		const same = attempt(() => {
+			const current = tools.tool(call.name)
+			const definition = advertised.find((entry) => entry.name === call.name)
+			return (
+				current === tool &&
+				(current?.annotations?.consequential === true) ===
+					(definition?.annotations?.consequential === true)
+			)
+		})
+		return !same.success || !same.value
+	}
+
+	// Denies each allowed call whose tool changed since its decision, with no `await` and before the
+	// pre-dispatch abort guard, so a `deny` listener that cancels here stores nothing.
 	#confirm(
 		tools: ToolManagerInterface,
 		authorization: {
@@ -1107,22 +1134,25 @@ export class Agent implements AgentInterface {
 			>
 			readonly denials: Map<number, ToolResult>
 		},
+		advertised: readonly ToolDefinition[],
 	): void {
 		for (const [index, { call, tool }] of authorization.allowed) {
-			if (tools.tool(call.name) === tool) continue
+			if (!this.#changed(tools, call, tool, advertised)) continue
 			authorization.allowed.delete(index)
 			authorization.denials.set(index, denyCall(call, AUTHORITY_NOTES.denied))
 			this.#emitter.emit('deny', call, `${call.name} changed after its decision`, undefined)
 			// A deny listener can change a tool this walk already read, so walk them all again.
-			this.#confirm(tools, authorization)
+			this.#confirm(tools, authorization, advertised)
 			return
 		}
 	}
 
-	// Carry cancellation into entered handlers, then merge executed results and denials
-	// in call order. An all-denied turn costs no tool run. The allowed entries are rebuilt in call
-	// order, because approved calls join the map after the synchronous pass and `execute` starts
-	// its batch in entry order; each entry passed `#confirm`, so only its call is read.
+	// Carry cancellation into entered handlers, then merge executed results and denials in call
+	// order. An all-denied turn costs no tool run. The allowed entries are rebuilt in call order,
+	// because approved calls join the map after the synchronous pass. The manager resolves a tool by
+	// name when it starts a call, and a handler's synchronous prefix runs before the next start, so
+	// each call is checked again right before it starts: the check and the manager's lookup read one
+	// instance, and the manager keeps its own policy for the call.
 	async #dispatch(
 		tools: ToolManagerInterface,
 		calls: readonly ToolCall[],
@@ -1134,11 +1164,16 @@ export class Agent implements AgentInterface {
 			>
 			readonly denials: ReadonlyMap<number, ToolResult>
 		},
+		advertised: readonly ToolDefinition[],
 	): Promise<readonly ToolResult[]> {
 		const { allowed, denials } = authorization
 		const entries = [...allowed].sort(([left], [right]) => left - right)
-		const batch = entries.map(([, { call }]) => call)
-		const executed = batch.length > 0 ? await tools.execute(batch, { signal }) : []
+		const started = entries.map(([, { call, tool }]) => {
+			if (!this.#changed(tools, call, tool, advertised)) return tools.execute(call, { signal })
+			this.#emitter.emit('deny', call, `${call.name} changed after its decision`, undefined)
+			return denyCall(call, AUTHORITY_NOTES.denied)
+		})
+		const executed = started.length > 0 ? await Promise.all(started) : []
 		// Denials and executed results never share an index.
 		const results = new Map<number, ToolResult>([
 			...denials,
@@ -1178,13 +1213,13 @@ export class Agent implements AgentInterface {
 					const result = next.value
 					return attempt(() => requireProviderResult(result))
 				}
-				const delta = next.value
-				if (!isProviderDelta(delta)) {
+				const delta = readProviderDelta(next.value)
+				if (delta === undefined) {
 					// The run ends here, so the foreign stream is released rather than held to its deadline.
 					void generator.return({ content: '' }).catch(() => {})
 					throw new ProviderError(
 						'PROTOCOL',
-						`provider error: a delta must carry a channel of 'content' or 'thinking' and string text; received ${preview(delta)}`,
+						`provider error: a delta must carry a channel of 'content' or 'thinking' and string text; received ${preview(next.value)}`,
 					)
 				}
 				if (delta.channel === 'content') {

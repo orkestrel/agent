@@ -1,4 +1,4 @@
-import type { ProviderDelta, ProviderResult, SystemOneAnswer, SystemOneResponse } from './types.js'
+import type { ProviderResult, SystemOneAnswer, SystemOneResponse } from './types.js'
 import type { Guard } from '@orkestrel/contract'
 import { isBudgetAmount } from '@orkestrel/budget'
 import {
@@ -46,34 +46,6 @@ export const isProviderResult: Guard<ProviderResult> = objectOf(
 	},
 	['thinking', 'tools', 'usage', 'truncated'],
 )
-
-/**
- * Checks whether a value is a provider delta: a `channel` of `content` or `thinking` and a string
- * `text`.
- *
- * @remarks
- * A hand guard, because a stream checks every delta: it destructures the two members rather than
- * composing a record guard. Unknown members and a class instance pass, and an unreadable member returns
- * false.
- *
- * @param value - The unknown delta candidate
- * @returns True if the value is a delta the loop can read; false otherwise
- *
- * @example
- * ```ts
- * isProviderDelta({ channel: 'content', text: 'Hi' }) // true
- * isProviderDelta({ channel: 'audio', text: 'Hi' }) // false
- * ```
- */
-export function isProviderDelta(value: unknown): value is ProviderDelta {
-	if (typeof value !== 'object' || value === null) return false
-	try {
-		const { channel, text }: { readonly channel?: unknown; readonly text?: unknown } = value
-		return (channel === 'content' || channel === 'thinking') && typeof text === 'string'
-	} catch {
-		return false
-	}
-}
 
 /**
  * Checks whether a value is a System One response envelope with optional model and usage.

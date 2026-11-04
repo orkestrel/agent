@@ -1,6 +1,7 @@
 import type {
 	AnswerMeasure,
 	FailureRead,
+	ProviderDelta,
 	ProviderOptions,
 	ProviderRequest,
 	ProviderResult,
@@ -60,6 +61,35 @@ export function buildProviderResult(
 		...(tools.length === 0 ? {} : { tools }),
 		...(usage === undefined ? {} : { usage }),
 		...(truncated === undefined ? {} : { truncated }),
+	}
+}
+
+/**
+ * Reads a foreign delta's two members once into an owned copy, the value a run checks and consumes.
+ *
+ * @remarks
+ * A stream checks every delta, so this is a hand read rather than a record guard. Reading each member
+ * once means a getter can't pass the check with one value and hand the run another. Unknown members
+ * and a class instance pass, and an unreadable member reads as no delta.
+ *
+ * @param value - The value the stream yielded
+ * @returns The owned delta, or undefined when the value is not one
+ *
+ * @example
+ * ```ts
+ * readProviderDelta({ channel: 'content', text: 'Hi' }) // { channel: 'content', text: 'Hi' }
+ * readProviderDelta({ channel: 'audio', text: 'Hi' }) // undefined
+ * ```
+ */
+export function readProviderDelta(value: unknown): ProviderDelta | undefined {
+	if (typeof value !== 'object' || value === null) return undefined
+	try {
+		const { channel, text }: { readonly channel?: unknown; readonly text?: unknown } = value
+		return (channel === 'content' || channel === 'thinking') && typeof text === 'string'
+			? { channel, text }
+			: undefined
+	} catch {
+		return undefined
 	}
 }
 

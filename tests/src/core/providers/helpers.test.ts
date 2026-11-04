@@ -19,10 +19,12 @@ import {
 	requestToRelay,
 	buildRelayRequest,
 	describeRelayRefusal,
+	readProviderDelta,
 } from '@src/core'
 import { PREVIEW_LIMIT, isContractError, preview } from '@orkestrel/contract'
-import { captureError, requireValue } from '@orkestrel/test'
+import { captureError, createHostileValues, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
+import { createShiftingDelta } from '../../../setup.js'
 import {
 	createToolCall,
 	RecordedBody,
@@ -39,6 +41,36 @@ import {
 	RELAY_SYSTEM_CASES,
 	RELAY_TOOL_CASES,
 } from '../../../setup.js'
+
+describe('readProviderDelta', () => {
+	it('returns an owned copy of the two members', () => {
+		const delta = { channel: 'thinking', text: 'Hm', extra: true }
+		expect(readProviderDelta(delta)).toEqual({ channel: 'thinking', text: 'Hm' })
+		expect(readProviderDelta(delta)).not.toBe(delta)
+	})
+
+	it('reads each member once', () => {
+		const { delta, reads } = createShiftingDelta('valid', 47)
+		expect(readProviderDelta(delta)).toEqual({ channel: 'content', text: 'valid' })
+		expect(reads.reported).toEqual(['valid'])
+	})
+
+	it.each([
+		[null],
+		['text'],
+		[{}],
+		[{ channel: 'audio', text: 'x' }],
+		[{ channel: 'content', text: 47 }],
+	])('refuses value %#', (value) => {
+		expect(readProviderDelta(value)).toBeUndefined()
+	})
+
+	it('contains every hostile value', () => {
+		expect(createHostileValues().filter((value) => readProviderDelta(value) !== undefined)).toEqual(
+			[],
+		)
+	})
+})
 
 describe('buildProviderResult — the assembled provider turn', () => {
 	it('omits empty result optionals and retains populated calls and usage', () => {
