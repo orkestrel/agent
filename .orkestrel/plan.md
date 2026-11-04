@@ -5,6 +5,7 @@
 Make `@orkestrel/agent`, its related packages, and the `reason` family refuse what they cannot read, with `@orkestrel/contract` and JSON Schema as the shared boundary, so that missing or malformed input never settles as a value.
 
 - The user, 2026-11-03: "it feels like the default wasn't already to refuse or error out on stuff especially when it's something missing". "the contract package is literally the backbone of all orkestrel packages, you are supposed to use it and apply it rigorously throughout these packages". "address all the issues you find". "don't worry about bumps right now, just worry about making the corrections in the packages and then pointing the dependents to the latest built local path of the dependency".
+- The user, 2026-11-04, on what follows the hardening: "once we have fully hardened contract and the other packages, we should proceed with the debrief". This replaces the earlier order, which put the debrief after `learn`.
 - Exit: every row of `failopen.md` and every section of `semantics.md` landed or ruled out; one `orkestrel-falsify` round closed on the integrated result; `verifier` read the tree-wide gates on each package's final commit; the user published the layers in order with `test:distribution` read at each.
 - The user, 2026-11-04: "Make sure to take care of the contract issues, don't defer it, work on it in parallel, especially since contract is so important to the ecosystem, we need it to be a tight and hardened as possible, and since it is required in all packages, it's best to get done as soon as possible so it goes into the same version bump." So these join the campaign: a nested `shape` that `is` refuses, the door and fault text in `@orkestrel/contract` subject to one `analyst` pass, and `rawShape` refusals naming a real path.
 - Out of this campaign: unbounded refusal text in `@orkestrel/workspace`, `@orkestrel/database`, and `@orkestrel/relation`, `@orkestrel/mcp` losing the blocks of a result with only non-text content (needs a contract decision), and every package outside the table below.
@@ -56,7 +57,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study`, `mcp`, `qualifier`, `rater`, `interpret` read; `program`, `brief` open | `ledger.md` |
 | Live proofs on the dedicated daemon | `ollama` at `9ef095b` and `4109f7e`, 14 files, 82 passed | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | `learn` builds the skeleton; here, finish `contract`'s corrections and its generated test, the door with `tool` first, one take-up per package and `database`; then the falsify round, then `verifier` | § How the wave runs; § Sequence; `learn`'s plan |
+| Next action | `learn` builds the skeleton; here, finish `contract`'s corrections and its generated test, the door with `tool` first, one take-up per package and `database`; then the falsify round, then `verifier`, then the debrief | § How the wave runs; § Sequence; `learn`'s plan |
 
 ## Sequence
 
@@ -71,6 +72,7 @@ Each unit's role runs on the Codex column of `.agents/orchestration.md` § Roles
 | Independent reviews | `program`, `brief` | each finding fixed, deferred, or ruled out |
 | Falsify | one round over the integrated result, numbered claims, the objective lane | an all-confirmed round, or a stop stated per `orkestrel-falsify` § End the depth search |
 | Verify | `verifier`, each package in layer order, once | exits read bare |
+| Debrief | `orkestrel-debrief` once `contract` and the other packages are hardened, not after `learn`: performance, patterns, and conventions, each with evidence, research, and an example, landed in scaffold's skills and rules as a method per package and scenario. `methods.md` is its input | every finding has a carrier, on the user's go-ahead for scaffold |
 | Publish | the user, in layer order, re-pinning at each; `test:distribution` at each; a new replay lineage screened first | registry serves each layer |
 
 ## Deferred
