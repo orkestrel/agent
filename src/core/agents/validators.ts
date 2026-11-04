@@ -1,5 +1,21 @@
-import type { AuthorityDecision } from './types.js'
-import { isString, literalOf, objectOf } from '@orkestrel/contract'
+import type { AuthorityDecision, AuthorityVerdict } from './types.js'
+import { isString, objectOf } from '@orkestrel/contract'
+
+/**
+ * Checks whether a value is an authority verdict: `allow`, `ask`, or `deny`.
+ *
+ * @param value - The unknown verdict candidate
+ * @returns True if the value names a verdict; false otherwise
+ *
+ * @example
+ * ```ts
+ * isAuthorityVerdict('ask') // true
+ * isAuthorityVerdict('maybe') // false
+ * ```
+ */
+export function isAuthorityVerdict(value: unknown): value is AuthorityVerdict {
+	return value === 'allow' || value === 'ask' || value === 'deny'
+}
 
 /**
  * Checks whether a value is an authority decision: an object whose `zone` is a string, whose
@@ -20,8 +36,7 @@ import { isString, literalOf, objectOf } from '@orkestrel/contract'
  * ```
  */
 export function isAuthorityDecision(value: unknown): value is AuthorityDecision {
-	return objectOf(
-		{ zone: isString, verdict: literalOf('allow', 'ask', 'deny'), reason: isString },
-		['reason'],
-	)(value)
+	return objectOf({ zone: isString, verdict: isAuthorityVerdict, reason: isString }, ['reason'])(
+		value,
+	)
 }

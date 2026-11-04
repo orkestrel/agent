@@ -13,6 +13,7 @@ import {
 import { parseJSONAs } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import {
+	AGENT_AUTHORITY,
 	createRelayHop,
 	createScriptedProvider,
 	createTokenUsage,
@@ -303,6 +304,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 		tools.add(
 			createTool({
 				name: 'add',
+				strict: false,
 				execute: (args) => {
 					executions.handler(args)
 					return Number(args.a) + Number(args.b)
@@ -316,7 +318,7 @@ describe('provider-agnosticism — a minimal provider drives the FULL loop', () 
 			],
 			{ name: 'alpha', recorded: true },
 		)
-		const agent = createAgent(provider, { tools, limit: 4 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 4 })
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
 
 		const stream = agent.stream()

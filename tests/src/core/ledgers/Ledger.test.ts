@@ -43,6 +43,7 @@ import {
 } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import {
+	createRecordedTool,
 	LEDGER_BENCH_MODEL,
 	LEDGER_REPLAY_FIXTURE,
 	LEDGER_SNAPSHOT_SEED,
@@ -311,6 +312,7 @@ describe('Ledger', () => {
 				{
 					tool: createTool({
 						name: 'lookup',
+						strict: false,
 						execute: () => 'Account BW-20931: Brightwater Studio.\r\nRefund is $148.50.',
 					}),
 					read: () => ({
@@ -899,7 +901,9 @@ describe('Ledger', () => {
 		const ledger = createLedger(provider, {
 			...options,
 			agent: { limit: 2 },
-			lookups: [{ ...lookup, tool: createTool({ name: 'lookup', execute: () => text }) }],
+			lookups: [
+				{ ...lookup, tool: createTool({ name: 'lookup', strict: false, execute: () => text }) },
+			],
 		})
 		await ledger.respond('Check the account.')
 		expect(
@@ -2227,6 +2231,7 @@ describe('Ledger', () => {
 				{
 					tool: createTool({
 						name: 'lookup',
+						strict: false,
 						execute: (args) => {
 							if (args.id === 'FX-111') throw new Error('FX-111 failed')
 							return 'BW-20931 unreadable'
@@ -2288,10 +2293,41 @@ describe('Ledger', () => {
 		).toBe(false)
 	})
 
-	it('counts an empty recall against its limit and permits a short nonclosed result', async () => {
+	it('refuses an empty recall topic at the door, as a failure the model reads', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([
 			{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { topic: '' } }] },
+			{ content: 'Done.' },
+		])
+		const ledger = createLedger(provider, { ...options, recall: { limit: 1 } })
+		await ledger.respond('Request.')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'empty')?.content,
+		).toBe('topic: constraint; expected string; received ""; constraint min; limit 1')
+	})
+
+	it('refuses a recall argument it does not declare', async () => {
+		const options = buildLedgerOptions()
+		const provider = createScriptedProvider([
+			{
+				content: '',
+				tools: [
+					{ id: 'extra', name: 'recall', arguments: { topic: 'delivery', category: 'fact' } },
+				],
+			},
+			{ content: 'Done.' },
+		])
+		const ledger = createLedger(provider, options)
+		await ledger.respond('Request.')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'extra')?.content,
+		).toBe('category: extra; this key is not declared, remove it')
+	})
+
+	it('counts a blank recall against its limit and permits a short nonclosed result', async () => {
+		const options = buildLedgerOptions()
+		const provider = createScriptedProvider([
+			{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { topic: '   ' } }] },
 			{ content: '', tools: [{ id: 'next', name: 'recall', arguments: { topic: 'delivery' } }] },
 			{ content: 'Done.' },
 		])
@@ -2323,7 +2359,7 @@ describe('Ledger', () => {
 		expect(LEDGER_NOTES.results).toBe('Your lookups and recalls in this request returned:')
 	})
 
-	it('recalls joined topics with lookup leads and stops a repeated recall irrespective of category', async () => {
+	it('recalls joined topics with lookup leads and stops a repeated recall irrespective of surrounding space', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
@@ -2333,7 +2369,7 @@ describe('Ledger', () => {
 						{
 							id: 'recall',
 							name: 'recall',
-							arguments: { topic: 'Brightwater Studio and delivery', category: 'fact' },
+							arguments: { topic: 'Brightwater Studio and delivery' },
 						},
 					],
 				},
@@ -2343,7 +2379,7 @@ describe('Ledger', () => {
 						{
 							id: 'recall',
 							name: 'recall',
-							arguments: { topic: '  Brightwater Studio and delivery  ', category: 'rule' },
+							arguments: { topic: '  Brightwater Studio and delivery  ' },
 						},
 					],
 				},
@@ -2375,7 +2411,7 @@ describe('Ledger', () => {
 		)
 		const parameters = provider.calls[0]?.tools?.find((tool) => tool.name === 'recall')?.parameters
 		expect(JSON.stringify(parameters)).toBe(
-			'{"type":"object","properties":{"topic":{"type":"string","description":"An owner name, an id, or a topic"}},"required":["topic"]}',
+			'{"type":"object","properties":{"topic":{"type":"string","minLength":1,"description":"An owner name, an id, or a topic"}},"required":["topic"],"additionalProperties":false}',
 		)
 	})
 
@@ -3104,7 +3140,7 @@ describe('Ledger', () => {
 						{
 							id: 'one',
 							name: 'recall',
-							arguments: { topic: 'delivery', category: 'unused'.repeat(1000) },
+							arguments: { topic: 'delivery' },
 						},
 					],
 				},
@@ -3125,7 +3161,6 @@ describe('Ledger', () => {
 		expect(recalled).toContain('Delivery 19 arrived Tuesday with a completed receipt.')
 		expect(recalled).toContain('Delivery 18 arrived Tuesday with a completed receipt.')
 		expect(recalled).toMatch(/\d+ older items not shown/)
-		expect(recalled).not.toContain('unused')
 	})
 
 	it('keeps recalled results in the digest when a later empty lookup replaces their source', async () => {
@@ -3145,7 +3180,12 @@ describe('Ledger', () => {
 		const lookup = requireValue(options.lookups?.[0])
 		const ledger = createLedger(provider, {
 			...options,
-			lookups: [{ ...lookup, tool: createTool({ name: 'lookup', execute: () => 'No record' }) }],
+			lookups: [
+				{
+					...lookup,
+					tool: createTool({ name: 'lookup', strict: false, execute: () => 'No record' }),
+				},
+			],
 		})
 		ledger.conversation.add([
 			{ role: 'user', content: 'The caller asked about the account.' },
@@ -3166,6 +3206,48 @@ describe('Ledger', () => {
 		expect(extractLedgerRecords(requireValue(provider.calls[4]).messages)).not.toContain(
 			'Refund is $140.',
 		)
+	})
+})
+
+describe('Ledger — its authority', () => {
+	it('denies a tool it does not advertise, with its reason', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'late-1', name: 'late', arguments: {} }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.agent.context.tools.add(createRecordedTool('late', executed))
+		const result = await ledger.respond('Check the refund.')
+		expect(executed.calls).toEqual([])
+		expect(result.content).toBe('Done.')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'late-1')?.content,
+		).toBe('"late" did not run: the ledger advertises no such tool')
+	})
+
+	it('allows recall and each lookup it advertises', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'lookup-1', name: 'lookup', arguments: { id: 'BW-20931' } },
+						{ id: 'recall-1', name: 'recall', arguments: { topic: 'refunds' } },
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		await ledger.respond('Check the refund.')
+		const replies = ledger.conversation.messages().filter((message) => message.role === 'tool')
+		expect(replies.map((message) => message.call)).toEqual(['lookup-1', 'recall-1'])
+		expect(replies.every((message) => !message.content.includes('did not run'))).toBe(true)
 	})
 })
 

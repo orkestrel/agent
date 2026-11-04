@@ -31,7 +31,11 @@ import { renderArguments } from './helpers.js'
  * @example
  * ```ts
  * const approver = new Approver()
- * const authority = createAuthority({ rules, ask: approver.ask })
+ * const authority = createAuthority({
+ * 	rules,
+ * 	fallback: { zone: 'default', verdict: 'deny' },
+ * 	ask: approver.ask,
+ * })
  * approver.answer({ id, approved: true }) // true while that ask waits
  * ```
  */

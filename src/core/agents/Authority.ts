@@ -6,25 +6,24 @@ import type {
 	AuthorityOptions,
 	AuthorityRule,
 } from './types.js'
-import { DEFAULT_AUTHORITY_ZONE } from './constants.js'
 import { AgentError } from './errors.js'
+import { requireFallback, requireRules } from './helpers.js'
 
 /**
  * Gates the agent loop's tool calls — the synchronous policy consulted before each call runs,
  * turning one {@link AuthorityContext} into an {@link AuthorityDecision} by walking the ordered
- * rules first-match-wins and falling back to a configurable default, which allows an unmatched
- * call unless its `fallback` decides otherwise, and the approver that answers an `ask` verdict.
+ * rules first-match-wins and falling back to the required `fallback`, and the approver that answers
+ * an `ask` verdict.
  *
  * @remarks
+ * - **Refuses at construction.** The constructor throws an `AgentError` coded `'AUTHORITY'` when the
+ *   `fallback` is missing or malformed, or when a rule has no valid `verdict`, so a policy with a
+ *   hole in it never runs.
  * - **Ordered, first-match-wins.** `evaluate` walks the configured rules in order and
- *   returns the first whose `match(context)` is true as
- *   `{ zone, verdict: rule.verdict ?? 'allow', reason }` — a matched rule with no `verdict`
- *   allows.
- * - **Fallback.** When no rule matches, `evaluate` returns the configured `fallback`.
- *   Default: `{ zone: DEFAULT_AUTHORITY_ZONE, verdict: 'allow' }` (allow-unmatched),
- *   so a rules list of denials behaves as a denylist. To make the gate deny-by-default
- *   (an allowlist — only matched rules that allow get through), pass a `verdict: 'deny'`
- *   `fallback`.
+ *   returns the first whose `match(context)` is true as `{ zone, verdict, reason }`.
+ * - **Fallback.** When no rule matches, `evaluate` returns the configured `fallback`: a
+ *   `verdict: 'deny'` fallback makes an allowlist (only matched rules that allow get through), and a
+ *   `verdict: 'allow'` fallback makes a denylist.
  * - **Consulted before each tool call.** The agent loop calls `evaluate({ call })` for
  *   every {@link import('@orkestrel/tool').ToolCall} the model emits; a denied call is fed
  *   back to the model as a denial {@link import('@orkestrel/tool').ToolResult} (a `tool`
@@ -39,9 +38,10 @@ import { AgentError } from './errors.js'
  *
  * @example
  * ```ts
- * // A denylist: deny the `delete` tool, allow everything else (default fallback).
+ * // A denylist: deny the `delete` tool, allow everything else.
  * const authority = new Authority({
  * 	rules: [{ match: (c) => c.call.name === 'delete', zone: 'restricted', verdict: 'deny' }],
+ * 	fallback: { zone: 'default', verdict: 'allow' },
  * })
  * authority.evaluate({ call: { id: '1', name: 'delete', arguments: {} } }) // { zone: 'restricted', verdict: 'deny' }
  * authority.evaluate({ call: { id: '2', name: 'add', arguments: {} } }) // { zone: 'default', verdict: 'allow' }
@@ -52,10 +52,10 @@ export class Authority implements AuthorityInterface {
 	readonly #fallback: AuthorityDecision
 	readonly #handler: AuthorityHandler | undefined
 
-	constructor(options?: AuthorityOptions) {
-		this.#rules = options?.rules ?? []
-		this.#fallback = options?.fallback ?? { zone: DEFAULT_AUTHORITY_ZONE, verdict: 'allow' }
-		this.#handler = options?.ask
+	constructor(options: AuthorityOptions) {
+		this.#fallback = requireFallback(options)
+		this.#rules = requireRules(options.rules)
+		this.#handler = options.ask
 	}
 
 	evaluate(context: AuthorityContext): AuthorityDecision {
@@ -63,7 +63,7 @@ export class Authority implements AuthorityInterface {
 			if (rule.match(context))
 				return {
 					zone: rule.zone,
-					verdict: rule.verdict ?? 'allow',
+					verdict: rule.verdict,
 					...(rule.reason === undefined ? {} : { reason: rule.reason }),
 				}
 		}

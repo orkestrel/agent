@@ -231,6 +231,7 @@ await new GuideCommand({
 		TEV1_REQUEST,
 		TEV1_SCORE,
 		LEDGER_DESK_THRESHOLDS,
+		AGENT_AUTHORITY,
 	} = await import('./setup.js')
 	const { createFixtureServer, stopTimed } = await import('./setupServer.js')
 	const { describe, expect, expectTypeOf, it } = await import('vitest')
@@ -495,6 +496,7 @@ await new GuideCommand({
 			)
 			const agent = createAgent(provider, {
 				tools,
+				authority: AGENT_AUTHORITY,
 				limit: 2,
 				scope: createScope({ name: 'read', tools: ['search'] }),
 			})
@@ -532,6 +534,7 @@ await new GuideCommand({
 			)
 			const agent = createAgent(provider, {
 				tools,
+				authority: AGENT_AUTHORITY,
 				scope: createScope({ name: 'research', instructions: ['safety'], tools: ['search'] }),
 			})
 			agent.context.instructions.add([
@@ -567,7 +570,7 @@ await new GuideCommand({
 				recorded: true,
 				repeat: false,
 			})
-			const agent = createAgent(provider, { tools })
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 			agent.context.instructions.add({ name: 'safety', content: 'Refuse unsafe requests.' })
 			agent.emitter.on('turn', () =>
 				agent.context.apply(createScope({ name: 'research', instructions: [], tools: ['search'] })),
@@ -602,6 +605,7 @@ await new GuideCommand({
 			)
 			const agent = createAgent(provider, {
 				tools,
+				authority: AGENT_AUTHORITY,
 				conversations,
 				// This case pins the between-turns rebuild by message arithmetic, so the window explicitly
 				// projects the request's messages and leaves the tool definitions out of the measure.
@@ -1185,6 +1189,7 @@ await new GuideCommand({
 				{
 					conversations,
 					tools,
+					authority: AGENT_AUTHORITY,
 					window: createBudget({
 						max: estimateMessages(conversation.view()) + 1,
 						// Message arithmetic is the claim, so the window projects the request's messages.
@@ -1255,7 +1260,11 @@ await new GuideCommand({
 				}),
 			)
 
-			const agent = createAgent(provider, { tools, select: judged.handler })
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				select: judged.handler,
+			})
 			// The fence's `ask` helper appends the user turn and runs; the transcription inlines it.
 			const triage = modes.get('triage')
 			agent.context.apply(triage)
@@ -1342,7 +1351,7 @@ await new GuideCommand({
 				],
 				{ recorded: true, repeat: false },
 			)
-			const agent = createAgent(provider, { tools })
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
 			const first = agent.stream()
 			await entered.promise
@@ -1591,7 +1600,7 @@ await new GuideCommand({
 			)
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'refund', execute: () => 'refunded' }))
-			const agent = createAgent(provider, { tools })
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 			agent.emitter.on('deny', (call, reason) => denials.push([call.name, reason]))
 			agent.context.apply(createScope({ name: 'answer', tools: [] }))
 			agent.context.messages.add({ role: 'user', content: 'Refund invoice 42.' })
@@ -3009,6 +3018,7 @@ await new GuideCommand({
 			const agent = createAgent(provider, {
 				system: 'You triage tickets.',
 				tools,
+				authority: AGENT_AUTHORITY,
 				conversations,
 				window: createBudget({
 					max: 1_000_000,
@@ -3270,7 +3280,7 @@ await new GuideCommand({
 					},
 				}),
 			)
-			const agent = createAgent(provider, { tools })
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 			const stream = agent.stream()
 			try {
 				await entered.promise
@@ -3908,7 +3918,11 @@ await new GuideCommand({
 				const agent = createAgent(provider, {
 					tools,
 					conversations: threads,
-					authority: createAuthority({ rules, ask: approver.ask }),
+					authority: createAuthority({
+						rules,
+						fallback: { zone: 'files', verdict: 'deny' },
+						ask: approver.ask,
+					}),
 				})
 				sessions.set(principal, { agent, threads, approver })
 			}
@@ -5336,7 +5350,7 @@ await new GuideCommand({
 					createTool({ ...definition, execute: () => 'Order BW-5512' }),
 				),
 			)
-			const agent = createAgent(browser, { tools })
+			const agent = createAgent(browser, { tools, authority: AGENT_AUTHORITY })
 			agent.context.messages.add({ role: 'user', content: 'What did I select?' })
 			const result = await agent.generate({ schema: { type: 'object' } })
 
@@ -5436,7 +5450,9 @@ await new GuideCommand({
 				{ recorded: true, repeat: false },
 			)
 			const authority = barrel.createAuthority({
-				rules: [{ match: (context) => context.call.name === 'search', zone: 'read' }],
+				rules: [
+					{ match: (context) => context.call.name === 'search', zone: 'read', verdict: 'allow' },
+				],
 				fallback: { zone: 'blocked', verdict: 'deny', reason: 'that tool is not on the list' },
 			})
 			const agent = createAgent(provider, { tools, authority })
@@ -5472,13 +5488,19 @@ await new GuideCommand({
 				{ content: '', tools: [{ id: 'refund-1', name: 'refund', arguments: {} }] },
 				{ content: 'Done.' },
 			]
-			const floor = createAgent(createScriptedProvider(turns, { repeat: false }), { tools })
+			const floor = createAgent(createScriptedProvider(turns, { repeat: false }), {
+				tools,
+				authority: AGENT_AUTHORITY,
+			})
 			floor.context.messages.add({ role: 'user', content: 'Refund order BW-5512.' })
 			await floor.generate()
 			const before = [...ran]
 			const relaxed = createAgent(createScriptedProvider(turns, { repeat: false }), {
 				tools,
-				authority: barrel.createAuthority({ ask: () => true }),
+				authority: barrel.createAuthority({
+					fallback: { zone: 'default', verdict: 'allow' },
+					ask: () => true,
+				}),
 			})
 			relaxed.context.messages.add({ role: 'user', content: 'Refund order BW-5512.' })
 			await relaxed.generate()
@@ -5794,10 +5816,16 @@ await new GuideCommand({
 			const tools = createToolManager()
 			const conversations = createConversationManager()
 			const thread = conversations.add({ id: 'first' })
-			const agent = createAgent(provider, { tools, skills, conversations })
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				skills,
+				conversations,
+			})
 			tools.add(
 				createTool({
 					name: 'load_skill',
+					strict: false,
 					execute: (args) => {
 						const skill = skills.skill(String(args.name))
 						if (skill === undefined) return 'no such skill'
@@ -5844,6 +5872,7 @@ await new GuideCommand({
 			])
 			const foldAgent = createAgent(folded, {
 				tools: foldTools,
+				authority: AGENT_AUTHORITY,
 				skills,
 				conversations: foldThreads,
 				// Message arithmetic is the claim, so the window projects the request's messages.
@@ -5855,6 +5884,7 @@ await new GuideCommand({
 			foldTools.add(
 				createTool({
 					name: 'load_skill',
+					strict: false,
 					execute: () => {
 						foldAgent.context.instructions.add({ name: 'skill:review', content: body })
 						return 'loaded review'
@@ -5935,7 +5965,7 @@ await new GuideCommand({
 					return estimate
 				},
 			})
-			const agent = createAgent(provider, { tools, window })
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, window })
 			// The tool's description puts the first request over the window; the scope drops it next.
 			agent.emitter.on('tool', () =>
 				agent.context.apply(createScope({ name: 'answer', tools: [] })),
@@ -6316,7 +6346,7 @@ await new GuideCommand({
 					],
 					{ recorded: true, repeat: false },
 				)
-				const agent = createAgent(provider, { tools })
+				const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 				agent.emitter.on('allow', (call) => {
 					events.push(['allow', call.name])
 					tools.remove('refund')
@@ -6366,7 +6396,7 @@ await new GuideCommand({
 					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
 					{ content: 'Never read.' },
 				]),
-				{ tools, scheduler },
+				{ tools, authority: AGENT_AUTHORITY, scheduler },
 			)
 			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
 			const run = agent.stream()
@@ -6391,7 +6421,7 @@ await new GuideCommand({
 				createScriptedProvider([
 					{ content: '', tools: [{ id: 'slow-1', name: 'slow', arguments: {} }] },
 				]),
-				{ tools: slowTools },
+				{ tools: slowTools, authority: AGENT_AUTHORITY },
 			)
 			slow.context.messages.add({ role: 'user', content: 'Run it.' })
 			const stream = slow.stream()

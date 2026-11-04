@@ -13,6 +13,7 @@ import type { SchedulerInterface } from '@orkestrel/workflow'
 import { createTokenBudget } from '@orkestrel/budget'
 import { ToolManager } from '@orkestrel/tool'
 import { Agent } from './Agent.js'
+import { AgentError } from './errors.js'
 import { ConversationManager } from '../conversations/index.js'
 import { requireEntry } from './helpers.js'
 
@@ -34,7 +35,8 @@ import { requireEntry } from './helpers.js'
  *   rehydrated job is a programmer / config error that must fail loudly at build time, never
  *   silently resolve to `undefined` and run an agent missing a dependency.
  * - **`build` rehydrates.** Resolve the job's `provider`; assemble a fresh
- *   {@link ToolManager} from the `tools` names; rebuild the token `budget` from its
+ *   {@link ToolManager} from the `tools` names, which refuses with `code: 'REGISTRY'` when the job
+ *   names no `authority`; rebuild the token `budget` from its
  *   ceiling (`createTokenBudget({ max })`); resolve the optional `authority` /
  *   `scheduler` names; construct the {@link Agent} with `system` / `limit` / `timeout` /
  *   the threaded `signal`; seed its context with the job's `messages`; return it. The
@@ -101,9 +103,17 @@ export class AgentRegistry implements AgentRegistryInterface {
 	// collisions in the shared store) — omitted when no store is set, so the shape matches a
 	// registry with no `store`.
 	#buildOptions(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
+		const names = input.tools ?? []
+		if (names.length > 0 && input.authority === undefined) {
+			throw new AgentError(
+				'REGISTRY',
+				"a job that names tools and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities",
+				{ context: { tools: names } },
+			)
+		}
 		const budget = input.budget === undefined ? undefined : createTokenBudget({ max: input.budget })
 		return {
-			tools: this.#buildToolManager(input.tools),
+			...(names.length === 0 ? {} : { tools: this.#buildToolManager(names) }),
 			...(input.system === undefined ? {} : { system: input.system }),
 			...(input.limit === undefined ? {} : { limit: input.limit }),
 			...(input.timeout === undefined ? {} : { timeout: input.timeout }),
@@ -119,9 +129,9 @@ export class AgentRegistry implements AgentRegistryInterface {
 
 	// A fresh tool registry loaded with the named tools (each resolved — an unknown name
 	// throws). Always a new manager per build, so concurrent jobs never share one.
-	#buildToolManager(names: readonly string[] | undefined): ToolManager {
+	#buildToolManager(names: readonly string[]): ToolManager {
 		const manager = new ToolManager()
-		if (names !== undefined) for (const name of names) manager.add(this.tool(name))
+		for (const name of names) manager.add(this.tool(name))
 		return manager
 	}
 }

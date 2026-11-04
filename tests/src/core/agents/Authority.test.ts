@@ -1,19 +1,69 @@
 import { createScriptedApprover, createAuthorityContext } from '../../../setup.js'
+import { captureError } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { createAuthority, isAgentError } from '@src/core'
+import { Authority, createAuthority, isAgentError } from '@src/core'
 
 // Deterministic, Ollama-free unit tests for the Authority policy gate (the mirror of
 // src/core/agents/Authority.ts). The gate in ISOLATION: ordered first-match-wins, a
-// matched rule allows when it names no verdict and otherwise carries its verdict, the no-match
-// fallback (default allow-`'default'`, or a deny-by-default override), that `match` sees the
-// `{ call }` context (so a rule can branch on the call's name AND its arguments), and the
-// approver behind `ask`. The gate wired into the loop is covered in Agent.test.ts.
+// matched rule carries its required verdict, the required no-match fallback (an allowlist or a
+// denylist), that `match` sees the `{ call }` context (so a rule can branch on the call's name AND
+// its arguments), and the approver behind `ask`. The gate wired into the loop is covered in
+// Agent.test.ts.
+
+describe('Authority — refuses what no default can decide', () => {
+	it.each([
+		['no options', []],
+		['an empty options record', [{}]],
+		['a rules list with no fallback', [{ rules: [] }]],
+		['a malformed fallback', [{ fallback: { zone: 'default' } }]],
+	])('refuses %s with the text a host reads', (_name, args) => {
+		const error = captureError(() => Reflect.construct(Authority, args))
+		expect(isAgentError(error) && error.code).toBe('AUTHORITY')
+		expect(isAgentError(error) && error.message).toBe(
+			"an authority needs a fallback for the calls no rule matches; pass fallback: { zone: 'default', verdict: 'deny' } for an allowlist, or fallback: { zone: 'default', verdict: 'allow' } for a denylist",
+		)
+	})
+
+	it('refuses a rule with no verdict, naming its index', () => {
+		const error = captureError(() =>
+			Reflect.construct(Authority, [
+				{
+					fallback: { zone: 'default', verdict: 'deny' },
+					rules: [
+						{ match: () => true, zone: 'first', verdict: 'allow' },
+						{ match: () => true, zone: 'second', verdict: 'ask' },
+						{ match: () => true, zone: 'third' },
+					],
+				},
+			]),
+		)
+		expect(isAgentError(error) && error.code).toBe('AUTHORITY')
+		expect(isAgentError(error) && error.message).toBe(
+			"rule 2 has no verdict; set verdict: 'allow' | 'ask' | 'deny'",
+		)
+		expect(isAgentError(error) && error.context).toEqual({ rule: 2 })
+	})
+
+	it('refuses an unknown verdict the same way', () => {
+		const error = captureError(() =>
+			Reflect.construct(Authority, [
+				{
+					fallback: { zone: 'default', verdict: 'deny' },
+					rules: [{ match: () => true, zone: 'first', verdict: 'maybe' }],
+				},
+			]),
+		)
+		expect(isAgentError(error) && error.code).toBe('AUTHORITY')
+		expect(isAgentError(error) && error.context).toEqual({ rule: 0 })
+	})
+})
 
 describe('Authority — first-match-wins ordering', () => {
 	it('returns the FIRST matching rule, not a later one', () => {
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
-				{ match: (c) => c.call.name === 'add', zone: 'first', reason: 'won' },
+				{ match: (c) => c.call.name === 'add', zone: 'first', reason: 'won', verdict: 'allow' },
 				{ match: (c) => c.call.name === 'add', zone: 'second', verdict: 'deny', reason: 'lost' },
 			],
 		})
@@ -25,10 +75,11 @@ describe('Authority — first-match-wins ordering', () => {
 	})
 })
 
-describe('Authority — a matched rule allows by default and carries its verdict', () => {
-	it('allows when the matched rule omits verdict', () => {
+describe('Authority — a matched rule carries its verdict', () => {
+	it('omits the reason of a matched rule that names none', () => {
 		const authority = createAuthority({
-			rules: [{ match: () => true, zone: 'sensitive' }],
+			fallback: { zone: 'default', verdict: 'deny' },
+			rules: [{ match: () => true, zone: 'sensitive', verdict: 'allow' }],
 		})
 		const decision = authority.evaluate(createAuthorityContext('add'))
 		expect(decision).toEqual({ zone: 'sensitive', verdict: 'allow' })
@@ -39,6 +90,7 @@ describe('Authority — a matched rule allows by default and carries its verdict
 		'carries the matched rule verdict %s with its zone and reason',
 		(verdict) => {
 			const authority = createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{ match: (c) => c.call.name === 'delete', zone: 'restricted', verdict, reason: 'why' },
 				],
@@ -53,11 +105,12 @@ describe('Authority — a matched rule allows by default and carries its verdict
 })
 
 describe('Authority — fallback when no rule matches', () => {
-	it('default fallback is allow under the default zone', () => {
+	it('an allow fallback makes a denylist: an unmatched call passes', () => {
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [{ match: (c) => c.call.name === 'delete', zone: 'restricted', verdict: 'deny' }],
 		})
-		// `add` matches no rule → the default allow-`'default'` fallback.
+		// `add` matches no rule → the configured allow fallback.
 		expect(authority.evaluate(createAuthorityContext('add'))).toEqual({
 			zone: 'default',
 			verdict: 'allow',
@@ -65,7 +118,7 @@ describe('Authority — fallback when no rule matches', () => {
 	})
 
 	it('an empty rules list always returns the fallback', () => {
-		const authority = createAuthority()
+		const authority = createAuthority({ fallback: { zone: 'default', verdict: 'allow' } })
 		expect(authority.evaluate(createAuthorityContext('anything'))).toEqual({
 			zone: 'default',
 			verdict: 'allow',
@@ -74,7 +127,7 @@ describe('Authority — fallback when no rule matches', () => {
 
 	it('a deny-by-default fallback makes every unmatched call denied (allowlist)', () => {
 		const authority = createAuthority({
-			rules: [{ match: (c) => c.call.name === 'add', zone: 'safe' }],
+			rules: [{ match: (c) => c.call.name === 'add', zone: 'safe', verdict: 'allow' }],
 			fallback: { zone: 'restricted', verdict: 'deny', reason: 'not allowlisted' },
 		})
 		// `add` is allowlisted (matched rule allows); everything else hits the deny fallback.
@@ -95,6 +148,7 @@ describe('Authority — match receives the { call } context', () => {
 		// Deny `transfer` only when the amount argument exceeds a threshold — proving the
 		// matcher sees both the name and the parsed arguments.
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match: (c) => c.call.name === 'transfer' && Number(c.call.arguments.amount) > 100,
@@ -107,7 +161,7 @@ describe('Authority — match receives the { call } context', () => {
 		expect(authority.evaluate(createAuthorityContext('transfer', { amount: 500 })).verdict).toBe(
 			'deny',
 		)
-		// A small transfer matches no rule → allowed by the default fallback.
+		// A small transfer matches no rule → allowed by the fallback.
 		expect(authority.evaluate(createAuthorityContext('transfer', { amount: 5 })).verdict).toBe(
 			'allow',
 		)
@@ -120,14 +174,20 @@ describe('Authority — ask answers through the approver', () => {
 	const decision = { zone: 'sensitive', verdict: 'ask', reason: 'confirm' } as const
 
 	it.each([true, false])('returns a synchronous handler answer %s', async (answer) => {
-		const authority = createAuthority({ ask: () => answer })
+		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
+			ask: () => answer,
+		})
 		await expect(
 			authority.ask?.(createAuthorityContext('write'), decision, new AbortController().signal),
 		).resolves.toBe(answer)
 	})
 
 	it.each([true, false])('returns an async handler answer %s', async (answer) => {
-		const authority = createAuthority({ ask: async () => answer })
+		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
+			ask: async () => answer,
+		})
 		await expect(
 			authority.ask?.(createAuthorityContext('write'), decision, new AbortController().signal),
 		).resolves.toBe(answer)
@@ -137,7 +197,10 @@ describe('Authority — ask answers through the approver', () => {
 		const approver = createScriptedApprover([true])
 		const context = createAuthorityContext('write', { path: 'note.txt' })
 		const signal = new AbortController().signal
-		const authority = createAuthority({ ask: approver.ask })
+		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
+			ask: approver.ask,
+		})
 		await expect(authority.ask?.(context, decision, signal)).resolves.toBe(true)
 		expect(approver.calls).toEqual([[context, decision, signal]])
 		expect(approver.calls[0]?.[2]).toBe(signal)
@@ -146,6 +209,7 @@ describe('Authority — ask answers through the approver', () => {
 	it('turns a synchronous handler throw into a rejection', async () => {
 		const failure = new Error('approver crashed')
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			ask: () => {
 				throw failure
 			},
@@ -159,7 +223,7 @@ describe('Authority — ask answers through the approver', () => {
 	})
 
 	it('rejects with an APPROVER AgentError when no handler is set', async () => {
-		const authority = createAuthority()
+		const authority = createAuthority({ fallback: { zone: 'default', verdict: 'allow' } })
 		const pending = authority.ask?.(
 			createAuthorityContext('write'),
 			decision,

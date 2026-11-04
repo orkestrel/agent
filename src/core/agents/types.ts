@@ -608,14 +608,14 @@ export interface AgentOptions {
 	/** Carries an external cancel; its abort commits a partial result. */
 	readonly signal?: AbortSignal
 	/**
-	 * Holds an optional policy gate consulted after scope admits a tool call — a denied call is
+	 * Holds the policy gate consulted after scope admits a tool call — a denied call is
 	 * fed back to the model as a denial {@link ToolResult} (a `tool` chunk + a tool
 	 * message) rather than executed (no tool execution), so the model receives the
 	 * denial and can react; an allowed call dispatches normally, and an asked call dispatches only
 	 * when the authority's `ask` approves it. The loop raises an `allow` for a tool whose advertised
-	 * definition is annotated `consequential` to an `ask`, with or without this option. Omitted ⇒ a
-	 * default `Authority` with no rules and no approver: an unannotated call dispatches with an
-	 * `allow` in zone `'default'`, and a `consequential` call is denied as unanswered.
+	 * definition is annotated `consequential` to an `ask`. Required when `tools` is set: construction
+	 * throws an `AgentError` coded `'AUTHORITY'` otherwise. Omitted with no `tools` ⇒ no gate, and a
+	 * tool added later through `context.tools` is denied rather than run.
 	 */
 	readonly authority?: AuthorityInterface
 	/**
@@ -887,13 +887,14 @@ export interface AuthorityDecision {
  *
  * @remarks
  * The first rule whose `match` returns true decides; if none match, the authority's
- * `fallback` decides. A matched rule with no `verdict` allows. `zone` classifies the matched
- * call; `reason` is the optional explanation carried into the {@link AuthorityDecision}.
+ * `fallback` decides. `zone` classifies the matched call; `verdict` is required, and an
+ * `Authority` refuses a rule with none at construction; `reason` is the optional explanation
+ * carried into the {@link AuthorityDecision}.
  */
 export interface AuthorityRule {
 	readonly match: (context: AuthorityContext) => boolean
 	readonly zone: string
-	readonly verdict?: AuthorityVerdict
+	readonly verdict: AuthorityVerdict
 	readonly reason?: string
 }
 
@@ -909,16 +910,14 @@ export type AuthorityHandler = (
  *
  * @remarks
  * `rules` are evaluated in order, first match wins (see {@link AuthorityRule}).
- * `fallback` is the {@link AuthorityDecision} returned when no rule matches.
- * Default: `{ zone: DEFAULT_AUTHORITY_ZONE, verdict: 'allow' }` (allow-unmatched — a
- * rules list of denials acts as a denylist). Set `fallback` to a `verdict: 'deny'`
- * decision to flip the gate to deny-by-default (an allowlist — only matched rules
- * that allow get through). `ask` is the {@link AuthorityHandler} that answers each `ask`
- * verdict; absent, every ask is refused as unanswered.
+ * `fallback` is the {@link AuthorityDecision} returned when no rule matches, and it is required:
+ * a `verdict: 'deny'` fallback makes an allowlist (only matched rules that allow get through), and a
+ * `verdict: 'allow'` fallback makes a denylist. `ask` is the {@link AuthorityHandler} that answers
+ * each `ask` verdict; absent, every ask is refused as unanswered.
  */
 export interface AuthorityOptions {
 	readonly rules?: readonly AuthorityRule[]
-	readonly fallback?: AuthorityDecision
+	readonly fallback: AuthorityDecision
 	readonly ask?: AuthorityHandler
 }
 
@@ -936,7 +935,7 @@ export interface AuthorityOptions {
 export interface AuthorityInterface {
 	/**
 	 * Evaluates one tool call against the ordered rules — returns the first matching rule's
-	 * verdict, which allows when the rule names none, or the fallback when none match.
+	 * verdict, or the fallback when none match.
 	 *
 	 * @param context - The call under consideration (see {@link AuthorityContext})
 	 * @returns The first matching rule's verdict, or the fallback when none match
@@ -988,9 +987,9 @@ export interface AgentJobInput {
 	readonly messages: readonly MessageInput[]
 	/** Holds an optional system prompt seeding the agent's context. */
 	readonly system?: string
-	/** Names the registry keys of the values of {@link ToolInterface} loaded into the agent's tool manager. */
+	/** Names the registry keys of the values of {@link ToolInterface} loaded into the agent's tool manager; a non-empty list requires `authority`. */
 	readonly tools?: readonly string[]
-	/** Names the registry key of an optional {@link AuthorityInterface} policy gate. */
+	/** Names the registry key of the {@link AuthorityInterface} policy gate; required when `tools` names any. */
 	readonly authority?: string
 	/** Names the registry key of an optional {@link SchedulerInterface} pacing the loop. */
 	readonly scheduler?: string
@@ -1071,7 +1070,7 @@ export interface AgentRegistryInterface {
 	 * @param input - The serializable {@link AgentJobInput} to rehydrate
 	 * @param signal - An optional cancel threaded into the agent (a queue / runner abort)
 	 * @returns The ready agent, its context seeded with the job's messages
-	 * @throws {AgentError} Thrown when a referenced provider, tool, authority, or scheduler name is unregistered (`code: 'REGISTRY'`), or when the job's `limit` is not a nonnegative safe integer (`code: 'LIMIT'`)
+	 * @throws {AgentError} Thrown when a referenced provider, tool, authority, or scheduler name is unregistered, or the job names `tools` and no `authority` (`code: 'REGISTRY'`), or when the job's `limit` is not a nonnegative safe integer (`code: 'LIMIT'`)
 	 * @throws {ConversationError} Thrown when a seed message's role is not a `ConversationRole` (`code: 'ROLE'`), before the agent is returned
 	 */
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface
@@ -1147,8 +1146,15 @@ export interface AgentRunnerOptions {
 	readonly timeout?: number
 }
 
-/** Names the machine-readable agent approver, concurrency, limit, registry, and window failures. */
-export type AgentErrorCode = 'APPROVER' | 'CONCURRENCY' | 'LIMIT' | 'REGISTRY' | 'WINDOW'
+/** Names the machine-readable agent approver, authority, concurrency, limit, registry, schema, and window failures. */
+export type AgentErrorCode =
+	| 'APPROVER'
+	| 'AUTHORITY'
+	| 'CONCURRENCY'
+	| 'LIMIT'
+	| 'REGISTRY'
+	| 'SCHEMA'
+	| 'WINDOW'
 
 /**
  * Holds the disjoint estimate components of one message, in heuristic estimate units.

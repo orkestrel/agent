@@ -175,6 +175,7 @@ import type {
 	AuthorityContext,
 	AuthorityDecision,
 	AuthorityHandler,
+	AuthorityInterface,
 	AuthorityRule,
 	AuthorityVerdict,
 	ChannelInterface,
@@ -315,6 +316,11 @@ import { createBinaryContent, createFile, createTextContent } from '@orkestrel/w
 
 /** Supplies usage shared by agent runs. */
 export const AGENT_USAGE = Object.freeze(createTokenUsage())
+
+/** Holds the allow-all authority a test agent that advertises tools and tests no policy passes. */
+export const AGENT_AUTHORITY: AuthorityInterface = createAuthority({
+	fallback: { zone: 'default', verdict: 'allow' },
+})
 
 /** Configures recorded agent turn scripts. */
 export const AGENT_SCRIPT_OPTIONS: ScriptedProviderOptions = Object.freeze({
@@ -839,6 +845,7 @@ export function seedCompactionAgent(
 	const agent = createAgent(provider, {
 		conversations,
 		tools,
+		authority: AGENT_AUTHORITY,
 		...(window === undefined ? {} : { window }),
 		limit: 5,
 	})
@@ -2267,7 +2274,8 @@ export function createRecordedBudget(
 }
 
 /**
- * Creates a real tool that records its arguments and returns a fixed output.
+ * Creates a real tool on the raw route (`strict: false`) that records the arguments it is handed and
+ * returns a fixed output, so a case that proves dispatch never meets the argument door.
  *
  * @param name - The tool name a provider call selects
  * @param recorder - The recorder that receives each call's arguments
@@ -2281,6 +2289,7 @@ export function createRecordedTool(
 ): ToolInterface {
 	return createTool({
 		name,
+		strict: false,
 		execute: (args) => {
 			recorder.handler(args)
 			return output
@@ -3390,6 +3399,7 @@ export function createAskAgent(
 	const agent = createAgent(provider, {
 		tools,
 		authority: createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [{ match: () => true, zone: 'files', verdict: 'ask' }],
 			ask,
 		}),
@@ -6248,6 +6258,7 @@ export async function exerciseThinkingReplay(replay: ThinkingReplay | undefined)
 	conversations.add()
 	const agent = createAgent(provider, {
 		tools,
+		authority: AGENT_AUTHORITY,
 		conversations,
 		window: createBudget({
 			max: 1_000_000,

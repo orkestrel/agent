@@ -48,9 +48,17 @@ import {
 } from '../../../setup.js'
 import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
-import { attempt, isContractError, parseJSONAs, parseJSONValue } from '@orkestrel/contract'
+import {
+	attempt,
+	isContractError,
+	numberShape,
+	objectShape,
+	parseJSONAs,
+	parseJSONValue,
+	stringShape,
+} from '@orkestrel/contract'
 import { createBudget, createTokenBudget, isBudgetError } from '@orkestrel/budget'
-import { createTool, createToolManager } from '@orkestrel/tool'
+import { CLOSED_PARAMETERS, createTool, createToolManager } from '@orkestrel/tool'
 import {
 	agentChunkToFrame,
 	agentResultToJSON,
@@ -78,6 +86,7 @@ import {
 	SCOPE_NOTE,
 } from '@src/core'
 import {
+	AGENT_AUTHORITY,
 	abandonSelection,
 	createAddTool,
 	createAskAgent,
@@ -168,6 +177,7 @@ describe('Agent — thinking replay', () => {
 			},
 			{
 				tools,
+				authority: AGENT_AUTHORITY,
 				conversations,
 				window: createBudget<ProviderRequest>({
 					max: 10000,
@@ -198,7 +208,7 @@ describe('Agent — thinking replay', () => {
 		)
 		const tools = createToolManager()
 		tools.add(createAddTool())
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		expect(provider.replay).toBeUndefined()
 		await agent.generate()
@@ -239,7 +249,7 @@ describe('Agent — thinking replay', () => {
 			})
 			const tools = createToolManager()
 			tools.add(createAddTool())
-			const agent = createAgent(provider, { tools })
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 			agent.context.messages.add({ role: 'user', content: 'go' })
 			expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
 			agent.context.messages.add({ role: 'user', content: 'again' })
@@ -319,7 +329,7 @@ describe('Agent — thinking replay', () => {
 				})
 				const tools = createToolManager()
 				tools.add(createAddTool())
-				const agent = createAgent(provider, { tools })
+				const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 				agent.context.messages.add({ role: 'user', content: 'go' })
 				await agent.generate()
 				expect(transport.requests).toHaveLength(2)
@@ -372,7 +382,12 @@ describe('Agent — thinking replay', () => {
 			})
 			const tools = createToolManager()
 			tools.add(createAddTool())
-			const agent = createAgent(provider, { tools, conversations, window })
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				conversations,
+				window,
+			})
 			expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
 			expect(conversation.sections).toHaveLength(replay === 'none' ? 0 : 1)
 			// These charges independently include framing, tool-call JSON, and permitted thinking.
@@ -413,7 +428,7 @@ describe('Agent — single turn', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const result = await agent.generate()
 		expect(result.content).toBe('done')
@@ -458,14 +473,14 @@ describe('Agent — single turn', () => {
 		const tools = createToolManager()
 		tools.add(createTool({ name: 'noop', execute: () => null }))
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, { system: 'be brief', tools })
+		const agent = createAgent(provider, { system: 'be brief', tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		await agent.generate()
 		const [first] = provider.calls
 		expect(first?.messages[0]).toMatchObject({ role: 'system', content: 'be brief' })
 		expect(first?.messages.at(-1)).toMatchObject({ role: 'user', content: 'hi' })
 		// Tools reach the provider through definitions(), never serialized into messages.
-		expect(first?.tools).toEqual([{ name: 'noop' }])
+		expect(first?.tools).toEqual([{ name: 'noop', parameters: CLOSED_PARAMETERS }])
 		expect(first?.messages.some((m) => m.content.includes('noop'))).toBe(false)
 	})
 })
@@ -506,7 +521,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			createTool({ name: 'beta', execute: () => 2 }),
 		])
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 
 		await agent.generate()
@@ -527,6 +542,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		// Only `alpha` is in scope; `beta` is scoped out.
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			scope: new Scope({ name: 'alpha-only', tools: ['alpha'] }),
 		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -544,6 +560,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			scope: new Scope({ name: 'no-tools', tools: [] }),
 		})
 		agent.context.messages.add({ role: 'user', content: 'hi' })
@@ -581,6 +598,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		)
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			scope: new Scope({ name: 'safe-only', tools: ['safe'] }),
 			on: { deny: denied.handler },
 		})
@@ -702,7 +720,11 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, on: { deny: denied.handler } })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { deny: denied.handler },
+		})
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
 		expect(executed.calls).toEqual([['alpha'], ['beta']])
 		expect(denied.calls).toEqual([])
@@ -720,7 +742,11 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const events = createRecorder<AgentEventMap['tool']>()
-		const agent = createAgent(provider, { tools, on: { tool: events.handler } })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { tool: events.handler },
+		})
 		const run = agent.stream()
 		const chunks = await collect(run.events)
 		expect(await run.result).toEqual({ content: 'done', partial: false })
@@ -766,9 +792,11 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 			tools,
 			...(scope === undefined ? {} : { scope }),
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{
 						zone: 'test',
+						verdict: 'allow',
 						match: ({ call: requested }) => {
 							evaluated.handler(requested)
 							return true
@@ -803,6 +831,7 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 		)
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			limit: 2,
 			scope: new Scope({ name: 'save', tools: ['save'] }),
 			on: { deny: denied.handler },
@@ -884,7 +913,13 @@ describe('Agent — scope filters the advertised tool definitions', () => {
 describe('Agent — tool iteration', () => {
 	it('names each answered call on its tool message when one reply calls one tool twice', async () => {
 		const tools = createToolManager()
-		tools.add(createTool({ name: 'weather', execute: (args) => `sunny in ${String(args.city)}` }))
+		tools.add(
+			createTool({
+				name: 'weather',
+				contract: objectShape({ city: stringShape() }),
+				execute: (args) => `sunny in ${String(args.city)}`,
+			}),
+		)
 		const calls = [
 			createToolCall({ id: 'call-paris', name: 'weather', arguments: { city: 'Paris' } }),
 			createToolCall({ id: 'call-oslo', name: 'weather', arguments: { city: 'Oslo' } }),
@@ -893,7 +928,7 @@ describe('Agent — tool iteration', () => {
 			[{ content: '', tools: calls }, { content: 'done' }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'weather in Paris and Oslo' })
 		await agent.generate()
 		const answers = requireValue(provider.calls[1]).messages.filter(
@@ -919,7 +954,7 @@ describe('Agent — tool iteration', () => {
 			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'read the notes' })
 		await agent.generate()
 		expect(provider.calls).toHaveLength(2)
@@ -935,7 +970,7 @@ describe('Agent — tool iteration', () => {
 			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'read the empty file' })
 		await agent.generate()
 		expect(provider.calls).toHaveLength(2)
@@ -951,7 +986,7 @@ describe('Agent — tool iteration', () => {
 			[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'read the record' })
 		await agent.generate()
 		expect(provider.calls).toHaveLength(2)
@@ -960,9 +995,44 @@ describe('Agent — tool iteration', () => {
 		expect(message?.content).toBe('{"text":"first\\n\\"second\\"","count":2}')
 	})
 
+	it('feeds a tool door refusal back as the tool message, with the handler unrun', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(
+			createTool({
+				name: 'add',
+				contract: objectShape({ a: numberShape() }),
+				execute: (args) => {
+					executed.handler(args)
+					return 5
+				},
+			}),
+		)
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, z: 1 } }] },
+				{ content: 'done' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
+		agent.context.messages.add({ role: 'user', content: 'add' })
+		await agent.generate()
+		expect(executed.calls).toEqual([])
+		expect(provider.calls[1]?.messages.at(-1)?.content).toBe(
+			'z: extra; this key is not declared, remove it',
+		)
+	})
+
 	it('dispatches a tool call then finishes with the follow-up turn', async () => {
 		const tools = createToolManager()
-		tools.add(createTool({ name: 'add', execute: (args) => Number(args.a) + Number(args.b) }))
+		tools.add(
+			createTool({
+				name: 'add',
+				contract: objectShape({ a: numberShape(), b: numberShape() }),
+				execute: (args) => Number(args.a) + Number(args.b),
+			}),
+		)
 		const provider = createScriptedProvider(
 			[
 				{ result: { content: '', tools: [{ id: 'c1', name: 'add', arguments: { a: 2, b: 3 } }] } },
@@ -970,7 +1040,7 @@ describe('Agent — tool iteration', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
 		const result = await agent.generate()
 		expect(result.content).toBe('the answer is 5')
@@ -1001,7 +1071,7 @@ describe('Agent — tool iteration', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		expect(result.content).toBe('recovered')
@@ -1010,8 +1080,57 @@ describe('Agent — tool iteration', () => {
 	})
 })
 
+describe('Agent — tools need an authority', () => {
+	it('refuses tools with no authority at construction, with nothing emitted', () => {
+		const provider = createScriptedProvider([{ content: 'answer' }])
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const error = captureError(() => createAgent(provider, { tools }))
+		expect(isAgentError(error) && error.code).toBe('AUTHORITY')
+		expect(isAgentError(error) && error.message).toBe(
+			"tools are set and no authority is; pass authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) to allow every call, or rules with a deny fallback",
+		)
+		expect(provider.started).toBe(0)
+	})
+
+	it('refuses an empty manager too, because a host can add to it after construction', () => {
+		const provider = createScriptedProvider([{ content: 'answer' }])
+		const error = captureError(() => createAgent(provider, { tools: createToolManager() }))
+		expect(isAgentError(error) && error.code).toBe('AUTHORITY')
+	})
+
+	it('runs an agent with no tools and no authority', async () => {
+		const provider = createScriptedProvider([{ content: 'answer' }])
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate()
+		expect(result.content).toBe('answer')
+	})
+
+	it('denies a tool added later to an agent built with no authority, and never runs it', async () => {
+		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<[ToolCall, string | undefined, AuthorityDecision | undefined]>()
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [createToolCall({ name: 'late' })] }, { content: 'done' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { on: { deny: denied.handler } })
+		agent.context.tools.add(createRecordedTool('late', recorder))
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate()
+		expect(result.content).toBe('done')
+		expect(recorder.calls).toEqual([])
+		expect(denied.calls.map(([call, reason]) => [call.name, reason])).toEqual([
+			['late', 'no authority is set'],
+		])
+		expect(provider.calls[1]?.messages.at(-1)?.content).toBe(
+			`"late" did not run: ${AUTHORITY_NOTES.denied}`,
+		)
+	})
+})
+
 describe('Agent — authority gate', () => {
-	it('no authority → an unannotated tool call executes through the default authority', async () => {
+	it('an allow fallback → an unannotated tool call executes in its zone', async () => {
 		const recorder = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const allowed = createRecorder<AgentEventMap['allow']>()
 		const tools = createToolManager()
@@ -1023,8 +1142,12 @@ describe('Agent — authority gate', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		// No `authority` option → the default authority allows the unannotated call in zone `default`.
-		const agent = createAgent(provider, { tools, on: { allow: allowed.handler } })
+		// The allow-all authority clears the unannotated call in zone `default`.
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { allow: allowed.handler },
+		})
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
 		const result = await agent.generate()
 		expect(result.content).toBe('done')
@@ -1053,7 +1176,8 @@ describe('Agent — authority gate', () => {
 		)
 		// A rule that matches `add` and allows it (allowed defaults to true).
 		const authority = createAuthority({
-			rules: [{ match: (c) => c.call.name === 'add', zone: 'safe' }],
+			fallback: { zone: 'default', verdict: 'allow' },
+			rules: [{ match: (c) => c.call.name === 'add', zone: 'safe', verdict: 'allow' }],
 		})
 		const agent = createAgent(provider, { tools, authority })
 		agent.context.messages.add({ role: 'user', content: 'add 2 and 3' })
@@ -1083,6 +1207,7 @@ describe('Agent — authority gate', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match: (c) => c.call.name === 'add',
@@ -1125,6 +1250,7 @@ describe('Agent — authority gate', () => {
 		)
 		// A deny rule with NO reason → the `denied` note.
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [{ match: () => true, zone: 'restricted', verdict: 'deny' }],
 		})
 		const agent = createAgent(provider, { tools, authority })
@@ -1172,6 +1298,7 @@ describe('Agent — authority gate', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match: (c) => c.call.name === 'delete',
@@ -1235,6 +1362,7 @@ describe('Agent — authority gate', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [{ match: () => true, zone: 'restricted', verdict: 'deny', reason: 'all blocked' }],
 		})
 		const agent = createAgent(provider, { tools, authority, limit: 3 })
@@ -1292,6 +1420,7 @@ describe('Agent — generate ↔ stream parity', () => {
 		]
 		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
+			authority: AGENT_AUTHORITY,
 			limit: 5,
 		})
 		a.context.messages.add({ role: 'user', content: 'go' })
@@ -1299,6 +1428,7 @@ describe('Agent — generate ↔ stream parity', () => {
 
 		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
+			authority: AGENT_AUTHORITY,
 			limit: 5,
 		})
 		b.context.messages.add({ role: 'user', content: 'go' })
@@ -1317,7 +1447,10 @@ describe('Agent — generate ↔ stream parity', () => {
 		]
 		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
-			authority: createAuthority({ rules: [{ match: () => true, zone: 'deny', verdict: 'deny' }] }),
+			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
+				rules: [{ match: () => true, zone: 'deny', verdict: 'deny' }],
+			}),
 			limit: 5,
 		})
 		a.context.messages.add({ role: 'user', content: 'go' })
@@ -1325,7 +1458,10 @@ describe('Agent — generate ↔ stream parity', () => {
 
 		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
-			authority: createAuthority({ rules: [{ match: () => true, zone: 'deny', verdict: 'deny' }] }),
+			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
+				rules: [{ match: () => true, zone: 'deny', verdict: 'deny' }],
+			}),
 			limit: 5,
 		})
 		b.context.messages.add({ role: 'user', content: 'go' })
@@ -1349,6 +1485,7 @@ describe('Agent — generate ↔ stream parity', () => {
 		]
 		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager([createLoopTool()]),
+			authority: AGENT_AUTHORITY,
 			budget: createTokenBudget({ id: 'budget', max: 12, scope: 'total' }),
 		})
 		a.context.messages.add({ role: 'user', content: 'go' })
@@ -1356,6 +1493,7 @@ describe('Agent — generate ↔ stream parity', () => {
 
 		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager([createLoopTool()]),
+			authority: AGENT_AUTHORITY,
 			budget: createTokenBudget({ id: 'budget', max: 12, scope: 'total' }),
 		})
 		b.context.messages.add({ role: 'user', content: 'go' })
@@ -1409,7 +1547,7 @@ describe('Agent — chunk sequence', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
@@ -1442,7 +1580,7 @@ describe('Agent — iteration cap', () => {
 			})),
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, limit: 3 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 3 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		// 3 turns ran, then the loop stopped (didn't exhaust the 10-turn script forever). The
@@ -1567,7 +1705,7 @@ describe('Agent — budget bound', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, budget })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, budget })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		expect(result.partial).toBe(true)
@@ -1589,7 +1727,7 @@ describe('Agent — scheduler pacing', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, scheduler })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, scheduler })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
 		// 3 turns ran → yield fired before turns 2 and 3 only (not before turn 1, not after).
@@ -1696,7 +1834,7 @@ describe('Agent — stream drive (result settles independently of events)', () =
 			})),
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, timeout: 5_000 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, timeout: 5_000 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		// Pull exactly ONE chunk through the iterator protocol, then `return()` the iterator —
@@ -1746,7 +1884,10 @@ describe('Agent — stream drive (result settles independently of events)', () =
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools: createSeededToolManager() })
+		const agent = createAgent(provider, {
+			tools: createSeededToolManager(),
+			authority: AGENT_AUTHORITY,
+		})
 		agent.context.messages.add({ role: 'user', content: 'add' })
 		const stream = agent.stream()
 		const iterator = stream.events[Symbol.asyncIterator]()
@@ -2018,7 +2159,10 @@ describe('Agent — cancellation timing matrix', () => {
 			)
 			const agent = createAgent(provider, {
 				tools,
-				...(authorized ? { authority: createAuthority() } : {}),
+				authority: AGENT_AUTHORITY,
+				...(authorized
+					? { authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) }
+					: {}),
 			})
 			const stream = agent.stream()
 			expect(await collect(stream.events)).toContainEqual({
@@ -2051,8 +2195,11 @@ describe('Agent — cancellation timing matrix', () => {
 			)
 			const agent = createAgent(provider, {
 				tools,
+				authority: AGENT_AUTHORITY,
 				budget,
-				...(authorized ? { authority: createAuthority() } : {}),
+				...(authorized
+					? { authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) }
+					: {}),
 			})
 			const seed = agent.context.messages.add({ role: 'user', content: 'go' })
 			const stream = agent.stream()
@@ -2087,9 +2234,12 @@ describe('Agent — cancellation timing matrix', () => {
 			)
 			const agent = createAgent(provider, {
 				tools,
+				authority: AGENT_AUTHORITY,
 				signal: external.signal,
 				on: { usage: () => external.abort('usage listener ended the run') },
-				...(authorized ? { authority: createAuthority() } : {}),
+				...(authorized
+					? { authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) }
+					: {}),
 			})
 			const seed = agent.context.messages.add({ role: 'user', content: 'go' })
 			const stream = agent.stream()
@@ -2118,6 +2268,7 @@ describe('Agent — cancellation timing matrix', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match: (context) => context.call.name === 'blocked',
@@ -2164,7 +2315,7 @@ describe('Agent — cancellation timing matrix', () => {
 			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		const stream = agent.stream()
 		try {
 			await entered.promise
@@ -2199,7 +2350,7 @@ describe('Agent — cancellation timing matrix', () => {
 		)
 		const agent = createAgent(provider, {
 			tools,
-			authority: createAuthority(),
+			authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
 			timeout: AGENT_DEADLINE,
 		})
 		const stream = agent.stream()
@@ -2239,7 +2390,11 @@ describe('Agent — cancellation timing matrix', () => {
 			[{ result: { content: 'working', tools: [createToolCall({ name: 'wait' })] } }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, on: { finish: finished.handler } })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { finish: finished.handler },
+		})
 		const stream = agent.stream()
 		try {
 			const signal = await entered.promise
@@ -2290,7 +2445,7 @@ describe('Agent — cancellation timing matrix', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		const drained = collect(stream.events)
@@ -2321,7 +2476,7 @@ describe('Agent — cancellation timing matrix', () => {
 			})),
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, scheduler, limit: 6 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, scheduler, limit: 6 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		// The `turn` event for index 1 fires immediately before the inter-turn yield, so the abort it
 		// issues reaches the real scheduler as an already-aborted signal, after turn 1 completed.
@@ -2357,7 +2512,7 @@ describe('Agent — cancellation timing matrix', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, budget })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, budget })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		expect(result.partial).toBe(true)
@@ -2392,7 +2547,11 @@ describe('Agent — cancellation timing matrix', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, timeout: AGENT_DEADLINE })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			timeout: AGENT_DEADLINE,
+		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		const drained = collect(stream.events)
@@ -2438,7 +2597,7 @@ describe('Agent — limit boundary', () => {
 			[{ result: { content: 'one', tools: [createToolCall()] } }, { result: { content: 'two' } }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, limit: 1 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 1 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const stream = agent.stream()
 		const chunks = await collect(stream.events)
@@ -2479,7 +2638,7 @@ describe('Agent — limit boundary', () => {
 			})),
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		expect(provider.calls).toHaveLength(10)
@@ -2528,7 +2687,7 @@ describe('Agent — provider failure modes', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, limit: 5 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 5 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		expect(result.content).toBe('final')
@@ -2563,7 +2722,7 @@ describe('Agent — provider failure modes', () => {
 		const tools = createToolManager()
 		tools.add(createAddTool())
 		const provider = createSecondTurnFailureProvider()
-		const agent = createAgent(provider, { tools, limit: 5 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 5 })
 		const events = createRecorders<AgentEventMap, 'error' | 'finish'>(agent.emitter, [
 			'error',
 			'finish',
@@ -2604,7 +2763,12 @@ describe('Agent — scheduler edge cases', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, scheduler: faulty, limit: 5 })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			scheduler: faulty,
+			limit: 5,
+		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		// Turn 1 runs, then the inter-turn yield throws (signal not aborted) → reject.
 		await expect(agent.generate()).rejects.toThrow('scheduler fault')
@@ -2623,7 +2787,7 @@ describe('Agent — scheduler edge cases', () => {
 			})),
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, scheduler, limit: 6 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, scheduler, limit: 6 })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const pending = agent.generate()
 		await scheduler.reached
@@ -2642,7 +2806,7 @@ describe('Agent — scheduler edge cases', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		// No scheduler option → the inter-turn yield is skipped; multi-turn still works.
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		expect(result.content).toBe('done')
@@ -2661,12 +2825,14 @@ describe('Agent — authority deeper', () => {
 		const tools = createToolManager()
 		tools.add(createRecordedTool('add', recorder, 5))
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match: () => {
 						throw new Error('policy crashed')
 					},
 					zone: 'z',
+					verdict: 'allow',
 				},
 			],
 		})
@@ -2710,12 +2876,14 @@ describe('Agent — authority deeper', () => {
 	// and contain a throw whose stringification fails.
 	it('an empty Error message still yields a readable fail-closed denial', async () => {
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match() {
 						throw new Error('')
 					},
 					zone: 'z',
+					verdict: 'allow',
 				},
 			],
 		})
@@ -2755,12 +2923,14 @@ describe('Agent — authority deeper', () => {
 		// extraction would escape the gate and reject the whole run. The normalizer catches it.
 		const hostile: object = Object.create(null)
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match() {
 						throw hostile
 					},
 					zone: 'z',
+					verdict: 'allow',
 				},
 			],
 		})
@@ -2794,6 +2964,7 @@ describe('Agent — authority deeper', () => {
 		const tools = createToolManager()
 		tools.add(createRecordedTool('del', recorder, 'gone'))
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [{ match: (c) => c.call.name === 'del', zone: 'r', verdict: 'deny', reason: 'no' }],
 		})
 		const provider = createScriptedProvider(
@@ -2823,6 +2994,7 @@ describe('Agent — authority deeper', () => {
 		const tools = createToolManager()
 		tools.add([createRecordedTool('safe', allowRec), createRecordedTool('danger', denyRec, 'boom')])
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [{ match: (c) => c.call.name === 'danger', zone: 'r', verdict: 'deny', reason: 'no' }],
 		})
 		// Two tool turns, each mixing one allowed + one denied call, then a final turn.
@@ -2883,6 +3055,7 @@ describe('Agent — authority deeper', () => {
 		tools.add(
 			createTool({
 				name: 'transfer',
+				strict: false,
 				execute: (args) => {
 					recorder.handler(args)
 					return `sent ${String(args.amount)}`
@@ -2890,6 +3063,7 @@ describe('Agent — authority deeper', () => {
 			}),
 		)
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match: (c) => c.call.name === 'transfer' && Number(c.call.arguments.amount) > 100,
@@ -3132,7 +3306,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			})),
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, limit: 3 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 3 })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
@@ -3149,7 +3323,7 @@ describe('Agent — emitter (push observation surface)', () => {
 				{
 					result: {
 						content: '',
-						tools: [{ id: 'c1', name: 'add', arguments: { a: 2 } }],
+						tools: [{ id: 'c1', name: 'add', arguments: {} }],
 						usage: AGENT_USAGE,
 					},
 				},
@@ -3157,21 +3331,21 @@ describe('Agent — emitter (push observation surface)', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, limit: 5 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 5 })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
 		// One `tool` event, carrying the executed call + its real result (mirrors the chunk).
 		expect(events.tool.calls).toEqual([
 			[
-				{ id: 'c1', name: 'add', arguments: { a: 2 } },
+				{ id: 'c1', name: 'add', arguments: {} },
 				{ success: true, id: 'c1', name: 'add', value: 5 },
 			],
 		])
-		// The default authority cleared the unannotated call before it ran.
+		// The authority cleared the unannotated call before it ran.
 		expect(events.allow.calls).toEqual([
 			[
-				{ id: 'c1', name: 'add', arguments: { a: 2 } },
+				{ id: 'c1', name: 'add', arguments: {} },
 				{ zone: 'default', verdict: 'allow' },
 			],
 		])
@@ -3186,6 +3360,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		const tools = createToolManager()
 		tools.add(createRecordedTool('del', recorder, 'gone'))
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{ match: (c) => c.call.name === 'del', zone: 'r', verdict: 'deny', reason: 'blocked' },
 			],
@@ -3227,12 +3402,14 @@ describe('Agent — emitter (push observation surface)', () => {
 		const tools = createToolManager()
 		tools.add(createAddTool())
 		const authority = createAuthority({
+			fallback: { zone: 'default', verdict: 'allow' },
 			rules: [
 				{
 					match: () => {
 						throw new Error('policy crashed')
 					},
 					zone: 'z',
+					verdict: 'allow',
 				},
 			],
 		})
@@ -3344,7 +3521,7 @@ describe('Agent — emitter (push observation surface)', () => {
 			})),
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, limit: 3 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, limit: 3 })
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate()
@@ -3382,7 +3559,12 @@ describe('Agent — emitter (push observation surface)', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
-		const agent = createAgent(provider, { tools, limit: 5, error: errors.handler })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			limit: 5,
+			error: errors.handler,
+		})
 		const events = createRecorders<AgentEventMap, AgentEventName>(agent.emitter, AGENT_EVENTS)
 		const thrown = new Error('observer blew up')
 		// A buggy `tool` observer that throws every time it fires.
@@ -3423,6 +3605,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		const errors = createRecorder<readonly [error: unknown, event: string]>()
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			limit: 5,
 			error: (error, event) => {
 				errors.handler(error, event)
@@ -3454,6 +3637,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		// generate() path.
 		const a = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
+			authority: AGENT_AUTHORITY,
 			limit: 5,
 		})
 		const ea = createRecorders<AgentEventMap, AgentEventName>(a.emitter, AGENT_EVENTS)
@@ -3462,6 +3646,7 @@ describe('Agent — emitter (push observation surface)', () => {
 		// stream() path — same script, fully drained.
 		const b = createAgent(createScriptedProvider(script, AGENT_SCRIPT_OPTIONS), {
 			tools: createSeededToolManager(),
+			authority: AGENT_AUTHORITY,
 			limit: 5,
 		})
 		const eb = createRecorders<AgentEventMap, AgentEventName>(b.emitter, AGENT_EVENTS)
@@ -3520,6 +3705,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			// Message arithmetic is the claim here, so the window measures request messages alone.
 			window: createBudget({
 				max: estimateMessages(conversation.view()) + 1,
@@ -3617,7 +3803,7 @@ describe('Agent — automatic compaction (context window budget)', () => {
 		const tools = createToolManager()
 		tools.add(createAddTool())
 		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, { tools, window, limit: 5 })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, window, limit: 5 })
 		expect(agent.context.conversations.active?.summarizable).toBe(false)
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
@@ -3735,6 +3921,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({ max: 12, consumer: measureMessages }),
 			limit: 5,
 		})
@@ -3784,6 +3971,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget<ProviderRequest>({
 				max: 12,
 				consumer: (request) => {
@@ -3841,6 +4029,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			// Every request is over the window, and the opening request is the lone user message. The
 			// original message-only policy is explicit: the latch, not the tools, is the subject.
 			window: createBudget({ max: 3, consumer: measureMessages }),
@@ -3854,6 +4043,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		tools.add(
 			createTool({
 				name: 'note',
+				strict: false,
 				execute: (args) => {
 					executed.handler(args)
 					return 'noted'
@@ -3893,7 +4083,13 @@ describe('Agent — automatic compaction (production hardening)', () => {
 			AGENT_SCRIPT_OPTIONS,
 		)
 		const tools = createToolManager()
-		const agent = createAgent(provider, { conversations, tools, window, limit: 5 })
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			authority: AGENT_AUTHORITY,
+			window,
+			limit: 5,
+		})
 		tools.add(
 			createTool({
 				name: 'reply',
@@ -4057,6 +4253,7 @@ describe('Agent — limit exhaustion', () => {
 		const order: string[] = []
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			limit: 2,
 			on: {
 				exhaust: () => order.push('exhaust'),
@@ -4086,6 +4283,7 @@ describe('Agent — limit exhaustion', () => {
 		const order: string[] = []
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			limit: 2,
 			on: { exhaust: () => order.push('exhaust'), finish: () => order.push('finish') },
 		})
@@ -4137,6 +4335,7 @@ describe('Agent — limit exhaustion', () => {
 		const order: string[] = []
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			limit: 1,
 			signal: controller.signal,
 			on: {
@@ -4263,6 +4462,7 @@ describe('Agent — per-run overrides', () => {
 		const order: string[] = []
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			limit: 10,
 			on: { exhaust: () => order.push('exhaust') },
 		})
@@ -4548,6 +4748,7 @@ describe('Agent — strict compaction', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({ max: 12, consumer: measureMessages }),
 			limit: 5,
 			strict: true,
@@ -4589,6 +4790,7 @@ describe('Agent — blank compaction digest', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({ max: 12, consumer: measureMessages }),
 			limit: 5,
 		})
@@ -4626,6 +4828,7 @@ describe('Agent — blank compaction digest', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({ max: 12, consumer: measureMessages }),
 			limit: 5,
 			strict: true,
@@ -4762,7 +4965,14 @@ describe('Agent — strict window admission', () => {
 		// (10 + 4, plus 11 for its 41-char call JSON) and the result '5' (1 + 4), so the next request
 		// measures 5 + 25 + 5 = 35 messages-only, and the newest user message is all there is to keep.
 		const window = createBudget({ max: 6, consumer: measureMessages })
-		const agent = createAgent(provider, { conversations, tools, window, limit: 5, strict: true })
+		const agent = createAgent(provider, {
+			conversations,
+			tools,
+			authority: AGENT_AUTHORITY,
+			window,
+			limit: 5,
+			strict: true,
+		})
 		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		await expect(agent.generate()).rejects.toMatchObject({
@@ -4916,6 +5126,7 @@ describe('Agent — complete-request window admission', () => {
 			const agent = createAgent(provider, {
 				conversations,
 				tools,
+				authority: AGENT_AUTHORITY,
 				window: createBudget<ProviderRequest>({
 					max: 1_000_000,
 					consumer: (request) => {
@@ -4981,7 +5192,13 @@ describe('Agent — complete-request window admission', () => {
 				consumer: estimateRequest,
 			})
 			const provider = createAnswerProvider()
-			const agent = createAgent(provider, { conversations, tools, window, limit: 5 })
+			const agent = createAgent(provider, {
+				conversations,
+				tools,
+				authority: AGENT_AUTHORITY,
+				window,
+				limit: 5,
+			})
 
 			await agent.generate()
 
@@ -5160,6 +5377,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 				)
 				const agent = createAgent(provider, {
 					tools,
+					authority: AGENT_AUTHORITY,
 					scope: createScope({ name: 'lookup-only', tools: ['lookup'] }),
 					...(select === undefined ? {} : { select }),
 				})
@@ -5175,7 +5393,10 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 
 		expect(subset.selections[0]?.messages).toHaveLength(2)
 		expect(advertised[1]).toEqual(advertised[0])
-		expect(advertised[0]).toEqual([[{ name: 'lookup' }], [{ name: 'lookup' }]])
+		expect(advertised[0]).toEqual([
+			[{ name: 'lookup', parameters: CLOSED_PARAMETERS }],
+			[{ name: 'lookup', parameters: CLOSED_PARAMETERS }],
+		])
 	})
 
 	it('keeps the scope-dispatch record when the handler drops every message but the request', async () => {
@@ -5209,6 +5430,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 				)
 				const agent = createAgent(provider, {
 					tools,
+					authority: AGENT_AUTHORITY,
 					scope: new Scope({ name: 'safe-only', tools: ['safe'] }),
 					on: { deny: denied.handler, tool: dispatched.handler },
 					...(select === undefined ? {} : { select }),
@@ -5248,6 +5470,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 		)
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			select: async (conversation) => {
 				agent.context.apply(createScope({ name: 'answer', tools: [] }))
 				return { messages: conversation.view(), judgments: [] }
@@ -5278,6 +5501,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 		)
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			scope: createScope({ name: 'answer', tools: [] }),
 			select: selection.handler,
 			on: { deny: denied.handler },
@@ -5387,6 +5611,7 @@ describe('Agent — the select event follows each select-site build', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({
 				max: estimateMessages(conversation.view()) + 1,
 				consumer: measureMessages,
@@ -5754,6 +5979,7 @@ describe('Agent — the handler resolves once per select site, scope first', () 
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({
 				max: estimateMessages(history.view()) + 1,
 				consumer: measureMessages,
@@ -5909,6 +6135,7 @@ describe('Agent — run boundaries', () => {
 		conversations.add()
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			conversations,
 			window: createBudget<ProviderRequest>({ max: 1_000_000, consumer: estimateRequest }),
 		})
@@ -6022,6 +6249,7 @@ describe('Agent — turn records', () => {
 		)
 		const agent = createAgent(provider, {
 			tools: createSeededToolManager(),
+			authority: AGENT_AUTHORITY,
 			limit: Number.MAX_SAFE_INTEGER,
 		})
 		agent.context.messages.add({ role: 'user', content: 'add' })
@@ -6162,6 +6390,7 @@ describe('Agent — three failure layers', () => {
 		)
 		const agent = createAgent(provider, {
 			tools: createSeededToolManager([createLoopTool()]),
+			authority: AGENT_AUTHORITY,
 			budget,
 			allowance: budget,
 		})
@@ -6603,6 +6832,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 				ask: approver.ask,
 			}),
@@ -6690,6 +6920,7 @@ describe('Agent — authority ask', () => {
 			const agent = createAgent(provider, {
 				tools,
 				authority: createAuthority({
+					fallback: { zone: 'default', verdict: 'allow' },
 					rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 					ask: approver.ask,
 				}),
@@ -6733,6 +6964,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{ match: ({ call }) => call.name === 'write', zone: 'z', verdict: 'ask' },
 					{ match: ({ call }) => call.name === 'delete', zone: 'z', verdict: 'deny', reason: 'no' },
@@ -6800,6 +7032,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{ match: ({ call }) => call.name === 'write', zone: 'z', verdict: 'ask' },
 					{ match: ({ call }) => call.name === 'delete', zone: 'z', verdict: 'deny' },
@@ -6839,6 +7072,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'write', zone: 'z', verdict: 'ask' }],
 				ask: approver.ask,
 			}),
@@ -6872,6 +7106,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
 				ask: () => {
 					tools.add(createRecordedTool('read', executed))
@@ -6899,6 +7134,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 				ask: approver.ask,
 			}),
@@ -6941,6 +7177,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 				ask: approver.ask,
 			}),
@@ -6966,6 +7203,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 				ask: () => {
 					tools.add(createRecordedTool('write', replaced))
@@ -7006,6 +7244,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
 				ask: () => {
 					tools.add(createRecordedTool('read', replaced))
@@ -7063,6 +7302,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 				ask: ({ call }) => {
 					if (call.name === 'other') tools.add(createRecordedTool('write', replaced))
@@ -7109,6 +7349,7 @@ describe('Agent — authority ask', () => {
 			const agent = createAgent(provider, {
 				tools,
 				authority: createAuthority({
+					fallback: { zone: 'default', verdict: 'allow' },
 					rules: [{ match: ({ call }) => rules.includes(call.name), zone: 'z', verdict: 'ask' }],
 					ask: ({ call }) => {
 						if (call.name === 'other') tools.remove('read')
@@ -7157,6 +7398,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
 				ask: () => {
 					tools.remove('read')
@@ -7191,6 +7433,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'write', zone: 'z', verdict: 'ask' }],
 				ask: approver.ask,
 			}),
@@ -7286,6 +7529,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'delete', zone: 'z', verdict: 'deny' }],
 			}),
 		})
@@ -7333,6 +7577,7 @@ describe('Agent — authority ask', () => {
 			const agent = createAgent(provider, {
 				tools,
 				authority: createAuthority({
+					fallback: { zone: 'default', verdict: 'allow' },
 					rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 					ask: (context, decision, signal) => {
 						entered.handler(getEventListeners(signal, 'abort').length)
@@ -7378,6 +7623,7 @@ describe('Agent — authority ask', () => {
 			tools,
 			scope: new Scope({ name: 'known', tools: ['write', 'read', 'delete'] }),
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{ match: ({ call }) => call.name === 'write', zone: 'z', verdict: 'ask' },
 					{ match: ({ call }) => call.name === 'delete', zone: 'z', verdict: 'deny' },
@@ -7422,6 +7668,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'z', verdict: 'ask' }],
 				ask: createScriptedApprover([true]).ask,
 			}),
@@ -7509,7 +7756,10 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			limit: 3,
-			authority: createAuthority({ rules: [{ match: () => true, zone: 'z', verdict: 'deny' }] }),
+			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
+				rules: [{ match: () => true, zone: 'z', verdict: 'deny' }],
+			}),
 			on: { exhaust: exhausted.handler, deny: denied.handler },
 		})
 		agent.context.messages.add({ role: 'user', content: 'save it' })
@@ -7541,6 +7791,7 @@ describe('Agent — authority ask', () => {
 			createTool({
 				name: 'write',
 				annotations: { consequential: true },
+				strict: false,
 				execute: (args) => {
 					written.handler(args)
 					return 'saved'
@@ -7562,6 +7813,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{
 						match: ({ call }) => call.id === 'w1',
@@ -7620,6 +7872,7 @@ describe('Agent — authority ask', () => {
 			createTool({
 				name: 'write',
 				annotations: { consequential: true },
+				strict: false,
 				execute: (args) => {
 					written.handler(args)
 					return 'saved'
@@ -7667,6 +7920,7 @@ describe('Agent — authority ask', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
 				ask: ({ call }) => {
 					entered.handler(call.name)
@@ -7675,6 +7929,7 @@ describe('Agent — authority ask', () => {
 							createTool({
 								name: 'read',
 								annotations: { consequential: true },
+								strict: false,
 								execute: (args) => {
 									replaced.handler(args)
 									return 'ran the replacement'
@@ -7712,7 +7967,11 @@ describe('Agent — authority ask', () => {
 		)
 		const agent = createAgent(provider, {
 			tools,
-			authority: createAuthority({ rules: [], ask: approver.ask }),
+			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
+				rules: [],
+				ask: approver.ask,
+			}),
 			on: {
 				deny: denied.handler,
 				usage: () => {
@@ -7720,6 +7979,7 @@ describe('Agent — authority ask', () => {
 						createTool({
 							name: 'read',
 							annotations: { consequential: true },
+							strict: false,
 							execute: (args) => {
 								replaced.handler(args)
 								return 'ran the replacement'
@@ -7755,6 +8015,7 @@ describe('Agent — authority ask', () => {
 							createTool({
 								name: 'read',
 								annotations: { consequential: true },
+								strict: false,
 								execute: (args) => {
 									replaced.handler(args)
 									return 'ran the replacement'
@@ -7768,7 +8029,11 @@ describe('Agent — authority ask', () => {
 		)
 		const agent = createAgent(provider, {
 			tools,
-			authority: createAuthority({ rules: [], ask: approver.ask }),
+			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
+				rules: [],
+				ask: approver.ask,
+			}),
 			on: { deny: denied.handler },
 		})
 		expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
@@ -7795,6 +8060,7 @@ describe('Agent — authority ask', () => {
 					createTool({
 						name: 'read',
 						annotations: { consequential: true },
+						strict: false,
 						execute: (args) => {
 							replaced.handler(args)
 							return 'ran the replacement'
@@ -7817,7 +8083,11 @@ describe('Agent — authority ask', () => {
 			tools,
 			conversations,
 			window: createBudget<ProviderRequest>({ max: 300, consumer: estimateRequest }),
-			authority: createAuthority({ rules: [], ask: approver.ask }),
+			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
+				rules: [],
+				ask: approver.ask,
+			}),
 			on: { deny: denied.handler },
 		})
 		expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
@@ -7848,7 +8118,11 @@ describe('Agent — authority ask', () => {
 		)
 		const agent = createAgent(provider, {
 			tools,
-			authority: createAuthority({ rules: [], ask: approver.ask }),
+			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
+				rules: [],
+				ask: approver.ask,
+			}),
 			on: { deny: denied.handler },
 		})
 		const late = createRecordedTool('read', replaced)
@@ -7886,6 +8160,7 @@ describe('Agent — authority ask', () => {
 			tools,
 			signal: controller.signal,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'other', zone: 'z', verdict: 'ask' }],
 				ask: () => {
 					tools.add(createRecordedTool('read', executed))
@@ -7939,6 +8214,7 @@ describe('Agent — authority ask', () => {
 			createTool({
 				name: 'read',
 				annotations: { untrusted: true },
+				strict: false,
 				execute: (args) => {
 					read.handler(args)
 					return injection
@@ -7947,6 +8223,7 @@ describe('Agent — authority ask', () => {
 			createTool({
 				name: 'write',
 				annotations: consequential ? { consequential: true } : {},
+				strict: false,
 				execute: (args) => {
 					written.handler(args)
 					return 'saved'
@@ -7979,9 +8256,15 @@ describe('Agent — authority ask', () => {
 		)
 		const agent = createAgent(provider, {
 			tools,
+			authority: AGENT_AUTHORITY,
 			...(answers === undefined
 				? {}
-				: { authority: createAuthority({ ask: createScriptedApprover(answers).ask }) }),
+				: {
+						authority: createAuthority({
+							fallback: { zone: 'default', verdict: 'allow' },
+							ask: createScriptedApprover(answers).ask,
+						}),
+					}),
 		})
 		agent.context.messages.add({ role: 'user', content: 'read note.txt' })
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
@@ -7991,7 +8274,7 @@ describe('Agent — authority ask', () => {
 		expect(provider.calls[2]?.messages.at(-1)?.content).toBe(reply)
 	})
 
-	it('default authority: with no authority an unannotated tool runs and allow carries the default zone', async () => {
+	it('an allow fallback: an unannotated tool runs and allow carries the fallback zone', async () => {
 		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const allowed = createRecorder<AgentEventMap['allow']>()
 		const tools = createToolManager()
@@ -8001,7 +8284,11 @@ describe('Agent — authority ask', () => {
 			[{ result: { content: '', tools: [call] } }, { result: { content: 'done' } }],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools, on: { allow: allowed.handler } })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { allow: allowed.handler },
+		})
 		expect(await agent.generate()).toEqual({ content: 'done', partial: false })
 		expect(executed.calls).toEqual([[{}]])
 		expect(allowed.calls).toEqual([[call, { zone: 'default', verdict: 'allow' }]])
@@ -8076,7 +8363,7 @@ describe('Agent — run-bound conversation', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { conversations, tools })
+		const agent = createAgent(provider, { conversations, tools, authority: AGENT_AUTHORITY })
 		first.add({ role: 'user', content: 'Add the numbers.' })
 
 		const run = agent.generate()
@@ -8129,6 +8416,7 @@ describe('Agent — run-bound conversation', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({ max: 60, consumer: measureMessages }),
 		})
 		first.add([
@@ -8181,6 +8469,7 @@ describe('Agent — run-bound conversation', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			select: selection.handler,
 			window: createBudget({ max: 60, consumer: measureMessages }),
 		})
@@ -8351,6 +8640,7 @@ describe('Agent — run-bound conversation', () => {
 		const agent = createAgent(provider, {
 			conversations,
 			tools,
+			authority: AGENT_AUTHORITY,
 			window: createBudget({ max: 60, consumer: measureMessages }),
 		})
 		first.add([
@@ -8418,6 +8708,7 @@ describe('Agent — the ask chunk and the approver', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{ match: ({ call }) => call.name === 'read', zone: 'open', verdict: 'allow' },
 					{
@@ -8468,6 +8759,7 @@ describe('Agent — the ask chunk and the approver', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'files', verdict: 'ask' }],
 				ask: approver.ask,
 			}),
@@ -8513,6 +8805,7 @@ describe('Agent — the ask chunk and the approver', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: ({ call }) => call.name === 'write', zone: 'files', verdict: 'ask' }],
 				ask: approver.ask,
 			}),
@@ -8549,6 +8842,7 @@ describe('Agent — the ask chunk and the approver', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'files', verdict: 'ask' }],
 				ask: () => {
 					entered.resolve()
@@ -8663,6 +8957,7 @@ describe('Agent — the ask chunk and the approver', () => {
 		const agent = createAgent(provider, {
 			tools,
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [{ match: () => true, zone: 'files', verdict: 'ask' }],
 				ask: approver.ask,
 			}),

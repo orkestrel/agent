@@ -34,7 +34,8 @@ The package targets the following runtime and module formats:
 The following example builds an agent with one tool and streams a turn:
 
 ```ts
-import { createAgent } from '@orkestrel/agent'
+import { createAgent, createAuthority } from '@orkestrel/agent'
+import { numberShape, objectShape } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 
 const tools = createToolManager()
@@ -42,12 +43,18 @@ tools.add(
 	createTool({
 		name: 'add',
 		description: 'Add two numbers',
+		contract: objectShape({ a: numberShape(), b: numberShape() }),
 		execute: (args) => Number(args.a) + Number(args.b),
 	}),
 )
 
 // `provider` is your ProviderInterface implementation (see the guide)
-const agent = createAgent(provider, { system: 'You are concise.', tools })
+// Tools need an authority: this one allows every call; rules with a deny fallback make an allowlist.
+const agent = createAgent(provider, {
+	system: 'You are concise.',
+	tools,
+	authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+})
 agent.context.messages.add({ role: 'user', content: 'Say hi.' })
 
 const stream = agent.stream()

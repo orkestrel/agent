@@ -23,9 +23,16 @@ import type {
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolContext, ToolResult } from '@orkestrel/tool'
 import { createAbort } from '@orkestrel/abort'
-import { attempt, isError, isFiniteNumber, isString } from '@orkestrel/contract'
+import {
+	attempt,
+	isError,
+	isFiniteNumber,
+	isString,
+	objectShape,
+	stringShape,
+} from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
-import { createAgent } from '../agents/factories.js'
+import { createAgent, createAuthority } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
 import { estimateMessages } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
@@ -214,21 +221,29 @@ export class Ledger implements LedgerInterface {
 			createTool({
 				name: 'recall',
 				description: `Recall what the full conversation record holds on a topic: an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. Returns source lines, newest first.`,
-				parameters: {
-					type: 'object',
-					properties: {
-						topic: { type: 'string', description: 'An owner name, an id, or a topic' },
-					},
-					required: ['topic'],
-				},
+				contract: objectShape({
+					topic: stringShape({ min: 1, description: 'An owner name, an id, or a topic' }),
+				}),
 				execute: (args) => this.#recall(args),
 			}),
 		)
+		// The ledger holds no approver, and it allows exactly the names it advertises, so a tool a host
+		// adds to the agent's manager later is denied instead of inheriting those names' trust.
 		this.#agent = createAgent(provider, {
 			...options.agent,
 			conversations,
 			system: options.system,
 			tools,
+			authority: createAuthority({
+				rules: [
+					{
+						match: (context) => lookups.includes(context.call.name),
+						zone: 'ledger',
+						verdict: 'allow',
+					},
+				],
+				fallback: { zone: 'ledger', verdict: 'deny', reason: 'the ledger advertises no such tool' },
+			}),
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
 			strict: false,
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),

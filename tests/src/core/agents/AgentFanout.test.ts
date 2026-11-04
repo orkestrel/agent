@@ -3,6 +3,7 @@ import { AgentFanout, createAgentRegistry, isAgentJobError } from '@src/core'
 import { createRunner } from '@orkestrel/workflow'
 import { describe, expect, it } from 'vitest'
 import {
+	AGENT_AUTHORITY,
 	createAgentJob,
 	createLoopTool,
 	createScriptedProvider,
@@ -21,6 +22,7 @@ describe('AgentFanout', () => {
 		)
 		const child = createScriptedProvider([{ content: 'child' }])
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: parent, child },
 			tools: { loop: createLoopTool() },
 		})
@@ -33,6 +35,7 @@ describe('AgentFanout', () => {
 		const results = await runner.execute([
 			createAgentJob({
 				tools: ['loop'],
+				authority: 'allow',
 				limit: 1,
 				children: [createAgentJob({ provider: 'child' })],
 			}),

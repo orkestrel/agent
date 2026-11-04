@@ -13,7 +13,7 @@ import type {
 	StudyToolsOperation,
 	StudyToolsSessionOptions,
 } from './types.js'
-import { errorToMessage, isObject } from '@orkestrel/contract'
+import { errorToMessage, isObject, objectShape, stringShape } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { open, realpath, rm } from 'node:fs/promises'
 import { basename, dirname, relative, resolve } from 'node:path'
@@ -66,11 +66,13 @@ export class StudyToolsSession implements StudySessionInterface {
 				name: 'write',
 				description: 'Creates one new bounded scratch text file',
 				annotations: { consequential: true },
+				contract: objectShape({ path: stringShape(), content: stringShape() }),
 				execute: (args, context) => this.#write(args, context),
 			}),
 			createTool({
 				name: 'read',
 				description: 'Reads one bounded scratch text file',
+				contract: objectShape({ path: stringShape() }),
 				execute: (args, context) => this.#read(args, context),
 			}),
 			createTool({
@@ -78,18 +80,25 @@ export class StudyToolsSession implements StudySessionInterface {
 				description:
 					'Stores one memo revision from its name, description, and content, and acknowledges it; use memo to read the content',
 				annotations: { consequential: true },
+				contract: objectShape({
+					name: stringShape(),
+					description: stringShape(),
+					content: stringShape(),
+				}),
 				execute: (args, context) => this.#remember(args, context),
 			}),
 			createTool({
 				name: 'memo',
 				description:
 					'Reads the current content of one memo by name; use remember to store a revision',
+				contract: objectShape({ name: stringShape() }),
 				execute: (args, context) => this.#memo(args, context),
 			}),
 			createTool({
 				name: 'skill',
 				description:
 					'Loads one registered skill by name for the next run, and acknowledges it without returning the body',
+				contract: objectShape({ name: stringShape() }),
 				execute: (args, context) => this.#skill(args, context),
 			}),
 		])

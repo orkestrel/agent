@@ -104,20 +104,20 @@ export function createChannel<T>(): ChannelInterface<T> {
 /**
  * Creates a policy gate — an {@link AuthorityInterface} the agent loop consults before
  * each tool call runs, evaluating the ordered rules first-match-wins and falling back
- * to the configured default when none match.
+ * to the required `fallback` when none match.
  *
  * @remarks
- * `rules` are evaluated in order — the first whose `match` is true decides (a matched
- * rule with no `verdict` allows). When no rule matches, the `fallback` decides. Default:
- * `{ zone: DEFAULT_AUTHORITY_ZONE, verdict: 'allow' }` (allow-unmatched — a rules list of
- * denials acts as a denylist). Pass a `verdict: 'deny'` `fallback` to flip the gate to
- * deny-by-default (an allowlist). `ask` answers each `ask` verdict; with none, every ask is
- * refused as unanswered. Wire the result into `createAgent` through `AgentOptions.authority`:
- * a denied call is fed back to the model as a denial `ToolResult` (not executed), so the model
- * can react. Synchronous — `evaluate` returns the verdict directly; only `ask` is async.
+ * `rules` are evaluated in order — the first whose `match` is true decides, and each rule names its
+ * `verdict`. When no rule matches, the `fallback` decides: a `verdict: 'deny'` fallback makes an
+ * allowlist, and a `verdict: 'allow'` fallback makes a denylist. `ask` answers each `ask` verdict;
+ * with none, every ask is refused as unanswered. Wire the result into `createAgent` through
+ * `AgentOptions.authority`: a denied call is fed back to the model as a denial `ToolResult` (not
+ * executed), so the model can react. Synchronous — `evaluate` returns the verdict directly; only
+ * `ask` is async.
  *
- * @param options - Optional `rules` (ordered), `fallback`, and `ask` (see {@link AuthorityOptions})
+ * @param options - The `fallback`, and optional `rules` (ordered) and `ask` (see {@link AuthorityOptions})
  * @returns A working {@link AuthorityInterface}
+ * @throws {AgentError} Thrown when the `fallback` is missing or malformed, or a rule has no valid `verdict` (code `'AUTHORITY'`)
  *
  * @example
  * ```ts
@@ -126,11 +126,12 @@ export function createChannel<T>(): ChannelInterface<T> {
  * // Deny the `delete` tool, allow everything else.
  * const authority = createAuthority({
  * 	rules: [{ match: (c) => c.call.name === 'delete', zone: 'restricted', verdict: 'deny' }],
+ * 	fallback: { zone: 'default', verdict: 'allow' },
  * })
  * const agent = createAgent(provider, { tools, authority })
  * ```
  */
-export function createAuthority(options?: AuthorityOptions): AuthorityInterface {
+export function createAuthority(options: AuthorityOptions): AuthorityInterface {
 	return new Authority(options)
 }
 
@@ -148,7 +149,11 @@ export function createAuthority(options?: AuthorityOptions): AuthorityInterface 
  * @example
  * ```ts
  * const approver = createApprover()
- * const authority = createAuthority({ rules, ask: approver.ask })
+ * const authority = createAuthority({
+ * 	rules,
+ * 	fallback: { zone: 'default', verdict: 'deny' },
+ * 	ask: approver.ask,
+ * })
  * const agent = createAgent(provider, { tools, authority })
  * const stream = agent.stream({ prompt: { content: 'Tidy the notes.' } })
  * for await (const frame of agentStreamToFrames(stream, approver)) {
@@ -178,16 +183,29 @@ export function createApprover(): ApproverInterface {
  *
  * @example
  * ```ts
- * import { createAgentRegistry } from '@orkestrel/agent'
+ * import { createAgentRegistry, createAuthority } from '@orkestrel/agent'
  * import type { ProviderInterface } from '@orkestrel/agent'
+ * import { numberShape, objectShape } from '@orkestrel/contract'
  * import { createTool } from '@orkestrel/tool'
  *
  * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
  * const registry = createAgentRegistry({
  * 	providers: { main: provider },
- * 	tools: { add: createTool({ name: 'add', execute: (a) => Number(a.x) + Number(a.y) }) },
+ * 	tools: {
+ * 		add: createTool({
+ * 			name: 'add',
+ * 			contract: objectShape({ x: numberShape(), y: numberShape() }),
+ * 			execute: (a) => Number(a.x) + Number(a.y),
+ * 		}),
+ * 	},
+ * 	authorities: { open: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) },
  * })
- * const agent = registry.build({ provider: 'main', messages: [{ role: 'user', content: 'Hi.' }] })
+ * const agent = registry.build({
+ * 	provider: 'main',
+ * 	messages: [{ role: 'user', content: 'Hi.' }],
+ * 	tools: ['add'],
+ * 	authority: 'open',
+ * })
  * ```
  */
 export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistryInterface {

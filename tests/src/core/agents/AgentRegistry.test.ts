@@ -11,6 +11,7 @@ import {
 	isConversationError,
 } from '@src/core'
 import {
+	AGENT_AUTHORITY,
 	AGENT_USAGE,
 	createAddTool,
 	createRecordedScheduler,
@@ -31,7 +32,7 @@ describe('AgentRegistry — accessors', () => {
 	it('resolves a registered provider / tool / authority / scheduler by name', () => {
 		const provider = createScriptedProvider([{ content: 'ok' }])
 		const tool = createAddTool()
-		const authority = createAuthority()
+		const authority = createAuthority({ fallback: { zone: 'default', verdict: 'allow' } })
 		const scheduler = createScheduler()
 		const registry = createAgentRegistry({
 			providers: { main: provider },
@@ -110,16 +111,44 @@ describe('AgentRegistry — build (rehydration)', () => {
 		expect(isConversationError(error) && error.code).toBe('ROLE')
 	})
 
+	it('refuses a job that names tools and no authority at build', () => {
+		const provider = createScriptedProvider([{ content: 'ok' }])
+		const registry = createAgentRegistry({
+			providers: { main: provider },
+			tools: { add: createAddTool() },
+		})
+		const error = captureError(() =>
+			registry.build({ provider: 'main', messages: [], tools: ['add'] }),
+		)
+		expect(isAgentError(error) && error.code).toBe('REGISTRY')
+		expect(isAgentError(error) && error.message).toContain('names tools and no authority')
+		expect(isAgentError(error) && error.context).toEqual({ tools: ['add'] })
+	})
+
+	it('builds a job with an empty tools list and no authority', () => {
+		const registry = createAgentRegistry({
+			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
+		})
+		const agent = registry.build({ provider: 'main', messages: [], tools: [] })
+		expect(agent.context.tools.count).toBe(0)
+	})
+
 	it("resolves the `tools` names into the agent's tool manager", () => {
 		const provider = createScriptedProvider([{ content: 'ok' }])
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: {
 				add: createAddTool(),
 				now: createTool({ name: 'now', execute: () => 1 }),
 			},
 		})
-		const agent = registry.build({ provider: 'main', messages: [], tools: ['add', 'now'] })
+		const agent = registry.build({
+			provider: 'main',
+			messages: [],
+			tools: ['add', 'now'],
+			authority: 'allow',
+		})
 		expect(agent.context.tools.count).toBe(2)
 		expect(
 			agent.context.tools
@@ -128,15 +157,20 @@ describe('AgentRegistry — build (rehydration)', () => {
 				.sort(),
 		).toEqual(['add', 'now'])
 		// A fresh manager per build — never shared between two rehydrated agents.
-		const other = registry.build({ provider: 'main', messages: [], tools: ['add'] })
+		const other = registry.build({
+			provider: 'main',
+			messages: [],
+			tools: ['add'],
+			authority: 'allow',
+		})
 		expect(other.context.tools).not.toBe(agent.context.tools)
 	})
 
 	it('throws when a job names an unknown tool (loud failure, not a silent skip)', () => {
 		const registry = createTurnRegistry({ content: 'ok' })
-		expect(() => registry.build({ provider: 'main', messages: [], tools: ['ghost'] })).toThrow(
-			'unknown tool: ghost',
-		)
+		expect(() =>
+			registry.build({ provider: 'main', messages: [], tools: ['ghost'], authority: 'allow' }),
+		).toThrow('unknown tool: ghost')
 	})
 
 	it('threads the supplied signal into the agent — a pre-aborted cancel commits a partial', async () => {
@@ -164,6 +198,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			{ content: 'b' },
 		])
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
@@ -171,6 +206,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'go' }],
 			tools: ['loop'],
+			authority: 'allow',
 			budget: 5,
 		})
 		const result = await agent.generate()
@@ -187,6 +223,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			{ content: '', tools: [{ id: 'c', name: 'loop', arguments: {} }] },
 		])
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
@@ -194,6 +231,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'go' }],
 			tools: ['loop'],
+			authority: 'allow',
 			limit: 3,
 		})
 		const result = await agent.generate()
@@ -221,6 +259,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			{ content: 'done' },
 		])
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 			schedulers: { pacer: scheduler },
@@ -229,6 +268,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'go' }],
 			tools: ['loop'],
+			authority: 'allow',
 			scheduler: 'pacer',
 			limit: 5,
 		})
@@ -257,6 +297,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			},
 			authorities: {
 				deny: createAuthority({
+					fallback: { zone: 'default', verdict: 'allow' },
 					rules: [
 						{ match: (c) => c.call.name === 'add', zone: 'r', verdict: 'deny', reason: 'no' },
 					],
@@ -282,7 +323,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		// references a missing gate must fail LOUDLY at build, not run ungated.
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
-			authorities: { gate: createAuthority() },
+			authorities: { gate: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) },
 		})
 		expect(() => registry.build({ provider: 'main', messages: [], authority: 'ghost' })).toThrow(
 			'unknown authority: ghost',
@@ -346,6 +387,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 
 	it('leaves the agent with no tools when `tools` is absent or empty (count === 0)', () => {
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
 			tools: { add: createAddTool() },
 		})
@@ -362,10 +404,16 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 		// is keyed by tool.name, so a re-add overwrites. Pin the count + the single definition.
 		const add = createAddTool()
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
 			tools: { add },
 		})
-		const agent = registry.build({ provider: 'main', messages: [], tools: ['add', 'add'] })
+		const agent = registry.build({
+			provider: 'main',
+			messages: [],
+			tools: ['add', 'add'],
+			authority: 'allow',
+		})
 		expect(agent.context.tools.count).toBe(1)
 		expect(agent.context.tools.definitions().map((d) => d.name)).toEqual(['add'])
 		expect(agent.context.tools.tool('add')).toBe(add)
@@ -382,6 +430,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 			{ content: 'done' },
 		])
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
@@ -389,6 +438,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'go' }],
 			tools: ['loop'],
+			authority: 'allow',
 		})
 		const result = await agent.generate()
 		// 4 provider calls (3 tool turns + the final answer) — the default cap (10) didn't bite.
@@ -493,6 +543,7 @@ describe('AgentRegistry — build (field wiring completeness)', () => {
 describe('AgentRegistry — build isolation & immutability', () => {
 	it('produces independent agents — distinct ids and separate contexts that do not bleed', () => {
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
 			tools: { add: createAddTool() },
 		})
@@ -500,6 +551,7 @@ describe('AgentRegistry — build isolation & immutability', () => {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'shared' }],
 			tools: ['add'],
+			authority: 'allow',
 		}
 		const first = registry.build(input)
 		const second = registry.build(input)
@@ -521,8 +573,9 @@ describe('AgentRegistry — build isolation & immutability', () => {
 		// The same job object is reused for two builds; `build` must read it, never write it.
 		const messages = [{ role: 'user', content: 'go' }] as const
 		const tools = ['add'] as const
-		const input: AgentJobInput = { provider: 'main', messages, tools }
+		const input: AgentJobInput = { provider: 'main', messages, tools, authority: 'allow' }
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: createScriptedProvider([{ content: 'ok' }]) },
 			tools: { add: createAddTool() },
 		})
@@ -542,7 +595,11 @@ describe('AgentRegistry — build isolation & immutability', () => {
 		const add = createAddTool()
 		const providers: Record<string, typeof provider> = { main: provider }
 		const tools: Record<string, typeof add> = { add }
-		const registry = createAgentRegistry({ providers, tools })
+		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
+			providers,
+			tools,
+		})
 		// A post-construction edit to the caller's record is ignored by the registry.
 		const ghost = createScriptedProvider([{ content: 'ghost' }])
 		providers.ghost = ghost

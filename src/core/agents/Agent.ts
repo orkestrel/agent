@@ -47,7 +47,6 @@ import { raceSignal } from '../conversations/index.js'
 import { AUTHORITY_NOTES, DEFAULT_AGENT_LIMIT, SCOPE_NOTE } from './constants.js'
 import { agentPromptContract } from './contracts.js'
 import { AgentError } from './errors.js'
-import { Authority } from './Authority.js'
 import { Channel } from './Channel.js'
 import {
 	assembleResult,
@@ -126,7 +125,9 @@ export class Agent implements AgentInterface {
 	readonly #allowance: BudgetInterface<TokenUsage> | undefined
 	readonly #scheduler: SchedulerInterface | undefined
 	readonly #signal: AbortSignal | undefined
-	readonly #authority: AuthorityInterface
+	// The gate consulted for each admitted call; `undefined` only on an agent built with no `tools`,
+	// where a tool a host adds later through `context.tools` is denied rather than run.
+	readonly #authority: AuthorityInterface | undefined
 	// The context budget that admits each provider request — its `consumer` is a token estimator
 	// over the complete `ProviderRequest`, its `max` the context window. `#admit` re-measures the
 	// exact request (replay-filtered messages, advertised tools, per-call options) against it before
@@ -164,6 +165,12 @@ export class Agent implements AgentInterface {
 	>()
 
 	constructor(provider: ProviderInterface, options?: AgentOptions) {
+		if (options?.tools !== undefined && options.authority === undefined) {
+			throw new AgentError(
+				'AUTHORITY',
+				"tools are set and no authority is; pass authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) to allow every call, or rules with a deny fallback",
+			)
+		}
 		this.#limit = requireLimit(options?.limit ?? DEFAULT_AGENT_LIMIT)
 		this.#id = crypto.randomUUID()
 		this.#provider = provider
@@ -184,7 +191,7 @@ export class Agent implements AgentInterface {
 		this.#allowance = options?.allowance
 		this.#scheduler = options?.scheduler
 		this.#signal = options?.signal
-		this.#authority = options?.authority ?? new Authority()
+		this.#authority = options?.authority
 		this.#window = options?.window
 		this.#strict = options?.strict ?? false
 		this.#emitter = new Emitter<AgentEventMap>(options)
@@ -962,6 +969,11 @@ export class Agent implements AgentInterface {
 			return failure(denial)
 		}
 		const authority = this.#authority
+		if (authority === undefined) {
+			const denial = denyCall(call, undefined)
+			this.#emitter.emit('deny', call, 'no authority is set', undefined)
+			return failure(denial)
+		}
 		// A security gate must fail closed: if a policy `evaluate` throws, or a member read of its
 		// decision throws, the call is not cleared, so it must not run. Synthesize a denial instead of
 		// letting the throw reject the whole run — the tool stays unexecuted and the model still
@@ -1030,7 +1042,7 @@ export class Agent implements AgentInterface {
 				readonly reason: string | undefined
 				readonly note: string
 			}>((resolve) => {
-				const ask = authority.ask
+				const ask = authority?.ask
 				resolve(
 					ask === undefined
 						? { approved: false, reason: undefined, note: AUTHORITY_NOTES.unanswered }

@@ -394,7 +394,7 @@ describe('RelayProvider', () => {
 	it('skips a malformed line when lenient', async () => {
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
-			parser: createNDJSONParser,
+			parser: () => createNDJSONParser({ strict: false }),
 			fetch: createStreamingTransport(['invalid\n', RELAY_RESULT_FRAME]),
 		})
 		expect(await provider.generate([], new AbortController().signal)).toEqual({ content: 'answer' })

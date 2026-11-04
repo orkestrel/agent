@@ -162,9 +162,11 @@ export class StudyMemorySession implements StudySessionInterface {
 						instruction: { id: 'summary-instruction', role: 'user', content: STUDY_MEMORY_SUMMARY },
 						signal: options.signal,
 					})
+		// The raw route: `#lookup` owns a malformed call, which settles the trial with its known cost.
 		const lookup = createTool({
 			name: 'lookup',
 			description: 'Reads the latest released public reference snapshot by id',
+			strict: false,
 			parameters: {
 				type: 'object',
 				properties: { id: { type: 'string' } },
@@ -253,7 +255,11 @@ export class StudyMemorySession implements StudySessionInterface {
 				timeout: options.profile.bounds.goal.duration,
 				signal: options.signal,
 				...(compaction === undefined
-					? {}
+					? {
+							authority: options.agent.createAuthority({
+								fallback: { zone: 'study', verdict: 'allow' },
+							}),
+						}
 					: {
 							window: createBudget<ProviderRequest>({
 								max: room.context - room.output - room.safety,
@@ -268,6 +274,7 @@ export class StudyMemorySession implements StudySessionInterface {
 										reason: STUDY_MEMORY_REPEAT,
 									},
 								],
+								fallback: { zone: 'study', verdict: 'allow' },
 							}),
 						}),
 				on: {

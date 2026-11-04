@@ -8,11 +8,6 @@ import type { AuthorityNote } from './types.js'
 export const DEFAULT_AGENT_LIMIT = 10
 
 /**
- * Names the default zone for an unmatched tool call allowed by an authority.
- */
-export const DEFAULT_AUTHORITY_ZONE = 'default'
-
-/**
  * Holds the model-facing texts the loop writes after a tool name in a denial result — the
  * `denied` note for a deny with no reason, an evaluate throw, an invalid decision, or a tool
  * changed after its decision; the `refused` note for an ask the approver refused; and the

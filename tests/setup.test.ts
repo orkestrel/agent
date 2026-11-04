@@ -1560,7 +1560,10 @@ describe('agent wire fixtures', () => {
 
 	it('holds one rule that asks for every call in the files zone', () => {
 		const call = { id: 'w1', name: 'write', arguments: { path: 'notes/a.md' } }
-		const authority = createAuthority({ rules: AGENT_WIRE_RULES })
+		const authority = createAuthority({
+			rules: AGENT_WIRE_RULES,
+			fallback: { zone: 'files', verdict: 'deny' },
+		})
 
 		expect(AGENT_WIRE_RULES).toHaveLength(1)
 		expect(authority.evaluate({ call })).toEqual({ zone: 'files', verdict: 'ask' })

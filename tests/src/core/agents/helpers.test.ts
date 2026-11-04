@@ -9,6 +9,7 @@ import type {
 } from '@src/core'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import {
+	AGENT_AUTHORITY,
 	createAgentTurn,
 	createMessage,
 	AccessedAgentResult,
@@ -1300,7 +1301,7 @@ describe('agentStreamToFrames — the page projection of one run', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const agent = createAgent(provider, { tools })
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'Check the invoice.' })
 
 		const run = agent.stream()
@@ -1464,6 +1465,7 @@ describe('agentStreamToFrames — the page projection of one run', () => {
 				judgments: [],
 			}),
 			authority: createAuthority({
+				fallback: { zone: 'default', verdict: 'allow' },
 				rules: [
 					{
 						match: ({ call }) => call.name === 'drop',

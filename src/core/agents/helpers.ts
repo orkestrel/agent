@@ -14,6 +14,8 @@ import type {
 	AgentTurn,
 	ApproverInterface,
 	AuthorityDecision,
+	AuthorityOptions,
+	AuthorityRule,
 	MessageMeasure,
 	RequestMeasure,
 } from './types.js'
@@ -30,12 +32,14 @@ import {
 	isFiniteNumber,
 	isObject,
 	isString,
+	objectOf,
 	parseJSONValue,
 	preview,
 } from '@orkestrel/contract'
 import { AUTHORITY_NOTES, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentError, AgentJobError } from './errors.js'
 import { isConversation } from '../conversations/index.js'
+import { isAuthorityDecision, isAuthorityVerdict } from './validators.js'
 import { hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 
@@ -259,7 +263,11 @@ export function agentResultToFrame(
  * @example
  * ```ts
  * const approver = createApprover()
- * const authority = createAuthority({ rules, ask: approver.ask })
+ * const authority = createAuthority({
+ * 	rules,
+ * 	fallback: { zone: 'default', verdict: 'deny' },
+ * 	ask: approver.ask,
+ * })
  * const agent = createAgent(provider, { tools, authority })
  * for await (const frame of agentStreamToFrames(agent.stream({ prompt }), approver)) {
  * 	send(JSON.stringify(frame))
@@ -698,6 +706,68 @@ export function resolveDecision(
 ): AuthorityDecision {
 	const raised = decision.verdict === 'allow' && definition?.annotations?.consequential === true
 	return { ...decision, verdict: raised ? 'ask' : decision.verdict }
+}
+
+/**
+ * Returns an authority's no-match decision after checking the options carry one, or throws a coded
+ * error naming the two fallbacks a host chooses between.
+ *
+ * @remarks
+ * A rules list says nothing about the calls it does not match, so no fallback is assumed: a denylist
+ * and an allowlist differ only here. The check is {@link isAuthorityDecision}, a total guard, so a
+ * missing options object and a malformed fallback refuse alike.
+ *
+ * @param options - The authority's options as a host passed them
+ * @returns The fallback, narrowed to an {@link AuthorityDecision}
+ * @throws {AgentError} Thrown when the options carry no valid `fallback` (code `'AUTHORITY'`)
+ *
+ * @example
+ * ```ts
+ * requireFallback({ fallback: { zone: 'default', verdict: 'deny' } }) // { zone: 'default', verdict: 'deny' }
+ * ```
+ */
+export function requireFallback(options: AuthorityOptions): AuthorityDecision {
+	const fallback = attempt(() => (isObject(options) ? Reflect.get(options, 'fallback') : undefined))
+	if (fallback.success && isAuthorityDecision(fallback.value)) return fallback.value
+	throw new AgentError(
+		'AUTHORITY',
+		"an authority needs a fallback for the calls no rule matches; pass fallback: { zone: 'default', verdict: 'deny' } for an allowlist, or fallback: { zone: 'default', verdict: 'allow' } for a denylist",
+	)
+}
+
+/**
+ * Returns an authority's rules after checking each one names a verdict, or throws a coded error naming
+ * the first rule that does not.
+ *
+ * @remarks
+ * Absent rules return an empty list. A rule's verdict decides a tool call, so a rule with none is
+ * refused rather than read as an allow. The error's `context` carries the rule's index as `rule`.
+ *
+ * @param rules - The ordered rules, or `undefined` for none
+ * @returns The rules unchanged, or an empty list when none were supplied
+ * @throws {AgentError} Thrown when a rule has no valid `verdict` (code `'AUTHORITY'`)
+ *
+ * @example
+ * ```ts
+ * requireRules([{ match: () => true, zone: 'files', verdict: 'ask' }]).length // 1
+ * ```
+ */
+export function requireRules(
+	rules: readonly AuthorityRule[] | undefined,
+): readonly AuthorityRule[] {
+	if (rules === undefined) return []
+	// `Array.from` visits a hole as an undefined rule, which the guard refuses; `findIndex` reads it too.
+	const refused = Array.from(rules).findIndex(
+		(rule) => !objectOf({ verdict: isAuthorityVerdict })(rule),
+	)
+	if (refused !== -1) {
+		throw new AgentError(
+			'AUTHORITY',
+			`rule ${refused} has no verdict; set verdict: 'allow' | 'ask' | 'deny'`,
+			{ context: { rule: refused } },
+		)
+	}
+	return rules
 }
 
 /**

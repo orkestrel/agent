@@ -8,6 +8,7 @@ import {
 	createObservedGatedProvider,
 	createTurnRegistry,
 } from '../../../setup.js'
+import { numberShape, objectShape } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createWorkspaceManager } from '@orkestrel/workspace'
 import {
@@ -26,7 +27,12 @@ import {
 } from '@src/core'
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
-import { createAgentJob, createScriptedProvider, createLoopTool } from '../../../setup.js'
+import {
+	AGENT_AUTHORITY,
+	createAgentJob,
+	createScriptedProvider,
+	createLoopTool,
+} from '../../../setup.js'
 import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
 
 // Exercises agent factory wiring and durable job orchestration.
@@ -92,15 +98,26 @@ describe('createAgent', () => {
 
 	it('a passed scope filters: no-tools scope empties advertised tool definitions + filters instructions from build()', async () => {
 		const tools = createToolManager()
-		tools.add(createTool({ name: 'add', execute: (args) => Number(args.a) + Number(args.b) }))
+		tools.add(
+			createTool({
+				name: 'add',
+				contract: objectShape({ a: numberShape(), b: numberShape() }),
+				execute: (args) => Number(args.a) + Number(args.b),
+			}),
+		)
 		const instructions = createInstructionManager()
 		instructions.add({ name: 'tone', content: 'Be terse.' })
 		const noTools = createScope({ name: 'reader', tools: [], instructions: [] })
 		const provider = createScriptedProvider([{ content: 'ok' }], { recorded: true })
-		const agent = createAgent(provider, { tools, instructions, scope: noTools })
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			instructions,
+			scope: noTools,
+		})
 
 		expect(agent.context.scope).toBe(noTools)
-		expect(agent.context.tools.definitions()).toEqual([{ name: 'add' }]) // manager itself unfiltered
+		expect(agent.context.tools.definitions().map((definition) => definition.name)).toEqual(['add']) // manager itself unfiltered
 		const built = agent.context.build()
 		expect(built.find((message) => message.role === 'system')).toBeUndefined() // instruction scoped out
 
@@ -182,17 +199,20 @@ describe('createAgentQueue', () => {
 	it('a partial result THROWS by default (an AgentJobError carrying the partial)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
 		const queue = createAgentQueue({ registry }) // partial defaults to false
 		await expect(
-			queue.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })),
+			queue.enqueue(
+				createAgentJob({ provider: 'main', tools: ['loop'], authority: 'allow', budget: 5 }),
+			),
 		).rejects.toThrow('agent job ended partial')
 		// The rejection is an AgentJobError; extract its partial (or undefined) UNCONDITIONALLY
 		// first, so every assertion is unconditional (no `expect` inside a narrowing branch).
 		const caught = await queue
-			.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 }))
+			.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], authority: 'allow', budget: 5 }))
 			.catch((error: unknown) => error)
 		const partial = isAgentJobError(caught) ? caught.partial : undefined
 		expect(isAgentJobError(caught)).toBe(true)
@@ -203,6 +223,7 @@ describe('createAgentQueue', () => {
 	it('a partial result RE-RUNS while retries remain (then rejects)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
@@ -210,7 +231,9 @@ describe('createAgentQueue', () => {
 		// the budget fires → the provider starts TWICE, proving the partial re-ran.
 		const queue = createAgentQueue({ registry, retries: 1 })
 		await expect(
-			queue.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })),
+			queue.enqueue(
+				createAgentJob({ provider: 'main', tools: ['loop'], authority: 'allow', budget: 5 }),
+			),
 		).rejects.toThrow('agent job ended partial')
 		expect(provider.started).toBe(2)
 	})
@@ -218,12 +241,13 @@ describe('createAgentQueue', () => {
 	it('`partial: true` RESOLVES a partial as success (never throws)', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
 		const queue = createAgentQueue({ registry, partial: true })
 		const result = await queue.enqueue(
-			createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 }),
+			createAgentJob({ provider: 'main', tools: ['loop'], authority: 'allow', budget: 5 }),
 		)
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('a')
@@ -298,12 +322,15 @@ describe('createAgentRunner', () => {
 	it('fail-fast: a partial job (throwing by default) rejects the whole run', async () => {
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
 		const runner = createAgentRunner({ registry })
 		await expect(
-			runner.execute([createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })]),
+			runner.execute([
+				createAgentJob({ provider: 'main', tools: ['loop'], authority: 'allow', budget: 5 }),
+			]),
 		).rejects.toThrow('agent job ended partial')
 	})
 
@@ -421,12 +448,15 @@ describe('createAgentQueue — partial policy (shared settle), extended', () => 
 		// then fires before turn 2), so `provider.started` is the honest attempt counter.
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
 		const queue = createAgentQueue({ registry, retries: 2 })
 		await expect(
-			queue.enqueue(createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 })),
+			queue.enqueue(
+				createAgentJob({ provider: 'main', tools: ['loop'], authority: 'allow', budget: 5 }),
+			),
 		).rejects.toThrow('agent job ended partial')
 		expect(provider.started).toBe(3) // initial attempt + 2 retries
 	})
@@ -626,6 +656,7 @@ describe('createAgentQueue — durability, extended', () => {
 			provider: 'main',
 			messages: [{ role: 'user', content: 'go' }],
 			tools: ['nonexistent'],
+			authority: 'allow',
 		}
 		const caught = await queue.enqueue(withMissingTool).catch((error: unknown) => error)
 		expect(caught instanceof Error ? caught.message : '').toBe('unknown tool: nonexistent')
@@ -701,12 +732,13 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		// resolves, so a one-job run completes with a partial result instead of rejecting.
 		const provider = createScriptedProvider(PARTIAL_TURNS)
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
 		const runner = createAgentRunner({ registry, partial: true })
 		const results = await runner.execute([
-			createAgentJob({ provider: 'main', tools: ['loop'], budget: 5 }),
+			createAgentJob({ provider: 'main', tools: ['loop'], authority: 'allow', budget: 5 }),
 		])
 		expect(results).toHaveLength(1)
 		expect(results[0]?.partial).toBe(true)
@@ -780,6 +812,7 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		)
 		const child = createScriptedProvider([{ content: 'child' }])
 		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
 			providers: { main: parent, child },
 			tools: { loop: createLoopTool() },
 		})
@@ -787,6 +820,7 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		const results = await runner.execute([
 			createAgentJob({
 				tools: ['loop'],
+				authority: 'allow',
 				limit: 1,
 				children: [createAgentJob({ provider: 'child' })],
 			}),
