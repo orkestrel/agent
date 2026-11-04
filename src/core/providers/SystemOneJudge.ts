@@ -1,5 +1,6 @@
 import type { SystemOneJudgeOptions, SystemOneRequest } from './types.js'
 import type { JudgeRequest, JudgeResult } from '../types.js'
+import { preview } from '@orkestrel/contract'
 import { AgentJudge } from './AgentJudge.js'
 import { SYSTEM_ONE_PATH } from './constants.js'
 import { extractSystemOneAnswer, extractSystemOneUsage, questionToSystemOne } from './helpers.js'
@@ -94,7 +95,10 @@ export class SystemOneJudge extends AgentJudge {
 	 */
 	read(value: unknown, request: JudgeRequest): JudgeResult {
 		if (!isSystemOneResponse(value)) {
-			throw new JudgeError('PROTOCOL', 'judge error: invalid System One response envelope')
+			throw new JudgeError(
+				'PROTOCOL',
+				`judge error: invalid System One response envelope; received ${preview(value)}`,
+			)
 		}
 		const entries = Object.entries(request.questions).map(([id, question]) => {
 			if (!Object.hasOwn(value.answers, id)) {
@@ -104,7 +108,7 @@ export class SystemOneJudge extends AgentJudge {
 			if (!isSystemOneAnswer(wire)) {
 				throw new JudgeError(
 					'PROTOCOL',
-					`judge error: question ${id} has an invalid System One answer`,
+					`judge error: question ${id} has an invalid System One answer; received ${preview(wire)}`,
 				)
 			}
 			const answer = extractSystemOneAnswer(wire, question)

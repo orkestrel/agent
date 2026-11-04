@@ -27,6 +27,21 @@ import {
 	TEV1_ANSWERS,
 } from '../../../setup.js'
 
+describe('SystemOneJudge — what it refuses', () => {
+	it('throws PROTOCOL on a malformed envelope, naming what it read, bounded', () => {
+		const judge = new SystemOneJudge({
+			url: 'http://judge.test',
+			model: 'tev1:0.8b',
+		})
+		const error = captureError(() =>
+			judge.read({ answers: 'x'.repeat(4000) }, { state: 'text', questions: {} }),
+		)
+		expect(isJudgeError(error) && error.code).toBe('PROTOCOL')
+		expect(isJudgeError(error) && error.message).toContain('received')
+		expect(isJudgeError(error) && error.message.length).toBeLessThan(200)
+	})
+})
+
 describe('SystemOneJudge', () => {
 	it('projects the TypeSafe quickstart with no extra members', () => {
 		const judge = new SystemOneJudge({ url: 'https://api.typesafe.ai', model: 'jev-latest' })
@@ -198,7 +213,7 @@ describe('SystemOneJudge', () => {
 	it('reports a malformed envelope as a protocol error', () => {
 		const judge = new SystemOneJudge({ url: 'http://judge.test', model: 'tev1:0.8b' })
 		expect(() => judge.read({ answers: [] }, SYSTEM_ONE_JUDGE_REQUEST)).toThrow(
-			new JudgeError('PROTOCOL', 'judge error: invalid System One response envelope'),
+			'judge error: invalid System One response envelope; received',
 		)
 	})
 

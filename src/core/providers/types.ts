@@ -298,6 +298,8 @@ export type ProviderErrorCode =
 export interface ProviderErrorOptions {
 	readonly status?: number
 	readonly cause?: unknown
+	/** Holds the values that locate the failure, such as the `faults` of a refused question. */
+	readonly context?: Readonly<Record<string, unknown>>
 }
 
 /** Carries a relay delta, settled result, remote abort, or remote failure. */

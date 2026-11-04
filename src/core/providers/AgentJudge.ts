@@ -2,10 +2,13 @@ import type { AgentJudgeInput, AgentJudgeInterface, ProviderOptions } from './ty
 import type { JudgeRequest, JudgeResult } from '../types.js'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
+import { describeFaults } from '@orkestrel/tool'
 import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
 import { JudgeError } from './errors.js'
 import { copyJSON } from '../cloners.js'
+import { judgeAnswerContract, judgeQuestionContract } from '../contracts.js'
 import { JudgeAbortError } from '../errors.js'
+import { describeQuestionRefusal, estimateTokens, scanJudgmentTies } from '../helpers.js'
 import { buildJudgeResult, buildProviderHeaders, readFailure, readBodyText } from './helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
@@ -19,7 +22,9 @@ import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
  * order. `ask` validates the request before any call, builds every body before the first call so
  * a wire limit refuses the request before inference, and runs the calls one after another, each
  * under its own deadline folded with the caller's signal. A cancel throws a `JudgeAbortError`
- * whose `partial` merges the calls that completed. A transport error reaches the caller unchanged.
+ * whose `partial` merges the calls that completed. A transport error reaches the caller unchanged. An
+ * answer that does not fit its question throws code `PROTOCOL`, and a call whose `read` reports no
+ * usage bills the estimate of its response text.
  *
  * @example Writing a judge wire
  * ```ts
@@ -115,7 +120,12 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 		const entries = questions.map(([id, question]) => {
 			const copy = copyJSON(question)
 			if (!isJudgeQuestion(copy)) {
-				throw new JudgeError('QUESTION', `judge error: question ${id} is malformed`)
+				const faults = judgeQuestionContract.audit(copy)
+				throw new JudgeError(
+					'QUESTION',
+					`judge error: ${describeQuestionRefusal(id, faults, judgeQuestionContract.schema)}`,
+					{ context: { question: id, faults } },
+				)
 			}
 			return [id, copy] as const
 		})
@@ -162,7 +172,24 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 			if (value === undefined) throw new JudgeError('PROTOCOL', 'judge error: invalid JSON body')
 			const result = this.read(value, request)
 			combined.throwIfAborted()
-			return result
+			for (const [id, answer] of Object.entries(result.answers)) {
+				const question = Object.hasOwn(request.questions, id) ? request.questions[id] : undefined
+				const faults = question === undefined ? [] : scanJudgmentTies(question, answer)
+				if (faults.length > 0) {
+					throw new JudgeError(
+						'PROTOCOL',
+						`judge error: the answer to question ${id} does not fit it\n${describeFaults(faults, judgeAnswerContract.schema)}`,
+						{ context: { question: id, faults } },
+					)
+				}
+			}
+			if (result.usage !== undefined) return result
+			// A call that reports no usage still spent tokens, so it bills its estimate as a provider call does.
+			const estimate = estimateTokens(text.text)
+			return {
+				...result,
+				usage: { prompt: 0, completion: estimate, total: estimate },
+			}
 		} catch (error) {
 			if (combined.aborted) {
 				// A throw that raced the cancel is the call's real failure, so it is recorded as the cause.

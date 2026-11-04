@@ -3,11 +3,17 @@ import {
 	isJudgeQuestion,
 	isNonNegativeSafeInteger,
 	isPositiveSafeInteger,
+	judgeQuestionContract,
 } from '@src/core'
 import { isNonNegativeInteger } from '@orkestrel/contract'
 import { createHostileValues } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { approveEvery, TEV1_REQUEST } from '../../setup.js'
+import {
+	approveEvery,
+	JUDGE_QUESTION_FIXTURES,
+	JUDGE_QUESTION_REFUSALS,
+	TEV1_REQUEST,
+} from '../../setup.js'
 
 describe('isJudgeEntry — the text or JSON a judge reads', () => {
 	it('accepts a string, a JSON record, a null-prototype record, and a JSON array', () => {
@@ -172,5 +178,36 @@ describe('isPositiveSafeInteger', () => {
 			Symbol('capacity'),
 		])
 			expect(isPositiveSafeInteger(value)).toBe(false)
+	})
+})
+
+describe('isJudgeEntry and isJudgeQuestion — exact, and in lockstep with their shapes', () => {
+	it.each(['', [], {}])('refuses the empty entry %j', (entry) => {
+		expect(isJudgeEntry(entry)).toBe(false)
+	})
+
+	it.each(JUDGE_QUESTION_FIXTURES)('holds both ways on the owned question %#', (question) => {
+		expect(isJudgeQuestion(question)).toBe(true)
+		expect(judgeQuestionContract.is(question)).toBe(true)
+	})
+
+	it.each(JUDGE_QUESTION_REFUSALS)('refuses the question value %#', (value) => {
+		expect(isJudgeQuestion(value)).toBe(false)
+	})
+
+	it('holds is ⟹ guard on the refused values a shape can state', () => {
+		expect(
+			JUDGE_QUESTION_REFUSALS.filter(
+				(value) => judgeQuestionContract.is(value) && !isJudgeQuestion(value),
+			),
+		).toEqual([])
+	})
+
+	it('reads the empty record and the one-option choice as the guard refusing what a shape cannot state', () => {
+		// A shape has no minProperties, so these are the two places the shape admits more than the guard.
+		expect(judgeQuestionContract.is({ form: 'noul', instructions: {} })).toBe(true)
+		expect(isJudgeQuestion({ form: 'noul', instructions: {} })).toBe(false)
+		expect(judgeQuestionContract.is({ form: 'choice', criteria: { a: null } })).toBe(true)
+		expect(isJudgeQuestion({ form: 'choice', criteria: { a: null } })).toBe(false)
 	})
 })

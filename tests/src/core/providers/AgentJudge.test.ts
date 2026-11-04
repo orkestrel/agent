@@ -1,5 +1,7 @@
 import type { JudgeEntry, JudgeRequest } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
+import { isArray } from '@orkestrel/contract'
+import { estimateTokens } from '@src/core'
 import {
 	DEFAULT_PROVIDER_TIMEOUT,
 	isJudgeAbortError,
@@ -91,7 +93,7 @@ describe('AgentJudge — identity and request composition', () => {
 		)
 	})
 
-	it('reports the configured model and no usage when the response names neither', async () => {
+	it('reports the configured model and bills its estimate when the response names neither', async () => {
 		const transport = new RecordedTransport(() => new Response('{}'))
 		const judge = new ScriptedJudge({
 			url: 'http://judge.test',
@@ -111,6 +113,7 @@ describe('AgentJudge — identity and request composition', () => {
 			model: 'jev-latest',
 			answers: { refund: TEV1_NOUL },
 			refusals: { team: { missing: ['sales'] } },
+			usage: { prompt: 0, completion: 1, total: 1 },
 		})
 	})
 
@@ -222,7 +225,8 @@ describe('AgentJudge — requests refused before inference', () => {
 		await expect(judge.ask(request, new AbortController().signal)).rejects.toMatchObject({
 			name: 'JudgeError',
 			code: 'QUESTION',
-			message: 'judge error: question team is malformed',
+			message:
+				'judge error: question team is malformed; a choice names two or more criteria, a score two or more levels, and a noul only true and false',
 		})
 		expect(transport.requests).toHaveLength(0)
 		expect(judge.bodies).toHaveLength(0)
@@ -554,5 +558,60 @@ describe('AgentJudge — cancellation and partial results', () => {
 		abort.abort()
 		await expect(result).rejects.toMatchObject({ code: 'ABORT', partial: { answers: {} } })
 		expect(transport.signals).toEqual([])
+	})
+})
+
+describe('AgentJudge — the result door', () => {
+	it('refuses an answer that does not fit its question, with faults', async () => {
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'filing',
+			fetch: new RecordedTransport(() => Response.json({ model: 'filing' })).fetch,
+			answers: { q: { form: 'noul', noul: 2 } },
+		})
+		const error = await judge
+			.ask({ state: 'text', questions: { q: { form: 'noul' } } }, new AbortController().signal)
+			.catch((caught: unknown) => caught)
+		expect(isJudgeError(error) && error.code).toBe('PROTOCOL')
+		expect(JSON.stringify(isJudgeError(error) ? error.context?.faults : undefined)).toContain(
+			'noul',
+		)
+	})
+
+	it('carries the faults of a malformed question', async () => {
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'filing',
+			fetch: new RecordedTransport(() => Response.json({ model: 'filing' })).fetch,
+		})
+		const error = await Reflect.apply(judge.ask, judge, [
+			{ state: 'text', questions: { q: { form: 'noul', extra: 1 } } },
+			new AbortController().signal,
+		]).catch((caught: unknown) => caught)
+		expect(isJudgeError(error) && error.code).toBe('QUESTION')
+		expect(isJudgeError(error) && isArray(error.context?.faults)).toBe(true)
+	})
+
+	it('bills the estimate of its response text when a call reports no usage', async () => {
+		const body = JSON.stringify({
+			model: 'filing',
+			padding: 'x'.repeat(40),
+		})
+		const judge = new ScriptedJudge({
+			url: 'http://judge.test',
+			model: 'filing',
+			fetch: new RecordedTransport(() => new Response(body)).fetch,
+			answers: { q: { form: 'noul', noul: 0.5 } },
+		})
+		const result = await judge.ask(
+			{ state: 'text', questions: { q: { form: 'noul' } } },
+			new AbortController().signal,
+		)
+		const estimate = estimateTokens(body)
+		expect(result.usage).toEqual({
+			prompt: 0,
+			completion: estimate,
+			total: estimate,
+		})
 	})
 })

@@ -165,6 +165,8 @@ export class JudgeError extends Error {
 	readonly code: JudgeErrorCode
 	/** Holds the response status for an HTTP failure, or undefined for other codes. */
 	readonly status: number | undefined
+	/** Holds the values that locate the failure, such as the `faults` of a refused question, or `undefined` when none were supplied. */
+	readonly context: Readonly<Record<string, unknown>> | undefined
 
 	constructor(code: JudgeErrorCode, message: string, options?: ProviderErrorOptions) {
 		super(message, options)
@@ -172,6 +174,7 @@ export class JudgeError extends Error {
 		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.JudgeError'), { value: this })
 		this.code = code
 		this.status = options?.status
+		this.context = options?.context
 	}
 }
 
@@ -198,6 +201,10 @@ export function isJudgeError(value: unknown): value is JudgeError {
 		const code = INTRINSICS.reflect.read(value, 'code')
 		if (!(code === 'HTTP' || code === 'PROTOCOL' || code === 'QUESTION')) return false
 		const status = INTRINSICS.reflect.read(value, 'status')
-		return status === undefined || isNumber(status)
+		const context = INTRINSICS.reflect.read(value, 'context')
+		return (
+			(status === undefined || isNumber(status)) &&
+			(context === undefined || isObject(context) || isFunction(context))
+		)
 	})
 }

@@ -12,14 +12,16 @@ import {
 } from '@orkestrel/contract'
 
 /**
- * Checks whether a value is a judge entry: a string, a JSON record, or a JSON array.
+ * Checks whether a value is a judge entry: a non-empty string, a non-empty JSON record, or a non-empty
+ * JSON array.
  *
  * @remarks
- * Total: a cycle, a non-JSON member, a class instance, and an untrusted input return false. `null`
- * is not an entry; a criteria guard admits it where the protocol keeps it.
+ * Total: a cycle, a non-JSON member, a class instance, and an untrusted input return false. `''`,
+ * `[]`, and `{}` give a judge nothing to read, so they return false. `null` is not an entry; a
+ * criteria guard admits it where the protocol keeps it.
  *
  * @param value - The unknown entry candidate
- * @returns True if the value is a string or JSON structure the model can read; false otherwise
+ * @returns True if the value is a non-empty string or JSON structure the model can read; false otherwise
  * @example
  * ```ts
  * isJudgeEntry('Customer asks for a refund') // true
@@ -29,8 +31,9 @@ import {
  * ```
  */
 export function isJudgeEntry(value: unknown): value is JudgeEntry {
-	if (isString(value)) return true
-	return (isRecord(value) || isArray(value)) && isJSONValue(value)
+	if (isString(value)) return value.length > 0
+	if (isArray(value)) return isJSONValue(value) && value.length > 0
+	return isRecord(value) && isJSONValue(value) && Object.keys(value).length > 0
 }
 
 /**
@@ -39,8 +42,10 @@ export function isJudgeEntry(value: unknown): value is JudgeEntry {
  * @remarks
  * Total: an untrusted input returns false. A choice needs at least 2 options and a score at least 2
  * levels, because the confidence formula divides by the candidate count; a description or a level
- * can be `null`. `instructions` and noul `criteria` are omitted when absent and never `null`.
- * Server limits on option, level, and question counts are left to the server.
+ * can be `null`. `instructions` and noul `criteria` are omitted when absent and never `null`. The
+ * guard is exact on the question's own keys: an unknown member, and an own `undefined` optional,
+ * return false, as `judgeQuestionContract` does. Server limits on option, level, and question counts
+ * are left to the server.
  *
  * @param value - The unknown question candidate
  * @returns True if the value is a question the judge engine can send; false otherwise
@@ -57,6 +62,8 @@ export function isJudgeQuestion(value: unknown): value is JudgeQuestion {
 		if (!isRecord(value)) return false
 		const { form, instructions, criteria } = value
 		if (instructions !== undefined && !isJudgeEntry(instructions)) return false
+		const owned = 1 + (instructions === undefined ? 0 : 1) + (criteria === undefined ? 0 : 1)
+		if (Object.keys(value).length !== owned) return false
 		if (form === 'choice') {
 			return (
 				isRecord(criteria) &&
@@ -70,7 +77,12 @@ export function isJudgeQuestion(value: unknown): value is JudgeQuestion {
 		if (form !== 'noul') return false
 		if (criteria === undefined) return true
 		if (!isRecord(criteria)) return false
-		return optionalOf(isJudgeEntry)(criteria.true) && optionalOf(isJudgeEntry)(criteria.false)
+		const held = (criteria.true === undefined ? 0 : 1) + (criteria.false === undefined ? 0 : 1)
+		return (
+			Object.keys(criteria).length === held &&
+			optionalOf(isJudgeEntry)(criteria.true) &&
+			optionalOf(isJudgeEntry)(criteria.false)
+		)
 	})
 	return checked.success && checked.value
 }

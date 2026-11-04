@@ -1,6 +1,15 @@
-import type { JudgeQuestion, Judgment, LiteralSet, Message, ThinkingReplay } from './types.js'
+import type {
+	JudgeAnswer,
+	JudgeQuestion,
+	Judgment,
+	LiteralSet,
+	Message,
+	ThinkingReplay,
+} from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import { attempt, isArray, isFiniteNumber, isRecord } from '@orkestrel/contract'
+import type { AuditFault, JSONSchema } from '@orkestrel/contract'
+import { describeFaults } from '@orkestrel/tool'
+import { attempt, isArray, isFiniteNumber, isRecord, isString, preview } from '@orkestrel/contract'
 
 /**
  * Filters a list of members by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
@@ -107,6 +116,200 @@ export function stripThinking(
 		const { thinking: _thinking, ...rest } = message
 		return rest
 	})
+}
+
+/**
+ * Estimates the context-token footprint of a string — the deterministic `ceil(length / 4)`
+ * character heuristic {@link import('./agents/helpers.js').estimateMessages} sums over a conversation's
+ * messages (the default context-budget estimator).
+ *
+ * @remarks
+ * Approximates `ceil(length / 4)` (4 characters per token), so the same input always yields the same estimate (no model round-trip).
+ * Empty text is `0`. This is a planning heuristic for reasoning about how much a turn's
+ * messages cost the next request, not an exact tokenizer count — it never calls a provider,
+ * so the agent layer stays provider-agnostic and synchronous where it can be.
+ *
+ * @param text - The text to estimate (a section summary, a message's content)
+ * @returns The estimated token count (`ceil(text.length / 4)`; `0` for empty text)
+ *
+ * @example
+ * ```ts
+ * estimateTokens('') // 0
+ * estimateTokens('hello') // 2  (ceil(5 / 4))
+ * estimateTokens('a'.repeat(40)) // 10
+ * ```
+ */
+export function estimateTokens(text: string): number {
+	return Math.ceil(text.length / 4)
+}
+
+/**
+ * Describes a snapshot a store refuses, naming its id, the first fault, and what a host does about it.
+ *
+ * @remarks
+ * A store's row is the host's table, so the text tells the host to read the row itself and rewrite it,
+ * or to delete it, rather than reading a refused row as absent, which would let `open` overwrite it.
+ * The id and each fault segment are JSON-encoded and length-capped.
+ *
+ * @param noun - What the snapshot holds, such as `conversation`
+ * @param id - The id the row is keyed by
+ * @param faults - The faults of the snapshot's shape
+ * @returns The refusal's text
+ * @example
+ * ```ts
+ * describeSnapshotRefusal('conversation', 'c1', [{ reason: 'extra', path: ['summary'] }])
+ * // 'conversation "c1" holds a snapshot this version refuses (extra key "summary" at the root; ...'
+ * ```
+ */
+export function describeSnapshotRefusal(
+	noun: string,
+	id: unknown,
+	faults: readonly AuditFault[],
+): string {
+	const [first] = faults
+	const path = first === undefined ? [] : isString(first.path) ? [first.path] : first.path
+	const held = preview(id)
+	const finding =
+		first?.reason === 'extra'
+			? `extra key ${preview(path.at(-1))} at ${path.length === 1 ? 'the root' : preview(path.slice(0, -1).join('.'))}`
+			: first === undefined
+				? 'a value its shape cannot name'
+				: `${first.reason} at ${path.length === 0 ? 'the root' : preview(path.join('.'))}`
+	const remedy =
+		first?.reason === 'extra' ? 'rewrite it without the key' : 'rewrite it to the declared shape'
+	return `${noun} ${held} holds a snapshot this version refuses (${finding}; a snapshot written before this change can carry it); read the row through your own table and ${remedy}, or delete it with store.delete(${held})`
+}
+
+/**
+ * Describes why a judge question refuses, in the text both of its doors throw.
+ *
+ * @remarks
+ * The rule travels in the text because the question shape cannot state it: a record has no minimum
+ * size, so a single-option choice refuses at the guard with no fault for the list to name.
+ *
+ * @param id - The question's id
+ * @param faults - What the question shape's audit found
+ * @param schema - The question shape's JSON Schema
+ * @returns The refusal text, with the fault list on the lines after it
+ * @example
+ * ```ts
+ * describeQuestionRefusal('team', [], judgeQuestionContract.schema)
+ * // 'question team is malformed; a choice names two or more criteria, a score two or more levels, and a noul only true and false'
+ * ```
+ */
+export function describeQuestionRefusal(
+	id: string,
+	faults: readonly AuditFault[],
+	schema: JSONSchema,
+): string {
+	const refusal = `question ${id} is malformed; a choice names two or more criteria, a score two or more levels, and a noul only true and false`
+	return faults.length === 0 ? refusal : `${refusal}\n${describeFaults(faults, schema)}`
+}
+
+/**
+ * Scans what a judge's answer must hold to its question: the same form, every probability in
+ * `[0, 1]`, a choice's keys equal to the criteria keys, and a score as long as its levels.
+ *
+ * @remarks
+ * These ties run where a judgment is written, at `JudgmentManager.add` and the `AgentJudge` result
+ * ingestion. A read of a stored record checks only exact keys, literal forms, and number types,
+ * because records written before the ties can miss them.
+ *
+ * @param question - The question that was asked
+ * @param answer - The answer the judge gave
+ * @returns Every broken tie as a fault, or an empty list
+ * @example
+ * ```ts
+ * scanJudgmentTies({ form: 'noul' }, { form: 'noul', noul: 2 })
+ * // [{ reason: 'constraint', path: ['answer', 'noul'], expected: 'number', constraint: 'max', limit: 1, received: '2' }]
+ * ```
+ */
+export function scanJudgmentTies(
+	question: JudgeQuestion,
+	answer: JudgeAnswer,
+): readonly AuditFault[] {
+	if (question.form === 'noul' && answer.form === 'noul') {
+		return scanProbability(answer.noul, ['answer', 'noul'])
+	}
+	if (question.form === 'choice' && answer.form === 'choice') {
+		const wanted = Object.keys(question.criteria)
+		const held = Object.keys(answer.probabilities)
+		return [
+			...wanted
+				.filter((key) => !Object.hasOwn(answer.probabilities, key))
+				.map((key): AuditFault => ({
+					reason: 'missing',
+					path: ['answer', 'probabilities', key],
+					expected: 'number',
+				})),
+			...held
+				.filter((key) => !Object.hasOwn(question.criteria, key))
+				.map((key): AuditFault => ({
+					reason: 'extra',
+					path: ['answer', 'probabilities', key],
+				})),
+			...held.flatMap((key) =>
+				scanProbability(answer.probabilities[key], ['answer', 'probabilities', key]),
+			),
+		]
+	}
+	if (question.form === 'score' && answer.form === 'score') {
+		const levels = question.criteria.length
+		const count = answer.probabilities.length
+		return [
+			...(count === levels
+				? []
+				: [
+						{
+							reason: 'constraint',
+							path: ['answer', 'probabilities'],
+							expected: 'array',
+							constraint: count < levels ? 'min' : 'max',
+							limit: levels,
+							received: String(count),
+						} satisfies AuditFault,
+					]),
+			...answer.probabilities.flatMap((value, index) =>
+				scanProbability(value, ['answer', 'probabilities', String(index)]),
+			),
+		]
+	}
+	return [
+		{
+			reason: 'type',
+			path: ['answer', 'form'],
+			expected: 'literal',
+			received: answer.form,
+		},
+	]
+}
+
+/**
+ * Scans one probability against `[0, 1]`.
+ *
+ * @param value - The probability
+ * @param path - Where it sits
+ * @returns A constraint fault when it is out of bounds, or an empty list
+ * @example
+ * ```ts
+ * scanProbability(0.5, ['answer', 'noul']) // []
+ * ```
+ */
+export function scanProbability(
+	value: number | undefined,
+	path: readonly string[],
+): readonly AuditFault[] {
+	if (value !== undefined && value >= 0 && value <= 1) return []
+	return [
+		{
+			reason: 'constraint',
+			path,
+			expected: 'number',
+			constraint: value !== undefined && value < 0 ? 'min' : 'max',
+			limit: value !== undefined && value < 0 ? 0 : 1,
+			received: String(value),
+		},
+	]
 }
 
 /**
