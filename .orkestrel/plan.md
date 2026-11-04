@@ -59,7 +59,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study`, `mcp`, `qualifier`, `rater`, `interpret` read; `program`, `brief` open | `ledger.md` |
 | Live proofs on the dedicated daemon | `ollama` at `9ef095b` and `4109f7e`, 14 files, 82 passed | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | `learn` builds the skeleton; here, `interpret`'s take-up after its refusal record, a ruling on `contract`'s cold import against what's published; then the falsify round, then `verifier`, then the debrief | § How the wave runs; § Sequence; `learn`'s plan |
+| Next action | `learn` builds the skeleton; here, `interpret`'s take-up after its refusal record,  then the falsify round, then `verifier`, then the debrief | § How the wave runs; § Sequence; `learn`'s plan |
 
 ## Sequence
 
@@ -86,4 +86,5 @@ Findings below the release bar, each one line with the reason it stays below. Th
 | --- | --- |
 | `@orkestrel/mcp` loses the blocks of a result with only non-text content | needs a contract decision; a text result is unaffected |
 | Unbounded refusal text in `@orkestrel/workspace` and `@orkestrel/relation` | outside § Repositories; `toolbox` caps what it translates |
+| `reason`'s cold import reads 36.6 ms against 19.4 ms published, about 17 ms of contracts built at load. Deferring `schema` to first read saved 4.7 ms on a throwaway copy, and was declined | it would replace a plain `schema` value with a getter, so a spread could compile and a compile failure could surface after `createContract`. The rest is builder construction and validation, the safety this wave added |
 | `@orkestrel/mcp` `buildCallOutcome` throws a tool's error text unbounded; `@orkestrel/agent` `Channel.push` and `AgentProvider` success bodies have no size cap | a host chooses its endpoint, the timeout and budget bound it, and `AgentProvider` documents the choice |
