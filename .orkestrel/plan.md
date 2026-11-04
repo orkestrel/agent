@@ -59,7 +59,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study`, `mcp`, `qualifier`, `rater`, `interpret` read; `program`, `brief` open | `ledger.md` |
 | Live proofs on the dedicated daemon | `ollama` at `9ef095b` and `4109f7e`, 14 files, 82 passed | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | `learn` builds the skeleton; here, finish `contract`'s corrections and its generated test, the door with `tool` first, one take-up per package and `database`; then the falsify round, then `verifier`, then the debrief | § How the wave runs; § Sequence; `learn`'s plan |
+| Next action | `learn` builds the skeleton; here, `interpret`'s take-up after its refusal record, a ruling on `contract`'s cold import against what's published; then the falsify round, then `verifier`, then the debrief | § How the wave runs; § Sequence; `learn`'s plan |
 
 ## Sequence
 
