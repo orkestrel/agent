@@ -505,3 +505,4 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-03 | The `learn` design round opened: this session designs and that thread implements; recorded judge rows counted, and `tev1:0.8b` asked the 543 unique recorded questions on port 11435, 145 s | Orchestrator | `tmp/learn/`; the `learn` checkout's own records |
 | 2026-11-03 | Blind labels for the `learn` design round on the recorded `category` and pair rows, read-only, no shell | `sonnet` and `opus`, one labeler each | `plan.md` O170; `tmp/learn/` |
 | 2026-11-03 | The `learn` round: three package maps (`sonnet`), two Fable reviews, a blind rule (`opus`), and the user's answer on the `interpret` release and the model | user; `fable`; `opus`; `sonnet` | `plan.md` O171; `tmp/learn/` |
+| 2026-11-03 | The user's rulings on what the model is and on the family's fail-open defaults | user | `plan.md` O172 |
