@@ -2173,17 +2173,9 @@ describe('Agent — cancellation timing matrix', () => {
 			expect(await collect(stream.events)).toContainEqual({
 				category: 'tool',
 				call,
-				result: {
-					id: call.id,
-					name: call.name,
-					success: true,
-					value: 'entered',
-				},
+				result: { id: call.id, name: call.name, success: true, value: 'entered' },
 			})
-			expect(await stream.result).toMatchObject({
-				content: 'done',
-				partial: false,
-			})
+			expect(await stream.result).toMatchObject({ content: 'done', partial: false })
 		},
 	)
 
@@ -4737,9 +4729,7 @@ describe('Agent — the run schema is enforced', () => {
 	])('settles error with SCHEMA under the default on %s', async (_name, content, reason) => {
 		const provider = createScriptedProvider([{ content }], AGENT_SCRIPT_OPTIONS)
 		const faults = createRecorder<AgentEventMap['fault']>()
-		const agent = createAgent(provider, {
-			on: { fault: faults.handler },
-		})
+		const agent = createAgent(provider, { on: { fault: faults.handler } })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const error = await agent.generate({ schema: closed }).catch((caught: unknown) => caught)
 		expect(isAgentError(error) && error.code).toBe('SCHEMA')
@@ -4773,10 +4763,7 @@ describe('Agent — the run schema is enforced', () => {
 	it('emits fault and settles with the raw content under strict: false', async () => {
 		const provider = createScriptedProvider([{ content: 'plain text' }], AGENT_SCRIPT_OPTIONS)
 		const faults = createRecorder<AgentEventMap['fault']>()
-		const agent = createAgent(provider, {
-			strict: false,
-			on: { fault: faults.handler },
-		})
+		const agent = createAgent(provider, { strict: false, on: { fault: faults.handler } })
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const result = await agent.generate({ schema: closed })
 		expect(result.content).toBe('plain text')

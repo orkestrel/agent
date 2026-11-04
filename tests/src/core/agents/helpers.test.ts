@@ -114,6 +114,7 @@ describe('requireLimit', () => {
 
 	it('refuses every other number with a LIMIT code naming the value', () => {
 		for (const limit of [
+			0,
 			Number.NaN,
 			-1,
 			1.5,

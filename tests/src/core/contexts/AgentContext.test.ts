@@ -689,18 +689,9 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		// appends the workspace image data after — own-first, then workspace.
 		const context = new AgentContext()
 		context.workspaces.add({
-			seed: [
-				createFile({
-					path: 'ctx.png',
-					content: createBinaryContent('CTX', 'image/png'),
-				}),
-			],
+			seed: [createFile({ path: 'ctx.png', content: createBinaryContent('CTX', 'image/png') })],
 		})
-		context.messages.add({
-			role: 'user',
-			content: 'see this',
-			images: ['OWN'],
-		})
+		context.messages.add({ role: 'user', content: 'see this', images: ['OWN'] })
 
 		const built = context.build()
 
@@ -1898,11 +1889,7 @@ describe('AgentContext — the skills and memos indexes', () => {
 				close: '</memos>',
 			},
 		})
-		memos.add({
-			name: 'tone',
-			description: 'Prefers bullet lists.',
-			content: 'Use bullet lists.',
-		})
+		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
 
 		const built = new AgentContext({ skills, memos }).build()
 

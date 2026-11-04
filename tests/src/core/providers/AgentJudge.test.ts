@@ -593,10 +593,7 @@ describe('AgentJudge — the result door', () => {
 	})
 
 	it('bills the estimate of its response text when a call reports no usage', async () => {
-		const body = JSON.stringify({
-			model: 'filing',
-			padding: 'x'.repeat(40),
-		})
+		const body = JSON.stringify({ model: 'filing', padding: 'x'.repeat(40) })
 		const judge = new ScriptedJudge({
 			url: 'http://judge.test',
 			model: 'filing',
@@ -608,10 +605,6 @@ describe('AgentJudge — the result door', () => {
 			new AbortController().signal,
 		)
 		const estimate = estimateTokens(body)
-		expect(result.usage).toEqual({
-			prompt: 0,
-			completion: estimate,
-			total: estimate,
-		})
+		expect(result.usage).toEqual({ prompt: 0, completion: estimate, total: estimate })
 	})
 })

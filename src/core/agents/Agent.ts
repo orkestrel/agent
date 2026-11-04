@@ -643,11 +643,7 @@ export class Agent implements AgentInterface {
 					this.#emitter.emit('fault', answered.error)
 				}
 			}
-			conversation.add({
-				role: 'assistant',
-				content: result.content,
-				...recorded,
-			})
+			conversation.add({ role: 'assistant', content: result.content, ...recorded })
 			turns.push({
 				...settled,
 				content: result.content,

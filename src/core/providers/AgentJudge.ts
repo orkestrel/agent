@@ -186,10 +186,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 			if (result.usage !== undefined) return result
 			// A call that reports no usage still spent tokens, so it bills its estimate as a provider call does.
 			const estimate = estimateTokens(text.text)
-			return {
-				...result,
-				usage: { prompt: 0, completion: estimate, total: estimate },
-			}
+			return { ...result, usage: { prompt: 0, completion: estimate, total: estimate } }
 		} catch (error) {
 			if (combined.aborted) {
 				// A throw that raced the cancel is the call's real failure, so it is recorded as the cause.

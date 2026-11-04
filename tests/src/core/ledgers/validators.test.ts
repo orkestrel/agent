@@ -48,10 +48,7 @@ describe('isLedgerSnapshot', () => {
 		expect(isLedgerSnapshot(LEDGER_SNAPSHOT_SEED)).toBe(true)
 		expect(isLedgerSnapshot({ conversation, requests, notes, failures })).toBe(true)
 		expect(isLedgerSnapshot({ ...LEDGER_SNAPSHOT_SEED, version: 2 })).toBe(false)
-		const free = {
-			...LEDGER_SNAPSHOT_SEED,
-			gauge: { scale: 2, overhead: 0 },
-		}
+		const free = { ...LEDGER_SNAPSHOT_SEED, gauge: { scale: 2, overhead: 0 } }
 		expect(isLedgerSnapshot(free)).toBe(true)
 	})
 

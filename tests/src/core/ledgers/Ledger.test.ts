@@ -798,13 +798,8 @@ describe('Ledger', () => {
 	it('faults direct agent generation without planning for the earlier request', async () => {
 		const judge = new SilentJudge()
 		const options = buildLedgerOptions({ judge })
-		const provider = createScriptedProvider([{ content: 'Done.' }], {
-			recorded: true,
-		})
-		const ledger = createLedger(provider, {
-			...options,
-			agent: { strict: false },
-		})
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, { ...options, agent: { strict: false } })
 		await ledger.respond('Earlier request.')
 		const judgments = ledger.conversation.judgments.judgments()
 		const requests = judge.requests.length
@@ -2286,10 +2281,7 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		const ledger = createLedger(provider, {
-			...options,
-			agent: { strict: false },
-		})
+		const ledger = createLedger(provider, { ...options, agent: { strict: false } })
 		await ledger.respond('First request.')
 		ledger.agent.context.apply(
 			createScope({
@@ -3399,17 +3391,12 @@ describe('Ledger — strict by default', () => {
 	it('rejects respond when a judge fails, after the fault event', async () => {
 		const failure = new Error('the judge is unreachable')
 		const faults = createRecorder<[error: unknown]>()
-		const provider = createScriptedProvider([{ content: 'never' }], {
-			recorded: true,
-		})
+		const provider = createScriptedProvider([{ content: 'never' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...buildLedgerOptions({ judge: createFailingJudge(failure) }),
 			agent: { on: { fault: faults.handler } },
 		})
-		ledger.conversation.add({
-			role: 'user',
-			content: 'The depot opens at nine.',
-		})
+		ledger.conversation.add({ role: 'user', content: 'The depot opens at nine.' })
 		await expect(ledger.respond('When does it open?')).rejects.toBe(failure)
 		expect(faults.calls).toEqual([[failure]])
 		expect(provider.calls).toEqual([])
@@ -3420,17 +3407,12 @@ describe('Ledger — strict by default', () => {
 	it('goes on with the question undecided under strict: false, after the fault event', async () => {
 		const failure = new Error('the judge is unreachable')
 		const faults = createRecorder<[error: unknown]>()
-		const provider = createScriptedProvider([{ content: 'Nine.' }], {
-			recorded: true,
-		})
+		const provider = createScriptedProvider([{ content: 'Nine.' }], { recorded: true })
 		const ledger = createLedger(provider, {
 			...buildLedgerOptions({ judge: createFailingJudge(failure) }),
 			agent: { strict: false, on: { fault: faults.handler } },
 		})
-		ledger.conversation.add({
-			role: 'user',
-			content: 'The depot opens at nine.',
-		})
+		ledger.conversation.add({ role: 'user', content: 'The depot opens at nine.' })
 		const result = await ledger.respond('When does it open?')
 		expect(result.content).toBe('Nine.')
 		expect(faults.calls[0]).toEqual([failure])
@@ -3456,18 +3438,13 @@ describe('Ledger — strict by default', () => {
 		const { ledger } = createPacedLedger(seed.snapshot, [{ content: 'never' }], scheduler)
 		const pending = ledger.respond('What is the status of OR-1000?')
 		await scheduler.reached
-		ledger.conversation.add({
-			role: 'user',
-			content: 'Order OR-1000 is on hold.',
-		})
+		ledger.conversation.add({ role: 'user', content: 'Order OR-1000 is on hold.' })
 		gate.resolve()
 		await expect(pending).rejects.toThrow('changed during selection')
 	})
 
 	it('refuses a direct agent run outside a request', async () => {
-		const provider = createScriptedProvider([{ content: 'never' }], {
-			recorded: true,
-		})
+		const provider = createScriptedProvider([{ content: 'never' }], { recorded: true })
 		const ledger = createLedger(provider, buildLedgerOptions())
 		ledger.conversation.add({ role: 'user', content: 'Check it.' })
 		await expect(ledger.agent.generate()).rejects.toThrow(

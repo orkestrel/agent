@@ -38,9 +38,7 @@ describe('ConversationManager — an id already live', () => {
 		const live = manager.add({ id: 'c1' })
 		const error = captureError(() => manager.add({ id: 'c1' }))
 		expect(isConversationError(error) && error.code).toBe('ID')
-		expect(isConversationError(error) && error.context).toEqual({
-			conversation: 'c1',
-		})
+		expect(isConversationError(error) && error.context).toEqual({ conversation: 'c1' })
 		expect(manager.conversation('c1')).toBe(live)
 	})
 
@@ -566,14 +564,9 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		const driver = createMemoryDriver()
 		await plantSnapshotRow(driver, 'conversations', {
 			id: JUDGMENT_SNAPSHOT.id,
-			snapshot: {
-				...JUDGMENT_SNAPSHOT,
-				judgments: [{ ...JUDGMENT_RECORD, time: Number.NaN }],
-			},
+			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ ...JUDGMENT_RECORD, time: Number.NaN }] },
 		})
-		const manager = new ConversationManager({
-			store: createDatabaseConversationStore(driver),
-		})
+		const manager = new ConversationManager({ store: createDatabaseConversationStore(driver) })
 
 		await expect(manager.open(JUDGMENT_SNAPSHOT.id)).rejects.toSatisfy(
 			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',

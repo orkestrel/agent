@@ -33,13 +33,7 @@ import {
 
 describe('JudgmentManager — the write door', () => {
 	const noul = { form: 'noul' } as const
-	const input = {
-		id: 'q',
-		question: noul,
-		model: 'judge',
-		sources: [],
-		state: 'text',
-	}
+	const input = { id: 'q', question: noul, model: 'judge', sources: [], state: 'text' }
 
 	it.each([
 		['a noul out of bounds', noul, { form: 'noul', noul: 2 }, 'max'],
@@ -86,11 +80,7 @@ describe('JudgmentManager — the write door', () => {
 	})
 
 	it('reads a stored record that misses a tie, because records written before the ties can', () => {
-		const stored = {
-			...input,
-			answer: { form: 'noul', noul: 2 } as const,
-			time: 1,
-		}
+		const stored = { ...input, answer: { form: 'noul', noul: 2 } as const, time: 1 }
 		expect(new JudgmentManager([stored]).count).toBe(1)
 	})
 
@@ -114,9 +104,7 @@ describe('JudgmentManager — the write door', () => {
 			.resolve(judge, { state: 'text', questions: { q: noul } }, [], new AbortController().signal)
 			.catch((caught: unknown) => caught)
 		expect(isConversationError(error) && error.code).toBe('JUDGMENT')
-		expect(isConversationError(error) && error.context).toEqual({
-			questions: ['q'],
-		})
+		expect(isConversationError(error) && error.context).toEqual({ questions: ['q'] })
 	})
 
 	it('stores an abort partial that answers only some of its questions', async () => {

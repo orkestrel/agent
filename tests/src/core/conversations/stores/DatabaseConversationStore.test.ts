@@ -286,12 +286,7 @@ describe('DatabaseConversationStore — a present row that fails the guard throw
 
 	it('writes nothing for a malformed snapshot', async () => {
 		const store = createDatabaseConversationStore(createMemoryDriver())
-		const malformed = {
-			id: 'c1',
-			sections: [],
-			messages: [],
-			summary: 'x',
-		}
+		const malformed = { id: 'c1', sections: [], messages: [], summary: 'x' }
 		const error = await Reflect.apply(store.set, store, [malformed]).catch(
 			(caught: unknown) => caught,
 		)

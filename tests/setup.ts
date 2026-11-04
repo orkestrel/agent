@@ -1844,12 +1844,7 @@ export function createForeignAgent(
  * @returns The judge
  */
 export function createFailingJudge(failure: Error): JudgeInterface {
-	return {
-		id: 'failing',
-		name: 'failing',
-		model: 'failing',
-		ask: () => Promise.reject(failure),
-	}
+	return { id: 'failing', name: 'failing', model: 'failing', ask: () => Promise.reject(failure) }
 }
 
 /**
@@ -1859,12 +1854,7 @@ export function createFailingJudge(failure: Error): JudgeInterface {
  * @returns The judge
  */
 export function createSettledJudge(result: JudgeResult): JudgeInterface {
-	return {
-		id: 'settled',
-		name: 'settled',
-		model: result.model,
-		ask: () => Promise.resolve(result),
-	}
+	return { id: 'settled', name: 'settled', model: result.model, ask: () => Promise.resolve(result) }
 }
 
 /**
@@ -7807,15 +7797,9 @@ export async function seedCompactionArm(provider: ProviderInterface): Promise<Ag
 	const conversation = conversations.add({ keep: 2, summarize: createStubSummarizer().summarize })
 	const agent = createAgent(provider, {
 		conversations,
-		window: createBudget<ProviderRequest>({
-			max: 32_768,
-			consumer: estimateRequest,
-		}),
+		window: createBudget<ProviderRequest>({ max: 32_768, consumer: estimateRequest }),
 	})
-	agent.context.instructions.add({
-		name: 'desk',
-		content: 'Serve the desk.',
-	})
+	agent.context.instructions.add({ name: 'desk', content: 'Serve the desk.' })
 	conversation.add([
 		{ role: 'user', content: 'Order 1 shipped.' },
 		{ role: 'assistant', content: 'Noted.' },

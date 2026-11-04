@@ -96,10 +96,7 @@ describe('DatabaseMemoStore — a present row that fails the guard throws', () =
 
 	it('throws on a row that names another id', async () => {
 		const driver = createMemoryDriver()
-		await plantSnapshotRow(driver, 'memos', {
-			id: 'ada',
-			snapshot: { id: 'grace', memos: [] },
-		})
+		await plantSnapshotRow(driver, 'memos', { id: 'ada', snapshot: { id: 'grace', memos: [] } })
 		const store = createDatabaseMemoStore(driver)
 		const error = await store.get('ada').catch((caught: unknown) => caught)
 		expect(isContextError(error) && error.code).toBe('SNAPSHOT')

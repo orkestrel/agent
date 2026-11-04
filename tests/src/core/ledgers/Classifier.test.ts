@@ -772,9 +772,7 @@ describe('Classifier', () => {
 								...(refused
 									? {
 											refusals: {
-												[key]: {
-													missing: ['evidence'],
-												},
+												[key]: { missing: ['evidence'] },
 											},
 										}
 									: {}),

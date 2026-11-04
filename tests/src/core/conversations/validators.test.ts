@@ -495,11 +495,7 @@ describe('the owned conversation guards, in lockstep with their shapes', () => {
 	it('holds both ways on a judgment and a section of the fixtures', () => {
 		expect(isJudgment(JUDGMENT_RECORD)).toBe(true)
 		expect(judgmentContract.is(JUDGMENT_RECORD)).toBe(true)
-		const section = {
-			id: 's',
-			summary: 'recap',
-			messages: MESSAGE_FIXTURES.slice(0, 1),
-		}
+		const section = { id: 's', summary: 'recap', messages: MESSAGE_FIXTURES.slice(0, 1) }
 		expect(isSection(section)).toBe(true)
 		expect(sectionContract.is(section)).toBe(true)
 	})
