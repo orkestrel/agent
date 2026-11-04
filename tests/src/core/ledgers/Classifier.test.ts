@@ -15,6 +15,8 @@ import { buildLedgerIndex, matchEntities } from '../../../../src/core/ledgers/he
 import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildCategoryAnswer,
+	createOnceFailingJudge,
+	LEDGER_ONCE_FAILURES,
 	buildLedgerMessage,
 	buildLedgerJudgment,
 	buildClassifierOptions,
@@ -111,6 +113,26 @@ describe('Classifier', () => {
 		}
 	})
 
+	it.each(LEDGER_ONCE_FAILURES)(
+		'holds nothing after a %s by default, reporting it once and asking again',
+		async (_, failure) => {
+			const conversation = createConversation()
+			conversation.add({ role: 'user', content: 'The depot opens at nine.' })
+			const classifier = new Classifier(
+				buildClassifierOptions({
+					conversation,
+					judge: createOnceFailingJudge(failure, createPhraseJudge([])),
+				}),
+			)
+			const first = await classifier.classify(new Set(), new AbortController().signal)
+			const second = await classifier.classify(new Set(), new AbortController().signal)
+			expect(first.failure).toBe(failure)
+			expect(second.failure).toBeUndefined()
+			expect(second.judgments).toHaveLength(1)
+			expect(summarizeAttempts(second.attempts).map(({ outcome }) => outcome)).toEqual(['resolved'])
+		},
+	)
+
 	it('keeps held fingerprints when the judge model alternates A B A', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
@@ -127,6 +149,7 @@ describe('Classifier', () => {
 		)
 		const classifier = new Classifier(
 			buildClassifierOptions({
+				strict: false,
 				conversation,
 				judge,
 				topics: [],
@@ -152,6 +175,7 @@ describe('Classifier', () => {
 		})
 		const classifier = new Classifier(
 			buildClassifierOptions({
+				strict: false,
 				conversation,
 				judge,
 				topics: [],
@@ -508,6 +532,7 @@ describe('Classifier', () => {
 		})
 		const classifier = new Classifier(
 			buildClassifierOptions({
+				strict: false,
 				conversation,
 				judge,
 				topics: [],
@@ -857,6 +882,7 @@ describe('Classifier', () => {
 		)
 		const classifier = new Classifier(
 			buildClassifierOptions({
+				strict: false,
 				conversation,
 				judge,
 				topics: [],

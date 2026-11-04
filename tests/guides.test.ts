@@ -2401,6 +2401,9 @@ await new GuideCommand({
 			expect(result.content).toBe('Done.')
 			expect(provider.calls).toHaveLength(1)
 			expect(guideText).toContain(
+				"A selection reads the conversation it was asked about, so a host append or removal while a `respond` call's selection runs faults it with a `changed during selection` error. Under the default `strict`, `respond` rejects with that error before it reaches the provider,",
+			)
+			expect(guideText).toContain(
 				"A direct run on the ledger's conversation while a `respond` call's pass runs is refused with `AgentError` `'CONCURRENCY'`.",
 			)
 			expect(guideText).toContain(
@@ -2452,7 +2455,7 @@ await new GuideCommand({
 				2 * requireValue(first.get(transient), 'Missing transient asks').length,
 			)
 			expect(guideText).toContain(
-				"Under the default `strict`, a judge failure rejects the `respond` call after the `fault` event, and a held failure rejects each later request too. Under `strict: false`, a judge failure leaves its question unanswered, and the next request asks it again, except for two failures that hold the question so that no later request asks it: a refused question, which the judge reports as a `JudgeError` with code `'QUESTION'`, and the deterministic logprob failure the `DETERMINISTIC_JUDGE_ERROR` constant matches.",
+				"Under the default `strict`, a judge failure rejects the `respond` call it belongs to, after the `fault` event, and holds nothing, so the next request asks the judge again about every question still unanswered. A failure that repeats rejects that request too, so a question the judge always refuses stops each request until you remove its message or set `strict: false`. Under `strict: false`, a judge failure leaves its question unanswered, and the next request asks it again, except for two failures that hold the question so that no later request asks it: a refused question, which the judge reports as a `JudgeError` with code `'QUESTION'`, and the deterministic logprob failure the `DETERMINISTIC_JUDGE_ERROR` constant matches.",
 			)
 		})
 

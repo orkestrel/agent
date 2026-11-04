@@ -97,7 +97,9 @@ import {
 	ScriptedReads,
 	SequentialSystemOneJudge,
 	createForeignSignal,
+	createOnceFailingJudge,
 	createPhraseJudge,
+	LEDGER_ONCE_FAILURES,
 	createScriptedProvider,
 	extractLedgerRecords,
 	readCallRequest,
@@ -3418,6 +3420,33 @@ describe('Ledger — strict by default', () => {
 		expect(faults.calls[0]).toEqual([failure])
 	})
 
+	it.each(LEDGER_ONCE_FAILURES)(
+		'rejects only the request a %s belongs to, and the next respond asks again',
+		async (_, failure) => {
+			const provider = createScriptedProvider([{ content: 'Nine.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ judge: createOnceFailingJudge(failure, createPhraseJudge([])) }),
+			)
+			const statement = ledger.conversation.add({
+				role: 'user',
+				content: 'The depot opens at nine.',
+			})
+			await expect(ledger.respond('When does it open?')).rejects.toBe(failure)
+			expect(provider.calls).toEqual([])
+			const before = ledger.conversation.count
+
+			const result = await ledger.respond('When does it open?')
+
+			expect(result.content).toBe('Nine.')
+			expect(provider.calls).toHaveLength(1)
+			expect(ledger.conversation.count).toBe(before + 2)
+			expect(
+				ledger.conversation.judgments.judgment(JSON.stringify(['category', statement.id])),
+			).toBeDefined()
+		},
+	)
+
 	it('rejects respond on a selection failure, and the rejection leaves the ledger free', async () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
 		const { ledger } = createPacedLedger(
@@ -3439,6 +3468,19 @@ describe('Ledger — strict by default', () => {
 		const pending = ledger.respond('What is the status of OR-1000?')
 		await scheduler.reached
 		ledger.conversation.add({ role: 'user', content: 'Order OR-1000 is on hold.' })
+		gate.resolve()
+		await expect(pending).rejects.toThrow('changed during selection')
+	})
+
+	it('rejects respond when the host removes a message during selection', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const removed = requireValue(seed.snapshot.conversation.messages[1])
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const { ledger } = createPacedLedger(seed.snapshot, [{ content: 'never' }], scheduler)
+		const pending = ledger.respond('What is the status of OR-1000?')
+		await scheduler.reached
+		ledger.conversation.remove(removed.id)
 		gate.resolve()
 		await expect(pending).rejects.toThrow('changed during selection')
 	})

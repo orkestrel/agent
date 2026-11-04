@@ -2,6 +2,8 @@ import {
 	answerLedgerKey,
 	buildCategoryAnswer,
 	createFailingJudge,
+	createOnceFailingJudge,
+	LEDGER_ONCE_FAILURES,
 	createSettledJudge,
 	REWRITTEN_CONVERSATION_SNAPSHOT,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
@@ -2017,6 +2019,17 @@ describe('judge fixtures', () => {
 		const answer = buildCategoryAnswer({ rule: 0.9, fact: 0.1 })
 		expect(Object.keys(answer.probabilities).toSorted()).toEqual(LEDGER_CATEGORIES.toSorted())
 		expect(answer.probabilities).toMatchObject({ rule: 0.9, fact: 0.1, chatter: 0 })
+	})
+
+	it('creates a judge that rejects its first ask and reaches another judge after that', async () => {
+		const failure = new Error('unreachable')
+		const result = { model: 'settled', answers: {} }
+		const signal = new AbortController().signal
+		const request = { state: 'text', questions: {} }
+		const judge = createOnceFailingJudge(failure, createSettledJudge(result))
+		await expect(judge.ask(request, signal)).rejects.toBe(failure)
+		expect(await judge.ask(request, signal)).toBe(result)
+		expect(LEDGER_ONCE_FAILURES.map(([label]) => label)).toHaveLength(3)
 	})
 
 	it('creates a judge that resolves or rejects every ask with one value', async () => {

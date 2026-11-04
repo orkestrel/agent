@@ -278,8 +278,9 @@ export interface LedgerGauge {
  * a turn while it files, so a page passes it to keep the filing out of one long task. The classifier
  * and the loop race its yield against the run signal, so a scheduler that ignores its signal still
  * ends on a cancel. `strict` defaults to `true`: a judge failure or another selection failure rejects
- * `respond` after the `fault` event, and with `strict: false` the request goes on with that question
- * undecided, or from the conversation's `view()`. A provider failure in the first pass is the one
+ * that `respond` call after the `fault` event, and the next call asks the judge again about whatever is
+ * still unanswered. With `strict: false` the request goes on with that question undecided, or from the
+ * conversation's `view()`. A provider failure in the first pass is the one
  * failure the answer pass recovers under either value.
  */
 export type LedgerAgentOptions = Pick<
@@ -351,8 +352,8 @@ export interface LedgerOptions {
  * of `conversation.messages`: a request or note a `user` message and a failure a `tool` message.
  * `gauge` carries the scale and overhead alone. The gauge's observations of earlier requests are
  * not carried, so a hydrated ledger sizes and closes `recall` from its fallback reserve until it
- * completes a request. A question the classifier held after a deterministic judge failure is not
- * carried, so a hydrated ledger asks it again. Hydrating a second ledger from one snapshot forks
+ * completes a request. A question a `strict: false` classifier held after a deterministic judge
+ * failure is not carried, so a hydrated ledger asks it again. Hydrating a second ledger from one snapshot forks
  * it at the parent's frontier.
  */
 export interface LedgerSnapshot {
@@ -721,6 +722,8 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
  * no scheduler, the call takes no host turn and reads no added clock.
  */
 export interface ClassifierOptions {
+	/** Sets what a refused question or a deterministic judge failure leaves behind. Default `true`: nothing, so the next call asks again. `false` holds the question, so no later call asks it. */
+	readonly strict?: boolean
 	readonly conversation: ConversationInterface
 	readonly judge: JudgeInterface
 	readonly questions: LedgerQuestion
@@ -740,7 +743,7 @@ export type ClassifierPhase = 'category' | 'topic' | 'amends' | 'supersedes'
  *
  * @remarks
  * `cached` means the conversation already held a matching judgment, so the classifier did not call the judgment manager.
- * `skipped` means the classifier held the question, after a deterministic failure or because a message it names left the conversation, and did not call the judgment manager.
+ * `skipped` means the classifier held the question, after a deterministic failure under `strict: false` or because a message it names left the conversation, and did not call the judgment manager.
  * `resolved` means the judgment manager's resolve call fulfilled. `failed` means it rejected while the caller's signal was live.
  * `aborted` means it rejected with a `JudgeAbortError` or after the caller's signal aborted.
  */
@@ -777,7 +780,7 @@ export interface ClassifierResult {
 	readonly attempts: readonly ClassifierAttempt[]
 	/** Holds the error when an assign or entities handler throw, a scheduler rejection, or a caller abort interrupts classification; judgments and usage retain the partial result. A judge rejection under a live signal sets no fault. */
 	readonly fault?: Error
-	/** Holds the first judge rejection under a live signal: that question stays undecided and the filing goes on, so the result is whole but for it. A question held after a deterministic failure reports that failure again. */
+	/** Holds the first judge rejection of this call under a live signal: that question stays undecided and the filing goes on, so the result is whole but for it. A question held from an earlier call reports nothing. */
 	readonly failure?: Error
 }
 

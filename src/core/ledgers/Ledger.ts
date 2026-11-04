@@ -208,6 +208,7 @@ export class Ledger implements LedgerInterface {
 			},
 			...(options.correction === undefined ? {} : { correction: options.correction }),
 			...(options.agent?.scheduler === undefined ? {} : { scheduler: options.agent.scheduler }),
+			...(options.agent?.strict === undefined ? {} : { strict: options.agent.strict }),
 		})
 		const tools = createToolManager()
 		for (const lookup of options.lookups ?? []) {
@@ -338,7 +339,7 @@ export class Ledger implements LedgerInterface {
 	/**
 	 * Appends a request and serves it, recovering an unfinished or rejected first pass with one answer pass.
 	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
-	 * When the answer pass rejects, `respond` rejects with that error, and under the default `strict` a judge failure or another selection failure rejects it too. Every rejection leaves the ledger free for a later call.
+	 * When the answer pass rejects, `respond` rejects with that error, and under the default `strict` a judge failure or another selection failure rejects it too. A rejection belongs to its own call: the ledger stays free, and the next call asks the judge again about whatever is still unanswered.
 	 * @param content - The request text
 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
 	 * @returns The final pass, the usage of every pass, and the filing attempts of this request alone

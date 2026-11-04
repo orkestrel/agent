@@ -36,7 +36,7 @@ import { renderCauseChain } from './helpers.js'
  */
 export class Classifier implements ClassifierInterface {
 	readonly #options: ClassifierOptions
-	readonly #failed = new Map<string, Error>()
+	readonly #failed = new Set<string>()
 	#slice = 0
 
 	/**
@@ -462,13 +462,8 @@ export class Classifier implements ClassifierInterface {
 		if (this.#read(spec) !== undefined)
 			return { judgments: [spec.id], attempts: [{ key: spec.id, phase, outcome: 'cached' }] }
 		const fingerprint = JSON.stringify(spec)
-		const held = this.#failed.get(fingerprint)
-		if (held !== undefined)
-			return {
-				judgments: [],
-				attempts: [{ key: spec.id, phase, outcome: 'skipped' }],
-				failure: held,
-			}
+		if (this.#failed.has(fingerprint))
+			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
 		signal.throwIfAborted()
 		if (spec.sources.some((id) => this.#options.conversation.message(id) === undefined))
 			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
@@ -513,11 +508,14 @@ export class Classifier implements ClassifierInterface {
 			else results.push({ judgments: [], attempts })
 			if (signal.aborted) throw error
 			const failure = isError(error) ? error : new Error(errorToMessage(error))
+			// Under the default `strict` this failure rejects the request it belongs to and the next request
+			// asks again; a lenient request goes on past it, so a question that cannot succeed is held.
 			if (
-				(isJudgeError(error) && error.code === 'QUESTION') ||
-				DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error))
+				this.#options.strict === false &&
+				((isJudgeError(error) && error.code === 'QUESTION') ||
+					DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error)))
 			)
-				this.#failed.set(fingerprint, failure)
+				this.#failed.add(fingerprint)
 			return { judgments: [], attempts: [], failure }
 		}
 	}

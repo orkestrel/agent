@@ -1847,6 +1847,33 @@ export function createFailingJudge(failure: Error): JudgeInterface {
 	return { id: 'failing', name: 'failing', model: 'failing', ask: () => Promise.reject(failure) }
 }
 
+/** Lists the failures a judge can raise once: a transient one, and the two `strict: false` holds. */
+export const LEDGER_ONCE_FAILURES: ReadonlyArray<readonly [string, Error]> = Object.freeze([
+	['transient failure', new Error('judge error: connection reset')],
+	['refused question', new JudgeError('QUESTION', 'judge error: refused before inference')],
+	['deterministic failure', new Error('judge error: invalid or duplicate top logprob token')],
+])
+
+/**
+ * Creates a judge whose first ask rejects with one failure and whose later asks reach another judge.
+ *
+ * @param failure - The failure the first ask rejects with
+ * @param inner - The judge every later ask reaches
+ * @returns The judge
+ */
+export function createOnceFailingJudge(failure: Error, inner: JudgeInterface): JudgeInterface {
+	const failures = new ScriptedReads<Error | undefined>([failure], undefined)
+	return {
+		id: inner.id,
+		name: inner.name,
+		model: inner.model,
+		ask: (request, signal) => {
+			const next = failures.read()
+			return next === undefined ? inner.ask(request, signal) : Promise.reject(next)
+		},
+	}
+}
+
 /**
  * Creates a judge that resolves every ask with one result.
  *
