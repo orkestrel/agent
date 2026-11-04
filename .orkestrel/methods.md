@@ -8,7 +8,8 @@ This file is the debrief's working input, added to as methods prove out so nothi
 
 | Scenario | Method | Reading | Example |
 | --- | --- | --- | --- |
-| Import cost dominated by contracts built at module load | Compile a built contract's function members on first use; the first call pays | `reason` cold import 93.3 to 33.5 ms; `workflow` 56.6 to 40.2 ms | `contract` `198f48a` |
+| Import cost dominated by contracts built at module load | Compile a built contract's function members on first use; the first call pays | A hardened `reason` build's cold import 93.3 to 33.5 ms; `workflow` 56.6 to 40.2 ms. Against what's published, `reason` reads 19.44 to 36.85 ms, interleaved, so the contracts still cost about 17 ms | `contract` `198f48a` |
+| Comparing a build to what's published | Measure the published artifact, interleaved. A number from earlier in the same campaign is not the published baseline | 93.3 ms was quoted as published for hours; the published build reads 19.44 ms | `reason` `f8646a5` |
 | A builder re-walks subtrees it already validated | Seal built shapes so a walk of them runs once | Depth-6 `createContract` 1.317 to 0.111 ms; object `is` and `parse` 2 to 4 percent slower | `contract` `0f05405` |
 | A union parse tries each arm | A value's literal property names one arm | Last arm 20.7 to 4.1 µs | `contract` `4dff475` |
 | A per-element hot path needs validation | Hand guard with a lockstep test; a shape-derived guard only at a once-per-entity door | Policy ruling 12 in `failopen.md` holds the readings and where each form belongs | `agent` hydrate guards |
