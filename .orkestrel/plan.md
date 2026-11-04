@@ -24,6 +24,8 @@ The user, 2026-11-04, on hardening: "Let's continue with the hardening scope". A
 - **Release bar.** A finding outside a row's claims blocks if it returns a wrong result as success, bypasses an authority or a refusal, makes a contract refuse its own valid value, allows a hang or unbounded cost from untrusted input, loses or corrupts stored data, or breaks a consumer at install. In `@orkestrel/contract`, every substantiated finding blocks, by the user's word. Anything else enters § Deferred, which the user can lift.
 - **One take-up per package.** `contract`'s additions land first, and each dependent takes them in one pass.
 - **Stops.** `contract`: its latest review failed 6 of 11 claims, so one `analyst` pass asks whether a generated test of its three laws replaces further review rounds. Every other seam: one review, one fix round; a second round needs its stop stated in the brief.
+- **The law between a guard and its contract names the representation.** A definition needs `is` to imply the structural guard, with semantic validation after it. A result needs `wire.is(project(result))` on every outcome its producer advertises, refusals included, and raw `guard` implying `is` is not required, so runtime guards keep `NaN` and host values. A foreign value stays open. An owned snapshot passes its contract and survives restoration.
+- **The standing check is a table in each package's tests, not a shared engine.** Each pair declares its direction and projection, with a canonical positive case and a negative control, using `contract`'s generator and `@orkestrel/test`'s values and actual producer outputs. A generated value the guard refuses stays visible.
 - **Real runs are the deep instrument.** The model's example and its evaluation, `test:studies`, and the live `ollama` project read what reviews miss.
 
 ## Repositories
@@ -54,7 +56,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study`, `mcp`, `qualifier`, `rater`, `interpret` read; `program`, `brief` open | `ledger.md` |
 | Live proofs on the dedicated daemon | `ollama` at `9ef095b` and `4109f7e`, 14 files, 82 passed | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | `learn` builds the skeleton; here, read the four censuses and rule each hit, then finish `contract`'s corrections and its design question, the door with `tool` first, one take-up per package and `database`; then the falsify round, then `verifier` | § How the wave runs; § Sequence; `learn`'s plan |
+| Next action | `learn` builds the skeleton; here, finish `contract`'s corrections and its generated test, the door with `tool` first, one take-up per package and `database`; then the falsify round, then `verifier` | § How the wave runs; § Sequence; `learn`'s plan |
 
 ## Sequence
 
@@ -62,8 +64,8 @@ Each unit's role runs on the Codex column of `.agents/orchestration.md` § Roles
 
 | Step | Units | Done when |
 | --- | --- | --- |
-| Censuses | one per class across every package | each hit ruled: a row, § Deferred, or no defect |
-| `contract`, one writer at a time | corrections to a nested `shape` that `is` refuses and to `rawShape`'s paths; then `admitValue` and `describeFaults` with `@orkestrel/tool` as the first consumer, then `workflow`, `reason`, `toolbox`, `ollama`, `study`, and `agent` taking them with no shim | each proved in `tool` before spreading |
+| `contract`, one writer at a time | corrections to a nested `shape` that `is` refuses and to `rawShape`'s paths; a generated test of the three laws; then `admitValue`, `describeFaults`, and `auditFaultShape` with `@orkestrel/tool` as the first consumer | each proved in `tool` before spreading |
+| One take-up per package, layer order | `reason`, `qualifier`, `rater`, `interpret`, `program`, `brief`, `workflow`, `toolbox`, `ollama`, `study`, `agent`: `contract`'s additions with no shim, the standing check, and each package's census rows. `agent`: `Conversation` projects a stored call and refuses non-JSON `arguments`, and `isJudgeAnswer` matches its contract. `workflow`: its raw-id lines. `interpret`: roots narrow to records | failing test and mutation probe per row; gates green |
 | `database` | every exhaustive switch on `category` takes `shape`, once `contract` is final; `SQLiteDriver` requires `path`, with `':memory:'` explicit, since an absent path loses data at close; `requireColumns` bounds a table name; a census of the other consumers by type check | failing test and mutation probe recorded |
 | Family | `interpret`'s last rows, `program`'s review, then `brief` | the same, with one independent review |
 | Independent reviews | `program`, `brief` | each finding fixed, deferred, or ruled out |
