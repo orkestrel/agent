@@ -1876,6 +1876,28 @@ export function buildCategoryAnswer(
 	}
 }
 
+/** Holds the answer forms a judge returns, the owned half of the answer lockstep. */
+export const JUDGE_ANSWER_FIXTURES: readonly unknown[] = Object.freeze([
+	{ form: 'noul', noul: 0.9 },
+	{ form: 'score', probabilities: [0.1, 0.9] },
+	{ form: 'choice', probabilities: { billing: 0.1, bug: 0.9 } },
+])
+
+/** Holds answer values a stored record cannot carry, the refused half of the answer lockstep. */
+export const JUDGE_ANSWER_REFUSALS: readonly unknown[] = Object.freeze([
+	null,
+	{},
+	{ form: 'other', noul: 1 },
+	{ form: 'noul' },
+	{ form: 'noul', noul: Number.NaN },
+	{ form: 'noul', noul: 0.9, note: 'refused' },
+	{ form: 'noul', noul: 0.9, probabilities: undefined },
+	{ form: 'score', probabilities: [0, '1'] },
+	{ form: 'score', probabilities: { a: 1 } },
+	{ form: 'choice', probabilities: { yes: '1' } },
+	{ form: 'choice', probabilities: [0.5, 0.5] },
+])
+
 /** Holds the question forms a judge reads, the owned half of the question lockstep. */
 export const JUDGE_QUESTION_FIXTURES: readonly unknown[] = Object.freeze([
 	{ form: 'noul' },

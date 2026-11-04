@@ -6487,15 +6487,12 @@ await new GuideCommand({
 			})
 
 			expect(barrel.isJudgment.name).toBe('')
-			expect(barrel.isMemo.name).toBe('')
 			expect(barrel.isJudgment(record)).toBe(true)
 			expect(barrel.isJudgment({ ...record, usage: undefined })).toBe(false)
 			expect(guideText).toContain(
 				'A judgment whose `usage` member is present with the value `undefined` is refused',
 			)
-			expect(guideText).toContain(
-				'`isJudgment` and `isMemo` are guard constants, so each reads an empty `.name`.',
-			)
+			expect(guideText).toContain('`isJudgment` is a guard constant, so it reads an empty `.name`.')
 		})
 
 		it('renders an index entry as one line', () => {

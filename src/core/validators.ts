@@ -1,7 +1,8 @@
-import type { JudgeEntry, JudgeQuestion } from './types.js'
+import type { JudgeAnswer, JudgeEntry, JudgeQuestion } from './types.js'
 import {
 	arrayOf,
 	attempt,
+	holds,
 	isArray,
 	isFiniteNumber,
 	isJSONValue,
@@ -85,6 +86,39 @@ export function isJudgeQuestion(value: unknown): value is JudgeQuestion {
 		)
 	})
 	return checked.success && checked.value
+}
+
+/**
+ * Checks whether a value is a stored judge answer of the choice, score, or noul form.
+ *
+ * @remarks
+ * Total: an untrusted input returns false. The guard is exact on the answer's own keys and reads each
+ * probability as a finite number. Whether a probability is in `[0, 1]`, and whether the answer fits
+ * its question, belong to the write, so a record an earlier version stored still reads. Every
+ * judgment of a hydrate reads this guard, so it counts keys by hand rather than through a built one,
+ * and `judgeAnswerContract` holds it in lockstep: an answer the contract accepts passes here.
+ *
+ * @param value - The value to test
+ * @returns True if the value has the shape of a {@link JudgeAnswer}; false otherwise
+ * @example
+ * ```ts
+ * isJudgeAnswer({ form: 'noul', noul: 0.9 }) // true
+ * isJudgeAnswer({ form: 'choice', probabilities: { billing: 1 } }) // true
+ * isJudgeAnswer({ form: 'noul', noul: 0.9, note: 'extra' }) // false
+ * ```
+ */
+export function isJudgeAnswer(value: unknown): value is JudgeAnswer {
+	return holds(() => {
+		if (!isRecord(value) || Object.keys(value).length !== 2) return false
+		const { form, noul, probabilities } = value
+		if (form === 'noul') return isFiniteNumber(noul)
+		if (form === 'score') return arrayOf(isFiniteNumber)(probabilities)
+		return (
+			form === 'choice' &&
+			isRecord(probabilities) &&
+			Object.values(probabilities).every(isFiniteNumber)
+		)
+	})
 }
 
 /**

@@ -12,15 +12,13 @@ import {
 	isObject,
 	isRecord,
 	isString,
-	literalOf,
 	optionalOf,
 	recordOf,
 	unionOf,
-	whereOf,
 } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
 import { MESSAGE_ROLES } from '../constants.js'
-import { isJudgeQuestion } from '../validators.js'
+import { isJudgeAnswer, isJudgeQuestion } from '../validators.js'
 
 /**
  * Checks whether a value satisfies the domain conversation-message contract.
@@ -127,19 +125,7 @@ export const isJudgment: Guard<Judgment> = unionOf(
 			state: isString,
 			time: isFiniteNumber,
 			usage: isTokenUsage,
-			answer: unionOf(
-				recordOf({ form: literalOf('noul'), noul: isFiniteNumber }),
-				recordOf({
-					form: literalOf('score'),
-					probabilities: arrayOf(isFiniteNumber),
-				}),
-				recordOf({
-					form: literalOf('choice'),
-					probabilities: whereOf(isRecord, (value): value is Readonly<Record<string, number>> =>
-						Object.values(value).every(isFiniteNumber),
-					),
-				}),
-			),
+			answer: isJudgeAnswer,
 		},
 		['usage'],
 	),

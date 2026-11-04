@@ -1,6 +1,6 @@
 import { MEMO_SNAPSHOT_FIXTURES, MEMO_SNAPSHOT_REFUSALS } from '../../../setup.js'
 import { memoSnapshotContract } from '@src/core'
-import { createMemoManager, isMemo, isMemoSnapshot } from '@src/core'
+import { createMemoManager, isMemo, isMemoOrigin, isMemoSnapshot } from '@src/core'
 import { createRecorder, roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 
@@ -103,6 +103,24 @@ describe('isMemo', () => {
 		})
 
 		expect(isMemo(revision)).toBe(false)
+	})
+})
+
+describe('isMemoOrigin', () => {
+	it('accepts a conversation with and without its message', () => {
+		expect(isMemoOrigin({ conversation: 'c1' })).toBe(true)
+		expect(isMemoOrigin({ conversation: 'c1', message: 'm1' })).toBe(true)
+	})
+
+	it.each([
+		[null],
+		[{}],
+		[{ conversation: 1 }],
+		[{ conversation: 'c1', message: 1 }],
+		[{ conversation: 'c1', message: undefined }],
+		[{ conversation: 'c1', extra: true }],
+	])('refuses origin %#', (value) => {
+		expect(isMemoOrigin(value)).toBe(false)
 	})
 })
 

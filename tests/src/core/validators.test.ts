@@ -1,6 +1,8 @@
 import {
 	isJudgeEntry,
+	isJudgeAnswer,
 	isJudgeQuestion,
+	judgeAnswerContract,
 	isNonNegativeSafeInteger,
 	isPositiveSafeInteger,
 	judgeQuestionContract,
@@ -10,6 +12,8 @@ import { createHostileValues } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	approveEvery,
+	JUDGE_ANSWER_FIXTURES,
+	JUDGE_ANSWER_REFUSALS,
 	JUDGE_QUESTION_FIXTURES,
 	JUDGE_QUESTION_REFUSALS,
 	TEV1_REQUEST,
@@ -184,6 +188,26 @@ describe('isPositiveSafeInteger', () => {
 describe('isJudgeEntry and isJudgeQuestion — exact, and in lockstep with their shapes', () => {
 	it.each(['', [], {}])('refuses the empty entry %j', (entry) => {
 		expect(isJudgeEntry(entry)).toBe(false)
+	})
+
+	it.each(JUDGE_ANSWER_FIXTURES)('holds both ways on the owned answer %#', (answer) => {
+		expect(judgeAnswerContract.is(answer)).toBe(true)
+		expect(isJudgeAnswer(answer)).toBe(true)
+	})
+
+	it.each(JUDGE_ANSWER_REFUSALS)('refuses the answer value %#', (value) => {
+		expect(judgeAnswerContract.is(value)).toBe(false)
+		expect(isJudgeAnswer(value)).toBe(false)
+	})
+
+	it('reads a stored probability outside [0, 1], which only a write refuses', () => {
+		const stored = { form: 'noul', noul: 2 }
+		expect(judgeAnswerContract.is(stored)).toBe(false)
+		expect(isJudgeAnswer(stored)).toBe(true)
+	})
+
+	it('contains every hostile answer value', () => {
+		expect(createHostileValues().filter((value) => isJudgeAnswer(value))).toEqual([])
 	})
 
 	it.each(JUDGE_QUESTION_FIXTURES)('holds both ways on the owned question %#', (question) => {

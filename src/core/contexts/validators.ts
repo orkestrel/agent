@@ -1,6 +1,33 @@
-import type { Memo, MemoSnapshot } from './types.js'
-import type { Guard } from '@orkestrel/contract'
-import { arrayOf, isFiniteNumber, isString, recordOf } from '@orkestrel/contract'
+import type { Memo, MemoOrigin, MemoSnapshot } from './types.js'
+import { arrayOf, holds, isFiniteNumber, isRecord, isString } from '@orkestrel/contract'
+
+/**
+ * Checks whether a value is a memo's origin: a record with a string `conversation` and an optional
+ * string `message`.
+ *
+ * @remarks
+ * The guard is exact: an unknown member and an own `undefined` `message` return false. Malformed and
+ * unreadable inputs return false.
+ *
+ * @param value - The value to test
+ * @returns True if `value` has the shape of a {@link MemoOrigin}; false otherwise
+ * @example
+ * ```ts
+ * isMemoOrigin({ conversation: 'c1', message: 'm1' }) // true
+ * isMemoOrigin({ conversation: 'c1', extra: true }) // false
+ * ```
+ */
+export function isMemoOrigin(value: unknown): value is MemoOrigin {
+	return holds(() => {
+		if (!isRecord(value)) return false
+		const { conversation, message } = value
+		return (
+			isString(conversation) &&
+			(message === undefined || isString(message)) &&
+			Object.keys(value).length === (message === undefined ? 1 : 2)
+		)
+	})
+}
 
 /**
  * Checks whether a value is a stored memo revision: a record with a string `id`, `name`,
@@ -11,7 +38,8 @@ import { arrayOf, isFiniteNumber, isString, recordOf } from '@orkestrel/contract
  * `message`. The guard is exact: an unknown member and an own `undefined` optional return false. The
  * `time` must be finite, because a stored revision is owned through JSON, which turns `NaN` and the
  * infinities into `null`. Malformed and unreadable inputs, a throwing getter or a revoked proxy
- * included, return false.
+ * included, return false. Every revision of a hydrate reads this guard, so it counts keys by hand
+ * rather than through a built one, and `memoSnapshotContract` holds it in lockstep.
  *
  * @param value - The value to test
  * @returns True if `value` has the shape of a {@link Memo}; false otherwise
@@ -24,17 +52,21 @@ import { arrayOf, isFiniteNumber, isString, recordOf } from '@orkestrel/contract
  * isMemo({ id: 'm1', name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.', time: Number.NaN }) // false
  * ```
  */
-export const isMemo: Guard<Memo> = recordOf(
-	{
-		id: isString,
-		name: isString,
-		description: isString,
-		content: isString,
-		time: isFiniteNumber,
-		origin: recordOf({ conversation: isString, message: isString }, ['message']),
-	},
-	['origin'],
-)
+export function isMemo(value: unknown): value is Memo {
+	return holds(() => {
+		if (!isRecord(value)) return false
+		const { id, name, description, content, time, origin } = value
+		return (
+			isString(id) &&
+			isString(name) &&
+			isString(description) &&
+			isString(content) &&
+			isFiniteNumber(time) &&
+			(origin === undefined || isMemoOrigin(origin)) &&
+			Object.keys(value).length === (origin === undefined ? 5 : 6)
+		)
+	})
+}
 
 /**
  * Checks whether a value is a stored memo set: a record with a string `id` and a dense `memos`
@@ -56,5 +88,9 @@ export const isMemo: Guard<Memo> = recordOf(
  * ```
  */
 export function isMemoSnapshot(value: unknown): value is MemoSnapshot {
-	return recordOf({ id: isString, memos: arrayOf(isMemo) })(value)
+	return holds(() => {
+		if (!isRecord(value) || Object.keys(value).length !== 2) return false
+		const { id, memos } = value
+		return isString(id) && arrayOf(isMemo)(memos)
+	})
 }
