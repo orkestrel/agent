@@ -560,9 +560,8 @@ export interface AgentOptions {
 	 * Each turn snapshots the scope's tool allow-list before advertising and checks calls
 	 * against that list before applying authority. A call whose name no definition advertises is
 	 * denied the same way, whatever the authority would decide.
-	 * A reply to a turn advertising no tools ends the run as its answer, records an assistant
-	 * message without calls, and emits a `deny` event for every dropped call without marking it partial.
-	 * Other scoped-out calls produce denial tool results and messages, and the loop continues.
+	 * Every scoped-out call, one in a turn advertising no tools included, produces a denial tool
+	 * result and message and a `deny` event, and the loop continues.
 	 * A scope change through the context's `apply` method applies the tool allow-list at the next
 	 * turn's snapshot, which a `turn` listener reaches for the same turn, and the instructions,
 	 * skills, memos, files, and `select` at the next build or select site: run entry, the pre-first-turn
@@ -570,7 +569,7 @@ export interface AgentOptions {
 	 */
 	readonly scope?: ScopeInterface
 	/**
-	 * Caps the tool-iteration turns before the loop stops, as a nonnegative safe integer.
+	 * Caps the tool-iteration turns before the loop stops, as a positive safe integer.
 	 * Thrown as an `AgentError` with code `'LIMIT'` when it is not. Default: `DEFAULT_AGENT_LIMIT`.
 	 */
 	readonly limit?: number
@@ -652,10 +651,12 @@ export interface AgentOptions {
 	 * still finds over the window, equal to `max` included, after the one permitted fold, or that
 	 * cannot fold, is refused before the provider is called: the run settles `error` with an
 	 * `AgentError` coded `'WINDOW'` whose `context` holds the `agent`, the measured `consumed`, and
-	 * the window `max`, and no `fault` fires for it. If `false`, the run continues — over-window
-	 * after a summarizer failure or a futile fold, and on the run's conversation's `view()` after a
-	 * selection fault. A cancel at a selection site or a fold, a `fault` listener's included, settles
-	 * partial instead of `error`. Default: `false`.
+	 * the window `max`, and no `fault` fires for it. A final answer that misses the run's `schema`
+	 * settles `error` with an `AgentError` coded `'SCHEMA'`. If `false`, the run continues —
+	 * over-window after a summarizer failure or a futile fold, on the run's conversation's `view()`
+	 * after a selection fault, and with the raw content after a schema miss, which emits `fault`. A
+	 * cancel at a selection site or a fold, a `fault` listener's included, settles partial instead of
+	 * `error`. Default: `true`.
 	 */
 	readonly strict?: boolean
 	/**
@@ -692,13 +693,18 @@ export interface AgentRunOptions {
 	readonly think?: boolean
 	/**
 	 * Constrains the response to this JSON-Schema shape, forwarded to the provider's `stream`
-	 * as {@link ProviderStreamOptions.schema} — a per-run structured-output request. Omitted ⇒
-	 * no constraint (the loop sends no schema).
+	 * as {@link ProviderStreamOptions.schema} — a per-run structured-output request, and enforced: the
+	 * final answer must parse as JSON and satisfy the schema, through the lenient `schemaToShape`. A
+	 * miss under {@link AgentOptions.strict} settles the run `error` with an `AgentError` coded
+	 * `'SCHEMA'` whose `context` holds the `faults` and stores no answer; under `strict: false` it emits
+	 * `fault` with that error and settles with the raw content, the opt-out for a provider that ignores
+	 * schemas. A `truncated` answer skips the check and keeps its `model` stop. Omitted ⇒ no constraint
+	 * (the loop sends no schema).
 	 */
 	readonly schema?: Readonly<Record<string, unknown>>
 	/**
 	 * Overrides {@link AgentOptions.limit} for this run only — the max tool-iteration turns
-	 * before the loop stops, as a nonnegative safe integer; the call throws an `AgentError` with
+	 * before the loop stops, as a positive safe integer; the call throws an `AgentError` with
 	 * code `'LIMIT'` when it is not. Omitted ⇒ the agent's constructed `limit` applies.
 	 */
 	readonly limit?: number
@@ -797,7 +803,7 @@ export interface AgentInterface {
 	 * A run started while another is live throws an {@link import('./errors.js').AgentError} with
 	 * `code: 'CONCURRENCY'` when the agent carries a `window`, when the run's effective
 	 * `budget` or `allowance` is an instance a live run holds, or when a live run is bound to the
-	 * run's conversation; a run whose `limit` is not a nonnegative safe
+	 * run's conversation; a run whose `limit` is not a positive safe
 	 * integer throws one with `code: 'LIMIT'`. A `prompt` that `agentPromptContract` refuses, a
 	 * `budget` or `allowance` that does not implement `BudgetInterface`, or a `conversation` that
 	 * does not implement `ConversationInterface`, throws a `ContractError` with code `'placement'`
@@ -809,7 +815,7 @@ export interface AgentInterface {
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
-	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
 	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, or the `conversation` does not implement `ConversationInterface` (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
@@ -821,7 +827,7 @@ export interface AgentInterface {
 	 * @remarks
 	 * Like `generate()`, a run that would share the `window`, a live run's budget or allowance
 	 * instance, or a live run's conversation throws an {@link import('./errors.js').AgentError} with
-	 * `code: 'CONCURRENCY'`, an invalid `limit` throws one with `code: 'LIMIT'`, and a `prompt` that
+	 * `code: 'CONCURRENCY'`, a `limit` that is not a positive safe integer throws one with `code: 'LIMIT'`, and a `prompt` that
 	 * `agentPromptContract` refuses, a `budget` or `allowance` that does not implement
 	 * `BudgetInterface`, or a `conversation` that does not implement `ConversationInterface` throws a
 	 * `ContractError` with code `'placement'`, synchronously — before the
@@ -836,7 +842,7 @@ export interface AgentInterface {
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
-	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
 	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, or the `conversation` does not implement `ConversationInterface` (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
@@ -982,8 +988,8 @@ export interface AuthorityNote {
 export interface AgentJobInput {
 	/** Names the registry key of the {@link ProviderInterface} the job runs against. */
 	readonly provider: string
-	/** Holds the seed conversation added to the rehydrated agent's context (serializable). */
-	readonly messages: readonly MessageInput[]
+	/** Holds the seed conversation added to the rehydrated agent's context (serializable). Default: an empty seed. */
+	readonly messages?: readonly MessageInput[]
 	/** Holds an optional system prompt seeding the agent's context. */
 	readonly system?: string
 	/** Names the registry keys of the values of {@link ToolInterface} loaded into the agent's tool manager; a non-empty list requires `authority`. */

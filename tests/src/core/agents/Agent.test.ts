@@ -50,6 +50,7 @@ import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import { createScheduler } from '@orkestrel/workflow'
 import {
 	attempt,
+	isArray,
 	isContractError,
 	numberShape,
 	objectShape,
@@ -1025,9 +1026,7 @@ describe('Agent — tool iteration', () => {
 		agent.context.messages.add({ role: 'user', content: 'add' })
 		await agent.generate()
 		expect(executed.calls).toEqual([])
-		expect(provider.calls[1]?.messages.at(-1)?.content).toBe(
-			'z: extra; this key is not declared, remove it',
-		)
+		expect(provider.calls[1]?.messages.at(-1)?.content).toContain('z: extra')
 	})
 
 	it('dispatches a tool call then finishes with the follow-up turn', async () => {
@@ -2174,9 +2173,17 @@ describe('Agent — cancellation timing matrix', () => {
 			expect(await collect(stream.events)).toContainEqual({
 				category: 'tool',
 				call,
-				result: { id: call.id, name: call.name, success: true, value: 'entered' },
+				result: {
+					id: call.id,
+					name: call.name,
+					success: true,
+					value: 'entered',
+				},
 			})
-			expect(await stream.result).toMatchObject({ content: 'done', partial: false })
+			expect(await stream.result).toMatchObject({
+				content: 'done',
+				partial: false,
+			})
 		},
 	)
 
@@ -2655,6 +2662,17 @@ describe('Agent — limit boundary', () => {
 })
 
 // ── Provider failure modes (scripted) ────────────────────────────────────────
+
+describe('Agent — a refused prompt names what it refused', () => {
+	it('lists the faults in its text', () => {
+		const agent = createAgent(createScriptedProvider([{ content: 'never' }]))
+		const error = captureError(() =>
+			Reflect.apply(agent.stream, agent, [{ prompt: { content: 'x', role: 'user' } }]),
+		)
+		expect(isContractError(error) && error.code).toBe('placement')
+		expect(isContractError(error) && error.message).toContain('role: extra')
+	})
+})
 
 describe('Agent — strict by default', () => {
 	it('refuses a request over the window when strict is not passed', async () => {
@@ -4704,9 +4722,73 @@ describe('Agent — per-run overrides', () => {
 // `schema` (like `think`) is a per-run `ProviderStreamOptions` field: composed options
 // are passed to `provider.stream`, omitting undefined keys (an options object only when at
 // least one of `think` / `schema` is present -- preserving the prior think-only behavior).
+describe('Agent — the run schema is enforced', () => {
+	const closed = {
+		type: 'object',
+		properties: { a: { type: 'number' } },
+		required: ['a'],
+		additionalProperties: false,
+	}
+
+	it.each([
+		['a missing required key', '{}', 'missing'],
+		['a string where a number is declared, and an undeclared key', '{"a":"5","zzz":1}', 'extra'],
+		['text that is not JSON', 'Sure, here it is.', 'type'],
+	])('settles error with SCHEMA under the default on %s', async (_name, content, reason) => {
+		const provider = createScriptedProvider([{ content }], AGENT_SCRIPT_OPTIONS)
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const agent = createAgent(provider, {
+			on: { fault: faults.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const error = await agent.generate({ schema: closed }).catch((caught: unknown) => caught)
+		expect(isAgentError(error) && error.code).toBe('SCHEMA')
+		const carried = isAgentError(error) ? error.context?.faults : undefined
+		expect(JSON.stringify(carried)).toContain(`"reason":"${reason}"`)
+		expect(isArray(carried)).toBe(true)
+		expect(agent.status).toBe('error')
+		expect(faults.calls).toEqual([])
+		expect(agent.context.messages.messages().map((message) => message.role)).toEqual(['user'])
+	})
+
+	it('settles an answer that satisfies the schema', async () => {
+		const provider = createScriptedProvider([{ content: '{"a":5}' }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		expect((await agent.generate({ schema: closed })).content).toBe('{"a":5}')
+	})
+
+	it('keeps the model stop and no SCHEMA on a truncated answer', async () => {
+		const provider = createScriptedProvider(
+			[{ result: { content: '{"a":', truncated: true } }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate({ schema: closed })
+		expect(result.stop?.layer).toBe('model')
+		expect(result.content).toBe('{"a":')
+	})
+
+	it('emits fault and settles with the raw content under strict: false', async () => {
+		const provider = createScriptedProvider([{ content: 'plain text' }], AGENT_SCRIPT_OPTIONS)
+		const faults = createRecorder<AgentEventMap['fault']>()
+		const agent = createAgent(provider, {
+			strict: false,
+			on: { fault: faults.handler },
+		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		const result = await agent.generate({ schema: closed })
+		expect(result.content).toBe('plain text')
+		expect(faults.calls).toHaveLength(1)
+		const [fault] = requireValue(faults.calls[0])
+		expect(isAgentError(fault) && fault.code).toBe('SCHEMA')
+	})
+})
+
 describe('Agent — per-run schema', () => {
 	it('forwards a per-run schema alone', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'ok' } }], AGENT_SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: '{}' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const schema: Readonly<Record<string, unknown>> = { type: 'object' }
@@ -4715,7 +4797,7 @@ describe('Agent — per-run schema', () => {
 	})
 
 	it('forwards think AND schema together when both are set', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'ok' } }], AGENT_SCRIPT_OPTIONS)
+		const provider = createScriptedProvider([{ result: { content: '{}' } }], AGENT_SCRIPT_OPTIONS)
 		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'hi' })
 		const schema: Readonly<Record<string, unknown>> = { type: 'object' }
@@ -5287,8 +5369,14 @@ describe('Agent — complete-request window admission', () => {
 			tools.add(createTool({ name: 'other', execute: () => 'o' }))
 			const provider = createScriptedProvider(
 				[
-					{ result: { content: '', thinking: 'first', tools: [createToolCall()] } },
-					{ result: { content: 'done' } },
+					{
+						result: {
+							content: '',
+							thinking: 'first',
+							tools: [createToolCall()],
+						},
+					},
+					{ result: { content: '{}' } },
 				],
 				{ ...AGENT_SCRIPT_OPTIONS, replay },
 			)
@@ -6945,9 +7033,18 @@ describe('Agent — three failure layers', () => {
 		const reported: TokenUsage = { prompt: 2, completion: 3, total: 4 }
 		const deltas = Array.from({ length: 10 }, () => 'abcde')
 		for (const [turn, billed] of [
-			[{ result: { content: deltas.join(''), usage: reported }, deltas }, reported],
 			[
-				{ result: { content: 'Once upon a time' }, deltas: story.deltas },
+				{
+					result: { content: deltas.join(''), usage: reported },
+					deltas,
+				},
+				reported,
+			],
+			[
+				{
+					result: { content: 'Once upon a time' },
+					deltas: story.deltas,
+				},
 				{ prompt: 0, completion: 4, total: 4 },
 			],
 		] as const) {

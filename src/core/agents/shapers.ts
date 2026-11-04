@@ -2,14 +2,38 @@ import type { ContractShape } from '@orkestrel/contract'
 import {
 	arrayShape,
 	booleanShape,
+	jsonShape,
 	literalShape,
 	numberShape,
 	objectShape,
 	optionalShape,
+	recordShape,
 	stringShape,
 	unionShape,
 } from '@orkestrel/contract'
-import { tokenUsageShape } from '../shapers.js'
+import { messageInputShape, tokenUsageShape } from '../shapers.js'
+
+/**
+ * Describes a durable agent job — the record `AgentRegistry.build` checks exactly, so a misspelled key
+ * refuses instead of running an agent without it.
+ *
+ * @remarks
+ * `children` holds JSON records, because each child crosses this shape at its own `build`. `limit`
+ * reads as a number here and as a positive safe integer at the agent's construction, which owns that
+ * refusal.
+ */
+export const agentJobShape = objectShape({
+	provider: stringShape(),
+	messages: optionalShape(arrayShape(messageInputShape)),
+	system: optionalShape(stringShape()),
+	tools: optionalShape(arrayShape(stringShape())),
+	authority: optionalShape(stringShape()),
+	scheduler: optionalShape(stringShape()),
+	limit: optionalShape(numberShape()),
+	timeout: optionalShape(numberShape()),
+	budget: optionalShape(numberShape()),
+	children: optionalShape(arrayShape(recordShape(jsonShape()))),
+}) satisfies ContractShape
 
 /**
  * Describes the agent frame wire — one exact object per `AgentFrame` arm, discriminated by

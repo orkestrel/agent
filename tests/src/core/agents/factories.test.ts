@@ -4,7 +4,6 @@ import { createRecorder, waitForCondition, waitForEvent } from '@orkestrel/test'
 import {
 	JOB_USAGE,
 	PARTIAL_TURNS,
-	AGENT_JOB_SHAPE,
 	createObservedGatedProvider,
 	createTurnRegistry,
 } from '../../../setup.js'
@@ -28,6 +27,7 @@ import {
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
 import {
+	AGENT_JOB_SHAPE,
 	AGENT_AUTHORITY,
 	createAgentJob,
 	createScriptedProvider,

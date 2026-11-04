@@ -111,6 +111,36 @@ describe('AgentRegistry — build (rehydration)', () => {
 		expect(isConversationError(error) && error.code).toBe('ROLE')
 	})
 
+	it('refuses a job with a misspelled key, naming it under an extra fault', () => {
+		const registry = createAgentRegistry({
+			providers: { p: createScriptedProvider([]) },
+		})
+		const error = captureError(() =>
+			Reflect.apply(registry.build, registry, [{ provider: 'p', authorty: 'a' }]),
+		)
+		expect(isAgentError(error) && error.code).toBe('REGISTRY')
+		expect(isAgentError(error) && error.context).toEqual({
+			faults: [{ reason: 'extra', path: ['authorty'] }],
+		})
+	})
+
+	it('refuses a job member of the wrong type, with no repair', () => {
+		const registry = createAgentRegistry({
+			providers: { p: createScriptedProvider([]) },
+		})
+		const error = captureError(() =>
+			Reflect.apply(registry.build, registry, [{ provider: 'p', limit: '3' }]),
+		)
+		expect(isAgentError(error) && error.code).toBe('REGISTRY')
+	})
+
+	it('builds a job with no messages, an empty seed', () => {
+		const registry = createAgentRegistry({
+			providers: { p: createScriptedProvider([]) },
+		})
+		expect(registry.build({ provider: 'p' }).context.messages.messages()).toEqual([])
+	})
+
 	it('refuses a job that names tools and no authority at build', () => {
 		const provider = createScriptedProvider([{ content: 'ok' }])
 		const registry = createAgentRegistry({

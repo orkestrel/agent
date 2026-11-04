@@ -42,6 +42,7 @@ import {
 } from '@orkestrel/contract'
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
+import { describeFaults } from '@orkestrel/tool'
 import { AgentContext } from '../contexts/index.js'
 import { raceSignal } from '../conversations/index.js'
 import { AUTHORITY_NOTES, DEFAULT_AGENT_LIMIT, SCOPE_NOTE } from './constants.js'
@@ -52,8 +53,8 @@ import {
 	assembleResult,
 	chargeUsage,
 	denyCall,
-	estimateTokens,
 	inferStop,
+	requireAnswer,
 	requireBudget,
 	requireConversation,
 	requireLimit,
@@ -61,7 +62,13 @@ import {
 	settleToolResult,
 } from './helpers.js'
 import { isAuthorityDecision } from './validators.js'
-import { filterAllowList, sanitizeUsage, stripThinking, sumUsage } from '../helpers.js'
+import {
+	estimateTokens,
+	filterAllowList,
+	sanitizeUsage,
+	stripThinking,
+	sumUsage,
+} from '../helpers.js'
 import {
 	isProviderAbortError,
 	isProviderDelta,
@@ -233,10 +240,21 @@ export class Agent implements AgentInterface {
 		// The prompt is checked exactly before every other guard, so a refused prompt starts nothing.
 		const prompt = options?.prompt
 		if (prompt !== undefined && !agentPromptContract.is(prompt)) {
-			throw new ContractError('Agent: prompt must be an exact AgentPrompt', {
-				code: 'placement',
-				context: { path: ['options', 'prompt'], limit: 'AgentPrompt', received: preview(prompt) },
-			})
+			// A contract error's context declares no faults, so they travel in the text it carries.
+			const faults = attempt(() =>
+				describeFaults(agentPromptContract.audit(prompt), agentPromptContract.schema),
+			)
+			throw new ContractError(
+				`Agent: prompt must be an exact AgentPrompt${faults.success ? `\n${faults.value}` : ''}`,
+				{
+					code: 'placement',
+					context: {
+						path: ['options', 'prompt'],
+						limit: 'AgentPrompt',
+						received: preview(prompt),
+					},
+				},
+			)
 		}
 		// Resolve effective per-run bounds — a per-run override wins, else the construction
 		// default. `limit`, `budget`, and `allowance` also thread into `#execute` (the loop bound,
@@ -616,8 +634,20 @@ export class Agent implements AgentInterface {
 				})
 				continue
 			}
-			// No tools: this turn's content is the final answer — record it and finish.
-			conversation.add({ role: 'assistant', content: result.content, ...recorded })
+			// No tools: this turn's content is the final answer. A truncated answer is the model's stop,
+			// and a cancel already settles the run, so neither meets the schema.
+			if (schema !== undefined && result.truncated !== true && !abort.signal.aborted) {
+				const answered = attempt(() => requireAnswer(result.content, schema))
+				if (!answered.success) {
+					if (this.#strict) throw answered.error
+					this.#emitter.emit('fault', answered.error)
+				}
+			}
+			conversation.add({
+				role: 'assistant',
+				content: result.content,
+				...recorded,
+			})
 			turns.push({
 				...settled,
 				content: result.content,

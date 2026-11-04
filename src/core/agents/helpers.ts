@@ -20,7 +20,7 @@ import type {
 	RequestMeasure,
 } from './types.js'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
-import type { JSONValue } from '@orkestrel/contract'
+import type { AuditFault, JSONValue } from '@orkestrel/contract'
 import type { QueueContext, QueueOptions } from '@orkestrel/queue'
 import type { ToolCall, ToolDefinition, ToolResult } from '@orkestrel/tool'
 import { isBudget, isBudgetAmount, isBudgetError } from '@orkestrel/budget'
@@ -28,19 +28,23 @@ import {
 	attempt,
 	canonicalStringify,
 	ContractError,
+	createContract,
 	isBoolean,
 	isFiniteNumber,
 	isObject,
 	isString,
 	objectOf,
+	parseJSON,
 	parseJSONValue,
 	preview,
+	schemaToShape,
 } from '@orkestrel/contract'
+import { describeFaults } from '@orkestrel/tool'
 import { AUTHORITY_NOTES, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
 import { AgentError, AgentJobError } from './errors.js'
 import { isConversation } from '../conversations/index.js'
 import { isAuthorityDecision, isAuthorityVerdict } from './validators.js'
-import { hasCalls, renderJSON } from '../helpers.js'
+import { estimateTokens, hasCalls, renderJSON } from '../helpers.js'
 import { isPositiveSafeInteger } from '../validators.js'
 
 /**
@@ -356,31 +360,6 @@ export function inferStop(
 		consumed: reason.context.consumed,
 		...measured,
 	}
-}
-
-/**
- * Estimates the context-token footprint of a string — the deterministic `ceil(length / 4)`
- * character heuristic {@link estimateMessages} sums over a conversation's messages (the default
- * context-budget estimator).
- *
- * @remarks
- * Approximates `ceil(length / 4)` (4 characters per token), so the same input always yields the same estimate (no model round-trip).
- * Empty text is `0`. This is a planning heuristic for reasoning about how much a turn's
- * messages cost the next request, not an exact tokenizer count — it never calls a provider,
- * so the agent layer stays provider-agnostic and synchronous where it can be.
- *
- * @param text - The text to estimate (a section summary, a message's content)
- * @returns The estimated token count (`ceil(text.length / 4)`; `0` for empty text)
- *
- * @example
- * ```ts
- * estimateTokens('') // 0
- * estimateTokens('hello') // 2  (ceil(5 / 4))
- * estimateTokens('a'.repeat(40)) // 10
- * ```
- */
-export function estimateTokens(text: string): number {
-	return Math.ceil(text.length / 4)
 }
 
 /**
@@ -707,6 +686,58 @@ export function resolveDecision(
 ): AuthorityDecision {
 	const raised = decision.verdict === 'allow' && definition?.annotations?.consequential === true
 	return { ...decision, verdict: raised ? 'ask' : decision.verdict }
+}
+
+/**
+ * Checks a run's final answer against its schema: the content must parse as JSON and satisfy the
+ * schema, or the call throws a coded error carrying the faults.
+ *
+ * @remarks
+ * The schema enters through the lenient `schemaToShape`, which widens every keyword it cannot express
+ * and never narrows, because a provider constrains its own output and a false refusal would discard a
+ * good answer. The check is `is`, because `explain` alone passes what `parse` would repair. Each call
+ * compiles once, and a run has one final answer.
+ *
+ * @param content - The final answer's text
+ * @param schema - The run's JSON Schema
+ * @throws {AgentError} Thrown when the content is not JSON, misses the schema, or the schema does not compile (code `'SCHEMA'`), with the faults under `context.faults` for the first two
+ *
+ * @example
+ * ```ts
+ * requireAnswer('{"a":5}', { type: 'object', properties: { a: { type: 'number' } } })
+ * requireAnswer('nope', { type: 'object' }) // throws AgentError ('SCHEMA')
+ * ```
+ */
+export function requireAnswer(content: string, schema: Readonly<Record<string, unknown>>): void {
+	const compiled = attempt(() => createContract(schemaToShape(schema)))
+	if (!compiled.success) {
+		throw new AgentError(
+			'SCHEMA',
+			'the run schema does not compile; pass a JSON Schema built from plain values',
+			{ cause: compiled.error },
+		)
+	}
+	const parsed = parseJSON(content)
+	const faults: readonly AuditFault[] =
+		parsed === undefined
+			? [
+					{
+						reason: 'type',
+						path: [],
+						expected: 'json',
+						received: preview(content),
+					},
+				]
+			: compiled.value.is(parsed)
+				? []
+				: compiled.value.audit(parsed)
+	if (faults.length > 0) {
+		throw new AgentError(
+			'SCHEMA',
+			`the final answer does not satisfy the run schema; pass strict: false to take the raw content from a provider that ignores schemas\n${describeFaults(faults, compiled.value.schema)}`,
+			{ context: { faults } },
+		)
+	}
 }
 
 /**

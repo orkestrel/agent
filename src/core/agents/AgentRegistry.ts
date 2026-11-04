@@ -11,8 +11,9 @@ import type { ConversationStoreInterface } from '../conversations/index.js'
 import type { ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import { createTokenBudget } from '@orkestrel/budget'
-import { ToolManager } from '@orkestrel/tool'
+import { describeFaults, ToolManager } from '@orkestrel/tool'
 import { Agent } from './Agent.js'
+import { agentJobContract } from './contracts.js'
 import { AgentError } from './errors.js'
 import { ConversationManager } from '../conversations/index.js'
 import { requireEntry } from './helpers.js'
@@ -86,11 +87,20 @@ export class AgentRegistry implements AgentRegistryInterface {
 	}
 
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface {
+		// A job is an owned record, so it crosses exactly: no key is repaired, and a typo refuses.
+		const faults = agentJobContract.audit(input)
+		if (faults.length > 0) {
+			throw new AgentError(
+				'REGISTRY',
+				`a job must hold only the declared members of AgentJobInput\n${describeFaults(faults, agentJobContract.schema)}`,
+				{ context: { faults } },
+			)
+		}
 		const provider = this.provider(input.provider)
 		const agent = new Agent(provider, this.#buildOptions(input, signal))
 		// Seed the conversation onto the rehydrated agent's context — the serializable
 		// MessageInputs become stored messages (each id minted by the manager).
-		for (const message of input.messages) agent.context.messages.add(message)
+		for (const message of input.messages ?? []) agent.context.messages.add(message)
 		return agent
 	}
 
