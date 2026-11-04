@@ -15,6 +15,8 @@ import { removeEntries } from '../../helpers.js'
 import { MEMO_SECTION_HEADER } from '../constants.js'
 import { ContextError } from '../errors.js'
 import { renderIndexEntry } from '../helpers.js'
+import { describeFaults } from '@orkestrel/tool'
+import { memoSnapshotContract } from '../contracts.js'
 import { isMemoSnapshot } from '../validators.js'
 
 /**
@@ -73,9 +75,11 @@ export class MemoManager implements MemoManagerInterface {
 		const owned = supplied === undefined ? undefined : copyJSON(supplied)
 		const snapshot = isMemoSnapshot(owned) ? owned : undefined
 		if (supplied !== undefined && snapshot === undefined) {
+			const faults = memoSnapshotContract.audit(owned)
 			throw new ContextError(
 				'SNAPSHOT',
-				'context error: memo snapshot is malformed; pass what snapshot() returned',
+				`context error: memo snapshot is malformed; pass what snapshot() returned\n${describeFaults(faults, memoSnapshotContract.schema)}`,
+				{ context: { faults } },
 			)
 		}
 		// Restoring is silent: nothing was edited, so no event fires.

@@ -1,6 +1,12 @@
 import type { MemoSnapshot, MemoSnapshotRow, MemoStoreInterface } from '../types.js'
+import type { AuditFault } from '@orkestrel/contract'
 import type { TableInterface } from '@orkestrel/database'
+import { preview } from '@orkestrel/contract'
+import { describeFaults } from '@orkestrel/tool'
+import { memoSnapshotContract } from '../contracts.js'
+import { ContextError } from '../errors.js'
 import { isMemoSnapshot } from '../validators.js'
+import { describeSnapshotRefusal } from '../../helpers.js'
 
 /**
  * Backs a {@link MemoStoreInterface} with one table of the `databases` layer — a memo set's durable
@@ -24,8 +30,9 @@ import { isMemoSnapshot } from '../validators.js'
  *   the row `{ id: snapshot.id, snapshot }`.
  * - **`get(id)` resolves the stored snapshot for an id**, narrowing the opaque JSON column back to
  *   a {@link MemoSnapshot} ({@link import('../validators.js').isMemoSnapshot} — the total guard for
- *   an untrusted storage read), or `undefined` if none is stored, the blob is malformed, or the
- *   blob's own `id` is not the requested one.
+ *   an untrusted storage read), or `undefined` only when no row is stored. A row whose blob is malformed
+ *   or names another id throws a `ContextError` coded `'SNAPSHOT'`, so a host never overwrites it
+ *   unawares, and `delete` still removes it.
  * - **`delete(id)` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
  * @example
@@ -60,21 +67,38 @@ export class DatabaseMemoStore implements MemoStoreInterface {
 	 *
 	 * @remarks
 	 * The column is an untrusted storage read, so a blob that fails
-	 * {@link import('../validators.js').isMemoSnapshot}, or whose own `id` is not `id`, resolves
-	 * `undefined` rather than a memo set under the wrong key.
+	 * {@link import('../validators.js').isMemoSnapshot}, or whose own `id` is not `id`, throws rather
+	 * than reading as absent.
 	 *
 	 * @param id - The memo set id to resolve (the row key)
-	 * @returns The stored snapshot, or `undefined` when no row is stored, the blob is malformed, or
-	 * the blob names another id
+	 * @returns The stored snapshot, or `undefined` when no row is stored
+	 * @throws {ContextError} Thrown when the row's blob is malformed or names another id (code `'SNAPSHOT'`), with the faults under `context.faults`
 	 */
 	async get(id: string): Promise<MemoSnapshot | undefined> {
 		const row = await this.#table.get(id)
 		if (row === undefined) return undefined
 		// The snapshot crosses back as an untrusted storage read (a structured clone / a JSON row),
 		// so narrow the opaque JSON column with the total boundary guard rather than a cast;
-		// a malformed blob resolves `undefined`, never a broken memo set.
+		// `audit` runs only after the guard refused, to fill the faults.
 		const snapshot = row.snapshot
-		return isMemoSnapshot(snapshot) && snapshot.id === id ? snapshot : undefined
+		if (isMemoSnapshot(snapshot)) {
+			if (snapshot.id === id) return snapshot
+			const faults: readonly AuditFault[] = [
+				{
+					reason: 'type',
+					path: ['id'],
+					expected: 'literal',
+					received: preview(snapshot.id),
+				},
+			]
+			throw new ContextError('SNAPSHOT', describeSnapshotRefusal('memo set', id, faults), {
+				context: { id, faults },
+			})
+		}
+		const faults = memoSnapshotContract.audit(snapshot)
+		throw new ContextError('SNAPSHOT', describeSnapshotRefusal('memo set', id, faults), {
+			context: { id, faults },
+		})
 	}
 
 	/**
@@ -83,8 +107,18 @@ export class DatabaseMemoStore implements MemoStoreInterface {
 	 *
 	 * @param snapshot - The snapshot to store, keyed by its `id`
 	 * @returns A promise that resolves after the row is written
+	 * @throws {ContextError} Thrown before any write when the snapshot fails the guard `get` reads (code `'SNAPSHOT'`), so no row is written that `get` refuses
 	 */
 	async set(snapshot: MemoSnapshot): Promise<void> {
+		if (!isMemoSnapshot(snapshot)) {
+			const unchecked: unknown = snapshot
+			const faults = memoSnapshotContract.audit(unchecked)
+			throw new ContextError(
+				'SNAPSHOT',
+				`a memo store writes only what snapshot() returned\n${describeFaults(faults, memoSnapshotContract.schema)}`,
+				{ context: { faults } },
+			)
+		}
 		await this.#table.set({ id: snapshot.id, snapshot })
 	}
 

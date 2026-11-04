@@ -1,4 +1,6 @@
 import type { AgentContextInterface, MessageInput, Message, Selection } from '@src/core'
+import { isContextError } from '@src/core'
+import { captureError } from '@orkestrel/test'
 import { Tool, ToolManager } from '@orkestrel/tool'
 import {
 	WorkspaceManager,
@@ -687,9 +689,18 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		// appends the workspace image data after — own-first, then workspace.
 		const context = new AgentContext()
 		context.workspaces.add({
-			seed: [createFile({ path: 'ctx.png', content: createBinaryContent('CTX', 'image/png') })],
+			seed: [
+				createFile({
+					path: 'ctx.png',
+					content: createBinaryContent('CTX', 'image/png'),
+				}),
+			],
 		})
-		context.messages.add({ role: 'user', content: 'see this', images: ['OWN'] })
+		context.messages.add({
+			role: 'user',
+			content: 'see this',
+			images: ['OWN'],
+		})
 
 		const built = context.build()
 
@@ -711,17 +722,16 @@ describe('AgentContext — image data attachment (active workspace)', () => {
 		expect(stored.images).toBeUndefined()
 	})
 
-	it('skips attachment (no throw) when there is no user message', () => {
+	it('refuses the build when image files have no user turn to carry them', () => {
 		const context = new AgentContext()
 		context.workspaces.add({
 			seed: [createFile({ path: 'x.png', content: createBinaryContent('X', 'image/png') })],
 		})
 		context.messages.add({ role: 'assistant', content: 'no user here' })
 
-		const built = context.build()
+		const error = captureError(() => context.build())
 
-		// No message carries the data (the only turn is an assistant turn).
-		expect(built.some((message) => message.images !== undefined)).toBe(false)
+		expect(isContextError(error) && error.code).toBe('IMAGES')
 	})
 
 	it('does not touch messages when there are no images at all', () => {
@@ -1669,7 +1679,7 @@ describe('AgentContext — the system boundary canary', () => {
 		])
 	})
 
-	it('leaves the context message without images when the tail holds no user message', () => {
+	it('refuses IMAGES rather than dropping them when the tail holds no user message', () => {
 		const context = new AgentContext({ system: 'sys' })
 		const workspace = context.workspaces.add({
 			seed: [createFile({ path: 'scan.png', content: createBinaryContent('SCAN', 'image/png') })],
@@ -1677,13 +1687,10 @@ describe('AgentContext — the system boundary canary', () => {
 		workspace.write('notes.txt', 'NOTES')
 		context.messages.add({ role: 'assistant', content: 'no user here' })
 
-		const built = context.build()
+		const error = captureError(() => context.build())
 
-		expect(built.map(({ id, ...body }) => body)).toStrictEqual([
-			{ role: 'system', content: 'sys' },
-			{ role: 'user', content: '## Workspace\n\nFile: notes.txt\n```text\nNOTES\n```' },
-			{ role: 'assistant', content: 'no user here' },
-		])
+		expect(isContextError(error) && error.code).toBe('IMAGES')
+		expect(isContextError(error) && error.message).toContain('holds 1 image file(s)')
 	})
 
 	it('returns the tail alone for empty inputs', () => {
@@ -1885,9 +1892,17 @@ describe('AgentContext — the skills and memos indexes', () => {
 		})
 		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
 		const memos = createMemoManager({
-			format: { open: '<memos>', render: (one) => `<memo>${one.name}</memo>`, close: '</memos>' },
+			format: {
+				open: '<memos>',
+				render: (one) => `<memo>${one.name}</memo>`,
+				close: '</memos>',
+			},
 		})
-		memos.add({ name: 'tone', description: 'Prefers bullet lists.', content: 'Use bullet lists.' })
+		memos.add({
+			name: 'tone',
+			description: 'Prefers bullet lists.',
+			content: 'Use bullet lists.',
+		})
 
 		const built = new AgentContext({ skills, memos }).build()
 

@@ -1,5 +1,6 @@
 import type { Memo, Message } from '@src/core'
 import type { FileInterface } from '@orkestrel/workspace'
+import { isContextError } from '@src/core'
 import {
 	attachImages,
 	attachUserImages,
@@ -208,10 +209,17 @@ describe('attachUserImages — the image payload on a conversation last user tur
 		expect(attachUserImages(conversation, [])).toBe(conversation)
 	})
 
-	it('returns the conversation unchanged when it holds no user message', () => {
+	it('refuses image data when the conversation holds turns and no user message', () => {
 		const assistantOnly: readonly Message[] = [{ id: 'a', role: 'assistant', content: 'hi' }]
+		const error = captureError(() => attachUserImages(assistantOnly, ['payload']))
 
-		expect(attachUserImages(assistantOnly, ['payload'])).toBe(assistantOnly)
+		expect(isContextError(error) && error.code).toBe('IMAGES')
+	})
+
+	it('returns an empty conversation unchanged, because a head-only build holds no turn to refuse', () => {
+		const empty: readonly Message[] = []
+
+		expect(attachUserImages(empty, ['payload'])).toBe(empty)
 	})
 
 	it('merges after a user turn own images, through attachImages', () => {

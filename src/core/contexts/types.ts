@@ -11,7 +11,7 @@ import type { FileInput, FileInterface, WorkspaceManagerInterface } from '@orkes
  * @remarks
  * `'SNAPSHOT'`: a `snapshot` option that `isMemoSnapshot` refuses after it is copied through JSON.
  */
-export type ContextErrorCode = 'SNAPSHOT'
+export type ContextErrorCode = 'SNAPSHOT' | 'IMAGES'
 
 /**
  * Represents an immutable instruction — a named directive a richer context places between the

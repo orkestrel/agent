@@ -4,18 +4,21 @@ import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
 
 /**
  * Reports a context snapshot that `isMemoSnapshot` refuses, thrown by the construction of a
- * {@link import('./memos/MemoManager.js').MemoManager} before it seats any state, carrying the
- * machine-readable `code` `'SNAPSHOT'`.
+ * {@link import('./memos/MemoManager.js').MemoManager} before it seats any state or by a memo store,
+ * or image files a build has no user turn to carry, carrying the machine-readable `code`
+ * `'SNAPSHOT' | 'IMAGES'`.
  *
  * @remarks
  * A `snapshot` option crosses a foreign boundary (a client, a store, a file), so the manager copies
  * it through JSON and checks the copy: a value JSON cannot carry, a revision missing a field, a
  * non-finite `time`, a sparse `memos` array, a non-string `id`, or a non-array `memos` is a
- * programmer error and throws this with `'SNAPSHOT'`. Narrow a caught value with
- * {@link isContextError} and branch on `error.code`.
+ * programmer error and throws this with `'SNAPSHOT'`, its `context` holding the `faults`. A build
+ * over a conversation that holds turns and no user turn, with image files in the active workspace,
+ * throws `'IMAGES'` rather than dropping them. Narrow a caught value with {@link isContextError} and
+ * branch on `error.code`.
  */
 export class ContextError extends Error {
-	/** Names the machine-readable condition — `'SNAPSHOT'`: a snapshot option that is not a memo snapshot. */
+	/** Names the machine-readable condition — `'SNAPSHOT'`: a snapshot that is not a memo snapshot; `'IMAGES'`: image files with no user turn to carry them. */
 	readonly code: ContextErrorCode
 	/** Holds the values that locate the failure, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined
@@ -63,7 +66,7 @@ export function isContextError(value: unknown): value is ContextError {
 		)
 			return false
 		const code = INTRINSICS.reflect.read(value, 'code')
-		if (code !== 'SNAPSHOT') return false
+		if (code !== 'SNAPSHOT' && code !== 'IMAGES') return false
 		const context = INTRINSICS.reflect.read(value, 'context')
 		return context === undefined || isObject(context) || isFunction(context)
 	})

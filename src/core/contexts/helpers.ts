@@ -2,6 +2,7 @@ import type { Memo } from './types.js'
 import type { Message } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
+import { ContextError } from './errors.js'
 
 /**
  * Renders a path-addressed text body as a fenced reference block — a `File: <path>` label line
@@ -126,11 +127,16 @@ export function attachUserImages(
 	conversation: readonly Message[],
 	payloads: readonly string[],
 ): readonly Message[] {
-	if (payloads.length === 0) return conversation
+	if (payloads.length === 0 || conversation.length === 0) return conversation
 	const target = conversation.findLastIndex(
 		(message: Message | undefined) => message?.role === 'user',
 	)
-	if (target === -1) return conversation
+	if (target === -1) {
+		throw new ContextError(
+			'IMAGES',
+			`the active workspace holds ${payloads.length} image file(s) and the conversation holds no user turn to carry them; add a user message or scope the files out`,
+		)
+	}
 	return conversation.map((message, index) =>
 		index === target ? attachImages(message, payloads) : message,
 	)

@@ -1,3 +1,5 @@
+import { MEMO_SNAPSHOT_FIXTURES, MEMO_SNAPSHOT_REFUSALS } from '../../../setup.js'
+import { memoSnapshotContract } from '@src/core'
 import { createMemoManager, isMemo, isMemoSnapshot } from '@src/core'
 import { createRecorder, roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
@@ -12,7 +14,7 @@ describe('isMemo', () => {
 		expect(isMemo(memo)).toBe(true)
 		expect(isMemo({ ...memo, origin: { conversation: 'c1' } })).toBe(true)
 		expect(isMemo({ ...memo, origin: { conversation: 'c1', message: 'm4' } })).toBe(true)
-		expect(isMemo({ ...memo, extra: 'kept open' })).toBe(true)
+		expect(isMemo({ ...memo, extra: 'refused' })).toBe(false)
 	})
 
 	it('accepts every revision a manager mints, through a JSON round trip', () => {
@@ -157,5 +159,17 @@ describe('isMemoSnapshot', () => {
 		).toBe(false)
 		expect(reads.calls).toEqual([['memos']])
 		expect(isMemoSnapshot(revoked.proxy)).toBe(false)
+	})
+})
+
+describe('the memo guards, in lockstep with their shapes', () => {
+	it.each(MEMO_SNAPSHOT_FIXTURES)('holds both ways on the owned snapshot %#', (snapshot) => {
+		expect(isMemoSnapshot(snapshot)).toBe(true)
+		expect(memoSnapshotContract.is(snapshot)).toBe(true)
+	})
+
+	it.each(MEMO_SNAPSHOT_REFUSALS)('holds is ⟹ guard on the value %#', (value) => {
+		expect(isMemoSnapshot(value)).toBe(false)
+		expect(memoSnapshotContract.is(value)).toBe(false)
 	})
 })

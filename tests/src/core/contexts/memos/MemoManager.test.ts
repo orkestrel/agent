@@ -14,6 +14,18 @@ import { MALFORMED_MEMO_SNAPSHOTS, MEMO_EVENTS, MEMO_REVISION } from '../../../.
 // MemoManager is the name-keyed memo set: one append-ordered list of revisions from which the
 // current memos, each history, and the snapshot derive. Real behavior, no mocks.
 
+describe('MemoManager — hydrate is exact', () => {
+	it('refuses an unknown key, with the key in its faults', () => {
+		const error = captureError(() =>
+			Reflect.construct(MemoManager, [{ snapshot: { id: 'ada', memos: [], extra: 1 } }]),
+		)
+		expect(isContextError(error) && error.code).toBe('SNAPSHOT')
+		expect(isContextError(error) && error.context?.faults).toEqual([
+			{ reason: 'extra', path: ['extra'] },
+		])
+	})
+})
+
 describe('MemoManager — add & lookup', () => {
 	it('starts empty with a minted id', () => {
 		const manager = new MemoManager()
@@ -440,7 +452,7 @@ describe('MemoManager — foreign snapshot', () => {
 			// A foreign value is untyped on arrival, so the construct goes through Reflect.
 			const error = captureError(() => Reflect.construct(MemoManager, [{ snapshot }]))
 
-			return isContextError(error) && error.message
+			return isContextError(error) && error.message.split('\n')[0]
 		})
 
 		expect(messages).toEqual(
