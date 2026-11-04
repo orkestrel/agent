@@ -31,4 +31,6 @@ Delete this file when its rows close and the debrief has carried them.
 
 **Live, on the dedicated daemon:** `ollama`'s service project 89 of 89 at `bf6fbfc`. An untagged and a case-varied `model` name echo as sent, so the provider's guard passes. A zero-argument tool call reads `arguments: {}` on three seeds, on one daemon and model. **`agent`'s study suite:** 161 of 161.
 
-**Open:** claims 11 and 31, on `interpret`'s two laws at `cb0bb5c`, take one independent lane, because that repair departed from what the round read.
+**Independent lane on `interpret`'s two laws at `cb0bb5c`:** `VERDICT: FAIL 1, 2, 3, 4, 6`, with 5 confirmed. Ruled: the neighbor law reads both sides of a number, three repairs at the same law, a trailing colon on an anchor, the normalized text beside a span, the limit's code, and the table crossed with each number form. Other right readings that ask go to `learn`'s known-limits list. This is the seam's stop: no further lane on the reader.
+
+**Open:** that writer turn, then one final repack and `verifier` on each package.

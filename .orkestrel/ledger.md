@@ -52,3 +52,4 @@
 | 2026-11-04 | Falsify subjective lane: `VERDICT: FAIL 6, 14, 22, 23, 25, 28, 29; outside the claims: O1`, each reproduced. Repairs dispatched to `contract`, `database`, `ollama`, `toolbox`, `workflow`, and `agent` | `reviewer` on `opus`; `astra`; `builder` on `sol` | `falsify.md` |
 | 2026-11-04 | `interpret`'s two reader laws at `cb0bb5c` on bare gates, rescored independently: latent 68 to 24, right 35 to 33. The freeze holds from here | the `learn` session's writer and `verifier` | `methods.md` |
 | 2026-11-04 | Falsify settling lane: `VERDICT: FAIL 9, 24`. Live `ollama` 89 of 89, `agent`'s study suite 161 of 161. An independent lane reads `interpret`'s two laws | `reviewer` on `astra`; Orchestrator; `reviewer` on `opus` | `falsify.md` |
+| 2026-11-04 | Independent read of `interpret`'s two laws: `VERDICT: FAIL 1, 2, 3, 4, 6`. The neighbor law goes two-sided, and the seam stops after this turn | `reviewer` on `opus`; Orchestrator's ruling | `falsify.md` |
