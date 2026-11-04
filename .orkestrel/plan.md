@@ -17,6 +17,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | --- | --- | --- | --- |
 | 0 | `@orkestrel/contract` | https://github.com/orkestrel/contract | a field's default, strict conversion, lenient soundness, build cost, discriminated union faults, fault guards, lossless repair |
 | 1 | `@orkestrel/ndjson` | https://github.com/orkestrel/ndjson | strict by default |
+| 2 | `@orkestrel/database` | https://github.com/orkestrel/database | `shapeToColumnStorage` and any other exhaustive switch on `category` take the new `shape` category; `agent`, `toolbox`, and `workflow` declare it |
 | 2 | `@orkestrel/reason` | https://github.com/orkestrel/reason | three states, one settle loop, the subject door |
 | 2 | `@orkestrel/tool` | https://github.com/orkestrel/tool | the argument door, enforced `parameters`, a bare tool takes nothing |
 | 3 | `@orkestrel/qualifier`, `@orkestrel/rater`, `@orkestrel/interpret` | https://github.com/orkestrel | states, doors, shapes and contracts; `interpret` fills nothing by position or by distance and gains an exact number reader |
@@ -32,11 +33,11 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Item | Status | Evidence |
 | --- | --- | --- |
 | Rulings on semantics and fail-open rows | done 2026-11-04, each reopenable by the user | `semantics.md`, `failopen.md` |
-| Writers, each package above through layer 7 except `program` and `brief` | landed locally, open rows in § Sequence | `ledger.md`; each package's commits |
-| Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study` read; `mcp`, `qualifier`, `rater`, `interpret`, `program`, `brief` open | `ledger.md` |
+| Writers, each package above through layer 7 except `database` and `brief` | landed locally, open rows in § Sequence | `ledger.md`; each package's commits |
+| Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study`, `mcp`, `qualifier`, `rater`, `interpret` read; `program`, `brief` open | `ledger.md` |
 | Live proofs on the dedicated daemon | `ollama` at `9ef095b` and `4109f7e`, 14 files, 82 passed | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | close the open rows, then the falsify round, then `verifier` | § Sequence |
+| Next action | finish `contract`'s corrections, then the door with `tool` first, then `database`; then the falsify round, then `verifier` | § Sequence |
 
 ## Sequence
 
@@ -44,10 +45,10 @@ Each unit's role runs on the Codex column of `.agents/orchestration.md` § Roles
 
 | Step | Units | Done when |
 | --- | --- | --- |
-| Open rows | `contract`'s build cost, discriminated union faults, fault guards, and lossless repair; then `tool`, `workflow`, `reason`, and `ollama` taking them; `toolbox`'s union tools; `agent`'s approved-instance dispatch and its Study half | each row's failing test and mutation probe recorded |
-| `contract`, one writer at a time | a nested `shape` that `is` refuses, then `rawShape`'s paths; then `admitValue` and `describeFaults` with `@orkestrel/tool` as the first consumer, then `workflow`, `reason`, `toolbox`, `ollama`, `study`, and `agent` taking them with no shim | each proved in `tool` before spreading |
-| Family | `program`, then `brief` | the same, with one independent review |
-| Independent reviews | `mcp`; `qualifier`, `rater`, `interpret`; `program`, `brief` | each finding fixed, deferred, or ruled out |
+| `contract`, one writer at a time | corrections to a nested `shape` that `is` refuses and to `rawShape`'s paths; then `admitValue` and `describeFaults` with `@orkestrel/tool` as the first consumer, then `workflow`, `reason`, `toolbox`, `ollama`, `study`, and `agent` taking them with no shim | each proved in `tool` before spreading |
+| `database` | every exhaustive switch on `category` takes `shape`, once `contract` is final; a census of the other consumers by type check | failing test and mutation probe recorded |
+| Family | `interpret`'s last rows, `program`'s review, then `brief` | the same, with one independent review |
+| Independent reviews | `program`, `brief` | each finding fixed, deferred, or ruled out |
 | Falsify | one round over the integrated result, numbered claims, the objective lane | an all-confirmed round, or a stop stated per `orkestrel-falsify` § End the depth search |
 | Verify | `verifier`, each package in layer order, once | exits read bare |
 | Publish | the user, in layer order, re-pinning at each; `test:distribution` at each; a new replay lineage screened first | registry serves each layer |

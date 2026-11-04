@@ -32,3 +32,4 @@
 | 2026-11-04 | `qualifier`, `rater`, `interpret` independent read | `reviewer` on `astra` | fix rows in `learn`'s campaign |
 | 2026-11-04 | Last rows: `tool`, `workflow`, `ollama`, `toolbox` | `builder` on `sol` | `fe77b9d`, `fc8b8ce`, `1fc131a`, `ac31925` |
 | 2026-11-04 | Rulings ported into tracked records | `builder` on `sol` | `semantics.md`, `failopen.md` |
+| 2026-11-04 | `database` joins the campaign: `shapeToColumnStorage` switches on every `category`, and `contract`'s new `shape` breaks it | `contract`'s review; Orchestrator's census | `plan.md` § Repositories |
