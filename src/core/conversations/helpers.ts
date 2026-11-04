@@ -1,12 +1,14 @@
 import type { ConversationSnapshot, Section } from './types.js'
 import type {
 	ConversationRole,
+	JudgeAnswer,
 	JudgeRequest,
 	JudgeResult,
 	Judgment,
 	JudgmentInput,
 	Message,
 	MessageInput,
+	Refusal,
 } from '../types.js'
 import type { ContractInterface } from '@orkestrel/contract'
 import { attempt, isArray, isRecord, isString, preview } from '@orkestrel/contract'
@@ -18,12 +20,38 @@ import { CONVERSATION_ROLES } from '../constants.js'
 import { isNonNegativeSafeInteger, isPositiveSafeInteger } from '../validators.js'
 
 /**
+ * Reads what a judge result holds for one question, from its own keys alone.
+ *
+ * @param result - The reported answers and refusals
+ * @param id - The question's id
+ * @returns The answer and the refusal, each undefined when the result holds none
+ * @example
+ * ```ts
+ * readJudgeOutcome({ model: 'm', answers: {} }, 'q') // { answer: undefined, refusal: undefined }
+ * ```
+ */
+export function readJudgeOutcome(
+	result: JudgeResult,
+	id: string,
+): { readonly answer: JudgeAnswer | undefined; readonly refusal: Refusal | undefined } {
+	return {
+		answer: Object.hasOwn(result.answers, id) ? result.answers[id] : undefined,
+		refusal:
+			result.refusals !== undefined && Object.hasOwn(result.refusals, id)
+				? result.refusals[id]
+				: undefined,
+	}
+}
+
+/**
  * Returns after checking a complete judge result answered or refused every question it was asked, or
  * throws a coded error naming those it left out.
  *
  * @remarks
  * A cancelled call's partial is not complete, so `JudgmentManager` reads this on a settled result only,
  * and {@link buildJudgments} stores whatever a partial holds.
+ *
+ * An undefined value is no answer, as {@link buildJudgments} reads it, so a key alone doesn't count.
  *
  * @param request - The request whose question keys must be answered
  * @param result - The result the judge settled
@@ -35,11 +63,10 @@ import { isNonNegativeSafeInteger, isPositiveSafeInteger } from '../validators.j
  * ```
  */
 export function requireJudgeResult(request: JudgeRequest, result: JudgeResult): void {
-	const left = Object.keys(request.questions).filter(
-		(id) =>
-			!Object.hasOwn(result.answers, id) &&
-			(result.refusals === undefined || !Object.hasOwn(result.refusals, id)),
-	)
+	const left = Object.keys(request.questions).filter((id) => {
+		const { answer, refusal } = readJudgeOutcome(result, id)
+		return answer === undefined && refusal === undefined
+	})
 	if (left.length === 0) return
 	throw new ConversationError(
 		'JUDGMENT',
@@ -71,11 +98,7 @@ export function buildJudgments(
 ): readonly JudgmentInput[] {
 	const single = Object.keys(request.questions).length === 1
 	return Object.entries(request.questions).flatMap(([id, question]): readonly JudgmentInput[] => {
-		const answer = Object.hasOwn(result.answers, id) ? result.answers[id] : undefined
-		const refusal =
-			result.refusals !== undefined && Object.hasOwn(result.refusals, id)
-				? result.refusals[id]
-				: undefined
+		const { answer, refusal } = readJudgeOutcome(result, id)
 		if (answer === undefined && refusal === undefined) return []
 		return [
 			{

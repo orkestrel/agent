@@ -1,5 +1,5 @@
 import type { JSONRecord } from '@orkestrel/contract'
-import type { Judgment, JudgeRequest } from '@src/core'
+import type { JudgeInterface, Judgment, JudgeRequest } from '@src/core'
 import {
 	createConversation,
 	isConversationError,
@@ -105,6 +105,39 @@ describe('JudgmentManager — the write door', () => {
 			.catch((caught: unknown) => caught)
 		expect(isConversationError(error) && error.code).toBe('JUDGMENT')
 		expect(isConversationError(error) && error.context).toEqual({ questions: ['q'] })
+	})
+
+	it.each([
+		['an undefined answer', { model: 'judge', answers: { q: undefined } }],
+		['an undefined refusal', { model: 'judge', answers: {}, refusals: { q: undefined } }],
+		['both undefined', { model: 'judge', answers: { q: undefined }, refusals: { q: undefined } }],
+	])('refuses a settled result whose question holds %s', async (_, result) => {
+		const manager = new JudgmentManager()
+		const judge: JudgeInterface = Reflect.apply(createSettledJudge, undefined, [result])
+		const error = await manager
+			.resolve(judge, { state: 'text', questions: { q: noul } }, [], new AbortController().signal)
+			.catch((caught: unknown) => caught)
+		expect(isConversationError(error) && error.code).toBe('JUDGMENT')
+		expect(isConversationError(error) && error.context).toEqual({ questions: ['q'] })
+		expect(manager.judgments()).toEqual([])
+	})
+
+	it('stores nothing from an abort partial holding an undefined answer, which its guard refuses', async () => {
+		const manager = new JudgmentManager()
+		const judge = createFailingJudge(
+			Reflect.construct(JudgeAbortError, [
+				{ model: 'judge', answers: { q: { form: 'noul', noul: 0.5 }, r: undefined } },
+			]),
+		)
+		await expect(
+			manager.resolve(
+				judge,
+				{ state: 'text', questions: { q: noul, r: noul } },
+				[],
+				new AbortController().signal,
+			),
+		).rejects.toBeInstanceOf(JudgeAbortError)
+		expect(manager.judgments()).toEqual([])
 	})
 
 	it('stores an abort partial that answers only some of its questions', async () => {
