@@ -14,6 +14,8 @@ This file is the debrief's working input, added to as methods prove out so nothi
 | A per-element hot path needs validation | Hand guard with a lockstep test; a shape-derived guard only at a once-per-entity door | Policy ruling 12 in `failopen.md` holds the readings and where each form belongs | `agent` hydrate guards |
 | A walk's cost is exponential on shared cyclic data | Change the precedence so one linear walk decides; delete the mechanism rather than bound it | Shared cyclic graph at 22 levels: 4.56 s to 163 µs; 41 levels 253 µs | `contract` `aadb739` |
 | A bound exists, and is read after the cost is spent | Read the existing limit during capture, one counter per door call, passed down | `createContract` spent 1.2 GB before refusing; landing, unread after the repair | `contract`, in progress |
+| A reading on a loaded host passes a bar set at a quieter moment | Compare builds interleaved in one lane ticket, and bar the relative change, not an absolute from another moment | `reason` read 37.57 ms against a 35 ms line; interleaved, the same build read 35.78 and 36.68, so `contract` added 0.9 ms, 2.5 percent | `contract` `32b987b` |
+| One loop scans the whole preceding text per number | A counting probe located it before any rewrite | 238 million characters at 65,534 units to 1; 74 ms at the limit, against 330 ms estimated | `interpret`, in progress |
 | A refused raw schema is re-walked per owner | One-line repair | 4,251 to 38 ms at N=4,000, unconfirmed | `contract`, in progress |
 
 ## Hardening
