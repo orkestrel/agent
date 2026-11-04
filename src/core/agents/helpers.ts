@@ -992,7 +992,7 @@ export function settleToolResult(result: ToolResult): {
  * @param category - The registry category named in an error
  * @param name - The requested key
  * @returns The registered value
- * @throws {AgentError} Thrown when the name is absent, with code REGISTRY and a `context` naming the `category` and the `name`.
+ * @throws {AgentError} Thrown when the name is absent, with code REGISTRY, the name encoded and capped in its text because a tool refusal reaches a model, and a `context` naming the `category` and the `name`.
  * @example
  * ```ts
  * requireEntry(new Map([['main', provider]]), 'provider', 'main') // provider
@@ -1001,7 +1001,7 @@ export function settleToolResult(result: ToolResult): {
 export function requireEntry<T>(pool: ReadonlyMap<string, T>, category: string, name: string): T {
 	const value = pool.get(name)
 	if (value === undefined) {
-		throw new AgentError('REGISTRY', `unknown ${category}: ${name}`, {
+		throw new AgentError('REGISTRY', `unknown ${category}: ${preview(name)}`, {
 			context: { category, name },
 		})
 	}

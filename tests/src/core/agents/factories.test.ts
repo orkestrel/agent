@@ -643,7 +643,7 @@ describe('createAgentQueue — durability, extended', () => {
 			.enqueue(createAgentJob({ provider: 'ghost' }))
 			.catch((error: unknown) => error)
 		expect(caught).toBeInstanceOf(Error)
-		expect(caught instanceof Error ? caught.message : '').toBe('unknown provider: ghost')
+		expect(caught instanceof Error ? caught.message : '').toBe('unknown provider: "ghost"')
 		expect(isAgentJobError(caught)).toBe(false)
 		expect(provider.started).toBe(0)
 	})
@@ -659,7 +659,7 @@ describe('createAgentQueue — durability, extended', () => {
 			authority: 'allow',
 		}
 		const caught = await queue.enqueue(withMissingTool).catch((error: unknown) => error)
-		expect(caught instanceof Error ? caught.message : '').toBe('unknown tool: nonexistent')
+		expect(caught instanceof Error ? caught.message : '').toBe('unknown tool: "nonexistent"')
 		expect(provider.started).toBe(0)
 	})
 
@@ -671,7 +671,7 @@ describe('createAgentQueue — durability, extended', () => {
 			.enqueue(createAgentJob({ authority: 'ghost' }))
 			.catch((error: unknown) => error)
 		expect(caught).toBeInstanceOf(Error)
-		expect(caught instanceof Error ? caught.message : '').toBe('unknown authority: ghost')
+		expect(caught instanceof Error ? caught.message : '').toBe('unknown authority: "ghost"')
 		expect(isAgentJobError(caught)).toBe(false)
 		expect(provider.started).toBe(0)
 	})
@@ -684,7 +684,7 @@ describe('createAgentQueue — durability, extended', () => {
 			.enqueue(createAgentJob({ scheduler: 'ghost' }))
 			.catch((error: unknown) => error)
 		expect(caught).toBeInstanceOf(Error)
-		expect(caught instanceof Error ? caught.message : '').toBe('unknown scheduler: ghost')
+		expect(caught instanceof Error ? caught.message : '').toBe('unknown scheduler: "ghost"')
 		expect(isAgentJobError(caught)).toBe(false)
 		expect(provider.started).toBe(0)
 	})

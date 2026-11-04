@@ -568,6 +568,16 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 		expect(error.cause).toBe(cause)
 		expect(isProviderError(error)).toBe(true)
 		expect(isProviderError(new Error('plain'))).toBe(false)
+		const faults = [{ reason: 'missing', path: ['content'] }]
+		const carried = new ProviderError('PROTOCOL', 'malformed', { context: { faults } })
+		expect(carried.context).toEqual({ faults })
+		expect(isProviderError(carried)).toBe(true)
+		expect(new ProviderError('PROTOCOL', 'malformed').context).toBeUndefined()
+		expect(
+			isProviderError(
+				Object.defineProperty(new ProviderError('PROTOCOL', 'malformed'), 'context', { value: 7 }),
+			),
+		).toBe(false)
 		expect(new ProviderError('PROTOCOL', 'missing').status).toBeUndefined()
 	})
 })

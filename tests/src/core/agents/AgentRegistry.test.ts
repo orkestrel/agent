@@ -48,10 +48,10 @@ describe('AgentRegistry — accessors', () => {
 
 	it('throws a clear, kind-specific error on an unknown name', () => {
 		const registry = createTurnRegistry({ content: 'ok' })
-		expect(() => registry.provider('ghost')).toThrow('unknown provider: ghost')
-		expect(() => registry.tool('ghost')).toThrow('unknown tool: ghost')
-		expect(() => registry.authority('ghost')).toThrow('unknown authority: ghost')
-		expect(() => registry.scheduler('ghost')).toThrow('unknown scheduler: ghost')
+		expect(() => registry.provider('ghost')).toThrow('unknown provider: "ghost"')
+		expect(() => registry.tool('ghost')).toThrow('unknown tool: "ghost"')
+		expect(() => registry.authority('ghost')).toThrow('unknown authority: "ghost"')
+		expect(() => registry.scheduler('ghost')).toThrow('unknown scheduler: "ghost"')
 	})
 
 	it('throws an AgentError carrying code REGISTRY, so a catch branches without parsing the message', () => {
@@ -60,7 +60,7 @@ describe('AgentRegistry — accessors', () => {
 		if (!isAgentError(caught)) throw new Error('expected an AgentError')
 		expect(caught.code).toBe('REGISTRY')
 		expect(caught.name).toBe('AgentError')
-		expect(caught.message).toBe('unknown tool: ghost')
+		expect(caught.message).toBe('unknown tool: "ghost"')
 		expect(caught.context).toEqual({ category: 'tool', name: 'ghost' })
 	})
 })
@@ -194,7 +194,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		const registry = createTurnRegistry({ content: 'ok' })
 		expect(() =>
 			registry.build({ provider: 'main', messages: [], tools: ['ghost'], authority: 'allow' }),
-		).toThrow('unknown tool: ghost')
+		).toThrow('unknown tool: "ghost"')
 	})
 
 	it('threads the supplied signal into the agent — a pre-aborted cancel commits a partial', async () => {
@@ -350,7 +350,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			authorities: { gate: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) },
 		})
 		expect(() => registry.build({ provider: 'main', messages: [], authority: 'ghost' })).toThrow(
-			'unknown authority: ghost',
+			'unknown authority: "ghost"',
 		)
 	})
 
@@ -362,7 +362,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 			schedulers: { pacer: createScheduler() },
 		})
 		expect(() => registry.build({ provider: 'main', messages: [], scheduler: 'ghost' })).toThrow(
-			'unknown scheduler: ghost',
+			'unknown scheduler: "ghost"',
 		)
 	})
 
@@ -371,7 +371,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		// resolves, so it throws before constructing anything.
 		const registry = createTurnRegistry({ content: 'ok' })
 		expect(() => registry.build({ provider: 'ghost', messages: [] })).toThrow(
-			'unknown provider: ghost',
+			'unknown provider: "ghost"',
 		)
 	})
 })
@@ -628,7 +628,7 @@ describe('AgentRegistry — build isolation & immutability', () => {
 		const ghost = createScriptedProvider([{ content: 'ghost' }])
 		providers.ghost = ghost
 		delete tools.add
-		expect(() => registry.provider('ghost')).toThrow('unknown provider: ghost')
+		expect(() => registry.provider('ghost')).toThrow('unknown provider: "ghost"')
 		expect(registry.tool('add')).toBe(add)
 		// The registry never wrote back into the caller's records either.
 		expect(Object.keys(tools)).toEqual([])
@@ -709,7 +709,7 @@ describe('AgentRegistry — empty registry', () => {
 		// An empty providers record → every build fails at the first resolution.
 		const registry = createAgentRegistry({ providers: {} })
 		expect(() => registry.build({ provider: 'main', messages: [] })).toThrow(
-			'unknown provider: main',
+			'unknown provider: "main"',
 		)
 	})
 
@@ -722,8 +722,8 @@ describe('AgentRegistry — empty registry', () => {
 			authorities: {},
 			schedulers: {},
 		})
-		expect(() => registry.tool('x')).toThrow('unknown tool: x')
-		expect(() => registry.authority('x')).toThrow('unknown authority: x')
-		expect(() => registry.scheduler('x')).toThrow('unknown scheduler: x')
+		expect(() => registry.tool('x')).toThrow('unknown tool: "x"')
+		expect(() => registry.authority('x')).toThrow('unknown authority: "x"')
+		expect(() => registry.scheduler('x')).toThrow('unknown scheduler: "x"')
 	})
 })
