@@ -9,12 +9,27 @@ import {
 	JudgmentManager,
 } from '@src/core'
 import { createRecorder, roundTripJSON } from '@orkestrel/test'
+import {
+	conversationSnapshotContract,
+	isMessageInput,
+	judgmentContract,
+	messageContract,
+	messageInputContract,
+	sectionContract,
+} from '@src/core'
+import {
+	CONVERSATION_SNAPSHOT_FIXTURES,
+	MALFORMED_CONVERSATION_SNAPSHOTS,
+	MESSAGE_FIXTURES,
+	MESSAGE_REFUSALS,
+} from '../../../setup.js'
 import { describe, expect, it } from 'vitest'
 import {
 	approveEvery,
 	buildCallsSnapshot,
 	buildConversationSnapshot,
 	createMalformedConversationCases,
+	REWRITTEN_CONVERSATION_SNAPSHOT,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
 	TOOL_SNAPSHOT,
 	JUDGMENT_EDGE_RECORDS,
@@ -204,9 +219,17 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 		expect(isConversationSnapshot(TOOL_SNAPSHOT)).toBe(true)
 	})
 
-	it('admits the conversation summary a 0.0.29 snapshot carries, as an unknown member', () => {
-		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(true)
-		expect(isConversationSnapshot({ id: 'c', summary: 7, sections: [], messages: [] })).toBe(true)
+	it('refuses the conversation summary a 0.0.29 snapshot carries, as an unknown member', () => {
+		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(false)
+		expect(
+			isConversationSnapshot({
+				id: 'c',
+				summary: 7,
+				sections: [],
+				messages: [],
+			}),
+		).toBe(false)
+		expect(isConversationSnapshot(REWRITTEN_CONVERSATION_SNAPSHOT)).toBe(true)
 	})
 
 	it('rejects malformed input without throwing (total guard)', () => {
@@ -360,12 +383,38 @@ describe('isMessage — the per-message shape guard (total + defensive)', () => 
 	})
 
 	it('rejects a non-array calls, a malformed calls element, and a non-array images', () => {
-		expect(isMessage({ id: 'm1', role: 'assistant', content: '', calls: 'nope' })).toBe(false)
-		expect(isMessage({ id: 'm1', role: 'assistant', content: '', calls: [null] })).toBe(false)
 		expect(
-			isMessage({ id: 'm1', role: 'assistant', content: '', calls: [{ id: 'c1', name: 'tool' }] }),
+			isMessage({
+				id: 'm1',
+				role: 'assistant',
+				content: '',
+				calls: 'nope',
+			}),
 		).toBe(false)
-		expect(isMessage({ id: 'm1', role: 'user', content: 'see', images: 'DATA' })).toBe(false)
+		expect(
+			isMessage({
+				id: 'm1',
+				role: 'assistant',
+				content: '',
+				calls: [null],
+			}),
+		).toBe(false)
+		expect(
+			isMessage({
+				id: 'm1',
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'c1', name: 'tool' }],
+			}),
+		).toBe(false)
+		expect(
+			isMessage({
+				id: 'm1',
+				role: 'user',
+				content: 'see',
+				images: 'DATA',
+			}),
+		).toBe(false)
 	})
 
 	it('accepts a string call on a tool message and on every other role the flat type admits', () => {
@@ -416,5 +465,162 @@ describe('isConversation', () => {
 		}
 		expect(isConversation(conversation)).toBe(true)
 		expect(calls.calls).toEqual([])
+	})
+})
+
+describe('the owned conversation guards, in lockstep with their shapes', () => {
+	it.each(MESSAGE_FIXTURES)('holds both ways on the owned message %#', (message) => {
+		expect(isMessage(message)).toBe(true)
+		expect(messageContract.is(message)).toBe(true)
+	})
+
+	it.each(MESSAGE_REFUSALS)('holds is ⟹ guard on the message value %#', (value) => {
+		expect(isMessage(value)).toBe(false)
+		expect(messageContract.is(value)).toBe(false)
+	})
+
+	it.each(CONVERSATION_SNAPSHOT_FIXTURES)(
+		'holds both ways on the owned snapshot %#',
+		(snapshot) => {
+			expect(isConversationSnapshot(snapshot)).toBe(true)
+			expect(conversationSnapshotContract.is(snapshot)).toBe(true)
+		},
+	)
+
+	it.each(MALFORMED_CONVERSATION_SNAPSHOTS)('holds is ⟹ guard on %s', (_title, snapshot) => {
+		expect(isConversationSnapshot(snapshot)).toBe(false)
+		expect(conversationSnapshotContract.is(snapshot)).toBe(false)
+	})
+
+	it('holds both ways on a judgment and a section of the fixtures', () => {
+		expect(isJudgment(JUDGMENT_RECORD)).toBe(true)
+		expect(judgmentContract.is(JUDGMENT_RECORD)).toBe(true)
+		const section = {
+			id: 's',
+			summary: 'recap',
+			messages: MESSAGE_FIXTURES.slice(0, 1),
+		}
+		expect(isSection(section)).toBe(true)
+		expect(sectionContract.is(section)).toBe(true)
+	})
+})
+
+describe('the owned conversation guards are exact', () => {
+	it.each([
+		[
+			'an unknown snapshot key, as a 0.0.35 summary',
+			{ id: 'c', sections: [], messages: [], summary: 'x' },
+		],
+		['an own undefined judgments', { id: 'c', sections: [], messages: [], judgments: undefined }],
+		[
+			'an unknown section key',
+			{
+				id: 'c',
+				sections: [{ id: 's', summary: 'r', messages: [], at: 1 }],
+				messages: [],
+			},
+		],
+		[
+			'an unknown message key',
+			{
+				id: 'c',
+				sections: [],
+				messages: [{ id: 'm', role: 'user', content: '', at: 1 }],
+			},
+		],
+		[
+			'an own undefined message optional',
+			{
+				id: 'c',
+				sections: [],
+				messages: [{ id: 'm', role: 'user', content: '', call: undefined }],
+			},
+		],
+	])('refuses %s', (_title, snapshot) => {
+		expect(isConversationSnapshot(snapshot)).toBe(false)
+		expect(conversationSnapshotContract.is(snapshot)).toBe(false)
+	})
+
+	it.each([
+		['a judgment key', { ...JUDGMENT_RECORD, extra: 1 }],
+		[
+			'an answer key',
+			{
+				...JUDGMENT_RECORD,
+				answer: { form: 'noul', noul: 0.9, why: 'x' },
+			},
+		],
+		[
+			'a refusal key',
+			{
+				...JUDGMENT_RECORD,
+				answer: undefined,
+				refusal: { missing: [], why: 'x' },
+			},
+		],
+		['a question key', { ...JUDGMENT_RECORD, question: { form: 'noul', extra: 1 } }],
+	])('refuses an unknown %s in a judgment', (_title, record) => {
+		expect(isJudgment(record)).toBe(false)
+	})
+
+	it('keeps the read side off the ties: a stored answer outside its question still reads', () => {
+		expect(
+			isJudgment({
+				...JUDGMENT_RECORD,
+				answer: { form: 'noul', noul: 2 },
+			}),
+		).toBe(true)
+		expect(
+			isJudgment({
+				...JUDGMENT_RECORD,
+				question: { form: 'choice', criteria: { a: null, b: null } },
+				answer: { form: 'choice', probabilities: { a: 0.5 } },
+			}),
+		).toBe(true)
+	})
+})
+
+describe('isMessageInput', () => {
+	it('admits each member of its declared type and leaves the role to requireRole', () => {
+		expect(isMessageInput({ role: 'user', content: 'hi' })).toBe(true)
+		expect(isMessageInput({ role: 'other', content: 'hi' })).toBe(true)
+		expect(
+			isMessageInput({
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'c', name: 'n', arguments: {} }],
+				thinking: 't',
+			}),
+		).toBe(true)
+	})
+
+	it.each([
+		[{}],
+		[{ role: 'user' }],
+		[{ role: 'user', content: 1 }],
+		[{ role: 'user', content: '', calls: [{}] }],
+		[{ role: 'user', content: '', call: 1 }],
+		[{ role: 'user', content: '', images: [1] }],
+		[{ role: 'user', content: '', thinking: 1 }],
+		[null],
+		[
+			new Proxy(
+				{},
+				{
+					get() {
+						throw new Error('unreadable')
+					},
+				},
+			),
+		],
+	])('refuses row %#', (value) => {
+		expect(isMessageInput(value)).toBe(false)
+	})
+
+	it('holds is ⟹ guard against the input shape', () => {
+		for (const { id: _id, ...input } of MESSAGE_FIXTURES) {
+			expect(messageInputContract.is(input)).toBe(true)
+			expect(isMessageInput(input)).toBe(true)
+		}
 	})
 })

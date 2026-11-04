@@ -84,7 +84,7 @@ export function createConversation(options?: ConversationOptions): ConversationI
  * @remarks
  * Starts empty; `add(input?)` mints a {@link ConversationInterface} (its `id` from the input
  * or a random UUID), flowing the manager's default `summarize` / `keep` in unless the input
- * overrides them, and stores it (an already-present `id` overwrites — last write wins) — and
+ * overrides them, and stores it (an already-present `id` throws, code `'ID'`) — and
  * auto-activates the first one (a registry with conversations always has one `active`); a later
  * `add` leaves `active` unchanged. `switch(id)` re-points `active` (an unknown `id` returns
  * `undefined`, leaving `active` unchanged — lenient, never throws); `conversation(id)` /

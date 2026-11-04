@@ -28,7 +28,9 @@ export type ConversationErrorCode =
 	| 'KEEP'
 	| 'SUMMARY'
 	| 'ROLE'
+	| 'MESSAGE'
 	| 'SNAPSHOT'
+	| 'ID'
 
 /**
  * Stores judgments by caller key and resolves requests by reusing matching records.
@@ -581,8 +583,8 @@ export interface ConversationInterface {
  * {@link ConversationManagerInterface} hydrates a conversation from it through that seam (see
  * {@link ConversationManagerInterface.open}). It is narrowed back from an untrusted storage read by
  * {@link import('./validators.js').isConversationSnapshot} (the total boundary guard), which
- * admits unknown members: a 0.0.29 snapshot that carries a conversation `summary` passes and
- * hydrates without it.
+ * is exact: an unknown member refuses, so a 0.0.29 snapshot that carries a conversation `summary`
+ * throws until its row is rewritten without the key.
  */
 export interface ConversationSnapshot {
 	readonly id: string
@@ -754,7 +756,7 @@ export interface ConversationManagerOptions {
  * - **Registry.** `count` is how many are stored. `add(input?)` mints a
  *   {@link ConversationInterface} (its `id` from `input` or a random UUID), flowing the
  *   default `summarize` / `keep` of the manager in unless the `input` overrides them; `add` of an
- *   already-present `id` overwrites it (last write wins). `conversation(id)` looks one up
+ *   already-present `id` throws (code `'ID'`). `conversation(id)` looks one up
  *   (`undefined` when absent); `conversations()` lists them in insertion order.
  * - **Active pointer.** `active` is the active conversation (the conversation an agent run binds
  *   when it names none, and the one the context renders with no selection), `undefined` until the
@@ -796,11 +798,11 @@ export interface ConversationManagerInterface {
 	/**
 	 * Mints a conversation, taking its `id` from the input or a fresh UUID and flowing the
 	 * default `summarize` / `keep` of the manager in unless the input overrides them —
-	 * auto-activates the first, and an already-present `id` overwrites, last write wins.
+	 * auto-activates the first, and an already-present `id` throws.
 	 *
 	 * @param input - Optional {@link ConversationInput} overrides
 	 * @returns The created conversation
-	 * @throws ConversationError Thrown when `snapshot` is malformed or repeats an id (code `'SNAPSHOT'`) or holds a message whose role is not a `ConversationRole` (code `'ROLE'`); nothing registers and `active` is unchanged
+	 * @throws ConversationError Thrown when the `id` is already live (code `'ID'`), or when `snapshot` is malformed or repeats an id (code `'SNAPSHOT'`) or holds a message whose role is not a `ConversationRole` (code `'ROLE'`); nothing registers and `active` is unchanged
 	 */
 	add(input?: ConversationInput): ConversationInterface
 	/**

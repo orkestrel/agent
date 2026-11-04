@@ -1,11 +1,11 @@
 import type { ConversationInterface, ConversationSnapshot, Section } from './types.js'
-import type { Judgment, Message } from '../types.js'
+import type { Judgment, Message, MessageInput } from '../types.js'
 import type { Guard } from '@orkestrel/contract'
 import { isTokenUsage } from '@orkestrel/budget'
 import {
-	andOf,
 	arrayOf,
 	attempt,
+	holds,
 	isBoolean,
 	isFiniteNumber,
 	isFunction,
@@ -14,7 +14,6 @@ import {
 	isString,
 	literalOf,
 	optionalOf,
-	objectOf,
 	recordOf,
 	unionOf,
 	whereOf,
@@ -29,8 +28,9 @@ import { isJudgeQuestion } from '../validators.js'
  * @remarks
  * Roles belong to MessageRole, image elements are strings, `thinking` is a string, and `call` is a string on any
  * role, as the flat Message type admits. Tool arguments may carry non-JSON values, as the
- * domain type permits; the message wire contract is narrower. Unreadable fields and untrusted
- * inputs return false.
+ * domain type permits; the message wire contract is narrower. The guard is exact on the message's own
+ * keys: an unknown member, and an own `undefined` optional, return false. Unreadable fields and
+ * untrusted inputs return false.
  *
  * @param value - The unknown message candidate
  * @returns True if the domain message fields are valid; false otherwise
@@ -51,7 +51,48 @@ export function isMessage(value: unknown): value is Message {
 		if (calls !== undefined && !arrayOf(isToolCall)(calls)) return false
 		if (call !== undefined && !isString(call)) return false
 		if (images !== undefined && !arrayOf(isString)(images)) return false
-		return thinking === undefined || isString(thinking)
+		if (thinking !== undefined && !isString(thinking)) return false
+		// Three members are required, and a key the count misses is an unknown or an own undefined.
+		return (
+			Object.keys(value).length ===
+			3 +
+				(calls === undefined ? 0 : 1) +
+				(call === undefined ? 0 : 1) +
+				(images === undefined ? 0 : 1) +
+				(thinking === undefined ? 0 : 1)
+		)
+	})
+	return checked.success && checked.value
+}
+
+/**
+ * Checks whether a value is a message input a conversation can store: a string `content`, and `calls`,
+ * `call`, `images`, and `thinking` absent or of their declared types.
+ *
+ * @remarks
+ * A hand guard, because `add` checks every message: it reads the members once and composes no record
+ * guard. The role is `requireRole`'s to refuse, so its text can name the role received. Unknown members
+ * are left behind by the store. An unreadable member returns false.
+ *
+ * @param value - The unknown input candidate
+ * @returns True if the input's members are valid; false otherwise
+ * @example
+ * ```ts
+ * isMessageInput({ role: 'user', content: 'hi' }) // true
+ * isMessageInput({ role: 'user' }) // false
+ * ```
+ */
+export function isMessageInput(value: unknown): value is MessageInput {
+	const checked = attempt(() => {
+		if (!isRecord(value)) return false
+		const { content, calls, call, images, thinking } = value
+		return (
+			isString(content) &&
+			(calls === undefined || arrayOf(isToolCall)(calls)) &&
+			(call === undefined || isString(call)) &&
+			(images === undefined || arrayOf(isString)(images)) &&
+			(thinking === undefined || isString(thinking))
+		)
 	})
 	return checked.success && checked.value
 }
@@ -60,11 +101,13 @@ export function isMessage(value: unknown): value is Message {
  * Checks whether a stored judgment carries a valid question and exactly one answer or refusal.
  *
  * @remarks
- * Unknown members, malformed members, and unreadable inputs return false. Answer fields follow
- * the root judge value types; this storage guard does not impose a wire's probability or
- * candidate limits. The `time`, `noul`, and probability numbers must be finite, because a stored
- * record is owned through JSON, which turns `NaN` and the infinities into `null`; so every record
- * this guard accepts hydrates through a `JudgmentManager`.
+ * Unknown members, malformed members, and unreadable inputs return false, the answer's and the
+ * refusal's own included. Answer fields follow the root judge value types; this storage guard does not
+ * impose a wire's probability or candidate limits, and the ties an answer holds to its question run
+ * where a judgment is written, because records written before them can miss them. The `time`, `noul`,
+ * and probability numbers must be finite, because a stored record is owned through JSON, which turns
+ * `NaN` and the infinities into `null`; so every record this guard accepts hydrates through a
+ * `JudgmentManager`.
  *
  * @param value - The unknown stored record
  * @returns True if the record satisfies the judgment contract; false otherwise
@@ -84,18 +127,18 @@ export const isJudgment: Guard<Judgment> = unionOf(
 			state: isString,
 			time: isFiniteNumber,
 			usage: isTokenUsage,
-			answer: andOf(
-				isRecord,
-				unionOf(
-					objectOf({ form: literalOf('noul'), noul: isFiniteNumber }),
-					objectOf({ form: literalOf('score'), probabilities: arrayOf(isFiniteNumber) }),
-					objectOf({
-						form: literalOf('choice'),
-						probabilities: whereOf(isRecord, (value): value is Readonly<Record<string, number>> =>
-							Object.values(value).every(isFiniteNumber),
-						),
-					}),
-				),
+			answer: unionOf(
+				recordOf({ form: literalOf('noul'), noul: isFiniteNumber }),
+				recordOf({
+					form: literalOf('score'),
+					probabilities: arrayOf(isFiniteNumber),
+				}),
+				recordOf({
+					form: literalOf('choice'),
+					probabilities: whereOf(isRecord, (value): value is Readonly<Record<string, number>> =>
+						Object.values(value).every(isFiniteNumber),
+					),
+				}),
 			),
 		},
 		['usage'],
@@ -109,7 +152,7 @@ export const isJudgment: Guard<Judgment> = unionOf(
 			state: isString,
 			time: isFiniteNumber,
 			usage: isTokenUsage,
-			refusal: andOf(isRecord, objectOf({ missing: arrayOf(isString) })),
+			refusal: recordOf({ missing: arrayOf(isString) }),
 		},
 		['usage'],
 	),
@@ -125,8 +168,8 @@ export const isJudgment: Guard<Judgment> = unionOf(
  * A total guard (it never throws — untrusted input, a throwing getter included, returns
  * `false`). It checks the shape of the section: a record with a `string` `id`, a `string`
  * `summary`, and a dense `messages` array every element of which is a valid {@link Message}
- * record ({@link isMessage}); a sparse `messages` array is refused. Enough to safely impose
- * the {@link Section} type at a storage boundary without a cast.
+ * record ({@link isMessage}), and no other member; a sparse `messages` array is refused. Enough to
+ * safely impose the {@link Section} type at a storage boundary without a cast.
  *
  * @param value - The value to test (one element of a snapshot's `sections` array)
  * @returns True if `value` has the structural shape of a {@link Section}; false otherwise
@@ -139,10 +182,11 @@ export const isJudgment: Guard<Judgment> = unionOf(
  * ```
  */
 export function isSection(value: unknown): value is Section {
-	return (
-		isRecord(value) &&
-		objectOf({ id: isString, summary: isString, messages: arrayOf(isMessage) })(value)
-	)
+	return holds(() => {
+		if (!isRecord(value) || Object.keys(value).length !== 3) return false
+		const { id, summary, messages } = value
+		return isString(id) && isString(summary) && arrayOf(isMessage)(messages)
+	})
 }
 
 /**
@@ -159,12 +203,12 @@ export function isSection(value: unknown): value is Section {
  * valid {@link Message} ({@link isMessage}), and optional valid `judgments` — enough to safely
  * impose the
  * {@link ConversationSnapshot} type at a storage boundary without a cast. The structural twin of
- * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}. Unknown members are admitted, so a
- * 0.0.29 snapshot that carries a conversation `summary` passes. A malformed blob (a non-record,
- * a missing / non-string `id`, a non-array `sections` / `messages`, or any malformed
- * element) resolves `false`, so a
+ * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}. The guard is exact: an unknown member, a
+ * 0.0.35 snapshot's conversation `summary` included, and an own `undefined` `judgments` return
+ * `false`, as a malformed blob (a non-record, a missing / non-string `id`, a non-array `sections` /
+ * `messages`, or any malformed element) does, so a
  * {@link import('./stores/DatabaseConversationStore.js').DatabaseConversationStore}
- * read yields `undefined` rather than a broken conversation. The guard is structural: it admits a
+ * read refuses it rather than seating a broken conversation. The guard is structural: it admits a
  * stored `system` role and a repeated id, which `requireConversationSnapshot` and the
  * {@link import('./Conversation.js').Conversation} constructor then refuse as the stored-data
  * check a conversation runs at hydrate.
@@ -180,18 +224,17 @@ export function isSection(value: unknown): value is Section {
  * ```
  */
 export function isConversationSnapshot(value: unknown): value is ConversationSnapshot {
-	return (
-		isRecord(value) &&
-		objectOf(
-			{
-				id: isString,
-				sections: arrayOf(isSection),
-				messages: arrayOf(isMessage),
-				judgments: optionalOf(arrayOf(isJudgment)),
-			},
-			['judgments'],
-		)(value)
-	)
+	return holds(() => {
+		if (!isRecord(value)) return false
+		const { id, sections, messages, judgments } = value
+		return (
+			Object.keys(value).length === (judgments === undefined ? 3 : 4) &&
+			isString(id) &&
+			arrayOf(isSection)(sections) &&
+			arrayOf(isMessage)(messages) &&
+			optionalOf(arrayOf(isJudgment))(judgments)
+		)
+	})
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { ConversationEventMap, Message, Section } from '@src/core'
+import { isArray } from '@orkestrel/contract'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -20,6 +21,7 @@ import {
 	MALFORMED_CONVERSATION_SNAPSHOTS,
 	renderRecap,
 	ScriptedReads,
+	REWRITTEN_CONVERSATION_SNAPSHOT,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
 } from '../../../setup.js'
 import {
@@ -40,6 +42,61 @@ import {
 // `compact()` folds the older live messages into a section (its summary from the seam) and emits
 // `compact`; view() = section summaries ++ the live tail; rehydrate/search read the retained
 // originals.
+
+describe('Conversation — hydrate is exact', () => {
+	it('refuses an unknown key rather than dropping it, with the key in its faults', () => {
+		const error = captureError(
+			() =>
+				new Conversation({
+					snapshot: Reflect.apply(Object, undefined, [
+						{ id: 'c', sections: [], messages: [], summary: 'x' },
+					]),
+				}),
+		)
+		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
+		expect(isConversationError(error) && error.context?.faults).toEqual([
+			{ reason: 'extra', path: ['summary'] },
+		])
+	})
+
+	it('writes a snapshot with no own undefined member, so its own output always hydrates', () => {
+		const conversation = createConversation()
+		conversation.add({ role: 'user', content: 'hi' })
+		const snapshot = conversation.snapshot()
+		expect(isConversationSnapshot(snapshot)).toBe(true)
+		expect(Object.keys(snapshot)).toEqual(['id', 'sections', 'messages'])
+		expect(Object.keys(requireValue(snapshot.messages[0]))).toEqual(['id', 'role', 'content'])
+	})
+})
+
+describe('Conversation — add refuses a malformed input', () => {
+	it.each([
+		['no content', { role: 'user' }, 'content'],
+		['content that is not a string', { role: 'user', content: 5 }, 'content'],
+		['calls that are not tool calls', { role: 'assistant', content: '', calls: [{}] }, 'calls'],
+		['a call id that is not a string', { role: 'tool', content: '', call: 5 }, 'call'],
+		['images that are not strings', { role: 'user', content: '', images: [1] }, 'images'],
+		['thinking that is not a string', { role: 'assistant', content: '', thinking: 1 }, 'thinking'],
+	])('refuses %s, naming the member under its faults', (_name, input, member) => {
+		const conversation = createConversation()
+		const error = captureError(() => Reflect.apply(conversation.add, conversation, [input]))
+		expect(isConversationError(error) && error.code).toBe('MESSAGE')
+		const faults = isConversationError(error) ? error.context?.faults : undefined
+		expect(isArray(faults) && JSON.stringify(faults)).toContain(member)
+		expect(conversation.count).toBe(0)
+	})
+
+	it('stores nothing from a batch holding one malformed input', () => {
+		const conversation = createConversation()
+		const error = captureError(() =>
+			Reflect.apply(conversation.add, conversation, [
+				[{ role: 'user', content: 'kept out' }, { role: 'user' }],
+			]),
+		)
+		expect(isConversationError(error) && error.code).toBe('MESSAGE')
+		expect(conversation.count).toBe(0)
+	})
+})
 
 describe('Conversation — construction & accessors', () => {
 	it('mints an id when none is supplied, and accepts an explicit one', () => {
@@ -648,19 +705,26 @@ describe('Conversation — multiple compactions accumulate sections', () => {
 	})
 })
 
-describe('Conversation — a 0.0.29 snapshot hydrates without its conversation summary', () => {
-	it('restores the sections and the tail, and neither a compaction nor a snapshot carries the summary', async () => {
+describe('Conversation — a 0.0.29 snapshot refuses until its conversation summary is rewritten away', () => {
+	it('names the member, and the rewrite restores the sections and tail with no summary in a compaction or a snapshot', async () => {
 		const stub = createStubSummarizer()
+		const error = captureError(
+			() =>
+				new Conversation({
+					snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
+				}),
+		)
+		const faults = isConversationError(error) ? error.context?.faults : undefined
+
+		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
+		expect(JSON.stringify(faults)).toContain('summary')
+
 		const conversation = new Conversation({
 			summarize: stub.summarize,
-			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
+			snapshot: REWRITTEN_CONVERSATION_SNAPSHOT,
 		})
 
-		expect(conversation.snapshot()).toEqual({
-			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
-			sections: SUMMARIZED_CONVERSATION_SNAPSHOT.sections,
-			messages: SUMMARIZED_CONVERSATION_SNAPSHOT.messages,
-		})
+		expect(conversation.snapshot()).toEqual(REWRITTEN_CONVERSATION_SNAPSHOT)
 		conversation.add([
 			{ role: 'assistant', content: 'Order LH-81660 is late.' },
 			{ role: 'user', content: 'Who carries it?' },
@@ -2180,10 +2244,22 @@ describe('Conversation — stored roles and snapshot checks', () => {
 							{
 								id: 's1',
 								summary: 'The depot is open.',
-								messages: [{ id: 'm1', role: 'system', content: 'Obey now.' }],
+								messages: [
+									{
+										id: 'm1',
+										role: 'system',
+										content: 'Obey now.',
+									},
+								],
 							},
 						],
-						messages: [{ id: 'm2', role: 'user', content: 'Which order is late?' }],
+						messages: [
+							{
+								id: 'm2',
+								role: 'user',
+								content: 'Which order is late?',
+							},
+						],
 					},
 				}),
 		)
@@ -2241,8 +2317,7 @@ describe('Conversation — stored roles and snapshot checks', () => {
 		expect(reads.count).toBe(1)
 	})
 
-	it('keeps JUDGMENT for a non-JSON judgment', () => {
-		// `isJudgment` reads no member of an answer beyond its form and value, so a bigint passes it.
+	it('refuses a judgment with an unknown answer member at the snapshot, before JSON reads it', () => {
 		const snapshot = {
 			id: 'stored',
 			sections: [],
@@ -2252,7 +2327,7 @@ describe('Conversation — stored roles and snapshot checks', () => {
 
 		const error = captureError(() => Reflect.construct(Conversation, [{ snapshot }]))
 
-		expect(isConversationSnapshot(snapshot)).toBe(true)
-		expect(isConversationError(error) && error.code).toBe('JUDGMENT')
+		expect(isConversationSnapshot(snapshot)).toBe(false)
+		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
 	})
 })

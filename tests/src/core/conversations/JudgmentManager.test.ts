@@ -19,6 +19,8 @@ import {
 	createRecordedJudge,
 	SilentJudge,
 	SequentialSystemOneJudge,
+	createFailingJudge,
+	createSettledJudge,
 	SYSTEM_ONE_JUDGE_REQUEST,
 	SYSTEM_ONE_JUDGE_OBJECT,
 	SYSTEM_ONE_OBJECT,
@@ -28,6 +30,111 @@ import {
 	TEV1_NOUL,
 	TEV1_SCORE,
 } from '../../../setup.js'
+
+describe('JudgmentManager — the write door', () => {
+	const noul = { form: 'noul' } as const
+	const input = {
+		id: 'q',
+		question: noul,
+		model: 'judge',
+		sources: [],
+		state: 'text',
+	}
+
+	it.each([
+		['a noul out of bounds', noul, { form: 'noul', noul: 2 }, 'max'],
+		[
+			'a form that is not the question form',
+			noul,
+			{ form: 'score', probabilities: [0.5, 0.5] },
+			'type',
+		],
+		[
+			'a choice missing a criterion',
+			{ form: 'choice', criteria: { a: null, b: null } },
+			{ form: 'choice', probabilities: { a: 1 } },
+			'missing',
+		],
+		[
+			'a choice with an undeclared key',
+			{ form: 'choice', criteria: { a: null, b: null } },
+			{ form: 'choice', probabilities: { a: 0.5, b: 0.5, c: 0 } },
+			'extra',
+		],
+		[
+			'a score shorter than its levels',
+			{ form: 'score', criteria: ['low', 'high'] },
+			{ form: 'score', probabilities: [1] },
+			'min',
+		],
+		[
+			'a score probability below zero',
+			{ form: 'score', criteria: ['low', 'high'] },
+			{ form: 'score', probabilities: [-0.5, 1] },
+			'min',
+		],
+	])('refuses %s with faults', (_title, question, answer, finding) => {
+		const manager = new JudgmentManager()
+		const error = captureError(() =>
+			Reflect.apply(manager.add, manager, [{ ...input, question, answer }]),
+		)
+		expect(isConversationError(error) && error.code).toBe('JUDGMENT')
+		expect(
+			JSON.stringify(isConversationError(error) ? error.context?.faults : undefined),
+		).toContain(finding)
+		expect(manager.count).toBe(0)
+	})
+
+	it('reads a stored record that misses a tie, because records written before the ties can', () => {
+		const stored = {
+			...input,
+			answer: { form: 'noul', noul: 2 } as const,
+			time: 1,
+		}
+		expect(new JudgmentManager([stored]).count).toBe(1)
+	})
+
+	it('refuses an empty questions map, as the judge engine does', async () => {
+		const manager = new JudgmentManager()
+		const error = await manager
+			.resolve(
+				new SilentJudge(),
+				{ state: 'text', questions: {} },
+				[],
+				new AbortController().signal,
+			)
+			.catch((caught: unknown) => caught)
+		expect(isConversationError(error) && error.code).toBe('JUDGMENT')
+	})
+
+	it('refuses a judge that leaves a question neither answered nor refused', async () => {
+		const manager = new JudgmentManager()
+		const judge = createSettledJudge({ model: 'judge', answers: {} })
+		const error = await manager
+			.resolve(judge, { state: 'text', questions: { q: noul } }, [], new AbortController().signal)
+			.catch((caught: unknown) => caught)
+		expect(isConversationError(error) && error.code).toBe('JUDGMENT')
+		expect(isConversationError(error) && error.context).toEqual({
+			questions: ['q'],
+		})
+	})
+
+	it('stores an abort partial that answers only some of its questions', async () => {
+		const manager = new JudgmentManager()
+		const judge = createFailingJudge(
+			new JudgeAbortError({ model: 'judge', answers: { q: { form: 'noul', noul: 0.5 } } }),
+		)
+		await manager
+			.resolve(
+				judge,
+				{ state: 'text', questions: { q: noul, r: noul } },
+				[],
+				new AbortController().signal,
+			)
+			.catch(() => undefined)
+		expect(manager.judgments().map((one) => one.id)).toEqual(['q'])
+	})
+})
 
 describe('JudgmentManager', () => {
 	it('stamps additions, replaces keys in insertion order, and removes every batch key', () => {
@@ -313,18 +420,18 @@ describe('JudgmentManager', () => {
 		expect(judge.requests).toHaveLength(0)
 	})
 
-	it('returns no records for an empty question set without asking', async () => {
+	it('refuses an empty question set without asking', async () => {
 		const judge = new SilentJudge()
 		const manager = new JudgmentManager()
 
-		expect(
-			await manager.resolve(
+		await expect(
+			manager.resolve(
 				judge,
 				{ state: 'Charged twice', questions: {} },
 				[],
 				new AbortController().signal,
 			),
-		).toEqual([])
+		).rejects.toSatisfy((error: unknown) => isConversationError(error) && error.code === 'JUDGMENT')
 		expect(judge.requests).toHaveLength(0)
 		expect(manager.count).toBe(0)
 	})

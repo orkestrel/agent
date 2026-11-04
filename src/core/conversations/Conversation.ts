@@ -13,7 +13,9 @@ import type { Message, MessageInput } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
+import { messageInputContract } from '../contracts.js'
 import { collectExchanges, removeEntries, stripThinking } from '../helpers.js'
+import { conversationSnapshotContract } from './contracts.js'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { ConversationError } from './errors.js'
 import {
@@ -21,8 +23,8 @@ import {
 	buildSummaryMessage,
 	raceSignal,
 	requireConversationSnapshot,
+	requireMessageInput,
 	requireKeep,
-	requireRole,
 	requireCumulative,
 	requireSectionsCap,
 	requireSummary,
@@ -128,7 +130,10 @@ export class Conversation implements ConversationInterface {
 		// snapshot. Restoring is silent: nothing was edited, so no event fires. The snapshot is checked
 		// before any member is seated, and every member is seated from the checked read alone.
 		const supplied = options?.snapshot
-		const snapshot = supplied === undefined ? undefined : requireConversationSnapshot(supplied)
+		const snapshot =
+			supplied === undefined
+				? undefined
+				: requireConversationSnapshot(supplied, conversationSnapshotContract)
 		this.#judgments = new JudgmentManager(snapshot?.judgments)
 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
 		this.#emitter = new Emitter<ConversationEventMap>(options)
@@ -172,11 +177,11 @@ export class Conversation implements ConversationInterface {
 	add(inputs: readonly MessageInput[]): readonly Message[]
 	add(input: MessageInput | readonly MessageInput[]): Message | readonly Message[] {
 		if (isArray(input)) {
-			// Every role is checked before any element is stored, so a refused batch stores nothing.
-			input.forEach((one) => requireRole(one.role))
+			// Every input is checked before any element is stored, so a refused batch stores nothing.
+			input.forEach((one) => requireMessageInput(one, messageInputContract))
 			return input.map((one) => this.#create(one))
 		}
-		return this.#create(input)
+		return this.#create(requireMessageInput(input, messageInputContract))
 	}
 
 	message(id: string): Message | undefined {
@@ -374,7 +379,7 @@ export class Conversation implements ConversationInterface {
 	#create(input: MessageInput): Message {
 		const message: Message = {
 			id: crypto.randomUUID(),
-			role: requireRole(input.role),
+			role: input.role,
 			content: input.content,
 			...(input.calls === undefined ? {} : { calls: input.calls }),
 			...(input.call === undefined ? {} : { call: input.call }),

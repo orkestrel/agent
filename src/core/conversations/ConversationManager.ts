@@ -6,9 +6,10 @@ import type {
 	ConversationStoreInterface,
 	ConversationSummaryHandler,
 } from './types.js'
-import { isArray } from '@orkestrel/contract'
+import { isArray, preview } from '@orkestrel/contract'
 import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
 import { Conversation } from './Conversation.js'
+import { ConversationError } from './errors.js'
 import { requireKeep } from './helpers.js'
 import { removeEntries } from '../helpers.js'
 
@@ -24,7 +25,8 @@ import { removeEntries } from '../helpers.js'
  * - **Registry.** Conversations live in an insertion-ordered `Map` keyed by `id`. `add(input?)`
  *   mints a {@link Conversation} (its `id` from `input` or `crypto.randomUUID()`), flowing the
  *   default `#summarize` / `#keep` of the manager in unless the `input` overrides them, and stores
- *   it (an already-present `id` overwrites — last write wins). `count` is the map size,
+ *   it (an already-present `id` throws a `ConversationError` coded `'ID'`, because replacing a live
+ *   conversation would orphan its turns). `count` is the map size,
  *   `conversation(id)` looks one up, `conversations()` lists them in insertion order.
  * - **Active pointer.** `active` is the active conversation (the conversation an agent run binds
  *   when it names none), `undefined` until the first `add` (which auto-activates it — a registry
@@ -87,6 +89,14 @@ export class ConversationManager implements ConversationManagerInterface {
 	}
 
 	add(input?: ConversationInput): ConversationInterface {
+		const held = input?.id ?? input?.snapshot?.id
+		if (held !== undefined && this.#conversations.has(held)) {
+			throw new ConversationError(
+				'ID',
+				`conversation ${preview(held)} is already live; pick another id, or remove it first`,
+				{ context: { conversation: held } },
+			)
+		}
 		// An optional `snapshot` hydrates through the declared `ConversationOptions.snapshot` seam,
 		// so the live summarize / keep ride beside it in the same options object.
 		const sections = input?.sections ?? this.#sections
@@ -130,9 +140,15 @@ export class ConversationManager implements ConversationManagerInterface {
 			this.#active = id
 			return registered
 		}
+		if (snapshot === undefined) return undefined
 		// A store answering with another conversation's snapshot would register and activate the
 		// wrong id, so only a snapshot of `id` hydrates.
-		if (snapshot === undefined || snapshot.id !== id) return undefined
+		if (snapshot.id !== id) {
+			throw new ConversationError(
+				'SNAPSHOT',
+				`the store answered ${preview(id)} with the snapshot of ${preview(snapshot.id)}; a store returns only the row of the id it is asked`,
+			)
+		}
 		// Reuse `add` so the default summarize / keep of the manager flow into the rehydrated conversation.
 		const conversation = this.add({ snapshot })
 		// Re-point `active` explicitly: `add` only auto-activates the first conversation, so an open

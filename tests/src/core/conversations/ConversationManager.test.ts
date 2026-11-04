@@ -1,4 +1,5 @@
 import type { ConversationEventMap } from '@src/core'
+import { captureError } from '@orkestrel/test'
 import {
 	Conversation,
 	ConversationManager,
@@ -20,6 +21,7 @@ import {
 	plantSnapshotRow,
 	renderRecap,
 	seedConversation,
+	REWRITTEN_CONVERSATION_SNAPSHOT,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
 } from '../../../setup.js'
 
@@ -29,6 +31,47 @@ import {
 // auto-activates; a later add leaves active; switch re-points it; removing the active (or clear)
 // clears it. The manager's default summarize / keep flow into every conversation it creates; a
 // per-add override wins — real behavior, a data-stub summarizer, NOT a behavior-mock.
+
+describe('ConversationManager — an id already live', () => {
+	it('refuses a re-add and keeps the live conversation', () => {
+		const manager = new ConversationManager()
+		const live = manager.add({ id: 'c1' })
+		const error = captureError(() => manager.add({ id: 'c1' }))
+		expect(isConversationError(error) && error.code).toBe('ID')
+		expect(isConversationError(error) && error.context).toEqual({
+			conversation: 'c1',
+		})
+		expect(manager.conversation('c1')).toBe(live)
+	})
+
+	it('refuses a snapshot whose id is live', () => {
+		const manager = new ConversationManager()
+		manager.add({ id: 'c1' })
+		const error = captureError(() =>
+			manager.add({ snapshot: { id: 'c1', sections: [], messages: [] } }),
+		)
+		expect(isConversationError(error) && error.code).toBe('ID')
+	})
+
+	it('refuses a store answering with another conversation', async () => {
+		const store = createMemoryConversationStore()
+		const manager = new ConversationManager({
+			store: {
+				get: () =>
+					Promise.resolve({
+						id: 'other',
+						sections: [],
+						messages: [],
+					}),
+				set: store.set.bind(store),
+				delete: store.delete.bind(store),
+			},
+		})
+		const error = await manager.open('c1').catch((caught: unknown) => caught)
+		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
+		expect(manager.conversation('other')).toBeUndefined()
+	})
+})
 
 describe('ConversationManager — add / accessors / count', () => {
 	it('starts empty with no active conversation', () => {
@@ -79,13 +122,13 @@ describe('ConversationManager — add / accessors / count', () => {
 		const manager = new ConversationManager({ summarize: createStubSummarizer().summarize })
 
 		const conversation = manager.add({
-			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
+			snapshot: REWRITTEN_CONVERSATION_SNAPSHOT,
 			on: { compact: compacted.handler },
 		})
 
-		expect(conversation.id).toBe(SUMMARIZED_CONVERSATION_SNAPSHOT.id)
-		expect(conversation.sections).toEqual(SUMMARIZED_CONVERSATION_SNAPSHOT.sections)
-		expect(conversation.messages()).toEqual(SUMMARIZED_CONVERSATION_SNAPSHOT.messages)
+		expect(conversation.id).toBe(REWRITTEN_CONVERSATION_SNAPSHOT.id)
+		expect(conversation.sections).toEqual(REWRITTEN_CONVERSATION_SNAPSHOT.sections)
+		expect(conversation.messages()).toEqual(REWRITTEN_CONVERSATION_SNAPSHOT.messages)
 		expect(manager.conversation(conversation.id)).toBe(conversation)
 		expect(compacted.count).toBe(0)
 		conversation.add({ role: 'user', content: 'Who carries it?' })
@@ -125,14 +168,14 @@ describe('ConversationManager — add / accessors / count', () => {
 		},
 	)
 
-	it('a re-add of the same id OVERWRITES (last write wins)', () => {
+	it('a re-add of a live id refuses with ID and keeps the first (no silent overwrite)', () => {
 		const manager = new ConversationManager()
 		const first = manager.add({ id: 'dup' })
-		const second = manager.add({ id: 'dup' })
+		const error = captureError(() => manager.add({ id: 'dup' }))
 
+		expect(isConversationError(error) && error.code).toBe('ID')
 		expect(manager.count).toBe(1)
-		expect(manager.conversation('dup')).toBe(second)
-		expect(manager.conversation('dup')).not.toBe(first)
+		expect(manager.conversation('dup')).toBe(first)
 	})
 })
 
@@ -167,12 +210,12 @@ describe('ConversationManager — active pointer + switch + auto-activate', () =
 		expect(manager.active).toBe(a) // unchanged — lenient, no throw
 	})
 
-	it('the active pointer follows a re-add of the active id (live lookup, never stale)', () => {
+	it('the active pointer holds through a refused re-add of the active id (live lookup, never stale)', () => {
 		const manager = new ConversationManager()
-		manager.add({ id: 'a' }) // active
-		const replacement = manager.add({ id: 'a' }) // overwrite the active id
+		const first = manager.add({ id: 'a' }) // active
 
-		expect(manager.active).toBe(replacement)
+		expect(captureError(() => manager.add({ id: 'a' }))).toBeDefined()
+		expect(manager.active).toBe(first)
 	})
 })
 
@@ -505,27 +548,36 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 		expect(manager.count).toBe(1)
 	})
 
-	it('open(id) resolves undefined for a stored snapshot that names another id', async () => {
+	it('open(id) refuses a stored snapshot that names another id, and changes nothing', async () => {
 		const foreign = createForeignConversationStore()
 		const manager = new ConversationManager({ store: foreign })
 		const b = manager.add({ id: 'b' })
 
-		expect(await manager.open('a')).toBeUndefined()
+		await expect(manager.open('a')).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
 		expect(manager.conversation('b')).toBe(b)
 		expect(manager.conversation('a')).toBeUndefined()
 		expect(manager.active).toBe(b)
 		expect(b.count).toBe(0)
 	})
 
-	it('open(id) resolves undefined for a stored judgment that is not finite', async () => {
+	it('open(id) refuses a stored judgment that is not finite', async () => {
 		const driver = createMemoryDriver()
 		await plantSnapshotRow(driver, 'conversations', {
 			id: JUDGMENT_SNAPSHOT.id,
-			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ ...JUDGMENT_RECORD, time: Number.NaN }] },
+			snapshot: {
+				...JUDGMENT_SNAPSHOT,
+				judgments: [{ ...JUDGMENT_RECORD, time: Number.NaN }],
+			},
 		})
-		const manager = new ConversationManager({ store: createDatabaseConversationStore(driver) })
+		const manager = new ConversationManager({
+			store: createDatabaseConversationStore(driver),
+		})
 
-		await expect(manager.open(JUDGMENT_SNAPSHOT.id)).resolves.toBeUndefined()
+		await expect(manager.open(JUDGMENT_SNAPSHOT.id)).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
 		expect(manager.count).toBe(0)
 	})
 
@@ -684,20 +736,28 @@ describe('ConversationManager — durable open / save (the optional store seam)'
 })
 
 describe('ConversationManager — open reads a 0.0.29 snapshot without its conversation summary', () => {
-	it('narrows the persisted row, hydrates sections and tail, and drops the summary from the next snapshot', async () => {
+	it('refuses the persisted row with its summary, and hydrates sections and tail once it is rewritten', async () => {
 		const driver = createMemoryDriver()
+		const store = createDatabaseConversationStore(driver)
 		await plantSnapshotRow(driver, 'conversations', {
 			id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
 			snapshot: SUMMARIZED_CONVERSATION_SNAPSHOT,
 		})
 		const manager = new ConversationManager({
 			summarize: createStubSummarizer().summarize,
-			store: createDatabaseConversationStore(driver),
+			store,
 		})
 
-		const opened = requireValue(await manager.open(SUMMARIZED_CONVERSATION_SNAPSHOT.id))
+		await expect(manager.open(SUMMARIZED_CONVERSATION_SNAPSHOT.id)).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
+		expect(manager.count).toBe(0)
 
-		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(true)
+		await store.delete(SUMMARIZED_CONVERSATION_SNAPSHOT.id)
+		await store.set(REWRITTEN_CONVERSATION_SNAPSHOT)
+		const opened = requireValue(await manager.open(REWRITTEN_CONVERSATION_SNAPSHOT.id))
+
+		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(false)
 		expect(manager.active).toBe(opened)
 		expect('summary' in opened.snapshot()).toBe(false)
 		expect(opened.view().map((message) => message.content)).toEqual([

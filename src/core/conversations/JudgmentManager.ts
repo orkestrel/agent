@@ -1,11 +1,18 @@
 import type { JudgmentManagerInterface } from './types.js'
 import type { JudgeInterface, JudgeRequest, Judgment, JudgmentInput } from '../types.js'
 import { isArray, isRecord } from '@orkestrel/contract'
+import { describeFaults } from '@orkestrel/tool'
 import { ConversationError } from './errors.js'
-import { buildJudgments, requireJudgment } from './helpers.js'
+import { buildJudgments, requireJudgeResult, requireJudgment } from './helpers.js'
 import { copyJSON, freezeJSON } from '../cloners.js'
+import { judgeAnswerContract, judgeQuestionContract } from '../contracts.js'
 import { JudgeAbortError, isJudgeAbortError } from '../errors.js'
-import { matchesJudgment, removeEntries } from '../helpers.js'
+import {
+	describeQuestionRefusal,
+	matchesJudgment,
+	removeEntries,
+	scanJudgmentTies,
+} from '../helpers.js'
 import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
 /**
@@ -89,12 +96,21 @@ export class JudgmentManager implements JudgmentManagerInterface {
 		const rendered = typeof state === 'string' ? state : JSON.stringify(state)
 		const origins = [...sources]
 		const entries = isRecord(request.questions) ? Object.entries(request.questions) : []
+		if (entries.length === 0) {
+			throw new ConversationError(
+				'JUDGMENT',
+				'conversation error: a judge request needs at least one question, keyed by id',
+			)
+		}
 		const checked = entries.map(([id, raw]) => {
 			const question = copyJSON(raw)
 			if (!isJudgeQuestion(question)) {
-				throw new ConversationError('JUDGMENT', `conversation error: question ${id} is malformed`, {
-					context: { question: id },
-				})
+				const faults = judgeQuestionContract.audit(question)
+				throw new ConversationError(
+					'JUDGMENT',
+					`conversation error: ${describeQuestionRefusal(id, faults, judgeQuestionContract.schema)}`,
+					{ context: { question: id, faults } },
+				)
 			}
 			return [id, question] as const
 		})
@@ -140,6 +156,7 @@ export class JudgmentManager implements JudgmentManagerInterface {
 		if (signal.aborted) throw new JudgeAbortError({ model: judge.model, answers: {} })
 		try {
 			const result = await judge.ask(unmatched, signal)
+			requireJudgeResult(unmatched, result)
 			return this.add(buildJudgments(unmatched, result, origins, rendered, judge.model))
 		} catch (error) {
 			if (isJudgeAbortError(error))
@@ -153,6 +170,16 @@ export class JudgmentManager implements JudgmentManagerInterface {
 		const judgment = requireJudgment(
 			freezeJSON(isRecord(copy) ? { ...copy, time: Date.now() } : copy),
 		)
+		// The ties run on a write alone, because a record written before them can miss them.
+		const faults =
+			judgment.answer === undefined ? [] : scanJudgmentTies(judgment.question, judgment.answer)
+		if (faults.length > 0) {
+			throw new ConversationError(
+				'JUDGMENT',
+				`conversation error: judgment ${judgment.id} answers its question wrongly\n${describeFaults(faults, judgeAnswerContract.schema)}`,
+				{ context: { question: judgment.id, faults } },
+			)
+		}
 		this.#judgments.set(judgment.id, judgment)
 		return judgment
 	}

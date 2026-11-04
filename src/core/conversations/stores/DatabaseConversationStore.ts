@@ -3,8 +3,14 @@ import type {
 	ConversationSnapshotRow,
 	ConversationStoreInterface,
 } from '../types.js'
+import type { AuditFault } from '@orkestrel/contract'
 import type { TableInterface } from '@orkestrel/database'
+import { preview } from '@orkestrel/contract'
+import { describeFaults } from '@orkestrel/tool'
+import { conversationSnapshotContract } from '../contracts.js'
+import { ConversationError } from '../errors.js'
 import { isConversationSnapshot } from '../validators.js'
+import { describeSnapshotRefusal } from '../../helpers.js'
 
 /**
  * Backs a {@link ConversationStoreInterface} with one table of the `databases` layer — a
@@ -36,8 +42,9 @@ import { isConversationSnapshot } from '../validators.js'
  *   the row `{ id: snapshot.id, snapshot }`.
  * - **`get(id)` resolves the stored snapshot for an id**, narrowing the opaque JSON column back to
  *   a {@link ConversationSnapshot} ({@link import('../validators.js').isConversationSnapshot} — the
- *   total guard for an untrusted storage read), or `undefined` if none is stored, the blob is
- *   malformed, or the blob's own `id` is not the requested one.
+ *   total guard for an untrusted storage read), or `undefined` only when no row is stored. A row whose
+ *   blob is malformed or names another id throws a `ConversationError` coded `'SNAPSHOT'`, so `open`
+ *   and `create` stop rather than overwrite it, and `delete` still removes it.
  * - **`delete(id)` drops a snapshot by id**; an absent id is a no-op (no throw).
  *
  * Unlike a session store there is no idle-TTL / eviction — a persisted conversation lives until an
@@ -78,21 +85,38 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 	 *
 	 * @remarks
 	 * The column is an untrusted storage read, so a blob that fails
-	 * {@link import('../validators.js').isConversationSnapshot}, or whose own `id` is not `id`,
-	 * resolves `undefined` rather than a conversation under the wrong key.
+	 * {@link import('../validators.js').isConversationSnapshot}, or whose own `id` is not `id`, throws
+	 * rather than reading as absent, which would let a later `set` overwrite it.
 	 *
 	 * @param id - The conversation id to resolve (the row key)
-	 * @returns The persisted snapshot, or `undefined` when no row is stored, the blob is malformed,
-	 * or the blob names another id
+	 * @returns The persisted snapshot, or `undefined` when no row is stored
+	 * @throws {ConversationError} Thrown when the row's blob is malformed or names another id (code `'SNAPSHOT'`), with the faults under `context.faults`
 	 */
 	async get(id: string): Promise<ConversationSnapshot | undefined> {
 		const row = await this.#table.get(id)
 		if (row === undefined) return undefined
 		// The snapshot crosses back as an untrusted storage read (a structured clone / a JSON row),
 		// so narrow the opaque JSON column with the total boundary guard rather than a cast;
-		// a malformed blob resolves `undefined`, never a broken conversation.
+		// `audit` runs only after the guard refused, to fill the faults.
 		const snapshot = row.snapshot
-		return isConversationSnapshot(snapshot) && snapshot.id === id ? snapshot : undefined
+		if (isConversationSnapshot(snapshot)) {
+			if (snapshot.id === id) return snapshot
+			const faults: readonly AuditFault[] = [
+				{
+					reason: 'type',
+					path: ['id'],
+					expected: 'literal',
+					received: preview(snapshot.id),
+				},
+			]
+			throw new ConversationError('SNAPSHOT', describeSnapshotRefusal('conversation', id, faults), {
+				context: { id, faults },
+			})
+		}
+		const faults = conversationSnapshotContract.audit(snapshot)
+		throw new ConversationError('SNAPSHOT', describeSnapshotRefusal('conversation', id, faults), {
+			context: { id, faults },
+		})
 	}
 
 	/**
@@ -101,8 +125,18 @@ export class DatabaseConversationStore implements ConversationStoreInterface {
 	 *
 	 * @param snapshot - The snapshot to store, keyed by its `id`
 	 * @returns A promise that resolves after the row is written
+	 * @throws {ConversationError} Thrown before any write when the snapshot fails the guard `get` reads (code `'SNAPSHOT'`), so no row is written that `get` refuses
 	 */
 	async set(snapshot: ConversationSnapshot): Promise<void> {
+		if (!isConversationSnapshot(snapshot)) {
+			const unchecked: unknown = snapshot
+			const faults = conversationSnapshotContract.audit(unchecked)
+			throw new ConversationError(
+				'SNAPSHOT',
+				`a conversation store writes only what snapshot() returned\n${describeFaults(faults, conversationSnapshotContract.schema)}`,
+				{ context: { faults } },
+			)
+		}
 		await this.#table.set({ id: snapshot.id, snapshot })
 	}
 

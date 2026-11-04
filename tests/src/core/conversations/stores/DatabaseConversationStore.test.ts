@@ -1,3 +1,4 @@
+import { isConversationError } from '@src/core'
 import { createDatabaseConversationStore } from '@src/core'
 import { createMemoryDriver } from '@orkestrel/database'
 import { createDatabaseWorkspaceStore, createWorkspace } from '@orkestrel/workspace'
@@ -47,7 +48,9 @@ describe('DatabaseConversationStore', () => {
 			id: JUDGMENT_SNAPSHOT.id,
 			snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ id: 'broken' }] },
 		})
-		expect(await createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id)).toBeUndefined()
+		await expect(
+			createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id),
+		).rejects.toSatisfy((error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT')
 	})
 	describe('set → get round-trip (sections + live tail)', () => {
 		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
@@ -147,12 +150,12 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		expect(await reader.get('shared')).toEqual(snapshot)
 	})
 
-	it('a TAMPERED row (a hostile calls[] element) resolves UNDEFINED from get (fail-closed)', async () => {
+	it('a TAMPERED row (a hostile calls[] element) throws SNAPSHOT from get (fail-closed)', async () => {
 		// Plant a tampered row OUT-OF-BAND over the store's own driver — the same one-table shape
 		// the factory builds — whose snapshot column smuggles a malformed assistant calls[] element
 		// (the shape a real chat template would otherwise render). The isMessage guard rejects
-		// it at the read boundary, so the store resolves ABSENT: hydrate mints a fresh thread
-		// instead of replaying (or throwing on) the poisoned call.
+		// it at the read boundary, so the store throws: reading it as absent would let a fresh
+		// thread overwrite the row, and replaying it would render the poisoned call.
 		const driver = createMemoryDriver()
 		await plantSnapshotRow(driver, 'conversations', {
 			id: 'poisoned',
@@ -163,7 +166,9 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 			},
 		})
 		const store = createDatabaseConversationStore(driver)
-		expect(await store.get('poisoned')).toBeUndefined()
+		await expect(store.get('poisoned')).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
 	})
 
 	it('reads back a tool message naming its call beside one saved without call', async () => {
@@ -176,7 +181,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		expect(got?.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
 	})
 
-	it('a TAMPERED row (a non-string call) resolves UNDEFINED from get (fail-closed)', async () => {
+	it('a TAMPERED row (a non-string call) throws SNAPSHOT from get (fail-closed)', async () => {
 		const driver = createMemoryDriver()
 		await plantSnapshotRow(driver, 'conversations', {
 			id: 'poisoned',
@@ -187,7 +192,9 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 			},
 		})
 		const store = createDatabaseConversationStore(driver)
-		expect(await store.get('poisoned')).toBeUndefined()
+		await expect(store.get('poisoned')).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
 	})
 
 	it('a conversation store and a workspace store over ONE driver keep one id apart', async () => {
@@ -209,18 +216,20 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		expect(await createDatabaseWorkspaceStore(driver).get('shared')).toEqual(workspace)
 	})
 
-	it('a row whose snapshot names another id resolves UNDEFINED from get', async () => {
+	it('a row whose snapshot names another id throws SNAPSHOT from get, and an absent row stays absent', async () => {
 		const driver = createMemoryDriver()
 		const snapshot = await buildConversationSnapshot('b')
 		await plantSnapshotRow(driver, 'conversations', { id: 'a', snapshot })
 		const store = createDatabaseConversationStore(driver)
 
-		expect(await store.get('a')).toBeUndefined()
+		await expect(store.get('a')).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
 		expect(await store.get('b')).toBeUndefined()
 	})
 
 	it.each([Number.NaN, Number.POSITIVE_INFINITY])(
-		'a judgment time of %s resolves UNDEFINED from get, so no hydration throws',
+		'a judgment time of %s throws SNAPSHOT from get, before any hydration',
 		async (time) => {
 			const driver = createMemoryDriver()
 			await plantSnapshotRow(driver, 'conversations', {
@@ -228,9 +237,65 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 				snapshot: { ...JUDGMENT_SNAPSHOT, judgments: [{ ...JUDGMENT_RECORD, time }] },
 			})
 
-			expect(
-				await createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id),
-			).toBeUndefined()
+			await expect(
+				createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id),
+			).rejects.toSatisfy(
+				(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+			)
 		},
 	)
+})
+
+describe('DatabaseConversationStore — a present row that fails the guard throws', () => {
+	it('names the id, the key, the table, and store.delete when a row carries a summary', async () => {
+		const driver = createMemoryDriver()
+		await plantSnapshotRow(driver, 'conversations', {
+			id: 'c1',
+			snapshot: { id: 'c1', sections: [], messages: [], summary: 'x' },
+		})
+		const store = createDatabaseConversationStore(driver)
+		const error = await store.get('c1').catch((caught: unknown) => caught)
+		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
+		const message = isConversationError(error) ? error.message : ''
+		expect(message).toContain('"c1"')
+		expect(message).toContain('"summary"')
+		expect(message).toContain('your own table')
+		expect(message).toContain('store.delete("c1")')
+		expect(isConversationError(error) && error.context?.faults).toEqual([
+			{ reason: 'extra', path: ['summary'] },
+		])
+	})
+
+	it('throws on a row that names another id, and still deletes it', async () => {
+		const driver = createMemoryDriver()
+		await plantSnapshotRow(driver, 'conversations', {
+			id: 'c1',
+			snapshot: { id: 'c2', sections: [], messages: [] },
+		})
+		const store = createDatabaseConversationStore(driver)
+		const error = await store.get('c1').catch((caught: unknown) => caught)
+		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
+		await store.delete('c1')
+		expect(await store.get('c1')).toBeUndefined()
+	})
+
+	it('resolves undefined only for a missing row', async () => {
+		const store = createDatabaseConversationStore(createMemoryDriver())
+		expect(await store.get('absent')).toBeUndefined()
+	})
+
+	it('writes nothing for a malformed snapshot', async () => {
+		const store = createDatabaseConversationStore(createMemoryDriver())
+		const malformed = {
+			id: 'c1',
+			sections: [],
+			messages: [],
+			summary: 'x',
+		}
+		const error = await Reflect.apply(store.set, store, [malformed]).catch(
+			(caught: unknown) => caught,
+		)
+		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
+		expect(await store.get('c1')).toBeUndefined()
+	})
 })
