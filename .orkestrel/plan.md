@@ -64,7 +64,7 @@ Each unit's role runs on the Codex column of `.agents/orchestration.md` § Roles
 | --- | --- | --- |
 | Censuses | one per class across every package | each hit ruled: a row, § Deferred, or no defect |
 | `contract`, one writer at a time | corrections to a nested `shape` that `is` refuses and to `rawShape`'s paths; then `admitValue` and `describeFaults` with `@orkestrel/tool` as the first consumer, then `workflow`, `reason`, `toolbox`, `ollama`, `study`, and `agent` taking them with no shim | each proved in `tool` before spreading |
-| `database` | every exhaustive switch on `category` takes `shape`, once `contract` is final; a census of the other consumers by type check | failing test and mutation probe recorded |
+| `database` | every exhaustive switch on `category` takes `shape`, once `contract` is final; `SQLiteDriver` requires `path`, with `':memory:'` explicit, since an absent path loses data at close; `requireColumns` bounds a table name; a census of the other consumers by type check | failing test and mutation probe recorded |
 | Family | `interpret`'s last rows, `program`'s review, then `brief` | the same, with one independent review |
 | Independent reviews | `program`, `brief` | each finding fixed, deferred, or ruled out |
 | Falsify | one round over the integrated result, numbered claims, the objective lane | an all-confirmed round, or a stop stated per `orkestrel-falsify` § End the depth search |
@@ -79,3 +79,4 @@ Findings below the release bar, each one line with the reason it stays below. Th
 | --- | --- |
 | `@orkestrel/mcp` loses the blocks of a result with only non-text content | needs a contract decision; a text result is unaffected |
 | Unbounded refusal text in `@orkestrel/workspace` and `@orkestrel/relation` | outside § Repositories; `toolbox` caps what it translates |
+| `@orkestrel/mcp` `buildCallOutcome` throws a tool's error text unbounded; `@orkestrel/agent` `Channel.push` and `AgentProvider` success bodies have no size cap | a host chooses its endpoint, the timeout and budget bound it, and `AgentProvider` documents the choice |
