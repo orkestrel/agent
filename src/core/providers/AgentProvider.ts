@@ -32,7 +32,8 @@ import { joinThinking } from '../helpers.js'
  * have no size limit. A qwen3 implicit-open reclassification corrects the final
  * content while content deltas already yielded cannot be recalled. A subclass fills
  * `name`, `frame`, `encode`, `read`, and `finish`; the constructor takes the `split`
- * and `strict` switches to control reasoning separation and settled-result requirements.
+ * and `strict` switches to control reasoning separation and whether a stream must end with a settled
+ * `result` or a `done` record, which it must by default.
  * The `replay` input names which stored thinking the agent and relay send back. Default: `'none'`.
  * A throw from the framing seam (`parse`, or `finish`) becomes a `ProviderError` with the
  * `PROTOCOL` code whose `cause` is the throw, unless it is already a `ProviderError` or
@@ -64,7 +65,8 @@ import { joinThinking } from '../helpers.js'
  * class TextProvider extends AgentProvider<string> {
  * 	readonly name = 'text'
  * 	constructor(options: TextOptions) {
- * 		super({ ...options, path: '/generate' })
+ * 		// Raw text has no terminal record, so a stream that stops reads as complete.
+ * 		super({ ...options, path: '/generate', strict: false })
  * 	}
  * 	frame(): ProviderParserInterface<string> {
  * 		return new TextFrame()
@@ -103,7 +105,7 @@ export abstract class AgentProvider<
 		this.#transport = input.fetch ?? globalThis.fetch.bind(globalThis)
 		this.#headers = input.headers
 		this.#split = input.split ?? true
-		this.#strict = input.strict ?? false
+		this.#strict = input.strict ?? true
 	}
 
 	/** Identifies the concrete backend. */
@@ -237,8 +239,11 @@ export abstract class AgentProvider<
 			const tail = splitter?.flush() ?? ''
 			if (tail.length > 0) yield { channel: 'content', text: tail }
 			combined.throwIfAborted()
-			if (this.#strict) {
-				throw new ProviderError('PROTOCOL', 'provider error: missing settled result')
+			if (this.#strict && increments.at(-1)?.done !== true) {
+				throw new ProviderError(
+					'PROTOCOL',
+					'provider error: the stream ended with no settled result and no terminal record; the response was cut, or a wire with no terminal record passes strict: false',
+				)
 			}
 			return this.#assemble(splitter, increments)
 		} catch (error) {
@@ -300,7 +305,7 @@ export abstract class AgentProvider<
 	}
 
 	// Both exits assemble alike, so an aborted call's partial carries what a settled call would. A
-	// settled-result increment replaces the fold.
+	// settled-result increment replaces the fold; a `done` increment closes it.
 	#assemble(
 		splitter: ThinkSplitterInterface | undefined,
 		increments: readonly ProviderIncrement[],

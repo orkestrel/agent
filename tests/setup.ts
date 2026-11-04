@@ -165,7 +165,7 @@ import type {
 	RelayProviderOptions,
 	RelayRefusal,
 } from '@src/core'
-import { Classifier, createLedger, createRelay, RelayProvider, renderStub } from '@src/core'
+import { Agent, Classifier, createLedger, createRelay, RelayProvider, renderStub } from '@src/core'
 import { createBudget } from '@orkestrel/budget'
 import type {
 	AgentFrame,
@@ -201,6 +201,7 @@ import type {
 	LedgerThreshold,
 	AgentContextInterface,
 	AgentInterface,
+	AgentOptions,
 	AgentJudgeInput,
 	AgentProviderInput,
 	ChoiceAnswer,
@@ -1774,6 +1775,37 @@ export function createScriptedProvider(
 	options?: ScriptedProviderOptions,
 ): ScriptedProviderInterface {
 	return new ScriptedProvider(turns, options)
+}
+
+/**
+ * Creates an agent over a provider whose stream yields the given values and returns the given value,
+ * the foreign implementation a run's provider door reads. The values are unchecked, so the construction
+ * goes through Reflect.
+ *
+ * @param result - The value the stream returns
+ * @param deltas - The values the stream yields first. Default: none
+ * @param options - The agent options
+ * @returns The agent over that provider
+ */
+export function createForeignAgent(
+	result: unknown,
+	deltas: readonly unknown[] = [],
+	options?: AgentOptions,
+): AgentInterface {
+	return Reflect.construct(Agent, [
+		{
+			id: 'foreign',
+			name: 'foreign',
+			async *stream() {
+				yield* deltas
+				return result
+			},
+			async generate() {
+				return result
+			},
+		},
+		options,
+	])
 }
 
 /**
@@ -3540,7 +3572,8 @@ export async function serveIngressCanary(
 			}),
 		)
 	}
-	await agent.generate()
+	// A strict run settles `error` on a selected system message, so it sends nothing.
+	await agent.generate().catch(() => undefined)
 	return {
 		error: source === 'select' ? faults.calls[0]?.[0] : caught,
 		sent: provider.calls.map((call) => call.messages),

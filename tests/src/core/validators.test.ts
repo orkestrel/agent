@@ -1,4 +1,9 @@
-import { isJudgeEntry, isJudgeQuestion, isNonNegativeSafeInteger } from '@src/core'
+import {
+	isJudgeEntry,
+	isJudgeQuestion,
+	isNonNegativeSafeInteger,
+	isPositiveSafeInteger,
+} from '@src/core'
 import { isNonNegativeInteger } from '@orkestrel/contract'
 import { createHostileValues } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
@@ -145,5 +150,27 @@ describe('isNonNegativeSafeInteger — the count and limit guard', () => {
 		for (const [index, value] of createHostileValues().entries()) {
 			expect(() => isNonNegativeSafeInteger(value), `hostile value ${index}`).not.toThrow()
 		}
+	})
+})
+
+describe('isPositiveSafeInteger', () => {
+	it('accepts positive safe boundaries and refuses other values without coercion', () => {
+		for (const value of [1, Number.MAX_SAFE_INTEGER])
+			expect(isPositiveSafeInteger(value)).toBe(true)
+		for (const value of [
+			0,
+			-0,
+			-1,
+			0.5,
+			Number.MAX_SAFE_INTEGER + 1,
+			NaN,
+			Infinity,
+			'1',
+			null,
+			undefined,
+			{},
+			Symbol('capacity'),
+		])
+			expect(isPositiveSafeInteger(value)).toBe(false)
 	})
 })

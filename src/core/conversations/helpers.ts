@@ -12,7 +12,7 @@ import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 import { ConversationError } from './errors.js'
 import { isConversationSnapshot, isJudgment } from './validators.js'
 import { CONVERSATION_ROLES } from '../constants.js'
-import { isNonNegativeSafeInteger } from '../validators.js'
+import { isNonNegativeSafeInteger, isPositiveSafeInteger } from '../validators.js'
 
 /**
  * Builds records for answered or refused request keys, attaching usage only for a single question.
@@ -239,15 +239,15 @@ export function requireConversationSnapshot(value: unknown): ConversationSnapsho
 }
 
 /**
- * Returns a `sections` cap after checking its lower bound, or throws a coded error.
+ * Returns a `sections` cap after checking it is a positive safe integer, or throws a coded error.
  *
  * @remarks
- * A supplied cap must satisfy `>= 1`; fractional caps and positive infinity pass, and `NaN`
- * is refused. An absent cap leaves the sections list unbounded.
+ * A fraction, positive infinity, and `NaN` are refused with `0` and a negative, because a count of
+ * sections is a whole number. An absent cap leaves the sections list unbounded.
  *
  * @param cap - The cap to check, or `undefined` for no cap
  * @returns The cap unchanged, or `undefined` when none was supplied
- * @throws ConversationError Thrown when the cap does not satisfy `>= 1` (code `'SECTIONS'`, including `NaN`)
+ * @throws ConversationError Thrown when the cap is not a positive safe integer (code `'SECTIONS'`)
  *
  * @example
  * ```ts
@@ -257,8 +257,10 @@ export function requireConversationSnapshot(value: unknown): ConversationSnapsho
  * ```
  */
 export function requireSectionsCap(cap: number | undefined): number | undefined {
-	if (cap !== undefined && !(cap >= 1)) {
-		throw new ConversationError('SECTIONS', 'a sections cap must be >= 1')
+	if (cap !== undefined && !isPositiveSafeInteger(cap)) {
+		throw new ConversationError('SECTIONS', 'a sections cap must be a positive safe integer', {
+			context: { sections: cap },
+		})
 	}
 	return cap
 }

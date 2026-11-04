@@ -54,15 +54,20 @@ import {
 	denyCall,
 	estimateTokens,
 	inferStop,
-	renderToolValue,
 	requireBudget,
 	requireConversation,
 	requireLimit,
 	resolveDecision,
+	settleToolResult,
 } from './helpers.js'
 import { isAuthorityDecision } from './validators.js'
 import { filterAllowList, sanitizeUsage, stripThinking, sumUsage } from '../helpers.js'
-import { isProviderAbortError } from '../providers/index.js'
+import {
+	isProviderAbortError,
+	isProviderDelta,
+	ProviderError,
+	requireProviderResult,
+} from '../providers/index.js'
 
 /**
  * Composes a {@link ProviderInterface}, an {@link AgentContext}, and a
@@ -136,9 +141,10 @@ export class Agent implements AgentInterface {
 	// cost `budget` ceiling — when the request reaches its `max` this compacts + continues
 	// (non-fatal on a summarizer throw, futile-guarded) and never aborts; only `strict` refuses.
 	readonly #window: BudgetInterface<ProviderRequest> | undefined
-	// When true, a summarizer failure during automatic compaction rethrows (after the `fault`
-	// event) instead of skipping compaction and continuing over-window, and a request still over
-	// the window after the permitted fold is refused with a WINDOW error before dispatch.
+	// True by default: a summarizer failure during automatic compaction rethrows (after the `fault`
+	// event) instead of skipping compaction and continuing over-window, a request still over the
+	// window after the permitted fold is refused with a WINDOW error before dispatch, and an answer
+	// that fails the run's `schema` is refused with a SCHEMA error.
 	readonly #strict: boolean
 	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into the loop. No
@@ -193,7 +199,7 @@ export class Agent implements AgentInterface {
 		this.#signal = options?.signal
 		this.#authority = options?.authority
 		this.#window = options?.window
-		this.#strict = options?.strict ?? false
+		this.#strict = options?.strict ?? true
 		this.#emitter = new Emitter<AgentEventMap>(options)
 	}
 
@@ -461,10 +467,8 @@ export class Agent implements AgentInterface {
 						...(schema === undefined ? {} : { schema }),
 					}
 		// Reset `#window` at run entry so no stale `consumed` carries across runs / a conversation
-		// switch. A `limit: 0` run never measures or folds, and adds no `await` when `window` is unset.
+		// switch.
 		this.#window?.clear()
-		// A cancel at the entry select site of a `limit: 0` run never reaches a turn's abort checks.
-		const cancelled = abort.signal.aborted
 		// One readonly record per turn; the turn index is the list length.
 		const turns: AgentTurn[] = []
 		// One turn per step: observe it, pace the boundary, admit the request, stream the provider,
@@ -569,11 +573,7 @@ export class Agent implements AgentInterface {
 				this.#emitter.emit('usage', settled.usage, settled.estimate)
 				yield { category: 'usage', usage: settled.usage, estimate: settled.estimate }
 			}
-			if (definitions === undefined) {
-				for (const call of result.tools ?? []) {
-					this.#emitter.emit('deny', call, 'no tool is advertised in the active scope', undefined)
-				}
-			} else if (result.tools !== undefined && result.tools.length > 0) {
+			if (result.tools !== undefined && result.tools.length > 0) {
 				const admittedCalls = filterAllowList(names, result.tools, (call) => call.name)
 				const authorization = this.#authorize(result.tools, admittedCalls, advertised, held)
 				// The ask pass runs only for an asked call, so a turn with no `ask` verdict adds no `await`.
@@ -595,21 +595,16 @@ export class Agent implements AgentInterface {
 				// Each dispatched call's tool message, appended per step of a loop that yields.
 				const replies: Message[] = []
 				for (const [position, call] of result.tools.entries()) {
-					const outcome = results[position]
-					if (outcome === undefined) continue
+					const dispatched = results[position]
+					if (dispatched === undefined) continue
+					const { outcome, content } = settleToolResult(dispatched)
 					// Observe the dispatched tool + its result — beside the `tool` yield (the result
 					// already exists). Carries the same pair the chunk carries.
 					this.#emitter.emit('tool', call, outcome)
 					yield { category: 'tool', call, result: outcome }
 					// `call` comes from the paired call rather than the result's `id`, so tool message
 					// `position` names `calls[position]` even when a supplied tool manager returns another id.
-					replies.push(
-						conversation.add({
-							role: 'tool',
-							content: outcome.success ? renderToolValue(outcome.value) : outcome.error,
-							call: call.id,
-						}),
-					)
+					replies.push(conversation.add({ role: 'tool', content, call: call.id }))
 				}
 				// The next turn's admission measures and folds the grown prompt, so a final answer never
 				// pays for a fold. A tools turn's truncation does not end the run, so it is not recorded.
@@ -646,7 +641,7 @@ export class Agent implements AgentInterface {
 				(total, one) => (one === undefined ? total : sumUsage(total, one)),
 				undefined,
 			),
-			partial: final?.partial ?? cancelled,
+			partial: final?.partial ?? abort.signal.aborted,
 			// Every allowed turn requested tools; a cancel during the last one is an `abort`, never an
 			// `exhaust`, so the signal is read here.
 			exhausted: final?.outcome === 'tools' && !abort.signal.aborted,
@@ -679,8 +674,12 @@ export class Agent implements AgentInterface {
 		const thinking = surfaced !== undefined && surfaced.length > 0 ? surfaced : undefined
 		const content = streamed.join('')
 		const estimate = estimateTokens(content)
-		const reported = provided.success ? provided.value.usage : partial?.usage
-		const usage = reported === undefined ? undefined : sanitizeUsage(reported)
+		// A settled result's usage crossed the provider-result door; only an abort partial is sanitized.
+		const usage = provided.success
+			? provided.value.usage
+			: partial?.usage === undefined
+				? undefined
+				: sanitizeUsage(partial.usage)
 		// The one charge site for every path, a genuine failure included. The estimate is already on
 		// the cost budget only when the meter charged that same instance; a call that reported no usage
 		// keeps its estimate on the cost budget, unless the meter put it there.
@@ -731,7 +730,7 @@ export class Agent implements AgentInterface {
 	// non-summarizable conversation is measured but never folded, so the auto path never throws the
 	// `compact()` SUMMARIZER error. A cancel anywhere returns no dispatch so the run settles partial,
 	// and wins over `strict`; otherwise `strict` refuses a request still over the window with a
-	// WINDOW error before any dispatch, while the lenient default sends it.
+	// WINDOW error before any dispatch, while `strict: false` sends it.
 	async #admit(
 		window: BudgetInterface<ProviderRequest>,
 		conversation: ConversationInterface,
@@ -1151,9 +1150,17 @@ export class Agent implements AgentInterface {
 				const next = await generator.next()
 				if (next.done === true) {
 					const result = next.value
-					return attempt(() => result)
+					return attempt(() => requireProviderResult(result))
 				}
 				const delta = next.value
+				if (!isProviderDelta(delta)) {
+					// The run ends here, so the foreign stream is released rather than held to its deadline.
+					void generator.return({ content: '' }).catch(() => {})
+					throw new ProviderError(
+						'PROTOCOL',
+						`provider error: a delta must carry a channel of 'content' or 'thinking' and string text; received ${preview(delta)}`,
+					)
+				}
 				if (delta.channel === 'content') {
 					streamed.push(delta.text)
 					meter?.charge(delta.text)

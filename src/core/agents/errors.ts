@@ -129,7 +129,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 // `catch` branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
 
 /**
- * Reports an `ask` on an authority that has no approver or that its approver refuses, an authority missing its fallback or a rule's verdict, tools set with no authority, a run sharing accounting or a conversation with a live run, a `limit` that is not a nonnegative safe integer, a name absent from a registry pool, a strict run's answer that fails its schema, or a strict run whose request exceeds its window. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise; a `'WINDOW'` refusal rejects the run's `result` instead, and an `'APPROVER'` refusal rejects the promise the `ask` method of an `Authority` or the `ask` handler of an `Approver` returns. Await the call inside `try`/`catch` to catch it.
+ * Reports an `ask` on an authority that has no approver or that its approver refuses, an authority missing its fallback or a rule's verdict, tools set with no authority, a run sharing accounting or a conversation with a live run, a `limit` that is not a positive safe integer, a name absent from a registry pool, a strict run's answer that fails its schema, or a strict run whose request exceeds its window. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise; a `'WINDOW'` refusal rejects the run's `result` instead, and an `'APPROVER'` refusal rejects the promise the `ask` method of an `Authority` or the `ask` handler of an `Approver` returns. Await the call inside `try`/`catch` to catch it.
  *
  * @remarks
  * `'APPROVER'` reports an `ask` on an `Authority` built with no `ask` handler, or an ask an
@@ -147,7 +147,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * `agent` id, and the `conversation` id for a shared conversation. For concurrent runs, use
  * separate agents, or one agent with no `window`, distinct budget and allowance instances per
  * run, and a distinct conversation per run.
- * `'LIMIT'` reports a construction or per-run `limit` that is not a nonnegative safe integer,
+ * `'LIMIT'` reports a construction or per-run `limit` that is not a positive safe integer,
  * including one a rehydrated job carries into `build`. `'REGISTRY'` reports a rehydration name
  * absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` / `build`,
  * whose `context` names the `category` and the `name`, and a job that names `tools` and no
@@ -158,7 +158,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * Narrow a caught value with {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver, or one its approver refuses; `'AUTHORITY'`: an authority missing its fallback or a rule's verdict, or tools set with no authority; `'CONCURRENCY'`: a run sharing accounting or a conversation with a live run; `'LIMIT'`: a `limit` that is not a nonnegative safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
+	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver, or one its approver refuses; `'AUTHORITY'`: an authority missing its fallback or a rule's verdict, or tools set with no authority; `'CONCURRENCY'`: a run sharing accounting or a conversation with a live run; `'LIMIT'`: a `limit` that is not a positive safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
 	readonly code: AgentErrorCode
 	/** Holds the values that locate the failure, such as the `agent` id of a refused run, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined

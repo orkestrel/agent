@@ -64,7 +64,7 @@ describe('createLedger', () => {
 			}),
 		).not.toThrow()
 	})
-	it('rejects shares, capacity, and limits with their matching codes and accepts zero limits', () => {
+	it('rejects shares, capacity, and limits with their matching codes and accepts a zero recall limit', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const value of [0, -1, 1.1, NaN, Infinity]) {
 			expect(() =>
@@ -87,11 +87,10 @@ describe('createLedger', () => {
 			).toThrow(expect.objectContaining({ code: 'LIMIT' }))
 		}
 		expect(() =>
-			createLedger(createScriptedProvider([]), {
-				...options,
-				recall: { limit: 0 },
-				agent: { limit: 0 },
-			}),
+			createLedger(createScriptedProvider([]), { ...options, agent: { limit: 0 } }),
+		).toThrow(expect.objectContaining({ code: 'LIMIT' }))
+		expect(() =>
+			createLedger(createScriptedProvider([]), { ...options, recall: { limit: 0 } }),
 		).not.toThrow()
 	})
 	it('forwards the narrow option through the factory', async () => {

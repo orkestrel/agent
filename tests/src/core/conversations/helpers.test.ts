@@ -398,18 +398,18 @@ describe('requireCumulative', () => {
 })
 
 describe('requireSectionsCap', () => {
-	it('returns undefined, a cap of 1, a fractional cap above 1, and positive infinity unchanged', () => {
+	it('returns undefined and a positive safe integer unchanged', () => {
 		expect(requireSectionsCap(undefined)).toBeUndefined()
 		expect(requireSectionsCap(1)).toBe(1)
-		expect(requireSectionsCap(1.5)).toBe(1.5)
-		expect(requireSectionsCap(Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY)
+		expect(requireSectionsCap(4)).toBe(4)
 	})
 
-	it('throws the SECTIONS code for NaN', () => {
-		expect(() => requireSectionsCap(Number.NaN)).toThrow(
-			expect.objectContaining({ code: 'SECTIONS' }),
-		)
-	})
+	it.each([Number.NaN, 1.5, Number.POSITIVE_INFINITY, 0, -1])(
+		'throws the SECTIONS code for %s',
+		(cap) => {
+			expect(() => requireSectionsCap(cap)).toThrow(expect.objectContaining({ code: 'SECTIONS' }))
+		},
+	)
 
 	it('throws the SECTIONS code below 1, at zero of either sign, and for negative infinity', () => {
 		for (const cap of [0.5, 0, -0, -1, Number.NEGATIVE_INFINITY]) {

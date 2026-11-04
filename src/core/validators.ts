@@ -76,6 +76,20 @@ export function isJudgeQuestion(value: unknown): value is JudgeQuestion {
 }
 
 /**
+ * Checks whether a value is a positive safe integer.
+ * @param value - The value to inspect
+ * @returns True if the value is a positive safe integer; false otherwise
+ * @example
+ * ```ts
+ * isPositiveSafeInteger(4096) // true
+ * isPositiveSafeInteger(0) // false
+ * ```
+ */
+export function isPositiveSafeInteger(value: unknown): value is number {
+	return isFiniteNumber(value) && Number.isSafeInteger(value) && value > 0
+}
+
+/**
  * Checks whether a value is a non-negative safe integer, `-0` included.
  *
  * @remarks

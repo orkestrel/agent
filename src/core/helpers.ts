@@ -129,7 +129,8 @@ export function sanitizeToken(value: number): number {
 /**
  * Sanitizes a {@link TokenUsage} into non-negative integers — the guard an agent's
  * abort-usage path applies to a provider's partial usage before it is charged against a
- * budget or folded into the run total.
+ * budget or folded into the run total, because a cancelled stream has no settled result to refuse;
+ * a settled result's usage crosses the provider-result door instead.
  *
  * @remarks
  * Per field (`prompt` / `completion` / `total`): a non-finite value (`NaN`, `+Infinity`,

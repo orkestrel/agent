@@ -56,7 +56,11 @@ describe('wire shapes', () => {
 			thinking: optionalShape(stringShape()),
 			tools: optionalShape(arrayShape(toolCallShape)),
 			usage: optionalShape(
-				objectShape({ prompt: numberShape(), completion: numberShape(), total: numberShape() }),
+				objectShape({
+					prompt: numberShape({ min: 0 }),
+					completion: numberShape({ min: 0 }),
+					total: numberShape({ min: 0 }),
+				}),
 			),
 			truncated: optionalShape(booleanShape()),
 		})

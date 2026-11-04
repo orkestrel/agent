@@ -271,7 +271,7 @@ export interface LedgerGauge {
  * Selects the agent bounds, hooks, scheduler, and context libraries a ledger passes through to the agent it builds.
  *
  * @remarks
- * `limit` must be a nonnegative safe integer. Default: the `DEFAULT_LEDGER_LIMIT` constant. The
+ * `limit` must be a positive safe integer. Default: the `DEFAULT_LEDGER_LIMIT` constant. The
  * ledger owns every other agent option: the conversation, the tools, the selection handler, and
  * the scope. One memo set can serve many ledgers of one principal, and the plan prices what these
  * libraries add to the head. `scheduler` also reaches the ledger's classifier, which hands the host
@@ -919,7 +919,7 @@ export type LedgerErrorCode =
 	| 'SHARE'
 	/** Reports an invalid capacity or a generation cap that is not a nonnegative safe integer less than capacity. */
 	| 'CAPACITY'
-	/** Reports a recall limit or an agent limit that is not a nonnegative safe integer. */
+	/** Reports a recall limit that is not a nonnegative safe integer, or an agent limit that is not a positive safe integer. */
 	| 'LIMIT'
 	/** Reports a topic with an empty name or a name another topic carries. */
 	| 'TOPIC'

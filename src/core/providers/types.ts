@@ -230,6 +230,8 @@ export interface ProviderIncrement {
 	readonly usage?: TokenUsage
 	readonly truncated?: boolean
 	readonly result?: ProviderResult
+	/** Marks the wire's terminal record, so a strict engine folds every increment into the settled result. */
+	readonly done?: boolean
 }
 
 /**
@@ -258,8 +260,9 @@ export interface ProviderOptions {
  * @remarks
  * `path` appends to `url`. If `split` is true, separates in-content reasoning;
  * if false, preserves content verbatim. Default: true.
- * If `strict` is true, requires a settled result record; if false, assembles at end of input.
- * Default: false.
+ * If `strict` is true, a stream that ends with neither a settled `result` nor a `done` record throws
+ * a `ProviderError` with the `PROTOCOL` code, because it was cut; if false, assembles at end of input,
+ * which a wire with no terminal record passes. Default: true.
  */
 export interface AgentProviderInput extends ProviderOptions {
 	readonly url: string
@@ -286,7 +289,7 @@ export interface AgentProviderInterface<
 export type ProviderErrorCode =
 	/** Reports a non-OK HTTP response, including a relay request rejected with status 413. */
 	| 'HTTP'
-	/** Reports a missing body, malformed wire record, or missing required settled result. */
+	/** Reports a missing body, malformed wire record, a stream that ended with no settled result and no terminal record, or a result or delta the published contract refuses. */
 	| 'PROTOCOL'
 	/** Reports an upstream provider failure carried by a relay error record. */
 	| 'PROVIDER'

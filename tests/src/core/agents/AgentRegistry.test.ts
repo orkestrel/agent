@@ -242,13 +242,13 @@ describe('AgentRegistry — build (rehydration)', () => {
 		expect(result.partial).toBe(true)
 	})
 
-	it('refuses a rehydrated `limit` that is not a nonnegative safe integer, and accepts 0', () => {
+	it('refuses a rehydrated `limit` that is not a positive safe integer', () => {
 		const registry = createTurnRegistry({ content: 'ok' })
-		for (const limit of [Number.NaN, -1, Number.POSITIVE_INFINITY, 1.5]) {
+		for (const limit of [0, -1, 1.5]) {
 			const caught = captureError(() => registry.build({ provider: 'main', messages: [], limit }))
 			expect(isAgentError(caught) ? caught.code : undefined).toBe('LIMIT')
 		}
-		expect(registry.build({ provider: 'main', messages: [], limit: 0 }).status).toBe('idle')
+		expect(registry.build({ provider: 'main', messages: [], limit: 1 }).status).toBe('idle')
 	})
 
 	it('resolves a `scheduler` name and the rehydrated loop paces through it', async () => {

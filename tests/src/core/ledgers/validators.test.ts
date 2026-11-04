@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-	isFraction,
-	isLedgerSnapshot,
-	isPositiveSafeInteger,
-} from '../../../../src/core/ledgers/validators.js'
+import { isFraction, isLedgerSnapshot } from '../../../../src/core/ledgers/validators.js'
 import {
 	LEDGER_SNAPSHOT_SEED,
 	createInvalidLedgerSnapshotCases,
@@ -28,28 +24,6 @@ describe('isFraction', () => {
 			Symbol('fraction'),
 		])
 			expect(isFraction(value)).toBe(false)
-	})
-})
-
-describe('isPositiveSafeInteger', () => {
-	it('accepts positive safe boundaries and refuses other values without coercion', () => {
-		for (const value of [1, Number.MAX_SAFE_INTEGER])
-			expect(isPositiveSafeInteger(value)).toBe(true)
-		for (const value of [
-			0,
-			-0,
-			-1,
-			0.5,
-			Number.MAX_SAFE_INTEGER + 1,
-			NaN,
-			Infinity,
-			'1',
-			null,
-			undefined,
-			{},
-			Symbol('capacity'),
-		])
-			expect(isPositiveSafeInteger(value)).toBe(false)
 	})
 })
 

@@ -252,7 +252,8 @@ await new GuideCommand({
 	class TextProvider extends AgentProvider<string> {
 		readonly name = 'text'
 		constructor(options: TextOptions) {
-			super({ ...options, path: '/generate' })
+			// Raw text has no terminal record, so a stream that stops reads as complete.
+			super({ ...options, path: '/generate', strict: false })
 		}
 		frame(): ProviderParserInterface<string> {
 			return new TextFrame()
@@ -415,6 +416,7 @@ await new GuideCommand({
 			const chunks = ['<think>Greet ', 'briefly.</think>Hello', ' there.']
 			const provider = new ConfiguredProvider({
 				url: 'https://text.test',
+				strict: false,
 				fetch: () =>
 					Promise.resolve(
 						new Response(
@@ -460,7 +462,7 @@ await new GuideCommand({
 
 		it('enforces the scope dispatch and answer-only behavior the guide states', async () => {
 			expect(guideText).toContain('A scoped-out tool is neither described nor callable.')
-			expect(guideText).toContain('no tool is advertised in the active scope')
+			expect(guideText).toContain('`<tool name> is not in the active scope`')
 			expect(guideText).toContain(
 				'`"TOOL" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.`',
 			)
@@ -490,14 +492,15 @@ await new GuideCommand({
 							{ id: 'search', name: 'search', arguments: {} },
 						],
 					},
-					{ content: 'answer', tools: [{ id: 'dropped', name: 'search', arguments: {} }] },
+					{ content: '', tools: [{ id: 'dropped', name: 'search', arguments: {} }] },
+					{ content: 'answer' },
 				],
 				{ recorded: true, repeat: false },
 			)
 			const agent = createAgent(provider, {
 				tools,
 				authority: AGENT_AUTHORITY,
-				limit: 2,
+				limit: 3,
 				scope: createScope({ name: 'read', tools: ['search'] }),
 			})
 			agent.emitter.on('deny', (_call, reason) => denials.push(reason))
@@ -508,7 +511,7 @@ await new GuideCommand({
 			expect(executed).toEqual(['search'])
 			expect(denials).toEqual([
 				'delete is not in the active scope',
-				'no tool is advertised in the active scope',
+				'search is not in the active scope',
 			])
 			expect(
 				provider.calls[1]?.messages
@@ -607,6 +610,7 @@ await new GuideCommand({
 				tools,
 				authority: AGENT_AUTHORITY,
 				conversations,
+				strict: false,
 				// This case pins the between-turns rebuild by message arithmetic, so the window explicitly
 				// projects the request's messages and leaves the tool definitions out of the measure.
 				window: createBudget({
@@ -1591,10 +1595,8 @@ await new GuideCommand({
 			const denials: Array<readonly [string, string | undefined]> = []
 			const provider = createScriptedProvider(
 				[
-					{
-						content: 'Refunds need a manager.',
-						tools: [{ id: 'refund-1', name: 'refund', arguments: {} }],
-					},
+					{ content: '', tools: [{ id: 'refund-1', name: 'refund', arguments: {} }] },
+					{ content: 'Refunds need a manager.' },
 				],
 				{ recorded: true, repeat: false },
 			)
@@ -1607,10 +1609,10 @@ await new GuideCommand({
 			const result = await agent.generate()
 
 			expect(result).toEqual({ content: 'Refunds need a manager.', partial: false })
-			expect(denials).toEqual([['refund', 'no tool is advertised in the active scope']])
+			expect(denials).toEqual([['refund', 'refund is not in the active scope']])
 			expect(provider.calls[0]?.tools).toBeUndefined()
 			expect(guideText).toContain(
-				"agent.emitter.on('deny', (call, reason) => log(call.name, reason)) // 'refund', 'no tool is advertised in the active scope'",
+				"agent.emitter.on('deny', (call, reason) => log(call.name, reason)) // 'refund', 'refund is not in the active scope'",
 			)
 			expect(guideText).toContain(
 				"const result = await agent.generate() // { content: 'Refunds need a manager.', partial: false }",
@@ -3671,7 +3673,7 @@ await new GuideCommand({
 		it('carries the provider-subclass fence lines the transcription copies', () => {
 			expect(guideText).toContain('class TextProvider extends AgentProvider<string> {')
 			expect(guideText).toContain("readonly name = 'text'")
-			expect(guideText).toContain("super({ ...options, path: '/generate' })")
+			expect(guideText).toContain("super({ ...options, path: '/generate', strict: false })")
 			expect(guideText).toContain('read(record: string): ProviderIncrement {')
 			expect(guideText).toContain("return { content: record, thinking: '', tools: [] }")
 		})
@@ -3736,7 +3738,7 @@ await new GuideCommand({
 				'split: true, // route <think> spans to `thinking`, yield the clean answer',
 			)
 			expect(guideText).toContain(
-				'strict: false, // assemble at end of input instead of requiring a settled record',
+				'strict: false, // this wire has no terminal record: assemble at end of input instead of refusing',
 			)
 			expect(guideText).toContain('declare function token(signal: AbortSignal): Promise<string>')
 		})
@@ -5187,6 +5189,7 @@ await new GuideCommand({
 					messages: [forged, ...conversation.view()],
 					judgments: [],
 				}),
+				strict: false,
 			})
 			agent.emitter.on('fault', (error) => faults.push(error))
 			agent.emitter.on('select', (selection) => selections.push(selection))
@@ -5873,6 +5876,7 @@ await new GuideCommand({
 			const foldAgent = createAgent(folded, {
 				tools: foldTools,
 				authority: AGENT_AUTHORITY,
+				strict: false,
 				skills,
 				conversations: foldThreads,
 				// Message arithmetic is the claim, so the window projects the request's messages.
@@ -5912,7 +5916,7 @@ await new GuideCommand({
 			conversation.add({ role: 'user', content: 'x'.repeat(4_000) })
 			const provider = createScriptedProvider([{ content: 'Answered.' }], { recorded: true })
 			const window = createBudget({ max: 100, consumer: estimateRequest })
-			const agent = createAgent(provider, { window })
+			const agent = createAgent(provider, { window, strict: false })
 			agent.emitter.on('fault', (error) => faults.push(error))
 			agent.emitter.on('error', (error) => errors.push(error))
 			const result = await agent.generate({ conversation })
@@ -5930,9 +5934,9 @@ await new GuideCommand({
 				'The over-window prompt then proceeds to the provider, and the provider decides what happens past its window.',
 			)
 			expect(guideText).toContain(
-				"With `strict` false, the default, no error and no agent event marks that point: the loop sends the over-window request, and no reading covers the provider's behavior past its window.",
+				"With `strict: false`, no error and no agent event marks that point: the loop sends the over-window request, and no reading covers the provider's behavior past its window,",
 			)
-			expect(guideText).toContain('only `strict` refuses a request still over the window.')
+			expect(guideText).toContain('`strict`, the default, refuses a request still over the window.')
 		})
 
 		it('reads the window of the last request', async () => {
@@ -5965,7 +5969,12 @@ await new GuideCommand({
 					return estimate
 				},
 			})
-			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY, window })
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				window,
+				strict: false,
+			})
 			// The tool's description puts the first request over the window; the scope drops it next.
 			agent.emitter.on('tool', () =>
 				agent.context.apply(createScope({ name: 'answer', tools: [] })),
@@ -5978,7 +5987,7 @@ await new GuideCommand({
 			expect(window.consumed).toBe(measured.at(-1))
 			expect(window.exhausted).toBe(false)
 			expect(guideText).toContain(
-				'The `consumed` and `exhausted` members of your `window` `Budget` read the last request the loop measured, so read them after a run, or set `strict`.',
+				'read the `consumed` and `exhausted` members of your `window` `Budget`, which hold the last request the loop measured, after a run.',
 			)
 		})
 

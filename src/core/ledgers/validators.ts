@@ -16,19 +16,6 @@ export function isFraction(value: unknown): value is number {
 }
 
 /**
- * Checks whether a value is a positive safe integer.
- * @param value - The value to inspect
- * @returns True if the value is a positive safe integer; false otherwise
- * @example
- * ```ts
- * isPositiveSafeInteger(4096) // true
- * ```
- */
-export function isPositiveSafeInteger(value: unknown): value is number {
-	return isFiniteNumber(value) && Number.isSafeInteger(value) && value > 0
-}
-
-/**
  * Checks whether a value is a ledger snapshot whose marked ids name messages of its own conversation.
  *
  * @remarks

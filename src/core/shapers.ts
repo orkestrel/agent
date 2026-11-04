@@ -47,10 +47,10 @@ export const messageShape = objectShape({
  * counts, shared by the provider result and the agent frame wires.
  *
  * @remarks
- * The guard refuses extra members; the contract parser drops them.
+ * Each count is a nonnegative number. The guard refuses extra members; the contract parser drops them.
  */
 export const tokenUsageShape = objectShape({
-	prompt: numberShape(),
-	completion: numberShape(),
-	total: numberShape(),
+	prompt: numberShape({ min: 0 }),
+	completion: numberShape({ min: 0 }),
+	total: numberShape({ min: 0 }),
 }) satisfies ContractShape

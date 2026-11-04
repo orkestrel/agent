@@ -52,6 +52,10 @@ import {
 	requireBudget,
 	requireConversation,
 	settleAgentJob,
+	settleToolResult,
+	requireFallback,
+	requireRules,
+	isAgentError,
 	requireEntry,
 	requireLimit,
 	resolveDecision,
@@ -102,8 +106,8 @@ describe('requireEntry', () => {
 })
 
 describe('requireLimit', () => {
-	it('returns a nonnegative safe integer unchanged, including 0', () => {
-		expect(requireLimit(0)).toBe(0)
+	it('returns a positive safe integer unchanged', () => {
+		expect(requireLimit(1)).toBe(1)
 		expect(requireLimit(3)).toBe(3)
 		expect(requireLimit(Number.MAX_SAFE_INTEGER)).toBe(Number.MAX_SAFE_INTEGER)
 	})
@@ -143,25 +147,22 @@ describe('renderToolValue', () => {
 		expect(renderToolValue(undefined)).toBe('')
 	})
 
-	it('falls back to the string form for a value JSON cannot carry', () => {
+	it('returns undefined for a value JSON cannot carry, so the loop reports a tool failure', () => {
 		const graph: Record<string, unknown> = { name: 'route' }
 		graph.next = graph
-		expect(renderToolValue(10n)).toBe('10')
-		expect(renderToolValue(graph)).toBe('[object Object]')
-		expect(renderToolValue(Symbol('route'))).toBe('Symbol(route)')
+		expect(renderToolValue(10n)).toBeUndefined()
+		expect(renderToolValue(graph)).toBeUndefined()
+		expect(renderToolValue(Symbol('route'))).toBeUndefined()
 		expect(
 			renderToolValue({
 				toJSON: () => {
 					throw new Error('unserializable')
 				},
 			}),
-		).toBe('[object Object]')
-	})
-
-	it('renders empty content when neither JSON nor the string form can carry the value', () => {
+		).toBeUndefined()
 		const bare: Record<string, unknown> = Object.create(null)
 		bare.self = bare
-		expect(renderToolValue(bare)).toBe('')
+		expect(renderToolValue(bare)).toBeUndefined()
 	})
 })
 
@@ -251,15 +252,22 @@ describe('agentResultToJSON', () => {
 			enumerable: true,
 			get: () => 'done',
 		})
-		const inherited = { usage: { prompt: -1, completion: 1.5, total: 0 } }
+		const inherited = { usage: { prompt: 1, completion: 1.5, total: 0 } }
 		Object.setPrototypeOf(inherited, { content: 'inherited', partial: true })
 
 		expect(agentResultToJSON(accessor)).toEqual({ content: 'done', partial: false })
 		expect(agentResultToJSON(inherited)).toEqual({
 			content: 'inherited',
-			usage: { prompt: -1, completion: 1.5, total: 0 },
+			usage: { prompt: 1, completion: 1.5, total: 0 },
 			partial: true,
 		})
+		expect(
+			agentResultToJSON({
+				content: 'x',
+				partial: false,
+				usage: { prompt: -1, completion: 0, total: 0 },
+			}),
+		).toBeUndefined()
 	})
 
 	it('reads each result and usage field exactly once', () => {
@@ -436,11 +444,15 @@ describe('agentResultToJSON', () => {
 })
 
 describe('tokenUsageToJSON', () => {
-	it('projects a finite triple to a fresh exact usage, keeping negative and fractional counts', () => {
-		const source = { prompt: 2, completion: -1, total: 1.5, cached: 4 }
+	it('projects a finite nonnegative triple to a fresh exact usage, keeping fractional counts', () => {
+		const source = { prompt: 2, completion: 1, total: 1.5, cached: 4 }
 		const projected = tokenUsageToJSON(source)
-		expect(projected).toEqual({ prompt: 2, completion: -1, total: 1.5 })
+		expect(projected).toEqual({ prompt: 2, completion: 1, total: 1.5 })
 		expect(projected).not.toBe(source)
+	})
+
+	it('resolves undefined for a negative count', () => {
+		expect(tokenUsageToJSON({ prompt: 2, completion: -1, total: 1 })).toBeUndefined()
 	})
 
 	it('resolves undefined for a non-finite or missing count, a non-object, and a throwing getter', () => {
@@ -1286,6 +1298,40 @@ describe('agentResultToFrame — the terminal finish frame', () => {
 			{ category: 'finish', content: 'The invoice is', partial: true, layer: 'model' },
 			{ category: 'finish', content: 'The invoice is paid.', partial: false },
 		])
+	})
+})
+
+describe('settleToolResult', () => {
+	it('passes a failure through with its error as the content', () => {
+		const failed = { success: false, id: '1', name: 'read', error: 'nope' } as const
+		expect(settleToolResult(failed)).toEqual({ outcome: failed, content: 'nope' })
+	})
+
+	it('renders a success', () => {
+		const done = { success: true, id: '1', name: 'read', value: { count: 2 } } as const
+		expect(settleToolResult(done)).toEqual({ outcome: done, content: '{"count":2}' })
+	})
+
+	it('turns a value JSON cannot carry into a failure naming the tool', () => {
+		const settled = settleToolResult({ success: true, id: '1', name: 'read', value: 10n })
+		expect(settled.outcome).toMatchObject({ success: false, id: '1', name: 'read' })
+		expect(settled.content).toContain('"read" returned a value JSON cannot carry')
+	})
+})
+
+describe('requireFallback and requireRules', () => {
+	it('returns a valid fallback and refuses a missing one', () => {
+		const fallback = { zone: 'default', verdict: 'deny' } as const
+		expect(requireFallback({ fallback })).toBe(fallback)
+		const error = captureError(() => Reflect.apply(requireFallback, undefined, [undefined]))
+		expect(isAgentError(error) && error.code).toBe('AUTHORITY')
+	})
+
+	it('returns an empty list for absent rules and refuses a hole', () => {
+		expect(requireRules(undefined)).toEqual([])
+		// A hole in the list reads as an undefined rule.
+		const error = captureError(() => Reflect.apply(requireRules, undefined, [new Array(1)]))
+		expect(isAgentError(error) && error.context).toEqual({ rule: 0 })
 	})
 })
 

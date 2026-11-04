@@ -152,6 +152,7 @@ import {
 	createLedger,
 	createMemoManager,
 	createMemoryConversationStore,
+	isConversationError,
 	isConversationSnapshot,
 	isMemoSnapshot,
 	isProviderAbortError,
@@ -1314,7 +1315,7 @@ describe('system boundary canary fixtures', () => {
 		expect(memos[0]?.content).toContain(CANARY_SENTINELS.fact)
 	})
 
-	it.each(CANARY_INGRESS_SOURCES)(
+	it.each(CANARY_INGRESS_SOURCES.filter((source) => source !== 'select'))(
 		'serves the %s ingress canary with the system text first',
 		async (source) => {
 			const canary = await serveIngressCanary(source)
@@ -1325,6 +1326,12 @@ describe('system boundary canary fixtures', () => {
 			expect(first[0]?.content).toContain(CANARY_SENTINELS.system)
 		},
 	)
+	it('sends nothing on a selected system message, because the strict run settles error', async () => {
+		const canary = await serveIngressCanary('select')
+
+		expect(canary.sent).toEqual([])
+		expect(isConversationError(canary.error) && canary.error.code).toBe('ROLE')
+	})
 
 	it('names malformed snapshots the conversation guard refuses, each title distinct', () => {
 		const titles = MALFORMED_CONVERSATION_SNAPSHOTS.map(([title]) => title)

@@ -962,13 +962,15 @@ describe('Conversation — sections cap', () => {
 		)
 	})
 
-	it('accepts a fractional cap >= 1 (only the >= 1 bound is validated)', () => {
-		expect(() => new Conversation({ sections: 1.5 })).not.toThrow()
+	it('refuses a fractional cap, because a count of sections is a whole number', () => {
+		expect(() => new Conversation({ sections: 1.5 })).toThrow(
+			expect.objectContaining({ code: 'SECTIONS' }),
+		)
 	})
 
-	it('retains at most the ceiling of a fractional cap after a successful merge', async () => {
+	it('retains at most its cap after a successful merge', async () => {
 		const stub = createStubSummarizer()
-		const conversation = new Conversation({ summarize: stub.summarize, sections: 1.5 })
+		const conversation = new Conversation({ summarize: stub.summarize, sections: 2 })
 		const events = createRecorders<ConversationEventMap, 'collapse'>(conversation.emitter, [
 			'collapse',
 		])
@@ -983,15 +985,21 @@ describe('Conversation — sections cap', () => {
 			{ role: 'user', content: 'Third request.' },
 		])
 		await conversation.compact()
+		conversation.add([
+			{ role: 'assistant', content: 'Third answer.' },
+			{ role: 'user', content: 'Fourth request.' },
+		])
+		await conversation.compact()
 
 		expect(conversation.sections).toHaveLength(2)
-		expect(conversation.sections.length).toBeLessThanOrEqual(Math.ceil(1.5))
 		expect(events.collapse.count).toBe(1)
 		expect(events.collapse.calls[0]?.[0].messages.map(({ content }) => content)).toEqual([
 			'First request.',
 			'First answer.',
+			'Second request.',
+			'Second answer.',
 		])
-		expect(stub.calls.map((messages) => messages.length)).toEqual([2, 2, 1])
+		expect(stub.calls.map((messages) => messages.length)).toEqual([2, 2, 2, 2])
 	})
 
 	it('throws ConversationError code SECTIONS for a zero or negative per-compact override', async () => {

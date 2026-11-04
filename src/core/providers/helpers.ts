@@ -22,12 +22,15 @@ import {
 	canonicalStringify,
 	failure,
 	isArray,
+	isFunction,
 	isNumber,
+	isObject,
 	preview,
 	success,
 } from '@orkestrel/contract'
-import { JudgeError } from './errors.js'
+import { JudgeError, ProviderError } from './errors.js'
 import { MAX_ERROR_BODY_LENGTH } from './constants.js'
+import { isProviderResult } from './validators.js'
 import { sanitizeUsage, sumUsage } from '../helpers.js'
 
 /**
@@ -58,6 +61,58 @@ export function buildProviderResult(
 		...(usage === undefined ? {} : { usage }),
 		...(truncated === undefined ? {} : { truncated }),
 	}
+}
+
+/**
+ * Owns a provider's settled result: reads each published member of the foreign value once into a fresh
+ * record, checks that copy, and returns it, or throws a coded error the run rejects with.
+ *
+ * @remarks
+ * The check is {@link isProviderResult}, so a class instance carrying the published members passes and
+ * an unknown member is left behind. `usage` is copied count by count; `tools` keeps the array the
+ * provider returned. An absent `usage` stays absent, which the loop bills as its estimate.
+ *
+ * @param value - The value a provider's stream returned
+ * @returns The owned result
+ * @throws {ProviderError} Thrown when the value does not carry the published members (code `PROTOCOL`)
+ *
+ * @example
+ * ```ts
+ * requireProviderResult({ content: 'answer', extra: true }) // { content: 'answer' }
+ * requireProviderResult({}) // throws ProviderError ('PROTOCOL')
+ * ```
+ */
+export function requireProviderResult(value: unknown): ProviderResult {
+	const owned = attempt(() => {
+		if (!isObject(value) && !isFunction(value)) return undefined
+		const thinking = Reflect.get(value, 'thinking')
+		const tools = Reflect.get(value, 'tools')
+		const usage = Reflect.get(value, 'usage')
+		const truncated = Reflect.get(value, 'truncated')
+		return {
+			content: Reflect.get(value, 'content'),
+			...(thinking === undefined ? {} : { thinking }),
+			...(tools === undefined ? {} : { tools }),
+			...(usage === undefined
+				? {}
+				: {
+						usage: isObject(usage)
+							? {
+									prompt: Reflect.get(usage, 'prompt'),
+									completion: Reflect.get(usage, 'completion'),
+									total: Reflect.get(usage, 'total'),
+								}
+							: usage,
+					}),
+			...(truncated === undefined ? {} : { truncated }),
+		}
+	})
+	if (owned.success && isProviderResult(owned.value)) return owned.value
+	throw new ProviderError(
+		'PROTOCOL',
+		`provider error: a provider must return string content, with thinking, tools, usage, and truncated absent or of their published types, and usage counts finite and nonnegative; received ${preview(owned.success ? owned.value : value)}`,
+		owned.success ? undefined : { cause: owned.error },
+	)
 }
 
 /**

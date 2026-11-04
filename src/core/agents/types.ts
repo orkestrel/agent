@@ -70,7 +70,7 @@ export type AgentChunk =
  * holding unresolved tool intent (the model requested tools on the very last allowed
  * turn) — a distinct, non-cancel cause covered by {@link AgentRunResult.exhausted} (see
  * the `exhaust` {@link AgentEventMap} event). It is `false` for a turn that ran to a
- * natural finish (including a `limit: 0` run, which never enters the loop). `usage` is
+ * natural finish. `usage` is
  * present only when at least one provider call or selection reported usage — an aborted run's `usage`
  * includes the cancelled turn's tokens when the provider reports partial usage on the
  * abort (folded in exactly like a completed turn's); a provider that cannot observe
@@ -255,12 +255,11 @@ export type AgentEventMap = {
 	readonly ask: readonly [call: ToolCall, decision: AuthorityDecision]
 	/**
 	 * Reports a call denied by scope or authority, before dispatch; `decision` is absent for a scope
-	 * miss, a call whose name no definition advertises this turn, a no-advertisement drop, an evaluate
-	 * throw, an invalid decision, or a cleared call whose tool instance changed before dispatch.
-	 * A turn advertising no tools drops each call with `no tool is advertised in the active scope`.
-	 * Otherwise a call excluded by the tool allow-list, or whose name no definition advertises this
-	 * turn, carries `<tool name> is not in the active scope` and produces a denial tool result and
-	 * message. Authority evaluates only admitted calls that name an advertised definition. `reason` is
+	 * miss, a call whose name no definition advertises this turn, an evaluate throw, an invalid
+	 * decision, a call on an agent that holds no authority, or a cleared call whose tool instance
+	 * changed before dispatch. A call excluded by the tool allow-list, or whose name no definition
+	 * advertises this turn, a turn advertising no tools included, carries `<tool name> is not in the
+	 * active scope` and produces a denial tool result and message. Authority evaluates only admitted calls that name an advertised definition. `reason` is
 	 * the rule's `deny` reason, the thrown error's text, `invalid decision`, `<tool name> changed after
 	 * its decision` for a cleared call whose tool instance changed before dispatch (the model reads the
 	 * `denied` note), or `undefined`. A cancel that ends the turn before dispatch emits no such `deny`.

@@ -1788,13 +1788,13 @@ describe('Ledger', () => {
 		).toEqual([LEDGER_NOTES.closure])
 	})
 
-	it('makes no provider call at a zero agent turn limit', async () => {
-		const options = buildLedgerOptions()
+	it('refuses a zero agent turn limit at construction', () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const ledger = createLedger(provider, { ...options, agent: { limit: 0 } })
-		const result = await ledger.respond('Check the desk.')
+		const error = captureError(() =>
+			createLedger(provider, { ...buildLedgerOptions(), agent: { limit: 0 } }),
+		)
+		expect(isLedgerError(error) && error.code).toBe('LIMIT')
 		expect(provider.calls).toHaveLength(0)
-		expect(result.content).toBe('')
 	})
 
 	it('skips the answer pass after caller abort and refuses concurrency before appending', async () => {
@@ -3099,10 +3099,13 @@ describe('Ledger', () => {
 	it('uses the measured default turn limit and the default recall limit', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
-			Array.from({ length: 8 }, (_unused, at) => ({
-				content: '',
-				tools: [{ id: `call-${at}`, name: 'lookup', arguments: { id: `BW-${at}` } }],
-			})),
+			[
+				...Array.from({ length: 8 }, (_unused, at) => ({
+					content: '',
+					tools: [{ id: `call-${at}`, name: 'lookup', arguments: { id: `BW-${at}` } }],
+				})),
+				{ content: 'Done.' },
+			],
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)

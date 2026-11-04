@@ -23,7 +23,7 @@ import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { JSONValue } from '@orkestrel/contract'
 import type { QueueContext, QueueOptions } from '@orkestrel/queue'
 import type { ToolCall, ToolDefinition, ToolResult } from '@orkestrel/tool'
-import { isBudget, isBudgetError } from '@orkestrel/budget'
+import { isBudget, isBudgetAmount, isBudgetError } from '@orkestrel/budget'
 import {
 	attempt,
 	canonicalStringify,
@@ -41,21 +41,21 @@ import { AgentError, AgentJobError } from './errors.js'
 import { isConversation } from '../conversations/index.js'
 import { isAuthorityDecision, isAuthorityVerdict } from './validators.js'
 import { hasCalls, renderJSON } from '../helpers.js'
-import { isNonNegativeSafeInteger } from '../validators.js'
+import { isPositiveSafeInteger } from '../validators.js'
 
 /**
  * Projects an unknown value onto a fresh, exact `JSONValue` representation of an
  * {@link AgentResult} — capturing each structural field once through a total boundary,
- * accepting conforming accessors and inherited properties, preserving finite negative and
- * fractional usage counts, dropping extras, and resolving `undefined` for a malformed field, a
- * non-finite usage number, a throwing getter, or a malformed or revoked proxy.
+ * accepting conforming accessors and inherited properties, preserving fractional usage counts,
+ * dropping extras, and resolving `undefined` for a malformed field, a negative or non-finite usage
+ * number, a throwing getter, or a malformed or revoked proxy.
  *
  * @remarks
  * This is a total projection that reads untrusted input. Each structural field is captured once
  * through Contract's sanctioned exception boundary, so conforming accessors and inherited
  * properties are supported while a throwing getter or revoked proxy returns `undefined`.
- * Present usage counts must be finite numbers; negative and fractional values are preserved,
- * not normalized. The result is exact `{ content, thinking?, usage?, partial, stop? }`. A present
+ * Present usage counts must be finite and nonnegative; fractional values are preserved, not
+ * normalized. The result is exact `{ content, thinking?, usage?, partial, stop? }`. A present
  * `stop` is read once, then its `layer`, `id`, `max`, `consumed`, `estimate`, and `usage` once each
  * in that order, `max` and `consumed` only on a `meter` or `budget` arm; the arm is rebuilt
  * exactly, omitting absent readings, and a malformed `stop` refuses the whole value. Extra input
@@ -126,9 +126,9 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
 
 /**
  * Projects an unknown value onto a fresh, exact `TokenUsage` — capturing `prompt`, `completion`, and
- * `total` once each through a total boundary, preserving finite negative and fractional counts,
- * dropping extras, and resolving `undefined` for a non-object, a missing or non-finite count, a
- * throwing getter, or a malformed or revoked proxy.
+ * `total` once each through a total boundary, preserving fractional counts, dropping extras, and
+ * resolving `undefined` for a non-object, a missing, negative, or non-finite count, a throwing getter,
+ * or a malformed or revoked proxy.
  *
  * @remarks
  * The capture runs inside Contract's sanctioned exception boundary, so conforming accessors and
@@ -137,13 +137,14 @@ export function agentResultToJSON(value: unknown): JSONValue | undefined {
  * before it projects, because this function refuses `undefined` like any other non-object.
  *
  * @param value - The unknown value to project
- * @returns A fresh `{ prompt, completion, total }`, or `undefined` when the value is not a finite usage triple
+ * @returns A fresh `{ prompt, completion, total }`, or `undefined` when the value is not a finite nonnegative usage triple
  *
  * @example
  * ```ts
  * import { tokenUsageToJSON } from '@orkestrel/agent'
  *
- * tokenUsageToJSON({ prompt: 2, completion: -1, total: 1.5, cached: 4 }) // { prompt: 2, completion: -1, total: 1.5 }
+ * tokenUsageToJSON({ prompt: 2, completion: 1, total: 1.5, cached: 4 }) // { prompt: 2, completion: 1, total: 1.5 }
+ * tokenUsageToJSON({ prompt: 2, completion: -1, total: 1 }) // undefined
  * tokenUsageToJSON({ prompt: 2, completion: Infinity, total: 3 }) // undefined
  * ```
  */
@@ -153,7 +154,7 @@ export function tokenUsageToJSON(value: unknown): TokenUsage | undefined {
 		const prompt = Reflect.get(value, 'prompt')
 		const completion = Reflect.get(value, 'completion')
 		const total = Reflect.get(value, 'total')
-		return isFiniteNumber(prompt) && isFiniteNumber(completion) && isFiniteNumber(total)
+		return isBudgetAmount(prompt) && isBudgetAmount(completion) && isBudgetAmount(total)
 			? { prompt, completion, total }
 			: undefined
 	})
@@ -805,29 +806,30 @@ export function chargeUsage(
 }
 
 /**
- * Returns a tool-iteration cap after checking it is a nonnegative safe integer, or throws a coded
- * error.
+ * Returns a tool-iteration cap after checking it is a positive safe integer, or throws a coded error.
  *
  * @remarks
- * The check is {@link import('../validators.js').isNonNegativeSafeInteger}, so `0` and `-0`
- * pass while `NaN`, a fraction, a negative, and either infinity are refused. The error's `context`
- * carries the refused value as `limit`.
+ * The check is {@link import('../validators.js').isPositiveSafeInteger}, so `0`, `-0`, `NaN`, a
+ * fraction, a negative, and either infinity are refused, because a run of no turns asks the provider
+ * nothing and answers nothing. The error's `context` carries the refused value as `limit`.
  *
  * @param limit - The tool-iteration cap to check
  * @returns The cap unchanged
- * @throws {AgentError} Thrown when `limit` is not a nonnegative safe integer (code `'LIMIT'`)
+ * @throws {AgentError} Thrown when `limit` is not a positive safe integer (code `'LIMIT'`)
  *
  * @example
  * ```ts
  * requireLimit(3) // 3
- * requireLimit(1.5) // throws AgentError ('LIMIT')
+ * requireLimit(0) // throws AgentError ('LIMIT')
  * ```
  */
 export function requireLimit(limit: number): number {
-	if (!isNonNegativeSafeInteger(limit)) {
-		throw new AgentError('LIMIT', 'a limit must be a nonnegative safe integer', {
-			context: { limit },
-		})
+	if (!isPositiveSafeInteger(limit)) {
+		throw new AgentError(
+			'LIMIT',
+			'a limit must be a positive safe integer, because a run of no turns answers nothing',
+			{ context: { limit } },
+		)
 	}
 	return limit
 }
@@ -895,32 +897,62 @@ export function requireConversation(value: unknown): ConversationInterface | und
 }
 
 /**
- * Renders a tool's output as the string content of its tool message.
+ * Renders a tool's output as the string content of its tool message, or returns `undefined` when JSON
+ * cannot carry it.
  *
  * @remarks
  * A string passes through unchanged and `undefined` renders as `''`. Any other value renders as
  * its `JSON.stringify` text, byte for byte, when JSON can carry it. A value JSON cannot carry (a
- * `BigInt`, a cycle, a symbol, a throwing `toJSON`) renders as `String(value)`, and as `''` when
- * that conversion throws too, so a tool's output never rejects the run that dispatched it.
+ * `BigInt`, a cycle, a symbol, a function, a throwing `toJSON`) returns `undefined`, which
+ * {@link settleToolResult} turns into a tool failure.
  *
  * @param value - The tool's output (`ToolSuccess.value`, which may be `undefined`)
- * @returns The message content
+ * @returns The message content, or `undefined` when JSON cannot carry the value
  *
  * @example
  * ```ts
  * renderToolValue('sunny') // 'sunny'
  * renderToolValue({ count: 2 }) // '{"count":2}'
  * renderToolValue(undefined) // ''
- * renderToolValue(10n) // '10'
+ * renderToolValue(10n) // undefined
  * ```
  */
-export function renderToolValue(value: unknown): string {
+export function renderToolValue(value: unknown): string | undefined {
 	if (typeof value === 'string') return value
 	if (value === undefined) return ''
-	const rendered = renderJSON(value)
-	if (rendered !== undefined) return rendered
-	const fallback = attempt(() => String(value))
-	return fallback.success ? fallback.value : ''
+	return renderJSON(value)
+}
+
+/**
+ * Settles one dispatched result into the result the loop reports and the content of its tool message,
+ * turning a success whose value JSON cannot carry into a tool failure the model reads.
+ *
+ * @remarks
+ * A failure passes through with its `error` as the content. A success renders through
+ * {@link renderToolValue}. A success that renders to `undefined` becomes the failure arm with the
+ * call's `id` and `name`, whose `error` names the tool and the remedy.
+ *
+ * @param result - The result the tool manager returned for one call
+ * @returns The result to report and the tool message content
+ *
+ * @example
+ * ```ts
+ * settleToolResult({ success: true, id: '1', name: 'read', value: { count: 2 } }).content // '{"count":2}'
+ * settleToolResult({ success: true, id: '1', name: 'read', value: 10n }).outcome.success // false
+ * ```
+ */
+export function settleToolResult(result: ToolResult): {
+	readonly outcome: ToolResult
+	readonly content: string
+} {
+	if (!result.success) return { outcome: result, content: result.error }
+	const content = renderToolValue(result.value)
+	if (content !== undefined) return { outcome: result, content }
+	const error = `${preview(result.name)} returned a value JSON cannot carry; return strings, numbers, booleans, null, arrays, and plain records`
+	return {
+		outcome: { success: false, id: result.id, name: result.name, error },
+		content: error,
+	}
 }
 
 /**

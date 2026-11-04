@@ -3,7 +3,7 @@ import type { GaugeCall, GaugeInterface, GaugeOptions } from './types.js'
 import { isFiniteNumber } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { LedgerError } from './errors.js'
-import { isPositiveSafeInteger } from './validators.js'
+import { isPositiveSafeInteger } from '../validators.js'
 import { buildRecallMessage, fitSlope, resolvePredict } from './helpers.js'
 
 /**

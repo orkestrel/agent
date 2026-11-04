@@ -52,7 +52,7 @@ describe('AgentProvider — identity, transport, and request composition', () =>
 		const original = globalThis.fetch
 		globalThis.fetch = recordGlobalTransport
 		try {
-			const provider = new ScriptedWire({ url: 'https://provider.test' })
+			const provider = new ScriptedWire({ url: 'https://provider.test', strict: false })
 			expect(await provider.generate([], new AbortController().signal)).toEqual({
 				content: 'global',
 			})
@@ -64,6 +64,7 @@ describe('AgentProvider — identity, transport, and request composition', () =>
 	it('posts the projected body and awaits case-insensitive header overrides', async () => {
 		const transport = new RecordedTransport(() => new Response('c:ok'))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			path: '/chat',
 			fetch: transport.fetch,
@@ -90,6 +91,7 @@ describe('AgentProvider — identity, transport, and request composition', () =>
 	it('preserves the JSON content type when the hook adds only authentication', async () => {
 		const transport = new RecordedTransport(() => new Response(''))
 		await new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			headers: () => ({ Authorization: 'fixture' }),
@@ -120,6 +122,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 			],
 		])
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records,
 			fetch: createStreamingTransport([
@@ -153,6 +156,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 		const sparse: ToolCall[] = []
 		sparse[1] = call
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records: new Map<string, ProviderIncrement>([
 				['sparse', { content: '', thinking: '', tools: sparse }],
@@ -166,6 +170,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 
 	it('reclassifies implicit-open reasoning in the authoritative result', async () => {
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: createStreamingTransport(['c:reason', 'c:</think>answer']),
 		})
@@ -179,6 +184,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 
 	it('flushes a held content tail as the final delta', async () => {
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: createStreamingTransport(['c:answer<thi']),
 		})
@@ -192,6 +198,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 
 	it('preserves raw content verbatim when splitting is disabled', async () => {
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			split: false,
 			fetch: createStreamingTransport(['c:<think>raw</think>answer<thi']),
@@ -205,6 +212,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 
 	it('feeds a buffered record through finish and clears the parser', async () => {
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			buffered: true,
 			fetch: createStreamingTransport(['c:an', 'swer']),
@@ -218,6 +226,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 		const body = new RecordedBody([bytes.subarray(0, 3), bytes.subarray(3)])
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			buffered: true,
 			fetch: transport.fetch,
@@ -271,6 +280,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 		const results = await Promise.all(
 			scripts.map((script) =>
 				new ScriptedWire({
+					strict: false,
 					url: 'https://provider.test',
 					records,
 					fetch: createStreamingTransport(script),
@@ -287,6 +297,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 	it('carries a terminal truncation onto a cancelled call’s partial', async () => {
 		const abort = new AbortController()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records: new Map<string, ProviderIncrement>([
 				['cut', { content: 'cut off', thinking: '', tools: [], truncated: true }],
@@ -304,6 +315,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 	it('returns a settled result’s own truncation unchanged', async () => {
 		const result = { content: 'whole', truncated: false }
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records: new Map<string, ProviderIncrement>([
 				['done', { content: '', thinking: '', tools: [], truncated: true, result }],
@@ -329,6 +341,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 			]),
 		)
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records,
 			fetch: createStreamingTransport(keys),
@@ -338,15 +351,76 @@ describe('AgentProvider — stream assembly and settled results', () => {
 		expect(result.usage).toEqual({ prompt: 9_000, completion: 1, total: 9_001 })
 	})
 
-	it('rejects strict end of input without a settled result', async () => {
+	it('rejects a cut stream by default, because it ended with no settled result and no terminal record', async () => {
 		const provider = new ScriptedWire({
 			url: 'https://provider.test',
-			strict: true,
 			fetch: createStreamingTransport(['c:partial']),
 		})
 		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
 			code: 'PROTOCOL',
-			message: 'provider error: missing settled result',
+			message:
+				'provider error: the stream ended with no settled result and no terminal record; the response was cut, or a wire with no terminal record passes strict: false',
+		})
+	})
+
+	it('rejects an empty stream by default', async () => {
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			fetch: createStreamingTransport([]),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			code: 'PROTOCOL',
+		})
+	})
+
+	it('folds every increment when the last is a done record, under the default', async () => {
+		const records = new Map<string, ProviderIncrement>([
+			[
+				'done',
+				{
+					content: '!',
+					thinking: '',
+					tools: [],
+					usage: { prompt: 1, completion: 2, total: 3 },
+					truncated: false,
+					done: true,
+				},
+			],
+		])
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records,
+			fetch: createStreamingTransport(['c:one ', 'c:two', 'done']),
+		})
+		expect(await provider.generate([], new AbortController().signal)).toEqual({
+			content: 'one two!',
+			usage: { prompt: 1, completion: 2, total: 3 },
+			truncated: false,
+		})
+	})
+
+	it('refuses a stream whose done record is followed by another record', async () => {
+		const records = new Map<string, ProviderIncrement>([
+			['done', { content: '', thinking: '', tools: [], done: true }],
+		])
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			records,
+			fetch: createStreamingTransport(['c:one', 'done', 'c:two']),
+		})
+		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
+			code: 'PROTOCOL',
+		})
+	})
+
+	it('assembles a stream that ends with no terminal record under strict: false', async () => {
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			strict: false,
+			fetch: createStreamingTransport(['c:partial']),
+		})
+		expect(await provider.generate([], new AbortController().signal)).toEqual({
+			content: 'partial',
 		})
 	})
 
@@ -358,6 +432,7 @@ describe('AgentProvider — stream assembly and settled results', () => {
 		)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			records: new Map<string, ProviderIncrement | Error>([
@@ -380,7 +455,11 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 			Array.from({ length: 16 }, () => new TextEncoder().encode('x'.repeat(512))),
 		)
 		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		const provider = new ScriptedWire({
+			strict: false,
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+		})
 		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
 			name: 'ProviderError',
 			code: 'HTTP',
@@ -395,7 +474,11 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 	it('bounds decoded error bytes with the documented single-chunk overshoot', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('x'.repeat(8192))], false)
 		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		const provider = new ScriptedWire({
+			strict: false,
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+		})
 		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
 			code: 'HTTP',
 			status: 503,
@@ -414,6 +497,7 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 		)
 		const transport = new RecordedTransport(() => new Response(body.stream, { status: 503 }))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 200,
@@ -432,7 +516,11 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 
 	it('omits the separator for an empty error excerpt', async () => {
 		const transport = new RecordedTransport(() => new Response(undefined, { status: 401 }))
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		const provider = new ScriptedWire({
+			strict: false,
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+		})
 		await expect(provider.generate([], new AbortController().signal)).rejects.toMatchObject({
 			name: 'ProviderError',
 			code: 'HTTP',
@@ -446,10 +534,11 @@ describe('AgentProvider — HTTP failures and the bounded error body', () => {
 		const body = new RecordedBody([], true, cause)
 		const transport = new RecordedTransport(() => new Response(body.stream, { status: 502 }))
 		await expect(
-			new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch }).generate(
-				[],
-				new AbortController().signal,
-			),
+			new ScriptedWire({
+				strict: false,
+				url: 'https://provider.test',
+				fetch: transport.fetch,
+			}).generate([], new AbortController().signal),
 		).rejects.toMatchObject({
 			code: 'HTTP',
 			status: 502,
@@ -487,6 +576,7 @@ describe('AgentProvider — failures that reach the caller unchanged', () => {
 	it('propagates a hostile record decoder error unchanged', async () => {
 		const error = new Error('hostile decoder')
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records: new Map([['bad', error]]),
 			fetch: createStreamingTransport(['bad']),
@@ -498,6 +588,7 @@ describe('AgentProvider — failures that reach the caller unchanged', () => {
 	it('propagates a remotely reported abort unchanged', async () => {
 		const error = new ProviderAbortError({ content: 'remote partial' })
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records: new Map([['abort', error]]),
 			fetch: createStreamingTransport(['abort']),
@@ -510,6 +601,7 @@ describe('AgentProvider — failures that reach the caller unchanged', () => {
 		const body = new RecordedBody([new TextEncoder().encode('abort')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 40,
@@ -528,6 +620,7 @@ describe('AgentProvider — the header hook inside the cancellation bound', () =
 	it('races a never-resolving header hook against the deadline', async () => {
 		const transport = createRefusingTransport()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 10,
@@ -544,6 +637,7 @@ describe('AgentProvider — the header hook inside the cancellation bound', () =
 		const error = new Error('header rejected')
 		const transport = createRefusingTransport()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			headers: () => Promise.reject(error),
@@ -557,6 +651,7 @@ describe('AgentProvider — the header hook inside the cancellation bound', () =
 		const abort = new AbortController()
 		const entered = Promise.withResolvers<void>()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			headers: () => {
 				entered.resolve()
@@ -577,6 +672,7 @@ describe('AgentProvider — abort listener removal after the header hook', () =>
 		const hook = new RecordedHeader(pending.promise)
 		const transport = new RecordedTransport(() => new Response('c:done'))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 40,
@@ -606,6 +702,7 @@ describe('AgentProvider — abort listener removal after the header hook', () =>
 		const failure = new Error('header failed')
 		const hook = new RecordedHeader(failure)
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			timeout: 40,
 			headers: hook.read.bind(hook),
@@ -622,6 +719,7 @@ describe('AgentProvider — abort listener removal after the header hook', () =>
 		const hook = new RecordedHeader(pending.promise)
 		const abort = new AbortController()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			timeout: 40,
 			headers: hook.read.bind(hook),
@@ -667,7 +765,11 @@ describe('AgentProvider — abort listener removal after the header hook', () =>
 describe('AgentProvider — cancellation and partial results', () => {
 	it('rejects an already-aborted call before framing or issuing a request', async () => {
 		const transport = createRefusingTransport()
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		const provider = new ScriptedWire({
+			strict: false,
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+		})
 		await expect(provider.generate([], AbortSignal.abort())).rejects.toMatchObject({
 			partial: { content: '' },
 		})
@@ -678,6 +780,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 	it('flushes held content into the partial when cancelled between deltas', async () => {
 		const abort = new AbortController()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: createStreamingTransport(['c:answer<thi']),
 		})
@@ -705,6 +808,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 			],
 		])
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			records,
 			fetch: createStreamingTransport(['mixed']),
@@ -726,6 +830,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 		const body = new RecordedBody([new TextEncoder().encode('c:partial')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			timeout: 15,
 			fetch: transport.fetch,
@@ -765,6 +870,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 		const body = new RecordedBody([new TextEncoder().encode('c:unfolded')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			buffered: true,
@@ -782,6 +888,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 
 	it('normalizes a transport AbortError after the local deadline', async () => {
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: rejectTransportOnAbort,
 			timeout: 40,
@@ -795,7 +902,11 @@ describe('AgentProvider — cancellation and partial results', () => {
 	it('replaces a caller ProviderAbortError reason with the locally accumulated partial', async () => {
 		const body = new RecordedBody([new TextEncoder().encode('c:answer')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
-		const provider = new ScriptedWire({ url: 'https://provider.test', fetch: transport.fetch })
+		const provider = new ScriptedWire({
+			strict: false,
+			url: 'https://provider.test',
+			fetch: transport.fetch,
+		})
 		const abort = new AbortController()
 		const stream = provider.stream([], abort.signal)
 		expect(await stream.next()).toEqual({
@@ -815,6 +926,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 		const abort = new AbortController()
 		const failure = new ProviderError('PROTOCOL', 'provider error: malformed record')
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			abort,
 			records: new Map([['poison', failure]]),
@@ -833,6 +945,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 		const body = new RecordedBody([new TextEncoder().encode('c:partial')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			timeout: 15,
 			fetch: transport.fetch,
@@ -907,6 +1020,7 @@ describe('AgentProvider — deadline clearing and reader release on every exit',
 	it('clears the deadline after successful completion', async () => {
 		const transport = new RecordedTransport(() => new Response('c:ok'))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 20,
@@ -920,6 +1034,7 @@ describe('AgentProvider — deadline clearing and reader release on every exit',
 	it('clears the deadline after a transport rejection', async () => {
 		const transport = createRefusingTransport()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 20,
@@ -936,6 +1051,7 @@ describe('AgentProvider — deadline clearing and reader release on every exit',
 		const body = new RecordedBody([new TextEncoder().encode('c:answer')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			timeout: 20,
 			fetch: transport.fetch,
@@ -953,6 +1069,7 @@ describe('AgentProvider — deadline clearing and reader release on every exit',
 	it('clears the deadline after a non-OK response', async () => {
 		const transport = new RecordedTransport(() => new Response('unavailable', { status: 503 }))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 40,
@@ -969,6 +1086,7 @@ describe('AgentProvider — deadline clearing and reader release on every exit',
 		const body = new RecordedBody([new TextEncoder().encode('poison')], false)
 		const transport = new RecordedTransport(() => new Response(body.stream))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			timeout: 40,
@@ -985,6 +1103,7 @@ describe('AgentProvider — deadline clearing and reader release on every exit',
 		const failure = new ProviderAbortError({ content: 'remote' })
 		const transport = new RecordedTransport(() => new Response('abort'))
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			timeout: 20,
 			fetch: transport.fetch,
@@ -999,6 +1118,7 @@ describe('AgentProvider — deadline clearing and reader release on every exit',
 describe('AgentProvider — isolation between concurrent calls on one instance', () => {
 	it('keeps concurrent calls isolated and generate equal to a drained stream', async () => {
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: createStreamingTransport(['c:<thi', 'c:nk>reason</think>answer']),
 		})
@@ -1024,6 +1144,7 @@ describe('AgentProvider — isolation between concurrent calls on one instance',
 			() => new Response(requireValue(bodies.next().value).stream),
 		)
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: transport.fetch,
 			records: new Map<string, ProviderIncrement>([
@@ -1102,6 +1223,7 @@ describe('AgentProvider — isolation between concurrent calls on one instance',
 	it('isolates cancellation from a concurrent call on the same instance', async () => {
 		const abort = new AbortController()
 		const provider = new ScriptedWire({
+			strict: false,
 			url: 'https://provider.test',
 			fetch: createStreamingTransport(['c:answer', 'c:tail']),
 		})

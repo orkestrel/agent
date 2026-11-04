@@ -45,7 +45,7 @@ import {
 	stripThinking,
 	sumUsage,
 } from '../helpers.js'
-import { isNonNegativeSafeInteger } from '../validators.js'
+import { isNonNegativeSafeInteger, isPositiveSafeInteger } from '../validators.js'
 import { Classifier } from './Classifier.js'
 import { Gauge } from './Gauge.js'
 import { LedgerRequest } from './LedgerRequest.js'
@@ -92,7 +92,7 @@ import {
 	splitTopic,
 	splitSentences,
 } from './helpers.js'
-import { isFraction, isLedgerSnapshot, isPositiveSafeInteger } from './validators.js'
+import { isFraction, isLedgerSnapshot } from './validators.js'
 
 /**
  * Serves one conversation through classified records, a bounded copy of each request turn that carries them, and a final answer pass.
@@ -142,10 +142,10 @@ export class Ledger implements LedgerInterface {
 		if (!isPositiveSafeInteger(options.capacity))
 			throw new LedgerError('CAPACITY', 'capacity must be a positive safe integer')
 		this.#predict = resolvePredict(options.predict, options.capacity)
-		for (const value of [options.recall?.limit, options.agent?.limit]) {
-			if (value !== undefined && !isNonNegativeSafeInteger(value))
-				throw new LedgerError('LIMIT', 'limits must be nonnegative safe integers')
-		}
+		if (options.recall?.limit !== undefined && !isNonNegativeSafeInteger(options.recall.limit))
+			throw new LedgerError('LIMIT', 'a recall limit must be a nonnegative safe integer')
+		if (options.agent?.limit !== undefined && !isPositiveSafeInteger(options.agent.limit))
+			throw new LedgerError('LIMIT', 'an agent limit must be a positive safe integer')
 		// `Array.from` visits a hole in either list as an undefined entry, as iteration does, so the
 		// read of its `name` refuses it; `map` skips it.
 		const topics = Array.from(options.topics, (topic) => topic.name)
