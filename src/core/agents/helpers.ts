@@ -734,7 +734,7 @@ export function requireAnswer(content: string, schema: Readonly<Record<string, u
 	if (faults.length > 0) {
 		throw new AgentError(
 			'SCHEMA',
-			`the final answer does not satisfy the run schema; pass strict: false to take the raw content from a provider that ignores schemas\n${describeFaults(faults, compiled.value.schema)}`,
+			`the final answer does not satisfy the run schema; pass strict: false to createAgent to take the raw content from a provider that ignores schemas\n${describeFaults(faults, compiled.value.schema)}`,
 			{ context: { faults } },
 		)
 	}

@@ -4770,6 +4770,7 @@ describe('Agent — the run schema is enforced', () => {
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		const error = await agent.generate({ schema: closed }).catch((caught: unknown) => caught)
 		expect(isAgentError(error) && error.code).toBe('SCHEMA')
+		expect(isAgentError(error) && error.message).toContain('pass strict: false to createAgent')
 		const carried = isAgentError(error) ? error.context?.faults : undefined
 		expect(JSON.stringify(carried)).toContain(`"reason":"${reason}"`)
 		expect(isArray(carried)).toBe(true)

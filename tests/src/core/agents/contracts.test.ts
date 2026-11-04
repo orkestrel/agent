@@ -3,15 +3,32 @@ import {
 	REFUSED_WIRE_ANSWERS,
 	REFUSED_WIRE_FRAMES,
 	REFUSED_WIRE_PROMPTS,
+	AGENT_JOB_CASES,
 } from '../../../setup.js'
 import { seededRandom } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
-import { agentAnswerContract, agentFrameContract, agentPromptContract } from '@src/core'
+import {
+	agentAnswerContract,
+	agentFrameContract,
+	agentPromptContract,
+	agentJobContract,
+} from '@src/core'
 
 // The agent wire contracts: every frame arm accepted, every off-wire member refused, and the
 // guard, the parser, and the generator agreeing.
 
 describe('agent wire contracts', () => {
+	it.each(AGENT_JOB_CASES)('job: $name', ({ value, admitted }) => {
+		expect(agentJobContract.is(value)).toBe(admitted)
+	})
+
+	it('parses seeded durable jobs', () => {
+		for (const seed of Array.from({ length: 32 }, (_, index) => index + 1)) {
+			const value = agentJobContract.generate(seededRandom(seed))
+			expect(agentJobContract.is(value)).toBe(true)
+			expect(agentJobContract.parse(value)).toEqual(value)
+		}
+	})
 	it('accepts every frame arm', () => {
 		for (const [title, frame] of AGENT_WIRE_FRAMES) {
 			expect([title, agentFrameContract.is(frame)]).toEqual([title, true])

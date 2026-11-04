@@ -1364,6 +1364,40 @@ export async function collectPaced<T>(
 /** Supplies usage for job budget exhaustion. */
 export const JOB_USAGE = Object.freeze(createTokenUsage({ prompt: 3, total: 10 }))
 
+/** Lists authored durable job admissions and refusals. */
+export const AGENT_JOB_CASES = [
+	{ name: 'minimal', value: { provider: 'local' }, admitted: true },
+	{
+		name: 'options',
+		value: {
+			provider: 'local',
+			tools: ['search'],
+			authority: 'allow',
+			scheduler: 'serial',
+			limit: 2,
+			timeout: 5,
+			budget: 10,
+		},
+		admitted: true,
+	},
+	{
+		name: 'history',
+		value: {
+			provider: 'local',
+			messages: [{ role: 'user', content: 'hello' }],
+			children: [{ provider: 'child' }],
+		},
+		admitted: true,
+	},
+	{ name: 'missing provider', value: {}, admitted: false },
+	{ name: 'numeric provider', value: { provider: 1 }, admitted: false },
+	{ name: 'numeric tool', value: { provider: 'local', tools: [1] }, admitted: false },
+	{ name: 'extra member', value: { provider: 'local', undeclared: true }, admitted: false },
+	{ name: 'explicit absence', value: { provider: 'local', tools: undefined }, admitted: false },
+	{ name: 'non-finite limit', value: { provider: 'local', limit: Number.NaN }, admitted: false },
+	{ name: 'host child', value: { provider: 'local', children: [new Date(0)] }, admitted: false },
+]
+
 /** Supplies a repeated tool turn that exhausts the job budget. */
 export const PARTIAL_TURNS = Object.freeze([
 	{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: JOB_USAGE },
