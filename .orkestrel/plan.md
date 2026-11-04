@@ -6,7 +6,7 @@ Make `@orkestrel/agent`, its related packages, and the `reason` family refuse wh
 
 - The user, 2026-11-03: "it feels like the default wasn't already to refuse or error out on stuff especially when it's something missing". "the contract package is literally the backbone of all orkestrel packages, you are supposed to use it and apply it rigorously throughout these packages". "address all the issues you find". "don't worry about bumps right now, just worry about making the corrections in the packages and then pointing the dependents to the latest built local path of the dependency".
 - Exit: every row of `failopen.md` and every section of `semantics.md` landed or ruled out; one `orkestrel-falsify` round closed on the integrated result; `verifier` read the tree-wide gates on each package's final commit; the user published the layers in order with `test:distribution` read at each.
-- Out of this campaign: moving the door and fault text into `@orkestrel/contract`, unbounded refusal text in `@orkestrel/workspace`, `@orkestrel/database`, and `@orkestrel/relation`, and every package outside the table below.
+- Out of this campaign: moving the door and fault text into `@orkestrel/contract`, unbounded refusal text in `@orkestrel/workspace`, `@orkestrel/database`, and `@orkestrel/relation`, `@orkestrel/mcp` losing the blocks of a result with only non-text content (needs a contract decision), and every package outside the table below.
 
 ## Repositories
 
