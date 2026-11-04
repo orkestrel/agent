@@ -118,7 +118,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			observe: this.#observation.observe,
 			timing: options.provider.extractTiming,
 			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),
-			...(options.replay === undefined ? {} : { fetch: options.replay.fetch }),
+			...(options.replay === undefined ? {} : { replay: options.replay }),
 		})
 		this.#trace = new StudyAgentTrace({
 			runtime: options.agent,

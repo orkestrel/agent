@@ -20,6 +20,16 @@ import type {
 	StudyExchangeAttempt,
 	StudyExchangeRow,
 	StudyExchangeSinkInterface,
+	StudyLabelAnswer,
+	StudyLabelBatch,
+	StudyLabelControl,
+	StudyLabelLane,
+	StudyLabelMap,
+	StudyLabelPartition,
+	StudyLabelPool,
+	StudyLabelReceipt,
+	StudyLabelSegment,
+	StudyLabelSource,
 	StudyOllamaReplayInterface,
 	StudySealedResult,
 	StudyValidation,
@@ -32,8 +42,8 @@ import {
 	arrayOf,
 	canonicalStringify,
 	cloneJSONValue,
+	createContract,
 	isArray,
-	isBoolean,
 	isInteger,
 	isJSONValue,
 	isRecord,
@@ -59,6 +69,11 @@ import {
 	STUDY_CHECKPOINT_EVENT,
 	StudyResultStore,
 	buildStudyExchangeDeclaration,
+	buildStudyLabelPrompt,
+	collectStudyLabelAnswers,
+	studyLabelAnswerShape,
+	studyLabelAnswersContract,
+	studyLabelPoolContract,
 	buildStudyPacket,
 	collectStudyEvidence,
 	hashStudyBytes,
@@ -2119,6 +2134,7 @@ export const STUDY_MEMORY_INERT_EXCHANGES: StudyExchangeSinkInterface = Object.f
 /** Holds an inert replay that answers every fetch with an empty response. */
 export const STUDY_MEMORY_INERT_REPLAY: StudyOllamaReplayInterface = Object.freeze({
 	fetch: () => Promise.resolve(new Response('')),
+	served: () => false,
 	check: () => undefined,
 	close: () => Promise.resolve(),
 })
@@ -2767,8 +2783,8 @@ export function readMemoryProgressRows(stdout: string): ReadonlyMap<string, unkn
 	const [trial] = arrayOf(isRecord)(trials) ? trials : []
 	if (trial === undefined || !arrayOf(isRecord)(trial.goals))
 		throw new Error('The progress document lists no trial')
-	// `reading` is Study's own member of a goal in the progress document, so it keeps its name.
-	return new Map(trial.goals.map((goal) => [String(goal.goal), goal.reading]))
+	// `projection` is Study's own member of a goal in the progress document, so it keeps its name.
+	return new Map(trial.goals.map((goal) => [String(goal.goal), goal.projection]))
 }
 
 /**
@@ -2870,103 +2886,6 @@ export type MemoryLabelClass = 'work' | 'completion' | 'facts' | 'obligations'
 export type MemoryLabelVerdict = StudyJudgment['verdict']
 /** Names the prompt condition of a labeling node. */
 export type MemoryLabelCondition = 'plain' | 'receipts'
-/** Holds one sealed segment's retained packet and mapping bytes. */
-export interface MemoryLabelSegment {
-	/** Holds the sealed result's seal id, which the mapping names. */
-	readonly result: string
-	readonly arm: string
-	readonly packet: Uint8Array
-	readonly mapping: Uint8Array
-}
-/** Holds one authored fictional row that catches an inattentive lane. */
-export interface MemoryLabelControl {
-	readonly input: JSONValue
-	readonly product: JSONValue
-	readonly assertion: JSONValue
-	readonly verdict: MemoryLabelVerdict
-}
-/** Holds the one row text a labeler reads; a goal that failed holds no `product`. */
-export interface MemoryLabelRow {
-	readonly row: number
-	readonly input: JSONValue
-	readonly product?: JSONValue
-	readonly assertion: JSONValue
-}
-/** Holds the rows one fresh lane labels. */
-export interface MemoryLabelRequest {
-	readonly rows: readonly MemoryLabelRow[]
-}
-/** Links one neutral row to its packet identities and its source pair. */
-export interface MemoryLabelLink {
-	readonly row: number
-	/** Holds the index of the request that shows the row. */
-	readonly request: number
-	/** Holds the packet bytes' digest, which the row's labels bind. */
-	readonly packet: string
-	readonly result: string
-	readonly arm: string
-	readonly trial: string
-	readonly criterion: string
-	readonly source: { readonly trial: string; readonly criterion: string }
-	readonly goal: string
-	readonly class: MemoryLabelClass
-}
-/** Links one control's neutral row to the verdict its authored text states. */
-export interface MemoryLabelCheck {
-	readonly row: number
-	readonly request: number
-	readonly verdict: MemoryLabelVerdict
-}
-/** Holds what a lane must not see: each row's identity, and which rows are controls. */
-export interface MemoryLabelMap {
-	readonly links: readonly MemoryLabelLink[]
-	readonly checks: readonly MemoryLabelCheck[]
-}
-/** Holds a gate's labeling requests and their separate map. */
-export interface MemoryLabelPool {
-	readonly requests: readonly MemoryLabelRequest[]
-	readonly map: MemoryLabelMap
-}
-/** Holds one row a lane returned. */
-export interface MemoryLabelAnswer {
-	readonly row: number
-	readonly verdict: MemoryLabelVerdict
-	readonly reason: string
-	/** Holds whether the lane flagged the row's text as revealing its arm. */
-	readonly revealed?: boolean
-}
-/** Holds what one engine returned across its nodes. */
-export interface MemoryLabelLane {
-	readonly labeler: string
-	readonly rows: readonly MemoryLabelAnswer[]
-}
-/** Holds what a labels file states beside its judgments, and the lane that settles disputes. */
-export interface MemoryLabelOptions {
-	readonly created: string
-	readonly version: string
-	readonly third?: MemoryLabelLane
-}
-/** Holds the labels files of a pool and what their rows came to. */
-export interface MemoryLabelImport {
-	/** Holds one file per packet. */
-	readonly labels: readonly StudyLabels[]
-	/** Counts each lane's row that is absent or carries a blank reason, controls aside. */
-	readonly omitted: number
-	/** Lists the rows the labeling lanes disagree on, before any third lane. */
-	readonly disputes: readonly number[]
-	/** Counts, per lane in order, the controls it omitted or answered against the authored verdict. */
-	readonly missed: readonly number[]
-}
-/** Holds two lanes' agreement over one class. */
-export interface MemoryLabelAgreement {
-	readonly class: MemoryLabelClass
-	readonly count: number
-	readonly agreement: number
-	/** Holds Cohen's kappa over the three verdicts; undefined when chance agreement is 1. */
-	readonly kappa: number | undefined
-	/** Holds both-achieved over either-achieved; undefined when neither side holds an `achieved`. */
-	readonly overlap: number | undefined
-}
 /** Names an arm's place in a gate. */
 export type MemoryGateRole = 'treatment' | 'base' | 'repeat' | 'sham'
 /** Names what a gate clause asks of the treatment against the base. */
@@ -3049,7 +2968,7 @@ export interface MemoryJournal {
 /** Holds one kept labeling node's answers. */
 export interface MemoryLabelRead {
 	readonly node: Omit<MemoryLabelNode, 'prompt'>
-	readonly answers: readonly MemoryLabelAnswer[]
+	readonly answers: readonly StudyLabelAnswer[]
 	readonly wall: number | undefined
 }
 /** Holds what a labeling run's journal came to. */
@@ -3102,30 +3021,11 @@ export interface MemoryLabelFixture {
 	readonly result: StudySealedResult
 	readonly rubric: StudyRubric
 	readonly digest: string
-	readonly segment: MemoryLabelSegment
-}
-/** Holds one packet entry's pooling group, row text, and identities. */
-export interface MemoryLabelMember {
-	readonly group: string
-	readonly text: Omit<MemoryLabelRow, 'row'>
-	readonly link: Omit<MemoryLabelLink, 'row' | 'request'>
-}
-/** Holds one row before its number: a packet entry holds a `link`, and a control holds a `verdict`. */
-export interface MemoryLabelSeat {
-	readonly rank: string
-	readonly request: number
-	readonly text: Omit<MemoryLabelRow, 'row'>
-	readonly link?: Omit<MemoryLabelLink, 'row' | 'request'>
-	readonly verdict?: MemoryLabelVerdict
-}
-/** Holds one public evidence row a receipts prompt shows. */
-export interface MemoryLabelReceipt {
-	readonly event: string
-	readonly value: JSONValue
+	readonly segment: StudyLabelSegment
 }
 /** Holds what a pool wrapper keeps for its gate wrapper: the pool and its nodes, prompts aside. */
 export interface MemoryLabelPlan {
-	readonly pool: MemoryLabelPool
+	readonly pool: StudyLabelPool
 	readonly nodes: ReadonlyArray<Omit<MemoryLabelNode, 'prompt'>>
 }
 /** Holds one clause with what it read. */
@@ -3134,8 +3034,6 @@ export interface MemoryGateResult {
 	readonly outcome: MemoryGateOutcome
 }
 
-/** Holds the reason a disputed row's judgment states. */
-export const MEMORY_LABEL_DISPUTE = 'Labelers disagree'
 /** Holds the reason a row no lane settled reads under in a gate's arms. */
 export const MEMORY_LABEL_ABSENT = 'No lane labeled this row'
 /** Holds the reasoning effort of every labeling node. */
@@ -3153,7 +3051,7 @@ export const MEMORY_LABEL_HARNESS_NODE = 'harness'
 export const MEMORY_LABEL_HARNESS =
 	'Return the name of every tool you hold, and name every instruction file, memory text, and other context loaded into this conversation. Call no tool except the structured answer.'
 /** Holds fictional controls whose product plainly meets or misses its assertion. */
-export const MEMORY_LABEL_CONTROLS: readonly MemoryLabelControl[] = Object.freeze([
+export const MEMORY_LABEL_CONTROLS: readonly StudyLabelControl[] = Object.freeze([
 	Object.freeze({
 		input: { prompt: 'State the shelf that holds the blue lantern.' },
 		product: { value: { content: 'The blue lantern sits on shelf 14.' }, partial: false },
@@ -3545,6 +3443,45 @@ export function buildMemoryLabelFixture(
 }
 
 /**
+ * Builds fictional retained segments whose rows span arms, results, trials, goals, and classes, with
+ * JSON values whose key order and text a prompt must keep, and mappings listed in reverse.
+ * @returns One segment per arm and result
+ */
+export function buildMemoryLabelSegments(): readonly StudyLabelSegment[] {
+	const encoder = new TextEncoder()
+	return ['on', 'off', 'sham'].flatMap((arm) =>
+		['seal-a', 'seal-b'].map((result): StudyLabelSegment => {
+			const sources = ['trial-1', 'trial-2'].flatMap((trial) =>
+				['opening', 'correction', 'ev-12'].flatMap((goal) =>
+					MEMORY_LABEL_CLASSES.map((entry) => ({ trial, criterion: `${goal}-${entry}` })),
+				),
+			)
+			const named = sources.map((source, index) => ({
+				trial: `t-${arm}-${result}-${String(index % 2)}`,
+				criterion: `c-${String(index)}`,
+				source,
+			}))
+			return {
+				result,
+				arm,
+				packet: encoder.encode(
+					JSON.stringify({
+						entries: named.map(({ trial, criterion, source }, index) => ({
+							trial,
+							criterion,
+							input: { zeta: `Fictional request ${String(index)} é`, alpha: [index, null] },
+							...(index % 3 === 0 ? {} : { product: index % 3 === 1 ? 'Fictional reply' : null }),
+							assertion: `Fictional assertion of ${source.criterion}`,
+						})),
+					}),
+				),
+				mapping: encoder.encode(JSON.stringify({ result, entries: named.toReversed() })),
+			}
+		}),
+	)
+}
+
+/**
  * Builds inert links, one per listed class, numbered from row 1.
  * @param classes - Each row's class
  * @param arm - The arm every link names. Default: records.
@@ -3555,7 +3492,7 @@ export function buildMemoryLabelMap(
 	classes: readonly MemoryLabelClass[],
 	arm = 'records',
 	first = 1,
-): MemoryLabelMap {
+): StudyLabelMap {
 	return {
 		checks: [],
 		links: classes.map((entry, index) => ({
@@ -3571,17 +3508,6 @@ export function buildMemoryLabelMap(
 			class: entry,
 		})),
 	}
-}
-
-/**
- * Builds a lane's answers from its verdicts, numbered from row 1.
- * @param verdicts - Each row's verdict
- * @returns The answers, each with a reason
- */
-export function buildMemoryLabelAnswers(
-	verdicts: readonly MemoryLabelVerdict[],
-): readonly MemoryLabelAnswer[] {
-	return verdicts.map((verdict, index) => ({ row: index + 1, verdict, reason: 'A reason' }))
 }
 
 /**
@@ -3653,12 +3579,6 @@ export const MEMORY_LABEL_CLASSES: readonly MemoryLabelClass[] = Object.freeze([
 	'facts',
 	'obligations',
 ])
-/** Lists the verdicts a labeler answers. */
-export const MEMORY_LABEL_VERDICTS: readonly MemoryLabelVerdict[] = Object.freeze([
-	'achieved',
-	'unsuccessful',
-	'unknown',
-])
 /** Lists a gate's roles in their reading order. */
 export const MEMORY_GATE_ROLES: readonly MemoryGateRole[] = Object.freeze([
 	'treatment',
@@ -3666,26 +3586,6 @@ export const MEMORY_GATE_ROLES: readonly MemoryGateRole[] = Object.freeze([
 	'repeat',
 	'sham',
 ])
-/** Holds a labeling node's answer schema; the `reason` pattern refuses a blank reason at the tool call. */
-export const MEMORY_LABEL_SCHEMA = Object.freeze({
-	type: 'object',
-	properties: {
-		rows: {
-			type: 'array',
-			items: {
-				type: 'object',
-				properties: {
-					row: { type: 'integer' },
-					verdict: { type: 'string', enum: ['achieved', 'unsuccessful', 'unknown'] },
-					reason: { type: 'string', pattern: '\\S' },
-					revealed: { type: 'boolean' },
-				},
-				required: ['row', 'verdict', 'reason'],
-			},
-		},
-	},
-	required: ['rows'],
-})
 /** Holds the first node's answer schema. */
 export const MEMORY_LABEL_HARNESS_SCHEMA = Object.freeze({
 	type: 'object',
@@ -3696,84 +3596,16 @@ export const MEMORY_LABEL_HARNESS_SCHEMA = Object.freeze({
 	required: ['tools', 'context'],
 })
 
-/** Checks whether a value is one row a lane returned. */
-export const isMemoryLabelAnswer: Guard<MemoryLabelAnswer> = objectOf(
-	{
-		row: isInteger,
-		verdict: literalOf('achieved', 'unsuccessful', 'unknown'),
-		reason: isString,
-		revealed: isBoolean,
-	},
-	['revealed'],
-)
+/** Checks one row a lane returned, through the shape a labeler's schema publishes. */
+export const MEMORY_LABEL_ROW = createContract(studyLabelAnswerShape)
 /** Checks whether a value is the first node's report. */
 export const isMemoryHarnessReport: Guard<MemoryHarnessReport> = objectOf({
 	tools: arrayOf(isString),
 	context: arrayOf(isString),
 })
-/** Checks whether a value holds a retained packet's entries. */
-export const isMemoryPacket = objectOf({
-	entries: arrayOf(
-		objectOf(
-			{
-				trial: isString,
-				criterion: isString,
-				input: isJSONValue,
-				product: isJSONValue,
-				assertion: isJSONValue,
-			},
-			['product'],
-		),
-	),
-})
-/** Checks whether a value holds a retained mapping's result and links. */
-export const isMemoryMapping = objectOf({
-	result: isString,
-	entries: arrayOf(
-		objectOf({
-			trial: isString,
-			criterion: isString,
-			source: objectOf({ trial: isString, criterion: isString }),
-		}),
-	),
-})
 /** Checks whether a value is what a pool wrapper keeps for its gate wrapper. */
 export const isMemoryLabelPlan: Guard<MemoryLabelPlan> = objectOf({
-	pool: objectOf({
-		requests: arrayOf(
-			objectOf({
-				rows: arrayOf(
-					objectOf(
-						{ row: isInteger, input: isJSONValue, product: isJSONValue, assertion: isJSONValue },
-						['product'],
-					),
-				),
-			}),
-		),
-		map: objectOf({
-			links: arrayOf(
-				objectOf({
-					row: isInteger,
-					request: isInteger,
-					packet: isString,
-					result: isString,
-					arm: isString,
-					trial: isString,
-					criterion: isString,
-					source: objectOf({ trial: isString, criterion: isString }),
-					goal: isString,
-					class: literalOf('work', 'completion', 'facts', 'obligations'),
-				}),
-			),
-			checks: arrayOf(
-				objectOf({
-					row: isInteger,
-					request: isInteger,
-					verdict: literalOf('achieved', 'unsuccessful', 'unknown'),
-				}),
-			),
-		}),
-	}),
+	pool: (value: unknown): value is StudyLabelPool => studyLabelPoolContract.is(value),
 	nodes: arrayOf(
 		objectOf({
 			label: isString,
@@ -3804,159 +3636,17 @@ export function parseMemoryLabelClass(criterion: string): MemoryLabelClass | und
 }
 
 /**
- * Computes the rank that orders one pooled key under one order.
- * @param order - The order the rank moves with
- * @param key - The pooled key
- * @returns The rank's digest
+ * Reads a source pair's goal and class from its criterion id, the partition a memory pool groups by.
+ * @param source - The source pair a packet entry maps to
+ * @returns The goal and class, or undefined when the id holds no class, which refuses the pool
  */
-export function computeMemoryLabelRank(order: string, key: string): string {
-	return hashStudyBytes(`${order}\n${key}`)
-}
-
-/**
- * Collects a segment's packet entries with their identities, refusing a mapping that does not cover its packet.
- * @param segment - The segment's retained bytes
- * @returns Each entry's group, row text, and link
- * @throws Error - Thrown when the bytes are malformed, the mapping names another result or does not cover the packet, or a criterion holds no class
- */
-export function collectMemoryLabelMembers(
-	segment: MemoryLabelSegment,
-): readonly MemoryLabelMember[] {
-	const decoder = new TextDecoder()
-	const packet = parseJSON(decoder.decode(segment.packet))
-	const mapping = parseJSON(decoder.decode(segment.mapping))
-	if (!isMemoryPacket(packet)) throw new Error(`The packet of ${segment.result} is malformed`)
-	if (!isMemoryMapping(mapping)) throw new Error(`The mapping of ${segment.result} is malformed`)
-	if (mapping.result !== segment.result)
-		throw new Error(`The mapping names ${mapping.result}, and its segment holds ${segment.result}`)
-	if (mapping.entries.length !== packet.entries.length)
-		throw new Error(`The mapping of ${segment.result} does not cover its packet`)
-	const digest = hashStudyBytes(segment.packet)
-	return packet.entries.map((entry): MemoryLabelMember => {
-		const source = mapping.entries.find(
-			(link) => link.trial === entry.trial && link.criterion === entry.criterion,
-		)?.source
-		if (source === undefined)
-			throw new Error(`The mapping of ${segment.result} does not cover its packet`)
-		const criterionClass = parseMemoryLabelClass(source.criterion)
-		if (criterionClass === undefined)
-			throw new Error(`Criterion ${source.criterion} holds no rubric class`)
-		const goal = source.criterion.slice(0, -(criterionClass.length + 1))
-		return {
-			group: `${segment.arm}/${segment.result}/${source.trial}/${goal}`,
-			text: {
-				input: entry.input,
-				...(entry.product === undefined ? {} : { product: entry.product }),
-				assertion: entry.assertion,
-			},
-			link: {
-				packet: digest,
-				result: segment.result,
-				arm: segment.arm,
-				trial: entry.trial,
-				criterion: entry.criterion,
-				source,
-				goal,
-				class: criterionClass,
-			},
-		}
-	})
-}
-
-/**
- * Pools sealed packets into one request per goal-arm under neutral row numbers, every identity in a separate map.
- * @param segments - Each segment's retained packet and mapping bytes
- * @param order - The text the pool's order repeats for and moves with
- * @param controls - The authored rows to seat among the requests, marked in the map alone
- * @returns The requests and their map
- * @throws Error - Thrown when a control holds no request to join, or a segment refuses per its members
- */
-export function buildMemoryLabelPool(
-	segments: readonly MemoryLabelSegment[],
-	order: string,
-	controls: readonly MemoryLabelControl[],
-): MemoryLabelPool {
-	const members = segments.flatMap((segment) => collectMemoryLabelMembers(segment))
-	const groups = [...new Set(members.map((member) => member.group))]
-		.map((group) => ({ group, rank: computeMemoryLabelRank(order, group) }))
-		.toSorted((left, right) => (left.rank < right.rank ? -1 : 1))
-		.map((entry) => entry.group)
-	if (groups.length === 0 && controls.length > 0)
-		throw new Error('A control holds no request to join')
-	const seats: readonly MemoryLabelSeat[] = [
-		...members.map((member) => ({
-			rank: computeMemoryLabelRank(
-				order,
-				`${member.group}/${member.link.trial}/${member.link.criterion}`,
-			),
-			request: groups.indexOf(member.group),
-			text: member.text,
-			link: member.link,
-		})),
-		...controls.map((control, index) => {
-			const rank = computeMemoryLabelRank(order, `control/${String(index)}`)
-			return {
-				rank,
-				request: Number.parseInt(rank.slice(0, 8), 16) % groups.length,
-				text: { input: control.input, product: control.product, assertion: control.assertion },
-				verdict: control.verdict,
-			}
-		}),
-	]
-	const numbered = seats
-		.toSorted((left, right) =>
-			left.request === right.request
-				? left.rank < right.rank
-					? -1
-					: 1
-				: left.request - right.request,
-		)
-		.map((seat, index) => ({ ...seat, row: index + 1 }))
-	const seated = numbered.flatMap((seat) =>
-		seat.link === undefined ? [] : [{ ...seat.link, row: seat.row, request: seat.request }],
-	)
-	return {
-		requests: groups.map((_, request) => ({
-			rows: numbered
-				.filter((seat) => seat.request === request)
-				.map((seat) => ({ row: seat.row, ...seat.text })),
-		})),
-		map: {
-			links: seated,
-			checks: numbered.flatMap((seat) =>
-				seat.verdict === undefined
-					? []
-					: [{ row: seat.row, request: seat.request, verdict: seat.verdict }],
-			),
-		},
-	}
-}
-
-/**
- * Renders a request's rows as JSON-encoded data under the instruction.
- * @param request - The rows one lane labels
- * @param instruction - The fixed instruction
- * @param receipts - One goal-arm's public evidence rows, for the pilot's comparison
- * @returns The prompt, each row and receipt on its own line
- */
-export function buildMemoryLabelPrompt(
-	request: MemoryLabelRequest,
-	instruction: string,
-	receipts?: readonly MemoryLabelReceipt[],
-): string {
-	return [
-		instruction.trim(),
-		'',
-		'Rows, one JSON value per line:',
-		...request.rows.map((row) => JSON.stringify(row)),
-		...(receipts === undefined
-			? []
-			: [
-					'',
-					'Evidence the run recorded for these rows, one JSON value per line:',
-					...receipts.map((receipt) => JSON.stringify(receipt)),
-				]),
-	].join('\n')
+export function readMemoryLabelPartition(
+	source: StudyLabelSource,
+): StudyLabelPartition | undefined {
+	const entry = parseMemoryLabelClass(source.criterion)
+	return entry === undefined
+		? undefined
+		: { goal: source.criterion.slice(0, -(entry.length + 1)), class: entry }
 }
 
 /**
@@ -3968,142 +3658,10 @@ export function buildMemoryLabelPrompt(
 export function filterMemoryReceipts(
 	evidence: readonly StudyEvidence[],
 	goal: string,
-): readonly MemoryLabelReceipt[] {
+): readonly StudyLabelReceipt[] {
 	return evidence
 		.filter((entry) => entry.goal === goal && MEMORY_LABEL_RECEIPTS.includes(entry.event))
 		.map((entry) => ({ event: entry.event, value: entry.value }))
-}
-
-/**
- * Collects a lane's answered rows by row number, leaving out a blank reason, which Study's parser refuses.
- * @param rows - The rows the lane returned
- * @returns Each usable answer under its row
- */
-export function collectMemoryLabelAnswers(
-	rows: readonly MemoryLabelAnswer[],
-): ReadonlyMap<number, MemoryLabelAnswer> {
-	return new Map(
-		rows
-			.filter((entry) => entry.reason.trim().length > 0)
-			.map((entry): readonly [number, MemoryLabelAnswer] => [entry.row, entry]),
-	)
-}
-
-/**
- * Builds one labels file per packet from each lane's rows, settling agreement, dispute, and a third lane's answer.
- * @param map - The pool's map
- * @param lanes - One or two labeling lanes
- * @param options - The file fields and the lane that settles disputes
- * @returns The files, with the omitted rows, the disputes, and each lane's missed controls
- * @throws Error - Thrown on no lane or more than two, a row outside the map, a repeated row, or a third-lane row holding no dispute
- */
-export function buildMemoryLabels(
-	map: MemoryLabelMap,
-	lanes: readonly MemoryLabelLane[],
-	options: MemoryLabelOptions,
-): MemoryLabelImport {
-	if (lanes.length === 0 || lanes.length > 2)
-		throw new Error(`An import takes one or two lanes, and it holds ${String(lanes.length)}`)
-	const everyLane = [...lanes, ...(options.third === undefined ? [] : [options.third])]
-	const known = new Set([...map.links, ...map.checks].map((entry) => entry.row))
-	for (const lane of everyLane) {
-		const foreign = lane.rows.find((entry) => !known.has(entry.row))
-		if (foreign !== undefined) throw new Error(`Row ${String(foreign.row)} is outside the map`)
-		const repeated = lane.rows.find(
-			(entry, index) => lane.rows.findIndex((other) => other.row === entry.row) !== index,
-		)
-		if (repeated !== undefined) throw new Error(`A lane repeats row ${String(repeated.row)}`)
-	}
-	const answers = lanes.map((lane) => collectMemoryLabelAnswers(lane.rows))
-	const disputes = map.links
-		.filter((link) => {
-			const held = answers.map((entry) => entry.get(link.row))
-			return !held.includes(undefined) && new Set(held.map((entry) => entry?.verdict)).size > 1
-		})
-		.map((link) => link.row)
-	const late = options.third?.rows.find((entry) => !disputes.includes(entry.row))
-	if (late !== undefined) throw new Error(`Row ${String(late.row)} holds no dispute to settle`)
-	const third = collectMemoryLabelAnswers(options.third?.rows ?? [])
-	const settled = map.links.flatMap((link) => {
-		const held = answers.map((entry) => entry.get(link.row))
-		const [first] = held
-		if (first === undefined || held.includes(undefined)) return []
-		const answer: Pick<MemoryLabelAnswer, 'verdict' | 'reason'> = disputes.includes(link.row)
-			? (third.get(link.row) ?? { verdict: 'unknown', reason: MEMORY_LABEL_DISPUTE })
-			: first
-		const judgment: StudyJudgment = {
-			trial: link.trial,
-			criterion: link.criterion,
-			verdict: answer.verdict,
-			method: 'model',
-			reason: answer.reason,
-			references: answer.verdict === 'unknown' ? [] : [link.packet],
-		}
-		return [{ packet: link.packet, judgment }]
-	})
-	const names = everyLane.map((lane) => lane.labeler).join('+')
-	return {
-		labels: [...new Set(map.links.map((link) => link.packet))].map((packet) => ({
-			packet,
-			labeler: lanes.length === 1 ? `${names} single-labeled` : names,
-			version: options.version,
-			created: options.created,
-			usage: [],
-			judgments: settled.filter((entry) => entry.packet === packet).map((entry) => entry.judgment),
-		})),
-		omitted: answers.flatMap((entry) => map.links.filter((link) => !entry.has(link.row))).length,
-		disputes,
-		missed: answers.map(
-			(entry) =>
-				map.checks.filter((check) => entry.get(check.row)?.verdict !== check.verdict).length,
-		),
-	}
-}
-
-/**
- * Compares two lanes per class over the rows both answered, with controls aside.
- * @param left - The first lane's rows
- * @param right - The second lane's rows
- * @param map - The pool's map
- * @returns The agreement of each class that holds a shared row
- */
-export function compareMemoryLabels(
-	left: readonly MemoryLabelAnswer[],
-	right: readonly MemoryLabelAnswer[],
-	map: MemoryLabelMap,
-): readonly MemoryLabelAgreement[] {
-	const lefts = collectMemoryLabelAnswers(left)
-	const rights = collectMemoryLabelAnswers(right)
-	return MEMORY_LABEL_CLASSES.flatMap((entry) => {
-		const pairs = map.links
-			.filter((link) => link.class === entry)
-			.flatMap((link) => {
-				const one = lefts.get(link.row)?.verdict
-				const two = rights.get(link.row)?.verdict
-				return one === undefined || two === undefined ? [] : [{ one, two }]
-			})
-		if (pairs.length === 0) return []
-		const count = pairs.length
-		const agreement = pairs.filter((pair) => pair.one === pair.two).length / count
-		const chance = MEMORY_LABEL_VERDICTS.reduce(
-			(sum, verdict) =>
-				sum +
-				(pairs.filter((pair) => pair.one === verdict).length / count) *
-					(pairs.filter((pair) => pair.two === verdict).length / count),
-			0,
-		)
-		const either = pairs.filter((pair) => pair.one === 'achieved' || pair.two === 'achieved')
-		const both = either.filter((pair) => pair.one === pair.two)
-		return [
-			{
-				class: entry,
-				count,
-				agreement,
-				kappa: chance === 1 ? undefined : (agreement - chance) / (1 - chance),
-				overlap: either.length === 0 ? undefined : both.length / either.length,
-			},
-		]
-	})
 }
 
 /**
@@ -4305,7 +3863,7 @@ export function collectMemoryLabelJudgments(
  * @returns The population a gate reads
  */
 export function buildMemoryGatePopulation(
-	map: MemoryLabelMap,
+	map: StudyLabelMap,
 	labels: readonly StudyLabels[],
 	assignment: MemoryGateAssignment,
 ): MemoryGatePopulation {
@@ -4336,7 +3894,7 @@ export function buildMemoryGatePopulation(
  * @returns The rows, in dispute order
  */
 export function collectMemoryThirdRows(
-	map: MemoryLabelMap,
+	map: StudyLabelMap,
 	disputes: readonly number[],
 	results: readonly MemoryGateResult[],
 	assignment: MemoryGateAssignment,
@@ -4361,7 +3919,7 @@ export function collectMemoryThirdRows(
  * @returns The rows, deciding rows first
  */
 export function collectMemorySpotRows(
-	map: MemoryLabelMap,
+	map: StudyLabelMap,
 	labels: readonly StudyLabels[],
 	clauses: readonly MemoryGateClause[],
 	assignment: MemoryGateAssignment,
@@ -4432,10 +3990,10 @@ export function parseMemoryGateAssignment(text: string): MemoryGateAssignment | 
  * @returns The nodes, each holding its prompt
  */
 export function buildMemoryLabelNodes(
-	requests: readonly MemoryLabelRequest[],
+	requests: readonly StudyLabelBatch[],
 	engines: readonly string[],
 	instruction: string,
-	receipts?: ReadonlyArray<readonly MemoryLabelReceipt[]>,
+	receipts?: ReadonlyArray<readonly StudyLabelReceipt[]>,
 ): readonly MemoryLabelNode[] {
 	const conditions: readonly MemoryLabelCondition[] =
 		receipts === undefined ? ['plain'] : ['plain', 'receipts']
@@ -4446,7 +4004,7 @@ export function buildMemoryLabelNodes(
 					request: index,
 					engine,
 					condition,
-					prompt: buildMemoryLabelPrompt(
+					prompt: buildStudyLabelPrompt(
 						request,
 						instruction,
 						condition === 'plain' ? undefined : (receipts?.[index] ?? []),
@@ -4470,7 +4028,7 @@ export function buildMemoryLabelNodes(
 export function renderMemoryLabelScript(gate: string, nodes: readonly MemoryLabelNode[]): string {
 	return [
 		`export const meta = { name: ${JSON.stringify(`rc-s3-${gate}`)}, description: "Labels one gate's rows in fresh nodes and returns counts", phases: [{ title: "Harness" }, { title: "Label" }] }`,
-		`const schema = ${JSON.stringify(MEMORY_LABEL_SCHEMA)}`,
+		`const schema = ${JSON.stringify(studyLabelAnswersContract.schema)}`,
 		`const nodes = [`,
 		...nodes.map(
 			(node) =>
@@ -4584,7 +4142,7 @@ export function buildMemoryLabelRun(
 	nodes: ReadonlyArray<Omit<MemoryLabelNode, 'prompt'>>,
 	journal: MemoryJournal,
 	transcripts: ReadonlyMap<string, MemoryTranscriptResult>,
-	requests: readonly MemoryLabelRequest[],
+	requests: readonly StudyLabelBatch[],
 ): MemoryLabelRun {
 	const labels = new Set(nodes.map((node) => node.label))
 	const found = nodes.flatMap((node) => {
@@ -4600,7 +4158,9 @@ export function buildMemoryLabelRun(
 			? [
 					{
 						node,
-						answers: entry.result.rows.filter(isMemoryLabelAnswer),
+						answers: entry.result.rows.filter((row): row is StudyLabelAnswer =>
+							MEMORY_LABEL_ROW.is(row),
+						),
 						wall: transcript?.wall,
 					},
 				]
@@ -4632,10 +4192,11 @@ export function buildMemoryLabelRun(
 export function buildMemoryLabelLanes(
 	run: MemoryLabelRun,
 	condition: MemoryLabelCondition,
-): readonly MemoryLabelLane[] {
+): readonly StudyLabelLane[] {
 	const reads = run.reads.filter((read) => read.node.condition === condition)
-	return [...new Set(reads.map((read) => read.node.engine))].map((labeler) => ({
+	return [...new Set(reads.map((read) => read.node.engine))].map((labeler): StudyLabelLane => ({
 		labeler,
+		method: 'model',
 		rows: reads.filter((read) => read.node.engine === labeler).flatMap((read) => read.answers),
 	}))
 }
@@ -4666,15 +4227,15 @@ export function computeMemorySpread(values: readonly number[]): MemorySpread | u
  * @returns The result
  */
 export function computeMemoryPilot(
-	map: MemoryLabelMap,
-	requests: readonly MemoryLabelRequest[],
+	map: StudyLabelMap,
+	requests: readonly StudyLabelBatch[],
 	run: MemoryLabelRun,
 	engine: string,
 ): MemoryPilotResult {
 	const held = run.reads.filter((read) => read.node.engine === engine)
 	const plain = held.filter((read) => read.node.condition === 'plain')
-	const answers = collectMemoryLabelAnswers(plain.flatMap((read) => read.answers))
-	const receipts = collectMemoryLabelAnswers(
+	const answers = collectStudyLabelAnswers(plain.flatMap((read) => read.answers))
+	const receipts = collectStudyLabelAnswers(
 		held.filter((read) => read.node.condition === 'receipts').flatMap((read) => read.answers),
 	)
 	const sizes = new Map(

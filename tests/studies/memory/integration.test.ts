@@ -734,7 +734,7 @@ it.each(STUDY_MEMORY_ACTUAL_REFUSALS)(
 	},
 )
 
-it('sends false truncate and shift controls only for Compaction chat requests and marks only their dispatch evidence', async () => {
+it('sends a false shift only for Compaction chat requests, beside the false truncate every chat carries, and marks only their dispatch evidence', async () => {
 	const compaction = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.below, 400, [], true)
 	expect(compaction.failure).toBeUndefined()
 	expect(readMemoryControls(compaction.requests)).toEqual([
@@ -758,7 +758,7 @@ it('sends false truncate and shift controls only for Compaction chat requests an
 		expect(result.failure).toBeUndefined()
 		const controls = readMemoryControls(result.requests)
 		expect(controls.length).toBeGreaterThan(0)
-		expect(controls).toEqual(controls.map(() => ({ truncate: undefined, shift: undefined })))
+		expect(controls).toEqual(controls.map(() => ({ truncate: false, shift: undefined })))
 		expect(readMemoryEvents(result.evidence, 'dispatch').some((value) => 'strict' in value)).toBe(
 			false,
 		)

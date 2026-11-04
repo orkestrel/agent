@@ -892,12 +892,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				think: false,
 				options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_PARAMETER_PINS.agent },
 			})
-			// Compaction adds only the two explicit native controls; every other member matches the plain request.
-			expect(Object.keys(windowed).toSorted()).toEqual(
-				[...Object.keys(plain), 'shift', 'truncate'].toSorted(),
-			)
+			// Every chat carries a false truncate, and Compaction adds only a false shift; every other member matches the plain request.
+			expect(Object.keys(windowed).toSorted()).toEqual([...Object.keys(plain), 'shift'].toSorted())
 			expect([windowed.truncate, windowed.shift]).toEqual([false, false])
-			expect('truncate' in plain || 'shift' in plain).toBe(false)
+			expect(plain.truncate).toBe(false)
+			expect('shift' in plain).toBe(false)
 			expect(windowed.options).toEqual(plain.options)
 			expect(windowed.tools).toEqual(plain.tools)
 			expect(chats[0]?.body).not.toContain('overhead')
