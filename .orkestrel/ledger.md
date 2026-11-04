@@ -33,3 +33,4 @@
 | 2026-11-04 | Last rows: `tool`, `workflow`, `ollama`, `toolbox` | `builder` on `sol` | `fe77b9d`, `fc8b8ce`, `1fc131a`, `ac31925` |
 | 2026-11-04 | Rulings ported into tracked records | `builder` on `sol` | `semantics.md`, `failopen.md` |
 | 2026-11-04 | `database` joins the campaign: `shapeToColumnStorage` switches on every `category`, and `contract`'s new `shape` breaks it | `contract`'s review; Orchestrator's census | `plan.md` § Repositories |
+| 2026-11-04 | The user asked for a plan and goals, and named `learn` as where nothing was moving. The skeleton moves ahead of the hardening, and reader experiments stop after the run in flight | user; Orchestrator's ruling | `plan.md` § What this wave serves |

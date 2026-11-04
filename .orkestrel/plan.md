@@ -9,6 +9,12 @@ Make `@orkestrel/agent`, its related packages, and the `reason` family refuse wh
 - The user, 2026-11-04: "Make sure to take care of the contract issues, don't defer it, work on it in parallel, especially since contract is so important to the ecosystem, we need it to be a tight and hardened as possible, and since it is required in all packages, it's best to get done as soon as possible so it goes into the same version bump." So these join the campaign: a nested `shape` that `is` refuses, the door and fault text in `@orkestrel/contract` subject to one `analyst` pass, and `rawShape` refusals naming a real path.
 - Out of this campaign: unbounded refusal text in `@orkestrel/workspace`, `@orkestrel/database`, and `@orkestrel/relation`, `@orkestrel/mcp` losing the blocks of a result with only non-text content (needs a contract decision), and every package outside the table below.
 
+## What this wave serves
+
+The user, 2026-11-04: "I need a solid plan and goals. We're doing a lot of work and I appreciate the hardening of these packages but I feel like we need some direction here, we're doing a lot at once but I don't feel like we are getting anywhere with the learn package."
+
+The model in `@orkestrel/learn` comes first. This wave exists so that model stands on packages that refuse what they cannot read. The skeleton no longer waits for it: `learn`'s plan holds the model's goal, its four exit bars, and its milestones. No new finding delays the skeleton. Whether the wave's scope closes at the rows it holds is before the user.
+
 ## Repositories
 
 Layer order, lowest first. A dependent reads a lower layer's local build until the user publishes it. No `version` field moves before publication.
@@ -37,7 +43,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study`, `mcp`, `qualifier`, `rater`, `interpret` read; `program`, `brief` open | `ledger.md` |
 | Live proofs on the dedicated daemon | `ollama` at `9ef095b` and `4109f7e`, 14 files, 82 passed | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | finish `contract`'s corrections, then the door with `tool` first, then `database`; then the falsify round, then `verifier` | § Sequence |
+| Next action | `learn` builds the skeleton; here, finish `contract`'s corrections, then the door with `tool` first, then `database`; then the falsify round, then `verifier` | § Sequence; `learn`'s plan |
 
 ## Sequence
 
