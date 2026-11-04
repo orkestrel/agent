@@ -5956,7 +5956,7 @@ await new GuideCommand({
 				estimateRequest({ messages: requireValue(provider.calls[0], 'Missing call').messages }),
 			)
 			expect(guideText).toContain(
-				'The over-window prompt then proceeds to the provider, and the provider decides what happens past its window.',
+				'With `strict: false`, it proceeds to the provider, and the provider decides what happens past its window.',
 			)
 			expect(guideText).toContain(
 				"With `strict: false`, no error and no agent event marks that point: the loop sends the over-window request, and no reading covers the provider's behavior past its window,",
