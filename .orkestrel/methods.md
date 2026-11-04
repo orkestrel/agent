@@ -34,6 +34,7 @@ This file is the debrief's working input, added to as methods prove out so nothi
 | A bound is proposed from one door's reading | Measure every door on the fixture first; ownership allocates before validation | The fixture was read on `is`; `cloneShape` costs about 8 times that, and `createContract` refused only after 1.2 GB, so the first ruling would have closed the smaller path | `contract`, in progress |
 | A re-audit reports a fixture | Reproduce it on the committed build before acting, and extend it where that's cheap | Extending one fixture is how the ownership table turned up | `learn`, the ledger |
 | A column is about to run | Set the keep rule first, as a cost ratio | `wait` kept at 0 correct facts asked per 3 latent values removed; the multi-word alias at 0 latent values added per 1 right gained; a broad gate dropped on the same kind of column | `interpret` `f65b39e` |
+| A reader misreads a form a review found | State the law for the class and prove it with a table of every form, not the review's list: it consumes the whole numeric token or says unreadable, and never keeps a part | `3 000 000` read as 3 and approved past the authority, in `learn`'s composed model | `interpret`, in progress |
 | An author's API feels heavy | Read the example as an author and count what is said twice, before shrinking the example or moving the bar | 62 lines, 26 of them three sentences stated twice | `learn`, in progress |
 
 ## Disproved
