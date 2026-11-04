@@ -36,7 +36,7 @@ import { renderCauseChain } from './helpers.js'
  */
 export class Classifier implements ClassifierInterface {
 	readonly #options: ClassifierOptions
-	readonly #failed = new Set<string>()
+	readonly #failed = new Map<string, Error>()
 	#slice = 0
 
 	/**
@@ -51,7 +51,7 @@ export class Classifier implements ClassifierInterface {
 	 * Asks the judge every question the filing still lacks, in the measured order.
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
-	 * @returns The judgment keys, summed usage, and one attempt per logical question, in asking order; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+	 * @returns The judgment keys, summed usage, and one attempt per logical question, in asking order; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets `failure`
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
@@ -63,10 +63,12 @@ export class Classifier implements ClassifierInterface {
 			(total, result) => (result.usage === undefined ? total : sumUsage(total, result.usage)),
 			undefined,
 		)
+		const failure = results.find((result) => result.failure !== undefined)?.failure
 		return {
 			judgments: results.flatMap((result) => result.judgments),
 			attempts: results.flatMap((result) => result.attempts),
 			...(fault === undefined ? {} : { fault }),
+			...(failure === undefined ? {} : { failure }),
 			...(usage === undefined ? {} : { usage }),
 		}
 	}
@@ -460,8 +462,13 @@ export class Classifier implements ClassifierInterface {
 		if (this.#read(spec) !== undefined)
 			return { judgments: [spec.id], attempts: [{ key: spec.id, phase, outcome: 'cached' }] }
 		const fingerprint = JSON.stringify(spec)
-		if (this.#failed.has(fingerprint))
-			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
+		const held = this.#failed.get(fingerprint)
+		if (held !== undefined)
+			return {
+				judgments: [],
+				attempts: [{ key: spec.id, phase, outcome: 'skipped' }],
+				failure: held,
+			}
 		signal.throwIfAborted()
 		if (spec.sources.some((id) => this.#options.conversation.message(id) === undefined))
 			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
@@ -504,13 +511,14 @@ export class Classifier implements ClassifierInterface {
 					attempts,
 				})
 			else results.push({ judgments: [], attempts })
+			if (signal.aborted) throw error
+			const failure = isError(error) ? error : new Error(errorToMessage(error))
 			if (
 				(isJudgeError(error) && error.code === 'QUESTION') ||
 				DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error))
 			)
-				this.#failed.add(fingerprint)
-			if (signal.aborted) throw error
-			return { judgments: [], attempts: [] }
+				this.#failed.set(fingerprint, failure)
+			return { judgments: [], attempts: [], failure }
 		}
 	}
 }

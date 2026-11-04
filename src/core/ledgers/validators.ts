@@ -1,6 +1,8 @@
-import type { LedgerSnapshot } from './types.js'
+import type { LedgerQuestion, LedgerSnapshot } from './types.js'
 import { arrayOf, holds, isFiniteNumber, isRecord, isString } from '@orkestrel/contract'
+import { LEDGER_CATEGORIES } from './constants.js'
 import { isConversationSnapshot } from '../conversations/validators.js'
+import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
 /**
  * Checks whether a value is finite and lies in the interval (0, 1].
@@ -16,6 +18,41 @@ export function isFraction(value: unknown): value is number {
 }
 
 /**
+ * Checks whether a value holds the wording a ledger files with: a choice `category` question whose
+ * criteria describe every category, a non-empty `topic` string, and noul `amends` and `supersedes`
+ * questions.
+ *
+ * @remarks
+ * A ledger asks these on every message, so a hole in them would otherwise surface as filing that quietly
+ * stays undecided. Total: an unreadable member returns false.
+ *
+ * @param value - The value to inspect
+ * @returns True if the value holds the wording the ledger's questions read; false otherwise
+ * @example
+ * ```ts
+ * isLedgerQuestion(LEDGER_QUESTIONS) // true
+ * isLedgerQuestion({ topic: 'Does it concern this?' }) // false
+ * ```
+ */
+export function isLedgerQuestion(value: unknown): value is LedgerQuestion {
+	return holds(() => {
+		if (!isRecord(value)) return false
+		const { category, topic, amends, supersedes } = value
+		if (!isJudgeQuestion(category) || category.form !== 'choice') return false
+		const { criteria } = category
+		return (
+			LEDGER_CATEGORIES.every((one) => isJudgeEntry(criteria[one])) &&
+			isString(topic) &&
+			topic.trim() !== '' &&
+			isJudgeQuestion(amends) &&
+			amends.form === 'noul' &&
+			isJudgeQuestion(supersedes) &&
+			supersedes.form === 'noul'
+		)
+	})
+}
+
+/**
  * Checks whether a value is a ledger snapshot whose marked ids name messages of its own conversation.
  *
  * @remarks
@@ -23,8 +60,9 @@ export function isFraction(value: unknown): value is number {
  * dense arrays of strings. Each request and note id must name a `user` message of
  * `conversation.messages` and each failure id a `tool` message, so an id only a section original
  * holds is refused. A `gauge`, when present, must hold a finite `scale` greater than 0 and a finite
- * `overhead` of at least 0. Unknown members are admitted. Unreadable members and untrusted inputs
- * return false. The guard is structural: it admits a conversation holding a stored `system` role
+ * `overhead` of at least 0. The guard is exact: an unknown member and an own `undefined` `gauge` return
+ * false, at the snapshot and in its `gauge`. Unreadable members and untrusted inputs return false. The
+ * guard is structural: it admits a conversation holding a stored `system` role
  * or a repeated id, which `requireConversationSnapshot` and the `Conversation` constructor then
  * refuse as the stored-data check a ledger's hydrate runs.
  *
@@ -41,11 +79,12 @@ export function isLedgerSnapshot(value: unknown): value is LedgerSnapshot {
 	return holds(() => {
 		if (!isRecord(value)) return false
 		const { conversation, requests, notes, failures, gauge } = value
+		if (Object.keys(value).length !== (gauge === undefined ? 4 : 5)) return false
 		if (!isConversationSnapshot(conversation)) return false
 		const isIds = arrayOf(isString)
 		if (!isIds(requests) || !isIds(notes) || !isIds(failures)) return false
 		if (gauge !== undefined) {
-			if (!isRecord(gauge)) return false
+			if (!isRecord(gauge) || Object.keys(gauge).length !== 2) return false
 			const { scale, overhead } = gauge
 			if (!isFiniteNumber(scale) || scale <= 0 || !isFiniteNumber(overhead) || overhead < 0)
 				return false

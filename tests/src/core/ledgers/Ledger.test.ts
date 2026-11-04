@@ -6,6 +6,7 @@ import type {
 	Selection,
 	ThinkingReplay,
 } from '@src/core'
+import { createFailingJudge, createSecondTurnFailureProvider } from '../../../setup.js'
 import {
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
@@ -43,6 +44,7 @@ import {
 } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import {
+	buildCategoryAnswer,
 	createRecordedTool,
 	LEDGER_BENCH_MODEL,
 	LEDGER_REPLAY_FIXTURE,
@@ -272,10 +274,14 @@ describe('Ledger', () => {
 		const unrelated = ledger.conversation.add({ role: 'user', content: 'Unrelated limit 300.' })
 		const quiet = ledger.conversation.add({ role: 'user', content: 'Ignore MX-4471.' })
 		ledger.conversation.judgments.add(
-			buildLedgerJudgment(earlier, { answer: { form: 'choice', probabilities: { rule: 1 } } }),
+			buildLedgerJudgment(earlier, {
+				answer: buildCategoryAnswer({ rule: 1 }),
+			}),
 		)
 		ledger.conversation.judgments.add(
-			buildLedgerJudgment(quiet, { answer: { form: 'choice', probabilities: { distractor: 1 } } }),
+			buildLedgerJudgment(quiet, {
+				answer: buildCategoryAnswer({ distractor: 1 }),
+			}),
 		)
 		for (const message of [first, second, unrelated, quiet]) {
 			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, message, 1))
@@ -296,10 +302,25 @@ describe('Ledger', () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
-				{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
 				{
 					content: '',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'BW-20931' } }],
+					tools: [
+						{
+							id: 'read',
+							name: 'lookup',
+							arguments: { id: 'BW-20931' },
+						},
+					],
+				},
+				{
+					content: '',
+					tools: [
+						{
+							id: 'recall',
+							name: 'recall',
+							arguments: { topic: 'BW-20931' },
+						},
+					],
 				},
 				{ content: '' },
 				{ content: 'Done.' },
@@ -386,7 +407,11 @@ describe('Ledger', () => {
 			],
 			{ recorded: true, repeat: false },
 		)
-		const ledger = createLedger(provider, { ...options, capacity: 32_768 })
+		const ledger = createLedger(provider, {
+			...options,
+			capacity: 32_768,
+			agent: { strict: false },
+		})
 		await ledger.respond('Check BW-20931.')
 		ledger.conversation.add({ role: 'user', content: 'Check it again.' })
 		await expect(ledger.agent.generate()).resolves.toMatchObject({
@@ -420,10 +445,23 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'far', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				calls: [
+					{
+						id: 'far',
+						name: 'lookup',
+						arguments: { id: 'BW-20931' },
+					},
+				],
 			},
-			...Array.from({ length: 130_000 }, (): MessageInput => ({ role: 'user', content: 'Note.' })),
-			{ role: 'tool', call: 'far', content: 'Account BW-20931: Brightwater Studio.' },
+			...Array.from({ length: 130_000 }, (): MessageInput => ({
+				role: 'user',
+				content: 'Note.',
+			})),
+			{
+				role: 'tool',
+				call: 'far',
+				content: 'Account BW-20931: Brightwater Studio.',
+			},
 		])
 		const selected = waitForEvent<readonly [selection: Selection]>(
 			(listener) => ledger.agent.emitter.once('select', listener),
@@ -578,9 +616,19 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'c1', name: 'lookup', arguments: { id: 'x'.repeat(400) } }],
+				calls: [
+					{
+						id: 'c1',
+						name: 'lookup',
+						arguments: { id: 'x'.repeat(400) },
+					},
+				],
 			},
-			{ role: 'tool', call: 'c1', content: 'Account BW-20931: Brightwater Studio.' },
+			{
+				role: 'tool',
+				call: 'c1',
+				content: 'Account BW-20931: Brightwater Studio.',
+			},
 		])
 		await ledger.respond('Next?')
 		const sent = requireValue(provider.calls[0]).messages
@@ -643,7 +691,7 @@ describe('Ledger', () => {
 					return yield* provider.stream(...args)
 				},
 			},
-			options,
+			{ ...options, agent: { strict: false } },
 		)
 		ledger.conversation.add({ role: 'user', content: 'Seed.' })
 		const selections: Selection[] = []
@@ -750,8 +798,13 @@ describe('Ledger', () => {
 	it('faults direct agent generation without planning for the earlier request', async () => {
 		const judge = new SilentJudge()
 		const options = buildLedgerOptions({ judge })
-		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const ledger = createLedger(provider, options)
+		const provider = createScriptedProvider([{ content: 'Done.' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, {
+			...options,
+			agent: { strict: false },
+		})
 		await ledger.respond('Earlier request.')
 		const judgments = ledger.conversation.judgments.judgments()
 		const requests = judge.requests.length
@@ -807,7 +860,7 @@ describe('Ledger', () => {
 		}
 		ledger.conversation.judgments.add(
 			buildLedgerJudgment(quiet, {
-				answer: { form: 'choice', probabilities: { chatter: 1 } },
+				answer: buildCategoryAnswer({ chatter: 1 }),
 			}),
 		)
 		for (const [earlier, later] of [
@@ -889,10 +942,25 @@ describe('Ledger', () => {
 		const lookup = requireValue(options.lookups?.[0])
 		const provider = createScriptedProvider(
 			[
-				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
 				{
 					content: '',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'Brightwater' } }],
+					tools: [
+						{
+							id: 'lookup',
+							name: 'lookup',
+							arguments: { id: 'BW-20931' },
+						},
+					],
+				},
+				{
+					content: '',
+					tools: [
+						{
+							id: 'recall',
+							name: 'recall',
+							arguments: { topic: 'Brightwater' },
+						},
+					],
 				},
 				{ content: 'Done.' },
 			],
@@ -1402,11 +1470,23 @@ describe('Ledger', () => {
 		for (const predict of [0, 1024]) {
 			const provider = createScriptedProvider(
 				[
-					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
-					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
 					{
 						content: '',
-						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'delivery' } }],
+						usage: { prompt: 8, completion: 0, total: 8 },
+					},
+					{
+						content: '',
+						usage: { prompt: 8, completion: 0, total: 8 },
+					},
+					{
+						content: '',
+						tools: [
+							{
+								id: 'recall',
+								name: 'recall',
+								arguments: { topic: 'delivery' },
+							},
+						],
 						usage: { prompt: 2700, completion: 72, total: 2772 },
 					},
 					{ content: 'Done.' },
@@ -1966,6 +2046,7 @@ describe('Ledger', () => {
 		const fault = new Error('planning failed')
 		const ledger = createLedger(provider, {
 			...options,
+			agent: { strict: false },
 			get system() {
 				if (phases.calls.at(-1)?.[0] === 'start') throw fault
 				return options.system
@@ -1976,9 +2057,19 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				calls: [
+					{
+						id: 'seed',
+						name: 'lookup',
+						arguments: { id: 'BW-20931' },
+					},
+				],
 			},
-			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+			{
+				role: 'tool',
+				call: 'seed',
+				content: 'Account BW-20931: Brightwater Studio.',
+			},
 		])
 		const selections = createRecorder<readonly [selection: Selection, view: readonly Message[]]>()
 		ledger.agent.emitter.on('start', () => phases.handler('start'))
@@ -2054,6 +2145,7 @@ describe('Ledger', () => {
 		const ledger = createLedger(createScriptedProvider([{ content: 'Done.' }]), {
 			...options,
 			topics: [],
+			agent: { strict: false },
 			judge: new SequentialSystemOneJudge({
 				url: 'http://judge.test',
 				model: 'filing',
@@ -2145,6 +2237,7 @@ describe('Ledger', () => {
 		)
 		const ledger = createLedger(provider, {
 			...options,
+			agent: { strict: false },
 			topics: [],
 			judge: new SequentialSystemOneJudge({
 				url: 'http://judge.test',
@@ -2193,7 +2286,10 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		const ledger = createLedger(provider, options)
+		const ledger = createLedger(provider, {
+			...options,
+			agent: { strict: false },
+		})
 		await ledger.respond('First request.')
 		ledger.agent.context.apply(
 			createScope({
@@ -2250,9 +2346,19 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'bad-seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				calls: [
+					{
+						id: 'bad-seed',
+						name: 'lookup',
+						arguments: { id: 'BW-20931' },
+					},
+				],
 			},
-			{ role: 'tool', call: 'bad-seed', content: 'BW-20931 unreadable seed' },
+			{
+				role: 'tool',
+				call: 'bad-seed',
+				content: 'BW-20931 unreadable seed',
+			},
 		])
 		await ledger.respond('Read the account.')
 		expect(
@@ -2303,7 +2409,7 @@ describe('Ledger', () => {
 		await ledger.respond('Request.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'empty')?.content,
-		).toBe('topic: constraint; expected string; received ""; constraint min; limit 1')
+		).toContain('topic: constraint')
 	})
 
 	it('refuses a recall argument it does not declare', async () => {
@@ -2321,7 +2427,7 @@ describe('Ledger', () => {
 		await ledger.respond('Request.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'extra')?.content,
-		).toBe('category: extra; this key is not declared, remove it')
+		).toContain('category: extra')
 	})
 
 	it('counts a blank recall against its limit and permits a short nonclosed result', async () => {
@@ -2563,9 +2669,19 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				calls: [
+					{
+						id: 'seed',
+						name: 'lookup',
+						arguments: { id: 'BW-20931' },
+					},
+				],
 			},
-			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+			{
+				role: 'tool',
+				call: 'seed',
+				content: 'Account BW-20931: Brightwater Studio.',
+			},
 		])
 		const ownerRule = ledger.conversation.add({
 			role: 'user',
@@ -2655,9 +2771,19 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				calls: [
+					{
+						id: 'seed',
+						name: 'lookup',
+						arguments: { id: 'BW-20931' },
+					},
+				],
 			},
-			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+			{
+				role: 'tool',
+				call: 'seed',
+				content: 'Account BW-20931: Brightwater Studio.',
+			},
 		])
 		const source = ledger.conversation.add({
 			role: 'user',
@@ -2708,7 +2834,7 @@ describe('Ledger', () => {
 		expect(records).not.toContain('[amended by')
 		ledger.conversation.judgments.add(
 			buildLedgerJudgment(source, {
-				answer: { form: 'choice', probabilities: { rule: 1 } },
+				answer: buildCategoryAnswer({ rule: 1 }),
 			}),
 		)
 		const selected = waitForEvent<readonly [selection: Selection]>(
@@ -2730,9 +2856,19 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				calls: [
+					{
+						id: 'seed',
+						name: 'lookup',
+						arguments: { id: 'BW-20931' },
+					},
+				],
 			},
-			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+			{
+				role: 'tool',
+				call: 'seed',
+				content: 'Account BW-20931: Brightwater Studio.',
+			},
 		])
 		const rule = ledger.conversation.add({
 			role: 'user',
@@ -2744,12 +2880,12 @@ describe('Ledger', () => {
 		})
 		ledger.conversation.judgments.add(
 			buildLedgerJudgment(rule, {
-				answer: { form: 'choice', probabilities: { rule: 1 } },
+				answer: buildCategoryAnswer({ rule: 1 }),
 			}),
 		)
 		ledger.conversation.judgments.add(
 			buildLedgerJudgment(amendment, {
-				answer: { form: 'choice', probabilities: { fact: 0.6, correction: 0.4 } },
+				answer: buildCategoryAnswer({ fact: 0.6, correction: 0.4 }),
 			}),
 		)
 		for (const head of ['amends', 'supersedes'] as const)
@@ -2821,9 +2957,19 @@ describe('Ledger', () => {
 			{
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				calls: [
+					{
+						id: 'seed',
+						name: 'lookup',
+						arguments: { id: 'BW-20931' },
+					},
+				],
 			},
-			{ role: 'tool', call: 'seed', content: 'Account BW-20931: Brightwater Studio.' },
+			{
+				role: 'tool',
+				call: 'seed',
+				content: 'Account BW-20931: Brightwater Studio.',
+			},
 			{ role: 'user', content: 'For Brightwater, keep receipt 42.' },
 		])
 		await ledger.respond('Check Brightwater.')
@@ -3077,7 +3223,9 @@ describe('Ledger', () => {
 				'Brightwater Studio refunds need a manager.\n\nBrightwater Studio credits need a clerk.',
 		})
 		ledger.conversation.judgments.add(
-			buildLedgerJudgment(rule, { answer: { form: 'choice', probabilities: { rule: 1 } } }),
+			buildLedgerJudgment(rule, {
+				answer: buildCategoryAnswer({ rule: 1 }),
+			}),
 		)
 		await ledger.respond('Check the desk.')
 		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toBe(
@@ -3172,10 +3320,34 @@ describe('Ledger', () => {
 			[
 				{
 					content: '',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'Brightwater Studio' } }],
+					tools: [
+						{
+							id: 'recall',
+							name: 'recall',
+							arguments: { topic: 'Brightwater Studio' },
+						},
+					],
 				},
-				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
-				{ content: '', tools: [{ id: 'lookup', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				{
+					content: '',
+					tools: [
+						{
+							id: 'lookup',
+							name: 'lookup',
+							arguments: { id: 'BW-20931' },
+						},
+					],
+				},
+				{
+					content: '',
+					tools: [
+						{
+							id: 'lookup',
+							name: 'lookup',
+							arguments: { id: 'BW-20931' },
+						},
+					],
+				},
 				{ content: 'No record remains.' },
 			],
 			{ recorded: true },
@@ -3209,6 +3381,106 @@ describe('Ledger', () => {
 		expect(extractLedgerRecords(requireValue(provider.calls[4]).messages)).not.toContain(
 			'Refund is $140.',
 		)
+	})
+})
+
+describe('Ledger — strict by default', () => {
+	it('refuses questions that cannot file at construction', () => {
+		const error = captureError(() =>
+			Reflect.apply(createLedger, undefined, [
+				createScriptedProvider([]),
+				{ ...buildLedgerOptions(), questions: { topic: 'x' } },
+			]),
+		)
+		expect(isLedgerError(error) && error.code).toBe('QUESTION')
+		expect(isLedgerError(error) && error.message).toContain('LEDGER_QUESTIONS')
+	})
+
+	it('rejects respond when a judge fails, after the fault event', async () => {
+		const failure = new Error('the judge is unreachable')
+		const faults = createRecorder<[error: unknown]>()
+		const provider = createScriptedProvider([{ content: 'never' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, {
+			...buildLedgerOptions({ judge: createFailingJudge(failure) }),
+			agent: { on: { fault: faults.handler } },
+		})
+		ledger.conversation.add({
+			role: 'user',
+			content: 'The depot opens at nine.',
+		})
+		await expect(ledger.respond('When does it open?')).rejects.toBe(failure)
+		expect(faults.calls).toEqual([[failure]])
+		expect(provider.calls).toEqual([])
+		// The rejection leaves the ledger free for a later call.
+		await expect(ledger.respond('Again?')).rejects.toBe(failure)
+	})
+
+	it('goes on with the question undecided under strict: false, after the fault event', async () => {
+		const failure = new Error('the judge is unreachable')
+		const faults = createRecorder<[error: unknown]>()
+		const provider = createScriptedProvider([{ content: 'Nine.' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, {
+			...buildLedgerOptions({ judge: createFailingJudge(failure) }),
+			agent: { strict: false, on: { fault: faults.handler } },
+		})
+		ledger.conversation.add({
+			role: 'user',
+			content: 'The depot opens at nine.',
+		})
+		const result = await ledger.respond('When does it open?')
+		expect(result.content).toBe('Nine.')
+		expect(faults.calls[0]).toEqual([failure])
+	})
+
+	it('rejects respond on a selection failure, and the rejection leaves the ledger free', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const { ledger } = createPacedLedger(
+			seed.snapshot,
+			[{ content: 'never' }],
+			createFailingScheduler(),
+		)
+		await expect(ledger.respond('What is the status of OR-1000?')).rejects.toThrow(
+			'scheduler fault',
+		)
+		await expect(ledger.respond('What is open on the desk?')).rejects.toThrow('scheduler fault')
+	})
+
+	it('rejects respond when the conversation changes during selection', async () => {
+		const seed = await seedLedgerPrefix(18, 'correction')
+		const gate = Promise.withResolvers<void>()
+		const scheduler = createGatedScheduler(gate)
+		const { ledger } = createPacedLedger(seed.snapshot, [{ content: 'never' }], scheduler)
+		const pending = ledger.respond('What is the status of OR-1000?')
+		await scheduler.reached
+		ledger.conversation.add({
+			role: 'user',
+			content: 'Order OR-1000 is on hold.',
+		})
+		gate.resolve()
+		await expect(pending).rejects.toThrow('changed during selection')
+	})
+
+	it('refuses a direct agent run outside a request', async () => {
+		const provider = createScriptedProvider([{ content: 'never' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.conversation.add({ role: 'user', content: 'Check it.' })
+		await expect(ledger.agent.generate()).rejects.toThrow(
+			'ledger selection requires a request owned by an active respond call',
+		)
+		expect(provider.calls).toEqual([])
+	})
+
+	it('recovers a provider failure in the first pass with the answer pass', async () => {
+		const provider = createSecondTurnFailureProvider()
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const result = await ledger.respond('Check the desk.').catch((error: unknown) => error)
+		expect(isLedgerError(result)).toBe(false)
 	})
 })
 
@@ -3784,7 +4056,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			]),
 			{
 				...buildLedgerReplayOptions(createRecorder<readonly [key: string]>()),
-				agent: { limit: 1 },
+				agent: { limit: 1, strict: false },
 			},
 		)
 		ledger.conversation.add({ role: 'user', content: 'Check order FX-111.' })
@@ -3863,7 +4135,7 @@ describe('Ledger — snapshot and hydrate', () => {
 		const messages = refusals.map(([, snapshot]) => {
 			const error = captureError(() => createLedger(provider, { ...options, snapshot }))
 
-			return isLedgerError(error) && error.message
+			return isLedgerError(error) && error.message.split('\n')[0]
 		})
 
 		expect(messages).toEqual(
@@ -4037,7 +4309,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			keys: [89, 1],
 			amends: [26, 26],
 			supersedes: [26, 26],
-			digest: 'b722676db088eac263ab063f8e0b6b055af63683b634ac043c6f5a1561938396',
+			digest: '3de616f2fcb02d1242c3e03824247fa8643ad4e30e45e5678b7c1c73d2aa348a',
 		})
 	})
 
@@ -4092,21 +4364,22 @@ describe('Ledger — snapshot and hydrate', () => {
 		// The judge removes the earlier statement while the pass waits on its last question. The
 		// changed view faults the first selection, so the empty first reply opens the answer pass,
 		// whose selection reuses the request's plan.
-		const ledger = createLedger(
-			createScriptedProvider([{ content: '' }, { content: 'Noted.' }]),
-			buildLedgerBenchOptions(
-				createLedgerJudge(
-					asked,
-					async (request) => {
-						if (Object.hasOwn(request.questions, last)) (await ready.promise).remove(removed.id)
-						return keyed.ask(request, new AbortController().signal)
-					},
-					LEDGER_BENCH_MODEL,
-				),
-				true,
-				prefix.snapshot,
+		const options = buildLedgerBenchOptions(
+			createLedgerJudge(
+				asked,
+				async (request) => {
+					if (Object.hasOwn(request.questions, last)) (await ready.promise).remove(removed.id)
+					return keyed.ask(request, new AbortController().signal)
+				},
+				LEDGER_BENCH_MODEL,
 			),
+			true,
+			prefix.snapshot,
 		)
+		const ledger = createLedger(createScriptedProvider([{ content: '' }, { content: 'Noted.' }]), {
+			...options,
+			agent: { ...options.agent, strict: false },
+		})
 		ready.resolve(ledger.conversation)
 		const selections = createRecorder<readonly [selection: Selection]>()
 		ledger.agent.emitter.on('select', selections.handler)
@@ -4198,7 +4471,7 @@ describe('Ledger — run-bound conversation', () => {
 					return yield* provider.stream(...args)
 				},
 			},
-			buildLedgerOptions(),
+			{ ...buildLedgerOptions(), agent: { strict: false } },
 		)
 		ledger.conversation.add({ role: 'user', content: 'Seed.' })
 		await ledger.respond('First request.')
@@ -4270,6 +4543,7 @@ describe('Ledger — host turns', () => {
 			seed.snapshot,
 			[{ content: 'Elsewhere.' }, { content: 'Noted.' }],
 			scheduler,
+			{ agent: { strict: false } },
 		)
 		const plain = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }])
 		const pending = ledger.respond('What is the status of OR-1000?')
@@ -4307,7 +4581,7 @@ describe('Ledger — host turns', () => {
 				{ content: 'Noted.' },
 			],
 			scheduler,
-			{ recall: { limit: 1 } },
+			{ recall: { limit: 1 }, agent: { strict: false } },
 		)
 		const plain = createPacedLedger(seed.snapshot, [recalled, { content: 'Noted.' }], undefined, {
 			recall: { limit: 1 },
@@ -4346,6 +4620,7 @@ describe('Ledger — host turns', () => {
 			seed.snapshot,
 			[{ content: 'Noted.' }, { content: 'Noted again.' }],
 			scheduler,
+			{ agent: { strict: false } },
 		)
 		const pending = ledger.respond('What is the status of OR-1000?')
 		await scheduler.reached
@@ -4374,6 +4649,7 @@ describe('Ledger — host turns', () => {
 				seed.snapshot,
 				[{ content: '' }, { content: 'Noted.' }],
 				scheduler,
+				{ agent: { strict: false } },
 			)
 			const pending = ledger.respond('What is the status of OR-1000?')
 			await scheduler.reached
@@ -4461,6 +4737,7 @@ describe('Ledger — host turns', () => {
 			seed.snapshot,
 			[{ content: 'Noted.' }, { content: 'Noted again.' }],
 			createFailingScheduler(),
+			{ agent: { strict: false } },
 		)
 		const result = await ledger.respond('What is the status of OR-1000?')
 		const [faulted] = requireValue(selections.calls[0])

@@ -1,4 +1,4 @@
-import type { ClassifierAttempt, JudgeAnswer, LedgerTopic, Message } from '@src/core'
+import type { JudgeAnswer, LedgerTopic, Message } from '@src/core'
 import { createConversation, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
 import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
@@ -14,6 +14,7 @@ import { extractLiterals } from '../../../../src/core/helpers.js'
 import { buildLedgerIndex, matchEntities } from '../../../../src/core/ledgers/helpers.js'
 import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
+	buildCategoryAnswer,
 	buildLedgerMessage,
 	buildLedgerJudgment,
 	buildClassifierOptions,
@@ -90,7 +91,7 @@ describe('Classifier', () => {
 			const later = conversation.add({ role: 'user', content: 'Refund AB-12 is 30, not 20.' })
 			conversation.judgments.add(
 				buildLedgerJudgment(later, {
-					answer: { form: 'choice', probabilities: { correction: 1 } },
+					answer: buildCategoryAnswer({ correction: 1 }),
 				}),
 			)
 			const judge = new SilentJudge()
@@ -332,7 +333,7 @@ describe('Classifier', () => {
 			sources: [message.id],
 			state: 'user: Refund rules.',
 			question: LEDGER_QUESTIONS.category,
-			answer: { form: 'choice', probabilities: { chatter: 0.5, fact: 0.5 } },
+			answer: buildCategoryAnswer({ chatter: 0.5, fact: 0.5 }),
 		})
 		expect(classifier.category(message.id)).toBe('fact')
 	})
@@ -364,22 +365,28 @@ describe('Classifier', () => {
 			sources: [message.id],
 			state: 'user: Refund rules.',
 			question: LEDGER_QUESTIONS.category,
-			answer: { form: 'choice', probabilities: { chatter: 0.35, distractor: 0.35, fact: 0.3 } },
+			answer: buildCategoryAnswer({
+				chatter: 0.35,
+				distractor: 0.35,
+				fact: 0.3,
+			}),
 		})
 		expect(classifier.quiet(message.id)).toBe(true)
 		expect(classifier.category(message.id)).toBeUndefined()
 		expect(classifier.decisive(message.id)).toBe(false)
 		conversation.judgments.add({
 			...record,
-			answer: {
-				form: 'choice',
-				probabilities: { fact: 0.35, rule: 0.2, correction: 0.15, opinion: 0.3 },
-			},
+			answer: buildCategoryAnswer({
+				fact: 0.35,
+				rule: 0.2,
+				correction: 0.15,
+				opinion: 0.3,
+			}),
 		})
 		expect(classifier.decisive(message.id)).toBe(true)
 		conversation.judgments.add({
 			...record,
-			answer: { form: 'choice', probabilities: { fact: 0.7, opinion: 0.3 } },
+			answer: buildCategoryAnswer({ fact: 0.7, opinion: 0.3 }),
 		})
 		expect(classifier.category(message.id)).toBe('fact')
 		conversation.judgments.add({ ...record, model: 'different' })
@@ -451,13 +458,10 @@ describe('Classifier', () => {
 				sources: [message.id],
 				state: `${message.role}: ${message.content}`,
 				question: LEDGER_QUESTIONS.category,
-				answer: {
-					form: 'choice',
-					probabilities: {
-						correction: message.id === 'later' ? 0.3 : 0,
-						fact: message.id === 'later' ? 0.7 : 1,
-					},
-				},
+				answer: buildCategoryAnswer({
+					correction: message.id === 'later' ? 0.3 : 0,
+					fact: message.id === 'later' ? 0.7 : 1,
+				}),
 			})
 		}
 		await classifier.classify(new Set(), new AbortController().signal)
@@ -611,7 +615,7 @@ describe('Classifier', () => {
 					const key = requireValue(Object.keys(request.questions)[0])
 					return Promise.resolve({
 						model: 'partial',
-						answers: { [key]: { form: 'choice', probabilities: { fact: 1 } } },
+						answers: { [key]: buildCategoryAnswer({ fact: 1 }) },
 						usage: { prompt: 4, completion: 1, total: 5 },
 					})
 				}),
@@ -654,21 +658,20 @@ describe('Classifier', () => {
 			['topic', JSON.stringify(['topic', one, 'refunds'])],
 			['topic', JSON.stringify(['topic', two, 'refunds'])],
 		] as const
-		const rounds: Array<readonly ClassifierAttempt[]> = []
-		for (const round of [1, 2]) {
-			const result = await classifier.classify(new Set(), new AbortController().signal)
-			expect(result.judgments).toEqual([])
-			expect(summarizeAttempts(result.attempts)).toEqual(buildAttemptSummaries(asks, 'resolved'))
-			rounds.push(result.attempts)
-			expect(judge.requests).toHaveLength(round * asks.length)
-		}
+		const first = await classifier.classify(new Set(), new AbortController().signal)
+		expect(first.judgments).toHaveLength(asks.length)
+		expect(summarizeAttempts(first.attempts)).toEqual(buildAttemptSummaries(asks, 'resolved'))
+		expect(judge.requests).toHaveLength(asks.length)
+		// A refusal files as a judgment, so the second round finds each question settled and asks nothing.
+		const second = await classifier.classify(new Set(), new AbortController().signal)
+		expect(judge.requests).toHaveLength(asks.length)
 		expect(
-			rounds
-				.flat()
-				.filter((attempt) => ['resolved', 'failed', 'aborted'].includes(attempt.outcome)),
+			[...first.attempts, ...second.attempts].filter((attempt) =>
+				['resolved', 'failed', 'aborted'].includes(attempt.outcome),
+			),
 		).toHaveLength(judge.requests.length)
 		expect(judge.requests.map((request) => Object.keys(request.questions))).toEqual(
-			[...asks, ...asks].map(([, key]) => [key]),
+			asks.map(([, key]) => [key]),
 		)
 	})
 	it('returns a partial fault when a classification handler throws', async () => {
@@ -750,15 +753,31 @@ describe('Classifier', () => {
 						if (count === 1)
 							return Promise.resolve({
 								model: 'partial',
-								answers: { [key]: { form: 'choice', probabilities: { fact: 1 } } },
+								answers: {
+									[key]: buildCategoryAnswer({ fact: 1 }),
+								},
 								usage: { prompt: 4, completion: 1, total: 5 },
 							})
 						controller.abort()
 						return Promise.reject(
 							new JudgeAbortError({
 								model: 'partial',
-								answers: refused ? {} : { [key]: { form: 'choice', probabilities: { fact: 1 } } },
-								...(refused ? { refusals: { [key]: { missing: ['evidence'] } } } : {}),
+								answers: refused
+									? {}
+									: {
+											[key]: buildCategoryAnswer({
+												fact: 1,
+											}),
+										},
+								...(refused
+									? {
+											refusals: {
+												[key]: {
+													missing: ['evidence'],
+												},
+											},
+										}
+									: {}),
 								usage: { prompt: 40, completion: 1, total: 41 },
 							}),
 						)
@@ -1079,10 +1098,7 @@ describe('Classifier', () => {
 		] as const) {
 			seeded.judgments.add(
 				buildLedgerJudgment(message, {
-					answer: {
-						form: 'choice',
-						probabilities: message === later ? { correction: 1 } : { fact: 1 },
-					},
+					answer: buildCategoryAnswer(message === later ? { correction: 1 } : { fact: 1 }),
 				}),
 			)
 			seeded.judgments.add(buildLedgerTopicJudgment(message, LEDGER_REFUNDS_TOPIC, weight))
@@ -1249,7 +1265,7 @@ describe('Classifier', () => {
 					conversation.judgments.add(buildLedgerJudgment(earlier))
 					conversation.judgments.add(
 						buildLedgerJudgment(correction, {
-							answer: { form: 'choice', probabilities: { correction: 1 } },
+							answer: buildCategoryAnswer({ correction: 1 }),
 						}),
 					)
 					conversation.judgments.add(buildLedgerTopicJudgment(earlier, LEDGER_REFUNDS_TOPIC, 1))
@@ -1281,7 +1297,7 @@ describe('Classifier', () => {
 				conversation.judgments.add(buildLedgerJudgment(stated))
 				conversation.judgments.add(
 					buildLedgerJudgment(replaced, {
-						answer: { form: 'choice', probabilities: { correction: 1 } },
+						answer: buildCategoryAnswer({ correction: 1 }),
 					}),
 				)
 				for (const message of [stated, replaced])

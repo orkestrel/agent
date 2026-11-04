@@ -277,11 +277,22 @@ export interface LedgerGauge {
  * libraries add to the head. `scheduler` also reaches the ledger's classifier, which hands the host
  * a turn while it files, so a page passes it to keep the filing out of one long task. The classifier
  * and the loop race its yield against the run signal, so a scheduler that ignores its signal still
- * ends on a cancel.
+ * ends on a cancel. `strict` defaults to `true`: a judge failure or another selection failure rejects
+ * `respond` after the `fault` event, and with `strict: false` the request goes on with that question
+ * undecided, or from the conversation's `view()`. A provider failure in the first pass is the one
+ * failure the answer pass recovers under either value.
  */
 export type LedgerAgentOptions = Pick<
 	AgentOptions,
-	'limit' | 'timeout' | 'on' | 'scheduler' | 'instructions' | 'skills' | 'memos' | 'workspaces'
+	| 'limit'
+	| 'timeout'
+	| 'on'
+	| 'scheduler'
+	| 'instructions'
+	| 'skills'
+	| 'memos'
+	| 'workspaces'
+	| 'strict'
 >
 
 /**
@@ -382,6 +393,15 @@ export interface LedgerResult extends AgentResult {
  * thinking, until its pass observes the next call, and is final from then on.
  */
 export interface LedgerRequestInterface {
+	/** Records an error the request's run reported through its `fault` event. */
+	fault(error: unknown): void
+	/**
+	 * Reports whether the request's run reported this error through its `fault` event.
+	 *
+	 * @param error - The value a pass rejected with
+	 * @returns True if the run reported it; false otherwise
+	 */
+	faulted(error: unknown): boolean
 	/** Holds the request message, or undefined until `enter` appends it. */
 	readonly message: Message | undefined
 	/** Holds the selection the request's last successful plan produced, or undefined before one. */
@@ -508,14 +528,15 @@ export interface LedgerInterface {
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
 	 * A direct agent run on `conversation` while a `respond` call's pass runs is refused with an
-	 * `AgentError` whose `code` is `'CONCURRENCY'`; during the calibration that opens the call it is a
-	 * run no active `respond` call owns. The ledger's agent serves only `conversation`: a run on
-	 * another conversation started during a `respond` call gets no ledger selection, yet adds its
-	 * turns and usage to that call's gauge readings and shares its repeat stop, and it can still
-	 * reach the `recall` and lookup tools, which read `conversation`. The ledger's own guard refuses
-	 * only `respond`, `calibrate`, and `snapshot` calls.
-	 * A run no `respond` call owns, including a run during calibration, reads no request's state:
-	 * its lookup and `recall` calls run with no repeat stop, recall limit, or close rule.
+	 * `AgentError` whose `code` is `'CONCURRENCY'`. Under the default `strict`, any other run no active
+	 * `respond` call owns rejects with a `LedgerError` whose `code` is `'REQUEST'`: a direct run between
+	 * requests, one during calibration, and a run on another conversation during a call. Under
+	 * `strict: false` that run goes on over the whole view with no ledger selection; a run on another
+	 * conversation then adds its turns and usage to that call's gauge readings and shares its repeat
+	 * stop, and it can still reach the `recall` and lookup tools, which read `conversation`. The
+	 * ledger's own guard refuses only `respond`, `calibrate`, and `snapshot` calls.
+	 * Under `strict: false`, a run no `respond` call owns, including a run during calibration, reads no
+	 * request's state: its lookup and `recall` calls run with no repeat stop, recall limit, or close rule.
 	 * Every rejection leaves the ledger free for a later call.
 	 *
 	 * @param content - The request text
@@ -756,6 +777,8 @@ export interface ClassifierResult {
 	readonly attempts: readonly ClassifierAttempt[]
 	/** Holds the error when an assign or entities handler throw, a scheduler rejection, or a caller abort interrupts classification; judgments and usage retain the partial result. A judge rejection under a live signal sets no fault. */
 	readonly fault?: Error
+	/** Holds the first judge rejection under a live signal: that question stays undecided and the filing goes on, so the result is whole but for it. A question held after a deterministic failure reports that failure again. */
+	readonly failure?: Error
 }
 
 /**
@@ -771,7 +794,7 @@ export interface ClassifierInterface {
 	 *
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
-	 * @returns The judgment keys, usage spent, and one attempt per logical question; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets no `fault`
+	 * @returns The judgment keys, usage spent, and one attempt per logical question; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets `failure`
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**
@@ -931,6 +954,8 @@ export type LedgerErrorCode =
 	| 'REFERENCE'
 	/** Reports a snapshot that is malformed or that marks an id its conversation does not hold. */
 	| 'SNAPSHOT'
+	/** Reports filing wording that `isLedgerQuestion` refuses. */
+	| 'QUESTION'
 
 /** Carries the lowercase words and non-opening capitalized names of a message. */
 export interface LedgerWordSet {

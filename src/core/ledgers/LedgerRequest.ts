@@ -32,6 +32,8 @@ import { LedgerPass } from './LedgerPass.js'
 export class LedgerRequest implements LedgerRequestInterface {
 	readonly #content: string
 	readonly #limit: number
+	// The errors this request's run reported through `fault`, so `respond` tells a selection failure from a provider one.
+	readonly #faults = new Set<unknown>()
 	#message: Message | undefined
 	#plan: Selection | undefined
 	#passes: readonly LedgerPass[] = []
@@ -149,6 +151,14 @@ export class LedgerRequest implements LedgerRequestInterface {
 		const message = messages.slice(pass.position).find((entry) => entry.role === 'assistant')
 		if (message?.thinking === undefined) return
 		pass.think(computeThinking(message, completion))
+	}
+
+	fault(error: unknown): void {
+		this.#faults.add(error)
+	}
+
+	faulted(error: unknown): boolean {
+		return this.#faults.has(error)
 	}
 
 	file(attempts: readonly ClassifierAttempt[], plan?: Selection): void {

@@ -1,15 +1,16 @@
 import type { LedgerErrorCode } from './types.js'
-import { INTRINSICS, holds } from '@orkestrel/contract'
+import type { CodedErrorOptions } from '../types.js'
+import { INTRINSICS, holds, isFunction, isObject } from '@orkestrel/contract'
 
 /**
  * Reports an invalid ledger configuration, failed calibration, or unowned request selection,
  * carrying the machine-readable `code`.
  *
  * @remarks
- * A threshold, share, capacity, limit, topic, lookup, or gauge outside its bounds is a programmer
- * error and throws this with the matching {@link LedgerErrorCode}. A calibration call that reports
+ * A threshold, share, capacity, limit, topic, lookup, question, or gauge outside its bounds is a
+ * programmer error and throws this with the matching {@link LedgerErrorCode}. A calibration call that reports
  * no prompt usage throws this with `'GAUGE'`. A snapshot option that `isLedgerSnapshot` refuses
- * throws this with `'SNAPSHOT'`. Narrow a caught value with {@link isLedgerError} and
+ * throws this with `'SNAPSHOT'`, its `context` holding the `faults`. Narrow a caught value with {@link isLedgerError} and
  * branch on `error.code`. A selection without an active `respond` call, for a conversation other
  * than the ledger's, or for a request other than that call's request or a ledger note, reports
  * `'REQUEST'` through the selection's fault.
@@ -17,18 +18,22 @@ import { INTRINSICS, holds } from '@orkestrel/contract'
 export class LedgerError extends Error {
 	/** Names the machine-readable condition; the {@link LedgerErrorCode} union describes each code. */
 	readonly code: LedgerErrorCode
+	/** Holds the values that locate the failure, such as the `faults` of a refused snapshot, or `undefined` when none were supplied. */
+	readonly context: Readonly<Record<string, unknown>> | undefined
 
 	/**
 	 * Records the failure condition and its description.
 	 *
 	 * @param code - The machine-readable condition, exposed as `error.code`
 	 * @param message - The human-readable description of the failure
+	 * @param options - The optional {@link CodedErrorOptions}; `cause` reaches `Error.cause` only when present
 	 */
-	constructor(code: LedgerErrorCode, message: string) {
-		super(message)
+	constructor(code: LedgerErrorCode, message: string, options?: CodedErrorOptions) {
+		super(message, options?.cause === undefined ? undefined : { cause: options.cause })
 		this.name = 'LedgerError'
 		INTRINSICS.define(this, Symbol.for('@orkestrel/agent.LedgerError'), { value: this })
 		this.code = code
+		this.context = options?.context
 	}
 }
 
@@ -66,10 +71,12 @@ export function isLedgerError(value: unknown): value is LedgerError {
 				code === 'LOOKUP' ||
 				code === 'GAUGE' ||
 				code === 'REFERENCE' ||
-				code === 'SNAPSHOT'
+				code === 'SNAPSHOT' ||
+				code === 'QUESTION'
 			)
 		)
 			return false
-		return true
+		const context = INTRINSICS.reflect.read(value, 'context')
+		return context === undefined || isObject(context) || isFunction(context)
 	})
 }

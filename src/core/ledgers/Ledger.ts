@@ -31,7 +31,7 @@ import {
 	objectShape,
 	stringShape,
 } from '@orkestrel/contract'
-import { createTool, createToolManager } from '@orkestrel/tool'
+import { createTool, createToolManager, describeFaults } from '@orkestrel/tool'
 import { createAgent, createAuthority } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
 import { estimateMessages } from '../agents/helpers.js'
@@ -92,7 +92,8 @@ import {
 	splitTopic,
 	splitSentences,
 } from './helpers.js'
-import { isFraction, isLedgerSnapshot } from './validators.js'
+import { ledgerSnapshotContract } from './contracts.js'
+import { isFraction, isLedgerQuestion, isLedgerSnapshot } from './validators.js'
 
 /**
  * Serves one conversation through classified records, a bounded copy of each request turn that carries them, and a final answer pass.
@@ -127,7 +128,8 @@ export class Ledger implements LedgerInterface {
 	 * @param options - The filing policy, capacity, and request bounds
 	 * @throws {LedgerError} Thrown when a threshold, share, capacity, limit, topic, lookup, or gauge is invalid
 	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
-	 * @throws {LedgerError} Thrown when `snapshot` is malformed or marks an id its conversation does not hold (code `'SNAPSHOT'`)
+	 * @throws {LedgerError} Thrown when `questions` fails `isLedgerQuestion` (code `'QUESTION'`)
+	 * @throws {LedgerError} Thrown when `snapshot` is malformed or marks an id its conversation does not hold (code `'SNAPSHOT'`, its faults under `context.faults`)
 	 * @throws {ConversationError} Thrown when `isLedgerSnapshot` admits `snapshot` but its conversation holds a `system` message (code `'ROLE'`) or repeats an id (code `'SNAPSHOT'`)
 	 */
 	constructor(provider: ProviderInterface, options: LedgerOptions) {
@@ -154,12 +156,20 @@ export class Ledger implements LedgerInterface {
 		const lookups = ['recall', ...Array.from(options.lookups ?? [], (lookup) => lookup.tool.name)]
 		if (new Set(lookups).size !== lookups.length)
 			throw new LedgerError('LOOKUP', 'lookup names must be unique and cannot be recall')
+		if (!isLedgerQuestion(options.questions))
+			throw new LedgerError(
+				'QUESTION',
+				'questions must hold a choice category question whose criteria describe every category, a non-empty topic string, and noul amends and supersedes questions; pass the LEDGER_QUESTIONS constant for the measured wording',
+			)
 		const snapshot = options.snapshot
-		if (snapshot !== undefined && !isLedgerSnapshot(snapshot))
+		if (snapshot !== undefined && !isLedgerSnapshot(snapshot)) {
+			const faults = ledgerSnapshotContract.audit(snapshot)
 			throw new LedgerError(
 				'SNAPSHOT',
-				'snapshot must be well formed and mark only messages of its conversation; pass what snapshot() returned',
+				`snapshot must be well formed and mark only messages of its conversation; pass what snapshot() returned${faults.length === 0 ? '' : `\n${describeFaults(faults, ledgerSnapshotContract.schema)}`}`,
+				{ context: { faults } },
 			)
+		}
 		this.#provider = provider
 		this.#replay = provider.replay ?? 'none'
 		this.#options = options
@@ -245,7 +255,6 @@ export class Ledger implements LedgerInterface {
 				fallback: { zone: 'ledger', verdict: 'deny', reason: 'the ledger advertises no such tool' },
 			}),
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
-			strict: false,
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),
 		})
 		this.#agent.emitter.on('tool', (_call, result) => {
@@ -260,6 +269,7 @@ export class Ledger implements LedgerInterface {
 			if (isLedgerError(selection.fault) && selection.fault.code === 'REQUEST') return
 			this.#current()?.adopt(selection, this.#conversation.messages().length)
 		})
+		this.#agent.emitter.on('fault', (error) => this.#current()?.fault(error))
 		this.#agent.emitter.on('turn', () => this.#observeTurn())
 		this.#agent.emitter.on('usage', (usage) => this.#current()?.spend(usage))
 	}
@@ -328,7 +338,7 @@ export class Ledger implements LedgerInterface {
 	/**
 	 * Appends a request and serves it, recovering an unfinished or rejected first pass with one answer pass.
 	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
-	 * When the answer pass rejects, `respond` rejects with that error. Every rejection leaves the ledger free for a later call.
+	 * When the answer pass rejects, `respond` rejects with that error, and under the default `strict` a judge failure or another selection failure rejects it too. Every rejection leaves the ledger free for a later call.
 	 * @param content - The request text
 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
 	 * @returns The final pass, the usage of every pass, and the filing attempts of this request alone
@@ -346,13 +356,17 @@ export class Ledger implements LedgerInterface {
 			if (this.#gauge === undefined) await this.#measureGauge(caller)
 			const entered = request.enter(this.#conversation)
 			this.#requests.add(entered.id)
-			// The answer pass recovers a rejected first pass; the agent's error event carries its cause.
+			// The answer pass recovers a provider failure in the first pass; the agent's error event carries
+			// its cause. A selection failure that reached here rejected under `strict`, and it stands.
 			const first = await this.#generatePass(request, caller, this.#options.think).catch(
-				(): AgentResult => ({
-					content: '',
-					partial: true,
-					...(request.usage === undefined ? {} : { usage: request.usage }),
-				}),
+				(error: unknown): AgentResult => {
+					if (request.faulted(error)) throw error
+					return {
+						content: '',
+						partial: true,
+						...(request.usage === undefined ? {} : { usage: request.usage }),
+					}
+				},
 			)
 			const passes = [first]
 			if (!caller.aborted && (first.partial || first.content.trim() === '')) {
@@ -726,10 +740,15 @@ export class Ledger implements LedgerInterface {
 		selected: Message,
 		message: Message,
 	): Selection {
-		const { attempts, ...filed } = classified
+		const { attempts, failure, ...filed } = classified
 		const planned = attempt(() => {
 			if (filed.fault !== undefined) throw filed.fault
-			return { ...this.#plan(selected, this.#rescan()), ...filed }
+			return {
+				...this.#plan(selected, this.#rescan()),
+				...filed,
+				// The filing went on past a judge failure, so the plan stands beside it for a lenient run.
+				...(failure === undefined ? {} : { fault: failure }),
+			}
 		})
 		request.file(attempts, planned.success ? planned.value : undefined)
 		if (!planned.success) return this.#refuse(planned.error, filed, this.#conversation)
