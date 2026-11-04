@@ -27,3 +27,8 @@
 | 2026-11-04 | The user's realignment: Codex-family engines are the default for every new unit, Claude only when needed, and follow `AGENTS.md`, its rules, and `.agents/` strictly. Verbatim: "going forward use the codex models as much as you can, it should be our default instead of claude so that we can save on usage. You can still use claude models but when they are needed." | user | `plan.md` § Sequence |
 | 2026-11-04 | The user's word on `contract`: no deferrals, in parallel, into the same version bump | user | `plan.md` § Goal and exit criterion |
 | 2026-11-04 | Door and fault text in `contract`: one design pass | `analyst` on `astra` | open |
+| 2026-11-04 | `ndjson` acceptance gates at `416ff8e`: format, lint, check, build, `npm test` (96, 179, 544, 23, 37 passed), distribution in release mode (10 passed), every exit 0 | `verifier` on `luna` | this row |
+| 2026-11-04 | `mcp` independent read; `mcp` fix round | `reviewer` on `astra`; `builder` on `sol` | `a60c4d5` |
+| 2026-11-04 | `qualifier`, `rater`, `interpret` independent read | `reviewer` on `astra` | fix rows in `learn`'s campaign |
+| 2026-11-04 | Last rows: `tool`, `workflow`, `ollama`, `toolbox` | `builder` on `sol` | `fe77b9d`, `fc8b8ce`, `1fc131a`, `ac31925` |
+| 2026-11-04 | Rulings ported into tracked records | `builder` on `sol` | `semantics.md`, `failopen.md` |
