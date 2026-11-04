@@ -22,4 +22,13 @@ Delete this file when its rows close and the debrief has carried them.
 
 **Confirmed by a lane:** 2, 3, 4, 5's stable paths, 7, 10, 17, 21, 27, 31.
 
-**Unresolved, each with a named row not yet run:** 1, 8, 9, 11, 12, 13, 15, 16, 18, 19, 20, 24, 26, 30. These take one settling lane on the repaired tips. Claim 15 also needs the live project: a zero-argument tool on a model whose parser omits `arguments`, and an untagged or case-varied `model` name.
+**Settled by a third lane on the repaired tips:** 1, 8, 12, 13, 14, 15, 16, 18, 19, 20, 26, 29, 30 confirmed.
+
+| Claim | Finding | Ruling | Carrier |
+| --- | --- | --- | --- |
+| 9 | on a 16,000-rule chain, both strategies refuse with a stack exhaustion and agree on rules, conclusion, faults, and success, but forward's retained trace is a prefix of backward's | no defect: the equivalence covers the answer. A refusal's retained trace is diagnostic, and it's an authored stress case | stated here |
+| 24 | `contract`'s door table omits `rawShape`, `jsonShape` with a default, `schemaToShape`, `cloneSchema`, and `SchemaCloner.clone`, though each holds | correction, tests only | `contract` |
+
+**Live, on the dedicated daemon:** `ollama`'s service project 89 of 89 at `bf6fbfc`. An untagged and a case-varied `model` name echo as sent, so the provider's guard passes. A zero-argument tool call reads `arguments: {}` on three seeds, on one daemon and model. **`agent`'s study suite:** 161 of 161.
+
+**Open:** claims 11 and 31, on `interpret`'s two laws at `cb0bb5c`, take one independent lane, because that repair departed from what the round read.
