@@ -11,7 +11,7 @@ import type {
 	Refusal,
 } from '../types.js'
 import type { ContractInterface } from '@orkestrel/contract'
-import { attempt, isArray, isRecord, isString, preview } from '@orkestrel/contract'
+import { attempt, isArray, isJSONValue, isRecord, isString, preview } from '@orkestrel/contract'
 import { describeFaults } from '@orkestrel/tool'
 import { CONVERSATION_RECAP_PREFIX } from './constants.js'
 import { ConversationError } from './errors.js'
@@ -225,7 +225,7 @@ export function requireRole(role: unknown): ConversationRole {
  * @remarks
  * The role goes first, through {@link requireRole}, so its refusal names what it received. The members
  * cross {@link isMessageInput}, and `audit` runs only after it refused, so a stored message costs one
- * guard read.
+ * guard read. Tool-call arguments must also be JSON values before a message is stored.
  *
  * @param input - The message input to check
  * @param contract - The message input contract, whose `audit` is read only on a refusal
@@ -243,7 +243,11 @@ export function requireMessageInput(
 	contract: Pick<ContractInterface<unknown>, 'audit' | 'schema'>,
 ): MessageInput {
 	requireRole(isRecord(input) ? input.role : undefined)
-	if (isMessageInput(input)) return input
+	if (
+		isMessageInput(input) &&
+		(input.calls === undefined || input.calls.every((call) => isJSONValue(call.arguments)))
+	)
+		return input
 	const faults = contract.audit(input)
 	throw new ConversationError(
 		'MESSAGE',

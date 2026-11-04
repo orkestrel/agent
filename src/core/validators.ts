@@ -93,8 +93,8 @@ export function isJudgeQuestion(value: unknown): value is JudgeQuestion {
  *
  * @remarks
  * Total: an untrusted input returns false. The guard is exact on the answer's own keys and reads each
- * probability as a finite number. Whether a probability is in `[0, 1]`, and whether the answer fits
- * its question, belong to the write, so a record an earlier version stored still reads. Every
+ * probability as a finite number, with noul bounded to `[0, 1]`. Whether the answer fits
+ * its question belongs to the write. Every
  * judgment of a hydrate reads this guard, so it counts keys by hand rather than through a built one,
  * and `judgeAnswerContract` holds it in lockstep: an answer the contract accepts passes here.
  *
@@ -111,7 +111,7 @@ export function isJudgeAnswer(value: unknown): value is JudgeAnswer {
 	return holds(() => {
 		if (!isRecord(value) || Object.keys(value).length !== 2) return false
 		const { form, noul, probabilities } = value
-		if (form === 'noul') return isFiniteNumber(noul)
+		if (form === 'noul') return isFiniteNumber(noul) && noul >= 0 && noul <= 1
 		if (form === 'score') return arrayOf(isFiniteNumber)(probabilities)
 		return (
 			form === 'choice' &&

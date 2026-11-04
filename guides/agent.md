@@ -18,6 +18,12 @@ The loop and its tool handlers execute in the host that constructs them. See [Pl
 
 ## Surface
 
+`Conversation.add` stores each tool call with only its `id`, `name`, and `arguments`. It refuses
+non-JSON arguments with `ConversationError` code `'MESSAGE'` before storing any member of a batch.
+Hydration still admits non-JSON call arguments in an in-memory snapshot; a durable snapshot must
+satisfy its JSON contract. A stored noul answer outside `[0, 1]` refuses a database read with
+`ConversationError` code `'SNAPSHOT'`; the row remains available for explicit repair or deletion.
+
 The agent-owned surface: the inference boundary and the HTTP engine behind it, the relay that carries that boundary to a browser, the judge boundary with its HTTP engine and the System One wire, the conversation layer, the context and its managers, the loop, the authority gate, the durable-job bridge, and the ledger that serves a conversation through a judge's filing. Tool and workspace entities belong to their originating packages and are consumed directly — never re-exported here — and one vendor's wire belongs to the concrete provider that extends `AgentProvider`.
 
 A provider turns a conversation (plus optional tools) into a turn: `generate` resolves the assembled `ProviderResult` (content + any tool calls + any usage); `stream` yields channel-tagged `ProviderDelta` values as they arrive (`content` for answer text, `thinking` for live reasoning) and returns the same assembled result when the stream completes, so a caller can render tokens / reasoning live and still get the full outcome. Both bound the call with an `AbortSignal`:

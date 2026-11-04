@@ -79,9 +79,11 @@ describe('JudgmentManager — the write door', () => {
 		expect(manager.count).toBe(0)
 	})
 
-	it('reads a stored record that misses a tie, because records written before the ties can', () => {
+	it('refuses a stored noul answer outside its shape bounds', () => {
 		const stored = { ...input, answer: { form: 'noul', noul: 2 } as const, time: 1 }
-		expect(new JudgmentManager([stored]).count).toBe(1)
+		expect(captureError(() => new JudgmentManager([stored]))).toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'JUDGMENT',
+		)
 	})
 
 	it('refuses an empty questions map, as the judge engine does', async () => {

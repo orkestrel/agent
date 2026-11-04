@@ -381,7 +381,15 @@ export class Conversation implements ConversationInterface {
 			id: crypto.randomUUID(),
 			role: input.role,
 			content: input.content,
-			...(input.calls === undefined ? {} : { calls: input.calls }),
+			...(input.calls === undefined
+				? {}
+				: {
+						calls: input.calls.map(({ id, name, arguments: arguments_ }) => ({
+							id,
+							name,
+							arguments: arguments_,
+						})),
+					}),
 			...(input.call === undefined ? {} : { call: input.call }),
 			...(input.images === undefined ? {} : { images: input.images }),
 			...(input.thinking === undefined ? {} : { thinking: input.thinking }),

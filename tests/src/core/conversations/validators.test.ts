@@ -559,13 +559,13 @@ describe('the owned conversation guards are exact', () => {
 		expect(isJudgment(record)).toBe(false)
 	})
 
-	it('keeps the read side off the ties: a stored answer outside its question still reads', () => {
+	it('refuses noul shape violations while keeping question ties on the write side', () => {
 		expect(
 			isJudgment({
 				...JUDGMENT_RECORD,
 				answer: { form: 'noul', noul: 2 },
 			}),
-		).toBe(true)
+		).toBe(false)
 		expect(
 			isJudgment({
 				...JUDGMENT_RECORD,

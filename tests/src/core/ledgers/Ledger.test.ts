@@ -1143,7 +1143,7 @@ describe('Ledger', () => {
 		expect(ledger.conversation.messages()[1]?.thinking).toBe('secret'.repeat(100))
 	})
 
-	it('resolves when a thinking call carries cyclic arguments', async () => {
+	it('resolves with a hydrated cyclic call and refuses that call through add', async () => {
 		const options = buildLedgerOptions()
 		const args: Record<string, unknown> = {}
 		args.self = args
@@ -1152,16 +1152,33 @@ describe('Ledger', () => {
 				{
 					content: '',
 					thinking: 'plan',
-					tools: [{ id: 'cycle', name: 'lookup', arguments: args }],
 					usage: { prompt: 100, completion: 10, total: 110 },
 				},
 			],
 			{ recorded: true },
 		)
-		const ledger = createLedger(provider, { ...options, agent: { limit: 1 } })
+		const message = {
+			id: 'cyclic-message',
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'cycle', name: 'lookup', arguments: args }],
+		} as const
+		expect(captureError(() => createConversation().add(message))).toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'MESSAGE',
+		)
+		const ledger = createLedger(provider, {
+			...options,
+			agent: { limit: 1 },
+			snapshot: {
+				conversation: { id: 'cyclic', sections: [], messages: [message] },
+				requests: [],
+				notes: [],
+				failures: [],
+			},
+		})
 		await expect(ledger.respond('Review.')).resolves.toMatchObject({ thinking: 'plan\n\nplan' })
 		expect(
-			ledger.conversation.messages().some((message) => message.calls?.[0]?.arguments === args),
+			ledger.conversation.messages().some((stored) => stored.calls?.[0]?.arguments === args),
 		).toBe(true)
 	})
 
@@ -1824,14 +1841,26 @@ describe('Ledger', () => {
 	it('renders a seeded lookup whose arguments JSON cannot carry under its bare tool name', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const ledger = createLedger(provider, options)
-		ledger.conversation.add([
+		const messages: readonly MessageInput[] = [
 			{ role: 'user', content: 'Brightwater Studio called.' },
 			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.', 'seed', {
 				id: 'BW-20931',
 				count: 1n,
 			}),
-		])
+		]
+		const ledger = createLedger(provider, {
+			...options,
+			snapshot: {
+				conversation: {
+					id: 'seeded',
+					sections: [],
+					messages: messages.map((message, index) => ({ ...message, id: `seed-${index}` })),
+				},
+				requests: [],
+				notes: [],
+				failures: [],
+			},
+		})
 		const selected = waitForEvent<readonly [selection: Selection]>(
 			(listener) => ledger.agent.emitter.once('select', listener),
 			'the planned selection',

@@ -84,11 +84,14 @@ describe('Classifier', () => {
 
 	it('pairs a correction with assistant calls carrying bigint or JSON arguments', async () => {
 		for (const key of [1n, 1]) {
-			const conversation = createConversation()
-			const earlier = conversation.add({
+			const earlier = {
+				id: 'earlier',
 				role: 'assistant',
 				content: 'Refund AB-12 is 20.',
 				calls: [{ id: 'lookup', name: 'lookup', arguments: { key } }],
+			} as const
+			const conversation = createConversation({
+				snapshot: { id: 'correction', sections: [], messages: [earlier] },
 			})
 			const later = conversation.add({ role: 'user', content: 'Refund AB-12 is 30, not 20.' })
 			conversation.judgments.add(

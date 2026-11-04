@@ -34,6 +34,25 @@ import {
 // its TWIN-SPECIFIC blocks in the following describe: the default-driver overload, cross-instance durability over a shared
 // driver, and sibling-store non-collision.
 describe('DatabaseConversationStore', () => {
+	it('refuses an out-of-range noul row without overwriting it', async () => {
+		const driver = createMemoryDriver()
+		await plantSnapshotRow(driver, 'conversations', {
+			id: JUDGMENT_SNAPSHOT.id,
+			snapshot: {
+				...JUDGMENT_SNAPSHOT,
+				judgments: [{ ...JUDGMENT_RECORD, answer: { form: 'noul', noul: 2 } }],
+			},
+		})
+		const store = createDatabaseConversationStore(driver)
+		await expect(store.get(JUDGMENT_SNAPSHOT.id)).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
+		await expect(store.get(JUDGMENT_SNAPSHOT.id)).rejects.toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
+		await store.delete(JUDGMENT_SNAPSHOT.id)
+		expect(await store.get(JUDGMENT_SNAPSHOT.id)).toBeUndefined()
+	})
 	it('round trips judgment answers, refusals, and recorded times', async () => {
 		const { got } = await exerciseConversationStoreRoundTrip(
 			() => createDatabaseConversationStore(createMemoryDriver()),

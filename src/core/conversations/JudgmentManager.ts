@@ -167,6 +167,14 @@ export class JudgmentManager implements JudgmentManagerInterface {
 
 	#store(input: JudgmentInput): Judgment {
 		const copy = copyJSON(input)
+		if (isRecord(copy) && copy.answer !== undefined && !judgeAnswerContract.is(copy.answer)) {
+			const faults = judgeAnswerContract.audit(copy.answer)
+			throw new ConversationError(
+				'JUDGMENT',
+				`conversation error: a judgment answer must satisfy its shape\n${describeFaults(faults, judgeAnswerContract.schema)}`,
+				{ context: { faults } },
+			)
+		}
 		const judgment = requireJudgment(
 			freezeJSON(isRecord(copy) ? { ...copy, time: Date.now() } : copy),
 		)

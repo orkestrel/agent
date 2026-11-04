@@ -200,10 +200,10 @@ describe('isJudgeEntry and isJudgeQuestion — exact, and in lockstep with their
 		expect(isJudgeAnswer(value)).toBe(false)
 	})
 
-	it('reads a stored probability outside [0, 1], which only a write refuses', () => {
+	it('refuses a stored noul probability outside [0, 1]', () => {
 		const stored = { form: 'noul', noul: 2 }
 		expect(judgeAnswerContract.is(stored)).toBe(false)
-		expect(isJudgeAnswer(stored)).toBe(true)
+		expect(isJudgeAnswer(stored)).toBe(false)
 	})
 
 	it('contains every hostile answer value', () => {

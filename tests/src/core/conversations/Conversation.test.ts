@@ -4,6 +4,7 @@ import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
 	ConversationError,
+	conversationSnapshotContract,
 	createConversation,
 	createConversationManager,
 	estimateMessages,
@@ -70,6 +71,37 @@ describe('Conversation — hydrate is exact', () => {
 })
 
 describe('Conversation — add refuses a malformed input', () => {
+	it('projects stored calls to their declared members', () => {
+		const conversation = createConversation()
+		const call = { id: 'call', name: 'lookup', arguments: {}, extra: 1 }
+		const message = conversation.add({ role: 'assistant', content: '', calls: [call] })
+		expect(message.calls).toEqual([{ id: 'call', name: 'lookup', arguments: {} }])
+		expect(call.extra).toBe(1)
+		expect(conversationSnapshotContract.is(conversation.snapshot())).toBe(true)
+	})
+
+	it('refuses non-JSON call arguments before storing a batch', () => {
+		const conversation = createConversation()
+		const error = captureError(() =>
+			conversation.add([
+				{ role: 'user', content: 'hello' },
+				{
+					role: 'assistant',
+					content: '',
+					calls: [
+						{
+							id: 'call',
+							name: 'lookup',
+							arguments: { at: new Date(0), text: 'x'.repeat(100_000) },
+						},
+					],
+				},
+			]),
+		)
+		expect(isConversationError(error) && error.code).toBe('MESSAGE')
+		expect(isConversationError(error) && error.message.length).toBeLessThan(2000)
+		expect(conversation.count).toBe(0)
+	})
 	it.each([
 		['no content', { role: 'user' }, 'content'],
 		['content that is not a string', { role: 'user', content: 5 }, 'content'],
