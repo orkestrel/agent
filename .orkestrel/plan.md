@@ -45,6 +45,7 @@ Each unit's role runs on the Codex column of `.agents/orchestration.md` § Roles
 | Step | Units | Done when |
 | --- | --- | --- |
 | Open rows | `contract`'s build cost, discriminated union faults, fault guards, and lossless repair; then `tool`, `workflow`, `reason`, and `ollama` taking them; `toolbox`'s union tools; `agent`'s approved-instance dispatch and its Study half | each row's failing test and mutation probe recorded |
+| `contract`, one writer at a time | a nested `shape` that `is` refuses, then `rawShape`'s paths; then `admitValue` and `describeFaults` with `@orkestrel/tool` as the first consumer, then `workflow`, `reason`, `toolbox`, `ollama`, `study`, and `agent` taking them with no shim | each proved in `tool` before spreading |
 | Family | `program`, then `brief` | the same, with one independent review |
 | Independent reviews | `mcp`; `qualifier`, `rater`, `interpret`; `program`, `brief` | each finding fixed, deferred, or ruled out |
 | Falsify | one round over the integrated result, numbered claims, the objective lane | an all-confirmed round, or a stop stated per `orkestrel-falsify` § End the depth search |
