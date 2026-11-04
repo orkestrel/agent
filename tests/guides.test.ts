@@ -206,6 +206,7 @@ await new GuideCommand({
 		exerciseThinkingReplay,
 		createBoundedRelay,
 		buildLedgerInput,
+		buildCategoryAnswer,
 		buildGuideLedgerOptions,
 		createRecordedSelection,
 		createScriptedProvider,
@@ -1168,7 +1169,7 @@ await new GuideCommand({
 			expect(await opening).toBe(live)
 			expect(conversations.active).toBe(live)
 			expect(guideText).toContain(
-				"`add` forwards the input's `on` hooks and `error` handler to the conversation's emitter, so a throwing listener reports to that handler. `open(id)` returns the conversation registered under `id` while its store read was pending rather than overwriting it, and resolves `undefined` for a stored snapshot whose `id` is not `id`.",
+				"`add` forwards the input's `on` hooks and `error` handler to the conversation's emitter, so a throwing listener reports to that handler. `open(id)` returns the conversation registered under `id` while its store read was pending rather than overwriting it, and rejects with `ConversationError` `'SNAPSHOT'` for a stored snapshot whose `id` is not `id`.",
 			)
 		})
 
@@ -2193,6 +2194,7 @@ await new GuideCommand({
 					stream: (...args) => provider.stream(...args),
 				},
 				buildGuideLedgerOptions({
+					agent: { strict: false },
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
@@ -2267,10 +2269,10 @@ await new GuideCommand({
 			expect(faults.calls.flat()).toEqual([direct.fault, measured.fault])
 			expect(asks.calls).toEqual(asked)
 			expect(guideText).toContain(
-				'When the selection faults, the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no records.',
+				'When the selection faults, the run rejects under the default `strict`, and under `strict: false` the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no records.',
 			)
 			expect(guideText).toContain(
-				"Run the ledger's agent only through the `respond` method: the ledger's agent serves only the ledger's `conversation`. An active `respond` call owns a run on that conversation whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method or a run on another conversation, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so the agent emits `fault` and builds the prompt from the whole view of the run's conversation with no records, and the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
+				"Run the ledger's agent only through the `respond` method: the ledger's agent serves only the ledger's `conversation`. An active `respond` call owns a run on that conversation whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method or a run on another conversation, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so under the default `strict` the run rejects with that error before it reaches the provider, and under `strict: false` the agent emits `fault` and builds the prompt from the whole view of the run's conversation with no records. Either way the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
 			)
 		})
 
@@ -2294,6 +2296,7 @@ await new GuideCommand({
 					stream: (...args) => provider.stream(...args),
 				},
 				buildGuideLedgerOptions({
+					agent: { strict: false },
 					judge: createPhraseJudge([]),
 					capacity: 32_768,
 					gauge: { scale: 1, overhead: 0 },
@@ -2398,10 +2401,10 @@ await new GuideCommand({
 			expect(result.content).toBe('Done.')
 			expect(provider.calls).toHaveLength(1)
 			expect(guideText).toContain(
-				"A direct run on the ledger's conversation while a `respond` call's pass runs is refused with `AgentError` `'CONCURRENCY'`; during the calibration that opens the call it is a run no active `respond` call owns.",
+				"A direct run on the ledger's conversation while a `respond` call's pass runs is refused with `AgentError` `'CONCURRENCY'`.",
 			)
 			expect(guideText).toContain(
-				"A run on another conversation started during a `respond` call gets no ledger selection, yet adds its turns and usage to that call's gauge readings and shares its repeat stop.",
+				"a run on another conversation then adds its turns and usage to that call's gauge readings, shares its repeat stop, and can reach the `recall` and lookup tools",
 			)
 		})
 
@@ -2412,6 +2415,7 @@ await new GuideCommand({
 			const ledger = createLedger(
 				createScriptedProvider([{ content: 'Done.' }]),
 				buildGuideLedgerOptions({
+					agent: { strict: false },
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
@@ -2448,7 +2452,7 @@ await new GuideCommand({
 				2 * requireValue(first.get(transient), 'Missing transient asks').length,
 			)
 			expect(guideText).toContain(
-				"A judge failure leaves its question unanswered, and the next request asks it again, except for two failures that hold the question so that no later request asks it: a refused question, which the judge reports as a `JudgeError` with code `'QUESTION'`, and the deterministic logprob failure the `DETERMINISTIC_JUDGE_ERROR` constant matches.",
+				"Under the default `strict`, a judge failure rejects the `respond` call after the `fault` event, and a held failure rejects each later request too. Under `strict: false`, a judge failure leaves its question unanswered, and the next request asks it again, except for two failures that hold the question so that no later request asks it: a refused question, which the judge reports as a `JudgeError` with code `'QUESTION'`, and the deterministic logprob failure the `DETERMINISTIC_JUDGE_ERROR` constant matches.",
 			)
 		})
 
@@ -2641,6 +2645,7 @@ await new GuideCommand({
 			const ledger = createLedger(
 				provider,
 				buildGuideLedgerOptions({
+					agent: { strict: false },
 					judge: createPhraseJudge([]),
 					capacity,
 					gauge: { scale: 1, overhead: 0 },
@@ -2745,6 +2750,7 @@ await new GuideCommand({
 			const ledger = createLedger(
 				provider,
 				buildGuideLedgerOptions({
+					agent: { strict: false },
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
@@ -2759,7 +2765,7 @@ await new GuideCommand({
 									answers: Object.fromEntries(
 										Object.keys(request.questions).map((id): [string, JudgeAnswer] => [
 											id,
-											{ form: 'choice', probabilities: { chatter: 1 } },
+											buildCategoryAnswer({ chatter: 1 }),
 										]),
 									),
 								}
@@ -2830,6 +2836,10 @@ await new GuideCommand({
 			}
 			request.adopt(selection, conversation.count)
 			request.observe({ estimate: 40, tools: 2 }, conversation.count)
+			const failure = new Error('the judge is unreachable')
+			request.fault(failure)
+			expect(request.faulted(failure)).toBe(true)
+			expect(request.faulted(new Error('another'))).toBe(false)
 			request.spend({ prompt: 52, completion: 8, total: 60 })
 			expect(request.selection).toBe(selection)
 			expect(request.usage).toEqual({ prompt: 82, completion: 10, total: 92 })
@@ -2874,7 +2884,7 @@ await new GuideCommand({
 							([id, question]): readonly [string, JudgeAnswer] => [
 								id,
 								question.form === 'choice'
-									? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
+									? buildCategoryAnswer({ rule: 0.9, fact: 0.1 })
 									: { form: 'noul', noul: 0.9 },
 							],
 						),
@@ -3013,7 +3023,7 @@ await new GuideCommand({
 			const provider = createScriptedProvider(
 				[
 					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
-					{ content: 'Ticket 7 is open.' },
+					{ content: '{"ticket":7}' },
 				],
 				{ recorded: true, repeat: false },
 			)
@@ -4698,6 +4708,7 @@ await new GuideCommand({
 					refund: { form: 'noul', noul: 0.93 },
 					urgent: { form: 'noul', noul: 0.93 },
 				},
+				usage: { prompt: 0, completion: 6, total: 6 },
 			})
 
 			// A response the wire cannot read reaches the caller as the wire's own PROTOCOL failure.
@@ -4830,7 +4841,8 @@ await new GuideCommand({
 				),
 			).rejects.toMatchObject({
 				code: 'QUESTION',
-				message: 'judge error: question label is malformed',
+				message:
+					'judge error: question label is malformed; a choice names two or more criteria, a score two or more levels, and a noul only true and false',
 			})
 			await expect(
 				judge.ask({ state, questions: SYSTEM_ONE_JUDGE_REQUEST.questions }, signal),
@@ -5020,14 +5032,18 @@ await new GuideCommand({
 				usage: { prompt: 2925, completion: 12, total: 2937 },
 			})
 
-			// A response naming no model and no usage: the configured model, and no usage or refusals.
+			// A response naming no model and no usage: the configured model, its estimate, and no refusals.
 			const bare = await new ScriptedJudge({
 				url: 'http://judge.test',
 				model: 'configured',
 				fetch: new RecordedTransport(() => new Response('{}')).fetch,
 				answers: TEV1_ANSWERS,
 			}).ask(TEV1_REQUEST, signal)
-			expect(bare).toStrictEqual({ model: 'configured', answers: TEV1_ANSWERS })
+			expect(bare).toStrictEqual({
+				model: 'configured',
+				answers: TEV1_ANSWERS,
+				usage: { prompt: 0, completion: 1, total: 1 },
+			})
 
 			// Every body is built before the first call, so a refusal from `body` sends nothing.
 			const untouched = new RecordedTransport(() => new Response(JUDGE_ENVELOPE))
@@ -5087,11 +5103,14 @@ await new GuideCommand({
 					fetch: () => Promise.resolve(Response.json({ ...SYSTEM_ONE_TEV1, answers })),
 				}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal)
 				await expect(failure).rejects.toBeInstanceOf(JudgeError)
-				await expect(failure).rejects.toMatchObject({ code: 'PROTOCOL', message })
+				await expect(failure).rejects.toMatchObject({
+					code: 'PROTOCOL',
+					message: expect.stringContaining(message),
+				})
 			}
 		})
 
-		it('reports the model a System One response named and complete usage alone (the response-model clause)', async () => {
+		it('reports the model a System One response named, complete usage as given, and its estimate otherwise (the response-model clause)', async () => {
 			const results = await Promise.all(
 				SYSTEM_ONE_USAGE_CASES.map((body) =>
 					new SystemOneJudge({
@@ -5113,7 +5132,10 @@ await new GuideCommand({
 				{ prompt: 975, completion: 4, total: 979 },
 				{ prompt: 975, completion: 4, total: 979 },
 			])
-			for (const result of results.slice(2)) expect(result).not.toHaveProperty('usage')
+			for (const result of results.slice(2)) {
+				expect(result.usage?.prompt).toBe(0)
+				expect(result.usage?.completion).toBeGreaterThan(0)
+			}
 		})
 
 		it('aborts a header hook that never settles at the call’s deadline (the header-hook authentication clause)', async () => {
@@ -5338,7 +5360,7 @@ await new GuideCommand({
 			const upstream = createScriptedProvider(
 				[
 					{ content: '', tools: [{ id: 'read-1', name: 'read_selection', arguments: {} }] },
-					{ content: 'You selected order BW-5512.' },
+					{ content: '{"selected":"BW-5512"}' },
 				],
 				{ recorded: true, repeat: false },
 			)
@@ -5357,7 +5379,7 @@ await new GuideCommand({
 			agent.context.messages.add({ role: 'user', content: 'What did I select?' })
 			const result = await agent.generate({ schema: { type: 'object' } })
 
-			expect(result.content).toBe('You selected order BW-5512.')
+			expect(result.content).toBe('{"selected":"BW-5512"}')
 			expect(upstream.calls[0]?.messages.map(({ role, content }) => [role, content])).toEqual([
 				['system', 'You help on the Larkspur order page.'],
 				['user', 'What did I select?'],
@@ -6096,13 +6118,11 @@ await new GuideCommand({
 								Object.entries(request.questions).map(([id, question]): [string, JudgeAnswer] => [
 									id,
 									question.form === 'choice'
-										? {
-												form: 'choice',
-												probabilities:
-													isString(request.state) && request.state.includes('no, the refund')
-														? { correction: 1 }
-														: { fact: 1 },
-											}
+										? buildCategoryAnswer(
+												isString(request.state) && request.state.includes('no, the refund')
+													? { correction: 1 }
+													: { fact: 1 },
+											)
 										: { form: 'noul', noul: id.startsWith('["topic"') ? 0.9 : 0.1 },
 								]),
 							),

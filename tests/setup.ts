@@ -108,7 +108,7 @@ export function createGuideLedgerJudge(): JudgeInterface {
 				Object.entries(request.questions).map(([id, question]): [string, JudgeAnswer] => [
 					id,
 					question.form === 'choice'
-						? { form: 'choice', probabilities: { rule: 0.9, fact: 0.1 } }
+						? buildCategoryAnswer({ rule: 0.9, fact: 0.1 })
 						: { form: 'noul', noul: 0.1 },
 				]),
 			),
@@ -165,7 +165,15 @@ import type {
 	RelayProviderOptions,
 	RelayRefusal,
 } from '@src/core'
-import { Agent, Classifier, createLedger, createRelay, RelayProvider, renderStub } from '@src/core'
+import {
+	Agent,
+	Classifier,
+	createLedger,
+	createRelay,
+	LEDGER_CATEGORIES,
+	RelayProvider,
+	renderStub,
+} from '@src/core'
 import { createBudget } from '@orkestrel/budget'
 import type {
 	AgentFrame,
@@ -1272,18 +1280,24 @@ export const PARTIAL_TURNS = Object.freeze([
 	{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: JOB_USAGE },
 ] as const)
 
-/** Describes the serializable job fields exercised by durable queue cases. */
+/**
+ * Describes the serializable job fields exercised by durable queue cases, narrower than the published
+ * `agentJobShape`, whose JSON tool arguments a job's typed `ToolCall` cannot satisfy.
+ */
 export const AGENT_JOB_SHAPE = Object.freeze(
 	objectShape({
 		provider: stringShape(),
-		messages: arrayShape(
-			objectShape({
-				role: literalShape(CONVERSATION_ROLES),
-				content: stringShape(),
-			}),
+		messages: optionalShape(
+			arrayShape(
+				objectShape({
+					role: literalShape(CONVERSATION_ROLES),
+					content: stringShape(),
+				}),
+			),
 		),
 		system: optionalShape(stringShape()),
 		tools: optionalShape(arrayShape(stringShape())),
+		authority: optionalShape(stringShape()),
 		limit: optionalShape(integerShape({ min: 0 })),
 		budget: optionalShape(integerShape({ min: 0 })),
 	}),
@@ -1397,7 +1411,7 @@ export interface SummarizedConversationSnapshot extends ConversationSnapshot {
 
 /**
  * Supplies a snapshot in the 0.0.29 shape: one compacted section, a live tail, and the
- * conversation `summary` member that 0.0.30 reads past.
+ * conversation `summary` member that an exact snapshot guard refuses.
  */
 export const SUMMARIZED_CONVERSATION_SNAPSHOT: SummarizedConversationSnapshot =
 	Object.freeze<SummarizedConversationSnapshot>({
@@ -1414,6 +1428,14 @@ export const SUMMARIZED_CONVERSATION_SNAPSHOT: SummarizedConversationSnapshot =
 			},
 		],
 		messages: [{ id: 'user-order', role: 'user', content: 'Which order is late?' }],
+	})
+
+/** Supplies {@link SUMMARIZED_CONVERSATION_SNAPSHOT} rewritten without the member it no longer holds. */
+export const REWRITTEN_CONVERSATION_SNAPSHOT: ConversationSnapshot =
+	Object.freeze<ConversationSnapshot>({
+		id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
+		sections: SUMMARIZED_CONVERSATION_SNAPSHOT.sections,
+		messages: SUMMARIZED_CONVERSATION_SNAPSHOT.messages,
 	})
 
 /**
@@ -1651,7 +1673,14 @@ export class SilentJudge implements JudgeInterface {
 
 	ask(request: JudgeRequest): Promise<JudgeResult> {
 		this.#requests.handler(request)
-		return Promise.resolve({ model: this.model, answers: {} })
+		// It refuses every question, so a judge that files nothing still answers for each one it was asked.
+		return Promise.resolve({
+			model: this.model,
+			answers: {},
+			refusals: Object.fromEntries(
+				Object.keys(request.questions).map((id) => [id, { missing: [] }]),
+			),
+		})
 	}
 }
 
@@ -1807,6 +1836,209 @@ export function createForeignAgent(
 		options,
 	])
 }
+
+/**
+ * Creates a judge that rejects every ask with one failure.
+ *
+ * @param failure - The failure each ask rejects with
+ * @returns The judge
+ */
+export function createFailingJudge(failure: Error): JudgeInterface {
+	return {
+		id: 'failing',
+		name: 'failing',
+		model: 'failing',
+		ask: () => Promise.reject(failure),
+	}
+}
+
+/**
+ * Creates a judge that resolves every ask with one result.
+ *
+ * @param result - The result each ask resolves with
+ * @returns The judge
+ */
+export function createSettledJudge(result: JudgeResult): JudgeInterface {
+	return {
+		id: 'settled',
+		name: 'settled',
+		model: result.model,
+		ask: () => Promise.resolve(result),
+	}
+}
+
+/**
+ * Completes a category distribution with zeros, because the ties a judgment write holds a choice answer
+ * to name every criterion.
+ *
+ * @param probabilities - The probabilities the case names
+ * @returns The choice answer over every ledger category
+ */
+export function buildCategoryAnswer(
+	probabilities: Readonly<Record<string, number>>,
+): Extract<JudgeAnswer, { readonly form: 'choice' }> {
+	return {
+		form: 'choice',
+		probabilities: {
+			...Object.fromEntries(LEDGER_CATEGORIES.map((category) => [category, 0])),
+			...probabilities,
+		},
+	}
+}
+
+/** Holds the question forms a judge reads, the owned half of the question lockstep. */
+export const JUDGE_QUESTION_FIXTURES: readonly unknown[] = Object.freeze([
+	{ form: 'noul' },
+	{ form: 'noul', instructions: 'Is a refund owed?' },
+	{ form: 'noul', criteria: { true: 'Owed.', false: 'Not owed.' } },
+	{ form: 'choice', criteria: { billing: null, bug: 'Software defect' } },
+	{
+		form: 'choice',
+		instructions: { ask: 'Which?' },
+		criteria: { billing: ['a'], bug: 'b' },
+	},
+	{ form: 'score', criteria: ['Cosmetic', null, 'Blocking'] },
+])
+
+/** Holds question values a judge cannot read, the refused half of the question lockstep. */
+export const JUDGE_QUESTION_REFUSALS: readonly unknown[] = Object.freeze([
+	{},
+	{ form: 'other' },
+	{ form: 'noul', extra: true },
+	{ form: 'noul', instructions: '' },
+	{ form: 'noul', instructions: [] },
+	{ form: 'noul', criteria: { true: 'Owed.', maybe: 'x' } },
+	{ form: 'score', criteria: ['Only one'] },
+])
+
+/** Holds message records a conversation stores, the owned half of the message lockstep. */
+export const MESSAGE_FIXTURES: readonly Message[] = Object.freeze([
+	{ id: 'm1', role: 'user', content: 'Is the depot open?' },
+	{
+		id: 'm2',
+		role: 'assistant',
+		content: '',
+		calls: [{ id: 'c1', name: 'read', arguments: { a: 1 } }],
+	},
+	{ id: 'm3', role: 'tool', content: 'yes', call: 'c1' },
+	{ id: 'm4', role: 'user', content: 'See this.', images: ['IMAGE_BASE64'] },
+	{
+		id: 'm5',
+		role: 'assistant',
+		content: 'Open.',
+		thinking: 'The record says open.',
+	},
+])
+
+/** Holds message values a conversation cannot store, the refused half of the message lockstep. */
+export const MESSAGE_REFUSALS: readonly unknown[] = Object.freeze([
+	{},
+	{ id: 'm1', role: 'user' },
+	{ id: 'm1', role: 'other', content: '' },
+	{ id: 'm1', role: 'user', content: '', extra: 1 },
+	{ id: 'm1', role: 'user', content: '', thinking: undefined },
+	{ id: 'm1', role: 'user', content: '', images: [1] },
+])
+
+/** Holds conversation snapshots a real conversation writes, the owned half of the snapshot lockstep. */
+export const CONVERSATION_SNAPSHOT_FIXTURES: readonly unknown[] = Object.freeze([
+	{ id: 'c1', sections: [], messages: [] },
+	{ id: 'c2', sections: [], messages: MESSAGE_FIXTURES },
+	{
+		id: 'c3',
+		sections: [
+			{
+				id: 's1',
+				summary: 'recap',
+				messages: MESSAGE_FIXTURES.slice(0, 1),
+			},
+		],
+		messages: [],
+		judgments: [
+			{
+				id: 'q1',
+				question: { form: 'noul' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'judge',
+				sources: ['m1'],
+				state: 'text',
+				time: 1,
+			},
+			{
+				id: 'q2',
+				question: {
+					form: 'choice',
+					criteria: { a: null, b: null },
+				},
+				refusal: { missing: ['a'] },
+				model: 'judge',
+				sources: [],
+				state: 'text',
+				time: 2,
+				usage: { prompt: 1, completion: 2, total: 3 },
+			},
+		],
+	},
+])
+
+/** Holds memo snapshots a real memo set writes, the owned half of the memo lockstep. */
+export const MEMO_SNAPSHOT_FIXTURES: readonly unknown[] = Object.freeze([
+	{ id: 'ada', memos: [] },
+	{
+		id: 'ada',
+		memos: [
+			{
+				id: 'm1',
+				name: 'tone',
+				description: 'Prefers short replies.',
+				content: 'Briefly.',
+				time: 0,
+			},
+			{
+				id: 'm2',
+				name: 'tone',
+				description: 'Prefers short replies.',
+				content: 'Briefly.',
+				time: 1,
+				origin: { conversation: 'c1', message: 'm1' },
+			},
+		],
+	},
+])
+
+/** Holds memo snapshot values a memo set refuses, the refused half of the memo lockstep. */
+export const MEMO_SNAPSHOT_REFUSALS: readonly unknown[] = Object.freeze([
+	{},
+	{ id: 'ada' },
+	{ id: 'ada', memos: [], extra: 1 },
+	{ id: 'ada', memos: [{ id: 'm1', name: 'tone' }] },
+	{
+		id: 'ada',
+		memos: [
+			{
+				id: 'm1',
+				name: 'tone',
+				description: 'd',
+				content: 'c',
+				time: 0,
+				origin: undefined,
+			},
+		],
+	},
+	{
+		id: 'ada',
+		memos: [
+			{
+				id: 'm1',
+				name: 'tone',
+				description: 'd',
+				content: 'c',
+				time: 0,
+				tag: 'x',
+			},
+		],
+	},
+])
 
 /**
  * Builds the partial provider result accumulated before an abort.
@@ -2716,9 +2948,19 @@ export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSna
 					id: 'assistant-paris',
 					role: 'assistant',
 					content: '',
-					calls: [{ id: 'call-paris', name: 'weather', arguments: { city: 'Paris' } }],
+					calls: [
+						{
+							id: 'call-paris',
+							name: 'weather',
+							arguments: { city: 'Paris' },
+						},
+					],
 				},
-				{ id: 'tool-paris', role: 'tool', content: 'sunny in Paris' },
+				{
+					id: 'tool-paris',
+					role: 'tool',
+					content: 'sunny in Paris',
+				},
 			],
 		},
 	],
@@ -2727,9 +2969,20 @@ export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSna
 			id: 'assistant-oslo',
 			role: 'assistant',
 			content: '',
-			calls: [{ id: 'call-oslo', name: 'weather', arguments: { city: 'Oslo' } }],
+			calls: [
+				{
+					id: 'call-oslo',
+					name: 'weather',
+					arguments: { city: 'Oslo' },
+				},
+			],
 		},
-		{ id: 'tool-oslo', role: 'tool', content: 'sunny in Oslo', call: 'call-oslo' },
+		{
+			id: 'tool-oslo',
+			role: 'tool',
+			content: 'sunny in Oslo',
+			call: 'call-oslo',
+		},
 	],
 })
 
@@ -3148,9 +3401,22 @@ export const AGENT_WIRE_FRAMES: ReadonlyArray<readonly [string, AgentFrame]> = O
 	['a usage', { category: 'usage', usage: { prompt: 12, completion: 4, total: 16 }, estimate: 4 }],
 	[
 		'an ask',
-		{ category: 'ask', id: 'a1', name: 'write', zone: 'files', arguments: '{"path":"a.txt"}' },
+		{
+			category: 'ask',
+			id: 'a1',
+			name: 'write',
+			zone: 'files',
+			arguments: '{"path":"a.txt"}',
+		},
 	],
-	['a bare finish', { category: 'finish', content: 'The invoice is paid.', partial: false }],
+	[
+		'a bare finish',
+		{
+			category: 'finish',
+			content: 'The invoice is paid.',
+			partial: false,
+		},
+	],
 	[
 		'a stopped finish',
 		{
@@ -3533,7 +3799,10 @@ export async function serveIngressCanary(
 		source === 'seed'
 			? attempt<AgentInterface>(() =>
 					Reflect.apply(registry.build, registry, [
-						{ ...job, messages: [...job.messages, { role: 'system', content }] },
+						{
+							...job,
+							messages: [...(job.messages ?? []), { role: 'system', content }],
+						},
 					]),
 				)
 			: undefined
@@ -4245,8 +4514,8 @@ export const MESSAGE_WIRE_ROLES: readonly MessageRole[] = Object.freeze([
  * contract `messageContract` written by hand, so a round-trip test compares the two guards.
  *
  * @remarks
- * The wire is strictly narrower than the domain: an extra member and a non-JSON call argument
- * pass the domain guard only. Each `MESSAGE_ROLES` member, `system` included, passes both.
+ * The wire is narrower than the domain on one member: a non-JSON call argument passes the domain
+ * guard only, and both refuse an extra member. Each `MESSAGE_ROLES` member, `system` included, passes both.
  */
 export const MESSAGE_GUARD_CASES: ReadonlyArray<{
 	readonly label: string
@@ -4340,7 +4609,7 @@ export const MESSAGE_GUARD_CASES: ReadonlyArray<{
 	{
 		label: 'an extra member',
 		value: { id: 'm-extra', role: 'user', content: 'Hello.', extra: 1 },
-		domain: true,
+		domain: false,
 		wire: false,
 	},
 	{
@@ -4684,19 +4953,37 @@ export const SYSTEM_ONE_QUICKSTART_STATE =
 /** Lists incomplete and mismatched response bodies with the question each must name. */
 export const SYSTEM_ONE_PROTOCOL_CASES = Object.freeze([
 	{ id: 'label', answers: {} },
-	{ id: 'label', answers: { ...SYSTEM_ONE_TEV1.answers, label: { type: 'noul', noul: 0.5 } } },
 	{
 		id: 'label',
 		answers: {
 			...SYSTEM_ONE_TEV1.answers,
-			label: { type: 'choice', probabilities: { billing: 0.1, bug: 0.9 } },
+			label: { type: 'noul', noul: 0.5 },
+		},
+	},
+	{
+		id: 'label',
+		answers: {
+			...SYSTEM_ONE_TEV1.answers,
+			label: {
+				type: 'choice',
+				probabilities: { billing: 0.1, bug: 0.9 },
+			},
 		},
 	},
 	{
 		id: 'severity',
-		answers: { ...SYSTEM_ONE_TEV1.answers, severity: { type: 'score', probabilities: [0.1, 0.9] } },
+		answers: {
+			...SYSTEM_ONE_TEV1.answers,
+			severity: { type: 'score', probabilities: [0.1, 0.9] },
+		},
 	},
-	{ id: 'refund', answers: { ...SYSTEM_ONE_TEV1.answers, refund: { type: 'noul', noul: 1.1 } } },
+	{
+		id: 'refund',
+		answers: {
+			...SYSTEM_ONE_TEV1.answers,
+			refund: { type: 'noul', noul: 1.1 },
+		},
+	},
 ])
 
 /** Lists unreadable answer maps for {@link SYSTEM_ONE_JUDGE_REQUEST} with the `PROTOCOL` message each must produce. */
@@ -5785,7 +6072,7 @@ export function buildLedgerJudgment(
 		sources: [message.id],
 		state: `${message.role}: ${message.content}`,
 		model: 'recording-model',
-		answer: { form: 'choice', probabilities: { fact: 1 } },
+		answer: buildCategoryAnswer({ fact: 1 }),
 		...overrides,
 	}
 }
@@ -5990,14 +6277,13 @@ export function createPhraseJudge(
 				Object.entries(request.questions).map(([id, question]): readonly [string, JudgeAnswer] => [
 					id,
 					question.form === 'choice'
-						? {
-								form: 'choice',
-								probabilities: rules.some((rule) => state.includes(rule))
+						? buildCategoryAnswer(
+								rules.some((rule) => state.includes(rule))
 									? { rule: 1 }
 									: state.includes('Correction')
 										? { correction: 1 }
 										: { fact: 1 },
-							}
+							)
 						: {
 								form: 'noul',
 								noul:
@@ -6162,10 +6448,25 @@ export async function serveAmendedDesk(): Promise<{
 }> {
 	const provider = createScriptedProvider(
 		[
-			{ content: '', tools: [{ id: 'desk', name: 'recall', arguments: { topic: 'refunds' } }] },
 			{
 				content: '',
-				tools: [{ id: 'owner', name: 'recall', arguments: { topic: 'Brightwater' } }],
+				tools: [
+					{
+						id: 'desk',
+						name: 'recall',
+						arguments: { topic: 'refunds' },
+					},
+				],
+			},
+			{
+				content: '',
+				tools: [
+					{
+						id: 'owner',
+						name: 'recall',
+						arguments: { topic: 'Brightwater' },
+					},
+				],
 			},
 			{ content: '' },
 			{ content: 'Use code AA-12.' },
@@ -6225,10 +6526,9 @@ export async function classifyLedgerCorrection(
 						([id, question]): readonly [string, JudgeAnswer] => [
 							id,
 							question.form === 'choice'
-								? {
-										form: 'choice',
-										probabilities: state.includes('Correction') ? { correction: 1 } : { rule: 1 },
-									}
+								? buildCategoryAnswer(
+										state.includes('Correction') ? { correction: 1 } : { rule: 1 },
+									)
 								: {
 										form: 'noul',
 										noul: id.startsWith('["supersedes"')
@@ -7382,7 +7682,11 @@ export async function serveCanaryDesk(): Promise<CanaryDesk> {
 			system: `Serve the ${CANARY_SENTINELS.system} desk.`,
 			capacity: 4096,
 			share: { prompt: 1, tail: 0.001 },
-			agent: { skills: createCanarySkills(), memos: createCanaryMemos() },
+			agent: {
+				strict: false,
+				skills: createCanarySkills(),
+				memos: createCanaryMemos(),
+			},
 			lookups: [
 				LEDGER_ORDER_LOOKUP,
 				{
@@ -7503,9 +7807,15 @@ export async function seedCompactionArm(provider: ProviderInterface): Promise<Ag
 	const conversation = conversations.add({ keep: 2, summarize: createStubSummarizer().summarize })
 	const agent = createAgent(provider, {
 		conversations,
-		window: createBudget<ProviderRequest>({ max: 32_768, consumer: estimateRequest }),
+		window: createBudget<ProviderRequest>({
+			max: 32_768,
+			consumer: estimateRequest,
+		}),
 	})
-	agent.context.instructions.add({ name: 'desk', content: 'Serve the desk.' })
+	agent.context.instructions.add({
+		name: 'desk',
+		content: 'Serve the desk.',
+	})
 	conversation.add([
 		{ role: 'user', content: 'Order 1 shipped.' },
 		{ role: 'assistant', content: 'Noted.' },
@@ -7705,9 +8015,20 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 				id: 'call',
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'failed', name: 'lookup', arguments: { id: 'FX-111' } }],
+				calls: [
+					{
+						id: 'failed',
+						name: 'lookup',
+						arguments: { id: 'FX-111' },
+					},
+				],
 			},
-			{ id: 'failure', role: 'tool', call: 'failed', content: 'FX-111 failed' },
+			{
+				id: 'failure',
+				role: 'tool',
+				call: 'failed',
+				content: 'FX-111 failed',
+			},
 			{ id: 'note', role: 'user', content: 'Answer from the records.' },
 		],
 	},
@@ -8304,10 +8625,9 @@ export function answerLedgerKey(
 ): JudgeAnswer {
 	const [phase, id] = parseJSONAs(key, isArray) ?? []
 	if (phase === 'category')
-		return {
-			form: 'choice',
-			probabilities: isString(id) && corrections.has(id) ? { correction: 1 } : { fact: 1 },
-		}
+		return buildCategoryAnswer(
+			isString(id) && corrections.has(id) ? { correction: 1 } : { fact: 1 },
+		)
 	if (phase === 'topic') return { form: 'noul', noul: 1 }
 	if (phase === 'amends' || phase === 'supersedes') return { form: 'noul', noul: pairs[phase] }
 	throw new Error(`no ledger phase answers ${key}`)
@@ -8443,14 +8763,16 @@ export function createPacedLedger(
 ): PacedLedgerFixture {
 	const asked = createRecorder<readonly [key: string]>()
 	const selections = createRecorder<readonly [selection: Selection]>()
+	const options = buildLedgerBenchOptions(
+		createCorrectionJudge(asked, new Set(), { amends: 0, supersedes: 0 }),
+		false,
+		snapshot,
+		scheduler,
+	)
 	const ledger = createLedger(createScriptedProvider(turns), {
-		...buildLedgerBenchOptions(
-			createCorrectionJudge(asked, new Set(), { amends: 0, supersedes: 0 }),
-			false,
-			snapshot,
-			scheduler,
-		),
+		...options,
 		...overrides,
+		agent: { ...options.agent, ...overrides.agent },
 	})
 	ledger.agent.emitter.on('select', selections.handler)
 	return { ledger, asked, selections }
@@ -8547,18 +8869,21 @@ export const JUDGMENT_EDGE_RECORDS: ReadonlyArray<readonly [string, unknown, boo
 			{
 				id: JUDGMENT_RECORD.id,
 				question: JUDGMENT_RECORD.question,
-				refusal: { missing: ['true'], note: 'kept open' },
+				refusal: { missing: ['true'], note: 'refused' },
 				model: JUDGMENT_RECORD.model,
 				sources: JUDGMENT_RECORD.sources,
 				state: JUDGMENT_RECORD.state,
 				time: JUDGMENT_RECORD.time,
 			},
-			true,
+			false,
 		],
 		[
 			'an answer with an extra member',
-			{ ...JUDGMENT_RECORD, answer: { form: 'noul', noul: 0.9, note: 'kept open' } },
-			true,
+			{
+				...JUDGMENT_RECORD,
+				answer: { form: 'noul', noul: 0.9, note: 'refused' },
+			},
+			false,
 		],
 		[
 			'a refusal beside an undefined answer',

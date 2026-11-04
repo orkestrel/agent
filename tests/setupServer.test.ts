@@ -244,11 +244,13 @@ describe('takeLedgerSample', () => {
 
 	it('reaches the judge when the snapshot holds no judgments', async () => {
 		const seed = await seedLedgerPrefix(18, 'correction')
-		const sample = await takeLedgerSample({
-			...seed.snapshot,
-			conversation: { ...seed.snapshot.conversation, judgments: [] },
-		})
-		expect(sample.asked).toBeGreaterThan(0)
+		// Its judge rejects, and the ledger's default `strict` carries that out of the timed region.
+		await expect(
+			takeLedgerSample({
+				...seed.snapshot,
+				conversation: { ...seed.snapshot.conversation, judgments: [] },
+			}),
+		).rejects.toThrow('the timed ledger judge was reached')
 	})
 
 	it('raises the region wall by at least its busy wait', async () => {

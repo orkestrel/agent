@@ -194,10 +194,7 @@ it('takes a skill body from the manager', async () => {
 			.map((row) => [row.arguments, row.error]),
 	).toEqual([
 		[{ name: 'missing' }, 'Skill is absent'],
-		[
-			{ name: 'triage', content: 'Injected body.' },
-			'content: extra; this key is not declared, remove it',
-		],
+		[{ name: 'triage', content: 'Injected body.' }, expect.stringContaining('content: extra')],
 	])
 	const system = readStudyToolsText(rows, 'loaded', 0, 'system')
 	expect(system).toContain('Read the diff, then list each defect with its line.')

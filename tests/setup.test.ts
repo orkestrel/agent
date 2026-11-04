@@ -1,5 +1,10 @@
 import {
 	answerLedgerKey,
+	buildCategoryAnswer,
+	createFailingJudge,
+	createSettledJudge,
+	REWRITTEN_CONVERSATION_SNAPSHOT,
+	SUMMARIZED_CONVERSATION_SNAPSHOT,
 	buildJudgmentRecords,
 	buildLedgerBenchOptions,
 	buildLedgerBlock,
@@ -158,6 +163,7 @@ import {
 	isProviderAbortError,
 	MESSAGE_ROLES,
 	ThinkSplitter,
+	LEDGER_CATEGORIES,
 } from '@src/core'
 import { requireValue, waitForDelay } from '@orkestrel/test'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -1362,7 +1368,7 @@ describe('system boundary canary fixtures', () => {
 
 		expect(result).toEqual({
 			model: CANARY_SENTINELS.judge,
-			answers: { category: { form: 'choice', probabilities: { rule: 1 } } },
+			answers: { category: buildCategoryAnswer({ rule: 1 }) },
 			refusals: { '["amends"]': { missing: [CANARY_SENTINELS.judge] } },
 		})
 	})
@@ -2006,13 +2012,39 @@ describe('buildProviderPartial', () => {
 	})
 })
 
+describe('judge fixtures', () => {
+	it('completes a category answer with a zero for every ledger category', () => {
+		const answer = buildCategoryAnswer({ rule: 0.9, fact: 0.1 })
+		expect(Object.keys(answer.probabilities).toSorted()).toEqual(LEDGER_CATEGORIES.toSorted())
+		expect(answer.probabilities).toMatchObject({ rule: 0.9, fact: 0.1, chatter: 0 })
+	})
+
+	it('creates a judge that resolves or rejects every ask with one value', async () => {
+		const failure = new Error('unreachable')
+		const result = { model: 'settled', answers: {} }
+		const signal = new AbortController().signal
+		const request = { state: 'text', questions: {} }
+		expect(await createSettledJudge(result).ask(request, signal)).toBe(result)
+		await expect(createFailingJudge(failure).ask(request, signal)).rejects.toBe(failure)
+	})
+
+	it('rewrites the summarized snapshot without its summary, keeping the rest', () => {
+		const { summary: _summary, ...rewritten } = SUMMARIZED_CONVERSATION_SNAPSHOT
+		expect(REWRITTEN_CONVERSATION_SNAPSHOT).toEqual(rewritten)
+	})
+})
+
 describe('SilentJudge', () => {
-	it('records requests in order while preserving its empty-answer boundary', async () => {
+	it('records requests in order while refusing every question it is asked', async () => {
 		const judge = new SilentJudge()
-		const first = { state: 'first', questions: {} }
+		const first = { state: 'first', questions: { q: { form: 'noul' } } } as const
 		const second = { state: 'second', questions: {} }
 		expect(judge.requests).toEqual([])
-		expect(await judge.ask(first)).toEqual({ model: 'recording-model', answers: {} })
+		expect(await judge.ask(first)).toEqual({
+			model: 'recording-model',
+			answers: {},
+			refusals: { q: { missing: [] } },
+		})
 		await judge.ask(second)
 		expect(judge.requests).toEqual([first, second])
 		expect(new SilentJudge().requests).toEqual([])
@@ -2493,7 +2525,7 @@ describe('guide scenario fixtures', () => {
 		} as const
 		const result = await judge.ask(request, new AbortController().signal)
 		expect(result.answers).toEqual({
-			category: { form: 'choice', probabilities: { rule: 1 } },
+			category: buildCategoryAnswer({ rule: 1 }),
 			'["topic"]': { form: 'noul', noul: 0.9 },
 			'["amends"]': { form: 'noul', noul: 0.9 },
 			'["supersedes"]': { form: 'noul', noul: 0.1 },
@@ -2505,11 +2537,11 @@ describe('guide scenario fixtures', () => {
 					new AbortController().signal,
 				)
 			).answers.category,
-		).toEqual({ form: 'choice', probabilities: { correction: 1 } })
+		).toEqual(buildCategoryAnswer({ correction: 1 }))
 		expect(
 			(await judge.ask({ ...request, state: 'Delivery date.' }, new AbortController().signal))
 				.answers.category,
-		).toEqual({ form: 'choice', probabilities: { fact: 1 } })
+		).toEqual(buildCategoryAnswer({ fact: 1 }))
 	})
 	it('builds independent configurable desk options without adding a lookup', () => {
 		const first = buildGuideLedgerOptions()
@@ -3061,7 +3093,7 @@ describe('ledger snapshot fixtures', () => {
 			},
 			new AbortController().signal,
 		)
-		expect(result.answers.rule).toEqual({ form: 'choice', probabilities: { rule: 1 } })
+		expect(result.answers.rule).toEqual(buildCategoryAnswer({ rule: 1 }))
 		expect(asked.calls).toEqual([['rule']])
 		expect(options.gauge).toEqual({ scale: 1, overhead: 0 })
 	})
@@ -3333,14 +3365,12 @@ describe('ledger bench builders', () => {
 	it('answers each filing key from the correction ids and the pair answers', () => {
 		const corrections = new Set(['a'])
 		const pairs = { amends: 0.25, supersedes: 0.75 }
-		expect(answerLedgerKey('["category","a"]', corrections, pairs)).toEqual({
-			form: 'choice',
-			probabilities: { correction: 1 },
-		})
-		expect(answerLedgerKey('["category","b"]', corrections, pairs)).toEqual({
-			form: 'choice',
-			probabilities: { fact: 1 },
-		})
+		expect(answerLedgerKey('["category","a"]', corrections, pairs)).toEqual(
+			buildCategoryAnswer({ correction: 1 }),
+		)
+		expect(answerLedgerKey('["category","b"]', corrections, pairs)).toEqual(
+			buildCategoryAnswer({ fact: 1 }),
+		)
 		expect(answerLedgerKey('["topic","b","orders"]', corrections, pairs)).toEqual({
 			form: 'noul',
 			noul: 1,
@@ -3375,7 +3405,7 @@ describe('ledger bench builders', () => {
 		expect(result).toEqual({
 			model: 'bench',
 			answers: {
-				'["category","a"]': { form: 'choice', probabilities: { correction: 1 } },
+				'["category","a"]': buildCategoryAnswer({ correction: 1 }),
 				'["supersedes","b","a"]': { form: 'noul', noul: 1 },
 			},
 		})
