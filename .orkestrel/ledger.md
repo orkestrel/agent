@@ -61,3 +61,4 @@
 | 2026-11-04 | Debrief reconciled: 24 findings, 21 laws, one methods reference, 29 promotion rows. Nothing landed; the delta waits on the user | Orchestrator | `debrief.md` |
 | 2026-11-04 | Rulings on the debrief: the scaffold session lands the delta and holds its wording; the two-session split stays a one-off, so D19 adds no law; P10 goes in `@orkestrel/test`. D14 and P01 wait on the user | user | `debrief.md` |
 | 2026-11-04 | Debrief landing handed to the scaffold session, by brief | Orchestrator | `debrief.md` |
+| 2026-11-04 | Rulings on the debrief: every skill is hosted in a target, resolved against scaffold whether local or installed (D14); the lane tool becomes an `orkestrel-parallel` skill script, tested in scaffold (P01). Sent to the scaffold session by brief | user | `debrief.md` |

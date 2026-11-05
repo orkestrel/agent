@@ -38,7 +38,7 @@ Sources: O is the objective audit, F the subjective audit, K a method candidate,
 | D11 | O02 | `.agents/orchestration.md:165`: "No role commits, pushes, tags, publishes, installs, or runs a destructive command." `:153`: "Commit inside the branch, clone, copy, or worktree as its unit needs". The floor names no actor for the second | Orchestration-contract refinements | `.agents/orchestration.md` § Permission floor |
 | D12 | F4, F20 | Tools are unrestricted under a hosted child, so a charter binds only when the brief carries it. A brief line closed the writer deviations: "Don't commit and don't install". `references/claude-code.md:9` names role files a target does not hold | Orchestration-contract refinements | `orkestrel-parallel/references/t3.md`, `references/claude-code.md` |
 | D13 | O04, F15, K32 | `methods.md:68`: "A file this model needs is yours" let in "a guide imported by tests, nine centralized files in a subfolder, and two npm packages. The user caught it" | Skill refinements / creation | `orkestrel-dispatch/SKILL.md` |
-| D14 | F16 | None of the 27 surviving briefs uses the template, and none runs `brief.ts --check`. `src/core/constants.ts` excludes dispatch, scout, publish, and align "because they run from the scaffold checkout and a target is not an orchestration host". This campaign ran from a target | Fix now, on the user's ruling | `src/core/constants.ts` `TARGET_SKILL_NAMES` |
+| D14 | F16 | None of the 27 surviving briefs uses the template, and none runs `brief.ts --check`. `src/core/constants.ts` excludes dispatch, scout, publish, and align "because they run from the scaffold checkout and a target is not an orchestration host". This campaign ran from a target. The user, 2026-11-04: "yes and make it all the skills, scaffold holds them but we should be able to use them in other packages but referencing what we get from scaffold whether local or installed" | Fix now | `src/core/constants.ts` `TARGET_SKILL_NAMES`: every skill |
 | D15 | O08, F17, K06, P09 | `methods.md:19`: "`reason` read 37.57 ms against a 35 ms line; interleaved, the same build read 35.78 and 36.68, so `contract` added 0.9 ms, 2.5 percent". `methods.md:13`: "93.3 ms was quoted as published for hours; the published build reads 19.44 ms" | Rule additions, one law each; package promotion for the script | `.claude/rules/quality.md`; a harden skill script |
 | D16 | O06, K27 | `quality.md:36` asks for a control "drawn from outside the population the instrument covers". `methods.md:60`: "The `oneOf` control needed an unstable accessor, outside the laws' stable-read domain" | Rule additions, one law each | `.claude/rules/quality.md` |
 | D17 | O09, F12 | "Read every named input in full" gives no form for a read that outlasts a turn. Ten continuations were needed on one record. A per-file coverage table and "stop at a clean boundary" worked | Charter refinements | `distiller`, `grok` on both surfaces |
@@ -92,7 +92,7 @@ K31 lands in D05, K32 in D13, K34 and K38 in D06. Reference only, with no new la
 | P10, then P11 to P21 | Implement. Eleven packages copied one standing proof. A shared observation engine goes in `@orkestrel/test` core, with one consumer proved first and the verdict left to each caller. No universal "all guards equal wire" law. The user, 2026-11-04: "that is the whole idea of the test package anyway" | After publish |
 | P27, then P05 | Implement the bounded perturbation leaf in `@orkestrel/test` core, then the pure comparison on it. P05's generated-value discard and load fallback get fixed on the way | After P10 |
 | P09 | Implement as a harden skill script, with its mirrored proof | With D15 |
-| P01 | Implement. A lane serializer carries correctness claims, so `.agents/orchestration.md:111` sends it to its own package. Its source shows open questions: same-millisecond order, an owner absent at handover, an unchecked kill. These are unproved properties, not observed failures | On the user's word |
+| P01 | Implement as a skill script, `orkestrel-parallel/scripts/lane.ts`, with its tests in `@orkestrel/scaffold`. The user, 2026-11-04: "make it a script in the orkestrel-parallel, we have scripts in skills that is an established convention, it's just through scaffold which is where the tests are for them". Its source shows open questions the proof closes: same-millisecond order, an owner absent at handover, an unchecked kill. These are unproved properties, not observed failures | Lands with the delta. Callers move only at a quiet point, after M3 and a scaffold release, because two queues would not see each other |
 | P02, P07, P08 | Repair by adopting `orkestrel-publish`'s `swap.ts` and dispatch's `chain.ts` and `launch.ts`. `@orkestrel/learn` reads local builds through the current stack, so nothing moves mid-run | After publish |
 | P22, P23, P24, P28 | Repair by adopting `createHostileValues` and `seededRandom` where the semantics match, keeping targeted reads such as `steps` | Next visit to each package |
 | P03, P06, P25, P26, P29 | Retain with their owners | none |
@@ -104,17 +104,16 @@ K31 lands in D05, K32 in D13, K34 and K38 in D06. Reference only, with no new la
 | --- | --- |
 | Agents | `reviewer`, `analyst`, `scout`, `distiller`, `grok`, `verifier` on both surfaces; `.codex/agents/opus.toml` |
 | Rules | `.claude/rules/campaign.md`, `quality.md`, `patterns.md`, `tests.md`, `documentation.md` |
-| Skills | `orkestrel-harden` (`SKILL.md`, `references/hardening.md`, `references/document.md`, new `references/methods.md`, a comparison script); `orkestrel-falsify` (`SKILL.md`, `references/brief.md`); `orkestrel-parallel` (`SKILL.md`, `references/t3.md`, `references/claude-code.md`); `orkestrel-dispatch/SKILL.md` |
+| Skills | `orkestrel-harden` (`SKILL.md`, `references/hardening.md`, `references/document.md`, new `references/methods.md`, a comparison script); `orkestrel-falsify` (`SKILL.md`, `references/brief.md`); `orkestrel-parallel` (`SKILL.md`, `references/t3.md`, `references/claude-code.md`, new `scripts/lane.ts`); `orkestrel-dispatch/SKILL.md` |
 | Process | `.agents/orchestration.md` § Roles, § Routing, § Campaign, § Depth, breadth, and machinery, § Permission floor |
-| Code and guide | `src/core/constants.ts` `TARGET_SKILL_NAMES`, on the user's ruling on D14; `overwrite`'s leftover files once reproduced |
+| Code and guide | `src/core/constants.ts` `TARGET_SKILL_NAMES`, every skill; `overwrite`'s leftover files once reproduced |
 
 Re-proof: a process finding closes when the next campaign round runs the corrected process, and a tool finding closes by the same real command on an identified build.
 
 ## Open
 
-- The scaffold session lands and propagates the delta, without D14, D19, or P01.
-- The user's ruling on D14 and P01.
+- The scaffold session lands and propagates the delta, D14 and P01 included.
 - The second pass after M3.
 - Folder retirement and the `tmp/` sweep, after `orkestrel-debrief` steps 7 to 9.
 
-DEBRIEF: OPEN — the scaffold session's landing, the user's ruling on D14 and P01, and the pass after M3.
+DEBRIEF: OPEN — the scaffold session's landing and the pass after M3.
