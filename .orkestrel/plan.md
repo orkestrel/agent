@@ -57,9 +57,10 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Rulings on semantics and fail-open rows | done 2026-11-04, each reopenable by the user | `semantics.md`, `failopen.md` |
 | Writers, each package above through layer 7 except `database` and `brief` | landed locally, open rows in § Sequence | `ledger.md`; each package's commits |
 | Independent review by an engine that did not write the work | `contract`, `reason`, `ndjson`, `tool`, `workflow`, `agent`, `ollama`, `toolbox`, `study`, `mcp`, `qualifier`, `rater`, `interpret` read; `program`, `brief` open | `ledger.md` |
-| Live proofs on the dedicated daemon | `ollama` at `9ef095b` and `4109f7e`, 14 files, 82 passed | `ledger.md` |
+| Live proofs on the dedicated daemon | `ollama` at `bf6fbfc`, 16 files, 89 passed, its daemon proof on the dedicated executable; `agent`'s study suite 161 passed | `falsify.md` |
+| Acceptance gates on each package's final commit | all sixteen green on format, lint, type check, build, and test: 30,196 passed, 36 skipped | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | `learn` builds the skeleton; here, `interpret`'s take-up after its refusal record,  then the falsify round, then `verifier`, then the debrief | § How the wave runs; § Sequence; `learn`'s plan |
+| Next action | the debrief; then the user publishes in layer order, with `test:distribution` at each and a new replay lineage screened first. `learn` carries M2 and M3 | § Sequence; `learn`'s plan |
 
 ## Sequence
 

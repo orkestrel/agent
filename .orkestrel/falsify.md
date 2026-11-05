@@ -33,4 +33,4 @@ Delete this file when its rows close and the debrief has carried them.
 
 **Independent lane on `interpret`'s two laws at `cb0bb5c`:** `VERDICT: FAIL 1, 2, 3, 4, 6`, with 5 confirmed. Ruled: the neighbor law reads both sides of a number, three repairs at the same law, a trailing colon on an anchor, the normalized text beside a span, the limit's code, and the table crossed with each number form. Other right readings that ask go to `learn`'s known-limits list. This is the seam's stop: no further lane on the reader.
 
-**Open:** that writer turn, then one final repack and `verifier` on each package.
+**Closed:** that writer turn landed at `interpret` `74afa82`, and `verifier` read all sixteen packages' gates green. Delete this file once the debrief has carried its rows.
