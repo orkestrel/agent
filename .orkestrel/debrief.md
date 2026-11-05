@@ -49,6 +49,7 @@ Sources: O is the objective audit, F the subjective audit, K a method candidate,
 | D22 | F19 | `.codex/agents/opus.toml:10-11` swaps "when ... the Astra bench dark", on a file that runs on that engine | Charter refinements | `.codex/agents/opus.toml`, `.codex/agents/reviewer.toml` |
 | D23 | F21 | `references/codex.md:27` holds the neutral-wording rule, and the dispatch skill does not point at it. A brief still read "a hostile table", against `writing.md:89` | Skill refinements / creation | `orkestrel-dispatch/SKILL.md` |
 | D24 | F22 | `scaffold overwrite --groups configs --dirty --offline --json` "reports `removed: []` and leaves `configs/app/tsconfig.core.json`, `tsconfig.server.json`, and `vite.server.config.ts` after `app/` leaves". Not reproduced on an identified build | Fix now, once reproduced | `@orkestrel/scaffold` `overwrite` |
+| D25 | M2's rescore | `methods.md:69` asks for an independent rescore, and no role owns one that needs a new scorer. "A `checker` on Luna stopped twice without writing a scorer, at low and high effort", and the Orchestrator wrote it (`@orkestrel/learn` `.orkestrel/learn/ledger.md:84`). Writing a scorer from a definition is judgment: `astra` in a clean context writes it, blind to the scorer under test, and `checker` runs it and compares | Orchestration-contract refinements | `.agents/orchestration.md` § Routing |
 
 ## Methods: where the 63 land
 
