@@ -1,6 +1,6 @@
 # Debrief of the refuse-by-default fleet campaign
 
-Verdict: the law for ending a wave existed, and the route this campaign took never reached it. The canon delta below needs the user's go-ahead before anything lands, and nothing in `@orkestrel/scaffold` has changed.
+Verdict: the law for ending a wave existed, and the route this campaign took never reached it. The user gave the go-ahead on 2026-11-04: the scaffold session lands the canon delta and holds its wording to `@orkestrel/scaffold`'s standard. Nothing in `@orkestrel/scaffold` has changed yet.
 
 Canon paths name files in `@orkestrel/scaffold` at `1f73afbf3`. Evidence is quoted from the campaign record. A second pass follows `@orkestrel/learn`'s M3. Input: `methods.md`, `plan.md`, `ledger.md`, `falsify.md`, `@orkestrel/learn` `.orkestrel/learn/`.
 
@@ -43,7 +43,7 @@ Sources: O is the objective audit, F the subjective audit, K a method candidate,
 | D16 | O06, K27 | `quality.md:36` asks for a control "drawn from outside the population the instrument covers". `methods.md:60`: "The `oneOf` control needed an unstable accessor, outside the laws' stable-read domain" | Rule additions, one law each | `.claude/rules/quality.md` |
 | D17 | O09, F12 | "Read every named input in full" gives no form for a read that outlasts a turn. Ten continuations were needed on one record. A per-file coverage table and "stop at a clean boundary" worked | Charter refinements | `distiller`, `grok` on both surfaces |
 | D18 | F13 | `ledger.md:56`: "a verifier's shell returned early on this host". The verifier's charter names no yield behavior, and the fix sits on a page the role never reads | Charter refinements | `verifier` on both surfaces |
-| D19 | F14 | § Engines: "The Orchestrator owns the plan, every decision, integration, and acceptance." The user split design from implementation across two sessions. `methods.md:59`: "The implementer checks a ruling against the code before sending it on", and it reversed four rulings on measured evidence | Orchestration-contract refinements, on the user's ruling | `.agents/orchestration.md` § Sessions and consultation |
+| D19 | F14 | § Engines: "The Orchestrator owns the plan, every decision, integration, and acceptance." The user split design from implementation across two sessions. `methods.md:59`: "The implementer checks a ruling against the code before sending it on", and it reversed four rulings on measured evidence. The user, 2026-11-04: "it's not the usual practice, it's just something new I tried in this case". Reusing a session with the context already has its law, in § Sessions and consultation: "check the roster for an existing session whose responsibility, model, permissions, workspace, and retained context fit the task, and resume it" | Stays as-is: one trial, and the convention under it is already written | none |
 | D20 | O10 | `references/hardening.md:43` drops "for project-owned behavior" and fake clocks from the root's law at `AGENTS.md:43` | Root-reference trims | `orkestrel-harden/references/hardening.md` |
 | D21 | F18 | "Lane" means a capability, a unit, and a host resource. "Census" means four things. Scope this to those two words | Orchestration-contract refinements | `.agents/orchestration.md` |
 | D22 | F19 | `.codex/agents/opus.toml:10-11` swaps "when ... the Astra bench dark", on a file that runs on that engine | Charter refinements | `.codex/agents/opus.toml`, `.codex/agents/reviewer.toml` |
@@ -55,7 +55,7 @@ Sources: O is the objective audit, F the subjective audit, K a method candidate,
 
 The running catalog merges 436 source rows into 63 methods: performance 13, measurement 11, boundaries and refusal 18, proofs and tests 8, review 4, process 9. Fifteen are already law. Forty-eight are partly law, consolidated into 40 candidates.
 
-All 63 land together in one new reference, `orkestrel-harden/references/methods.md`: the selector by package kind and scenario, each method with what to do, what not to do and why, one reading, one example with its package and commit, then what failed and the arguments now settled. `.agents/orchestration.md` § Campaign points at it, so a campaign reads it before a hardening package does. This file is the user's request of 2026-11-04, and `writing.md`'s "Keep an example only when it disambiguates the rule" gives way to it here. A commit holds the rest of each method's evidence.
+All 63 land together in one new reference, `orkestrel-harden/references/methods.md`: the selector by package kind and scenario, each method with what to do, what not to do and why, one reading, one example with its package and commit, then what failed and the arguments now settled. `.agents/orchestration.md` § Campaign points at it, so a campaign reads it before a hardening package does. This file is the user's request of 2026-11-04. The scaffold session holds it to `writing.md`, and brings the user any place where "Keep an example only when it disambiguates the rule" and the request for evidence and examples can't both hold. A commit holds the rest of each method's evidence.
 
 The candidates below become one law each, a sentence at the named owner. The rest stay in the reference only.
 
@@ -89,7 +89,7 @@ K31 lands in D05, K32 in D13, K34 and K38 in D06. Reference only, with no new la
 
 | Rows | Ruling | When |
 | --- | --- | --- |
-| P10, then P11 to P21 | Implement. Eleven packages copied one standing proof. A shared observation engine goes in `@orkestrel/test` core, with one consumer proved first and the verdict left to each caller. No universal "all guards equal wire" law | After publish, on the user's word |
+| P10, then P11 to P21 | Implement. Eleven packages copied one standing proof. A shared observation engine goes in `@orkestrel/test` core, with one consumer proved first and the verdict left to each caller. No universal "all guards equal wire" law. The user, 2026-11-04: "that is the whole idea of the test package anyway" | After publish |
 | P27, then P05 | Implement the bounded perturbation leaf in `@orkestrel/test` core, then the pure comparison on it. P05's generated-value discard and load fallback get fixed on the way | After P10 |
 | P09 | Implement as a harden skill script, with its mirrored proof | With D15 |
 | P01 | Implement. A lane serializer carries correctness claims, so `.agents/orchestration.md:111` sends it to its own package. Its source shows open questions: same-millisecond order, an owner absent at handover, an unchecked kill. These are unproved properties, not observed failures | On the user's word |
@@ -105,16 +105,16 @@ K31 lands in D05, K32 in D13, K34 and K38 in D06. Reference only, with no new la
 | Agents | `reviewer`, `analyst`, `scout`, `distiller`, `grok`, `verifier` on both surfaces; `.codex/agents/opus.toml` |
 | Rules | `.claude/rules/campaign.md`, `quality.md`, `patterns.md`, `tests.md`, `documentation.md` |
 | Skills | `orkestrel-harden` (`SKILL.md`, `references/hardening.md`, `references/document.md`, new `references/methods.md`, a comparison script); `orkestrel-falsify` (`SKILL.md`, `references/brief.md`); `orkestrel-parallel` (`SKILL.md`, `references/t3.md`, `references/claude-code.md`); `orkestrel-dispatch/SKILL.md` |
-| Process | `.agents/orchestration.md` § Roles, § Campaign, § Depth, breadth, and machinery, § Sessions and consultation, § Permission floor |
-| Code and guide | `src/core/constants.ts` `TARGET_SKILL_NAMES`; `overwrite`'s leftover files once reproduced |
+| Process | `.agents/orchestration.md` § Roles, § Routing, § Campaign, § Depth, breadth, and machinery, § Permission floor |
+| Code and guide | `src/core/constants.ts` `TARGET_SKILL_NAMES`, on the user's ruling on D14; `overwrite`'s leftover files once reproduced |
 
 Re-proof: a process finding closes when the next campaign round runs the corrected process, and a tool finding closes by the same real command on an identified build.
 
 ## Open
 
-- The user's go-ahead on the delta, then the scaffold session lands and propagates it.
-- The user's ruling on D14, D19, P01, and P10.
+- The scaffold session lands and propagates the delta, without D14, D19, or P01.
+- The user's ruling on D14 and P01.
 - The second pass after M3.
 - Folder retirement and the `tmp/` sweep, after `orkestrel-debrief` steps 7 to 9.
 
-DEBRIEF: OPEN — the user's go-ahead, the scaffold session's landing, and the pass after M3.
+DEBRIEF: OPEN — the scaffold session's landing, the user's ruling on D14 and P01, and the pass after M3.
