@@ -60,7 +60,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Live proofs on the dedicated daemon | `ollama` at `bf6fbfc`, 16 files, 89 passed, its daemon proof on the dedicated executable; `agent`'s study suite 161 passed | `falsify.md` |
 | Acceptance gates on each package's final commit | all sixteen green on format, lint, type check, build, and test: 30,196 passed, 36 skipped | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | the release wave comes before `learn`'s M3, by the user's ruling: 45 packages, the 16 plus their runtime closure and development tools, with `@orkestrel/scaffold` first on its own account. The user publishes in layer order, with `test:distribution` at each and a new replay lineage screened first. `learn` carries M2 and M3 | § Sequence; `learn`'s plan |
+| Next action | all 45 published 2026-11-05. `learn`'s scored M3 run holds the lane, on the screened 0.40.14 runner, with its input re-frozen. Then the wave's close: 130 development ranges in 43 packages. Then the debrief's second pass | `release.md`; `learn`'s plan |
 
 ## Sequence
 

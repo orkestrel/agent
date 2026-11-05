@@ -1,30 +1,50 @@
-# Release wave: Agent 0.0.35
+# Release wave: the refuse-by-default family
 
-The user publishes every layer. `agent/plan.md` § Release owns the steps.
+The user publishes every layer. `plan.md` § Sequence owns the order, and the earlier wave's record is in this file's history.
 
 ## Scope
 
-`@orkestrel/scaffold` `.agents/skills/orkestrel-publish/references/wave.md` § Close the wave narrows from every catalog package to `@orkestrel/agent` and its related packages, the scope of `agent/plan.md` O69: Agent's runtime and development dependencies, its dependents `@orkestrel/ollama`, `@orkestrel/toolbox`, and `@orkestrel/study`, and the `@orkestrel/mcp` fixture.
+45 packages: the 16 this campaign hardened, their runtime closure, and their development tools, with `@orkestrel/scaffold` first on its own account. The user approved `--regenerate` for the whole wave. Every version bumps from what the registry serves at its layer.
 
 ## Layers
 
-The order is `agent/tenets.md` § Release, and each version bumps from what the registry serves at that layer.
+All published 2026-11-05, registry-confirmed by tarball, and each repository's `main` pushed afterward.
 
-| Package | Version | Bump | Evidence | Round |
-| --- | --- | --- | --- | --- |
-| `@orkestrel/ndjson` | 0.0.15 | bump | a dependency Agent's release adds, ahead of Agent | landed 2026-11-01 |
-| `@orkestrel/agent` | 0.0.35 | bump | runtime set adds `@orkestrel/ndjson` ^0.0.15, which the 0.0.34 manifest does not name; `compare.js --tarball` against the tarball rc-ol1 proved reads exit 0 with 4 published files, 0 added, 0 removed, and 0 changed | published 2026-11-03, registry-confirmed, `main` pushed at `ce059cfe` |
-| `@orkestrel/ollama` | 0.0.29 | bump | runtime ranges move, `dist` moved | published 2026-11-03, `main` pushed at `6f8b522` |
-| `@orkestrel/toolbox` | 0.0.24 | bump | runtime `@orkestrel/agent` range moves, `dist` same; pin only, because its census reads no consumer of the renamed names (the word `Reading` in a comment at `tests/policy.test.ts` line 932 is the one hit; Y33) | published 2026-11-03, `main` pushed at `464e737` |
-| `@orkestrel/study` | 0.0.10 | bump | runtime `@orkestrel/agent` and `@orkestrel/ollama` ranges move, and `buildStudyAgentAttempts` renames a public function | published 2026-11-03, `main` pushed at `ecb81e4` |
-| Agent's trailing development dependencies | `@orkestrel/ollama` ^0.0.29 and `@orkestrel/study` ^0.0.10 | no bump, `compare.js` reads 0 changed | § Close the wave; the sweep lists no trailing range in the release's packages | re-pinned as `dc0fec6f` |
+| Layer | Packages |
+| --- | --- |
+| Scaffold, by its own session | `scaffold` 0.0.123, then 0.0.124 |
+| Contract | `contract` 0.0.22 |
+| 1 | `abort` 0.0.16, `budget` 0.0.17, `codec` 0.0.9, `emitter` 0.0.15, `html` 0.0.15, `indexeddb` 0.0.17, `jsonrpc` 0.0.2, `ndjson` 0.0.16, `sqlite` 0.0.17, `test` 0.0.33, `timeout` 0.0.16 |
+| 2 | `console` 0.0.19, `database` 0.0.21, `form` 0.0.16, `markdown` 0.0.20, `pool` 0.0.20, `process` 0.0.18, `reason` 0.0.17, `router` 0.0.20, `sse` 0.0.13, `template` 0.0.13, `tool` 0.0.22, `websocket` 0.0.18 |
+| 3 | `guide` 0.0.30, `interpret` 0.0.20, `lsp` 0.0.14, `qualifier` 0.0.21, `queue` 0.0.20, `rater` 0.0.21, `relation` 0.0.19, `server` 0.0.26, `terminal` 0.0.23, `workspace` 0.0.15 |
+| 4 | `brief` 0.0.15, `mcp` 0.0.42, `program` 0.0.20, `workflow` 0.0.26 |
+| 5 | `agent` 0.0.36 |
+| 6 | `ollama` 0.0.30, `toolbox` 0.0.25 |
+| 7 | `study` 0.0.11 |
+| Held back by take-up repairs, then last | `probe` 0.0.29 at `3fba544`, `browser` 0.0.32 at `a915e66` |
 
-`@orkestrel/mcp` holds no place in the order and takes no release (`agent/plan.md` § Release).
+## Deviations
 
-## Surface
+| Package | What departed | Standing |
+| --- | --- | --- |
+| `ollama` 0.0.30 | Uploaded without `test:service`, because the wave's `release-prep.ts` hard-coded its steps and `window.ts` uploads with `--ignore-scripts`. A census of every `prepublishOnly` found only this one: 42 of 45 match the chain, `browser` caught it in time, and `scaffold`'s session confirmed its plans ran `test:templates` | Closed: run after the upload on the release tree, on the screened 0.40.14 runner at 11435, 89 of 89 in 513 s. No new release. The source's last live proof was at `bf6fbfc`, also 89 |
+| `agent` 0.0.36 | Gates ran on a staged `study`, because they need an API that wasn't yet published | Closed at `b5ae7940`: the whole chain passes on published `study` 0.0.11 and `ollama` 0.0.30, and `compare` reads no bump |
+| `browser` 0.0.32 | Distribution ran in default mode: 15 passed and 9 skipped. Under `--mode release` the same 5 host-bound cases fail, for want of `/proc` or a filesystem FIFO, and the other 15 pass | Standing Windows reading, the precedent of 0.0.28 to 0.0.31. `test:service` passed 257 and 6 skipped |
+| `browser` 0.0.32 | `playwright` held at `^1.64.1`. Upstream's 1.65.0 went up with no `playwright-core` behind it for about two hours, and was deprecated meanwhile | Upstream repaired it the same day. The round stays on `^1.64.1`, whose caret admits 1.65.0, and a later wave moves them together |
 
-`scaffold surface` at the release visit reads exit 0 with 0 collisions and 0 conflicts, with `AnswerMeasure`, `measureAnswer`, `ClassifierAttempt`, `LedgerLookupFinding`, and `requireCumulative` each listed once under `agent` (Y33). `scaffold surface` reads 9 signature-similarity advisories on `MemoSnapshotRow` and `MemoStoreInterface` against peers; each is the same row-and-store shape by design, so no rename.
+## Repairs the wave made in packages
 
-## Standing readings
+Each came from a chain or visit run, and each that changed behavior under test closed with a mutation probe.
 
-`test:studies`'s one known failure closed at Agent's closing development re-pin: 161 pass in full, and `npm ls @orkestrel/ndjson --all` lists one 0.0.15. RELEASE: LANDED.
+- `sqlite` `ba3bc8b`: the guide test's `using` replaced by a direct dispose.
+- `mcp` `7534aa4`: the distribution test's overrides and composition moved to served ranges.
+- `probe` `0028c5a`, `389dd1a`, `0b57444`: take-up of `mcp` 0.0.42 and `tool` 0.0.22. `3fba544`: the boot-dependency test counted the boot's own specifications, so it read three files or none and never two. A test defect, not a boot failure; the budget `2aaa3cd` widened on a wrong reading went back.
+- `browser` `eec33ff`: tool's door taken up, with the vocabulary tools keeping their own parsers through `strict: false`. `cabf39e`: two fixtures declare what they send. `a915e66`: the version stamp in `BROWSER_HAR_CREATOR` and its guide row.
+
+## Close
+
+Open. The sweep after `browser` read 133 trailing ranges in 44 of 45 packages, all `devDependencies`, none runtime or peer. `agent`'s three are done at `b5ae7940`, which leaves 130 in 43: `probe` in all of them, `guide` and `scaffold` in 34, `test` in 11, and `browser` in 8. `scaffold`'s own ranges are its session's. The 34 moving `scaffold` also take its overwrite. `mcp`'s composition test moves to `agent` 0.0.36 with them.
+
+By the Orchestrator's order of 2026-11-05, `learn`'s scored run goes first, since it needs an unbroken lane and depends on none of this. No range ships, so no upload is expected unless a ruling finds a moved `dist`.
+
+RELEASE: OPEN
