@@ -1,6 +1,6 @@
 # Debrief of the refuse-by-default fleet campaign
 
-Verdict: the law for ending a wave existed, and the route this campaign took never reached it. The user gave the go-ahead on 2026-11-04: the scaffold session lands the canon delta and holds its wording to `@orkestrel/scaffold`'s standard. Nothing in `@orkestrel/scaffold` has changed yet.
+Verdict: the law for ending a wave existed, and the route this campaign took never reached it. The user gave the go-ahead on 2026-11-04: the scaffold session lands the canon delta and holds its wording to `@orkestrel/scaffold`'s standard. The delta is committed at `@orkestrel/scaffold` `5f0f965e9`, local and unpushed, and its gates wait for the scored run to end.
 
 Canon paths name files in `@orkestrel/scaffold` at `1f73afbf3`. Evidence is quoted from the campaign record. A second pass follows `@orkestrel/learn`'s M3. Input: `methods.md`, `plan.md`, `ledger.md`, `falsify.md`, `@orkestrel/learn` `.orkestrel/learn/`.
 
@@ -112,8 +112,8 @@ Re-proof: a process finding closes when the next campaign round runs the correct
 
 ## Open
 
-- The scaffold session lands and propagates the delta, D14 and P01 included.
+- The scaffold session's gates and `verifier` on `5f0f965e9`, after the scored run ends, then its report.
 - The second pass after M3.
 - Folder retirement and the `tmp/` sweep, after `orkestrel-debrief` steps 7 to 9.
 
-DEBRIEF: OPEN — the scaffold session's landing and the pass after M3.
+DEBRIEF: OPEN — the gates on `@orkestrel/scaffold` `5f0f965e9` and the pass after M3.
