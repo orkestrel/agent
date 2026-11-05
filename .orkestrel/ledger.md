@@ -63,3 +63,4 @@
 | 2026-11-04 | Debrief landing handed to the scaffold session, by brief | Orchestrator | `debrief.md` |
 | 2026-11-04 | Rulings on the debrief: every skill is hosted in a target, resolved against scaffold whether local or installed (D14); the lane tool becomes an `orkestrel-parallel` skill script, tested in scaffold (P01). Sent to the scaffold session by brief | user | `debrief.md` |
 | 2026-11-04 | Debrief landed by the scaffold session at `@orkestrel/scaffold` `5f0f965e9`, D19 left as-is. Gates held behind the scored run | Orchestrator of `@orkestrel/scaffold` | `debrief.md` |
+| 2026-11-05 | Ruling on order: the family publishes before `learn`'s M3 runs | user | `plan.md` § State |
