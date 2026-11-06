@@ -84,7 +84,7 @@ Each ran its whole `prepublishOnly` chain with a real `npm ci`. An independent r
 ### Stops and what's owed
 
 - **`scaffold` holds at 0.0.125.** Its catalog table and mirrors trail the 8 until its next release, and a 0.0.126 now would leave every package's scaffold range trailing for no consumer. Reopens at the next release `scaffold` has a reason of its own to make.
-- **The push is the user's, and unanswered.** The 43 no-bump repositories, `scaffold`'s 2 roadmap commits, and `agent` stay unpushed, and silence is no yes. `interpret`'s `main` carries law G's unreleased commits on top, so a push there goes by hash at `9cd32ec`.
+- **The push is the user's, and unanswered.** The 43 no-bump repositories, `scaffold`'s 2 roadmap commits, and `agent` stay unpushed, and silence is no yes. `interpret`'s `main` also holds `5176ceb` and `8ee6bdd`, which change only `.orkestrel/limits.md`, because law G failed its sealed cost cap and no code landed, so any push there is one more records push and needs no special hash.
 - **Further uploads wait** for the user's return, because each needs their code.
 
 RELEASE: LANDED
