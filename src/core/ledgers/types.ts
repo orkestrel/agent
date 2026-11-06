@@ -82,7 +82,9 @@ export interface LedgerTopic {
  *
  * @remarks
  * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
- * before the records and the tail take the rest. `tail` is a share of what remains for messages.
+ * before the records and the tail take the rest. `tail` bounds the seed tail and, separately,
+ * the previous request and final reply. An exchange over its allowance, or one the budget can't
+ * hold beside the head, the seed tail, and the request, is omitted whole.
  * Each share must be finite, greater than 0, and at most 1.
  */
 export interface LedgerShare {

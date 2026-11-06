@@ -4129,8 +4129,8 @@ export const RECORDED_ANSWER_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Objec
  * {@link serveRecordsDesk} serves, every field except the stored `id`.
  *
  * @remarks
- * Written by hand from the request layout: a late request sends the same seed tail and writes the
- * same records into the copy of its own request turn.
+ * Written by hand from the request layout: a late request sends the seed tail, the previous
+ * exchange, and the records in the copy of its own request turn.
  */
 export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freeze([
 	{ role: 'system', content: 'Serve the desk.' },
@@ -4154,6 +4154,8 @@ export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.
 		call: 'owner-1',
 		content: 'lookup {"id":"customer:BW-20931"}: result shown under Records below',
 	},
+	{ role: 'user', content: 'Check Brightwater Studio.' },
+	{ role: 'assistant', content: 'Done.' },
 	{
 		role: 'user',
 		content:

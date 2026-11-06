@@ -1669,8 +1669,7 @@ await new GuideCommand({
 			])
 			// Every scripted reply was taken: two calibration calls and three turns.
 			expect(replies.next()).toEqual({ done: true, value: undefined })
-			// The second prompt is the system text alone, the seed tail, and the request copy carrying
-			// the records: the first request and its reply never reach it.
+			// The previous exchange follows the seed and precedes the request copy.
 			expect(prompts.count).toBe(3)
 			expect(
 				requireValue(prompts.calls[2]?.[0], 'Missing prompt').map(({ role, content }) => [
@@ -1680,6 +1679,8 @@ await new GuideCommand({
 			).toEqual([
 				['system', system],
 				['user', 'Refunds over $100 need a manager.'],
+				['user', 'Can Brightwater Studio get a refund on order BW-5512?'],
+				['assistant', 'Order BW-5512 qualifies for a $148.50 refund.'],
 				['user', copies[1]],
 			])
 			expect(guideText).toContain('const replies = script.values()')
@@ -1899,7 +1900,7 @@ await new GuideCommand({
 					(1 + LEDGER_SCALE_DRIFT),
 			)
 			expect(guideText).toContain(
-				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the tail takes at most the `tail` share',
+				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the seed tail takes at most the `tail` share',
 			)
 		})
 
@@ -2016,7 +2017,7 @@ await new GuideCommand({
 			const contents = requireValue(provider.calls[3], 'Missing recall turn').messages.map(
 				({ content }) => content,
 			)
-			expect(contents).not.toContain('Look up order BW-5512.')
+			expect(contents).toContain('Look up order BW-5512.')
 			expect(contents).not.toContain(result)
 			expect(contents.at(-1)).toBe(
 				`lookup_order {"id":"BW-5512"}: ${result}\nEarlier request: Look up order BW-5512.`,
@@ -2704,7 +2705,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('tails only the seed and records a message added after the first request, as the seed-tail limit claims', async () => {
+		it('keeps the seed and previous exchange while recording a host statement between requests', async () => {
 			const later = 'The Northgate courier brings refund forms on 2026-10-12.'
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
@@ -2726,11 +2727,13 @@ await new GuideCommand({
 			expect(sent.map(({ content }) => content)).toEqual([
 				'Serve the desk.',
 				'Refunds over $100 need a manager.',
+				'Review the desk.',
+				'Done.',
 				`${records}\n\n## Request\nWhen do the refund forms arrive?`,
 			])
 			expect(records).toContain(later)
 			expect(guideText).toContain(
-				'Only the messages added before the first request form the seed tail, so an application message added after the first request reaches a planned prompt only through the records or the `recall` tool.',
+				'A host statement between requests reaches the prompt through records or recall and does not displace that exchange.',
 			)
 		})
 
