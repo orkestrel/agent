@@ -300,11 +300,8 @@ describe('Ledger', () => {
 			},
 		}
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const ledger = createLedger(provider, {
-			...buildLedgerOptions({ topics: [] }),
-			gauge: undefined,
-			snapshot,
-		})
+		const { gauge: _gauge, ...uncalibrated } = buildLedgerOptions({ topics: [] })
+		const ledger = createLedger(provider, { ...uncalibrated, snapshot })
 		expect(JSON.stringify(ledger.snapshot())).toBe(JSON.stringify(snapshot))
 		await ledger.respond('Make that shorter.')
 		expect(
@@ -654,7 +651,7 @@ describe('Ledger', () => {
 		const restoredProvider = createScriptedProvider([{ content: 'Finished.' }], { recorded: true })
 		const restored = createLedger(restoredProvider, {
 			...options,
-			snapshot: parseJSONAs(JSON.stringify(ledger.snapshot()), isLedgerSnapshot),
+			snapshot: requireValue(parseJSONAs(JSON.stringify(ledger.snapshot()), isLedgerSnapshot)),
 		})
 		await restored.respond(question)
 		const hydrated = extractLedgerRecords(requireValue(restoredProvider.calls[0]).messages)
@@ -739,7 +736,10 @@ describe('Ledger', () => {
 				},
 				{ content: 'Answered.' },
 			]),
-			{ ...options, snapshot: parseJSONAs(JSON.stringify(snapshot), isLedgerSnapshot) },
+			{
+				...options,
+				snapshot: requireValue(parseJSONAs(JSON.stringify(snapshot), isLedgerSnapshot)),
+			},
 		)
 		await restored.respond('Find the earlier exchange.')
 		expect(

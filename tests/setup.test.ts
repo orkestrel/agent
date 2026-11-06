@@ -1448,7 +1448,12 @@ describe('system boundary canary fixtures', () => {
 			expect(recorded.at(-1)?.role).toBe('user')
 		}
 		expect(RECORDED_ANSWER_REQUEST[1]).toEqual(RECORDED_FIRST_REQUEST.at(-1))
-		expect(RECORDED_LATE_REQUEST.slice(0, -1)).toEqual(RECORDED_FIRST_REQUEST.slice(0, -1))
+		// A late request keeps the first request's head and seed whole, then adds the previous exchange.
+		expect(RECORDED_LATE_REQUEST.slice(0, -3)).toEqual(RECORDED_FIRST_REQUEST.slice(0, -1))
+		expect(RECORDED_LATE_REQUEST.slice(-3, -1).map((message) => message.role)).toEqual([
+			'user',
+			'assistant',
+		])
 	})
 
 	it('reads the records of the last request copy and empty text when no copy carries any', () => {
