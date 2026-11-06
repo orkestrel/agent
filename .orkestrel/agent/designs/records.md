@@ -165,6 +165,28 @@ run           | this run's turns                                                
 - The frozen-tail census motivates the change (`research/evidence.md` § Prior-campaign readings). The prior campaign's R1 moving tail could act but was stripped with no quality grade (`7ada8b77:.orkestrel/agent/plan.md` § Removed experiments).
 - Recall listing assistant replies is the fallback (D15).
 
+### Previous exchange
+
+`rc-q4` (`d91287f6`, for the user's ruling) carries the previous request and the last assistant message after it, between the seed tail and the request copy. It isn't the moving tail: the seed's selection stays, one exchange is carried, and nothing is switched.
+
+- The reply is the last assistant message after the previous request. A blank one, or one with calls, carries nothing, with no fallback to an older reply. A statement a host adds after it doesn't displace it.
+- It has its own allowance, the tail share of the plan's total, and it joins only if the head, the seed tail, the exchange, and the request fit the total with no records. Otherwise it's omitted whole. Records give way to an admitted exchange.
+- When it displaces a seed lookup's record, that stub reads `hidden`, because the stub stays true, and that moves the reusable prefix on that request.
+- Replayed on sealed checkpoints, ids of the previous product reaching the prompt read 39 of 94 before and 89 of 94 after, and the mean prompt 6663 characters before and 10763 after. What the longer prompt costs a live model is owed (D95).
+
+### Recall over earlier turns
+
+`rc-q2` (`deece186`, under D15, for the user's ruling) lets `Ledger#recall` list earlier requests and replies on a word match, after today's statements and lookup results, under `LEDGER_RECALL_LABELS`. A label names the message's role. A stored line break reads as a line break and two spaces, so only a label opens a line. Listed text stays out of the records and the `system` message. A small model must still choose to call `recall`, so this reaches older turns and doesn't replace rc-q4.
+
+## Filing
+
+### Quiet floor
+
+`rc-q1` (`d0e1c7cf`) keeps a user message carrying an id or number, by `extractLiterals`, out of quiet filing, whatever its stored weights, and `category` answers `undefined` when its winner is a quiet category the floor overrode. It supplies no fact, rule, or correction judgment, so a floor message still needs an owner or a topic to reach a rendered record. Requests take no category question, so the floor reaches statements a host adds, not `respond`'s turns (D93).
+
+- It rests on human text. Of 754 agreed rows, 214 carry an id or number and none is chatter or a distractor, and 1 of 466 quiet-labeled rows on untouched sets carries one. O170's long, machine-written family files nothing quiet at the cutoff, which is why no gate saw the loss.
+- It's a floor and not a repair of the class: statements with no id or number stay wrongly quiet, 35, 19, and 11 rows on the three held sets. `extractLiterals` reads an id only when hyphenated with a digit, so "Correct ID is CMWD4JDXJN" carries nothing. No word list closes this.
+
 ## Fixes
 
 ### Trim order
