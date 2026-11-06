@@ -519,3 +519,4 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-06 | The records round's falsify round on the integrated result | objective lane, `reviewer` on GPT-6.1 Sol; subjective lane, `reviewer` on Claude Opus 5.5 | `plan.md` O178 |
 | 2026-11-06 | records-d2, how the exchange is admitted | `planner` on Claude Fable 5.1 | `plan.md` O178 |
 | 2026-11-06 | rc-q4's repairs | `astra` on GPT-6 Astra writes; `reviewer` on GPT-6.1 Sol re-audits | `3ba8f586` |
+| 2026-11-06 | The user's word: a bounded Study run on the 4B model. Records arm, goals `ev-01-1` to `ev-02-4`, and a six-request conversation against the installed 0.0.36 | Orchestrator, GPU on the dedicated runner | `plan.md` O179 |
