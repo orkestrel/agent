@@ -83,8 +83,11 @@ export interface LedgerTopic {
  * @remarks
  * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
  * before the records and the tail take the rest. `tail` bounds the seed tail and, separately,
- * the previous request and final reply. An exchange over its allowance, or one the budget can't
- * hold beside the head, the seed tail, and the request, is omitted whole.
+ * the previous request and final reply. The seed and records are planned first, without the
+ * exchange. It joins only if its allowance and the total budget hold it beside the head, seed,
+ * and request copy with the kept records, and its first-call estimate does not close an otherwise
+ * open recall. Otherwise it is silently omitted whole. An admitted exchange can reduce recall
+ * listing room, but changes no record line or seed stub.
  * Each share must be finite, greater than 0, and at most 1.
  */
 export interface LedgerShare {

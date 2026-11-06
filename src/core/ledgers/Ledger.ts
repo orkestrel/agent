@@ -812,7 +812,7 @@ export class Ledger implements LedgerInterface {
 			) /
 			(1 + LEDGER_SCALE_DRIFT)
 		const built = this.#agent.context.build({ messages: [request], judgments: [] })
-		const tail = this.#selectTail(request, total, built, input, scan)
+		const tail = this.#selectTail(request, total, input, scan)
 		const tailIds = new Set(tail.map((message) => message.id))
 		const scoped = records.some((record) => record.key !== LEDGER_RULES_KEY)
 		const held = new Set([
@@ -936,6 +936,30 @@ export class Ledger implements LedgerInterface {
 			projection.amendments,
 			scan,
 		)
+		const exchange = this.#selectExchange(request, input)
+		const priced = buildRequestMessage(built.at(-1) ?? request, trimmed.rendered)
+		const probes = [[], exchange].map((pair) => [
+			...built.slice(0, -1),
+			...stripThinking([...tail.slice(0, -1), ...pair, priced], this.#replay),
+		])
+		const names = this.#agent.context.scope?.tools
+		const tools = this.#agent.context.tools
+			.definitions()
+			.filter((tool) => names === undefined || names.includes(tool.name)).length
+		const longest = this.#findLongest()
+		const closed = probes.map((messages) => {
+			const calls = [{ estimate: estimateMessages(messages), tools }]
+			return (
+				this.#gauge !== undefined &&
+				this.#gauge.remainder(calls) - this.#predict < 2 * this.#gauge.reserve(calls, longest)
+			)
+		})
+		// Admission follows trimming: the exchange can spend spare room, never a record or a seed message.
+		const admitted =
+			this.#price(stripThinking([...exchange, request], this.#replay)) - this.#price([request]) <=
+				total * this.#share.tail &&
+			this.#price(probes[1] ?? []) <= total &&
+			(closed[0] === true || closed[1] === false)
 		const shown = new Set([
 			...trimmed.included,
 			...records.flatMap((record) =>
@@ -956,6 +980,7 @@ export class Ledger implements LedgerInterface {
 					.map((message) =>
 						message.role === 'tool' ? this.#renderTailStub(message, scan, shown) : message,
 					),
+				...(admitted ? exchange : []),
 				buildRequestMessage(request, trimmed.rendered),
 			],
 		}
@@ -1106,7 +1131,6 @@ export class Ledger implements LedgerInterface {
 	#selectTail(
 		request: Message,
 		total: number,
-		built: readonly Message[],
 		input: LedgerProjectionInput,
 		scan: LedgerScan,
 	): readonly Message[] {
@@ -1173,33 +1197,43 @@ export class Ledger implements LedgerInterface {
 					),
 				) > cap,
 		)
+		return [
+			...exchanges
+				.slice(0, stop === -1 ? exchanges.length : stop)
+				.toReversed()
+				.flat(),
+			request,
+		]
+	}
+
+	#selectExchange(request: Message, input: LedgerProjectionInput): readonly Message[] {
 		const before = input.messages.slice(
 			0,
 			input.messages.findIndex((message) => message.id === request.id),
 		)
 		const position = before.findLastIndex((message) => this.#requests.has(message.id))
 		const previous = before[position]
-		const reply = before.slice(position + 1).findLast((message) => message.role === 'assistant')
-		const exchange =
-			previous !== undefined &&
+		const turns = before.slice(position + 1)
+		const reply = turns.findLast((message) => message.role === 'assistant' && !hasCalls(message))
+		const answers = turns.flatMap((message, index) =>
+			message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== ''
+				? [index]
+				: [],
+		)
+		const certain = answers.every(
+			(at, index) =>
+				index === 0 ||
+				turns
+					.slice((answers[index - 1] ?? -1) + 1, at)
+					.some((message) => this.#annotations.has(message.id)),
+		)
+		return previous !== undefined &&
+			certain &&
 			reply?.role === 'assistant' &&
 			!hasCalls(reply) &&
 			reply.content.trim() !== ''
-				? [previous, reply]
-				: []
-		const kept = exchanges
-			.slice(0, stop === -1 ? exchanges.length : stop)
-			.toReversed()
-			.flat()
-		// The exchange gives way to the budget: it joins only if the first call fits with no records at all.
-		const admitted =
-			this.#price(stripThinking([...exchange, request], this.#replay)) - this.#price([request]) <=
-				cap &&
-			this.#price([
-				...built.slice(0, -1),
-				...stripThinking([...kept, ...exchange, built.at(-1) ?? request], this.#replay),
-			]) <= total
-		return [...kept, ...(admitted ? exchange : []), request]
+			? [previous, reply]
+			: []
 	}
 
 	#renderTailStub(message: Message, scan: LedgerScan, shown?: ReadonlySet<string>): Message {
@@ -1356,10 +1390,14 @@ export class Ledger implements LedgerInterface {
 						const source = listable.get(id)
 						if (source === undefined) return []
 						const lookup = scan.finding(id)
+						const content = source.content.replace(
+							/(^|[\n\v\f\r\u0085\u2028\u2029])(?=Earlier (?:request|reply):)/g,
+							'$1  ',
+						)
 						const text =
 							lookup === undefined
-								? source.content
-								: `${renderLookupCall(lookup.name, lookup.arguments)}: ${source.content}`
+								? content
+								: `${renderLookupCall(lookup.name, lookup.arguments)}: ${content}`
 						return [
 							{
 								id,
@@ -1370,7 +1408,7 @@ export class Ledger implements LedgerInterface {
 										: [
 												[
 													splitResultLines(text)[0] ?? '',
-													splitResultLines(source.content)[0] ?? '',
+													splitResultLines(content)[0] ?? '',
 												] as const,
 											],
 							},

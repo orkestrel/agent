@@ -2733,7 +2733,7 @@ await new GuideCommand({
 			])
 			expect(records).toContain(later)
 			expect(guideText).toContain(
-				'A host statement between requests reaches the prompt through records or recall and does not displace that exchange.',
+				'A host statement reaches the prompt through records or recall, and neither that statement nor a host lookup after the reply erases the exchange.',
 			)
 		})
 

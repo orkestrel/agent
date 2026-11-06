@@ -2447,6 +2447,88 @@ export class FailingProvider extends ScriptedProvider {
 	}
 }
 
+/** Supplies previous reply sizes for the records and recall admission differentials. */
+export const LEDGER_ADMISSION_SIZES = Object.freeze([120, 2048, 8192, 14336])
+
+/** Supplies line separators whose stored label continuations must be indented. */
+export const LEDGER_LABEL_BREAKS = Object.freeze([
+	'\n',
+	'\r\n',
+	'\r',
+	'\v',
+	'\f',
+	'\u0085',
+	'\u2028',
+	'\u2029',
+])
+
+/**
+ * Runs the C2 inputs with a reply or blank-reply control at the same observed completion reserve.
+ * A zero prompt report leaves the configured gauge scale intact. Both ledgers observe the same
+ * completion before the control blanks its stored reply, so only carry eligibility changes.
+ * @param size - The previous reply's character count
+ * @param notes - The seed's note count: 40 for C2a, 60 for C2b
+ * @param blank - Whether to blank the previous reply after observing its completion
+ * @returns The raw first-call messages, their records, the previous reply, and recall output
+ */
+export async function serveLedgerAdmission(size: number, notes: number, blank: boolean) {
+	const reply = (notes === 40 ? 'word ' : 'warehouse ').repeat(size).slice(0, size)
+	const provider = createScriptedProvider(
+		[
+			{
+				content: reply,
+				usage: { prompt: 0, completion: Math.ceil(size / 4), total: Math.ceil(size / 4) },
+			},
+			{
+				content: '',
+				tools: [{ id: 'admission-recall', name: 'recall', arguments: { topic: 'note' } }],
+			},
+			{ content: 'Done.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			topics: [],
+			capacity: 19968,
+			predict: 8192,
+			share: { prompt: 1, tail: 0.35 },
+			gauge: { scale: 0.978, overhead: 926.49 },
+		}),
+	)
+	ledger.conversation.add(
+		buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund due $148.50.'),
+	)
+	for (const index of Array.from({ length: notes }, (_unused, at) => at))
+		ledger.conversation.add({
+			role: 'user',
+			content:
+				`Brightwater Studio note ${index}: the desk logged a routine update for this account. `.repeat(
+					4,
+				),
+		})
+	await ledger.respond(notes === 40 ? 'Write the long report.' : 'Tell me about the warehouse.')
+	if (blank) {
+		ledger.conversation.remove(requireValue(ledger.conversation.messages().at(-1)).id)
+		ledger.conversation.add({ role: 'assistant', content: '' })
+	}
+	await ledger.respond(
+		notes === 40
+			? 'Find the notes.'
+			: 'What is the refund due on Brightwater Studio order BW-20931?',
+	)
+	const messages = requireValue(provider.calls[1]).messages
+	return {
+		messages,
+		reply,
+		records: extractLedgerRecords(messages),
+		recalled: requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'admission-recall'),
+		).content,
+	}
+}
+
 /** Records iterator entry and return while forwarding a real scripted generator. */
 export class RecordedProvider extends ScriptedProvider {
 	readonly #gate: Promise<void>
