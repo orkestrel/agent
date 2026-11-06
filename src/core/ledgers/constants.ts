@@ -33,6 +33,12 @@ export const LEDGER_RULES_KEY = 'rules'
 /** Prefixes the key of an owner's record, which the owner's id follows. */
 export const LEDGER_OWNER_PREFIX = 'owner:'
 
+/** Labels recalled conversation text by its origin. */
+export const LEDGER_RECALL_LABELS = Object.freeze({
+	request: 'Earlier request:',
+	reply: 'Earlier reply:',
+})
+
 /**
  * Supplies the wording of every question the ledger asks its judge.
  *

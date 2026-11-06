@@ -56,6 +56,7 @@ import {
 	DEFAULT_LEDGER_SHARE,
 	LEDGER_NOTES,
 	LEDGER_OWNER_PREFIX,
+	LEDGER_RECALL_LABELS,
 	LEDGER_RULES_KEY,
 	LEDGER_SCALE_DRIFT,
 } from './constants.js'
@@ -232,7 +233,7 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Recall what the full conversation record holds on a topic: an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. Returns source lines, newest first.`,
+				description: `Recall what the full conversation record holds on a topic: an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.`,
 				contract: objectShape({
 					topic: stringShape({ min: 1, description: 'An owner name, an id, or a topic' }),
 				}),
@@ -1363,10 +1364,34 @@ export class Ledger implements LedgerInterface {
 				},
 				{ done: new Set(), listed: [], recalled: new Map() },
 			)
+			const earlier = input.messages
+				.slice(0, Math.max(0, start))
+				.reverse()
+				.flatMap((message) => {
+					if (gathered.done.has(message.id) || this.#annotations.has(message.id)) return []
+					const label = this.#requests.has(message.id)
+						? LEDGER_RECALL_LABELS.request
+						: message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== ''
+							? LEDGER_RECALL_LABELS.reply
+							: undefined
+					if (
+						label === undefined ||
+						!searches.some(
+							(search) =>
+								search.words.length > 0 &&
+								search.words.every((word) => message.content.toLowerCase().includes(word)),
+						)
+					)
+						return []
+					// Only a label opens a line here, so a stored line can't read as a reply it isn't.
+					return [`${label} ${message.content.replace(/[\n\v\f\r\u0085\u2028\u2029]+/g, '\n  ')}`]
+				})
+			const listed = [...gathered.listed, ...earlier]
+			// Statements list ahead of conversation messages, so an omitted message can be newer than a kept one.
 			const result =
-				gathered.listed.length === 0
+				listed.length === 0
 					? `nothing on "${topic}"; recall ${guidance}`
-					: cutListing(gathered.listed, room)
+					: cutListing(listed, room, earlier.length > 0 ? 'more' : 'older')
 			request?.list(result, gathered.recalled)
 			return result
 		} finally {

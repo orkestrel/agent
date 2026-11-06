@@ -2122,6 +2122,15 @@ describe('cutListing and matchesCutLine', () => {
 		expect(matchesCutLine('older items not shown; ')).toBe(false)
 		expect(matchesCutLine('The 2 older items not shown; ')).toBe(false)
 	})
+
+	it('names an omitted item more when the entries are not in age order, and matches that line too', () => {
+		expect(cutListing(items, 0, 'more')).toBe(
+			'first recalled line\n2 more items not shown; name a narrower topic to narrow the recall',
+		)
+		expect(cutListing(items, 0, 'more').split('\n').map(matchesCutLine)).toEqual([false, true])
+		expect(matchesCutLine('1 more item not shown; add a topic')).toBe(true)
+		expect(matchesCutLine('The 2 more items not shown; ')).toBe(false)
+	})
 })
 
 describe('renderStub', () => {

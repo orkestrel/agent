@@ -1057,10 +1057,12 @@ export function splitTopic(topic: string): readonly string[] {
  * @remarks
  * The cut keeps at least one entry. When it leaves entries out, its last line reads
  * `N older items not shown; name a narrower topic to narrow the recall`, which
- * {@link matchesCutLine} recognizes.
+ * {@link matchesCutLine} recognizes. Pass `more` when the entries aren't in age order, so the line
+ * doesn't claim an omitted entry is older than a kept one.
  *
  * @param entries - The entries in the order they are kept
  * @param room - The estimate units the joined entries can take
+ * @param kind - What the cut line calls an omitted entry. Default: `older`
  * @returns The kept entries followed by the cut line when any were left out, joined by newlines
  *
  * @example
@@ -1068,7 +1070,11 @@ export function splitTopic(topic: string): readonly string[] {
  * cutListing(['first entry', 'second entry'], 1) // 'first entry\n1 older item not shown; name a narrower topic to narrow the recall'
  * ```
  */
-export function cutListing(entries: readonly string[], room: number): string {
+export function cutListing(
+	entries: readonly string[],
+	room: number,
+	kind: 'older' | 'more' = 'older',
+): string {
 	// The cut keeps at least one entry, and stops at the first entry whose addition passes the room.
 	const stop = [...entries.keys()].findIndex(
 		(at) =>
@@ -1087,7 +1093,7 @@ export function cutListing(entries: readonly string[], room: number): string {
 		...kept,
 		...(left > 0
 			? [
-					`${left} older item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
+					`${left} ${kind} item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
 				]
 			: []),
 	].join('\n')
@@ -1105,7 +1111,7 @@ export function cutListing(entries: readonly string[], room: number): string {
  * ```
  */
 export function matchesCutLine(line: string): boolean {
-	return /^\d+ older items? not shown; /.test(line)
+	return /^\d+ (?:older|more) items? not shown; /.test(line)
 }
 
 /**

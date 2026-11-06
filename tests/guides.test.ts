@@ -2018,7 +2018,9 @@ await new GuideCommand({
 			)
 			expect(contents).not.toContain('Look up order BW-5512.')
 			expect(contents).not.toContain(result)
-			expect(contents.at(-1)).toBe(`lookup_order {"id":"BW-5512"}: ${result}`)
+			expect(contents.at(-1)).toBe(
+				`lookup_order {"id":"BW-5512"}: ${result}\nEarlier request: Look up order BW-5512.`,
+			)
 			expect(guideText).toContain(
 				'what its lookups returned reaches a later request through the records and the `recall` tool',
 			)
@@ -2071,7 +2073,7 @@ await new GuideCommand({
 				].join('\n'),
 			)
 			expect(guideText).toContain(
-				"It lists the earlier messages and lookup findings that match a topic (an owner name, an id, or a topic) with their stored content, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
+				"It lists matching statements and lookup findings first, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
 			)
 		})
 
@@ -2137,7 +2139,7 @@ await new GuideCommand({
 				`${seeds.length - kept.length} older items not shown; name a narrower topic to narrow the recall`,
 			)
 			expect(guideText).toContain(
-				'The tool cuts the list by whole items to the room the gauge leaves for the reply, naming how many older items it left out.',
+				'The tool cuts the list by whole items to the room the gauge leaves for the reply, retaining the first item even when it exceeds the room and naming how many items it left out.',
 			)
 		})
 
