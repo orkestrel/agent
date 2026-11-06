@@ -53,4 +53,4 @@ RELEASE: OPEN until `scaffold` 0.0.125 lands.
 
 ## After this wave
 
-M3 found a defect in `interpret` 0.0.20, so `interpret` and `brief` take a small release. `tmp/learn/rulings-m3.md` Round 10.
+M3 found a defect in `interpret` 0.0.20, so `interpret` took 0.0.21 at `267fbdb` and `brief` took 0.0.16 at `d81c5e2`, both published 2026-11-05 with `main` pushed. `tmp/learn/rulings-m3.md` Round 10.
