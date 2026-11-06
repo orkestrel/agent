@@ -60,7 +60,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Live proofs on the dedicated daemon | `ollama` at `bf6fbfc`, 16 files, 89 passed, its daemon proof on the dedicated executable; `agent`'s study suite 161 passed | `falsify.md` |
 | Acceptance gates on each package's final commit | all sixteen green on format, lint, type check, build, and test: 30,196 passed, 36 skipped | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | `interpret` 0.0.21 and `brief` 0.0.16 carry M3's repair. `learn` follows `tmp/learn/extraction/strategy.md`: no language model under test, a reader-free fresh batch of 330 rows, a baseline on human-written messages (RESTAURANTS-8K and MultiWOZ 2.4), then declarations, ownership, and a bounded training experiment, in the order that baseline picks. The wave's close is done but for `scaffold` 0.0.125, held for the debrief's second pass | `release.md`; `tmp/learn/rulings-m3.md` Round 13; `learn`'s plan |
+| Next action | `interpret` 0.0.21 and `brief` 0.0.16 carry M3's repair. `learn` follows `tmp/learn/extraction/strategy.md`, and its overnight reads are in. The user rules on the sentence-end fixes, ask once, the tied rule, and the bars, per `tmp/learn/morning-report.md`. The wave's close is done but for `scaffold` 0.0.125, which is ready and awaits the user's code | `release.md`; `tmp/learn/rulings-m3.md` Round 13; `learn`'s plan |
 
 ## Sequence
 
