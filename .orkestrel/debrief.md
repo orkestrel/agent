@@ -110,10 +110,83 @@ K31 lands in D05, K32 in D13, K34 and K38 in D06. Reference only, with no new la
 
 Re-proof: a process finding closes when the next campaign round runs the corrected process, and a tool finding closes by the same real command on an identified build.
 
+## Second pass
+
+Landed by the scaffold session and released as `@orkestrel/scaffold` 0.0.125, registry-confirmed 2026-11-06 at `ec7a6a121`, from `tmp/debrief/second-pass.md`. Its ledger follows, with L for a line of that file and P for this record's priority.
+
+Two lines were added to `second-pass.md` after this ledger was written, and the scaffold session ruled them by message: the parser differential lands in `patterns.md`, and the `stack.ts` re-pack lesson lands in `release.md`, with the tool itself retiring by adopting `swap.ts`, as P02 rules, and its tarball-against-checkout compare staying with Agent until then.
+
+### Rulings (L = line of second-pass.md; P = Agent priority)
+
+| Row | Ruling | Carrier | State |
+| --- | --- | --- | --- |
+| L3 | Roadmap: who owns a resumable long run is a design question for `study`, not canon | ROADMAP new item | landed |
+| L4 | Exit 1 stays (debrief ruled it; wave.md § Visit documents it). The note is what misreads: `USAGE: 'catalog' does not take --offline` names a usage error the caller did not make. Fix the note only | `src/bin/CLI.ts:907`, unit C | landed |
+| L5 | Counts clause landed at `methods.md` § Separate developmental evidence. Add the control: the audit must refuse the prior draw. Evidence `learn` ledger.md:121 | methods.md | landed |
+| L6 | Rule out for canon: the only record is the list line; `learn` plan.md:88 and ledger.md:120 show the order held once, with no reading of a writer-before-freeze run. One study's ruling, stays in its plan | none | ruled |
+| L7 | Stays as-is: evidence for § Routing's protocol line, no edit | none | ruled |
+| L8 | Landed: `lane.ts --status` prints each ticket and the holder. Re-proved when callers move | `5f0f965e9` | ruled |
+| L9 | Canon: pass the command directly, never through `bash -c` (`orkestrel-parallel` § Share). The caller move and deleting `agent/tmp/lane.ts` are the Agent session's | parallel SKILL.md | landed |
+| L10 | Method: compare the packet's wording with what the reader's prompt is built from, and read the first messages before the run. Evidence `learn` plan.md D29 | methods.md | landed |
+| L11 | Method: presence is not assignment; mark every row and plant swaps. Evidence `learn` plan.md:85 (swap 20 of 20), ledger.md:94 | methods.md | landed |
+| L12 | Page fix: the idle stop was absent for finished Codex children on this host. Evidence `learn` ledger.md:99, list line 12 | t3.md Background row | landed |
+| L13 | Static read: `~/.codex/config.toml` holds `probe` (cwd the `probe` checkout) plus `supervisor_modernization_probe_20261024` and `agent_boost_probe_20261025`. Machine config is the user's: morning question, and a ROADMAP note beside item 72 and 125 | morning report | landed |
+| L14 | Law: count what a child costs in consoles before a fan-out | windows.md | landed |
+| L15 | Law + method: rehearse at full scale, real inputs, no model, before a long run. Evidence `learn` ledger.md:104, plan.md:86 | quality.md § Performance; methods.md | landed |
+| L16 | Page quirk: `queue` on a completed run never reached the target; use `auto`, verify a consequential send by reading the target | t3.md | landed |
+| L17 | Host bullet: `ConvertTo-Json -Depth` on a live graph; shell outlives task; read memory beside consoles | windows.md; t3.md; quality.md | landed |
+| L18 | Law + method: price each arm in hours before ruling it in, show the table first. Evidence `learn` plan.md O36 | orchestration § Hold the plan; methods.md | landed |
+| L19 | Code: a removal refused because a file is held keeps the proved install and does not fail the step; an unsafe path still exits 1. Page: read holders by write-mode open | wave.ts, unit C; windows.md | landed |
+| L20 | Stays in the record: a measurement of one wave, no law. The flake is ROADMAP item 113 | none | ruled |
+| L21 | Law: a version table in a distribution test is a tied hit; a count of hits hides it | wave.md § Sweep | landed |
+| L22 | Dropped: its first reading is refuted by L26. The staged `study` re-proof is the Agent session's | none | ruled |
+| L23, L24 | P1. Code in unit A. L24's second clause: read an upstream's notice and dist-tags before waiting | Upstream.ts; wave.md § Refresh | landed |
+| L25 | Stays as-is: the caret admits 1.65.0, a later wave moves the pin. Observation only | none | ruled |
+| L26 | Law: read what a failing poll saw along the way, and let a background start's error reach it. Evidence probe `3fba544` | tests.md § Condition | landed |
+| L27 | Law: a take-up brief names the whole `npm test`; run the remaining suites once one fails | dispatch SKILL.md | landed |
+| L28 | In `steps.ts` (reads at chain start) and windows.md | unit B; windows.md | landed |
+| L29 | Host bullet: a Git Bash path inside `node -e` is not translated | windows.md | landed |
+| L30 | P2. `orkestrel-publish/scripts/steps.ts` derives the plan and runs it | unit B; wave.md § Prepare | landed |
+| L31 | Law: read the previous Release commit before writing the next | wave.md § Prepare | landed |
+| L32 | P8. Page quirk: a child's completed status is no proof its work stopped | t3.md | landed |
+| L33 | P3. `scaffold catalog` in § Close step 2 | wave.md § Close | landed |
+| L34 | Census by behavior over scaffold's scripts and source: no site slices a trimmed porcelain output (`.trim() !== ''` is emptiness; the path readers use `-z`). Law clause only | portability.md § Line endings | landed |
+| L35 | P4. Law: define a class by what the code does, and run a seeded differential where a baseline exists. Evidence interpret `c8c1c29` | orchestration § Depth; methods.md | landed |
+| L36 | P6. Law: a review brief carries the ruling beside the brief | falsify references/brief.md; orchestration § Size gate | landed |
+| L37 | P5. Law: a hot-path brief names a measured cost bar at the input limit | quality.md § Performance; dispatch step 4 | landed |
+| P7 | Refuse clause: a sum of sole-blocker rows is no bound; report row-level accounting. Evidence `learn` plan.md:264, ledger.md:112, :137 | methods.md | landed |
+| P9 | § tmp layout row, remove ROADMAP item 120. Evidence: `tmp/type/*/tmp` holds only `probes`; sampled packages pin ^0.0.29 | orchestration § tmp layout; ROADMAP | landed |
+| Own | A scaffold re-pin owes a release that makes the fleet's scaffold range trail: price the round before ruling the timing. Evidence `0a8164c3b` | wave.md § Close | landed |
+
+### Line numbering
+
+second-pass.md gained a line after these rulings were written: line 35 is the keep-alive item, so rows L35, L36, and L37 here are lines 36, 37, and 38.
+
+| Row | Ruling | Carrier | State |
+| --- | --- | --- | --- |
+| line 35 | Law: under a delegation with nobody awake, a waiting session arms a keep-alive and a limit, with a peer as watchdog. Page quirk: a nonzero pendingRequestCount with an empty t3_pending_request list. The cause stays unsettled in the record | orchestration § Pace; t3.md | landed |
+
+### Review of the pass
+
+Sonnet, two lanes, with these rulings and the briefs. Verified real and fixed: canon F1 (windows.md pointer), F2 (release.md:8), F3 (wave.md item 4), F4 (Law line), F5 (two readings), F6 (line 35), F7 (seven packages pin probe ^0.0.26: item 120 keeps the re-pin). Code claim 5: added .dll, stated the limits in readHolders. Refuted at the bar: code F1, types.ts:97. Claim 6 second half settled by receipt: the 0.0.124 chain ran every step with a retained node_modules.before under tmp/units/wave.
+
+### Units
+
+- A `sp-upstream`: `#releaseVersion`. Writer `opus`.
+- B `sp-steps`: `steps.ts`. Writer `opus`.
+- C `sp-cleanup`: wave.ts cleanup, CLI note. Writer `opus`.
+- Canon edits: Orchestrator, in the files no unit owns.
+- Review: Sonnet read-only, with these rulings, then one fix round only if a claim is falsified.
+- Release: bump, sweep, catalog, build, surface, `steps.ts` chain as one lane ticket, `Release 0.0.125` local.
+
+### Morning report items
+
+- 0.0.125 state; the code needed.
+- L13: remove the two dated Codex tables, and rule on the user-level `probe` table.
+- `orkestrel-debrief` retirement and the `tmp/` sweep stay the user's.
+
 ## Open
 
-- The scaffold session's gates and `verifier` on `5f0f965e9`, after the scored run ends, then its report.
-- The second pass after M3.
-- Folder retirement and the `tmp/` sweep, after `orkestrel-debrief` steps 7 to 9.
+- `orkestrel-debrief` step 9: the campaign-folder prune and the `tmp/` sweep. It needs `retention.md`'s checks, then the disposition presented to the user, then the user's explicit go-ahead. The scaffold session swept its own `tmp/` by the user's word, and `agent/tmp` and every other package's wait.
 
-DEBRIEF: OPEN — the gates on `@orkestrel/scaffold` `5f0f965e9` and the pass after M3.
+DEBRIEF: OPEN — step 9, on the user's go-ahead.
