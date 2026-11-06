@@ -516,3 +516,6 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-06 | rc-q2, recall reaches earlier requests and replies | `astra` on GPT-6 Astra writes; `reviewer` on GPT-6.1 Sol reads | `deece186` |
 | 2026-11-06 | rc-q4, the previous exchange, for the user's ruling | `astra` on GPT-6 Astra writes; `reviewer` on GPT-6.1 Sol reads | `d91287f6` |
 | 2026-11-06 | rc-q6's cost slot and records | Orchestrator | `plan.md` § State, Records round |
+| 2026-11-06 | The records round's falsify round on the integrated result | objective lane, `reviewer` on GPT-6.1 Sol; subjective lane, `reviewer` on Claude Opus 5.5 | `plan.md` O178 |
+| 2026-11-06 | records-d2, how the exchange is admitted | `planner` on Claude Fable 5.1 | `plan.md` O178 |
+| 2026-11-06 | rc-q4's repairs | `astra` on GPT-6 Astra writes; `reviewer` on GPT-6.1 Sol re-audits | `3ba8f586` |
