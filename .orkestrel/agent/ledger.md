@@ -511,3 +511,5 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-03 | The user's clarification: fix what is found without waiting for Codex, run the Study visit, and delete both viewers. Three fail-open audits (`opus`, `sonnet`), a Study writer (`opus`), and Fable's rulings on the audits (`fable`) launched | user; Orchestrator | `plan.md` O175; `tmp/learn/night-notes.md` |
 | 2026-11-06 | records-g1, absorb the strategy's evidence | `grok` on Cursor Grok 4.7 | `plan.md` O177 |
 | 2026-11-06 | records-d1, the design round on one brief, blind | `planner` on Claude Fable 5.1; `analyst` on GPT-6 Astra | `plan.md` O177 |
+| 2026-11-06 | rc-q1, the quiet floor | `astra` on GPT-6 Astra writes; `reviewer` on GPT-6.1 Sol reads | `d0e1c7cf` |
+| 2026-11-06 | rc-q3, text shapes in the bench | `builder` on GPT-6.1 Sol writes; `checker` on GPT-6 Luna reads | `049db17b` |
