@@ -49,7 +49,7 @@ The last sweep lists only `scaffold`'s three ranges, which are its session's. Th
 
 `scaffold`'s re-pin is committed locally by its session and owes a bump, because scaffold writes those ranges into what it publishes. By the user's word of 2026-11-05, 0.0.125 holds for the debrief's second pass, which ships a scaffold release anyway, so the fleet pays for one round. Until then published 0.0.124 plans `guide` ^0.0.29, `probe` ^0.0.28, and `browser` ^0.0.31 for generated workspaces.
 
-RELEASE: OPEN until the fleet round on `scaffold` 0.0.125 closes.
+§ After this wave records the fleet round that closed it, on 2026-11-06, and the push still waiting on the user's answer.
 
 ## After this wave
 
@@ -57,4 +57,34 @@ M3 found a defect in `interpret` 0.0.20, so `interpret` took 0.0.21 at `267fbdb`
 
 `interpret` took 0.0.22 at `050372c` and `brief` took 0.0.17 at `400b633`, both published 2026-11-06 with `main` pushed, for a word before a sentence-end period that wasn't read. S3, the field word, fails the bar its design set, and goes out as an exception the user accepted by releasing it. `tmp/learn/rulings-m3.md` Round 13.
 
-`scaffold` 0.0.125 landed at `ec7a6a121`, registry-confirmed 2026-11-06T13:28:22Z, carrying the debrief's second pass. That leaves the one fleet round, which the scaffold session runs by the user's word: "Once done done repin then overwrite and reconcile all packages with the new scaffold." While this is written, it holds 8 bumps prepared and not uploaded: `csv` 0.0.13, `msg` 0.0.16, `table` 0.0.15, `capture` 0.0.4, `sea` 0.0.22, `middleware` 0.0.28, `worker` 0.0.20, and `study` 0.0.12, which also carries `c2d549b`. This record closes on its report.
+`scaffold` 0.0.125 landed at `ec7a6a121`, registry-confirmed 2026-11-06T13:28:22Z, carrying the debrief's second pass. That left the one fleet round, which the scaffold session ran by the user's word: "Once done done repin then overwrite and reconcile all packages with the new scaffold."
+
+### The fleet round
+
+Eight packages owed a bump. All 8 went up on one code, confirmed 2026-11-06T15:31:33Z, each repository's `main` pushed with no tags:
+
+| Package | Version | Head |
+| --- | --- | --- |
+| `csv` | 0.0.13 | `a6dc627` |
+| `msg` | 0.0.16 | `680b8f8` |
+| `table` | 0.0.15 | `406cc63` |
+| `capture` | 0.0.4 | `80e5fa1` |
+| `sea` | 0.0.22 | `0d9f71a` |
+| `middleware` | 0.0.28 | `7f30249` |
+| `worker` | 0.0.20 | `189f257` |
+| `study` | 0.0.12, which also carries `c2d549b` | `cf094c6` |
+
+Each ran its whole `prepublishOnly` chain with a real `npm ci`. An independent read from this repository's side, on the registry and the tarballs, found all 8 clean: digests, file lists, manifests against the named commit, entry points, served ranges, and `compare.ts --version` at 0 changed.
+
+- **No bump, 43:** every other catalog package besides `scaffold`, re-pinned and overwritten on 0.0.125 with gates green. `test` stays at 0.0.33 with its `playwright` peer back at `^1.64.1` at `8215799`, since raising it serves no consumer and would owe another fleet round. `mcp`'s `fb9ecff` replaces a fixed delay with a wait in a test.
+- **`agent`:** the last trailing range, `study` ^0.0.12, re-pinned at `2bd2f511`, no bump.
+- **The closing sweep,** 2026-11-06T15:38:11Z at that commit: 414 `@orkestrel` runtime and development ranges across all 52 catalog packages, 0 trailing, and every manifest version equal to what the registry serves.
+- **Out of the round, by the user's word:** `supervisor`, `veneer`, and `learn`.
+
+### Stops and what's owed
+
+- **`scaffold` holds at 0.0.125.** Its catalog table and mirrors trail the 8 until its next release, and a 0.0.126 now would leave every package's scaffold range trailing for no consumer. Reopens at the next release `scaffold` has a reason of its own to make.
+- **The push is the user's, and unanswered.** The 43 no-bump repositories, `scaffold`'s 2 roadmap commits, and `agent` stay unpushed, and silence is no yes. `interpret`'s `main` carries law G's unreleased commits on top, so a push there goes by hash at `9cd32ec`.
+- **Further uploads wait** for the user's return, because each needs their code.
+
+RELEASE: LANDED
