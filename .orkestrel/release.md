@@ -43,8 +43,14 @@ Each came from a chain or visit run, and each that changed behavior under test c
 
 ## Close
 
-Open. The sweep after `browser` read 133 trailing ranges in 44 of 45 packages, all `devDependencies`, none runtime or peer. `agent`'s three are done at `b5ae7940`, which leaves 130 in 43: `probe` in all of them, `guide` and `scaffold` in 34, `test` in 11, and `browser` in 8. `scaffold`'s own ranges are its session's. The 34 moving `scaffold` also take its overwrite. `mcp`'s composition test moves to `agent` 0.0.36 with them.
+Done on this side, after `learn`'s scored run. The sweep after `browser` read 133 trailing ranges in 44 of 45 packages, all `devDependencies`, none runtime or peer. `agent`'s three went at `b5ae7940`, and the other 42 packages each committed `Re-pin <names> development ranges` with their gates green and `compare` ruling no bump, so no upload. Each also ran `scaffold catalog`, because the re-pin leaves tracked guide mirrors and `.claude/agents/orkestrel.md` behind and the gates don't notice. `mcp`'s composition test moved to `agent` 0.0.36 at the commit after its re-pin: 0.0.36 refuses tools with no authority, so its fixture's agents now pass one.
 
-By the Orchestrator's order of 2026-11-05, `learn`'s scored run goes first, since it needs an unbroken lane and depends on none of this. No range ships, so no upload is expected unless a ruling finds a moved `dist`.
+The last sweep lists only `scaffold`'s three ranges, which are its session's. These re-pin commits are local, and each goes out with that repository's next release.
 
-RELEASE: OPEN
+`scaffold`'s re-pin is committed locally by its session and owes a bump, because scaffold writes those ranges into what it publishes. By the user's word of 2026-11-05, 0.0.125 holds for the debrief's second pass, which ships a scaffold release anyway, so the fleet pays for one round. Until then published 0.0.124 plans `guide` ^0.0.29, `probe` ^0.0.28, and `browser` ^0.0.31 for generated workspaces.
+
+RELEASE: OPEN until `scaffold` 0.0.125 lands.
+
+## After this wave
+
+M3 found a defect in `interpret` 0.0.20, so `interpret` and `brief` take a small release. `tmp/learn/rulings-m3.md` Round 10.

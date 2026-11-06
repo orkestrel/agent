@@ -60,7 +60,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Live proofs on the dedicated daemon | `ollama` at `bf6fbfc`, 16 files, 89 passed, its daemon proof on the dedicated executable; `agent`'s study suite 161 passed | `falsify.md` |
 | Acceptance gates on each package's final commit | all sixteen green on format, lint, type check, build, and test: 30,196 passed, 36 skipped | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | all 45 published 2026-11-05. `learn`'s scored M3 run holds the lane, on the screened 0.40.14 runner, with its input re-frozen. Then the wave's close: 130 development ranges in 43 packages. Then the debrief's second pass | `release.md`; `learn`'s plan |
+| Next action | M3 read: safe on `2b`, one floor defect, and 40 and 95 percent missed. `interpret` 0.0.21 awaits the user's code, then `brief`. `learn`'s fresh batch then reads the safety repair alone, with a sealed second reading of the sentence-end recipe word. The user then chooses on the bars with those readings, and the next build follows `tmp/learn/extraction/synthesis.md`. The wave's close is done but for `scaffold` 0.0.125, held for the debrief's second pass | `release.md`; `tmp/learn/rulings-m3.md`; `learn`'s plan |
 
 ## Sequence
 
