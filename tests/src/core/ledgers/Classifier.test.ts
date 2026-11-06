@@ -1,5 +1,5 @@
 import type { JudgeAnswer, LedgerTopic, Message } from '@src/core'
-import { createConversation, JudgeAbortError } from '@src/core'
+import { createConversation, createLedger, JudgeAbortError } from '@src/core'
 import { isRecord } from '@orkestrel/contract'
 import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
@@ -11,15 +11,24 @@ import {
 	LEDGER_SLICE,
 } from '../../../../src/core/ledgers/constants.js'
 import { extractLiterals } from '../../../../src/core/helpers.js'
-import { buildLedgerIndex, matchEntities } from '../../../../src/core/ledgers/helpers.js'
+import {
+	buildLedgerIndex,
+	collectLive,
+	matchEntities,
+} from '../../../../src/core/ledgers/helpers.js'
 import { JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildCategoryAnswer,
+	buildLedgerExchange,
 	createOnceFailingJudge,
 	LEDGER_ONCE_FAILURES,
 	buildLedgerMessage,
 	buildLedgerJudgment,
 	buildClassifierOptions,
+	buildLedgerInput,
+	buildLedgerOptions,
+	createScriptedProvider,
+	extractLedgerRecords,
 	buildCorrectionSeed,
 	buildDeliverySeed,
 	buildLedgerPairJudgment,
@@ -45,6 +54,202 @@ import {
 } from '../../../setup.js'
 
 describe('Classifier', () => {
+	it('hydrates stored quiet weights with one burst of topic asks and the same records as a fresh ledger', async () => {
+		const judge = new SilentJudge()
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const fresh = createLedger(
+			provider,
+			buildLedgerOptions({
+				judge,
+				topics: [{ ...LEDGER_REFUNDS_TOPIC, requested: false }],
+			}),
+		)
+		const message = fresh.conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		fresh.conversation.judgments.add(
+			buildLedgerJudgment(message, { answer: buildCategoryAnswer({ chatter: 0.98, fact: 0.02 }) }),
+		)
+		const snapshot = fresh.snapshot()
+		const restoredJudge = new SilentJudge()
+		const restoredProvider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const restored = createLedger(restoredProvider, {
+			...buildLedgerOptions({
+				judge: restoredJudge,
+				topics: [{ ...LEDGER_REFUNDS_TOPIC, requested: false }],
+			}),
+			snapshot,
+		})
+		await fresh.respond('Check refunds.')
+		await restored.respond('Check refunds.')
+		expect(judge.requests.flatMap((request) => Object.keys(request.questions))).toEqual([
+			JSON.stringify(['topic', message.id, LEDGER_REFUNDS_TOPIC.name]),
+		])
+		expect(restoredJudge.requests).toEqual(judge.requests)
+		await restored.respond('Check refunds again.')
+		expect(restoredJudge.requests).toHaveLength(1)
+	})
+
+	it('carries an owner-backed floor statement into the records on a fresh ledger and through two hydrates', async () => {
+		const text = 'Brightwater Studio moved to 555 Lincoln Avenue.'
+		const request = 'Where did BW-20931 move?'
+		const topics = [{ ...LEDGER_REFUNDS_TOPIC, requested: false }]
+		const freshProvider = createScriptedProvider([{ content: 'Done.' }, { content: 'Done.' }], {
+			recorded: true,
+		})
+		const fresh = createLedger(
+			freshProvider,
+			buildLedgerOptions({ judge: new SilentJudge(), topics }),
+		)
+		fresh.conversation.add(
+			buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+		)
+		await fresh.respond('Check refunds.')
+		const statement = fresh.conversation.add({ role: 'user', content: text })
+		fresh.conversation.judgments.add(
+			buildLedgerJudgment(statement, {
+				answer: buildCategoryAnswer({ chatter: 0.98, fact: 0.02 }),
+			}),
+		)
+		const snapshot = fresh.snapshot()
+		const restoredProvider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const restored = createLedger(
+			restoredProvider,
+			buildLedgerOptions({ judge: new SilentJudge(), topics, snapshot }),
+		)
+		await fresh.respond(request)
+		await restored.respond(request)
+		const records = extractLedgerRecords(requireValue(restoredProvider.calls[0]).messages)
+		expect(records).toContain(text)
+		expect(records).toBe(extractLedgerRecords(requireValue(freshProvider.calls.at(-1)).messages))
+		expect(
+			restored.conversation.judgments.judgment(JSON.stringify(['category', statement.id]))?.answer,
+		).toEqual(buildCategoryAnswer({ chatter: 0.98, fact: 0.02 }))
+		const againJudge = new SilentJudge()
+		const againProvider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const again = createLedger(
+			againProvider,
+			buildLedgerOptions({ judge: againJudge, topics, snapshot: restored.snapshot() }),
+		)
+		await again.respond(request)
+		expect(extractLedgerRecords(requireValue(againProvider.calls[0]).messages)).toContain(text)
+		expect(
+			againJudge.requests
+				.flatMap((one) => Object.keys(one.questions))
+				.filter((key) => key.includes(statement.id)),
+		).toEqual([])
+	})
+
+	it('leaves missing, partial, and refused category answers undecided for a literal statement', async () => {
+		const conversation = createConversation()
+		const message = conversation.add({ role: 'user', content: '8 days sorry' })
+		const judge = new SilentJudge()
+		const classifier = new Classifier(buildClassifierOptions({ conversation, judge }))
+		expect(classifier.quiet(message.id)).toBe(false)
+		expect(classifier.category(message.id)).toBeUndefined()
+		conversation.judgments.add(
+			buildLedgerJudgment(message, {
+				answer: buildCategoryAnswer({ chatter: 0.35, distractor: 0.35, opinion: 0.3 }),
+			}),
+		)
+		expect(classifier.quiet(message.id)).toBe(false)
+		expect(classifier.category(message.id)).toBeUndefined()
+		const key = JSON.stringify(['category', message.id])
+		conversation.judgments.remove(key)
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(judge.requests.flatMap((request) => Object.keys(request.questions))).toContain(key)
+		const refused = requireValue(conversation.judgments.judgment(key))
+		expect(refused.answer).toBeUndefined()
+		expect(refused.refusal).toBeDefined()
+		expect(classifier.quiet(message.id)).toBe(false)
+		expect(classifier.category(message.id)).toBeUndefined()
+	})
+
+	it('keeps numeric and id user statements audible at and above the quiet cutoff', () => {
+		const conversation = createConversation()
+		const number = conversation.add({ role: 'user', content: '8 days sorry' })
+		const id = conversation.add({ role: 'user', content: 'Thanks, AB-12.' })
+		const chatter = conversation.add({ role: 'user', content: 'Thanks.' })
+		const assistant = conversation.add({ role: 'assistant', content: '8 days sorry' })
+		const tool = conversation.add({ role: 'tool', content: 'Thanks, AB-12.' })
+		const classifier = new Classifier(buildClassifierOptions({ conversation }))
+		for (const weight of [0.7, 0.98]) {
+			for (const message of conversation.messages())
+				conversation.judgments.add(
+					buildLedgerJudgment(message, {
+						answer: buildCategoryAnswer({ chatter: weight, opinion: 1 - weight }),
+					}),
+				)
+			for (const message of [number, id]) {
+				expect(classifier.quiet(message.id)).toBe(false)
+				expect(classifier.category(message.id)).toBeUndefined()
+				expect(classifier.decisive(message.id)).toBe(false)
+				expect(classifier.classification().categories.has(message.id)).toBe(false)
+			}
+			expect(classifier.classification().quiet).toEqual(
+				new Set([chatter.id, assistant.id, tool.id]),
+			)
+		}
+	})
+
+	it('asks a floor statement its topic before considering it for a later correction', async () => {
+		const conversation = createConversation()
+		const earlier = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
+		conversation.judgments.add(
+			buildLedgerJudgment(earlier, { answer: buildCategoryAnswer({ chatter: 1 }) }),
+		)
+		const judge = new SilentJudge()
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				judge,
+				topics: [LEDGER_REFUNDS_TOPIC],
+				entities: (text) => extractLiterals(text).ids,
+			}),
+		)
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(judge.requests.flatMap((request) => Object.keys(request.questions))).toEqual([
+			JSON.stringify(['topic', earlier.id, LEDGER_REFUNDS_TOPIC.name]),
+		])
+		const later = conversation.add({ role: 'user', content: 'Refund AB-12 is 30, not 20.' })
+		conversation.judgments.add(
+			buildLedgerJudgment(later, { answer: buildCategoryAnswer({ correction: 1 }) }),
+		)
+		await classifier.classify(new Set(), new AbortController().signal)
+		expect(judge.requests.flatMap((request) => Object.keys(request.questions))).toEqual([
+			JSON.stringify(['topic', earlier.id, LEDGER_REFUNDS_TOPIC.name]),
+			JSON.stringify(['topic', later.id, LEDGER_REFUNDS_TOPIC.name]),
+			JSON.stringify(['amends', earlier.id, later.id]),
+		])
+	})
+
+	it('keeps the earlier record when a quiet later message has an accepted supersession at a low correction cutoff', async () => {
+		const conversation = createConversation()
+		const earlier = conversation.add({ role: 'user', content: 'The depot opens at nine.' })
+		const later = conversation.add({ role: 'user', content: 'Thanks, never mind.' })
+		conversation.judgments.add(buildLedgerJudgment(earlier))
+		conversation.judgments.add(
+			buildLedgerJudgment(later, {
+				answer: buildCategoryAnswer({ chatter: 0.8, correction: 0.2 }),
+			}),
+		)
+		conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+		conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 1))
+		const classifier = new Classifier(
+			buildClassifierOptions({
+				conversation,
+				thresholds: { ...LEDGER_DESK_THRESHOLDS, correction: 0.2 },
+				entities: () => new Set(['depot']),
+			}),
+		)
+		await classifier.classify(new Set(), new AbortController().signal)
+		const classification = classifier.classification()
+		expect(classification.quiet.has(later.id)).toBe(true)
+		expect(
+			collectLive({ ...buildLedgerInput(), messages: conversation.messages(), classification }),
+		).toEqual([earlier.id])
+		expect(classification.supersessions.size).toBe(0)
+		expect(classification.amendments.size).toBe(0)
+	})
+
 	it('refuses a hole in the topic list, as a for…of visits it as an undefined topic', () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })

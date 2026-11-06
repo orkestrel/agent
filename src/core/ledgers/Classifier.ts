@@ -76,7 +76,7 @@ export class Classifier implements ClassifierInterface {
 	/**
 	 * Reads the category a message is filed under.
 	 * @param id - The message id
-	 * @returns The assigned category, the recorded category at the cutoff, or `undefined`
+	 * @returns The assigned category, the recorded category at the cutoff, or `undefined`; a quiet winner suppressed by the user literal floor remains undecided
 	 */
 	category(id: string): LedgerCategory | undefined {
 		const message = this.#options.conversation.message(id)
@@ -90,24 +90,30 @@ export class Classifier implements ClassifierInterface {
 			return probability !== undefined && probability >= cutoff ? [{ category, probability }] : []
 		})
 		// The first category in `LEDGER_CATEGORIES` order with the highest probability wins a tie.
-		return candidates.reduce<{ category: LedgerCategory; probability: number } | undefined>(
+		const winner = candidates.reduce<{ category: LedgerCategory; probability: number } | undefined>(
 			(best, candidate) =>
 				best === undefined || candidate.probability > best.probability ? candidate : best,
 			undefined,
 		)?.category
+		return winner !== undefined && QUIET_CATEGORIES.includes(winner) && !this.quiet(id)
+			? undefined
+			: winner
 	}
 
 	/**
 	 * Reports whether a message files under a quiet category.
 	 * @param id - The message id
-	 * @returns True if the assigned or recorded category is quiet; false otherwise.
+	 * @returns True if the assigned category is quiet or the recorded quiet weight reaches the cutoff, except for a user message carrying an id or number; false otherwise
 	 */
 	quiet(id: string): boolean {
 		const message = this.#options.conversation.message(id)
 		if (message === undefined) return false
 		const assigned = this.#options.assign(message)
 		if (assigned !== undefined) return QUIET_CATEGORIES.includes(assigned)
-		return this.#weigh(id, QUIET_CATEGORIES) >= this.#options.thresholds.category
+		if (this.#weigh(id, QUIET_CATEGORIES) < this.#options.thresholds.category) return false
+		if (message.role !== 'user') return true
+		const literals = extractLiterals(message.content)
+		return literals.ids.size + literals.numbers.size === 0
 	}
 
 	/**
@@ -166,7 +172,8 @@ export class Classifier implements ClassifierInterface {
 				before === undefined ||
 				after === undefined ||
 				(this.#readNoul(this.#buildPair(head, earlier, later)) ?? 0) <
-					this.#options.thresholds[head]
+					this.#options.thresholds[head] ||
+				this.quiet(later)
 			)
 				return []
 			return head === 'amends' &&

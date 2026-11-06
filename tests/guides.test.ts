@@ -2734,7 +2734,7 @@ await new GuideCommand({
 
 		it('retires a record message only through a replacing finding or a quiet filing and never by request count, as the no-retirement limit claims', async () => {
 			const rule = 'Refunds over $100 need a manager.'
-			const caller = 'Brightwater Studio called twice about order BW-5512.'
+			const caller = 'Brightwater Studio called twice about the order.'
 			const provider = createScriptedProvider([
 				{
 					content: '',

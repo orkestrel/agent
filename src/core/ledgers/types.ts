@@ -801,14 +801,14 @@ export interface ClassifierInterface {
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**
-	 * Returns the category a message is filed under, or undefined when no category reaches its cutoff.
+	 * Returns the assigned or recorded category, or undefined when no category reaches its cutoff or the user literal floor suppresses a quiet winner.
 	 *
 	 * @param id - The id of the message
 	 * @returns The category, or undefined
 	 */
 	category(id: string): LedgerCategory | undefined
 	/**
-	 * Returns true if the message is filed as quiet; false otherwise.
+	 * Returns true for a quiet assignment or a recorded quiet weight at the cutoff, except for a user message carrying an id or number; false otherwise.
 	 *
 	 * @param id - The id of the message
 	 * @returns True if the message is quiet; false otherwise.
