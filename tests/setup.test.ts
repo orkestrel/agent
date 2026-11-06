@@ -17,7 +17,10 @@ import {
 	LEDGER_BENCH_DESK,
 	renderLedgerPositions,
 	seedLedgerPrefix,
+	buildLedgerText,
+	measureLedgerText,
 } from './setup.js'
+import { checkLedgerSample, isLedgerCell, takeLedgerSample } from './setupServer.js'
 import {
 	admitsRelayCredential,
 	buildLedgerTailScenario,
@@ -3521,6 +3524,81 @@ describe('ledger bench builders', () => {
 		expect(await computeTextDigest('')).toBe(
 			'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
 		)
+	})
+})
+
+describe('ledger text shapes', () => {
+	it('keeps uniform blocks and generates the declared long tail and concentrated paste', () => {
+		for (const arm of ['control', 'correction'] as const) {
+			const uniform = buildLedgerPrefix(290, arm).snapshot.conversation.messages
+			const real = buildLedgerPrefix(290, arm, 'real').snapshot.conversation.messages
+			const paste = buildLedgerPrefix(290, arm, 'paste').snapshot.conversation.messages
+			const text = measureLedgerText(real)
+			expect(text.count).toBe(288)
+			expect(text.median).toBeGreaterThanOrEqual(513)
+			expect(text.median).toBeLessThanOrEqual(627)
+			expect(text.p95).toBeGreaterThanOrEqual(4500)
+			expect(text.p95).toBeLessThanOrEqual(5500)
+			expect(text.maximum).toBeGreaterThanOrEqual(9000)
+			expect(text.maximum).toBeLessThanOrEqual(11000)
+			expect(measureLedgerText(paste).maximum).toBe(200_000)
+			expect(paste[0]?.role).toBe('user')
+			expect(paste.slice(1).map((message) => message.content)).toEqual(
+				uniform.slice(1).map((message) => message.content),
+			)
+			expect(real.map((message) => message.role)).toEqual(uniform.map((message) => message.role))
+		}
+		expect(measureLedgerText([])).toEqual({ count: 0, bytes: 0, median: 0, p95: 0, maximum: 0 })
+		expect(measureLedgerText([{ role: 'user', content: 'é' }])).toEqual({
+			count: 1,
+			bytes: 2,
+			median: 1,
+			p95: 1,
+			maximum: 1,
+		})
+		const message = { role: 'user', content: 'Order OR-1000 is packed.' } as const
+		expect(buildLedgerText(message, 0, 288, 'uniform')).toBe(message)
+		expect(buildLedgerText(message, 0, 288, 'real').content).toHaveLength(120)
+	})
+
+	it('reads the complete seeded population including the short request and answer', async () => {
+		const seed = await seedLedgerPrefix(290, 'control', 'real')
+		expect(measureLedgerText(seed.snapshot.conversation.messages)).toEqual({
+			count: 290,
+			bytes: 489714,
+			median: 565,
+			p95: 5000,
+			maximum: 10000,
+		})
+	})
+
+	it('refuses unknown shapes and admits recall while keeping legacy cells valid', () => {
+		const cell = { arm: 'control', size: 290, count: 3, task: 'time' }
+		expect(isLedgerCell(cell)).toBe(true)
+		for (const shape of ['uniform', 'real', 'paste'])
+			expect(isLedgerCell({ ...cell, shape, task: 'recall' })).toBe(true)
+		expect(isLedgerCell({ ...cell, shape: 'unknown' })).toBe(false)
+		expect(isLedgerCell({ ...cell, task: 'unknown' })).toBe(false)
+	})
+
+	it('rejects a real seed sample when one stored answer is removed', async () => {
+		const seed = await seedLedgerPrefix(18, 'control', 'real')
+		const sample = await takeLedgerSample(seed.snapshot)
+		expect(checkLedgerSample(sample)).toBe(sample)
+		const judgments = requireValue(seed.snapshot.conversation.judgments)
+		expect(judgments.length).toBeGreaterThan(0)
+		const broken = await takeLedgerSample(
+			{
+				...seed.snapshot,
+				conversation: { ...seed.snapshot.conversation, judgments: judgments.slice(1) },
+			},
+			undefined,
+			undefined,
+			'time',
+			createCorrectionJudge(createRecorder(), new Set(), { amends: 0, supersedes: 0 }),
+		)
+		expect(broken.asked).toBeGreaterThan(0)
+		expect(() => checkLedgerSample(broken)).toThrow('the ledger bench sample broke an invariant')
 	})
 })
 

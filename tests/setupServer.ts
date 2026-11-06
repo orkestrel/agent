@@ -1,9 +1,10 @@
-import type { LedgerBenchArm } from './setup.js'
-import type { LedgerSnapshot, Selection } from '@src/core'
+import type { LedgerBenchArm, LedgerBenchShape, LedgerTextSize } from './setup.js'
+import type { JudgeInterface, LedgerSnapshot, Selection } from '@src/core'
 import type { RouteInput } from '@orkestrel/router'
 import type { ServerInterface } from '@orkestrel/server'
 import type { RecorderInterface } from '@orkestrel/test'
 import type { SchedulerInterface } from '@orkestrel/workflow'
+import type { ToolResult } from '@orkestrel/tool'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { cpus } from 'node:os'
 import { dirname } from 'node:path'
@@ -20,6 +21,7 @@ import {
 	createRecordedScheduler,
 	createScriptedProvider,
 	LEDGER_BENCH_MODEL,
+	measureLedgerText,
 	renderLedgerPositions,
 	seedLedgerPrefix,
 } from './setup.js'
@@ -84,9 +86,16 @@ export interface LedgerHeartbeat {
 	readonly turns: number
 }
 
+/** Carries one real recall tool's result and its call interval. */
+export interface LedgerRecall {
+	readonly wall: number
+	readonly cpu: number
+	readonly result: ToolResult
+}
+
 /**
- * Carries what one timed ledger bench request measured, from the agent's first `start` event to its
- * first `select` event. A sample of a paced cell also carries its heartbeat's {@link LedgerHeartbeat}.
+ * Carries a selection's first `start` to first `select` interval, or one direct recall's tool-call
+ * interval during the first selection event. A paced cell also carries the selection's {@link LedgerHeartbeat}.
  */
 export interface LedgerSample extends Partial<LedgerHeartbeat> {
 	readonly wall: number
@@ -106,8 +115,8 @@ export interface HostTimes {
 	readonly own: NodeJS.CpuUsage
 }
 
-/** Names what a ledger bench process does with its cell: seed the prefix, log one digest, or time samples. */
-export type LedgerCellTask = 'seed' | 'digest' | 'time'
+/** Names what a ledger bench process does: seed, digest, time selections, or time direct recalls. */
+export type LedgerCellTask = 'seed' | 'digest' | 'time' | 'recall'
 
 /** Names the scheduler a ledger bench sample passes: the host's Node backend, or a stub resolving with no macrotask. */
 export type LedgerCellPace = 'node' | 'micro'
@@ -127,6 +136,7 @@ export interface LedgerCell {
 	readonly seed?: string
 	readonly record?: string
 	readonly pace?: LedgerCellPace
+	readonly shape?: LedgerBenchShape
 }
 
 /** Carries what a ledger bench run reports of its measurement: tinybench's latency mean and relative margin of error. */
@@ -151,6 +161,7 @@ export type LedgerBench = (
 
 /** Carries what one ledger bench process recorded: its cell, its worker, its samples, and its readings. */
 export interface LedgerCellRecord {
+	readonly text: LedgerTextSize
 	readonly cell: LedgerCell
 	readonly pid: number
 	readonly version: string
@@ -273,12 +284,16 @@ export function readLedgerHeartbeat(
  * @param snapshot - The seeded snapshot to hydrate from
  * @param wait - The busy wait in milliseconds, registered after the `start` mark; undefined registers none
  * @param pace - The scheduler to pass and the heartbeat to arm at the `start` mark; undefined does neither
- * @returns The wall and CPU time from the first `start` to the first `select`, the judge-call count, the event tallies, the attempt outcomes, the digest of the position-labelled selection, and with a pace the heartbeat's pacing
+ * @param task - The region to time: selection, or one direct recall during its first selection event
+ * @param judge - The optional answering boundary a negative control uses; omitted rejects every ask
+ * @returns The selected region's wall and CPU, judge calls, event tallies, attempt outcomes, the selection digest (including the recall result for recall), and optional selection heartbeat
  */
 export async function takeLedgerSample(
 	snapshot: LedgerSnapshot,
 	wait?: number,
 	pace?: LedgerCellPace,
+	task: LedgerCellTask = 'time',
+	judge?: JudgeInterface,
 ): Promise<LedgerSample> {
 	const asked = createRecorder<readonly [key: string]>()
 	const ledger = createLedger(
@@ -286,7 +301,10 @@ export async function takeLedgerSample(
 		buildLedgerBenchOptions(
 			createLedgerJudge(
 				asked,
-				() => Promise.reject(new Error('the timed ledger judge was reached')),
+				(request) =>
+					judge === undefined
+						? Promise.reject(new Error('the timed ledger judge was reached'))
+						: judge.ask(request, new AbortController().signal),
 				LEDGER_BENCH_MODEL,
 			),
 			false,
@@ -299,6 +317,7 @@ export async function takeLedgerSample(
 			readonly [name: 'start' | 'select' | 'fault', usage: NodeJS.CpuUsage, at: number]
 		>()
 	const selections = createRecorder<readonly [selection: Selection]>()
+	const recalls = createRecorder<readonly [sample: Promise<LedgerRecall>]>()
 	ledger.agent.emitter.on('start', () =>
 		marks.handler('start', process.cpuUsage(), performance.now()),
 	)
@@ -306,6 +325,19 @@ export async function takeLedgerSample(
 	ledger.agent.emitter.on('select', (selection) => {
 		marks.handler('select', process.cpuUsage(), performance.now())
 		selections.handler(selection)
+		if (task === 'recall' && recalls.count === 0) {
+			const usage = process.cpuUsage()
+			const start = performance.now()
+			recalls.handler(
+				ledger.agent.context.tools
+					.execute({ id: 'bench-recall', name: 'recall', arguments: { topic: 'orders' } })
+					.then((result) => {
+						const wall = performance.now() - start
+						const cpu = process.cpuUsage(usage)
+						return { wall, cpu: (cpu.user + cpu.system) / 1000, result }
+					}),
+			)
+		}
 	})
 	ledger.agent.emitter.on('fault', () =>
 		marks.handler('fault', process.cpuUsage(), performance.now()),
@@ -319,9 +351,20 @@ export async function takeLedgerSample(
 	const [, startUsage, startAt] = requireValue(marks.calls.find(([name]) => name === 'start'))
 	const [, selectUsage, selectAt] = requireValue(marks.calls.find(([name]) => name === 'select'))
 	const [selection] = requireValue(selections.calls.at(0))
+	const recall = task === 'recall' ? await requireValue(recalls.calls.at(0))[0] : undefined
+	const recalled = recall?.result
+	if (recalled !== undefined && !recalled.success)
+		throw new Error(`the ledger bench recall failed: ${JSON.stringify(recalled)}`)
+	if (
+		recalled !== undefined &&
+		(!isString(recalled.value) || new Set(recalled.value.match(/OR-\d+/g)).size < 2)
+	)
+		throw new Error('the ledger bench recall matched fewer than two orders')
 	return {
-		wall: selectAt - startAt,
-		cpu: (selectUsage.user - startUsage.user + (selectUsage.system - startUsage.system)) / 1000,
+		wall: recall?.wall ?? selectAt - startAt,
+		cpu:
+			recall?.cpu ??
+			(selectUsage.user - startUsage.user + (selectUsage.system - startUsage.system)) / 1000,
 		asked: asked.count,
 		starts: marks.calls.filter(([name]) => name === 'start').length,
 		selects: marks.calls.filter(([name]) => name === 'select').length,
@@ -332,7 +375,10 @@ export async function takeLedgerSample(
 			),
 		),
 		digest: await computeTextDigest(
-			renderLedgerPositions(selection.messages, ledger.conversation.messages()),
+			renderLedgerPositions(
+				recalled === undefined ? selection.messages : { messages: selection.messages, recalled },
+				ledger.conversation.messages(),
+			),
 		),
 		...(pace === undefined
 			? {}
@@ -389,7 +435,14 @@ export function isLedgerCell(value: unknown): value is LedgerCell {
 	return (
 		isRecord(value) &&
 		(value.arm === 'correction' || value.arm === 'control') &&
-		(value.task === 'seed' || value.task === 'digest' || value.task === 'time') &&
+		(value.task === 'seed' ||
+			value.task === 'digest' ||
+			value.task === 'time' ||
+			value.task === 'recall') &&
+		(value.shape === undefined ||
+			value.shape === 'uniform' ||
+			value.shape === 'real' ||
+			value.shape === 'paste') &&
 		Number.isSafeInteger(value.size) &&
 		Number(value.size) > 0 &&
 		Number.isSafeInteger(value.count) &&
@@ -409,6 +462,8 @@ export function isLedgerCell(value: unknown): value is LedgerCell {
  * @param arm - The arm the calling bench case measures
  * @param size - The conversation length the calling bench case measures
  * @param env - The environment to read {@link LEDGER_CELL_VARIABLE} from. Default: `process.env`
+ * @param shape - The calling case's text shape, when specified
+ * @param task - The calling case's task, when specified
  * @returns The cell the named file holds, or the arm and size with {@link LEDGER_CELL_DEFAULT} when the variable is unset
  * @throws {Error} Thrown when the named file holds no ledger bench cell, or a cell for another arm or size
  */
@@ -416,13 +471,25 @@ export function readLedgerCell(
 	arm: LedgerBenchArm,
 	size: number,
 	env: Readonly<Record<string, string | undefined>> = process.env,
+	shape?: LedgerBenchShape,
+	task?: LedgerCellTask,
 ): LedgerCell {
 	const path = env[LEDGER_CELL_VARIABLE]
-	if (path === undefined) return { arm, size, ...LEDGER_CELL_DEFAULT }
+	if (path === undefined)
+		return {
+			arm,
+			size,
+			...LEDGER_CELL_DEFAULT,
+			...(shape === undefined ? {} : { shape }),
+			...(task === undefined ? {} : { task }),
+		}
 	const cell = parseJSONAs(readFileSync(path, 'utf8'), isLedgerCell)
 	if (cell === undefined) throw new Error(`${path} holds no ledger bench cell`)
 	if (cell.arm !== arm || cell.size !== size)
 		throw new Error(`${path} names the ${cell.arm} arm at ${cell.size}, not ${arm} at ${size}`)
+	if (shape !== undefined && (cell.shape ?? 'uniform') !== shape)
+		throw new Error(`${path} names another text shape`)
+	if (task !== undefined && cell.task !== task) throw new Error(`${path} names another task`)
 	return cell
 }
 
@@ -457,6 +524,7 @@ export function checkLedgerSample(sample: LedgerSample): LedgerSample {
  * @param count - The fixed warmup count; undefined applies {@link LEDGER_WARMUP}
  * @param pace - The pace each sample takes; undefined takes none
  * @param taken - The warmup samples taken so far
+ * @param task - The region every warmup times
  * @returns Every warmup sample in the order taken
  */
 export async function warmLedgerSamples(
@@ -465,6 +533,7 @@ export async function warmLedgerSamples(
 	count: number | undefined,
 	pace?: LedgerCellPace,
 	taken: readonly LedgerSample[] = [],
+	task: LedgerCellTask = 'time',
 ): Promise<readonly LedgerSample[]> {
 	const wall = taken.reduce((sum, sample) => sum + sample.wall, 0)
 	const warm =
@@ -475,9 +544,9 @@ export async function warmLedgerSamples(
 	if (warm) return taken
 	const sample = logLedgerSample(
 		'warmup',
-		checkLedgerSample(await takeLedgerSample(snapshot, wait, pace)),
+		checkLedgerSample(await takeLedgerSample(snapshot, wait, pace, task)),
 	)
-	return warmLedgerSamples(snapshot, wait, count, pace, [...taken, sample])
+	return warmLedgerSamples(snapshot, wait, count, pace, [...taken, sample], task)
 }
 
 /**
@@ -503,12 +572,15 @@ export function logLedgerSample(phase: 'warmup' | 'measured', sample: LedgerSamp
  * `bench(name, {}, fn).run({ time: 0, iterations: count, warmup: false, throws: true })` call,
  * whose own timing serves only the reported `mean` and `rme`. Every sample is checked and logged,
  * and the record lists the distinct selection digests of the warmups and the measured samples. A
- * cell's pace applies to its warmups and to every sample it takes.
+ * recall task follows the same warmup and sample rules, timing one direct tool call during the
+ * first cached selection event while its request is active. A cell's pace applies to every selection.
  *
  * @param bench - The `bench` test-context fixture
  * @param arm - The arm the calling bench case measures
  * @param size - The conversation length the calling bench case measures
  * @param env - The environment to read the cell from. Default: `process.env`
+ * @param shape - The calling case's text shape, when specified
+ * @param task - The calling case's task, when specified
  * @returns The cell record, also written to the cell's record file when it names one
  * @throws {Error} Thrown when the cell cannot be read or a sample breaks an invariant
  */
@@ -517,22 +589,24 @@ export async function runLedgerCell(
 	arm: LedgerBenchArm,
 	size: number,
 	env: Readonly<Record<string, string | undefined>> = process.env,
+	shape?: LedgerBenchShape,
+	task?: LedgerCellTask,
 ): Promise<LedgerCellRecord> {
-	const cell = readLedgerCell(arm, size, env)
-	const snapshot = await loadLedgerSeed(cell.seed, arm, size)
+	const cell = readLedgerCell(arm, size, env, shape, task)
+	const snapshot = await loadLedgerSeed(cell.seed, arm, size, cell.shape)
 	const seed = await computeTextDigest(JSON.stringify(snapshot))
 	const warmups =
-		cell.task === 'time'
-			? await warmLedgerSamples(snapshot, cell.wait, cell.warmups, cell.pace)
+		cell.task === 'time' || cell.task === 'recall'
+			? await warmLedgerSamples(snapshot, cell.wait, cell.warmups, cell.pace, [], cell.task)
 			: []
 	const samples = createRecorder<readonly [sample: LedgerSample]>()
 	const measured = await measureOtherLoad(async () => {
-		if (cell.task === 'time')
+		if (cell.task === 'time' || cell.task === 'recall')
 			return bench(`${arm} ${size}`, {}, async () =>
 				samples.handler(
 					logLedgerSample(
 						'measured',
-						checkLedgerSample(await takeLedgerSample(snapshot, cell.wait, cell.pace)),
+						checkLedgerSample(await takeLedgerSample(snapshot, cell.wait, cell.pace, cell.task)),
 					),
 				),
 			).run({ time: 0, iterations: cell.count, warmup: false, throws: true })
@@ -547,6 +621,7 @@ export async function runLedgerCell(
 	})
 	const taken = samples.calls.map(([sample]) => sample)
 	const record: LedgerCellRecord = {
+		text: measureLedgerText(snapshot.conversation.messages),
 		cell,
 		pid: process.pid,
 		version: process.version,
@@ -561,6 +636,7 @@ export async function runLedgerCell(
 			? {}
 			: { mean: measured.value.latency.mean, rme: measured.value.latency.rme }),
 	}
+	if (record.digests.length > 1) throw new Error('the ledger bench selection digest changed')
 	if (cell.record !== undefined) writeLedgerRecord(cell.record, record)
 	return record
 }
@@ -572,6 +648,7 @@ export async function runLedgerCell(
  * @param path - The seed file; undefined seeds in memory and writes nothing
  * @param arm - The history the prefix serves
  * @param size - The conversation length the seeded snapshot holds
+ * @param shape - The deterministic text distribution to seed
  * @returns The seeded snapshot
  * @throws {Error} Thrown when the file holds no ledger snapshot
  */
@@ -579,13 +656,14 @@ export async function loadLedgerSeed(
 	path: string | undefined,
 	arm: LedgerBenchArm,
 	size: number,
+	shape: LedgerBenchShape = 'uniform',
 ): Promise<LedgerSnapshot> {
 	if (path !== undefined && existsSync(path)) {
 		const snapshot = parseJSONAs(readFileSync(path, 'utf8'), isLedgerSnapshot)
 		if (snapshot === undefined) throw new Error(`${path} holds no ledger snapshot`)
 		return snapshot
 	}
-	const seed = await seedLedgerPrefix(size, arm)
+	const seed = await seedLedgerPrefix(size, arm, shape)
 	if (path !== undefined) {
 		mkdirSync(dirname(path), { recursive: true })
 		writeFileSync(path, JSON.stringify(seed.snapshot))

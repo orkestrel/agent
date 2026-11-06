@@ -8742,6 +8742,89 @@ export const LEDGER_BENCH_BLOCK = 8
 /** Counts the messages a seeding request adds after a ledger bench prefix: the request and its reply. */
 export const LEDGER_BENCH_TAIL = 2
 
+/** Names the deterministic text distribution a ledger bench reads. */
+export type LedgerBenchShape = 'uniform' | 'real' | 'paste'
+
+/** Carries the text population a ledger cell actually reads, in UTF-8 bytes and characters. */
+export interface LedgerTextSize {
+	readonly count: number
+	readonly bytes: number
+	readonly median: number
+	readonly p95: number
+	readonly maximum: number
+}
+
+/** Holds authored filler with no additional order identities or correction markers. */
+export const LEDGER_BENCH_SENTENCE =
+	' The support team recorded the delivery details and retained the customer update for the next handoff.'
+
+/**
+ * Builds message text of the selected shape while retaining the block statements and tool calls.
+ *
+ * @param message - The block message to extend
+ * @param index - The message's place in the prefix, which draws its length
+ * @param total - The messages in the prefix
+ * @param shape - The text distribution to draw from
+ * @returns The message, extended with authored filler to its drawn length
+ * @example
+ * ```ts
+ * buildLedgerText({ role: 'user', content: 'Note.' }, 0, 8, 'paste').content?.length // 200000
+ * ```
+ */
+export function buildLedgerText(
+	message: MessageInput,
+	index: number,
+	total: number,
+	shape: LedgerBenchShape,
+): MessageInput {
+	if (shape === 'uniform' || (shape === 'paste' && index !== 0)) return message
+	const rank = ((index * 73) % total) / Math.max(1, total - 1)
+	const length =
+		shape === 'paste'
+			? 200_000
+			: rank < 0.5
+				? Math.round(120 + rank * 900)
+				: rank < 0.94
+					? Math.round(570 + ((rank - 0.5) / 0.44) * 3930)
+					: rank < 0.96
+						? 5000
+						: Math.round(5000 + ((rank - 0.96) / 0.04) * 5000)
+	const content = message.content ?? ''
+	return {
+		...message,
+		content:
+			content +
+			LEDGER_BENCH_SENTENCE.repeat(Math.ceil(length / LEDGER_BENCH_SENTENCE.length)).slice(
+				0,
+				Math.max(0, length - content.length),
+			),
+	}
+}
+
+/**
+ * Reads nearest-rank text percentiles and UTF-8 bytes from the seeded messages.
+ *
+ * @param messages - The seeded messages
+ * @returns Their count, summed bytes, and median, p95, and maximum characters
+ * @example
+ * ```ts
+ * measureLedgerText([{ role: 'user', content: 'Note.' }]).maximum // 5
+ * ```
+ */
+export function measureLedgerText(messages: ReadonlyArray<Message | MessageInput>): LedgerTextSize {
+	const lengths = messages.map((message) => (message.content ?? '').length).sort((a, b) => a - b)
+	return {
+		count: messages.length,
+		bytes: messages.reduce(
+			(sum, message) => sum + new TextEncoder().encode(message.content ?? '').length,
+			0,
+		),
+		median: lengths[Math.max(0, Math.ceil(lengths.length * 0.5) - 1)] ?? 0,
+		p95: lengths[Math.max(0, Math.ceil(lengths.length * 0.95) - 1)] ?? 0,
+		maximum: lengths.at(-1) ?? 0,
+	}
+}
+
 /**
  * Builds one block of the ledger bench history: three attributed statements, a request, a lookup
  * exchange, an assistant reply, and a closing statement. In the correction arm, an odd block's
@@ -8787,20 +8870,33 @@ export function buildLedgerBlock(index: number, arm: LedgerBenchArm): readonly M
  *
  * @param length - The conversation length after the seeding request adds its two messages
  * @param arm - The history the prefix serves
+ * @param shape - The deterministic text distribution of its block messages
  * @returns The prefix snapshot and the ids of its correction-weighted statements
  */
-export function buildLedgerPrefix(length: number, arm: LedgerBenchArm): LedgerPrefix {
+export function buildLedgerPrefix(
+	length: number,
+	arm: LedgerBenchArm,
+	shape: LedgerBenchShape = 'uniform',
+): LedgerPrefix {
 	const conversation = createConversation()
 	const total = length - LEDGER_BENCH_TAIL
 	const blocks = Array.from({ length: Math.floor(total / LEDGER_BENCH_BLOCK) }, (_unused, index) =>
-		conversation.add(buildLedgerBlock(index, arm)),
+		conversation.add(
+			buildLedgerBlock(index, arm).map((message, offset) =>
+				buildLedgerText(message, index * LEDGER_BENCH_BLOCK + offset, total, shape),
+			),
+		),
 	)
 	const rest = total - blocks.length * LEDGER_BENCH_BLOCK
 	if (rest > 0)
 		conversation.add(
 			Array.from({ length: rest }, (_unused, index): MessageInput => ({
-				role: 'user',
-				content: `[Source F-${index}] Order OR-${1000 + index} note ${index}.`,
+				...buildLedgerText(
+					{ role: 'user', content: `[Source F-${index}] Order OR-${1000 + index} note ${index}.` },
+					blocks.length * LEDGER_BENCH_BLOCK + index,
+					total,
+					shape,
+				),
 			})),
 		)
 	return {
@@ -8935,10 +9031,15 @@ export function buildLedgerBenchOptions(
  *
  * @param length - The conversation length the seeded snapshot holds
  * @param arm - The history the prefix serves
+ * @param shape - The deterministic text distribution to file
  * @returns The snapshot after the request, its correction count, and the request's attempts
  */
-export async function seedLedgerPrefix(length: number, arm: LedgerBenchArm): Promise<LedgerSeed> {
-	const prefix = buildLedgerPrefix(length, arm)
+export async function seedLedgerPrefix(
+	length: number,
+	arm: LedgerBenchArm,
+	shape: LedgerBenchShape = 'uniform',
+): Promise<LedgerSeed> {
+	const prefix = buildLedgerPrefix(length, arm, shape)
 	const ledger = createLedger(
 		createScriptedProvider([{ content: 'Noted.' }]),
 		buildLedgerBenchOptions(
