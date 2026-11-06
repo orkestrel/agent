@@ -49,8 +49,12 @@ The last sweep lists only `scaffold`'s three ranges, which are its session's. Th
 
 `scaffold`'s re-pin is committed locally by its session and owes a bump, because scaffold writes those ranges into what it publishes. By the user's word of 2026-11-05, 0.0.125 holds for the debrief's second pass, which ships a scaffold release anyway, so the fleet pays for one round. Until then published 0.0.124 plans `guide` ^0.0.29, `probe` ^0.0.28, and `browser` ^0.0.31 for generated workspaces.
 
-RELEASE: OPEN until `scaffold` 0.0.125 lands.
+RELEASE: OPEN until the fleet round on `scaffold` 0.0.125 closes.
 
 ## After this wave
 
 M3 found a defect in `interpret` 0.0.20, so `interpret` took 0.0.21 at `267fbdb` and `brief` took 0.0.16 at `d81c5e2`, both published 2026-11-05 with `main` pushed. `tmp/learn/rulings-m3.md` Round 10.
+
+`interpret` took 0.0.22 at `050372c` and `brief` took 0.0.17 at `400b633`, both published 2026-11-06 with `main` pushed, for a word before a sentence-end period that wasn't read. S3, the field word, fails the bar its design set, and goes out as an exception the user accepted by releasing it. `tmp/learn/rulings-m3.md` Round 13.
+
+`scaffold` 0.0.125 landed at `ec7a6a121`, registry-confirmed 2026-11-06T13:28:22Z, carrying the debrief's second pass. That leaves the one fleet round, which the scaffold session runs by the user's word: "Once done done repin then overwrite and reconcile all packages with the new scaffold." While this is written, it holds 8 bumps prepared and not uploaded: `csv` 0.0.13, `msg` 0.0.16, `table` 0.0.15, `capture` 0.0.4, `sea` 0.0.22, `middleware` 0.0.28, `worker` 0.0.20, and `study` 0.0.12, which also carries `c2d549b`. This record closes on its report.

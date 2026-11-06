@@ -60,7 +60,7 @@ Layer order, lowest first. A dependent reads a lower layer's local build until t
 | Live proofs on the dedicated daemon | `ollama` at `bf6fbfc`, 16 files, 89 passed, its daemon proof on the dedicated executable; `agent`'s study suite 161 passed | `falsify.md` |
 | Acceptance gates on each package's final commit | all sixteen green on format, lint, type check, build, and test: 30,196 passed, 36 skipped | `ledger.md` |
 | Deviations from `.agents/orchestration.md`, all before the user's realignment of 2026-11-04 | writers committed and installed, where § Permission floor reserves both; fix rounds went by message, where § Sessions and consultation asks for a brief file; writers read their own gates; scripts written in bash, which `AGENTS.md` forbids | corrected in § Sequence |
-| Next action | `interpret` 0.0.21 and `brief` 0.0.16 carry M3's repair. `learn` stops as a product, by the user's word of 2026-11-06, after E1 failed its seal, with its salvage in `learn/.orkestrel/learn/designs/salvage.md`. `interpret` 0.0.22, then `brief` 0.0.17, are being released, and `scaffold` 0.0.125 follows once its catalog takes them, then the one fleet round. The wave's close is done but for that | `release.md`; ledger; `learn`'s plan |
+| Next action | `learn` is retired unpublished, by the user's word of 2026-11-06, and its session is pruning it. `interpret` 0.0.22, `brief` 0.0.17, and `scaffold` 0.0.125 are published. The one fleet round is the scaffold session's, with 8 bumps prepared for the user's code. Then `agent` re-pins what moved, `release.md` closes, and the debrief's step 9 waits on the user's go-ahead. Model tests wait on the user's word | `release.md`; ledger; `debrief.md` |
 
 ## Sequence
 
