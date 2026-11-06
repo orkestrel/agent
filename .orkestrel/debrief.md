@@ -2,7 +2,7 @@
 
 Verdict: the law for ending a wave existed, and the route this campaign took never reached it. The user gave the go-ahead on 2026-11-04: the scaffold session lands the canon delta and holds its wording to `@orkestrel/scaffold`'s standard. The delta is committed at `@orkestrel/scaffold` `5f0f965e9`, local and unpushed, and its gates wait for the scored run to end.
 
-Canon paths name files in `@orkestrel/scaffold` at `1f73afbf3`. Evidence is quoted from the campaign record. A second pass follows `@orkestrel/learn`'s M3. Input: `methods.md`, `plan.md`, `ledger.md`, `falsify.md`, `@orkestrel/learn` `.orkestrel/learn/`.
+Canon paths name files in `@orkestrel/scaffold` at `1f73afbf3`. Evidence is quoted from the campaign record. A second pass follows `@orkestrel/learn`'s M3. Input: `methods.md`, `plan.md`, `ledger.md`, `falsify.md`, `@orkestrel/learn` `.orkestrel/learn/`, which `learn` pruned at `02d01b4`, so read its citations below at `02d01b4^` in that repository.
 
 ## Rulings on divergences
 
