@@ -1665,11 +1665,11 @@ await new GuideCommand({
 			expect(second.content).toBe('Yes. Refunds over $100 need a manager.')
 			expect(copies).toEqual([
 				'## Rules\n- Refunds over $100 need a manager.\n\n## Request\nCan Brightwater Studio get a refund on order BW-5512?',
-				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nDoes the Brightwater Studio refund need a manager?',
+				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Request\nDoes the Brightwater Studio refund need a manager?',
 			])
 			// Every scripted reply was taken: two calibration calls and three turns.
 			expect(replies.next()).toEqual({ done: true, value: undefined })
-			// The previous exchange follows the seed and precedes the request copy.
+			// The first copy as sent and its reply follow the seed and precede the second copy.
 			expect(prompts.count).toBe(3)
 			expect(
 				requireValue(prompts.calls[2]?.[0], 'Missing prompt').map(({ role, content }) => [
@@ -1679,7 +1679,7 @@ await new GuideCommand({
 			).toEqual([
 				['system', system],
 				['user', 'Refunds over $100 need a manager.'],
-				['user', 'Can Brightwater Studio get a refund on order BW-5512?'],
+				['user', copies[0]],
 				['assistant', 'Order BW-5512 qualifies for a $148.50 refund.'],
 				['user', copies[1]],
 			])
@@ -1699,7 +1699,7 @@ await new GuideCommand({
 				"// '## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nCan Brightwater Studio get a refund on order BW-5512?' — no lookup has named an owner yet",
 			)
 			expect(guideText).toContain(
-				"// '## Records\\n### Brightwater Studio (BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?'",
+				"// '## Records\\n### Brightwater Studio (BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?' — the first copy still holds the rule",
 			)
 		})
 
@@ -1729,10 +1729,8 @@ await new GuideCommand({
 				capacity: 32_768,
 				lookups: [createGuideOrderLookup()],
 			}
-			const ledger = createLedger(
-				createGuideScriptProvider(script.values(), createRecorder<readonly [readonly Message[]]>()),
-				options,
-			)
+			const parent = createRecorder<readonly [readonly Message[]]>()
+			const ledger = createLedger(createGuideScriptProvider(script.values(), parent), options)
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
 			await ledger.calibrate(AbortSignal.timeout(30_000))
 			await ledger.respond('Can Brightwater Studio get a refund on order BW-5512?')
@@ -1743,10 +1741,11 @@ await new GuideCommand({
 			const snapshot = requireValue(isLedgerSnapshot(parsed) ? parsed : undefined)
 			// The second ledger's provider holds the one reply; a calibration call would take it.
 			const replies = [{ content: answer }].values()
-			const restored = createLedger(
-				createGuideScriptProvider(replies, createRecorder<readonly [readonly Message[]]>()),
-				{ ...options, snapshot },
-			)
+			const child = createRecorder<readonly [readonly Message[]]>()
+			const restored = createLedger(createGuideScriptProvider(replies, child), {
+				...options,
+				snapshot,
+			})
 			const overhead = restored.gauge?.overhead
 			const copies: Array<string | undefined> = []
 			restored.agent.emitter.on('select', (selection) =>
@@ -1764,10 +1763,53 @@ await new GuideCommand({
 			expect(restored.gauge).toEqual(snapshot.gauge)
 			expect(third.content).toBe(answer)
 			expect(replies.next()).toEqual({ done: true, value: undefined })
-			expect(copies).toEqual([
-				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nIs the Brightwater Studio refund approved yet?',
-			])
+			expect(copies).toEqual([request])
 			expect(uninterrupted).toEqual(copies)
+			// The whole prompt matches the uninterrupted ledger's, the window's copies included.
+			expect(snapshot.window?.exchanges).toHaveLength(2)
+			expect(
+				requireValue(child.calls[0]?.[0], 'Missing hydrated prompt').map(({ role, content }) => [
+					role,
+					content,
+				]),
+			).toEqual(
+				requireValue(parent.calls[3]?.[0], 'Missing uninterrupted prompt').map(
+					({ role, content }) => [role, content],
+				),
+			)
+			// A host that deletes the window gets the guard's admission and the newest pair plain.
+			const { conversation, requests, notes, failures, gauge } = snapshot
+			const migrated = {
+				conversation,
+				requests,
+				notes,
+				failures,
+				...(gauge === undefined ? {} : { gauge }),
+			}
+			expect(isLedgerSnapshot(migrated)).toBe(true)
+			const derived = createRecorder<readonly [readonly Message[]]>()
+			await createLedger(createGuideScriptProvider([{ content: answer }].values(), derived), {
+				...options,
+				snapshot: migrated,
+			}).respond(request)
+			expect(
+				requireValue(derived.calls[0]?.[0], 'Missing derived prompt').map(({ role, content }) => [
+					role,
+					content,
+				]),
+			).toEqual([
+				['system', options.system],
+				['user', 'Refunds over $100 need a manager.'],
+				['user', 'Does the Brightwater Studio refund need a manager?'],
+				['assistant', 'Yes. Refunds over $100 need a manager.'],
+				[
+					'user',
+					'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Rules\n- Refunds over $100 need a manager.\n\n## Request\nIs the Brightwater Studio refund approved yet?',
+				],
+			])
+			expect(guideText).toContain(
+				'A host that migrates or redacts a snapshot can delete its `window` member as the clean path',
+			)
 			expect(guideText).toContain(
 				"declare const provider: ProviderInterface // scripted with one reply: 'Not yet. A manager must approve it.'",
 			)
@@ -1786,7 +1828,80 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain("third.content // 'Not yet. A manager must approve it.'")
 			expect(guideText).toContain(
-				"// '## Records\\n### Brightwater Studio (BW-20931)\\n- Order BW-5512 for account BW-20931: Brightwater Studio.\\n- Refund due $148.50.\\n\\n## Rules\\n- Refunds over $100 need a manager.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
+				"// 'Is the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
+			)
+		})
+
+		it('takes a lower rung on a hydrated ledger between the two reserves with the same record coverage, as the gauge limit claims', async () => {
+			const rule = 'Refunds over $100 need a manager.'
+			const long = 'The refund form is on file. '.repeat(160)
+			// A prompt of 0 keeps the scale at 1, and a small completion keeps the live reserve small.
+			const usage = { prompt: 0, completion: 100, total: 100 }
+			const parent = createScriptedProvider(
+				[{ content: long, usage }, { content: long, usage }, { content: 'Done.' }],
+				{ recorded: true },
+			)
+			const options = buildGuideLedgerOptions({
+				judge: createPhraseJudge(['Refunds over']),
+				capacity: 4096,
+				gauge: { scale: 1, overhead: 0 },
+			})
+			const ledger = createLedger(parent, options)
+			ledger.conversation.add({ role: 'user', content: rule })
+			await ledger.respond('First request.')
+			await ledger.respond('Second request.')
+			const snapshot = ledger.snapshot()
+			const child = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			await createLedger(child, { ...options, snapshot }).respond('Third request.')
+			await ledger.respond('Third request.')
+
+			const live = requireValue(parent.calls[2], 'Missing uninterrupted prompt').messages
+			const hydrated = requireValue(child.calls[0], 'Missing hydrated prompt').messages
+			const copy = `## Rules\n- ${rule}\n\n## Request\n`
+			expect(live.map(({ content }) => content)).toEqual([
+				'Serve the desk.',
+				rule,
+				`${copy}First request.`,
+				long,
+				'Second request.',
+				long,
+				'Third request.',
+			])
+			expect(hydrated.map(({ content }) => content)).toEqual([
+				'Serve the desk.',
+				rule,
+				'Second request.',
+				long,
+				`${copy}Third request.`,
+			])
+			for (const prompt of [live, hydrated])
+				expect(prompt.map((message) => extractLedgerRecords([message])).join('\n\n')).toContain(
+					`- ${rule}`,
+				)
+			expect(guideText).toContain(
+				'A rung that lies between the two reserves can differ, which moves the prefix and never the record coverage.',
+			)
+		})
+
+		it('passes the two edits a stored copy cannot detect and refuses a changed sentence, as the stored copy limit claims', () => {
+			const { matchesLedgerCopy, splitSentences } = barrel
+			const request: Message = { id: 'request', role: 'user', content: 'Check delivery.' }
+			const copy =
+				'## Records\n- Delivery costs $12.\n- Refund is $9.\n\n## Request\nCheck delivery.'
+			// A held sentence edited to text the copy already holds elsewhere.
+			expect(matchesLedgerCopy(copy, request, ['Refund is $9.'])).toBe(true)
+			// A held sentence kept, with another appended: the receipt reads the kept one.
+			expect(
+				matchesLedgerCopy(
+					copy,
+					request,
+					splitSentences('Delivery costs $12. It is waived.').slice(0, 1),
+				),
+			).toBe(true)
+			expect(matchesLedgerCopy(copy, request, ['Delivery costs $99.'])).toBe(false)
+			expect(matchesLedgerCopy(copy, { ...request, content: 'Check redacted.' }, [])).toBe(false)
+			expect(guideText).toContain(
+				'Two edits pass the check, and the old copy then reaches the provider: an edit to text that already occurs elsewhere in that copy, and an edit that keeps a held sentence and appends another.',
 			)
 		})
 
@@ -2023,7 +2138,7 @@ await new GuideCommand({
 				`lookup_order {"id":"BW-5512"}: ${result}\nEarlier request: Look up order BW-5512.`,
 			)
 			expect(guideText).toContain(
-				'what its lookups returned reaches a later request through the records and the `recall` tool',
+				"what a request's lookups returned reaches a later request through the records and the `recall` tool",
 			)
 		})
 
@@ -2362,7 +2477,7 @@ await new GuideCommand({
 				).toEqual(boundary === hidden ? [shown.content] : [])
 			}
 			expect(guideText).toContain(
-				'The plan prices each lookup stub in the tail at the longer of its `shown` and `hidden` forms, so a tail that fits the plan still fits after the records decide which results they show.',
+				'The plan prices each lookup stub in the tail at the longer of its `shown` and `hidden` forms, so a tail that fits the plan still fits after the window and the copy decide which results they show.',
 			)
 		})
 
@@ -2624,7 +2739,7 @@ await new GuideCommand({
 			expect(estimateMessages(first)).toBeGreaterThan(capacity)
 			expect(second.findLast(({ role }) => role === 'tool')?.content).toBe(reading)
 			expect(guideText).toContain(
-				"The budget bounds only the records and the tail of a request's first call: the plan prices the built head, the tail, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The budget bounds only the records, the tail, and the window of a request's first call: the plan prices the built head, the tail, the window, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 			expect(guideText).toContain(
 				"A request, a lookup result, the pass's own turns, the answer note, or the whole view a faulted selection builds from reaches the provider whole when it's larger than the room the `capacity` option leaves, and the provider's own context limit decides what happens to it.",
@@ -2701,7 +2816,7 @@ await new GuideCommand({
 			)
 			expect(estimateMessages(direct)).toBeGreaterThan(budget)
 			expect(guideText).toContain(
-				"The budget bounds only the records and the tail of a request's first call: the plan prices the built head, the tail, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The budget bounds only the records, the tail, and the window of a request's first call: the plan prices the built head, the tail, the window, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
 			)
 		})
 
@@ -2727,11 +2842,12 @@ await new GuideCommand({
 			expect(sent.map(({ content }) => content)).toEqual([
 				'Serve the desk.',
 				'Refunds over $100 need a manager.',
-				'Review the desk.',
+				'## Rules\n- Refunds over $100 need a manager.\n\n## Request\nReview the desk.',
 				'Done.',
 				`${records}\n\n## Request\nWhen do the refund forms arrive?`,
 			])
 			expect(records).toContain(later)
+			expect(records).not.toContain('Refunds over')
 			expect(guideText).toContain(
 				'A host statement reaches the prompt through records or recall, and neither that statement nor a host lookup after the reply erases the exchange.',
 			)
@@ -2795,9 +2911,12 @@ await new GuideCommand({
 					],
 				}),
 			)
+			// A prompt's records sit across the window's copies and the request copy.
 			const texts: string[] = []
 			ledger.agent.emitter.on('select', (selection) =>
-				texts.push(extractLedgerRecords(selection.messages)),
+				texts.push(
+					selection.messages.map((message) => extractLedgerRecords([message])).join('\n\n'),
+				),
 			)
 			ledger.conversation.add([
 				{ role: 'user', content: rule },

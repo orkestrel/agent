@@ -1,6 +1,6 @@
 # Records design
 
-The ledger is the records strategy. This design covers its source of truth, its durability, its write cost, its render path, and its two fixes. Source locations name a symbol and its file as of `1e82d145` unless a line names `2da6d0b6`. Measurements point at `research/evidence.md`; gates point at `designs/measurement.md` § Gates; deferrals point at `plan.md` § Deferred.
+The ledger is the records strategy. This design covers its source of truth, its durability, its write cost, its render path, and its two fixes. Source locations name a symbol and its file as of `1e82d145` unless a line names another commit. Measurements point at `research/evidence.md`; gates point at `designs/measurement.md` § Gates; deferrals point at `plan.md` § Deferred.
 
 ## Source of truth
 
@@ -14,6 +14,7 @@ Store nothing that can be derived. The source of truth is three logs:
 
 - Records, lines, amendments, supersessions, and validity are projections of those logs (`buildRecords` in `src/core/ledgers/helpers.ts`).
 - Build no second event log and no delta graph; a snapshot is a cache of the logs, never their replacement (C19).
+- The window (§ Window) records what each prompt sent, which no log can derive. It is no source of truth: a stale record empties it, and the logs derive the newest pair (O186).
 - The marks live only in private fields, so a conversation snapshot alone mis-files on restore: a failed lookup with no recorded result files as `fact` (`Ledger#assign`), later assistant replies stop filing as `chatter` and reach the judge, and requests receive a category question they never get as of `1e82d145` (`Classifier` category pass).
 
 ## Ledger snapshot
@@ -28,6 +29,7 @@ export interface LedgerSnapshot {
 	readonly notes: readonly string[] // user messages carrying `LEDGER_NOTES` text
 	readonly failures: readonly string[] // tool messages whose call or reading failed
 	readonly gauge?: LedgerGauge
+	readonly window?: LedgerWindowSnapshot // present only while the window holds an exchange (O186)
 }
 
 export interface LedgerOptions {
@@ -52,6 +54,11 @@ export interface LedgerInterface {
 - The snapshot carries no version field until a second schema exists.
 - A deterministic judge failure the classifier memoized is not persisted, so a hydrated ledger asks that question again; the guide states this limit.
 - Hydrating a second ledger from `snapshot()` forks it at the parent's frontier. A subagent or a what-if branch needs no graph; merging back is the child's bounded answer arriving as one message in the parent (D16).
+- The window travels in the snapshot (O186; `d49671a3`), because in a chat with no arrivals it is the whole of the memory (O184). A snapshot of an empty window reads as one with no member, and a 0.0.36 snapshot reads as it did and derives the newest pair plain.
+- A hydrated ledger sends what the uninterrupted one would when the live and hydrated reserves admit the same rung. Gauge observations do not travel, so a rung between the two reserves can differ, which moves the prefix and never the record coverage (`LedgerSnapshot` in `src/core/ledgers/types.ts`).
+- `Ledger#snapshot` omits a window `auditLedgerWindow` faults against the conversation it took, and `isLedgerSnapshot` refuses such a window at the door.
+- `Ledger#seat` discards the whole window when `matchesLedgerCopy` refuses a stored copy against the conversation's current text, so an edit reaches no provider as old text. A request with no stored copy and every reply travel by id.
+- Two edits pass that check, a stated limit: an edit to text that already occurs elsewhere in that copy, and an edit that keeps a held sentence and appends another. A host migrating or redacting a snapshot can delete `window` as the clean path.
 
 ### Adverse orderings
 
@@ -130,14 +137,15 @@ Refused (F1): the Ollama judge sends one request per question, so grouping a mes
 
 As of `2da6d0b6`, the built system message holds, in order, the system text, the instructions, the workspace text, and the rendered records (the briefing) as its last part (`AgentContext#build` in `src/core/contexts/AgentContext.ts`). The tail follows: the seed exchanges before the first request, then the current request (`Ledger#selectTail` in `src/core/ledgers/Ledger.ts`). The records change on every request, so the reusable prefix across requests ends at the system text, and a lookup reading and a user's rule sentence reach the `system` message.
 
-`rc-u10` moves the records out of the `system` message into a built copy of the request turn (O11, O12; `designs/layout.md`). The target layout, ordered from stable to volatile:
+`rc-u10` moves the records out of the `system` message into a built copy of the request turn (O11, O12; `designs/layout.md`). The layout as of `d49671a3`, ordered from stable to volatile:
 
 ```text
-tools, system | system text, instructions with loaded skill bodies, skills index   (changes only on edit)
-user context  | memos index, workspace text                                         (changes on a memo write or a file edit)
-tail          | recent exchanges: requests, final replies, stubbed tool turns       (append-only; drained in batches)
-request       | ## Records, ## Rules, then ## Request and the user's words          (per request)
-run           | this run's turns                                                    (append-only within a run)
+tools, system | system text, instructions with loaded skill bodies, skills index    (changes only on edit)
+user context  | memos index, workspace text                                          (changes on a memo write or a file edit)
+seed tail     | messages before the first request, with lookup stubs                 (fixed selection; a stub's state follows the window)
+window        | completed exchanges as sent: request copies and final replies        (append-only; empties on a stale record)
+request       | ## Records and ## Rules lines the window lacks, ## Request, the words (per request)
+run           | this run's turns                                                     (append-only within a run)
 ```
 
 ### Records in the request turn
@@ -163,20 +171,28 @@ run           | this run's turns                                                
 - The cache claim depends on rc-u10: while the records precede the tail inside the `system` message, draining buys no prefix reuse.
 - A default-off switch on `LedgerOptions` gated the tail while the experiment ran. The gate failed and the switch was deleted as `c7e1d12e`; the seed tail stays (`plan.md` O163).
 - The frozen-tail census motivates the change (`research/evidence.md` § Prior-campaign readings). The prior campaign's R1 moving tail could act but was stripped with no quality grade (`7ada8b77:.orkestrel/agent/plan.md` § Removed experiments).
-- Recall listing assistant replies is the fallback (D15).
+- Recall listing assistant replies is the fallback (D15), built as `rc-q2` (§ Recall over earlier turns; `plan.md` O180).
+- The user's word reopens this seam (`plan.md` O182). § Window is what it builds: the seed tail stays, and no drain to half runs (`plan.md` O183).
 
-### Previous exchange
+### Window
 
-`rc-q4` (`d91287f6`, for the user's ruling) carries the previous request and the last assistant message after it, between the seed tail and the request copy. It isn't the moving tail: the seed's selection stays, one exchange is carried, and nothing is switched.
+`rc-s3` (`d49671a3`) replaces `rc-q4`'s one carried exchange (`d91287f6`, `3ba8f586`). Each prompt holds the seed tail, each completed exchange as it was sent, and a request copy holding only the record lines the window doesn't hold (`plan.md` O185, O186). The seed's selection stays, and nothing is switched. Refused layouts and what reopens each: `plan.md` § S10.
 
-- The reply is the last assistant message after the previous request. A blank one, or one with calls, carries nothing, with no fallback to an older reply. A statement a host adds after it doesn't displace it.
-- It has its own allowance, the tail share of the plan's total, and it joins only if the head, the seed tail, the exchange, and the request fit the total with no records. Otherwise it's omitted whole. Records give way to an admitted exchange.
-- When it displaces a seed lookup's record, that stub reads `hidden`, because the stub stays true, and that moves the reusable prefix on that request.
-- Replayed on sealed checkpoints, ids of the previous product reaching the prompt read 39 of 94 before and 89 of 94 after, and the mean prompt 6663 characters before and 10763 after. What the longer prompt costs a live model is owed (D95).
+- An entry is a `LedgerExchange` in `src/core/ledgers/types.ts`: the request copy as sent, its final reply, and the lines that copy rendered. Tool calls, tool messages, and ledger notes never enter it, so a request that called a tool shares a prefix only through its copy, and its reply reads again (O186).
+- A line is held by record key, record title, source, and sentence (`buildLedgerLineKey` in `src/core/ledgers/helpers.ts`), never by text, so identical words under another source keep their attribution. A copy with no line to add is the request itself (O185).
+- The window is additive (O178, `3ba8f586`). `Ledger#trim` plans the seed tail and the records without it, so it spends only spare room of the plan's total and never displaces a record line or a seed message. `share.tail` bounds only the seed tail (O185).
+- `Ledger#plan` prices three rungs in order: the whole window with a copy of the lines it doesn't hold; the newest exchange with its request plain and a copy of every selected line; no exchange and a copy of every selected line. A rung needs its prompt at or under the total and must not be what flips `recall` from open to closed, a differential check, so a ledger whose `recall` is closed without an exchange still carries one (O178, O185). No search runs, and records are never retrimmed to admit a window.
+- A fall to a lower rung is silent. An answered request leaves the window as what it sent plus its own exchange (`Ledger#commitExchange`).
+- The reply is the last call-free assistant message after its request, and two non-empty ones with no ledger note between them carry nothing, so a host-written line never reads as the answer (`collectLedgerReplies`; O178). A statement or a lookup a host adds after the reply doesn't displace it.
+- A stale record empties the window (`Ledger#plan`): a held message changed or removed, the accepted edges touching a held message changed, a held source gone from the projection, a held pair no longer paired, or a printed amendment note or reference that this request's lines would change. Absence from this request's selected records is no change (O185).
+- An empty window derives the newest pair by the conversation with its request plain, or nothing when the newest marked request holds no valid reply (`Ledger#selectExchange`). One rule serves hydrate, a stale record, and a fall to nothing, and it never falls back past an invalid newest exchange (O186).
+- A failed request leaves the window standing, so the next prompt extends the last good exchange (O185). An answered `view()` fallback joins with its request plain (O186). A committed partial reply after an abort joins under the pair rule (O185).
+- A seed stub's `shown` reads over the window and the copy together, with no wording change and no `LedgerLookupState` change (O185).
+- A model server that keeps a prompt cache reuses a prompt that extends the last. On a model whose generation prefix differs from how it renders a reply in history, the reply itself reads again, so a follow-up costs the reply plus the text the last prompt didn't hold. The guide states this limit with no figure, and `plan.md` holds the figures.
 
 ### Recall over earlier turns
 
-`rc-q2` (`deece186`, under D15, for the user's ruling) lets `Ledger#recall` list earlier requests and replies on a word match, after today's statements and lookup results, under `LEDGER_RECALL_LABELS`. A label names the message's role. A stored line break reads as a line break and two spaces, so only a label opens a line. Listed text stays out of the records and the `system` message. A small model must still choose to call `recall`, so this reaches older turns and doesn't replace rc-q4.
+`rc-q2` (`deece186`, under D15, for the user's ruling) lets `Ledger#recall` list earlier requests and replies on a word match, after today's statements and lookup results, under `LEDGER_RECALL_LABELS`. A label names the message's role. A stored line break reads as a line break and two spaces, so only a label opens a line. Listed text stays out of the records and the `system` message. A small model must still choose to call `recall`, so this reaches turns the window no longer holds and doesn't replace § Window. It reads the conversation and not the prompt, so it can list a reply the window already carries (D102).
 
 ## Filing
 
