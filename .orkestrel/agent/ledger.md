@@ -538,3 +538,4 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-07 | The falsify repairs' re-audit | `reviewer` Claude Opus 5.5 | `plan.md` O191 |
 | 2026-11-07 | The closing re-audit of six rows | `reviewer` GPT-6 Astra | `plan.md` O191 |
 | 2026-11-07 | The tree-wide gates on `c9a651b2` | `verifier` GPT-6 Luna | `plan.md` O191 |
+| 2026-11-07 | The user's word: ready to publish after a last push on `recall` and the manageable gaps. S11 opens | user | `plan.md` O192 |
