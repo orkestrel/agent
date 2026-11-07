@@ -540,3 +540,14 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-07 | The tree-wide gates on `c9a651b2` | `verifier` GPT-6 Luna | `plan.md` O191 |
 | 2026-11-07 | The user's word: ready to publish after a last push on `recall` and the manageable gaps. S11 opens | user | `plan.md` O192 |
 | 2026-11-07 | The user's word: the router stays in the studies, and the studies say what they are | user | `plan.md` O193 |
+| 2026-11-07 | rc-t1 to rc-t4 and their repair rounds | `astra` GPT-6 Astra | `plan.md` O194 |
+| 2026-11-07 | rc-t5's census of what is generic | `scout` Grok 4.7 | `plan.md` O194 |
+| 2026-11-07 | rc-t5a, the studies' names | `builder` GPT-6.1 Sol | `plan.md` O194 |
+| 2026-11-07 | rc-t5b, the README and the guide's recipe | `opus` Claude Opus 5.5 | `plan.md` O194 |
+| 2026-11-07 | rc-t's review | `reviewer` Claude Opus 5.5 | `plan.md` O194 |
+| 2026-11-07 | rc-t's re-audit of the repaired rows | `reviewer` GPT-6 Astra | `plan.md` O194 |
+| 2026-11-07 | rc-t5c, the guide true to the repaired build | `opus` GPT-6 Astra | `plan.md` O194 |
+| 2026-11-07 | The closure check of three rows | `reviewer` GPT-6 Astra | `plan.md` O194 |
+| 2026-11-07 | The tree-wide gates before `513a9a31` | `verifier` GPT-6 Luna | `plan.md` O194 |
+| 2026-11-07 | The user's word: Codex models as much as possible, usage reset | user | `plan.md` O194 |
+| 2026-11-07 | The user's word: S11 first, truly complete, as a publish point with a proper commit | user | `plan.md` O194 |
