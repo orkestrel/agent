@@ -533,3 +533,5 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-06 | rc-s3's re-audit | `reviewer` Claude Opus 5.5 | `plan.md` O186 |
 | 2026-11-07 | The changed-bytes design question, read-only consultation | `planner` Claude Fable 5.1 | `d49671a3` |
 | 2026-11-07 | rc-s4, the guide and designs | `opus` Claude Opus 5.5 | `plan.md` O189 |
+| 2026-11-07 | S10's falsify round, objective lane | `reviewer` GPT-6 Astra | `plan.md` O190 |
+| 2026-11-07 | S10's falsify round, subjective lane | `reviewer` Claude Opus 5.5 | `plan.md` O190 |
