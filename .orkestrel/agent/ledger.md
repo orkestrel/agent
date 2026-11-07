@@ -524,3 +524,5 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-06 | The user's word: yes to all three, real tests and numbers. S10 opens | user | `plan.md` O182 |
 | 2026-11-06 | S10's design round for rc-s2 and rc-s3, read-only consultation | `planner` Claude Fable 5.1 | `plan.md` O185 |
 | 2026-11-06 | S10's design round for rc-s2 and rc-s3 | `analyst` GPT-6 Astra | `plan.md` O185 |
+| 2026-11-06 | rc-s1, the 4B profile with the judge's placement | `builder` GPT-6.1 Sol | `plan.md` § S10 |
+| 2026-11-06 | rc-s1's conformance | `checker` GPT-6 Luna | `plan.md` § S10 |

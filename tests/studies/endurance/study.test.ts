@@ -255,7 +255,7 @@ describe('prospective public endurance declarations', () => {
 		// A reply at the output allowance fits one request: 136 B per chunk is goal 53's reply, 1014630 B over 7496 chunks, and 46120 B is the largest recorded request, compaction ev-03-2.
 		expect(q2.bounds.request.bytes).toBeGreaterThan(q2.room.output * 136 + 46120)
 		expect(provider.digest.model).toMatch(/^[0-9a-f]{64}$/)
-		// The one-variable comparison with the larger model holds the same room and the same roots.
+		// Both profiles hold the same room and the same roots.
 		expect(q2.room).toEqual(q4.room)
 		expect(q2.roots).toEqual(q4.roots)
 		const fixture = await loadMemoryInputs(
@@ -304,13 +304,43 @@ describe('prospective public endurance declarations', () => {
 					model: 'd8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04',
 					judge: 'ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b',
 				},
+				daemon: {
+					executable:
+						'C:\\Users\\mikes\\WebstormProjects\\agent\\tmp\\studies\\runner\\ollama-0.40.15\\ollama.exe',
+					digest: '544216ca2082b8bc19b4ba94b513f0098fa06774b232f3c140090e3449e322a5',
+					version: '0.40.15',
+					models: [
+						{
+							name: 'qwen3.5:4b-q4_K_M',
+							digest: 'd8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04',
+						},
+						{
+							name: 'hf.co/sky7350/Mica-v0.1-4B:Q4_K_M',
+							digest: 'ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b',
+						},
+					],
+					environment: {
+						OLLAMA_NUM_PARALLEL: '1',
+						OLLAMA_MAX_LOADED_MODELS: '0',
+						LLAMA_ARG_CONTEXT_SHIFT: '0',
+						OLLAMA_NOPRUNE: '1',
+					},
+				},
 			},
 			room: { context: 20480, output: 8192, safety: 512, recap: 2048, think: false },
+			settings: {
+				observe: true,
+				judge: { gpu: 0 },
+				version: '0.40.15',
+				metadata: { calls: 8192, bytes: 67108864, duration: 600000 },
+				gauge: { scale: 1, overhead: 352 },
+			},
+			record: { bytes: 536870912, calls: 4096, duration: 1800000 },
 			bounds: {
-				request: { duration: 360000, calls: 1, tokens: 19968, bytes: 1048576 },
-				goal: { duration: 900000, calls: 128, tokens: 2555904, bytes: 134217728 },
-				trial: { duration: 14400000, calls: 4096, tokens: 8000000, bytes: 1073741824 },
-				series: { duration: 21600000, calls: 8192, tokens: 16000000, bytes: 2147483648 },
+				request: { duration: 360000, calls: 1, tokens: 19968, bytes: 2097152 },
+				goal: { duration: 900000, calls: 512, tokens: 10223616, bytes: 536870912 },
+				trial: { duration: 2400000, calls: 4096, tokens: 81788928, bytes: 1073741824 },
+				series: { duration: 2400000, calls: 8192, tokens: 163577856, bytes: 2147483648 },
 			},
 		})
 		for (const input of [capacity, quality]) {

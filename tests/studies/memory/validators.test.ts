@@ -80,6 +80,26 @@ describe('memory declaration and mechanical evidence', () => {
 			expect([settings, isStudyMemoryOptions(settings)]).toEqual([settings, true])
 	})
 
+	it('admits a non-negative safe integer judge placement and refuses malformed placements', () => {
+		for (const gpu of [0, 1, Number.MAX_SAFE_INTEGER])
+			expect(isStudyMemoryOptions({ judge: { gpu } })).toBe(true)
+		expect(isStudyMemoryOptions({ judge: undefined })).toBe(true)
+		for (const judge of [
+			{ gpu: -1 },
+			{ gpu: 0.5 },
+			{ gpu: '0' },
+			{ gpu: 0, extra: true },
+			{ gpu: Number.MAX_SAFE_INTEGER + 1 },
+			{ gpu: Number.NaN },
+			{ gpu: Number.POSITIVE_INFINITY },
+			{},
+			null,
+			[],
+			0,
+		])
+			expect([judge, isStudyMemoryOptions({ judge })]).toEqual([judge, false])
+	})
+
 	it('admits a boolean narrow and refuses any other', () => {
 		for (const correction of [{ narrow: true }, { narrow: false }])
 			expect([correction, isStudyMemoryOptions({ correction })]).toEqual([correction, true])

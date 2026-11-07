@@ -254,6 +254,29 @@ describe('memory declaration and mechanical evidence', () => {
 		)
 	})
 
+	it('places only the records judge and preserves serialized options without placement', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const placed = { ...profile, settings: { judge: { gpu: 0 } } }
+		for (const arm of ['full', 'compaction'] as const) {
+			const original = buildStudyMemoryRoles(profile, arm)
+			const roles = buildStudyMemoryRoles(placed, arm)
+			expect(roles).toEqual(original)
+			expect(roles.judge).toBeUndefined()
+		}
+		const original = buildStudyMemoryRoles(profile, 'records')
+		const roles = buildStudyMemoryRoles(placed, 'records')
+		expect(roles.agent).toEqual(original.agent)
+		expect(roles.judge?.options).toEqual({
+			num_ctx: 32768,
+			num_predict: 1,
+			num_gpu: 0,
+			...STUDY_MEMORY_PARAMETER_PINS.judge,
+		})
+		expect(JSON.stringify(original.judge?.options)).toBe(
+			JSON.stringify({ num_ctx: 32768, num_predict: 1, ...STUDY_MEMORY_PARAMETER_PINS.judge }),
+		)
+	})
+
 	it('every role sends every pinned sampling key', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const budgets = { agent: 512, summary: 256, judge: 1 }

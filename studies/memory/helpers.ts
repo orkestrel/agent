@@ -154,6 +154,7 @@ export function buildStudyMemoryRoles(
 	const { provider, room } = profile
 	if (provider === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 	const compaction = arm === 'compaction'
+	const placement = isStudyMemoryOptions(profile.settings) ? profile.settings.judge : undefined
 	return {
 		agent: {
 			model: provider.model,
@@ -185,7 +186,12 @@ export function buildStudyMemoryRoles(
 			? {
 					judge: {
 						model: readStudyMemoryJudge(provider),
-						options: { num_ctx: room.context, num_predict: 1, ...STUDY_MEMORY_PARAMETERS.judge },
+						options: {
+							num_ctx: room.context,
+							num_predict: 1,
+							...(placement === undefined ? {} : { num_gpu: placement.gpu }),
+							...STUDY_MEMORY_PARAMETERS.judge,
+						},
 						think: false,
 						strict: false,
 						length: true,

@@ -32,6 +32,8 @@ export interface StudyMemoryOptions {
 	readonly metadata?: StudyOllamaMetadata | undefined
 	/** Mirrors `LedgerOptions.correction`; forwarded only in the records arm. */
 	readonly correction?: LedgerCorrectionOptions | undefined
+	/** Places the records judge on this host; `gpu` is forwarded as Ollama's `num_gpu`, so 0 runs the judge on the CPU. Forwarded only in the records arm. */
+	readonly judge?: { readonly gpu: number } | undefined
 }
 
 /** Holds one role's pinned sampling values, each key written as its Ollama wire name. */
