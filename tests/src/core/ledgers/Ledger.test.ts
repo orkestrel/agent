@@ -5510,6 +5510,481 @@ describe('Ledger — the request copy', () => {
 })
 
 describe('Ledger — snapshot and hydrate', () => {
+	it('leaves no derived window when reading its evidence throws', async () => {
+		const ledger = createLedger(createScriptedProvider([]), {
+			...buildLedgerOptions(),
+			snapshot: {
+				conversation: {
+					id: 'unreadable',
+					sections: [],
+					messages: [
+						{
+							id: 'request',
+							role: 'user',
+							content: 'First.',
+							calls: [
+								{
+									id: 'call',
+									name: 'lookup',
+									arguments: {
+										a: {
+											get b() {
+												throw new Error('read')
+											},
+										},
+									},
+								},
+							],
+						},
+						{ id: 'reply', role: 'assistant', content: 'First reply.' },
+					],
+				},
+				requests: ['request'],
+				notes: [],
+				failures: [],
+			},
+		})
+		await expect(ledger.respond('Continue.')).rejects.toThrow('read')
+		expect(ledger.snapshot()).not.toHaveProperty('window')
+	})
+
+	it('renders the later unit sentence without repeating its held owner sentence', async () => {
+		const provider = createScriptedProvider(
+			[{ content: 'First.', usage: { prompt: 1, completion: 1, total: 2 } }, { content: 'Done.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 50, predict: 0, share: { prompt: 1, tail: 0.001 } }),
+		)
+		ledger.conversation.add(
+			buildLedgerExchange(
+				'Account BW-20931: Brightwater Studio. The Northgate Courier collects today. Delivery for BW-20931 costs $12.',
+			),
+		)
+		await ledger.respond('Check Brightwater Studio.')
+		await ledger.respond('Check Northgate Courier.')
+		const copy = requireValue(provider.calls[1]).messages.at(-1)?.content
+		expect(copy).toContain('The Northgate Courier collects today.')
+		expect(copy).not.toContain('Delivery for BW-20931 costs $12.')
+	})
+
+	it.each([false, true])(
+		'checks an owner title supplied by a lookup with no receipt (edited=%s)',
+		async (edited) => {
+			const options = buildLedgerOptions({
+				capacity: 120,
+				predict: 0,
+				share: { prompt: 1, tail: 0.1 },
+				lookups: [
+					{
+						tool: createTool({ name: 'lookup', execute: () => '' }),
+						read: (_args, text) => ({
+							ids: ['BW-20931'],
+							owners: [
+								{
+									id: 'BW-20931',
+									names: [text.includes('Ada Lovelace') ? 'Ada Lovelace' : 'Redacted Holder'],
+								},
+							],
+						}),
+					},
+				],
+			})
+			const parent = createLedger(createScriptedProvider([{ content: 'First.' }]), options)
+			const source = requireValue(
+				parent.conversation
+					.add(
+						buildLedgerExchange(
+							`Account BW-20931: Ada Lovelace holds this account ${'details '.repeat(78)}.`,
+						),
+					)
+					.find((message) => message.role === 'tool'),
+			)
+			const fact = parent.conversation.add({
+				role: 'user',
+				content: 'BW-20931 delivery costs $10.',
+			})
+			parent.conversation.judgments.add(buildLedgerJudgment(fact))
+			await parent.respond('Check BW-20931.')
+			const original = parent.snapshot()
+			expect(original.window?.exchanges[0]?.copy).toContain('### Ada Lovelace')
+			expect(
+				original.window?.exchanges
+					.flatMap((entry) => entry.lines)
+					.some((line) => line.source === source.id),
+			).toBe(false)
+			const snapshot = requireValue(
+				parseJSONAs(
+					JSON.stringify({
+						...original,
+						conversation: {
+							...original.conversation,
+							messages: original.conversation.messages.map((message) =>
+								edited && message.id === source.id
+									? {
+											...message,
+											content: message.content.replace('Ada Lovelace', 'Redacted Holder'),
+										}
+									: message,
+							),
+						},
+					}),
+					isLedgerSnapshot,
+				),
+			)
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const child = createLedger(provider, { ...options, snapshot })
+			expect(child.snapshot().window).toEqual(edited ? undefined : original.window)
+			await child.respond('Make that shorter.')
+			expect(
+				provider.calls
+					.flatMap((call) => call.messages)
+					.some((message) => message.content.includes('Ada Lovelace')),
+			).toBe(!edited)
+		},
+	)
+
+	it.each([
+		'before-abort',
+		'before-filing',
+		'after-abort',
+		'after-filing',
+		'after-reject',
+		'host-reply',
+	])('keeps the last valid pair across a stale drain after %s', async (mode) => {
+		const controller = new AbortController()
+		const provider = createScriptedProvider(
+			[{ content: 'First reply.' }, { content: 'Second reply.' }, { content: 'Done.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			{
+				id: provider.id,
+				name: provider.name,
+				generate: async (...args) => {
+					if (
+						mode === 'after-reject' &&
+						provider.calls.length === 2 &&
+						!args[0].at(-1)?.content.includes('Make that shorter.')
+					)
+						throw new Error('send failed')
+					return provider.generate(...args)
+				},
+				stream: async function* (...args) {
+					if (
+						mode === 'after-reject' &&
+						provider.calls.length === 2 &&
+						!args[0].at(-1)?.content.includes('Make that shorter.')
+					)
+						throw new Error('send failed')
+					return yield* provider.stream(...args)
+				},
+			},
+			buildLedgerOptions({
+				capacity: 32768,
+				judge: createLedgerJudge(
+					createRecorder(),
+					(request) => {
+						if (
+							mode.endsWith('filing') &&
+							ledger.conversation
+								.messages()
+								.some((message) => message.content === 'Stopped request.')
+						)
+							controller.abort('stop')
+						return new SilentJudge().ask(request)
+					},
+					'recording-model',
+				),
+			}),
+		)
+		const earlier = requireValue(
+			ledger.conversation
+				.add(buildLedgerExchange(LEDGER_PRESERVATION_FIXTURE.earlier))
+				.find((message) => message.role === 'tool'),
+		)
+		await ledger.respond('Check Brightwater Studio.')
+		await ledger.respond('Check Brightwater Studio again.')
+		const before = mode.startsWith('before')
+		if (before) {
+			const later = ledger.conversation.add({
+				role: 'user',
+				content: LEDGER_PRESERVATION_FIXTURE.later,
+			})
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+		}
+		ledger.conversation.add({ role: 'user', content: 'A fresh filing fact.' })
+		const stopped = await ledger
+			.respond(
+				'Stopped request.',
+				mode === 'after-reject'
+					? undefined
+					: mode.endsWith('filing')
+						? controller.signal
+						: AbortSignal.abort('stop'),
+			)
+			.then(
+				(result) => result.partial,
+				(error: unknown) => String(error),
+			)
+		expect(stopped).toBe(mode === 'after-reject' ? 'Error: send failed' : true)
+		if (mode === 'host-reply')
+			ledger.conversation.add({ role: 'assistant', content: 'Host reply.' })
+		if (!before) {
+			const later = ledger.conversation.add({
+				role: 'user',
+				content: LEDGER_PRESERVATION_FIXTURE.later,
+			})
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+		}
+		await ledger.respond('Make that shorter.')
+		const contents = requireValue(provider.calls.at(-1)).messages.map((message) => message.content)
+		expect(contents).toContain(mode === 'host-reply' ? 'Host reply.' : 'Second reply.')
+		expect(contents).toContain(
+			mode === 'host-reply' ? 'Stopped request.' : 'Check Brightwater Studio again.',
+		)
+		expect(contents).not.toContain('First reply.')
+	})
+	it('drains a sentence whose end was cut to a substring of the stored copy', async () => {
+		const parent = createLedger(
+			createScriptedProvider([{ content: 'First.' }]),
+			buildLedgerOptions(),
+		)
+		const text = 'Ada Lovelace at Brightwater Studio phoned about BW-20931.'
+		const source = requireValue(
+			parent.conversation.add(buildLedgerExchange(text)).find((message) => message.role === 'tool'),
+		)
+		await parent.respond('Check Brightwater Studio.')
+		const original = parent.snapshot()
+		const edited = text.slice(0, -10)
+		expect(original.window?.exchanges[0]?.copy).toContain(edited)
+		const snapshot = {
+			...original,
+			conversation: {
+				...original.conversation,
+				messages: original.conversation.messages.map((message) =>
+					message.id === source.id ? { ...message, content: edited } : message,
+				),
+			},
+		}
+		expect(isLedgerSnapshot(snapshot)).toBe(true)
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const child = createLedger(provider, { ...buildLedgerOptions(), snapshot })
+		expect(child.snapshot()).not.toHaveProperty('window')
+		await child.respond('Check Brightwater Studio.')
+		expect(
+			provider.calls
+				.flatMap((call) => call.messages)
+				.map((message) => message.content)
+				.join('\n'),
+		).not.toContain(text)
+	})
+	it.each(['json', 'canonical'])(
+		'retains the digest window through a %s round trip',
+		async (encoding) => {
+			const parent = createLedger(
+				createScriptedProvider([{ content: 'First.' }]),
+				buildLedgerOptions({ capacity: 32768 }),
+			)
+			parent.conversation.add(
+				buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+			)
+			await parent.respond('Check Brightwater Studio.')
+			const original = parent.snapshot()
+			const snapshot = requireValue(
+				parseJSONAs(
+					encoding === 'json'
+						? JSON.stringify(original)
+						: requireValue(canonicalStringify(original)),
+					isLedgerSnapshot,
+				),
+			)
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const child = createLedger(provider, buildLedgerOptions({ capacity: 32768, snapshot }))
+			expect(child.snapshot().window).toEqual(original.window)
+			await child.respond('Check Brightwater Studio again.')
+			expect(requireValue(provider.calls[0]).messages.map((message) => message.content)).toContain(
+				original.window?.exchanges[0]?.copy,
+			)
+		},
+	)
+
+	it('drains an edited stored copy and refuses a missing digest', async () => {
+		const parent = createLedger(
+			createScriptedProvider([{ content: 'First.' }]),
+			buildLedgerOptions(),
+		)
+		parent.conversation.add(
+			buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+		)
+		await parent.respond('Check Brightwater Studio.')
+		const original = parent.snapshot()
+		const window = requireValue(original.window)
+		const { digest, ...undigested } = window
+		expect(digest).toMatch(/^[0-9a-f]{16}$/)
+		const missing = { ...original, window: undigested }
+		expect(isLedgerSnapshot(missing)).toBe(false)
+		const error = captureError(() =>
+			Reflect.construct(Ledger, [
+				createScriptedProvider([]),
+				{ ...buildLedgerOptions(), snapshot: missing },
+			]),
+		)
+		expect(isLedgerError(error) && error.code).toBe('SNAPSHOT')
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const child = createLedger(provider, {
+			...buildLedgerOptions(),
+			snapshot: {
+				...original,
+				window: {
+					...window,
+					exchanges: window.exchanges.map((entry) => ({
+						...entry,
+						copy: `${entry.copy}\nStale injected copy.`,
+					})),
+				},
+			},
+		})
+		expect(child.snapshot()).not.toHaveProperty('window')
+		await child.respond('Check Brightwater Studio.')
+		expect(
+			provider.calls
+				.flatMap((call) => call.messages)
+				.map((message) => message.content)
+				.join('\n'),
+		).not.toContain('Stale injected copy.')
+	})
+
+	it('omits a window holding an unencodable hydrated message', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, {
+			...buildLedgerOptions({ capacity: 32768 }),
+			snapshot: {
+				conversation: {
+					id: 'unencodable',
+					sections: [],
+					messages: [
+						{
+							id: 'request',
+							role: 'user',
+							content: 'First request.',
+							calls: [{ id: 'call', name: 'lookup', arguments: { amount: undefined } }],
+						},
+						{ id: 'reply', role: 'assistant', content: 'First reply.' },
+					],
+				},
+				requests: ['request'],
+				notes: [],
+				failures: [],
+			},
+		})
+		await ledger.respond('Continue.')
+		expect(requireValue(provider.calls[0]).messages.map((message) => message.content)).toContain(
+			'First reply.',
+		)
+		expect(ledger.snapshot()).not.toHaveProperty('window')
+	})
+	it.each([
+		'Lovelace at Brightwater Studio phoned about BW-20931.',
+		'Ada Lovelace at Brightwater Studio phoned.',
+		'Brightwater Studio.',
+		'Ada Lovelace at Brightwater Studio phoned about BW-20931. Another sentence.',
+		'Brightwater Studio changed its contact.',
+	])('drains a changed held source: %s', async (replacement) => {
+		const options = buildLedgerOptions({ topics: [], capacity: 32768 })
+		const parent = createLedger(
+			createScriptedProvider([{ content: 'First.' }, { content: 'Second.' }]),
+			options,
+		)
+		const seed = parent.conversation.add(
+			buildLedgerExchange(
+				'Ada Lovelace at Brightwater Studio phoned about BW-20931. Brightwater Studio.',
+			),
+		)
+		const source = requireValue(seed.find((message) => message.role === 'tool'))
+		await parent.respond('Check Brightwater Studio.')
+		await parent.respond('Summarize Brightwater Studio.')
+		const original = parent.snapshot()
+		const snapshot = {
+			...original,
+			conversation: {
+				...original.conversation,
+				messages: original.conversation.messages.map((message) =>
+					message.id === source.id
+						? { ...message, content: `${replacement} Brightwater Studio.` }
+						: message,
+				),
+			},
+		}
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const child = createLedger(provider, { ...options, snapshot })
+		expect(child.snapshot()).not.toHaveProperty('window')
+		await child.respond('Check Brightwater Studio.')
+		expect(
+			provider.calls.flatMap((call) => call.messages).map((message) => message.content),
+		).not.toContain(original.window?.exchanges[0]?.copy)
+	})
+
+	it('retains the derived pair after a drain followed by rejection', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'First reply.' }, { content: 'Second reply.' }], {
+				repeat: false,
+			}),
+			buildLedgerOptions({ capacity: 32768 }),
+		)
+		const seed = ledger.conversation.add(buildLedgerExchange(LEDGER_PRESERVATION_FIXTURE.earlier))
+		const earlier = requireValue(seed.find((message) => message.role === 'tool'))
+		await ledger.respond('Check Brightwater Studio.')
+		await ledger.respond('Check Brightwater Studio again.')
+		const later = ledger.conversation.add({
+			role: 'user',
+			content: LEDGER_PRESERVATION_FIXTURE.later,
+		})
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+		await expect(ledger.respond('What does Brightwater Studio pay?')).rejects.toThrow('exhausted')
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const child = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 32768, snapshot: ledger.snapshot() }),
+		)
+		await child.respond('Make that shorter.')
+		const contents = requireValue(provider.calls[0]).messages.map((message) => message.content)
+		expect(contents).toContain('Check Brightwater Studio again.')
+		expect(contents).toContain('Second reply.')
+		expect(contents).not.toContain('First reply.')
+	})
+
+	it('omits an untitled correction already held under its owner', async () => {
+		const provider = createScriptedProvider(
+			[{ content: 'First.' }, { content: 'Second.' }, { content: 'Third.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions({ capacity: 32768 }))
+		const earlier = requireValue(
+			ledger.conversation
+				.add(buildLedgerExchange(LEDGER_PRESERVATION_FIXTURE.earlier))
+				.find((message) => message.role === 'tool'),
+		)
+		await ledger.respond('Check Brightwater Studio.')
+		const later = ledger.conversation.add({
+			role: 'user',
+			content: LEDGER_PRESERVATION_FIXTURE.later,
+		})
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(later, { answer: buildCategoryAnswer({ correction: 1 }) }),
+		)
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+		await ledger.respond('Check Brightwater Studio correction.')
+		await ledger.respond('What is the weather like?')
+		expect(requireValue(provider.calls[2]).messages.at(-1)?.content).toBe(
+			'What is the weather like?',
+		)
+	})
 	it.each([
 		{
 			name: 'party prefix',
@@ -5724,7 +6199,7 @@ describe('Ledger — snapshot and hydrate', () => {
 		},
 	)
 
-	it('hydrates an edited reply from its stored bytes while retaining valid copies', async () => {
+	it('hydrates an edited reply from its stored bytes after draining copies', async () => {
 		const parent = createLedger(
 			createScriptedProvider([{ content: 'Old reply.' }]),
 			buildLedgerOptions({ topics: [] }),
@@ -5746,12 +6221,12 @@ describe('Ledger — snapshot and hydrate', () => {
 		}
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const child = createLedger(provider, buildLedgerOptions({ topics: [], snapshot }))
-		expect(child.snapshot().window).toEqual(snapshot.window)
+		expect(child.snapshot()).not.toHaveProperty('window')
 		await child.respond('Check Brightwater Studio again.')
 		const sent = requireValue(provider.calls[0]).messages
 		expect(sent.map((message) => message.content)).toContain('Edited reply.')
 		expect(sent.map((message) => message.content)).not.toContain('Old reply.')
-		expect(sent).toContainEqual(
+		expect(sent).not.toContainEqual(
 			expect.objectContaining({ content: original.window?.exchanges[0]?.copy }),
 		)
 	})

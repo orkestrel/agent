@@ -24,7 +24,6 @@ import type {
 	LedgerResult,
 	LedgerShare,
 	LedgerSnapshot,
-	LedgerWindowSnapshot,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolContext, ToolResult } from '@orkestrel/tool'
@@ -69,7 +68,7 @@ import {
 import { isLedgerError, LedgerError } from './errors.js'
 import {
 	auditLedgerWindow,
-	matchesLedgerCopy,
+	digestLedgerWindow,
 	buildLedgerCut,
 	buildLedgerLineKey,
 	collectLedgerLines,
@@ -347,7 +346,7 @@ export class Ledger implements LedgerInterface {
 		const conversation = this.#conversation.snapshot()
 		const ids = conversation.messages.map((message) => message.id)
 		const gauge = this.gauge
-		const window: LedgerWindowSnapshot = {
+		const window = {
 			exchanges: this.#window.map((entry) => ({
 				request: entry.request.id,
 				...(entry.request.content === this.#conversation.message(entry.request.id)?.content
@@ -363,6 +362,10 @@ export class Ledger implements LedgerInterface {
 			})),
 			amendments: [...this.#evidence.amendments.values()].map((edge) => ({ ...edge })),
 		}
+		const digest =
+			window.exchanges.length === 0
+				? undefined
+				: digestLedgerWindow(window.exchanges, conversation.messages)
 		return {
 			conversation,
 			requests: ids.filter((id) => this.#requests.has(id)),
@@ -370,9 +373,10 @@ export class Ledger implements LedgerInterface {
 			failures: ids.filter((id) => this.#results.get(id)?.success === false),
 			...(gauge === undefined ? {} : { gauge }),
 			...(window.exchanges.length === 0 ||
-			auditLedgerWindow(window, conversation.messages).length > 0
+			digest === undefined ||
+			auditLedgerWindow({ ...window, digest }, conversation.messages).length > 0
 				? {}
-				: { window }),
+				: { window: { ...window, digest } }),
 		}
 	}
 
@@ -555,7 +559,10 @@ export class Ledger implements LedgerInterface {
 		for (const id of snapshot.requests) this.#requests.add(id)
 		for (const id of snapshot.notes) this.#annotations.add(id)
 		const messages = this.#conversation.messages()
-		if (snapshot.window !== undefined) {
+		if (
+			snapshot.window !== undefined &&
+			digestLedgerWindow(snapshot.window.exchanges, messages) === snapshot.window.digest
+		) {
 			const window = snapshot.window.exchanges.map((entry) => {
 				const request = this.#conversation.message(entry.request)
 				const reply = this.#conversation.message(entry.reply)
@@ -572,24 +579,13 @@ export class Ledger implements LedgerInterface {
 						role: source.role,
 					}
 				})
-				if (
-					entry.copy !== undefined &&
-					!matchesLedgerCopy(
-						entry.copy,
-						request,
-						lines.map((line) => line.text),
-					)
-				)
-					return undefined
 				return {
 					request: { ...request, content: entry.copy ?? request.content },
 					reply,
 					lines,
 				}
 			})
-			this.#window = window.some((entry) => entry === undefined)
-				? []
-				: window.filter((entry) => entry !== undefined)
+			this.#window = window
 			this.#evidence = collectLedgerEvidence(
 				messages,
 				new Set(
@@ -1071,6 +1067,11 @@ export class Ledger implements LedgerInterface {
 						!prior.first.has(edge.earlier) &&
 						combined.first.has(edge.earlier)),
 			)
+		const last = stale ? this.#window.at(-1) : undefined
+		const retained =
+			last === undefined || replies.get(last.request.id)?.id !== last.reply.id
+				? undefined
+				: this.#conversation.message(last.request.id)
 		if (stale) this.#window = []
 		const [previous, reply] = this.#window.length === 0 ? this.#selectExchange(request, input) : []
 		const window: readonly LedgerExchange[] =
@@ -1078,7 +1079,18 @@ export class Ledger implements LedgerInterface {
 				? this.#window
 				: previous !== undefined && reply !== undefined
 					? [{ request: previous, reply, lines: [] }]
-					: []
+					: retained !== undefined && last !== undefined
+						? [{ request: retained, reply: last.reply, lines: [] }]
+						: []
+		if (this.#window.length === 0) {
+			const derived = collectLedgerEvidence(
+				scan.messages,
+				new Set(window.flatMap((entry) => [entry.request.id, entry.reply.id])),
+				projection.amendments,
+			)
+			this.#window = window
+			this.#evidence = derived
+		}
 		const carried = window.flatMap((entry) => entry.lines)
 		const delta = this.#render(
 			trimmed.records,
@@ -1267,7 +1279,12 @@ export class Ledger implements LedgerInterface {
 			.filter((entry) => first.get(entry.source) === entry)
 			.map((entry) => ({
 				...entry,
-				lines: entry.lines.filter((line) => !held.has(buildLedgerLineKey(line))),
+				lines: entry.lines.filter(
+					(line) =>
+						!prefix.some(
+							(prior) => prior.source === line.source && prior.sentence === line.sentence,
+						),
+				),
 			}))
 			.filter((entry) => entry.lines.length > 0)
 		const record = population.find(

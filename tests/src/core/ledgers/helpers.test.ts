@@ -9,7 +9,7 @@ import type {
 import type { Message } from '@src/core'
 import {
 	auditLedgerWindow,
-	matchesLedgerCopy,
+	digestLedgerWindow,
 	buildLedgerCut,
 	buildLedgerLineKey,
 	collectLedgerLines,
@@ -76,18 +76,78 @@ import {
 } from '../../../setup.js'
 
 describe('extracted ledger leaves', () => {
-	it('matches copied request suffixes and current held sentences independently', () => {
-		const request: Message = { id: 'request', role: 'user', content: 'Check delivery.' }
-		const copy = '## Records\n- Delivery costs $10.\n\n## Request\nCheck delivery.'
-		expect(matchesLedgerCopy(copy, request, ['Delivery costs $10.'])).toBe(true)
+	it('digests each held message and copy canonically and refuses unencodable messages', () => {
+		const exchanges = [
+			{
+				request: 'request',
+				reply: 'reply',
+				copy: 'copy',
+				lines: [{ key: '', title: '', source: 'source', sentence: 0 }],
+			},
+		]
+		const messages = ['request', 'reply', 'source'].map((id) => ({
+			id,
+			role: 'user' as const,
+			content: id,
+		}))
+		const digest = requireValue(digestLedgerWindow(exchanges, messages))
+		expect(digest).toBe('d24851c99283eebf')
+		expect(digest).toMatch(/^[0-9a-f]{16}$/)
+		for (const target of messages)
+			expect(
+				digestLedgerWindow(
+					exchanges,
+					messages.map((message) =>
+						message === target ? { ...message, content: 'changed' } : message,
+					),
+				),
+			).not.toBe(digest)
 		expect(
-			matchesLedgerCopy(copy, { ...request, content: 'Check redacted delivery.' }, [
-				'Delivery costs $10.',
-			]),
-		).toBe(false)
-		expect(matchesLedgerCopy(copy, request, ['Delivery costs [redacted].'])).toBe(false)
-		expect(matchesLedgerCopy(copy, request, [])).toBe(true)
-		expect(matchesLedgerCopy(request.content, request, [])).toBe(false)
+			digestLedgerWindow([{ ...requireValue(exchanges[0]), copy: 'changed' }], messages),
+		).not.toBe(digest)
+		expect(
+			digestLedgerWindow(
+				exchanges,
+				messages.map(({ id, role, content }) => ({ content, role, id })),
+			),
+		).toBe(digest)
+		const called: Message[] = [
+			...messages,
+			{
+				id: 'caller',
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'call', name: 'lookup', arguments: { id: 'BW-1' } }],
+			},
+			{ id: 'result', role: 'tool', call: 'call', content: 'Found.' },
+		]
+		const lookedUp = [
+			{
+				request: 'request',
+				reply: 'reply',
+				lines: [{ key: '', title: '', source: 'result', sentence: 0 }],
+			},
+		]
+		expect(
+			digestLedgerWindow(
+				lookedUp,
+				called.map((message) =>
+					message.id === 'caller'
+						? { ...message, calls: [{ id: 'call', name: 'lookup', arguments: { id: 'REDACTED' } }] }
+						: message,
+				),
+			),
+		).not.toBe(digestLedgerWindow(lookedUp, called))
+		expect(digestLedgerWindow(exchanges, [])).toBeUndefined()
+		expect(
+			digestLedgerWindow(
+				exchanges,
+				messages.map((message) => ({
+					...message,
+					calls: [{ id: 'call', name: 'lookup', arguments: { value: 1n } }],
+				})),
+			),
+		).toBeUndefined()
 	})
 	it('audits window references and sentence bounds against the stored conversation', () => {
 		const snapshot: LedgerSnapshot = {
@@ -104,6 +164,7 @@ describe('extracted ledger leaves', () => {
 			notes: [],
 			failures: [],
 			window: {
+				digest: 'fixture',
 				exchanges: [
 					{ request: 'q', reply: 'a', lines: [{ key: 's', title: '', source: 's', sentence: 0 }] },
 				],

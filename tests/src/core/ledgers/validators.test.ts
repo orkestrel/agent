@@ -123,7 +123,11 @@ describe('isLedgerWindowSnapshot', () => {
 				{ key: 'owner:BW-20931', title: 'Brightwater Studio', source: 'source', sentence: 0 },
 			],
 		}
-		const window = { exchanges: [entry], amendments: [{ earlier: 'source', later: 'correction' }] }
+		const window = {
+			digest: 'fixture',
+			exchanges: [entry],
+			amendments: [{ earlier: 'source', later: 'correction' }],
+		}
 		for (const value of [
 			window,
 			{ ...window, exchanges: [{ ...entry, copy: 'Records and request.' }] },

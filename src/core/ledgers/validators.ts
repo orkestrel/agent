@@ -11,12 +11,12 @@ import { auditLedgerWindow } from './helpers.js'
  * @returns True if the window and its members are well shaped; false otherwise
  * @example
  * ```ts
- * isLedgerWindowSnapshot({ exchanges: [{ request: 'request', reply: 'reply', lines: [] }], amendments: [] }) // true
+ * isLedgerWindowSnapshot({ digest: 'checksum', exchanges: [{ request: 'request', reply: 'reply', lines: [] }], amendments: [] }) // true
  * ```
  */
 export function isLedgerWindowSnapshot(value: unknown): value is LedgerWindowSnapshot {
 	return holds(() => {
-		if (!isRecord(value) || Object.keys(value).length !== 2) return false
+		if (!isRecord(value) || Object.keys(value).length !== 3 || !isString(value.digest)) return false
 		const { exchanges, amendments } = value
 		if (!arrayOf(isRecord)(exchanges) || exchanges.length === 0 || !arrayOf(isRecord)(amendments))
 			return false

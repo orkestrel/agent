@@ -3,6 +3,7 @@ import type {
 	GaugeCall,
 	LedgerAmendment,
 	LedgerEvidence,
+	LedgerExchangeSnapshot,
 	LedgerCategory,
 	LedgerIndex,
 	LedgerLine,
@@ -41,7 +42,7 @@ import { LedgerError } from './errors.js'
  * @returns Faults for missing or invalid window references and sentence ranges
  * @example
  * ```ts
- * auditLedgerWindow({ exchanges: [], amendments: [] }, []) // []
+ * auditLedgerWindow({ digest: 'empty', exchanges: [], amendments: [] }, []) // []
  * ```
  */
 export function auditLedgerWindow(
@@ -49,6 +50,7 @@ export function auditLedgerWindow(
 	conversation: readonly Message[],
 ): readonly AuditFault[] {
 	const messages = new Map(conversation.map((message) => [message.id, message]))
+	const lengths = new Map<string, number>()
 	const sources = new Set(messages.keys())
 	const requests = new Set(
 		conversation.filter((message) => message.role === 'user').map((message) => message.id),
@@ -96,7 +98,8 @@ export function auditLedgerWindow(
 			entry.lines.flatMap((line, at): readonly AuditFault[] => {
 				const message = messages.get(line.source)
 				if (message === undefined) return []
-				const length = splitSentences(message.content).length
+				const length = lengths.get(line.source) ?? splitSentences(message.content).length
+				if (!lengths.has(line.source)) lengths.set(line.source, length)
 				return line.sentence < length
 					? []
 					: [
@@ -115,25 +118,47 @@ export function auditLedgerWindow(
 }
 
 /**
- * Checks whether a sent copy still contains its current request and held source sentences.
- * @param copy - The decorated request text stored in the window
- * @param request - The current stored request
- * @param lines - The current original sentences identified by the held receipts
- * @returns True if the request suffix and every held sentence match; false otherwise
+ * Digests held messages and stored copies using canonical text.
+ * This non-cryptographic checksum detects host edits and makes no security claim.
+ * @param exchanges - The stored exchange entries
+ * @param messages - The conversation holding their messages
+ * @returns The hexadecimal checksum, or undefined when a held message cannot be encoded
  * @example
  * ```ts
- * matchesLedgerCopy('## Records\n- Delivery costs $12.\n\n## Request\nCheck delivery.', { id: 'request', role: 'user', content: 'Check delivery.' }, ['Delivery costs $12.']) // true
+ * digestLedgerWindow([], []) // a deterministic hexadecimal checksum
  * ```
  */
-export function matchesLedgerCopy(
-	copy: string,
-	request: Message,
-	lines: readonly string[],
-): boolean {
-	return (
-		copy.endsWith(`\n\n## Request\n${request.content}`) &&
-		lines.every((line) => copy.includes(line))
+export function digestLedgerWindow(
+	exchanges: readonly LedgerExchangeSnapshot[],
+	messages: readonly Message[],
+): string | undefined {
+	const byId = new Map(messages.map((message) => [message.id, message]))
+	const ids = new Set(
+		exchanges.flatMap((entry) => [
+			entry.request,
+			entry.reply,
+			...entry.lines.map((line) => line.source),
+		]),
 	)
+	const held = [...ids].map((id) => byId.get(id))
+	const callers = messages.filter(
+		(message) => message.role === 'tool' || message.calls !== undefined,
+	)
+	const encoded = [...held, ...callers].map((message) => canonicalStringify(message))
+	if (encoded.some((text) => text === undefined)) return undefined
+	const text = canonicalStringify([encoded, exchanges.map((entry) => entry.copy ?? null)])
+	if (text === undefined) return undefined
+	const hash = [...text].reduce(
+		(prior, character) => {
+			const code = character.codePointAt(0) ?? 0
+			return {
+				first: Math.imul(prior.first ^ code, 16777619) >>> 0,
+				second: Math.imul(prior.second ^ code, 16777619) >>> 0,
+			}
+		},
+		{ first: 2166136261, second: 3335557771 },
+	)
+	return hash.first.toString(16).padStart(8, '0') + hash.second.toString(16).padStart(8, '0')
 }
 
 /**

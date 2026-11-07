@@ -363,6 +363,9 @@ export interface LedgerOptions {
  * prefix when the live and hydrated reserves admit the same exchange rung. A rung between those
  * reserves can differ because hydration carries no gauge observations; this moves the prefix,
  * never the record coverage. A plain request omits `copy` because its content already lives in `conversation`.
+ * The required window `digest` checks canonical held messages and stored copies. A mismatch drains
+ * the window and its evidence; a missing digest refuses the snapshot. An unencodable held message
+ * makes `snapshot()` omit the window. The checksum detects edits, not authenticity.
  */
 export interface LedgerSnapshot {
 	readonly conversation: ConversationSnapshot
@@ -381,8 +384,9 @@ export interface LedgerExchangeSnapshot {
 	readonly lines: readonly LedgerReceipt[]
 }
 
-/** Carries a nonempty exchange window and the accepted edges it rendered against. */
+/** Carries a nonempty exchange window, its held-message and copy checksum, and its accepted edges. */
 export interface LedgerWindowSnapshot {
+	readonly digest: string
 	readonly exchanges: readonly LedgerExchangeSnapshot[]
 	readonly amendments: readonly LedgerAmendment[]
 }

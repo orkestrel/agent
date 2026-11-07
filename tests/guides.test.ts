@@ -1883,25 +1883,240 @@ await new GuideCommand({
 			)
 		})
 
-		it('passes the two edits a stored copy cannot detect and refuses a changed sentence, as the stored copy limit claims', () => {
-			const { matchesLedgerCopy, splitSentences } = barrel
-			const request: Message = { id: 'request', role: 'user', content: 'Check delivery.' }
-			const copy =
-				'## Records\n- Delivery costs $12.\n- Refund is $9.\n\n## Request\nCheck delivery.'
-			// A held sentence edited to text the copy already holds elsewhere.
-			expect(matchesLedgerCopy(copy, request, ['Refund is $9.'])).toBe(true)
-			// A held sentence kept, with another appended: the receipt reads the kept one.
-			expect(
-				matchesLedgerCopy(
-					copy,
-					request,
-					splitSentences('Delivery costs $12. It is waived.').slice(0, 1),
-				),
-			).toBe(true)
-			expect(matchesLedgerCopy(copy, request, ['Delivery costs $99.'])).toBe(false)
-			expect(matchesLedgerCopy(copy, { ...request, content: 'Check redacted.' }, [])).toBe(false)
+		it('discards the window when an edit reaches its digest and keeps it across an unedited round trip, as the stored window limit claims', async () => {
+			const { digestLedgerWindow, isLedgerSnapshot } = barrel
+			const rule = 'Refunds over $100 need a manager.'
+			const edited = 'Refunds over $500 need a manager.'
+			const options = buildGuideLedgerOptions({
+				judge: createPhraseJudge(['Refunds over']),
+				gauge: { scale: 1, overhead: 0 },
+			})
+			const ledger = createLedger(createScriptedProvider([{ content: 'First reply.' }]), options)
+			ledger.conversation.add({ role: 'user', content: rule })
+			await ledger.respond('First request.')
+			const parsed: unknown = JSON.parse(JSON.stringify(ledger.snapshot()))
+			const snapshot = requireValue(isLedgerSnapshot(parsed) ? parsed : undefined)
+			const window = requireValue(snapshot.window, 'Missing window')
+			const { messages } = snapshot.conversation
+			const copy = `## Rules\n- ${rule}\n\n## Request\n`
+			const changed = messages.map((message) =>
+				message.content === rule ? { ...message, content: edited } : message,
+			)
+			expect(digestLedgerWindow(window.exchanges, messages)).toBe(window.digest)
+			expect(digestLedgerWindow(window.exchanges, changed)).not.toBe(window.digest)
+			const cases = [
+				// An unedited round trip keeps the copy as it was sent.
+				{
+					input: snapshot,
+					expected: ['Serve the desk.', rule, `${copy}First request.`, 'First reply.', 'Next.'],
+				},
+				// An edited held message reaches the provider as its edited text alone.
+				{
+					input: {
+						...snapshot,
+						conversation: { ...snapshot.conversation, messages: changed },
+					},
+					expected: [
+						'Serve the desk.',
+						edited,
+						'First request.',
+						'First reply.',
+						`## Rules\n- ${edited}\n\n## Request\nNext.`,
+					],
+				},
+				// An edited stored copy leaves no window for it to reach the provider through.
+				{
+					input: {
+						...snapshot,
+						window: {
+							...window,
+							exchanges: window.exchanges.map((entry) => ({
+								...entry,
+								copy: `## Rules\n- Refunds never need a manager.\n\n## Request\nFirst request.`,
+							})),
+						},
+					},
+					expected: ['Serve the desk.', rule, 'First request.', 'First reply.', `${copy}Next.`],
+				},
+			]
+			for (const { input, expected } of cases) {
+				expect(isLedgerSnapshot(input)).toBe(true)
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				await createLedger(provider, { ...options, snapshot: input }).respond('Next.')
+				expect(
+					requireValue(provider.calls[0], 'Missing prompt').messages.map(({ content }) => content),
+				).toEqual(expected)
+			}
 			expect(guideText).toContain(
-				'Two edits pass the check, and the old copy then reaches the provider: an edit to text that already occurs elsewhere in that copy, and an edit that keeps a held sentence and appends another.',
+				"An edit to any of those, by a host migrating or redacting, makes the digest disagree: hydrating discards the whole window and the ledger derives the newest pair from the edited conversation, so old held text doesn't reach a provider.",
+			)
+			expect(guideText).toContain(
+				'The digest detects an edit, can collide, and makes no security claim.',
+			)
+		})
+
+		it("discards the window when an edit reaches only a lookup's call arguments, as the stored window limit claims", async () => {
+			const { digestLedgerWindow } = barrel
+			const request = 'Check Northgate Courier.'
+			const options = buildGuideLedgerOptions({
+				judge: createPhraseJudge([]),
+				gauge: { scale: 1, overhead: 0 },
+				lookups: [{ ...LEDGER_ORDER_LOOKUP, read: () => ({ ids: [], owners: [] }) }],
+			})
+			const ledger = createLedger(createScriptedProvider([{ content: 'First reply.' }]), options)
+			ledger.conversation.add([
+				{
+					role: 'assistant',
+					content: '',
+					calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+				},
+				{ role: 'tool', call: 'seed', content: 'The Northgate Courier charges $12.' },
+			])
+			await ledger.respond(request)
+			const snapshot = ledger.snapshot()
+			const window = requireValue(snapshot.window, 'Missing window')
+			const copy = requireValue(window.exchanges[0]?.copy, 'Missing copy')
+			expect(copy).toContain('lookup_order {"id":"BW-5512"}: The Northgate Courier charges $12.')
+			const messages = snapshot.conversation.messages.map((message) =>
+				message.calls === undefined
+					? message
+					: {
+							...message,
+							calls: message.calls.map((call) => ({ ...call, arguments: { id: 'REDACTED' } })),
+						},
+			)
+			expect(digestLedgerWindow(window.exchanges, messages)).not.toBe(window.digest)
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			await createLedger(provider, {
+				...options,
+				snapshot: { ...snapshot, conversation: { ...snapshot.conversation, messages } },
+			}).respond('Next.')
+			expect(
+				requireValue(provider.calls[0], 'Missing prompt').messages.map(({ content }) => content),
+			).not.toContain(copy)
+			expect(guideText).toContain(
+				"A held lookup's call arguments count too, through the assistant message that made the call.",
+			)
+		})
+
+		it('empties the window when a lookup repeats with the same text, as the repeated lookup limit claims', async () => {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'first', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Done.' },
+					{ content: 'Done.' },
+					{
+						content: '',
+						tools: [{ id: 'second', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Done.' },
+					{ content: 'Done.' },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [LEDGER_ORDER_LOOKUP],
+				}),
+			)
+			const records =
+				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Request\n'
+			await ledger.respond('Look up order BW-5512.')
+			await ledger.respond('Does the Brightwater Studio refund need a manager?')
+			await ledger.respond('Look up order BW-5512 again.')
+			await ledger.respond('Is the Brightwater Studio refund approved?')
+			expect(requireValue(provider.calls[2]).messages.at(-1)?.content).toBe(
+				`${records}Does the Brightwater Studio refund need a manager?`,
+			)
+			expect(requireValue(provider.calls[5]).messages.map(({ content }) => content)).toEqual([
+				'Serve the desk.',
+				'Look up order BW-5512 again.',
+				'Done.',
+				`${records}Is the Brightwater Studio refund approved?`,
+			])
+			expect(guideText).toContain(
+				'A lookup repeated with the same text retires the source the window holds',
+			)
+		})
+
+		it('keeps the not-shown stub of a replaced seed lookup beside a copy that prints its result, as the replaced lookup limit claims', async () => {
+			const result = 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'later', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Done.' },
+					{ content: 'Done.' },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [LEDGER_ORDER_LOOKUP],
+				}),
+			)
+			ledger.conversation.add([
+				{
+					role: 'assistant',
+					content: '',
+					calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+				},
+				{ role: 'tool', call: 'seed', content: result },
+			])
+			await ledger.respond('Look up order BW-5512 again.')
+			await ledger.respond('Does the Brightwater Studio refund need a manager?')
+			const prompt = requireValue(provider.calls[2], 'Missing later prompt').messages
+			expect(prompt.find(({ role }) => role === 'tool')?.content).toBe(
+				'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512',
+			)
+			expect(prompt.at(-1)?.content).toContain('- Refund due $148.50.')
+			expect(guideText).toContain(
+				"the seed stub reads `result not shown` while a later copy can print that lookup's result",
+			)
+		})
+
+		it('reads a later change as not shown beside a second change with no direct edge, as the second change limit claims', () => {
+			const { renderLedgerAnnotation } = barrel
+			const messages: readonly Message[] = [
+				{ id: 'earliest', role: 'user', content: 'Delivery costs $10.' },
+				{ id: 'superseded', role: 'user', content: 'Delivery costs $12 instead.' },
+				{ id: 'newest', role: 'user', content: 'Delivery costs $14 instead.' },
+			]
+			const earliest: LedgerLine = {
+				text: 'Delivery costs $10.',
+				source: 'earliest',
+				sentence: 0,
+				topics: [],
+				role: 'user',
+			}
+			const newest: LedgerLine = {
+				text: 'Delivery costs $14 instead.',
+				source: 'newest',
+				sentence: 0,
+				topics: [],
+				role: 'user',
+			}
+			const context = buildLedgerRenderContext(
+				messages,
+				[earliest, newest],
+				[
+					{ earlier: 'earliest', later: 'superseded' },
+					{ earlier: 'superseded', later: 'newest' },
+				],
+			)
+			expect(renderLedgerAnnotation(earliest, context)).toBe('[1] A later change is not shown.')
+			expect(renderLedgerAnnotation(newest, context)).toBe('')
+			expect(guideText).toContain(
+				'because a superseded amender reads as absent and no transitive edge is inferred.',
 			)
 		})
 

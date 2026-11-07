@@ -10,6 +10,7 @@ import { conversationSnapshotShape } from '../conversations/shapers.js'
 
 /** Describes the minimal serialized evidence of a nonempty exchange window. */
 export const ledgerWindowShape = objectShape({
+	digest: stringShape(),
 	exchanges: arrayShape(
 		objectShape({
 			request: stringShape(),
