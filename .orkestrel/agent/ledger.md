@@ -521,3 +521,6 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-06 | rc-q4's repairs | `astra` on GPT-6 Astra writes; `reviewer` on GPT-6.1 Sol re-audits | `3ba8f586` |
 | 2026-11-06 | The user's word: a bounded Study run on the 4B model. Records arm, goals `ev-01-1` to `ev-02-4`, and a six-request conversation against the installed 0.0.36 | Orchestrator, GPU on the dedicated runner | `plan.md` O179 |
 | 2026-11-06 | The user's word: models resident together, with `tev1`. Residency reads, and the 8 Study goals with Mica on the CPU | Orchestrator, GPU on the dedicated runner | `plan.md` O181 |
+| 2026-11-06 | The user's word: yes to all three, real tests and numbers. S10 opens | user | `plan.md` O182 |
+| 2026-11-06 | S10's design round for rc-s2 and rc-s3, read-only consultation | `planner` Claude Fable 5.1 | `plan.md` O185 |
+| 2026-11-06 | S10's design round for rc-s2 and rc-s3 | `analyst` GPT-6 Astra | `plan.md` O185 |
