@@ -3,9 +3,16 @@ import {
 	isFraction,
 	isLedgerQuestion,
 	isLedgerSnapshot,
+	isLedgerWindowSnapshot,
 } from '../../../../src/core/ledgers/validators.js'
-import { createLedger, isLedgerError, LEDGER_QUESTIONS, ledgerSnapshotContract } from '@src/core'
-import { captureError } from '@orkestrel/test'
+import {
+	createLedger,
+	isLedgerError,
+	LEDGER_QUESTIONS,
+	ledgerSnapshotContract,
+	ledgerWindowContract,
+} from '@src/core'
+import { captureError, requireValue } from '@orkestrel/test'
 import {
 	buildLedgerOptions,
 	createScriptedProvider,
@@ -36,6 +43,47 @@ describe('isFraction', () => {
 })
 
 describe('isLedgerSnapshot', () => {
+	it('refuses malformed window entries and dangling pair or source ids with audit faults', async () => {
+		const replay = await serveLedgerHistory()
+		const snapshot = replay.ledger.snapshot()
+		const window = requireValue(snapshot.window)
+		const exchange = requireValue(window.exchanges[0])
+		for (const [field, replacement] of [
+			['request', { ...exchange, request: 'absent' }],
+			['reply', { ...exchange, reply: 'absent' }],
+			[
+				'lines',
+				{ ...exchange, lines: [{ key: 'rules', title: 'Rules', source: 'absent', sentence: 0 }] },
+			],
+			[
+				'lines',
+				{
+					...exchange,
+					lines: [{ key: 'rules', title: 'Rules', source: exchange.request, sentence: -1 }],
+				},
+			],
+			['copy', { ...exchange, copy: 5 }],
+			['extra', { ...exchange, extra: true }],
+		] as const) {
+			const value = { ...snapshot, window: { ...window, exchanges: [replacement] } }
+			expect(isLedgerSnapshot(value)).toBe(false)
+			const error = captureError(() =>
+				createLedger(createScriptedProvider([]), {
+					...buildLedgerOptions(),
+					snapshot: Reflect.apply(Object, undefined, [value]),
+				}),
+			)
+			expect(isLedgerError(error) && error.code).toBe('SNAPSHOT')
+			expect(isLedgerError(error) && error.context?.faults).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						path: expect.arrayContaining(['window', 'exchanges', '0', field]),
+					}),
+				]),
+			)
+		}
+	})
+
 	it('accepts the snapshot a served ledger returns and its JSON round trip', async () => {
 		const replay = await serveLedgerHistory()
 		const snapshot = replay.ledger.snapshot()
@@ -63,6 +111,87 @@ describe('isLedgerSnapshot', () => {
 		expect(cases.map(([title, value]) => [title, isLedgerSnapshot(value)])).toEqual(
 			cases.map(([title]) => [title, false]),
 		)
+	})
+})
+
+describe('isLedgerWindowSnapshot', () => {
+	it('admits the exact window shape and agrees with its compiled contract on adjacent refusals', () => {
+		const entry = {
+			request: 'request',
+			reply: 'reply',
+			lines: [
+				{ key: 'owner:BW-20931', title: 'Brightwater Studio', source: 'source', sentence: 0 },
+			],
+		}
+		const window = { exchanges: [entry], amendments: [{ earlier: 'source', later: 'correction' }] }
+		for (const value of [
+			window,
+			{ ...window, exchanges: [{ ...entry, copy: 'Records and request.' }] },
+		]) {
+			expect(isLedgerWindowSnapshot(value)).toBe(true)
+			expect(ledgerWindowContract.is(value)).toBe(true)
+		}
+		for (const value of [
+			null,
+			undefined,
+			{},
+			[],
+			{ ...window, extra: true },
+			{ ...window, exchanges: [] },
+			{ ...window, exchanges: Array(1) },
+			{ ...window, exchanges: [undefined] },
+			{ ...window, exchanges: [{ ...entry, request: 1 }] },
+			{ ...window, exchanges: [{ ...entry, reply: null }] },
+			{ ...window, exchanges: [{ ...entry, copy: undefined }] },
+			{ ...window, exchanges: [{ ...entry, copy: 1 }] },
+			{ ...window, exchanges: [{ ...entry, extra: true }] },
+			{ ...window, exchanges: [{ ...entry, lines: Array(1) }] },
+			{
+				...window,
+				exchanges: [{ ...entry, lines: [{ key: '', title: '', source: 'source', sentence: -1 }] }],
+			},
+			{
+				...window,
+				exchanges: [{ ...entry, lines: [{ key: '', title: '', source: 'source', sentence: 0.5 }] }],
+			},
+			{
+				...window,
+				exchanges: [
+					{
+						...entry,
+						lines: [
+							{ key: '', title: '', source: 'source', sentence: Number.MAX_SAFE_INTEGER + 1 },
+						],
+					},
+				],
+			},
+			{
+				...window,
+				exchanges: [
+					{ ...entry, lines: [{ key: '', title: '', source: 'source', sentence: 0, extra: true }] },
+				],
+			},
+			{ ...window, amendments: Array(1) },
+			{ ...window, amendments: [{ earlier: 'source', later: 1 }] },
+			{ ...window, amendments: [{ earlier: 'source', later: 'correction', extra: true }] },
+		]) {
+			expect(isLedgerWindowSnapshot(value)).toBe(false)
+			expect(ledgerWindowContract.is(value)).toBe(false)
+		}
+	})
+
+	it('refuses unreadable window members without throwing', () => {
+		const proxy = Proxy.revocable({}, {})
+		proxy.revoke()
+		expect(isLedgerWindowSnapshot(proxy.proxy)).toBe(false)
+		expect(
+			isLedgerWindowSnapshot({
+				get exchanges() {
+					throw new Error('unreadable')
+				},
+				amendments: [],
+			}),
+		).toBe(false)
 	})
 })
 

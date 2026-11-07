@@ -5,6 +5,11 @@ import type { ProviderInterface } from '../providers/types.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type {
 	ClassifierResult,
+	LedgerDraft,
+	LedgerExchange,
+	LedgerEvidence,
+	LedgerOccurrence,
+	LedgerRenderResult,
 	LedgerAmendment,
 	LedgerCategory,
 	LedgerGauge,
@@ -19,6 +24,7 @@ import type {
 	LedgerResult,
 	LedgerShare,
 	LedgerSnapshot,
+	LedgerWindowSnapshot,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolContext, ToolResult } from '@orkestrel/tool'
@@ -62,7 +68,13 @@ import {
 } from './constants.js'
 import { isLedgerError, LedgerError } from './errors.js'
 import {
+	auditLedgerWindow,
+	matchesLedgerCopy,
 	buildLedgerCut,
+	buildLedgerLineKey,
+	collectLedgerLines,
+	collectLedgerReplies,
+	collectLedgerEvidence,
 	buildLedgerIndex,
 	buildLines,
 	buildLedgerRenderContext,
@@ -123,6 +135,8 @@ export class Ledger implements LedgerInterface {
 	readonly #scans = new Set<LedgerScan>()
 	readonly #calibrations = new Set<AbortSignal>()
 	#gauge: Gauge | undefined
+	#window: readonly LedgerExchange[] = []
+	#evidence: LedgerEvidence = collectLedgerEvidence([], new Set(), [])
 
 	/**
 	 * Composes the conversation, classifier, tools, and agent.
@@ -165,7 +179,11 @@ export class Ledger implements LedgerInterface {
 			)
 		const snapshot = options.snapshot
 		if (snapshot !== undefined && !isLedgerSnapshot(snapshot)) {
-			const faults = ledgerSnapshotContract.audit(snapshot)
+			const candidate: unknown = options.snapshot
+			const faults =
+				ledgerSnapshotContract.is(candidate) && candidate.window !== undefined
+					? auditLedgerWindow(candidate.window, candidate.conversation.messages)
+					: ledgerSnapshotContract.audit(candidate)
 			throw new LedgerError(
 				'SNAPSHOT',
 				`snapshot must be well formed and mark only messages of its conversation; pass what snapshot() returned${faults.length === 0 ? '' : `\n${describeFaults(faults, ledgerSnapshotContract.schema)}`}`,
@@ -319,8 +337,8 @@ export class Ledger implements LedgerInterface {
 	}
 
 	/**
-	 * Serializes the conversation, the marked ids, and the gauge into a snapshot a later ledger hydrates from.
-	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one
+	 * Serializes the conversation, marked ids, gauge, and completed exchange window for a later ledger.
+	 * @returns The snapshot, each id list in conversation order, with a gauge and window only when held
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	snapshot(): LedgerSnapshot {
@@ -329,12 +347,32 @@ export class Ledger implements LedgerInterface {
 		const conversation = this.#conversation.snapshot()
 		const ids = conversation.messages.map((message) => message.id)
 		const gauge = this.gauge
+		const window: LedgerWindowSnapshot = {
+			exchanges: this.#window.map((entry) => ({
+				request: entry.request.id,
+				...(entry.request.content === this.#conversation.message(entry.request.id)?.content
+					? {}
+					: { copy: entry.request.content }),
+				reply: entry.reply.id,
+				lines: entry.lines.map(({ key, title, source, sentence }) => ({
+					key,
+					title,
+					source,
+					sentence,
+				})),
+			})),
+			amendments: [...this.#evidence.amendments.values()].map((edge) => ({ ...edge })),
+		}
 		return {
 			conversation,
 			requests: ids.filter((id) => this.#requests.has(id)),
 			notes: ids.filter((id) => this.#annotations.has(id)),
 			failures: ids.filter((id) => this.#results.get(id)?.success === false),
 			...(gauge === undefined ? {} : { gauge }),
+			...(window.exchanges.length === 0 ||
+			auditLedgerWindow(window, conversation.messages).length > 0
+				? {}
+				: { window }),
 		}
 	}
 
@@ -426,6 +464,7 @@ export class Ledger implements LedgerInterface {
 			}
 		} finally {
 			this.#flush()
+			this.#commitExchange(request)
 			this.#live.delete(request)
 		}
 	}
@@ -516,6 +555,53 @@ export class Ledger implements LedgerInterface {
 		for (const id of snapshot.requests) this.#requests.add(id)
 		for (const id of snapshot.notes) this.#annotations.add(id)
 		const messages = this.#conversation.messages()
+		if (snapshot.window !== undefined) {
+			const window = snapshot.window.exchanges.map((entry) => {
+				const request = this.#conversation.message(entry.request)
+				const reply = this.#conversation.message(entry.reply)
+				if (request === undefined || reply === undefined)
+					throw new LedgerError('SNAPSHOT', 'window pair must belong to its conversation')
+				const lines = entry.lines.map((line) => {
+					const source = this.#conversation.message(line.source)
+					if (source === undefined)
+						throw new LedgerError('SNAPSHOT', 'window source must belong to its conversation')
+					return {
+						...line,
+						text: splitSentences(source.content)[line.sentence] ?? '',
+						topics: [],
+						role: source.role,
+					}
+				})
+				if (
+					entry.copy !== undefined &&
+					!matchesLedgerCopy(
+						entry.copy,
+						request,
+						lines.map((line) => line.text),
+					)
+				)
+					return undefined
+				return {
+					request: { ...request, content: entry.copy ?? request.content },
+					reply,
+					lines,
+				}
+			})
+			this.#window = window.some((entry) => entry === undefined)
+				? []
+				: window.filter((entry) => entry !== undefined)
+			this.#evidence = collectLedgerEvidence(
+				messages,
+				new Set(
+					this.#window.flatMap((entry) => [
+						entry.request.id,
+						entry.reply.id,
+						...entry.lines.map((line) => line.source),
+					]),
+				),
+				snapshot.window.amendments,
+			)
+		}
 		const groups = collectToolGroups(messages)
 		for (const message of messages) {
 			if (!snapshot.failures.includes(message.id)) continue
@@ -750,21 +836,30 @@ export class Ledger implements LedgerInterface {
 		const { attempts, failure, ...filed } = classified
 		const planned = attempt(() => {
 			if (filed.fault !== undefined) throw filed.fault
+			const { draft, ...plan } = this.#plan(selected, this.#rescan())
 			return {
-				...this.#plan(selected, this.#rescan()),
-				...filed,
-				// The filing went on past a judge failure, so the plan stands beside it for a lenient run.
-				...(failure === undefined ? {} : { fault: failure }),
+				draft,
+				selection: {
+					...plan,
+					...filed,
+					// A lenient run keeps the plan beside the filing failure.
+					...(failure === undefined ? {} : { fault: failure }),
+				},
 			}
 		})
-		request.file(attempts, planned.success ? planned.value : undefined)
+		request.file(
+			attempts,
+			planned.success ? planned.value.selection : undefined,
+			planned.success ? planned.value.draft : undefined,
+		)
 		if (!planned.success) return this.#refuse(planned.error, filed, this.#conversation)
+		const selection = planned.value.selection
 		return this.#annotations.has(message.id)
 			? {
-					...planned.value,
-					messages: [...planned.value.messages, ...this.#collectAfter(selected)],
+					...selection,
+					messages: [...selection.messages, ...this.#collectAfter(selected)],
 				}
-			: planned.value
+			: selection
 	}
 
 	// Falls back to the given conversation's view with the failure as the selection's fault, keeping
@@ -774,6 +869,8 @@ export class Ledger implements LedgerInterface {
 		filed: Omit<ClassifierResult, 'attempts'>,
 		conversation: ConversationInterface,
 	): Selection {
+		if (conversation === this.#conversation && !(isLedgerError(error) && error.code === 'REQUEST'))
+			this.#current()?.file([])
 		return {
 			...filed,
 			messages: conversation.view(),
@@ -791,7 +888,10 @@ export class Ledger implements LedgerInterface {
 		return !unsettled && (category === 'rule' || category === 'correction')
 	}
 
-	#plan(request: Message, scan: LedgerScan): Pick<Selection, 'messages'> {
+	#plan(
+		request: Message,
+		scan: LedgerScan,
+	): Pick<Selection, 'messages'> & { readonly draft: LedgerDraft } {
 		const { input, projection } = this.#project(scan)
 		const registry = scan.registry
 		const links = linkOwners(input.findings, registry.owners)
@@ -936,11 +1036,80 @@ export class Ledger implements LedgerInterface {
 			projection.amendments,
 			scan,
 		)
-		const exchange = this.#selectExchange(request, input)
-		const priced = buildRequestMessage(built.at(-1) ?? request, trimmed.rendered)
-		const probes = [[], exchange].map((pair) => [
+		const replies = collectLedgerReplies(scan.messages, this.#requests, this.#annotations)
+		const sources = new Set(
+			this.#window.flatMap((entry) => [
+				entry.request.id,
+				entry.reply.id,
+				...entry.lines.map((line) => line.source),
+			]),
+		)
+		const evidence = collectLedgerEvidence(scan.messages, sources, projection.amendments)
+		const prefix = this.#window.flatMap((entry) => entry.lines)
+		const prior = buildLedgerRenderContext(scan.messages, prefix, projection.amendments)
+		const combined = buildLedgerRenderContext(
+			scan.messages,
+			[...prefix, ...trimmed.rendered.lines],
+			projection.amendments,
+		)
+		const stale =
+			evidence.messages.size !== this.#evidence.messages.size ||
+			[...evidence.messages].some((receipt) => !this.#evidence.messages.has(receipt)) ||
+			evidence.amendments.size !== this.#evidence.amendments.size ||
+			[...evidence.amendments.keys()].some((receipt) => !this.#evidence.amendments.has(receipt)) ||
+			this.#window.some(
+				(entry) =>
+					replies.get(entry.request.id)?.id !== entry.reply.id ||
+					entry.lines.some((line) => !live.has(line.source)),
+			) ||
+			projection.amendments.some(
+				(edge) =>
+					(prior.first.has(edge.earlier) &&
+						prior.complete.has(edge.later) !== combined.complete.has(edge.later)) ||
+					(prior.first.has(edge.later) &&
+						combined.complete.has(edge.later) &&
+						!prior.first.has(edge.earlier) &&
+						combined.first.has(edge.earlier)),
+			)
+		if (stale) this.#window = []
+		const [previous, reply] = this.#window.length === 0 ? this.#selectExchange(request, input) : []
+		const window: readonly LedgerExchange[] =
+			this.#window.length > 0
+				? this.#window
+				: previous !== undefined && reply !== undefined
+					? [{ request: previous, reply, lines: [] }]
+					: []
+		const carried = window.flatMap((entry) => entry.lines)
+		const delta = this.#render(
+			trimmed.records,
+			mapped,
+			trimmed.included,
+			projection.amendments,
+			scan,
+			new Set(carried.map(buildLedgerLineKey)),
+			carried,
+		)
+		const newest = window.at(-1)
+		const plain = newest === undefined ? undefined : this.#conversation.message(newest.request.id)
+		const fallback: readonly LedgerExchange[] =
+			newest === undefined || plain === undefined
+				? []
+				: [{ request: plain, reply: newest.reply, lines: [] }]
+		const rungs = [
+			{ window, rendered: delta },
+			{ window: fallback, rendered: trimmed.rendered },
+			{ window: [], rendered: trimmed.rendered },
+		]
+		const probes = rungs.map((rung) => [
 			...built.slice(0, -1),
-			...stripThinking([...tail.slice(0, -1), ...pair, priced], this.#replay),
+			...stripThinking(
+				[
+					...tail.slice(0, -1),
+					...rung.window.flatMap((entry) => [entry.request, entry.reply]),
+					buildRequestMessage(built.at(-1) ?? request, rung.rendered.text),
+				],
+				this.#replay,
+			),
 		])
 		const names = this.#agent.context.scope?.tools
 		const tools = this.#agent.context.tools
@@ -955,33 +1124,40 @@ export class Ledger implements LedgerInterface {
 			)
 		})
 		// Admission follows trimming: the exchange can spend spare room, never a record or a seed message.
-		const admitted =
-			this.#price(stripThinking([...exchange, request], this.#replay)) - this.#price([request]) <=
-				total * this.#share.tail &&
-			this.#price(probes[1] ?? []) <= total &&
-			(closed[0] === true || closed[1] === false)
-		const shown = new Set([
-			...trimmed.included,
-			...records.flatMap((record) =>
-				record.members.filter((source) => {
-					const full = record.lines.filter((line) => line.source === source)
-					const visible =
-						trimmed.records
-							.find((one) => one.key === record.key)
-							?.lines.filter((line) => line.source === source) ?? []
-					return full.length > 0 && full.length === visible.length
-				}),
-			),
+		const prices = probes.map((messages) => this.#price(messages))
+		const admitted = rungs.find(
+			(_rung, at) =>
+				(prices[at] ?? Infinity) <= total && (closed[2] === true || closed[at] === false),
+		) ?? { window: [], rendered: trimmed.rendered }
+		const copy = buildRequestMessage(request, admitted.rendered.text)
+		const kept = admitted.window.flatMap((entry) => entry.lines)
+		const origins = new Set([
+			request.id,
+			...admitted.window.flatMap((entry) => [entry.request.id, entry.reply.id]),
+			...kept.map((line) => line.source),
+			...admitted.rendered.lines.map((line) => line.source),
 		])
+		const draft: LedgerDraft = {
+			copy,
+			lines: admitted.rendered.lines,
+			evidence: collectLedgerEvidence(scan.messages, origins, projection.amendments),
+			window: admitted.window,
+		}
+		const shown = buildLedgerRenderContext(
+			scan.messages,
+			[...kept, ...admitted.rendered.lines],
+			[],
+		).complete
 		return {
+			draft,
 			messages: [
 				...tail
 					.slice(0, -1)
 					.map((message) =>
 						message.role === 'tool' ? this.#renderTailStub(message, scan, shown) : message,
 					),
-				...(admitted ? exchange : []),
-				buildRequestMessage(request, trimmed.rendered),
+				...admitted.window.flatMap((entry) => [entry.request, entry.reply]),
+				copy,
 			],
 		}
 	}
@@ -1001,7 +1177,7 @@ export class Ledger implements LedgerInterface {
 		amendments: readonly LedgerAmendment[],
 		scan: LedgerScan,
 	): {
-		readonly rendered: string
+		readonly rendered: LedgerRenderResult
 		readonly records: readonly LedgerRecord[]
 		readonly included: ReadonlySet<string>
 	} {
@@ -1011,7 +1187,7 @@ export class Ledger implements LedgerInterface {
 		const found = findLedgerCut(0, steps.length, (count) => {
 			const cut = buildLedgerCut(steps.slice(0, count), records, included)
 			const rendered = this.#render(cut.records, mapped, cut.included, amendments, scan)
-			const copy = buildRequestMessage(priced, rendered)
+			const copy = buildRequestMessage(priced, rendered.text)
 			return this.#price([...head, ...stripThinking([...tail.slice(0, -1), copy], this.#replay)]) <=
 				total
 				? { ...cut, rendered }
@@ -1067,56 +1243,67 @@ export class Ledger implements LedgerInterface {
 		included: ReadonlySet<string>,
 		amendments: readonly LedgerAmendment[],
 		scan: LedgerScan,
-	): string {
+		held: ReadonlySet<string> = new Set(),
+		prefix: readonly LedgerOccurrence[] = [],
+	): LedgerRenderResult {
+		const population = records.map((record) => ({
+			...record,
+			lines: collectLedgerLines(record, held),
+		}))
 		const entries = mapped
 			.filter((unit) => included.has(unit.source))
 			.flatMap(({ record: unit }) =>
-				[...Map.groupBy(unit.lines, (line) => line.source)].map(([source, lines]) => ({
-					unit,
-					source,
-					lines,
-				})),
+				[...Map.groupBy(collectLedgerLines(unit, new Set()), (line) => line.source)].map(
+					([source, lines]) => ({
+						unit,
+						source,
+						lines,
+					}),
+				),
 			)
 		// A source renders once, under the first unit that carries it.
 		const first = new Map(entries.toReversed().map((entry) => [entry.source, entry]))
-		const unique = entries.filter((entry) => first.get(entry.source) === entry)
-		const record = records.find(
+		const unique = entries
+			.filter((entry) => first.get(entry.source) === entry)
+			.map((entry) => ({
+				...entry,
+				lines: entry.lines.filter((line) => !held.has(buildLedgerLineKey(line))),
+			}))
+			.filter((entry) => entry.lines.length > 0)
+		const record = population.find(
 			(candidate) => candidate.key === LEDGER_RULES_KEY && candidate.lines.length > 0,
 		)
-		const ownerRecords = records.filter(
+		const ownerRecords = population.filter(
 			(candidate) => candidate.key !== LEDGER_RULES_KEY && candidate.lines.length > 0,
 		)
 		// The context reads the lines in the order the records emit them, so each source's first
 		// retained line carries its annotation and its reference.
-		const context = buildLedgerRenderContext(
-			this.#conversation.messages(),
-			[
-				...ownerRecords.flatMap((candidate) => candidate.lines),
-				...unique
-					.filter((entry) => entry.unit.key !== LEDGER_RULES_KEY)
-					.flatMap((entry) => entry.lines),
-				...(record?.lines ?? []),
-				...unique
-					.filter((entry) => entry.unit.key === LEDGER_RULES_KEY)
-					.flatMap((entry) => entry.lines),
-			],
-			amendments,
-		)
+		const lines = [
+			...ownerRecords.flatMap((candidate) => candidate.lines),
+			...unique
+				.filter((entry) => entry.unit.key !== LEDGER_RULES_KEY)
+				.flatMap((entry) => entry.lines),
+			...(record?.lines ?? []),
+			...unique
+				.filter((entry) => entry.unit.key === LEDGER_RULES_KEY)
+				.flatMap((entry) => entry.lines),
+		]
+		const context = buildLedgerRenderContext(scan.messages, [...prefix, ...lines], amendments)
 		const owners = ownerRecords.map((owner) => renderLedgerPinned(owner, context)).join('\n\n')
-		const rendered = unique.map(({ unit, source, lines }) => {
+		const rendered = unique.map(({ unit, source, lines: retained }) => {
 			const sentences = splitSentences(this.#conversation.message(source)?.content ?? '')
 			return {
 				rules: unit.key === LEDGER_RULES_KEY,
 				texts:
 					unit.key === LEDGER_RULES_KEY && source === unit.members[0]
-						? lines.map((line) => this.#renderSource(source, sentences, [line], context, scan))
-						: [this.#renderSource(source, sentences, lines, context, scan)],
+						? retained.map((line) => this.#renderSource(source, sentences, [line], context, scan))
+						: [this.#renderSource(source, sentences, retained, context, scan)],
 			}
 		})
 		const pinned = rendered.filter((one) => !one.rules).flatMap((one) => one.texts)
 		const rules = rendered.filter((one) => one.rules).flatMap((one) => one.texts)
 		const body = [owners, pinned.join('\n')].filter((text) => text !== '').join('\n\n')
-		return [
+		const text = [
 			body === '' ? '' : `## Records\n${body}`,
 			record === undefined
 				? rules.length === 0
@@ -1124,8 +1311,9 @@ export class Ledger implements LedgerInterface {
 					: ['## Rules', ...rules].join('\n')
 				: [renderLedgerRecord(record, context), ...rules].join('\n'),
 		]
-			.filter((text) => text !== '')
+			.filter((part) => part !== '')
 			.join('\n\n')
+		return { text, lines }
 	}
 
 	#selectTail(
@@ -1211,29 +1399,36 @@ export class Ledger implements LedgerInterface {
 			0,
 			input.messages.findIndex((message) => message.id === request.id),
 		)
-		const position = before.findLastIndex((message) => this.#requests.has(message.id))
-		const previous = before[position]
-		const turns = before.slice(position + 1)
-		const reply = turns.findLast((message) => message.role === 'assistant' && !hasCalls(message))
-		const answers = turns.flatMap((message, index) =>
-			message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== ''
-				? [index]
-				: [],
-		)
-		const certain = answers.every(
-			(at, index) =>
-				index === 0 ||
-				turns
-					.slice((answers[index - 1] ?? -1) + 1, at)
-					.some((message) => this.#annotations.has(message.id)),
-		)
-		return previous !== undefined &&
-			certain &&
-			reply?.role === 'assistant' &&
-			!hasCalls(reply) &&
-			reply.content.trim() !== ''
-			? [previous, reply]
-			: []
+		const previous = before.findLast((message) => this.#requests.has(message.id))
+		const reply =
+			previous === undefined
+				? undefined
+				: collectLedgerReplies(before, this.#requests, this.#annotations).get(previous.id)
+		return previous !== undefined && reply !== undefined ? [previous, reply] : []
+	}
+
+	#commitExchange(request: LedgerRequest): void {
+		const draft = request.sent
+		const message = request.message
+		if (message === undefined) return
+		const reply = collectLedgerReplies(
+			this.#conversation.messages(),
+			this.#requests,
+			this.#annotations,
+		).get(message.id)
+		if (reply === undefined) return
+		this.#window = [
+			...(draft?.window ?? this.#window),
+			{ request: draft?.copy ?? message, reply, lines: draft?.lines ?? [] },
+		]
+		const evidence = draft?.evidence ?? this.#evidence
+		this.#evidence = {
+			messages: new Set([
+				...evidence.messages,
+				...collectLedgerEvidence([message, reply], new Set([message.id, reply.id]), []).messages,
+			]),
+			amendments: evidence.amendments,
+		}
 	}
 
 	#renderTailStub(message: Message, scan: LedgerScan, shown?: ReadonlySet<string>): Message {

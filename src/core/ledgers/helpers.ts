@@ -2,9 +2,11 @@ import type { Message } from '../types.js'
 import type {
 	GaugeCall,
 	LedgerAmendment,
+	LedgerEvidence,
 	LedgerCategory,
 	LedgerIndex,
 	LedgerLine,
+	LedgerOccurrence,
 	LedgerLookupFinding,
 	LedgerLookupState,
 	LedgerPlanGroup,
@@ -16,11 +18,13 @@ import type {
 	LedgerRenderContext,
 	LedgerTopic,
 	LedgerWordSet,
+	LedgerWindowSnapshot,
 } from './types.js'
 import type { ToolCall } from '@orkestrel/tool'
+import type { AuditFault } from '@orkestrel/contract'
 import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { extractLiterals, renderJSON } from '../helpers.js'
+import { extractLiterals, hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 import {
 	LEDGER_OWNER_PREFIX,
@@ -29,6 +33,108 @@ import {
 	PLACED_CATEGORIES,
 } from './constants.js'
 import { LedgerError } from './errors.js'
+
+/**
+ * Audits a shaped window's references and sentence ranges against its stored conversation.
+ * @param value - The window admitted by its shape guard
+ * @param conversation - The messages the snapshot holds
+ * @returns Faults for missing or invalid window references and sentence ranges
+ * @example
+ * ```ts
+ * auditLedgerWindow({ exchanges: [], amendments: [] }, []) // []
+ * ```
+ */
+export function auditLedgerWindow(
+	value: LedgerWindowSnapshot,
+	conversation: readonly Message[],
+): readonly AuditFault[] {
+	const messages = new Map(conversation.map((message) => [message.id, message]))
+	const sources = new Set(messages.keys())
+	const requests = new Set(
+		conversation.filter((message) => message.role === 'user').map((message) => message.id),
+	)
+	const replies = new Set(
+		conversation
+			.filter(
+				(message) =>
+					message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== '',
+			)
+			.map((message) => message.id),
+	)
+	const references = [
+		...value.exchanges.flatMap((entry, index) => [
+			{
+				id: entry.request,
+				allowed: requests,
+				path: ['window', 'exchanges', String(index), 'request'],
+			},
+			{ id: entry.reply, allowed: replies, path: ['window', 'exchanges', String(index), 'reply'] },
+			...entry.lines.map((line, at) => ({
+				id: line.source,
+				allowed: sources,
+				path: ['window', 'exchanges', String(index), 'lines', String(at), 'source'],
+			})),
+		]),
+		...value.amendments.flatMap((edge, index) =>
+			['earlier', 'later'].map((side) => ({
+				id: side === 'earlier' ? edge.earlier : edge.later,
+				allowed: sources,
+				path: ['window', 'amendments', String(index), side],
+			})),
+		),
+	]
+	return [
+		...references
+			.filter((reference) => !reference.allowed.has(reference.id))
+			.map((reference): AuditFault => ({
+				reason: 'variant',
+				path: reference.path,
+				variants: reference.allowed.size,
+				expected: [...reference.allowed],
+			})),
+		...value.exchanges.flatMap((entry, index) =>
+			entry.lines.flatMap((line, at): readonly AuditFault[] => {
+				const message = messages.get(line.source)
+				if (message === undefined) return []
+				const length = splitSentences(message.content).length
+				return line.sentence < length
+					? []
+					: [
+							{
+								reason: 'constraint',
+								path: ['window', 'exchanges', String(index), 'lines', String(at), 'sentence'],
+								expected: 'number',
+								constraint: 'max',
+								limit: length - 1,
+								received: String(line.sentence),
+							},
+						]
+			}),
+		),
+	]
+}
+
+/**
+ * Checks whether a sent copy still contains its current request and held source sentences.
+ * @param copy - The decorated request text stored in the window
+ * @param request - The current stored request
+ * @param lines - The current original sentences identified by the held receipts
+ * @returns True if the request suffix and every held sentence match; false otherwise
+ * @example
+ * ```ts
+ * matchesLedgerCopy('## Records\n- Delivery costs $12.\n\n## Request\nCheck delivery.', { id: 'request', role: 'user', content: 'Check delivery.' }, ['Delivery costs $12.']) // true
+ * ```
+ */
+export function matchesLedgerCopy(
+	copy: string,
+	request: Message,
+	lines: readonly string[],
+): boolean {
+	return (
+		copy.endsWith(`\n\n## Request\n${request.content}`) &&
+		lines.every((line) => copy.includes(line))
+	)
+}
 
 /**
  * Collects the live message ids placed in records or left without a record.
@@ -1398,4 +1504,107 @@ export function buildLines(
 		}
 		return [party === undefined ? line : { ...line, party }]
 	})
+}
+
+/**
+ * Encodes a sentence's record placement without comparing rendered text.
+ * @param line - The record key, title, source, and zero-based sentence index
+ * @returns The serialized placement identity
+ * @example
+ * ```ts
+ * buildLedgerLineKey({ key: 'rules', title: 'Rules', source: 'one', sentence: 0 })
+ * ```
+ */
+export function buildLedgerLineKey(
+	line: Pick<LedgerOccurrence, 'key' | 'title' | 'source' | 'sentence'>,
+): string {
+	return JSON.stringify([line.key, line.title, line.source, line.sentence])
+}
+
+/**
+ * Collects the record's sentence receipts not already held by a window.
+ * @param record - The selected record with its original sentence identities
+ * @param held - Placement identities already rendered in the window
+ * @returns The remaining sentences with their record placement
+ * @example
+ * ```ts
+ * collectLedgerLines({ key: 'rules', title: 'Rules', members: [], lines: [] }, new Set()) // []
+ * ```
+ */
+export function collectLedgerLines(
+	record: LedgerRecord,
+	held: ReadonlySet<string>,
+): readonly LedgerOccurrence[] {
+	return record.lines
+		.map((line) => ({ ...line, key: record.key, title: record.title }))
+		.filter((line) => !held.has(buildLedgerLineKey(line)))
+}
+
+/**
+ * Selects each marked request's unambiguous final call-free reply.
+ * @param messages - Stored conversation messages in order
+ * @param requests - Marked request ids delimiting reply intervals
+ * @param notes - Ledger notes that separate answer passes
+ * @returns Eligible final replies keyed by request id
+ * @example
+ * ```ts
+ * collectLedgerReplies([], new Set(), new Set()).size // 0
+ * ```
+ */
+export function collectLedgerReplies(
+	messages: readonly Message[],
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): ReadonlyMap<string, Message> {
+	const positions = messages.flatMap((message, at) => (requests.has(message.id) ? [at] : []))
+	return new Map(
+		positions.flatMap((position, index) => {
+			const request = messages[position]
+			const turns = messages.slice(position + 1, positions[index + 1])
+			const reply = turns.findLast((message) => message.role === 'assistant' && !hasCalls(message))
+			const answers = turns.flatMap((message, at) =>
+				message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== ''
+					? [at]
+					: [],
+			)
+			const certain = answers.every(
+				(at, offset) =>
+					offset === 0 ||
+					turns.slice((answers[offset - 1] ?? -1) + 1, at).some((message) => notes.has(message.id)),
+			)
+			return request !== undefined && certain && reply !== undefined && reply.content.trim() !== ''
+				? [[request.id, reply] as const]
+				: []
+		}),
+	)
+}
+
+/**
+ * Captures source bytes and direct amendment edges for a held window.
+ * @param messages - Current stored messages
+ * @param sources - Requests, replies, and record sources the window holds
+ * @param amendments - Accepted direct amendment edges from the current projection
+ * @returns Source and edge identities for stale detection
+ * @example
+ * ```ts
+ * collectLedgerEvidence([], new Set(), []).messages.size // 0
+ * ```
+ */
+export function collectLedgerEvidence(
+	messages: readonly Message[],
+	sources: ReadonlySet<string>,
+	amendments: readonly LedgerAmendment[],
+): LedgerEvidence {
+	return {
+		messages: new Set(
+			messages
+				.filter((message) => sources.has(message.id))
+				.map((message) => JSON.stringify(['message', message])),
+		),
+		amendments: new Map(
+			amendments
+				.filter((edge) => sources.has(edge.earlier) || sources.has(edge.later))
+				.map((edge) => [JSON.stringify(['edge', edge.earlier, edge.later]), { ...edge }]),
+		),
+	}
 }

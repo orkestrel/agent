@@ -1,7 +1,7 @@
 import type { Selection } from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
 import type { Message } from '../types.js'
-import type { ClassifierAttempt, GaugeCall, LedgerRequestInterface } from './types.js'
+import type { ClassifierAttempt, GaugeCall, LedgerDraft, LedgerRequestInterface } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { canonicalStringify } from '@orkestrel/contract'
 import { isNonNegativeSafeInteger } from '../validators.js'
@@ -36,6 +36,8 @@ export class LedgerRequest implements LedgerRequestInterface {
 	readonly #faults = new Set<unknown>()
 	#message: Message | undefined
 	#plan: Selection | undefined
+	#draft: LedgerDraft | undefined
+	#sent: LedgerDraft | undefined
 	#passes: readonly LedgerPass[] = []
 	#attempts: readonly ClassifierAttempt[] = []
 	#admitted: ReadonlySet<string> = new Set()
@@ -73,6 +75,11 @@ export class LedgerRequest implements LedgerRequestInterface {
 	 */
 	get plan(): Selection | undefined {
 		return this.#plan
+	}
+
+	/** Returns the copy and receipts adopted by the last provider turn. */
+	get sent(): LedgerDraft | undefined {
+		return this.#sent
 	}
 
 	/**
@@ -135,6 +142,14 @@ export class LedgerRequest implements LedgerRequestInterface {
 	}
 
 	observe(call: GaugeCall, position: number): void {
+		const draft = this.#draft
+		this.#sent =
+			draft !== undefined &&
+			this.selection?.messages.some(
+				(message) => message.id === draft.copy.id && message.content === draft.copy.content,
+			)
+				? draft
+				: undefined
 		this.#passes.at(-1)?.observe(call, position)
 	}
 
@@ -161,9 +176,12 @@ export class LedgerRequest implements LedgerRequestInterface {
 		return this.#faults.has(error)
 	}
 
-	file(attempts: readonly ClassifierAttempt[], plan?: Selection): void {
+	file(attempts: readonly ClassifierAttempt[], plan?: Selection, draft?: LedgerDraft): void {
 		this.#attempts = [...this.#attempts, ...attempts]
-		if (plan !== undefined) this.#plan = plan
+		this.#draft = draft
+		if (plan !== undefined) {
+			this.#plan = plan
+		}
 	}
 
 	admit(name: string, args: Readonly<Record<string, unknown>>): void {

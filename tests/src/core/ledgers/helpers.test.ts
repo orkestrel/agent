@@ -4,10 +4,17 @@ import type {
 	LedgerLookupFinding,
 	LedgerOwner,
 	LedgerRecord,
+	LedgerSnapshot,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
 import {
+	auditLedgerWindow,
+	matchesLedgerCopy,
 	buildLedgerCut,
+	buildLedgerLineKey,
+	collectLedgerLines,
+	collectLedgerReplies,
+	collectLedgerEvidence,
 	buildLedgerIndex,
 	buildRecallMessage,
 	buildRequestMessage,
@@ -69,6 +76,135 @@ import {
 } from '../../../setup.js'
 
 describe('extracted ledger leaves', () => {
+	it('matches copied request suffixes and current held sentences independently', () => {
+		const request: Message = { id: 'request', role: 'user', content: 'Check delivery.' }
+		const copy = '## Records\n- Delivery costs $10.\n\n## Request\nCheck delivery.'
+		expect(matchesLedgerCopy(copy, request, ['Delivery costs $10.'])).toBe(true)
+		expect(
+			matchesLedgerCopy(copy, { ...request, content: 'Check redacted delivery.' }, [
+				'Delivery costs $10.',
+			]),
+		).toBe(false)
+		expect(matchesLedgerCopy(copy, request, ['Delivery costs [redacted].'])).toBe(false)
+		expect(matchesLedgerCopy(copy, request, [])).toBe(true)
+		expect(matchesLedgerCopy(request.content, request, [])).toBe(false)
+	})
+	it('audits window references and sentence bounds against the stored conversation', () => {
+		const snapshot: LedgerSnapshot = {
+			conversation: {
+				id: 'c',
+				sections: [],
+				messages: [
+					{ id: 's', role: 'user', content: 'Delivery costs $12.' },
+					{ id: 'q', role: 'user', content: 'Check delivery.' },
+					{ id: 'a', role: 'assistant', content: 'Done.' },
+				],
+			},
+			requests: ['q'],
+			notes: [],
+			failures: [],
+			window: {
+				exchanges: [
+					{ request: 'q', reply: 'a', lines: [{ key: 's', title: '', source: 's', sentence: 0 }] },
+				],
+				amendments: [],
+			},
+		}
+		const window = requireValue(snapshot.window)
+		expect(auditLedgerWindow(window, snapshot.conversation.messages)).toEqual([])
+		expect(
+			auditLedgerWindow(
+				{ ...window, amendments: [{ earlier: 'gone', later: 's' }] },
+				snapshot.conversation.messages,
+			),
+		).toEqual([
+			expect.objectContaining({
+				reason: 'variant',
+				path: ['window', 'amendments', '0', 'earlier'],
+			}),
+		])
+		expect(
+			auditLedgerWindow(
+				{
+					...window,
+					exchanges: [
+						{
+							request: 'q',
+							reply: 'a',
+							lines: [{ key: 's', title: '', source: 's', sentence: 1 }],
+						},
+					],
+				},
+				snapshot.conversation.messages,
+			),
+		).toEqual([
+			expect.objectContaining({
+				reason: 'constraint',
+				path: ['window', 'exchanges', '0', 'lines', '0', 'sentence'],
+			}),
+		])
+	})
+	it('filters receipts by placement and sentence rather than text or source alone', () => {
+		const line: LedgerLine = {
+			text: 'Same words.',
+			source: 'one',
+			sentence: 0,
+			topics: [],
+			role: 'user',
+		}
+		const record: LedgerRecord = {
+			key: 'owner:one',
+			title: 'One',
+			members: ['one'],
+			lines: [line, { ...line, sentence: 1 }, { ...line, source: 'two' }],
+		}
+		const held = new Set([buildLedgerLineKey({ ...line, key: record.key, title: record.title })])
+		expect(collectLedgerLines(record, held).map((entry) => [entry.source, entry.sentence])).toEqual(
+			[
+				['one', 1],
+				['two', 0],
+			],
+		)
+		expect(collectLedgerLines({ ...record, title: 'Other' }, held)).toHaveLength(3)
+		expect(collectLedgerLines({ ...record, key: 'owner:two' }, held)).toHaveLength(3)
+		expect(record.lines).toHaveLength(3)
+	})
+
+	it('pairs replies only across ledger-note separation and rejects a blank final answer', () => {
+		const messages: readonly Message[] = [
+			{ id: 'request', role: 'user', content: 'Request.' },
+			{ id: 'partial', role: 'assistant', content: 'Partial.' },
+			{ id: 'note', role: 'user', content: 'Answer.' },
+			{ id: 'final', role: 'assistant', content: 'Final.' },
+		]
+		expect(collectLedgerReplies(messages, new Set(['request']), new Set()).size).toBe(0)
+		expect(
+			collectLedgerReplies(messages, new Set(['request']), new Set(['note'])).get('request')?.id,
+		).toBe('final')
+		expect(
+			collectLedgerReplies(
+				[...messages, { id: 'blank', role: 'assistant', content: ' ' }],
+				new Set(['request']),
+				new Set(['note']),
+			).size,
+		).toBe(0)
+	})
+
+	it('captures changed and removed source bytes and added or removed touching edges', () => {
+		const message: Message = { id: 'one', role: 'user', content: 'Original.' }
+		const sources = new Set(['one'])
+		const original = collectLedgerEvidence([message], sources, [])
+		expect(collectLedgerEvidence([{ ...message, content: 'Changed.' }], sources, [])).not.toEqual(
+			original,
+		)
+		expect(collectLedgerEvidence([], sources, [])).not.toEqual(original)
+		expect(
+			collectLedgerEvidence([message], sources, [{ earlier: 'one', later: 'two' }]),
+		).not.toEqual(original)
+		expect(
+			collectLedgerEvidence([message], sources, [{ earlier: 'three', later: 'four' }]),
+		).toEqual(original)
+	})
 	it('collects placed and orphan ids without duplicates', () => {
 		expect([
 			...collectProjectionIds({

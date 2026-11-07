@@ -82,12 +82,11 @@ export interface LedgerTopic {
  *
  * @remarks
  * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
- * before the records and the tail take the rest. `tail` bounds the seed tail and, separately,
- * the previous request and final reply. The seed and records are planned first, without the
- * exchange. It joins only if its allowance and the total budget hold it beside the head, seed,
- * and request copy with the kept records, and its first-call estimate does not close an otherwise
- * open recall. Otherwise it is silently omitted whole. An admitted exchange can reduce recall
- * listing room, but changes no record line or seed stub.
+ * before the records and the tail take the rest. `tail` bounds only the seed tail. The seed and
+ * records are planned before the completed-exchange window spends spare room. The full window
+ * with a delta copy, then its newest plain exchange with a full copy, then no exchange are priced
+ * in that order. Admission cannot close an otherwise open recall or displace a selected record
+ * line or seed message. A seed stub reads visibility across the window and the copy together.
  * Each share must be finite, greater than 0, and at most 1.
  */
 export interface LedgerShare {
@@ -359,7 +358,11 @@ export interface LedgerOptions {
  * not carried, so a hydrated ledger sizes and closes `recall` from its fallback reserve until it
  * completes a request. A question a `strict: false` classifier held after a deterministic judge
  * failure is not carried, so a hydrated ledger asks it again. Hydrating a second ledger from one snapshot forks
- * it at the parent's frontier.
+ * it at the parent's frontier. `window`, when present, retains sent request copies, reply ids,
+ * sentence receipts, and accepted amendment edges. The next plan keeps the same conversation
+ * prefix when the live and hydrated reserves admit the same exchange rung. A rung between those
+ * reserves can differ because hydration carries no gauge observations; this moves the prefix,
+ * never the record coverage. A plain request omits `copy` because its content already lives in `conversation`.
  */
 export interface LedgerSnapshot {
 	readonly conversation: ConversationSnapshot
@@ -367,6 +370,21 @@ export interface LedgerSnapshot {
 	readonly notes: readonly string[]
 	readonly failures: readonly string[]
 	readonly gauge?: LedgerGauge
+	readonly window?: LedgerWindowSnapshot
+}
+
+/** Carries the sent request text, stored pair ids, and sentence placements of one exchange. */
+export interface LedgerExchangeSnapshot {
+	readonly request: string
+	readonly copy?: string
+	readonly reply: string
+	readonly lines: readonly LedgerReceipt[]
+}
+
+/** Carries a nonempty exchange window and the accepted edges it rendered against. */
+export interface LedgerWindowSnapshot {
+	readonly exchanges: readonly LedgerExchangeSnapshot[]
+	readonly amendments: readonly LedgerAmendment[]
 }
 
 /**
@@ -399,6 +417,8 @@ export interface LedgerResult extends AgentResult {
  * thinking, until its pass observes the next call, and is final from then on.
  */
 export interface LedgerRequestInterface {
+	/** Holds the copy and receipts adopted by the last provider turn, or undefined for a view fallback. */
+	readonly sent: LedgerDraft | undefined
 	/** Records an error the request's run reported through its `fault` event. */
 	fault(error: unknown): void
 	/**
@@ -471,8 +491,9 @@ export interface LedgerRequestInterface {
 	 *
 	 * @param attempts - The selection's filing attempts, in asking order
 	 * @param plan - The planned selection, or undefined when planning failed
+	 * @param draft - The copy and receipts eligible for adoption; omission discards that eligibility
 	 */
-	file(attempts: readonly ClassifierAttempt[], plan?: Selection): void
+	file(attempts: readonly ClassifierAttempt[], plan?: Selection, draft?: LedgerDraft): void
 	/**
 	 * Admits one tool call of the request, compared by tool name and canonical arguments.
 	 *
@@ -616,6 +637,44 @@ export interface LedgerLine {
 	readonly party?: string
 	readonly topics: readonly string[]
 	readonly role: MessageRole
+}
+
+/** Identifies an original sentence at one record placement. */
+export interface LedgerReceipt {
+	readonly key: string
+	readonly title: string
+	readonly source: string
+	readonly sentence: number
+}
+
+/** Carries a rendered sentence with its record placement. */
+export interface LedgerOccurrence extends LedgerLine, LedgerReceipt {}
+
+/** Carries a completed request copy, its stored reply, and the sentences the copy rendered. */
+export interface LedgerExchange {
+	readonly request: Message
+	readonly reply: Message
+	readonly lines: readonly LedgerOccurrence[]
+}
+
+/** Carries a planned copy and its validity evidence to request settlement. */
+export interface LedgerDraft {
+	readonly copy: Message
+	readonly lines: readonly LedgerOccurrence[]
+	readonly evidence: LedgerEvidence
+	readonly window: readonly LedgerExchange[]
+}
+
+/** Captures held message identities and the accepted edges used to validate their copies. */
+export interface LedgerEvidence {
+	readonly messages: ReadonlySet<string>
+	readonly amendments: ReadonlyMap<string, LedgerAmendment>
+}
+
+/** Carries rendered record text and its sentences in emission order. */
+export interface LedgerRenderResult {
+	readonly text: string
+	readonly lines: readonly LedgerOccurrence[]
 }
 
 /**

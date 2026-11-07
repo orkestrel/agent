@@ -4212,7 +4212,7 @@ export const RECORDED_ANSWER_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Objec
  *
  * @remarks
  * Written by hand from the request layout: a late request sends the seed tail, the previous
- * exchange, and the records in the copy of its own request turn.
+ * exchange with its sent copy, then the plain request when the window holds every record line.
  */
 export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freeze([
 	{ role: 'system', content: 'Serve the desk.' },
@@ -4236,13 +4236,13 @@ export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.
 		call: 'owner-1',
 		content: 'lookup {"id":"customer:BW-20931"}: result shown under Records below',
 	},
-	{ role: 'user', content: 'Check Brightwater Studio.' },
-	{ role: 'assistant', content: 'Done.' },
 	{
 		role: 'user',
 		content:
-			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio again.',
+			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
 	},
+	{ role: 'assistant', content: 'Done.' },
+	{ role: 'user', content: 'Check Brightwater Studio again.' },
 ])
 
 /**

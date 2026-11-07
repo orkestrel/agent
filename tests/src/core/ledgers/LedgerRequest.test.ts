@@ -4,6 +4,33 @@ import { describe, expect, it } from 'vitest'
 import { LEDGER_INVALID_LIMITS, computeLedgerErrorCode } from '../../../setup.js'
 
 describe('LedgerRequest', () => {
+	it('replaces copy receipts with a successful plan and discards them on fallback', () => {
+		const request = new LedgerRequest('Check.')
+		const message = request.enter(createConversation())
+		const first = {
+			copy: { ...message, content: 'First copy.' },
+			lines: [],
+			evidence: { messages: new Set<string>(), amendments: new Map() },
+			window: [],
+		}
+		const second = { ...first, copy: { ...message, content: 'Second copy.' } }
+		const plan: Selection = { messages: [first.copy], judgments: [] }
+		request.file([], plan, first)
+		request.open(0)
+		request.adopt(plan, 1)
+		request.observe({ estimate: 1, tools: 0 }, 1)
+		expect(request.sent).toBe(first)
+		request.file([], { ...plan, messages: [second.copy] }, second)
+		expect(request.sent).toBe(first)
+		request.adopt({ ...plan, messages: [second.copy] }, 1)
+		request.observe({ estimate: 1, tools: 0 }, 1)
+		expect(request.sent).toBe(second)
+		request.file([])
+		expect(request.plan?.messages).toEqual([second.copy])
+		request.adopt({ messages: [message], judgments: [] }, 1)
+		request.observe({ estimate: 1, tools: 0 }, 1)
+		expect(request.sent).toBeUndefined()
+	})
 	it('refuses a recall limit that is not a nonnegative safe integer and accepts its boundaries', () => {
 		for (const limit of LEDGER_INVALID_LIMITS) {
 			expect(computeLedgerErrorCode(() => new LedgerRequest('Check.', limit))).toBe('LIMIT')
