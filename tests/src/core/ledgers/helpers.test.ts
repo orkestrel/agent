@@ -4,11 +4,12 @@ import type {
 	LedgerLookupFinding,
 	LedgerOwner,
 	LedgerRecord,
-	LedgerSnapshot,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
 import {
-	auditLedgerWindow,
+	collectRecallMessages,
+	matchesLookup,
+	hasHiddenRecall,
 	digestLedgerWindow,
 	buildLedgerCut,
 	buildLedgerLineKey,
@@ -58,6 +59,7 @@ import {
 import { captureError, createRecorder, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
+	throwProxyRead,
 	buildGaugeCall,
 	measureRoom,
 	LEDGER_EMPTY_FOUND,
@@ -76,6 +78,117 @@ import {
 } from '../../../setup.js'
 
 describe('extracted ledger leaves', () => {
+	it('matches successful canonical lookup copies but not changes empty results or unkeyable calls', () => {
+		const first = buildLedgerFinding(
+			'first',
+			'lookup',
+			{ id: 'BW-1' },
+			'One. Two.',
+			LEDGER_EMPTY_FOUND,
+		)
+		const copy = { ...first, id: 'copy' }
+		expect(matchesLookup(first, copy)).toBe(true)
+		for (const changed of [
+			{ ...copy, text: 'Other.' },
+			{ ...copy, arguments: { id: 'BW-2' } },
+			{ ...copy, result: undefined },
+			{ ...copy, name: 'other' },
+		])
+			expect(matchesLookup(first, changed)).toBe(false)
+		const unkeyable = { ...first, arguments: { id: 1n } }
+		expect(matchesLookup(unkeyable, unkeyable)).toBe(true)
+		expect(matchesLookup(unkeyable, { ...unkeyable, id: 'copy' })).toBe(false)
+	})
+	it('detects each eligible hidden origin including quiet statements but not current turns or notes', () => {
+		const messages: readonly Message[] = [
+			buildLedgerMessage('fact', 'user', 'Parcel closed. Receipt sealed.'),
+			buildLedgerMessage('tool', 'tool', 'Found a parcel. Receipt signed.'),
+			buildLedgerMessage('request', 'user', 'Check parcel.'),
+			buildLedgerMessage('reply', 'assistant', 'It is sealed.'),
+			buildLedgerMessage('quiet', 'user', 'Thanks.'),
+			buildLedgerMessage('note', 'user', 'Answer now.'),
+			buildLedgerMessage('blank', 'assistant', '  '),
+			{
+				...buildLedgerMessage('caller', 'assistant', 'Calling.'),
+				calls: [{ id: 'call', name: 'lookup', arguments: {} }],
+			},
+			buildLedgerMessage('unread', 'tool', 'Unfiled.'),
+			buildLedgerMessage('current', 'user', 'Shorten.'),
+			buildLedgerMessage('turn', 'assistant', 'Current turn.'),
+		]
+		const input = buildLedgerInput({
+			messages,
+			findings: [
+				buildLedgerFinding(
+					'tool',
+					'lookup',
+					{},
+					'Found a parcel. Receipt signed.',
+					LEDGER_EMPTY_FOUND,
+				),
+			],
+			classification: { quiet: ['quiet'] },
+		})
+		const requests = new Set(['request', 'current'])
+		const notes = new Set(['note'])
+		expect(collectRecallMessages(input, requests, notes).map((message) => message.id)).toEqual([
+			'fact',
+			'tool',
+			'request',
+			'reply',
+			'quiet',
+			'current',
+			'turn',
+		])
+		expect(hasHiddenRecall(input, 'current', requests, notes, messages, [])).toBe(false)
+		for (const id of ['fact', 'tool', 'request', 'reply', 'quiet']) {
+			const present = messages.filter((message) => message.id !== id)
+			expect(hasHiddenRecall(input, 'current', requests, notes, present, [])).toBe(true)
+		}
+		for (const id of ['fact', 'tool']) {
+			const present = messages.filter((message) => message.id !== id)
+			const lines = [0, 1].map((sentence) => ({ key: '', title: '', source: id, sentence }))
+			expect(hasHiddenRecall(input, 'current', requests, notes, present, lines)).toBe(false)
+			expect(hasHiddenRecall(input, 'current', requests, notes, present, lines.slice(0, 1))).toBe(
+				true,
+			)
+		}
+		const stub = messages.map((message) =>
+			message.id === 'tool'
+				? { ...message, content: 'result not shown; call recall with parcel' }
+				: message,
+		)
+		expect(hasHiddenRecall(input, 'current', requests, notes, stub, [])).toBe(true)
+		expect(
+			hasHiddenRecall(
+				input,
+				'current',
+				requests,
+				notes,
+				messages.filter((message) => !['note', 'current', 'turn'].includes(message.id)),
+				[],
+			),
+		).toBe(false)
+		expect(hasHiddenRecall(input, 'absent', requests, notes, [], [])).toBe(false)
+	})
+
+	it('includes every receipt field in the window digest', () => {
+		const messages = [
+			buildLedgerMessage('request', 'user', 'Check.'),
+			buildLedgerMessage('reply', 'assistant', 'Done.'),
+			buildLedgerMessage('source', 'user', 'One. Two.'),
+		]
+		const line = { key: 'record', title: 'Record', source: 'source', sentence: 0 }
+		const entry = { request: 'request', reply: 'reply', copy: 'One.', lines: [line] }
+		const digest = requireValue(digestLedgerWindow([entry], messages))
+		for (const changed of [
+			{ ...line, key: 'other' },
+			{ ...line, title: 'Other' },
+			{ ...line, sentence: 1 },
+		])
+			expect(digestLedgerWindow([{ ...entry, lines: [changed] }], messages)).not.toBe(digest)
+	})
+
 	it('digests each held message and copy canonically and refuses unencodable messages', () => {
 		const exchanges = [
 			{
@@ -91,7 +204,7 @@ describe('extracted ledger leaves', () => {
 			content: id,
 		}))
 		const digest = requireValue(digestLedgerWindow(exchanges, messages))
-		expect(digest).toBe('d24851c99283eebf')
+		expect(digest).toBe('ed478e691ef87403')
 		expect(digest).toMatch(/^[0-9a-f]{16}$/)
 		for (const target of messages)
 			expect(
@@ -139,6 +252,20 @@ describe('extracted ledger leaves', () => {
 			),
 		).not.toBe(digestLedgerWindow(lookedUp, called))
 		expect(digestLedgerWindow(exchanges, [])).toBeUndefined()
+		const unreadable = Object.defineProperty({}, 'value', { enumerable: true, get: throwProxyRead })
+		const cycle: Record<string, unknown> = {}
+		cycle.self = cycle
+		for (const value of [unreadable, cycle]) {
+			expect(
+				digestLedgerWindow(
+					exchanges,
+					messages.map((message) => ({
+						...message,
+						calls: [{ id: 'call', name: 'lookup', arguments: { value } }],
+					})),
+				),
+			).toBeUndefined()
+		}
 		expect(
 			digestLedgerWindow(
 				exchanges,
@@ -148,62 +275,6 @@ describe('extracted ledger leaves', () => {
 				})),
 			),
 		).toBeUndefined()
-	})
-	it('audits window references and sentence bounds against the stored conversation', () => {
-		const snapshot: LedgerSnapshot = {
-			conversation: {
-				id: 'c',
-				sections: [],
-				messages: [
-					{ id: 's', role: 'user', content: 'Delivery costs $12.' },
-					{ id: 'q', role: 'user', content: 'Check delivery.' },
-					{ id: 'a', role: 'assistant', content: 'Done.' },
-				],
-			},
-			requests: ['q'],
-			notes: [],
-			failures: [],
-			window: {
-				digest: 'fixture',
-				exchanges: [
-					{ request: 'q', reply: 'a', lines: [{ key: 's', title: '', source: 's', sentence: 0 }] },
-				],
-				amendments: [],
-			},
-		}
-		const window = requireValue(snapshot.window)
-		expect(auditLedgerWindow(window, snapshot.conversation.messages)).toEqual([])
-		expect(
-			auditLedgerWindow(
-				{ ...window, amendments: [{ earlier: 'gone', later: 's' }] },
-				snapshot.conversation.messages,
-			),
-		).toEqual([
-			expect.objectContaining({
-				reason: 'variant',
-				path: ['window', 'amendments', '0', 'earlier'],
-			}),
-		])
-		expect(
-			auditLedgerWindow(
-				{
-					...window,
-					exchanges: [
-						{
-							request: 'q',
-							reply: 'a',
-							lines: [{ key: 's', title: '', source: 's', sentence: 1 }],
-						},
-					],
-				},
-				snapshot.conversation.messages,
-			),
-		).toEqual([
-			expect.objectContaining({
-				reason: 'constraint',
-				path: ['window', 'exchanges', '0', 'lines', '0', 'sentence'],
-			}),
-		])
 	})
 	it('filters receipts by placement and sentence rather than text or source alone', () => {
 		const line: LedgerLine = {
@@ -1148,6 +1219,44 @@ describe('matchEntities', () => {
 })
 
 describe('collectLive', () => {
+	it('keeps the first unsuperseded finding after a correction in the identical run', () => {
+		const text = 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
+		const input = buildLedgerInput({
+			messages: [
+				buildLedgerMessage('a1', 'tool', text),
+				buildLedgerMessage('fix', 'user', 'Correction: refund is $149.50.'),
+				buildLedgerMessage('a2', 'tool', text),
+			],
+			findings: ['a1', 'a2'].map((id) =>
+				buildLedgerFinding(id, 'lookup', { id: 'BW-20931' }, text, LEDGER_EMPTY_FOUND),
+			),
+			classification: { amendments: { a1: ['fix'] }, supersessions: { a1: ['fix'] } },
+		})
+		expect(collectLive(input)).toEqual(['fix', 'a2'])
+		expect(checkLedgerProjection(buildRecords(input), input)).toEqual([])
+	})
+	it('keeps the earliest finding of the last identical run across interleaved identities', () => {
+		const input = buildLedgerInput({
+			messages: ['old', 'same', 'other', 'changed', 'repeat'].map((id) =>
+				buildLedgerMessage(
+					id,
+					'tool',
+					id === 'changed' || id === 'repeat' ? 'Changed.' : 'Original.',
+				),
+			),
+			findings: ['old', 'same', 'other', 'changed', 'repeat'].map((id) =>
+				buildLedgerFinding(
+					id,
+					'lookup',
+					{ id: id === 'other' ? 'BW-2' : 'BW-1' },
+					id === 'changed' || id === 'repeat' ? 'Changed.' : 'Original.',
+					LEDGER_EMPTY_FOUND,
+				),
+			),
+		})
+		expect(collectLive(input)).toEqual(['other', 'changed'])
+	})
+
 	it('lists the user messages and the current lookup results, leaving out the excluded, quiet, and supersessions', () => {
 		expect(collectLive(createLedgerDesk())).toEqual([
 			'user-01',
@@ -1317,6 +1426,30 @@ describe('placeMember', () => {
 })
 
 describe('collectAmendments', () => {
+	it('chooses the newest reachable live successor across branches and cycles and deduplicates it', () => {
+		const input = buildLedgerInput({
+			messages: ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => buildLedgerMessage(id, 'user', id)),
+			classification: {
+				amendments: { a: ['b', 'c', 'f'] },
+				supersessions: { b: ['c', 'd'], c: ['b', 'e'], f: ['missing'] },
+			},
+		})
+		const expected = [
+			{ earlier: 'a', later: 'e' },
+			{ earlier: 'a', later: 'f' },
+		]
+		expect(
+			collectAmendments(
+				input,
+				new Map(input.messages.map((message) => [message.id, message])),
+				collectLive(input),
+			),
+		).toEqual(expected)
+		const built = buildRecords(input)
+		expect(built.amendments).toEqual(expected)
+		expect(checkLedgerProjection(built, input)).toEqual([])
+	})
+
 	it('keeps direct edges in conversation order without duplicate or transitive edges', () => {
 		const input = buildLedgerInput({
 			messages: [
@@ -1423,7 +1556,7 @@ describe('collectAmendments', () => {
 				new Map(input.messages.map((message) => [message.id, message])),
 				live,
 			),
-		).toEqual([{ earlier: 'user-a', later: 'user-b' }])
+		).toEqual([{ earlier: 'user-a', later: 'user-c' }])
 	})
 
 	it('keeps direct chain provenance when its correction is itself corrected (R2b)', () => {
@@ -1485,7 +1618,7 @@ describe('collectAmendments', () => {
 		).toEqual([])
 		const control = buildLedgerInput({ messages, classification })
 		expect(collectAmendments(control, byMessage, collectLive(control))).toEqual([
-			{ earlier: 'user-a', later: 'user-b' },
+			{ earlier: 'user-a', later: 'user-c' },
 		])
 	})
 })
@@ -1945,7 +2078,7 @@ describe('buildRecords', () => {
 			},
 		})
 		const built = buildRecords(input)
-		expect(built.amendments).toEqual([{ earlier: 'user-a', later: 'user-b' }])
+		expect(built.amendments).toEqual([{ earlier: 'user-a', later: 'user-c' }])
 		const texts = built.records.flatMap((record) => record.lines.map((line) => line.text))
 		expect(texts).toContain('Standing rule: refunds need code MX-4471.')
 		expect(texts.some((text) => text.includes('MX-4486'))).toBe(false)
@@ -1979,7 +2112,7 @@ describe('buildRecords', () => {
 			],
 			entities: { 'tool-a': ['BW-20931'], 'tool-b': ['BW-20931'] },
 		})
-		expect(buildRecords(input).records.map((record) => record.members)).toEqual([['tool-b']])
+		expect(buildRecords(input).records.map((record) => record.members)).toEqual([['tool-a']])
 	})
 
 	it('pins the person prefix as measured, including a company read as the party (documented limit)', () => {

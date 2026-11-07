@@ -405,9 +405,9 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		}
 	})
 
-	it('executes an agent reply cut at the output allowance under the q2 byte bound', async () => {
-		const q2 = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8')),
+	it('executes an agent reply cut at the output allowance under the smallest byte bound', async () => {
+		const smallest = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/smallest.json', 'utf8')),
 		)
 		// Each streamed row is 136 B, the chunk size goal 53's cut reply read.
 		const chunk = `${JSON.stringify({
@@ -420,19 +420,19 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			...STUDY_MEMORY_CALIBRATION,
 			{
 				path: '/api/chat',
-				body: `${chunk.repeat(q2.room.output - 1)}${buildMemoryReply({
+				body: `${chunk.repeat(smallest.room.output - 1)}${buildMemoryReply({
 					content: '',
 					reason: 'length',
-					completion: q2.room.output,
+					completion: smallest.room.output,
 				})}`,
 			},
 		])
-		const base = buildMemoryProfile({ url: server.url, room: q2.room, duration: 15000 })
+		const base = buildMemoryProfile({ url: server.url, room: smallest.room, duration: 15000 })
 		const profile = {
 			...base,
 			bounds: {
 				...base.bounds,
-				request: { ...base.bounds.request, bytes: q2.bounds.request.bytes },
+				request: { ...base.bounds.request, bytes: smallest.bounds.request.bytes },
 			},
 		}
 		const fixture = createMemoryContext(profile)
@@ -451,11 +451,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(result.failure).toBeUndefined()
 			const results = readMemoryEvents(fixture.evidence, 'result')
 			expect(results).toEqual([expect.objectContaining({ partial: false })])
-			expect(results[0]?.content).toHaveLength(17 * (q2.room.output - 1))
+			expect(results[0]?.content).toHaveLength(17 * (smallest.room.output - 1))
 			const wire = readMemoryEvents(fixture.evidence, 'wire')
 				.filter((row) => row.role === 'agent')
 				.at(-1)
-			expect(wire).toMatchObject({ finish: 'length', completion: q2.room.output })
+			expect(wire).toMatchObject({ finish: 'length', completion: smallest.room.output })
 			// The reply outgrows the bound the failing run held, 1048576 B.
 			expect(wire?.bytes).toBeGreaterThan(1048576)
 			expect(readMemoryEvents(fixture.evidence, 'stop')).toEqual([])

@@ -58,17 +58,17 @@
 			"assertion": { "observation": "denial", "name": "write" }
 		},
 		{
-			"id": "cancel-result",
-			"scenario": "cancellation",
-			"goal": "cancel",
+			"id": "abort-result",
+			"scenario": "abort",
+			"goal": "abort",
 			"method": "trace",
 			"critical": false,
-			"assertion": { "observation": "result", "partial": true, "content": "before-cancel" }
+			"assertion": { "observation": "result", "partial": true, "content": "before-abort" }
 		},
 		{
-			"id": "cancel-file",
-			"scenario": "cancellation",
-			"goal": "cancel",
+			"id": "abort-file",
+			"scenario": "abort",
+			"goal": "abort",
 			"method": "state",
 			"critical": true,
 			"assertion": { "observation": "file", "path": "note.txt", "exists": false }

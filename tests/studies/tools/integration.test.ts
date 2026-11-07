@@ -84,7 +84,7 @@ it('executes all declared tools goals through the actual built Agent and retains
 		).toBe(true)
 		expect(
 			attempts
-				.filter((attempt) => attempt.trial.scenario === 'cancellation')
+				.filter((attempt) => attempt.trial.scenario === 'abort')
 				.every((attempt) => attempt.observations[0]?.product?.partial === true),
 		).toBe(true)
 		expect(parent.signal.aborted).toBe(false)
@@ -231,16 +231,14 @@ it('latches real parent meter refusal and retains all unserved goals and repetit
 	}
 })
 
-it('keeps a cancelled workload inside its goal and serves the next goal of the same session', async () => {
+it('keeps a aborted workload inside its goal and serves the next goal of the same session', async () => {
 	const fixture = await loadStudyToolsFixture()
 	const scratch = createScratch()
 	const meter = createStudyMeterFixture(fixture.profile.bounds)
 	try {
-		const trial = fixture.manifest.schedule.find((entry) => entry.scenario === 'cancellation')
-		const cancel = fixture.manifest.scenarios.find((scenario) => scenario.id === 'cancellation')
-			?.goals[0]
-		if (trial === undefined || cancel === undefined)
-			throw new Error('No declared cancellation workload')
+		const trial = fixture.manifest.schedule.find((entry) => entry.scenario === 'abort')
+		const abort = fixture.manifest.scenarios.find((scenario) => scenario.id === 'abort')?.goals[0]
+		if (trial === undefined || abort === undefined) throw new Error('No declared abort workload')
 		const driver = new StudyToolsDriver({
 			agent: fixture.agent,
 			subject: fixture.subject,
@@ -250,25 +248,25 @@ it('keeps a cancelled workload inside its goal and serves the next goal of the s
 		const rows: StudyEvidence[] = []
 		const context = createTraceStudyContext(meter, rows)
 		try {
-			// The declared goal cancels its own workload and returns the partial product.
-			await expect(session.execute(cancel, context)).resolves.toMatchObject({ partial: true })
+			// The declared goal aborts its own workload and returns the partial product.
+			await expect(session.execute(abort, context)).resolves.toMatchObject({ partial: true })
 			expect(meter.control.signal.aborted).toBe(false)
 			// The next goal of the same session runs under a fresh workload and completes.
 			const next = {
 				id: 'after',
 				input: {
-					prompt: 'Answer after the cancelled workload.',
+					prompt: 'Answer after the aborted workload.',
 					admitted: true,
 					files: [],
-					responses: [{ content: 'after-cancel', calls: [] }],
+					responses: [{ content: 'after-abort', calls: [] }],
 				},
 			}
 			await expect(session.execute(next, context)).resolves.toEqual({
-				value: { content: 'after-cancel' },
+				value: { content: 'after-abort' },
 				partial: false,
 			})
 			expect(rows.filter((row) => row.event === 'workload').map((row) => row.goal)).toEqual([
-				cancel.id,
+				abort.id,
 			])
 		} finally {
 			await session.close()

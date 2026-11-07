@@ -11,11 +11,11 @@ import {
 } from '../../../studies/memory/index.js'
 import {
 	buildMemoryObservationResponses,
-	MEMORY_ROUTE_CAPTURE,
-	MEMORY_ROUTE_UNAVAILABLE,
-	MEMORY_ROUTE_FAILURES,
-	MEMORY_ROUTE_GOAL,
-	MEMORY_ROUTE_OPEN,
+	MEMORY_TRIAGE_CAPTURE,
+	MEMORY_TRIAGE_UNAVAILABLE,
+	MEMORY_TRIAGE_FAILURES,
+	MEMORY_TRIAGE_GOAL,
+	MEMORY_TRIAGE_OPEN,
 	createMemoryRouteServer,
 	buildMemoryProfile,
 	createMemoryContext,
@@ -38,9 +38,9 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const profile = buildMemoryProfile({
 			url: server.url,
 			settings: {
-				router: { model: 'model', digest: 'a'.repeat(64) },
+				triage: { model: 'model', digest: 'a'.repeat(64) },
 				observe: true,
-				checkpoints: [MEMORY_ROUTE_GOAL.id],
+				checkpoints: [MEMORY_TRIAGE_GOAL.id],
 			},
 		})
 		const fixture = createMemoryContext(profile)
@@ -51,12 +51,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				fixture.context.signal,
 			)
 			try {
-				await expect(session.execute(MEMORY_ROUTE_GOAL, fixture.context)).resolves.toMatchObject({
+				await expect(session.execute(MEMORY_TRIAGE_GOAL, fixture.context)).resolves.toMatchObject({
 					partial: false,
 				})
-				const routes = fixture.evidence.filter((row) => row.event === 'route')
-				expect(routes).toHaveLength(1)
-				expect(routes[0]?.value).toMatchObject({
+				const decisions = fixture.evidence.filter((row) => row.event === 'triage')
+				expect(decisions).toHaveLength(1)
+				expect(decisions[0]?.value).toMatchObject({
 					model: 'model',
 					questions: [{ outcome: 'kept', winner: 'fact', probability: 0.9 }],
 				})
@@ -76,7 +76,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 							)
 						}),
 				).toBe(false)
-				const snapshot = readMemoryCheckpoint(fixture.evidence, MEMORY_ROUTE_GOAL.id)
+				const snapshot = readMemoryCheckpoint(fixture.evidence, MEMORY_TRIAGE_GOAL.id)
 				if (!isStudyMemoryCheckpoint(snapshot) || snapshot.ledger === undefined)
 					throw new Error('Missing ledger checkpoint')
 				const judgments = snapshot.ledger.conversation.judgments?.filter(
@@ -103,11 +103,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			await server.close()
 		}
 	})
-	it('rejects execute when its context aborts an open router inventory request', async () => {
-		const server = await createMemoryServer(MEMORY_ROUTE_OPEN)
+	it('rejects execute when its context aborts an open triage inventory request', async () => {
+		const server = await createMemoryServer(MEMORY_TRIAGE_OPEN)
 		const profile = buildMemoryProfile({
 			url: server.url,
-			settings: { router: { model: 'model', digest: 'a'.repeat(64) } },
+			settings: { triage: { model: 'model', digest: 'a'.repeat(64) } },
 		})
 		const controller = new AbortController()
 		const fixture = createMemoryContext(profile, controller.signal)
@@ -117,12 +117,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				new AbortController().signal,
 			)
 			try {
-				const execution = session.execute(MEMORY_ROUTE_GOAL, fixture.context).then(
+				const execution = session.execute(MEMORY_TRIAGE_GOAL, fixture.context).then(
 					() => undefined,
 					(error: unknown) => error,
 				)
 				await waitForCondition(
-					'the open router inventory request',
+					'the open triage inventory request',
 					() => server.requests.some((request) => request.path === '/api/tags'),
 					{ budget: 5000 },
 				)
@@ -137,10 +137,10 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			await server.close()
 		}
 	})
-	it('refuses a router session whose admitted namespace lacks the System One runtime', async () => {
+	it('refuses a triage session whose admitted namespace lacks the System One runtime', async () => {
 		const profile = buildMemoryProfile({
 			url: 'http://127.0.0.1:1',
-			settings: { router: { model: 'model', digest: 'a'.repeat(64) } },
+			settings: { triage: { model: 'model', digest: 'a'.repeat(64) } },
 		})
 		const driver = new StudyMemoryDriver({
 			...STUDY_MEMORY_MODULES,
@@ -152,14 +152,14 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
 				new AbortController().signal,
 			),
-		).rejects.toThrow('Memory router requires the admitted System One runtime')
+		).rejects.toThrow('Memory triage requires the admitted System One runtime')
 	})
-	it('runs a reused real records session through a direct-leg fault and retains route evidence', async () => {
+	it('runs a reused real records session through a direct-leg fault and retains triage evidence', async () => {
 		const result = await runMemoryTrial({
 			arm: 'records',
-			responses: MEMORY_ROUTE_FAILURES,
+			responses: MEMORY_TRIAGE_FAILURES,
 			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
-			settings: { router: { model: 'model', digest: 'a'.repeat(64) } },
+			settings: { triage: { model: 'model', digest: 'a'.repeat(64) } },
 		})
 		expect(result.failure).toBeUndefined()
 		expect(result.products).toHaveLength(2)
@@ -170,11 +170,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		)
 		expect(result.requests.some((request) => request.path === '/v1/systemone')).toBe(true)
 		expect(result.requests.some((request) => request.path === '/api/generate')).toBe(true)
-		const routes = result.evidence.filter((row) => row.event === 'route')
-		expect(routes.length).toBeGreaterThan(0)
-		expect(routes[0]?.value).toMatchObject({ model: 'model', questions: [{ outcome: 'fault' }] })
+		const decisions = result.evidence.filter((row) => row.event === 'triage')
+		expect(decisions.length).toBeGreaterThan(0)
+		expect(decisions[0]?.value).toMatchObject({ model: 'model', questions: [{ outcome: 'fault' }] })
 	})
-	it('preserves the real Mica identity when the profile has no router', async () => {
+	it('preserves the real Mica identity when the profile has no triage', async () => {
 		const fixture = createMemoryIdentity(buildMemoryProfile({ url: 'http://127.0.0.1:1' }))
 		const session = await fixture.driver.open(
 			{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
@@ -187,25 +187,25 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			await session.close()
 		}
 	})
-	it('refuses router exchanges and replay before opening a session', async () => {
+	it('refuses triage exchanges and replay before opening a session', async () => {
 		const profile = buildMemoryProfile({
 			url: 'http://127.0.0.1:1',
-			settings: { router: { model: 'tev1', digest: 'c'.repeat(64) } },
+			settings: { triage: { model: 'tev1', digest: 'c'.repeat(64) } },
 		})
-		for (const capture of MEMORY_ROUTE_CAPTURE) {
+		for (const capture of MEMORY_TRIAGE_CAPTURE) {
 			const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile, ...capture })
 			await expect(
 				driver.open(
 					{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
 					new AbortController().signal,
 				),
-			).rejects.toThrow('Memory router cannot record or replay its direct leg')
+			).rejects.toThrow('Memory triage cannot record or replay its direct leg')
 		}
 	})
-	it('refuses an absent router model or digest mismatch before any goal request', async () => {
-		for (const router of MEMORY_ROUTE_UNAVAILABLE) {
+	it('refuses an absent triage model or digest mismatch before any goal request', async () => {
+		for (const triage of MEMORY_TRIAGE_UNAVAILABLE) {
 			const server = await createMemoryServer()
-			const profile = buildMemoryProfile({ url: server.url, settings: { router } })
+			const profile = buildMemoryProfile({ url: server.url, settings: { triage } })
 			const fixture = createMemoryContext(profile)
 			try {
 				const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })

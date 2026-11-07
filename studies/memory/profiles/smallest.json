@@ -1,5 +1,5 @@
 {
-	"name": "q2",
+	"name": "smallest",
 	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [

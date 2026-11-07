@@ -27,7 +27,7 @@ import type {
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
 	/** Pins the direct System One leg; absent selects the Mica-only judge. */
-	readonly router?: { readonly model: string; readonly digest: string } | undefined
+	readonly triage?: { readonly model: string; readonly digest: string } | undefined
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */
@@ -116,7 +116,7 @@ export interface StudyMemoryLedger {
 	readonly LEDGER_NOTES: typeof LEDGER_NOTES
 }
 
-/** Holds the extra admitted Agent capabilities required only by the router. */
+/** Holds the extra admitted Agent capabilities required only by the triage. */
 export interface StudyMemoryRuntime {
 	readonly createSystemOneJudge: typeof createSystemOneJudge
 	readonly JudgeAbortError: typeof JudgeAbortError
@@ -135,7 +135,7 @@ export interface StudyMemoryJudgeOptions {
 	readonly evidence: { readonly append: (event: string, value: JSONValue) => void }
 }
 
-/** Holds the frozen consumer routing rule. */
+/** Holds the frozen consumer triage rule. */
 export interface StudyMemoryPolicy {
 	readonly version: number
 	readonly probability: number
@@ -143,7 +143,7 @@ export interface StudyMemoryPolicy {
 }
 
 /** Holds the first leg's decision for one caller question without state text. */
-export interface StudyMemoryRoute {
+export interface StudyMemoryTriage {
 	readonly id: string
 	readonly outcome: 'kept' | 'referred' | 'fault'
 	readonly winner: string | null

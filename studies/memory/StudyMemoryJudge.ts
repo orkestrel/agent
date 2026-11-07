@@ -2,12 +2,12 @@ import type { JudgeInterface, JudgeRequest, JudgeResult } from '@orkestrel/agent
 import type { StudyMemoryJudgeOptions } from './types.js'
 import {
 	buildStudyMemoryJudgeModel,
-	buildStudyMemoryRoute,
+	buildStudyMemoryTriage,
 	filterStudyMemoryResult,
 } from './helpers.js'
 import { STUDY_MEMORY_POLICY } from './constants.js'
 
-/** Routes choices through the frozen Study policy and retains only settled accepted outcomes. */
+/** Runs a two-step judge: one fast pass, then a second judge for what the fast pass doesn't keep. */
 export class StudyMemoryJudge implements JudgeInterface {
 	readonly #options: StudyMemoryJudgeOptions
 	readonly id = 'memory'
@@ -34,7 +34,7 @@ export class StudyMemoryJudge implements JudgeInterface {
 		const first =
 			Object.keys(choices).length === 0
 				? empty
-				: await this.#route({ ...request, questions: choices }, signal)
+				: await this.#triage({ ...request, questions: choices }, signal)
 		if (signal.aborted) throw new this.#options.runtime.JudgeAbortError(first)
 		const remaining = Object.fromEntries(
 			Object.entries(request.questions).filter(([id]) => !Object.hasOwn(first.answers, id)),
@@ -62,22 +62,22 @@ export class StudyMemoryJudge implements JudgeInterface {
 		}
 	}
 
-	async #route(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult> {
+	async #triage(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult> {
 		const started = performance.now()
 		const outcome = await this.#attempt(request, signal)
-		const routes = Object.entries(request.questions).map(([id, question]) =>
-			buildStudyMemoryRoute(id, question, outcome.result, outcome.fault && !signal.aborted),
+		const decisions = Object.entries(request.questions).map(([id, question]) =>
+			buildStudyMemoryTriage(id, question, outcome.result, outcome.fault && !signal.aborted),
 		)
-		this.#options.evidence.append('route', {
+		this.#options.evidence.append('triage', {
 			model: this.#options.first.model,
 			ms: performance.now() - started,
-			questions: routes.map((route) => ({ ...route })),
+			questions: decisions.map((triage) => ({ ...triage })),
 			usage: outcome.result?.usage === undefined ? null : { ...outcome.result.usage },
 		})
 		return {
 			...filterStudyMemoryResult(
 				outcome.result ?? { model: this.model, answers: {} },
-				routes.filter((route) => route.outcome === 'kept').map((route) => route.id),
+				decisions.filter((triage) => triage.outcome === 'kept').map((triage) => triage.id),
 			),
 			model: this.model,
 		}

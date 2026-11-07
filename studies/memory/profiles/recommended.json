@@ -1,5 +1,5 @@
 {
-	"name": "q4",
+	"name": "recommended",
 	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [
@@ -64,7 +64,7 @@
 	"settings": {
 		"observe": true,
 		"judge": { "gpu": 0 },
-		"router": {
+		"triage": {
 			"model": "tev1:0.8b",
 			"digest": "abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099"
 		},

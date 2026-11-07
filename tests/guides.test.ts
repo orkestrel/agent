@@ -11,6 +11,7 @@ import type {
 	ConversationManagerInterface,
 	ConversationSnapshot,
 	JudgeAnswer,
+	JudgeInterface,
 	JudgeRequest,
 	JudgeResult,
 	LedgerLine,
@@ -190,6 +191,7 @@ await new GuideCommand({
 		buildLedgerTailScenario,
 		LEDGER_FAILURE_MESSAGES,
 		createPhraseJudge,
+		seedLedgerRecall,
 		LEDGER_REFUNDS_TOPIC,
 		LEDGER_ORDER_LOOKUP,
 		fileLedgerCorrection,
@@ -206,6 +208,7 @@ await new GuideCommand({
 		exerciseThinkingReplay,
 		createBoundedRelay,
 		buildLedgerInput,
+		buildLedgerPairJudgment,
 		buildCategoryAnswer,
 		buildGuideLedgerOptions,
 		createRecordedSelection,
@@ -285,6 +288,50 @@ await new GuideCommand({
 		}
 		finish(_parser: ProviderParserInterface<string>): readonly string[] {
 			return []
+		}
+	}
+
+	// The two-step judge fence, transcribed. It is declared here because `measureAnswer` and
+	// `buildJudgeResult` are only in scope after the dynamic barrel import.
+	class TwoStepJudge implements JudgeInterface {
+		readonly id = 'two-step'
+		readonly name = 'two-step'
+		readonly model: string
+		readonly #first: JudgeInterface
+		readonly #second: JudgeInterface
+		readonly #keep: number
+
+		constructor(first: JudgeInterface, second: JudgeInterface, keep: number) {
+			this.#first = first
+			this.#second = second
+			this.#keep = keep
+			// A stored judgment is reused only under one identity, so all that changes an answer joins it.
+			this.model = JSON.stringify({ first: first.model, second: second.model, keep })
+		}
+
+		async ask(request: JudgeRequest, signal: AbortSignal): Promise<JudgeResult> {
+			const entries = Object.entries(request.questions)
+			const choices = entries.filter(([, question]) => question.form === 'choice')
+			const asked: JudgeResult =
+				choices.length === 0
+					? { model: this.model, answers: {} }
+					: await this.#first.ask({ ...request, questions: Object.fromEntries(choices) }, signal)
+			const kept = Object.entries(asked.answers).filter(([, answer]) => {
+				const { winner, probability } = measureAnswer(answer)
+				return probability >= this.#keep && winner !== 'correction'
+			})
+			const answered: JudgeResult = {
+				model: this.model,
+				answers: Object.fromEntries(kept),
+				...(asked.usage === undefined ? {} : { usage: asked.usage }),
+			}
+			const rest = entries.filter(([id]) => !Object.hasOwn(answered.answers, id))
+			return rest.length === 0
+				? answered
+				: barrel.buildJudgeResult(this.model, [
+						answered,
+						await this.#second.ask({ ...request, questions: Object.fromEntries(rest) }, signal),
+					])
 		}
 	}
 
@@ -1847,6 +1894,7 @@ await new GuideCommand({
 				gauge: { scale: 1, overhead: 0 },
 			})
 			const ledger = createLedger(parent, options)
+			seedLedgerRecall(ledger)
 			ledger.conversation.add({ role: 'user', content: rule })
 			await ledger.respond('First request.')
 			await ledger.respond('Second request.')
@@ -1999,7 +2047,76 @@ await new GuideCommand({
 			)
 		})
 
-		it('empties the window when a lookup repeats with the same text, as the repeated lookup limit claims', async () => {
+		it('extends the prompt across a lookup repeated with the same text and empties the window on a changed one, as the changed lookup limit claims', async () => {
+			const records =
+				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Request\n'
+			const first = 'Does the Brightwater Studio refund need a manager?'
+			const last = 'Is the Brightwater Studio refund approved?'
+			for (const row of [
+				{
+					id: 'BW-5512',
+					expected: [
+						'Serve the desk.',
+						'Look up order BW-5512.',
+						'Done.',
+						`${records}${first}`,
+						'Done.',
+						'Look up order again.',
+						'Done.',
+						last,
+					],
+				},
+				{
+					id: 'bw-5512',
+					expected: [
+						'Serve the desk.',
+						'Look up order again.',
+						'Done.',
+						`## Records\n### Brightwater Studio (BW-20931)\n- Order bw-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Request\n${last}`,
+					],
+				},
+			]) {
+				const provider = createScriptedProvider(
+					[
+						{
+							content: '',
+							tools: [{ id: 'first', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+						},
+						{ content: 'Done.' },
+						{ content: 'Done.' },
+						{
+							content: '',
+							tools: [{ id: 'second', name: 'lookup_order', arguments: { id: row.id } }],
+						},
+						{ content: 'Done.' },
+						{ content: 'Done.' },
+					],
+					{ recorded: true },
+				)
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						gauge: { scale: 1, overhead: 0 },
+						lookups: [LEDGER_ORDER_LOOKUP],
+					}),
+				)
+				await ledger.respond('Look up order BW-5512.')
+				await ledger.respond(first)
+				await ledger.respond('Look up order again.')
+				await ledger.respond(last)
+				expect(requireValue(provider.calls[5]).messages.map(({ content }) => content)).toEqual(
+					row.expected,
+				)
+			}
+			expect(guideText).toContain(
+				'A later finding of the same lookup with different text or an empty result retires the source the window holds, and that empties the window.',
+			)
+			expect(guideText).toContain(
+				'A lookup repeated with the same text retires nothing, so the prompt extends the one before it.',
+			)
+		})
+
+		it('files no finding for a failed call, so the earlier result stays live, as the repeat stop claims', async () => {
 			const provider = createScriptedProvider(
 				[
 					{
@@ -2007,10 +2124,9 @@ await new GuideCommand({
 						tools: [{ id: 'first', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
 					},
 					{ content: 'Done.' },
-					{ content: 'Done.' },
 					{
 						content: '',
-						tools: [{ id: 'second', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+						tools: [{ id: 'second', name: 'lookup_order', arguments: { id: 'bw-5512' } }],
 					},
 					{ content: 'Done.' },
 					{ content: 'Done.' },
@@ -2021,102 +2137,316 @@ await new GuideCommand({
 				provider,
 				buildGuideLedgerOptions({
 					gauge: { scale: 1, overhead: 0 },
-					lookups: [LEDGER_ORDER_LOOKUP],
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: {
+								...LEDGER_ORDER_LOOKUP.tool,
+								execute: (args) => {
+									if (args.id === 'bw-5512') throw new Error('the order service is down')
+									return 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
+								},
+							},
+						},
+					],
 				}),
 			)
-			const records =
-				'## Records\n### Brightwater Studio (BW-20931)\n- Order BW-5512 for account BW-20931: Brightwater Studio.\n- Refund due $148.50.\n\n## Request\n'
 			await ledger.respond('Look up order BW-5512.')
-			await ledger.respond('Does the Brightwater Studio refund need a manager?')
-			await ledger.respond('Look up order BW-5512 again.')
+			await ledger.respond('Look up order again.')
 			await ledger.respond('Is the Brightwater Studio refund approved?')
-			expect(requireValue(provider.calls[2]).messages.at(-1)?.content).toBe(
-				`${records}Does the Brightwater Studio refund need a manager?`,
-			)
-			expect(requireValue(provider.calls[5]).messages.map(({ content }) => content)).toEqual([
-				'Serve the desk.',
-				'Look up order BW-5512 again.',
-				'Done.',
-				`${records}Is the Brightwater Studio refund approved?`,
-			])
+			const prompt = requireValue(provider.calls.at(-1), 'Missing last prompt').messages
+			expect(prompt.at(-1)?.content).toContain('- Refund due $148.50.')
+			expect(prompt.at(-1)?.content).toContain('Order BW-5512 for account')
 			expect(guideText).toContain(
-				'A lookup repeated with the same text retires the source the window holds',
+				'and a thrown call files no finding, leaving the earlier result live.',
 			)
 		})
 
-		it('keeps the not-shown stub of a replaced seed lookup beside a copy that prints its result, as the replaced lookup limit claims', async () => {
+		it('keeps the not-shown stub of a changed seed lookup beside a copy that prints its result, and a shown stub on an identical repeat, as the replaced lookup limit claims', async () => {
 			const result = 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
-			const provider = createScriptedProvider(
-				[
+			for (const row of [
+				{
+					id: 'bw-5512',
+					stub: 'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512',
+				},
+				{
+					id: 'BW-5512',
+					stub: 'lookup_order {"id":"BW-5512"}: result shown under Records below',
+				},
+			]) {
+				const provider = createScriptedProvider(
+					[
+						{
+							content: '',
+							tools: [{ id: 'later', name: 'lookup_order', arguments: { id: row.id } }],
+						},
+						{ content: 'Done.' },
+						{ content: 'Done.' },
+					],
+					{ recorded: true },
+				)
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						gauge: { scale: 1, overhead: 0 },
+						lookups: [LEDGER_ORDER_LOOKUP],
+					}),
+				)
+				ledger.conversation.add([
 					{
+						role: 'assistant',
 						content: '',
-						tools: [{ id: 'later', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+						calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
 					},
-					{ content: 'Done.' },
-					{ content: 'Done.' },
-				],
-				{ recorded: true },
+					{ role: 'tool', call: 'seed', content: result },
+				])
+				await ledger.respond('Look up order BW-5512 again.')
+				await ledger.respond('Does the Brightwater Studio refund need a manager?')
+				const prompt = requireValue(provider.calls[2], 'Missing later prompt').messages
+				expect(prompt.find(({ role }) => role === 'tool')?.content).toBe(row.stub)
+				expect(prompt.map(({ content }) => content).join('\n')).toContain('- Refund due $148.50.')
+			}
+			expect(guideText).toContain(
+				'the seed stub reads `result not shown` while a later copy can print the replacing result',
 			)
+			expect(guideText).toContain(
+				'That full receipt makes a duplicate stub read `shown`, even when its own source is retired.',
+			)
+		})
+
+		it('points a superseded amender at its newest live successor and keeps its endpoint when none lives, as the amendment scope claims', () => {
+			const { buildRecords } = barrel
+			const messages: readonly Message[] = [
+				{ id: 'earliest', role: 'user', content: 'Delivery costs $10.' },
+				{ id: 'middle', role: 'user', content: 'Delivery costs $12 instead.' },
+				{ id: 'newest', role: 'user', content: 'Delivery costs $14 instead.' },
+			]
+			const edge = { amendments: { earliest: ['middle'] } }
+			const successor = buildRecords(
+				buildLedgerInput({
+					messages,
+					classification: { ...edge, supersessions: { middle: ['newest'] } },
+				}),
+			)
+			expect(successor.amendments).toEqual([{ earlier: 'earliest', later: 'newest' }])
+			// The successor filed quiet leaves no live one, so the edge keeps its endpoint and reads as absent.
+			const absent = buildRecords(
+				buildLedgerInput({
+					messages,
+					classification: { ...edge, supersessions: { middle: ['newest'] }, quiet: ['newest'] },
+				}),
+			)
+			expect(absent.amendments).toEqual([{ earlier: 'earliest', later: 'middle' }])
+			// An amendment of an amender files no edge to the earlier message.
+			const chain = buildRecords(
+				buildLedgerInput({
+					messages,
+					classification: { amendments: { earliest: ['middle'], middle: ['newest'] } },
+				}),
+			)
+			expect(chain.amendments).toEqual([
+				{ earlier: 'earliest', later: 'middle' },
+				{ earlier: 'middle', later: 'newest' },
+			])
+			expect(guideText).toContain(
+				"An edge whose amender a newer message superseded points at that amender's newest live successor, followed through accepted supersessions alone, so a change fully received by the records is not called not shown.",
+			)
+			expect(guideText).toContain(
+				'An amendment of an amender infers no edge to the earlier message.',
+			)
+		})
+
+		it('can call a change not shown while it sits raw in the seed tail, as the amendment limit states', async () => {
+			const correction = 'Correction: Halvorsen Interiors LH-31055 says delivery is $12, not $10.'
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
 				buildGuideLedgerOptions({
-					gauge: { scale: 1, overhead: 0 },
-					lookups: [LEDGER_ORDER_LOOKUP],
+					judge: createPhraseJudge([], [correction]),
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							read: (args) => ({
+								ids: [String(args.id)],
+								owners: [
+									args.id === 'BW-20931'
+										? { id: 'BW-20931', names: ['Brightwater Studio'] }
+										: { id: 'LH-31055', names: ['Halvorsen Interiors'] },
+								],
+							}),
+						},
+					],
 				}),
 			)
 			ledger.conversation.add([
 				{
 					role: 'assistant',
 					content: '',
-					calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					calls: [
+						{ id: 'brightwater', name: 'lookup_order', arguments: { id: 'BW-20931' } },
+						{ id: 'halvorsen', name: 'lookup_order', arguments: { id: 'LH-31055' } },
+					],
 				},
-				{ role: 'tool', call: 'seed', content: result },
+				{
+					role: 'tool',
+					call: 'brightwater',
+					content: 'Brightwater Studio BW-20931.',
+				},
+				{
+					role: 'tool',
+					call: 'halvorsen',
+					content: 'Halvorsen Interiors LH-31055.',
+				},
 			])
-			await ledger.respond('Look up order BW-5512 again.')
-			await ledger.respond('Does the Brightwater Studio refund need a manager?')
-			const prompt = requireValue(provider.calls[2], 'Missing later prompt').messages
-			expect(prompt.find(({ role }) => role === 'tool')?.content).toBe(
-				'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512',
-			)
-			expect(prompt.at(-1)?.content).toContain('- Refund due $148.50.')
-			expect(guideText).toContain(
-				"the seed stub reads `result not shown` while a later copy can print that lookup's result",
-			)
+			const earlier = ledger.conversation.add({
+				role: 'user',
+				content: 'Brightwater Studio delivery for BW-20931 costs $10.',
+			})
+			const later = ledger.conversation.add({ role: 'user', content: correction })
+			ledger.conversation.judgments.add({
+				...buildLedgerPairJudgment('amends', earlier, later, 1),
+				model: 'scripted',
+			})
+			ledger.conversation.judgments.add({
+				...buildLedgerPairJudgment('supersedes', earlier, later, 0),
+				model: 'scripted',
+			})
+			await ledger.respond('Check BW-20931.')
+			const messages = requireValue(provider.calls[0]).messages
+			expect(messages.some((message) => message.content === correction)).toBe(true)
+			expect(extractLedgerRecords(messages)).toContain('A later change is not shown.')
+			expect(extractLedgerRecords(messages)).not.toContain(correction)
+			expect(guideText).toContain("because the record's amendment rendering doesn't read that tail")
 		})
 
-		it('reads a later change as not shown beside a second change with no direct edge, as the second change limit claims', () => {
-			const { renderLedgerAnnotation } = barrel
-			const messages: readonly Message[] = [
-				{ id: 'earliest', role: 'user', content: 'Delivery costs $10.' },
-				{ id: 'superseded', role: 'user', content: 'Delivery costs $12 instead.' },
-				{ id: 'newest', role: 'user', content: 'Delivery costs $14 instead.' },
-			]
-			const earliest: LedgerLine = {
-				text: 'Delivery costs $10.',
-				source: 'earliest',
-				sentence: 0,
-				topics: [],
-				role: 'user',
-			}
-			const newest: LedgerLine = {
-				text: 'Delivery costs $14 instead.',
-				source: 'newest',
-				sentence: 0,
-				topics: [],
-				role: 'user',
-			}
-			const context = buildLedgerRenderContext(
-				messages,
-				[earliest, newest],
-				[
-					{ earlier: 'earliest', later: 'superseded' },
-					{ earlier: 'superseded', later: 'newest' },
-				],
+		it('learns only exact overhead and subtracts spared overhead in estimated use, as the gauge claims', () => {
+			const gauge = new Gauge({ scale: 2, overhead: 120, capacity: 1000 })
+			expect(gauge.remainder([{ estimate: 100, tools: 1 }])).toBe(680)
+			expect(gauge.remainder([{ estimate: 100, tools: 1, spared: 40 }])).toBe(720)
+			expect(gauge.remainder([{ estimate: 100, tools: 0, spared: 150 }])).toBe(800)
+			gauge.observe([{ estimate: 100, tools: 1, spared: 40, prompt: 380 }])
+			expect(gauge.scale).toBe(2)
+			gauge.observe([{ estimate: 100, tools: 0, spared: 120, prompt: 300 }])
+			expect(gauge.scale).toBe(3)
+			gauge.observe([{ estimate: 100, tools: 1, prompt: 520 }])
+			expect(gauge.scale).toBe(4)
+			expect(gauge.overhead).toBe(120)
+			expect(guideText).toContain('A partially spared first call keeps the existing scale.')
+		})
+
+		it('files through a two-step judge with no window or recall configuration, as the records desk recipe claims', async () => {
+			const rule = 'Refunds over $100 need a manager.'
+			const unsure = 'The Northgate courier brings refund forms on 2026-10-12.'
+			const correction = 'Correction: refunds over $100 need two managers.'
+			const fast = createRecorder<readonly [JudgeRequest]>()
+			const slow = createRecorder<readonly [JudgeRequest]>()
+			const usage = { prompt: 10, completion: 1, total: 11 }
+			const second = createPhraseJudge([rule])
+			const judge = new TwoStepJudge(
+				{
+					id: 'first',
+					name: 'first',
+					model: 'first-model',
+					ask: async (request) => {
+						fast.handler(request)
+						const state = isString(request.state) ? request.state : ''
+						return {
+							model: 'first-model',
+							usage,
+							answers: Object.fromEntries(
+								Object.keys(request.questions).map((id): [string, JudgeAnswer] => [
+									id,
+									buildCategoryAnswer(
+										state.includes(unsure)
+											? { fact: 0.5, chatter: 0.5 }
+											: state.includes(correction)
+												? { correction: 1 }
+												: { rule: 1 },
+									),
+								]),
+							),
+						}
+					},
+				},
+				{
+					id: 'second',
+					name: 'second',
+					model: 'second-model',
+					ask: async (request, signal) => {
+						slow.handler(request)
+						return await second.ask(request, signal)
+					},
+				},
+				0.7,
 			)
-			expect(renderLedgerAnnotation(earliest, context)).toBe('[1] A later change is not shown.')
-			expect(renderLedgerAnnotation(newest, context)).toBe('')
+			const provider = createScriptedProvider(
+				[{ content: 'First reply.' }, { content: 'Second reply.' }],
+				{ recorded: true },
+			)
+			const ledger = createLedger(provider, {
+				...buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [LEDGER_ORDER_LOOKUP],
+				}),
+				judge,
+			})
+			ledger.conversation.add([
+				{ role: 'user', content: rule },
+				{ role: 'user', content: unsure },
+				{ role: 'user', content: correction },
+			])
+			await ledger.respond('Does a refund need a manager?')
+			await ledger.respond('Make that shorter.')
+
+			const referred = slow.calls
+				.filter(([request]) =>
+					Object.values(request.questions).some((question) => question.form === 'choice'),
+				)
+				.map(([request]) => String(request.state))
+			// The first judge took every choice question and nothing else.
+			expect(
+				fast.calls.every(([request]) =>
+					Object.values(request.questions).every((question) => question.form === 'choice'),
+				),
+			).toBe(true)
+			expect(fast.count).toBeGreaterThan(0)
+			// The second judge took what the first didn't keep, and every other question.
+			expect(referred.some((state) => state.includes(rule))).toBe(false)
+			expect(referred.some((state) => state.includes(unsure))).toBe(true)
+			expect(referred.some((state) => state.includes(correction))).toBe(true)
+			expect(
+				slow.calls.some(([request]) =>
+					Object.values(request.questions).some((question) => question.form !== 'choice'),
+				),
+			).toBe(true)
+			expect(
+				ledger.conversation.snapshot().judgments?.every(({ model }) => model === judge.model),
+			).toBe(true)
+			// The window and the offer took no option: the prompt extends, and nothing hidden offers no recall.
+			const [first, next] = provider.calls
+			expect(requireValue(next).messages.slice(1, requireValue(first).messages.length)).toEqual(
+				requireValue(first).messages.slice(1),
+			)
+			expect(provider.calls.map((call) => call.tools?.map(({ name }) => name))).toEqual([
+				['lookup_order'],
+				['lookup_order'],
+			])
+			// A direct ask merges both judges' answers and keeps the first judge's usage.
+			const merged = await judge.ask(
+				{
+					state: rule,
+					questions: {
+						category: { form: 'choice', criteria: { rule: 'A rule.', fact: 'A fact.' } },
+						topic: { form: 'noul', instructions: 'Does it concern refunds?' },
+					},
+				},
+				AbortSignal.timeout(30_000),
+			)
+			expect(Object.keys(merged.answers).sort()).toEqual(['category', 'topic'])
+			expect(merged.usage).toEqual(usage)
+			expect(guideText).toContain("return probability >= this.#keep && winner !== 'correction'")
 			expect(guideText).toContain(
-				'because a superseded amender reads as absent and no transitive edge is inferred.',
+				'The application decides which models to run, which thresholds to keep, and whether to run two judges at all.',
 			)
 		})
 
@@ -2378,7 +2708,7 @@ await new GuideCommand({
 				)?.content,
 			).toContain(LEDGER_AMENDED_RULE)
 			expect(guideText).toContain(
-				'Accepted message-level amendments preserve every original indexed sentence of live earlier sources; the projection lists distinct direct edges in its `amendments` member. Sentence scope remains unresolved.',
+				'Accepted message-level amendments preserve every original indexed sentence of live earlier sources; the projection lists distinct accepted edges in its `amendments` member. Sentence scope remains unresolved.',
 			)
 		})
 
@@ -2740,7 +3070,7 @@ await new GuideCommand({
 				"A direct run on the ledger's conversation while a `respond` call's pass runs is refused with `AgentError` `'CONCURRENCY'`.",
 			)
 			expect(guideText).toContain(
-				"a run on another conversation then adds its turns and usage to that call's gauge readings, shares its repeat stop, and can reach the `recall` and lookup tools",
+				"a run on another conversation then adds its turns and usage to that call's gauge readings, shares its repeat stop, and can reach the lookup tools, and the `recall` tool when that call's request offers it",
 			)
 		})
 
@@ -2911,7 +3241,7 @@ await new GuideCommand({
 			expect(records).toContain('- Order BW-5512 for account BW-20931: Brightwater Studio.')
 			expect(records).not.toContain('Order bw-5512')
 			expect(guideText).toContain(
-				"For a lookup, the repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which finding replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second finding replaces the first in the records.",
+				"For a lookup, the repeat stop's identity compares string arguments as written. The projection's lookup identity, which the `identifyLookup` helper writes, trims and uppercases each top-level string argument and decides which finding replaces an earlier one. So `lookup_order` calls for `bw-5512` and `BW-5512` both run in one request, and the second finding replaces the first in the records when its text differs.",
 			)
 		})
 
@@ -3155,7 +3485,7 @@ await new GuideCommand({
 				expect(records).not.toContain(caller)
 			}
 			expect(guideText).toContain(
-				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later finding of the same lookup replaces it, or a later answer files it quiet.',
+				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later finding of the same lookup with different text or an empty result replaces it, or a later answer files it quiet.',
 			)
 		})
 
@@ -3487,6 +3817,7 @@ await new GuideCommand({
 						gauge: { scale: 1, overhead: 0 },
 					}),
 				)
+				seedLedgerRecall(ledger)
 				await ledger.respond('Review.')
 				expect(provider.calls).toHaveLength(2)
 				expect(
@@ -3500,7 +3831,7 @@ await new GuideCommand({
 			}
 			expect(recalled).toEqual([
 				barrel.LEDGER_NOTES.closure,
-				'nothing on "absent"; recall an owner name, an id, or one of refunds',
+				'nothing earlier on "absent"; answer from the messages you can see',
 			])
 			expect(guideText).toContain(
 				'a ledger still reads recorded thinking to measure what a call left.',

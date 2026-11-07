@@ -19,11 +19,10 @@ import type {
 	LedgerRenderContext,
 	LedgerTopic,
 	LedgerWordSet,
-	LedgerWindowSnapshot,
+	LedgerReceipt,
 } from './types.js'
 import type { ToolCall } from '@orkestrel/tool'
-import type { AuditFault } from '@orkestrel/contract'
-import { canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
+import { attempt, canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { extractLiterals, hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
@@ -36,93 +35,11 @@ import {
 import { LedgerError } from './errors.js'
 
 /**
- * Audits a shaped window's references and sentence ranges against its stored conversation.
- * @param value - The window admitted by its shape guard
- * @param conversation - The messages the snapshot holds
- * @returns Faults for missing or invalid window references and sentence ranges
- * @example
- * ```ts
- * auditLedgerWindow({ digest: 'empty', exchanges: [], amendments: [] }, []) // []
- * ```
- */
-export function auditLedgerWindow(
-	value: LedgerWindowSnapshot,
-	conversation: readonly Message[],
-): readonly AuditFault[] {
-	const messages = new Map(conversation.map((message) => [message.id, message]))
-	const lengths = new Map<string, number>()
-	const sources = new Set(messages.keys())
-	const requests = new Set(
-		conversation.filter((message) => message.role === 'user').map((message) => message.id),
-	)
-	const replies = new Set(
-		conversation
-			.filter(
-				(message) =>
-					message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== '',
-			)
-			.map((message) => message.id),
-	)
-	const references = [
-		...value.exchanges.flatMap((entry, index) => [
-			{
-				id: entry.request,
-				allowed: requests,
-				path: ['window', 'exchanges', String(index), 'request'],
-			},
-			{ id: entry.reply, allowed: replies, path: ['window', 'exchanges', String(index), 'reply'] },
-			...entry.lines.map((line, at) => ({
-				id: line.source,
-				allowed: sources,
-				path: ['window', 'exchanges', String(index), 'lines', String(at), 'source'],
-			})),
-		]),
-		...value.amendments.flatMap((edge, index) =>
-			['earlier', 'later'].map((side) => ({
-				id: side === 'earlier' ? edge.earlier : edge.later,
-				allowed: sources,
-				path: ['window', 'amendments', String(index), side],
-			})),
-		),
-	]
-	return [
-		...references
-			.filter((reference) => !reference.allowed.has(reference.id))
-			.map((reference): AuditFault => ({
-				reason: 'variant',
-				path: reference.path,
-				variants: reference.allowed.size,
-				expected: [...reference.allowed],
-			})),
-		...value.exchanges.flatMap((entry, index) =>
-			entry.lines.flatMap((line, at): readonly AuditFault[] => {
-				const message = messages.get(line.source)
-				if (message === undefined) return []
-				const length = lengths.get(line.source) ?? splitSentences(message.content).length
-				if (!lengths.has(line.source)) lengths.set(line.source, length)
-				return line.sentence < length
-					? []
-					: [
-							{
-								reason: 'constraint',
-								path: ['window', 'exchanges', String(index), 'lines', String(at), 'sentence'],
-								expected: 'number',
-								constraint: 'max',
-								limit: length - 1,
-								received: String(line.sentence),
-							},
-						]
-			}),
-		),
-	]
-}
-
-/**
- * Digests held messages and stored copies using canonical text.
+ * Digests held messages, lookup call context, stored copies, and sentence receipts using canonical text.
  * This non-cryptographic checksum detects host edits and makes no security claim.
  * @param exchanges - The stored exchange entries
  * @param messages - The conversation holding their messages
- * @returns The hexadecimal checksum, or undefined when a held message cannot be encoded
+ * @returns The hexadecimal checksum, or undefined when a required message is absent or canonical encoding fails
  * @example
  * ```ts
  * digestLedgerWindow([], []) // a deterministic hexadecimal checksum
@@ -144,10 +61,14 @@ export function digestLedgerWindow(
 	const callers = messages.filter(
 		(message) => message.role === 'tool' || message.calls !== undefined,
 	)
-	const encoded = [...held, ...callers].map((message) => canonicalStringify(message))
-	if (encoded.some((text) => text === undefined)) return undefined
-	const text = canonicalStringify([encoded, exchanges.map((entry) => entry.copy ?? null)])
-	if (text === undefined) return undefined
+	const encoded = attempt(() => {
+		const values = [...held, ...callers].map((message) => canonicalStringify(message))
+		return values.some((value) => value === undefined)
+			? undefined
+			: canonicalStringify([values, exchanges.map((entry) => [entry.copy ?? null, entry.lines])])
+	})
+	if (!encoded.success || encoded.value === undefined) return undefined
+	const text = encoded.value
 	const hash = [...text].reduce(
 		(prior, character) => {
 			const code = character.codePointAt(0) ?? 0
@@ -159,6 +80,102 @@ export function digestLedgerWindow(
 		{ first: 2166136261, second: 3335557771 },
 	)
 	return hash.first.toString(16).padStart(8, '0') + hash.second.toString(16).padStart(8, '0')
+}
+
+/**
+ * Collects stored messages eligible to open the recall offer.
+ * @remarks
+ * Notes and findings without a result do not open the offer. User statements, including quiet
+ * statements available through recall's word route, can open it; this helper does not filter results.
+ * @param input - The messages, findings, and classification
+ * @param requests - The marked request ids
+ * @param notes - The annotation ids to exclude
+ * @returns User statements, lookup findings with results, marked requests, and nonblank call-free replies
+ * @example
+ * ```ts
+ * collectRecallMessages(input, new Set(), new Set()) // eligible stored messages
+ * ```
+ */
+export function collectRecallMessages(
+	input: LedgerProjectionInput,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): readonly Message[] {
+	const findings = new Set(
+		input.findings.filter((finding) => finding.result !== undefined).map((finding) => finding.id),
+	)
+	return input.messages.filter(
+		(message) =>
+			!notes.has(message.id) &&
+			(requests.has(message.id) ||
+				(message.role === 'assistant' && !hasCalls(message) && message.content.trim() !== '') ||
+				(message.role === 'user' && !hasCalls(message)) ||
+				(message.role === 'tool' && findings.has(message.id))),
+	)
+}
+
+/**
+ * Checks whether an eligible earlier message is absent from the prompt or incompletely covered.
+ * A successful finding is held when a finding with the same canonical identity and text is fully received.
+ * @param input - The messages, findings, and classification
+ * @param request - The current request id; only messages before it count
+ * @param requests - The marked request ids
+ * @param notes - The annotation ids to exclude
+ * @param messages - The seed tail and held exchange messages; lookup stubs retain their rendered text
+ * @param lines - The receipts held by the window and the request copy together
+ * @returns True if an eligible earlier message is absent or only partly covered; false otherwise
+ * @example
+ * ```ts
+ * hasHiddenRecall(input, request.id, requests, notes, tail, lines) // whether to offer recall
+ * ```
+ */
+export function hasHiddenRecall(
+	input: LedgerProjectionInput,
+	request: string,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+	messages: readonly Message[],
+	lines: readonly LedgerReceipt[],
+): boolean {
+	const start = input.messages.findIndex((message) => message.id === request)
+	const before = new Set(input.messages.slice(0, Math.max(0, start)).map((message) => message.id))
+	const present = new Map(messages.map((message) => [message.id, message]))
+	const receipts = Map.groupBy(lines, (line) => line.source)
+	return collectRecallMessages(input, requests, notes).some((message) => {
+		if (!before.has(message.id)) return false
+		if (requests.has(message.id) || message.role === 'assistant') return !present.has(message.id)
+		if (present.get(message.id)?.content === message.content) return false
+		const finding = input.findings.find((one) => one.id === message.id)
+		const copies =
+			finding === undefined
+				? [message.id]
+				: input.findings
+						.filter((one) => before.has(one.id) && matchesLookup(finding, one))
+						.map((one) => one.id)
+		return !copies.some((id) => {
+			if (present.get(id)?.content === message.content) return true
+			const held = new Set((receipts.get(id) ?? []).map((line) => line.sentence))
+			return splitSentences(message.content).every((_, at) => held.has(at))
+		})
+	})
+}
+
+/**
+ * Checks whether two successful findings carry the same text for the same canonical lookup.
+ * @param left - The finding to compare
+ * @param right - The candidate copy
+ * @returns True for the same finding or equal canonical identities and text; unkeyable findings match only themselves
+ * @example
+ * ```ts
+ * matchesLookup(finding, finding) // true when it has a result
+ * ```
+ */
+export function matchesLookup(left: LedgerLookupFinding, right: LedgerLookupFinding): boolean {
+	if (left.result === undefined || right.result === undefined || left.text !== right.text)
+		return false
+	if (left.id === right.id) return true
+	const identity = identifyLookup(left.name, left.arguments)
+	return identity !== undefined && identity === identifyLookup(right.name, right.arguments)
 }
 
 /**
@@ -883,17 +900,17 @@ export function matchEntities(
  * Projects the owner records and the rules record from a conversation's messages.
  *
  * @remarks
- * Each line is a sentence of a live message, verbatim except that a sentence that opens with a pronoun opens with its party and a colon. A message is live when it is a user message,
- * or a tool message whose finding is the last finding of its call, and the input neither excludes it nor
- * files it quiet or replaced. A finding with an undefined `result` still replaces the earlier
- * finding of the same call, so the earlier result leaves every record.
+ * Each line is a sentence of a live message, verbatim except that a sentence that opens with a
+ * pronoun opens with its party and a colon. {@link collectLive} retains user messages and the
+ * earliest finding in each call identity's last run of identical text, subject to exclusions,
+ * quiet classification, and supersessions. An undefined result still replaces the earlier finding.
  *
  * A live message joins the owner records its entities name, directly or through a linked lookup
  * argument. A message that names no owner joins where its earlier side of an amendment pair joins,
  * or on the rules record when it is filed as a rule or a correction, and is an orphan otherwise.
  *
- * Every live sentence is retained. Accepted direct edges are listed in `amendments`. An amending message
- * that is itself superseded retains its accepted edge without restoring its text.
+ * Every live sentence is retained. Accepted edges are listed in `amendments`. An amender that is
+ * superseded points to its newest live successor, or retains its endpoint when none exists.
  *
  * A sentence that opens with a pronoun takes the party named in the sentence before it. The reading
  * trusts capitals, so a capitalized word that is no person, such as a carrier named mid-sentence,
@@ -1315,11 +1332,12 @@ export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | 
  * Collects the ids of the live messages in conversation order.
  *
  * @remarks
- * A message is live when it is a user message, or a tool message whose finding is the last finding of its
- * call, and the input neither excludes it nor files it quiet or replaced. A finding replaces any
- * earlier finding of the same call, an empty one included, so an empty lookup leaves the earlier
- * result out of every record. A finding with no canonical identity stays live as its own source
- * and participates in no replacement.
+ * A message is live when it is a user message or the first unsuperseded finding in its canonical
+ * call identity's last run of identical text, and the input neither excludes it nor files it quiet
+ * or superseded. When the whole run is superseded, its first finding reaches that final filter.
+ * Different text or an undefined result replaces the earlier run, so an empty lookup leaves the
+ * earlier result out of every record. A thrown lookup leaves the earlier result live. A finding
+ * with no canonical identity participates in no replacement.
  *
  * @param input - The messages, findings, and classification to read
  * @returns The live message ids
@@ -1338,18 +1356,24 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
 		findings.map((finding) => [finding.id, identifyLookup(finding.name, finding.arguments)]),
 	)
 	const current = new Set(
-		findings
-			.filter(
-				(finding) =>
-					finding.result !== undefined &&
-					!findings.some(
-						(later) =>
-							identities.get(finding.id) !== undefined &&
-							(position.get(later.id) ?? -1) > (position.get(finding.id) ?? -1) &&
-							identities.get(later.id) === identities.get(finding.id),
-					),
-			)
-			.map((finding) => finding.id),
+		[...Map.groupBy(findings, (finding) => identities.get(finding.id) ?? finding).values()].flatMap(
+			(group) => {
+				const ordered = group.toSorted(
+					(left, right) => (position.get(left.id) ?? -1) - (position.get(right.id) ?? -1),
+				)
+				const last = ordered.at(-1)
+				if (last?.result === undefined) return []
+				const boundary = ordered.findLastIndex(
+					(finding) => finding.result === undefined || finding.text !== last.text,
+				)
+				const first =
+					ordered
+						.slice(boundary + 1)
+						.find((finding) => (classification.supersessions.get(finding.id) ?? []).length === 0) ??
+					ordered[boundary + 1]
+				return first === undefined ? [] : [first.id]
+			},
+		),
 	)
 	return [...new Map(input.messages.map((message) => [message.id, message])).values()]
 		.filter(
@@ -1432,17 +1456,18 @@ export function placeMember(
 }
 
 /**
- * Collects accepted direct amendments of live messages.
+ * Collects accepted amendments of live messages, following superseded amenders to live successors.
  *
  * @remarks
  * An accepted edge relates an earlier live message to an amender without claiming which sentences
- * changed. An amender takes effect while live and retains its edge after another message supersedes
- * it, without restoring the superseded text. An excluded or quiet user or tool message has no effect.
+ * changed. A superseded amender points to its newest reachable live successor in conversation order,
+ * with cycles guarded and duplicate endpoints removed. With no live successor, its endpoint stays.
+ * This never restores superseded text. An excluded or quiet user or tool message has no effect.
  *
  * @param input - The exclusions and classification to read
  * @param byId - The messages by id
  * @param live - The live message ids from {@link collectLive}
- * @returns The distinct accepted direct edges in conversation order
+ * @returns The distinct accepted edges in conversation order
  *
  * @example
  * ```ts
@@ -1474,8 +1499,18 @@ export function collectAmendments(
 	return ordered
 		.filter((id) => living.has(id))
 		.flatMap((earlier) =>
-			[...new Set(classification.amendments.get(earlier) ?? [])]
-				.filter((later) => effective.has(later) && positions.has(later))
+			[
+				...new Set(
+					(classification.amendments.get(earlier) ?? [])
+						.filter((later) => effective.has(later) && positions.has(later))
+						.map((later) => {
+							const successors = new Set(
+								scanAmendments(classification.supersessions, later, () => true),
+							)
+							return ordered.findLast((id) => living.has(id) && successors.has(id)) ?? later
+						}),
+				),
+			]
 				.sort((a, b) => (positions.get(a) ?? 0) - (positions.get(b) ?? 0))
 				.map((later) => ({ earlier, later })),
 		)

@@ -11,10 +11,10 @@ import {
 	isStudyMemoryRuntime,
 	isStudyMemoryWire,
 } from '../../../studies/memory/index.js'
-import { STUDY_MEMORY_MODULES, MEMORY_ROUTE_INVALID } from '../../setupStudy.js'
+import { STUDY_MEMORY_MODULES, MEMORY_TRIAGE_INVALID } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
-	it('requires the router primitives from the admitted Agent namespace', () => {
+	it('requires the triage primitives from the admitted Agent namespace', () => {
 		expect(isStudyMemoryRuntime(STUDY_MEMORY_MODULES.agent)).toBe(true)
 		expect(isStudyMemoryRuntime(null)).toBe(false)
 		expect(isStudyMemoryRuntime({})).toBe(false)
@@ -31,9 +31,9 @@ describe('memory declaration and mechanical evidence', () => {
 			isStudyMemoryRuntime({ ...STUDY_MEMORY_MODULES.agent, buildJudgeResult: undefined }),
 		).toBe(false)
 	})
-	it('admits an exact router pin and rejects malformed router records', () => {
-		expect(isStudyMemoryOptions({ router: { model: 'tev1', digest: 'a'.repeat(64) } })).toBe(true)
-		for (const router of MEMORY_ROUTE_INVALID) expect(isStudyMemoryOptions({ router })).toBe(false)
+	it('admits an exact triage pin and rejects malformed triage records', () => {
+		expect(isStudyMemoryOptions({ triage: { model: 'tev1', digest: 'a'.repeat(64) } })).toBe(true)
+		for (const triage of MEMORY_TRIAGE_INVALID) expect(isStudyMemoryOptions({ triage })).toBe(false)
 	})
 	it('accepts exactly the declared settings members and refuses unknown keys and invalid values', () => {
 		const gauge = { scale: 1.5, overhead: 0 }

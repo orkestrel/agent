@@ -3,7 +3,6 @@ import { arrayOf, holds, isFiniteNumber, isRecord, isString } from '@orkestrel/c
 import { LEDGER_CATEGORIES } from './constants.js'
 import { isConversationSnapshot } from '../conversations/validators.js'
 import { isJudgeEntry, isJudgeQuestion, isNonNegativeSafeInteger } from '../validators.js'
-import { auditLedgerWindow } from './helpers.js'
 
 /**
  * Checks whether a value has the exact shape of a nonempty exchange window.
@@ -107,9 +106,8 @@ export function isLedgerQuestion(value: unknown): value is LedgerQuestion {
  * guard is structural: it admits a conversation holding a stored `system` role
  * or a repeated id, which `requireConversationSnapshot` and the `Conversation` constructor then
  * refuse as the stored-data check a ledger's hydrate runs.
- * A present `window` must be nonempty and exactly shaped; every pair and receipt source must
- * belong to this conversation, with a user request, a nonblank call-free assistant reply, and
- * a sentence index within its source. Its amendment endpoints must also belong to the conversation.
+ * A present `window` must be nonempty and exactly shaped. This guard does not audit its references
+ * or sentence ranges. Hydration discards the window when its digest disagrees or cannot be computed.
  *
  * @param value - The value to inspect, such as a parsed checkpoint
  * @returns True if the value has the shape of a ledger snapshot whose marked ids name messages of its own conversation; false otherwise
@@ -143,9 +141,7 @@ export function isLedgerSnapshot(value: unknown): value is LedgerSnapshot {
 			requests.every((id) => roles.get(id) === 'user') &&
 			notes.every((id) => roles.get(id) === 'user') &&
 			failures.every((id) => roles.get(id) === 'tool') &&
-			(window === undefined ||
-				(isLedgerWindowSnapshot(window) &&
-					auditLedgerWindow(window, conversation.messages).length === 0))
+			(window === undefined || isLedgerWindowSnapshot(window))
 		)
 	})
 }

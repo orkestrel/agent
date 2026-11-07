@@ -1,4 +1,4 @@
-import type { Selection } from '../contexts/types.js'
+import type { ScopeInterface, Selection } from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
 import type { Message } from '../types.js'
 import type { ClassifierAttempt, GaugeCall, LedgerDraft, LedgerRequestInterface } from './types.js'
@@ -36,6 +36,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	readonly #faults = new Set<unknown>()
 	#message: Message | undefined
 	#plan: Selection | undefined
+	#scope: ScopeInterface | undefined
 	#draft: LedgerDraft | undefined
 	#sent: LedgerDraft | undefined
 	#passes: readonly LedgerPass[] = []
@@ -75,6 +76,14 @@ export class LedgerRequest implements LedgerRequestInterface {
 	 */
 	get plan(): Selection | undefined {
 		return this.#plan
+	}
+
+	get scope(): ScopeInterface | undefined {
+		return this.#scope
+	}
+
+	apply(scope: ScopeInterface): void {
+		this.#scope = scope
 	}
 
 	/** Returns the copy and receipts adopted by the last provider turn. */

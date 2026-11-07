@@ -26,7 +26,7 @@ import type {
 	LedgerSnapshot,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import type { ToolCall, ToolContext, ToolResult } from '@orkestrel/tool'
+import type { ToolCall, ToolContext, ToolDefinition, ToolResult } from '@orkestrel/tool'
 import { createAbort } from '@orkestrel/abort'
 import {
 	describeFaults,
@@ -47,6 +47,7 @@ import {
 	collectExchanges,
 	collectToolGroups,
 	extractLiterals,
+	estimateTokens,
 	hasCalls,
 	stripThinking,
 	sumUsage,
@@ -67,7 +68,8 @@ import {
 } from './constants.js'
 import { isLedgerError, LedgerError } from './errors.js'
 import {
-	auditLedgerWindow,
+	hasHiddenRecall,
+	matchesLookup,
 	digestLedgerWindow,
 	buildLedgerCut,
 	buildLedgerLineKey,
@@ -179,10 +181,7 @@ export class Ledger implements LedgerInterface {
 		const snapshot = options.snapshot
 		if (snapshot !== undefined && !isLedgerSnapshot(snapshot)) {
 			const candidate: unknown = options.snapshot
-			const faults =
-				ledgerSnapshotContract.is(candidate) && candidate.window !== undefined
-					? auditLedgerWindow(candidate.window, candidate.conversation.messages)
-					: ledgerSnapshotContract.audit(candidate)
+			const faults = ledgerSnapshotContract.audit(candidate)
 			throw new LedgerError(
 				'SNAPSHOT',
 				`snapshot must be well formed and mark only messages of its conversation; pass what snapshot() returned${faults.length === 0 ? '' : `\n${describeFaults(faults, ledgerSnapshotContract.schema)}`}`,
@@ -250,7 +249,7 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Recall what the full conversation record holds on a topic: an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.`,
+				description: `Find something said earlier that isn't in the messages you can see, by an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.`,
 				contract: objectShape({
 					topic: stringShape({ min: 1, description: 'An owner name, an id, or a topic' }),
 				}),
@@ -372,9 +371,7 @@ export class Ledger implements LedgerInterface {
 			notes: ids.filter((id) => this.#annotations.has(id)),
 			failures: ids.filter((id) => this.#results.get(id)?.success === false),
 			...(gauge === undefined ? {} : { gauge }),
-			...(window.exchanges.length === 0 ||
-			digest === undefined ||
-			auditLedgerWindow({ ...window, digest }, conversation.messages).length > 0
+			...(window.exchanges.length === 0 || digest === undefined
 				? {}
 				: { window: { ...window, digest } }),
 		}
@@ -396,6 +393,7 @@ export class Ledger implements LedgerInterface {
 		const abort = createAbort({ ...(signal === undefined ? {} : { signal }) })
 		const caller = abort.signal
 		const request = new LedgerRequest(content, this.#options.recall?.limit)
+		const scope = this.#agent.context.scope
 		this.#live.add(request)
 		try {
 			if (this.#gauge === undefined) await this.#measureGauge(caller)
@@ -422,24 +420,24 @@ export class Ledger implements LedgerInterface {
 					this.#conversation.add({ role: 'user', content: LEDGER_NOTES.cue }).id,
 				)
 				const previous = this.#agent.context.scope
-				this.#agent.context.apply(
-					createScope({
-						name: 'answer',
-						tools: [],
-						select: async (conversation, message, runSignal) => {
-							const selection = await this.#select(conversation, message, runSignal)
-							if (selection.fault !== undefined) return selection
-							return {
-								...selection,
-								messages: selection.messages.filter((one) => one.role !== 'tool' && !hasCalls(one)),
-							}
-						},
-					}),
-				)
+				const answer = createScope({
+					...previous,
+					name: 'answer',
+					tools: [],
+					select: async (conversation, message, runSignal) => {
+						const selection = await this.#select(conversation, message, runSignal)
+						if (selection.fault !== undefined) return selection
+						return {
+							...selection,
+							messages: selection.messages.filter((one) => one.role !== 'tool' && !hasCalls(one)),
+						}
+					},
+				})
+				this.#agent.context.apply(answer)
 				try {
 					passes.push(await this.#generatePass(request, caller, false))
 				} finally {
-					this.#agent.context.apply(previous)
+					if (this.#agent.context.scope === answer) this.#agent.context.apply(previous)
 				}
 			}
 			const last = passes.at(-1) ?? first
@@ -467,6 +465,8 @@ export class Ledger implements LedgerInterface {
 				...(last.stop === undefined ? {} : { stop: last.stop }),
 			}
 		} finally {
+			if (request.scope !== undefined && this.#agent.context.scope === request.scope)
+				this.#agent.context.apply(scope)
 			this.#flush()
 			this.#commitExchange(request)
 			this.#live.delete(request)
@@ -1107,10 +1107,11 @@ export class Ledger implements LedgerInterface {
 			newest === undefined || plain === undefined
 				? []
 				: [{ request: plain, reply: newest.reply, lines: [] }]
+		const empty = { window: [], rendered: trimmed.rendered }
 		const rungs = [
 			{ window, rendered: delta },
 			{ window: fallback, rendered: trimmed.rendered },
-			{ window: [], rendered: trimmed.rendered },
+			empty,
 		]
 		const probes = rungs.map((rung) => [
 			...built.slice(0, -1),
@@ -1124,23 +1125,50 @@ export class Ledger implements LedgerInterface {
 			),
 		])
 		const names = this.#agent.context.scope?.tools
-		const tools = this.#agent.context.tools
-			.definitions()
-			.filter((tool) => names === undefined || names.includes(tool.name)).length
+		const definitions = this.#agent.context.tools.definitions()
+		const offered = rungs.map((rung) =>
+			hasHiddenRecall(
+				input,
+				request.id,
+				this.#requests,
+				this.#annotations,
+				[...tail.slice(0, -1), ...rung.window.flatMap((entry) => [entry.request, entry.reply])],
+				[...rung.window.flatMap((entry) => entry.lines), ...rung.rendered.lines],
+			),
+		)
 		const longest = this.#findLongest()
-		const closed = probes.map((messages) => {
-			const calls = [{ estimate: estimateMessages(messages), tools }]
+		const closed = probes.map((messages, at) => {
+			const tools = definitions.filter(
+				(tool) =>
+					(names === undefined || names.includes(tool.name)) &&
+					(tool.name !== 'recall' || offered[at]),
+			)
+			const calls = [
+				{ estimate: estimateMessages(messages), tools: tools.length, spared: this.#spared(tools) },
+			]
 			return (
+				offered[at] === true &&
 				this.#gauge !== undefined &&
 				this.#gauge.remainder(calls) - this.#predict < 2 * this.#gauge.reserve(calls, longest)
 			)
 		})
 		// Admission follows trimming: the exchange can spend spare room, never a record or a seed message.
 		const prices = probes.map((messages) => this.#price(messages))
-		const admitted = rungs.find(
-			(_rung, at) =>
-				(prices[at] ?? Infinity) <= total && (closed[2] === true || closed[at] === false),
-		) ?? { window: [], rendered: trimmed.rendered }
+		const admitted =
+			rungs.find(
+				(_rung, at) =>
+					(prices[at] ?? Infinity) <= total && (closed[2] === true || closed[at] === false),
+			) ?? empty
+		if (
+			offered[rungs.indexOf(admitted)] === false &&
+			(names === undefined || names.includes('recall'))
+		) {
+			const tools = definitions.filter((tool) => tool.name !== 'recall').map((tool) => tool.name)
+			const scope = this.#agent.context.scope
+			const narrowed = scope?.narrow({ tools }) ?? createScope({ name: 'ledger', tools })
+			this.#current()?.apply(narrowed)
+			this.#agent.context.apply(narrowed)
+		}
 		const copy = buildRequestMessage(request, admitted.rendered.text)
 		const kept = admitted.window.flatMap((entry) => entry.lines)
 		const origins = new Set([
@@ -1467,7 +1495,7 @@ export class Ledger implements LedgerInterface {
 							? hidden.length > visible.length
 								? 'hidden'
 								: 'shown'
-							: shown.has(message.id)
+							: scan.findings.some((other) => shown.has(other.id) && matchesLookup(finding, other))
 								? 'shown'
 								: 'hidden',
 			),
@@ -1482,15 +1510,28 @@ export class Ledger implements LedgerInterface {
 		const additions = this.#conversation.messages().slice(boundary)
 		const messages = this.#agent.context.build(request.selection)
 		const names = this.#agent.context.scope?.tools
+		const tools = this.#agent.context.tools
+			.definitions()
+			.filter((tool) => names === undefined || names.includes(tool.name))
 		request.observe(
 			{
 				estimate: estimateMessages(stripThinking([...messages, ...additions], this.#replay)),
-				tools: this.#agent.context.tools
-					.definitions()
-					.filter((tool) => names === undefined || names.includes(tool.name)).length,
+				tools: tools.length,
+				spared: this.#spared(tools),
 			},
 			this.#conversation.messages().length,
 		)
+	}
+
+	#spared(tools: readonly ToolDefinition[]): number {
+		const overhead = this.#gauge?.overhead ?? 0
+		if (tools.length === 0) return overhead
+		const missing = this.#agent.context.tools
+			.definitions()
+			.filter((tool) => !tools.some((one) => one.name === tool.name))
+		return missing.length === 0
+			? 0
+			: Math.min(overhead, estimateTokens(JSON.stringify(missing)) * (this.#gauge?.scale ?? 1))
 	}
 
 	#findLongest(): string {
@@ -1663,7 +1704,7 @@ export class Ledger implements LedgerInterface {
 			// Statements list ahead of conversation messages, so an omitted message can be newer than a kept one.
 			const result =
 				listed.length === 0
-					? `nothing on "${topic}"; recall ${guidance}`
+					? `nothing earlier on "${topic}"; answer from the messages you can see`
 					: cutListing(listed, room, earlier.length > 0 ? 'more' : 'older')
 			request?.list(result, gathered.recalled)
 			return result
@@ -1681,7 +1722,7 @@ export class Ledger implements LedgerInterface {
 					const result = this.#results.get(message.id)
 					if (message.role !== 'tool' || result?.success !== true) return []
 					const recalled = result.name === 'recall'
-					if (recalled && /^nothing on /.test(message.content)) return []
+					if (recalled && /^nothing earlier on /.test(message.content)) return []
 					const stored = recalled ? request.lines(message.content) : undefined
 					return splitResultLines(message.content)
 						.filter((line) => !recalled || !matchesCutLine(line))

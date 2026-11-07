@@ -23,7 +23,7 @@ import {
 	isString,
 	recordOf,
 } from '@orkestrel/contract'
-import { isStudyAgentRuntime } from '@orkestrel/study'
+import { isStudyAgentRuntime, isStudyAgentGauge, isStudyDigest } from '@orkestrel/study'
 import { isStudyOllamaMetadata } from '@orkestrel/study/server'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
@@ -57,7 +57,7 @@ export function isStudyMemoryLedger(value: unknown): value is StudyMemoryLedger 
 	)
 }
 
-/** Checks the admitted runtime primitives the optional direct router invokes. @param value - Admitted namespace. @returns Whether the first-leg factory, abort contract, and result merger exist. */
+/** Checks the admitted runtime primitives the optional direct triage invokes. @param value - Admitted namespace. @returns Whether the first-leg factory, abort contract, and result merger exist. */
 export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntime {
 	return holds(
 		() =>
@@ -88,18 +88,17 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'metadata',
 						'correction',
 						'judge',
-						'router',
+						'triage',
 					].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, version, metadata, correction, judge, router } = value
+		const { gauge, observe, checkpoints, version, metadata, correction, judge, triage } = value
 		if (
-			router !== undefined &&
-			(!recordOf({ model: isNonEmptyString, digest: isNonEmptyString })(router) ||
-				Object.keys(router).length !== 2 ||
-				router.digest.length !== 64 ||
-				!/^[0-9a-f]{64}$/u.test(router.digest))
+			triage !== undefined &&
+			(!recordOf({ model: isNonEmptyString, digest: isStudyDigest })(triage) ||
+				Object.keys(triage).length !== 2 ||
+				triage.digest.length !== 64)
 		)
 			return false
 		if (
@@ -113,14 +112,7 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
 		if (correction !== undefined && !recordOf({ narrow: isBoolean }, true)(correction)) return false
 		if (gauge !== undefined) {
-			if (
-				!isRecord(gauge) ||
-				Object.keys(gauge).length !== 2 ||
-				!isFiniteNumber(gauge.scale) ||
-				gauge.scale <= 0 ||
-				!isFiniteNumber(gauge.overhead) ||
-				gauge.overhead < 0
-			)
+			if (!isRecord(gauge) || Object.keys(gauge).length !== 2 || !isStudyAgentGauge(gauge))
 				return false
 		}
 		if (observe !== undefined && !isBoolean(observe)) return false

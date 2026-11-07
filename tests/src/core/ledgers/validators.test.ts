@@ -43,18 +43,12 @@ describe('isFraction', () => {
 })
 
 describe('isLedgerSnapshot', () => {
-	it('refuses malformed window entries and dangling pair or source ids with audit faults', async () => {
+	it('refuses malformed window entries with audit faults', async () => {
 		const replay = await serveLedgerHistory()
 		const snapshot = replay.ledger.snapshot()
 		const window = requireValue(snapshot.window)
 		const exchange = requireValue(window.exchanges[0])
 		for (const [field, replacement] of [
-			['request', { ...exchange, request: 'absent' }],
-			['reply', { ...exchange, reply: 'absent' }],
-			[
-				'lines',
-				{ ...exchange, lines: [{ key: 'rules', title: 'Rules', source: 'absent', sentence: 0 }] },
-			],
 			[
 				'lines',
 				{
@@ -81,6 +75,28 @@ describe('isLedgerSnapshot', () => {
 					}),
 				]),
 			)
+		}
+	})
+	it('admits shaped dangling references and changed receipts but discards their window', async () => {
+		const replay = await serveLedgerHistory()
+		const snapshot = replay.ledger.snapshot()
+		const window = requireValue(snapshot.window)
+		const exchange = requireValue(window.exchanges[0])
+		const line = requireValue(exchange.lines[0])
+		for (const replacement of [
+			{ ...exchange, request: 'absent' },
+			{ ...exchange, reply: 'absent' },
+			{ ...exchange, lines: [{ ...line, source: 'absent' }] },
+			{ ...exchange, lines: [{ ...line, sentence: 99999 }] },
+			{ ...exchange, lines: [{ ...line, title: 'Changed title' }] },
+		]) {
+			const changed = { ...snapshot, window: { ...window, exchanges: [replacement] } }
+			expect(isLedgerSnapshot(changed)).toBe(true)
+			const ledger = createLedger(
+				createScriptedProvider([]),
+				buildLedgerOptions({ snapshot: changed }),
+			)
+			expect(ledger.snapshot().window).toBeUndefined()
 		}
 	})
 

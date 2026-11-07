@@ -246,30 +246,30 @@ describe('prospective public endurance declarations', () => {
 		)
 	})
 
-	it('pins the q2 subject and its bounds', async () => {
-		const q2 = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8')),
+	it('pins the smallest subject and its bounds', async () => {
+		const smallest = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/smallest.json', 'utf8')),
 		)
-		const q4 = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/q4.json', 'utf8')),
+		const recommended = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
 		)
-		const provider = q2.provider
-		if (provider === undefined) throw new Error('Missing q2 provider')
-		expect(q2.bounds.goal.calls).toBe(512)
+		const provider = smallest.provider
+		if (provider === undefined) throw new Error('Missing smallest provider')
+		expect(smallest.bounds.goal.calls).toBe(512)
 		// A reply at the output allowance fits one request: 136 B per chunk is goal 53's reply, 1014630 B over 7496 chunks, and 46120 B is the largest recorded request, compaction ev-03-2.
-		expect(q2.bounds.request.bytes).toBeGreaterThan(q2.room.output * 136 + 46120)
+		expect(smallest.bounds.request.bytes).toBeGreaterThan(smallest.room.output * 136 + 46120)
 		expect(provider.digest.model).toMatch(/^[0-9a-f]{64}$/)
 		// Both profiles hold the same room and the same roots.
-		expect(q2.room).toEqual(q4.room)
-		expect(q2.roots).toEqual(q4.roots)
+		expect(smallest.room).toEqual(recommended.room)
+		expect(smallest.roots).toEqual(recommended.roots)
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
 			'qualification',
 		)
 		const goals = new Set(fixture.scenarios[0]?.goals.map((goal) => goal.id))
-		const settings = q2.settings
+		const settings = smallest.settings
 		if (!isRecord(settings) || !Array.isArray(settings.checkpoints))
-			throw new Error('Missing q2 checkpoints')
+			throw new Error('Missing smallest checkpoints')
 		expect(settings.checkpoints.length).toBeGreaterThan(0)
 		expect(settings.checkpoints.filter((id) => !goals.has(id))).toEqual([])
 		const model = { name: provider.model, digest: provider.digest.model }
@@ -284,20 +284,20 @@ describe('prospective public endurance declarations', () => {
 		expect(isStudyProvider({ ...provider, daemon: { ...daemon, models: [model] } })).toBe(false)
 	})
 
-	it('admits identical schedules and the pinned finite q4 profile while keeping semantics independently unknown', async () => {
+	it('admits identical schedules and the pinned finite recommended profile while keeping semantics independently unknown', async () => {
 		const profile = buildMemoryProfile({
 			url: 'http://127.0.0.1:1',
 			settings: STUDY_MEMORY_SETTINGS,
 		})
 		const capacity = await loadMemoryInputs(profile, 'qualification')
 		const quality = await loadMemoryInputs(profile, 'endurance')
-		const q4 = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/q4.json', 'utf8')),
+		const recommended = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
 		)
-		expect(q4.record).toBeUndefined()
-		expect(isStudyMemoryOptions(q4.settings)).toBe(true)
-		expect(q4).toMatchObject({
-			name: 'q4',
+		expect(recommended.record).toBeUndefined()
+		expect(isStudyMemoryOptions(recommended.settings)).toBe(true)
+		expect(recommended).toMatchObject({
+			name: 'recommended',
 			agent: 'dist/src/core/index.js',
 			subject: 'dist/src/core/index.js',
 			qualification: 'tmp/studies/qualification',
@@ -337,7 +337,7 @@ describe('prospective public endurance declarations', () => {
 			settings: {
 				observe: true,
 				judge: { gpu: 0 },
-				router: {
+				triage: {
 					model: 'tev1:0.8b',
 					digest: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
 				},

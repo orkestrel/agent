@@ -104,10 +104,10 @@ export class StudyMemorySession implements StudySessionInterface {
 			: undefined
 		const recorded = options.profile.record !== undefined
 		if (
-			settings?.router !== undefined &&
+			settings?.triage !== undefined &&
 			(options.exchanges !== undefined || options.replay !== undefined)
 		)
-			throw new StudyError('CONFIG', 'Memory router cannot record or replay its direct leg')
+			throw new StudyError('CONFIG', 'Memory triage cannot record or replay its direct leg')
 		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
 			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
 		const declaration = options.exchanges?.declaration
@@ -178,7 +178,7 @@ export class StudyMemorySession implements StudySessionInterface {
 						instruction: { id: 'summary-instruction', role: 'user', content: STUDY_MEMORY_SUMMARY },
 						signal: options.signal,
 					})
-		// The raw route: `#lookup` owns a malformed call, which settles the trial with its known cost.
+		// The raw triage: `#lookup` owns a malformed call, which settles the trial with its known cost.
 		const lookup = createTool({
 			name: 'lookup',
 			description: 'Reads the latest released public reference snapshot by id',
@@ -206,18 +206,18 @@ export class StudyMemorySession implements StudySessionInterface {
 				options: role.options,
 				fetch: (input, init) => this.#transport.fetch('judge', input, init),
 			})
-			const router = settings?.router
+			const triage = settings?.triage
 			const runtime =
-				router !== undefined && isStudyMemoryRuntime(options.ledger) ? options.ledger : undefined
-			if (router !== undefined && runtime === undefined)
-				throw new StudyError('CONFIG', 'Memory router requires the admitted System One runtime')
+				triage !== undefined && isStudyMemoryRuntime(options.ledger) ? options.ledger : undefined
+			if (triage !== undefined && runtime === undefined)
+				throw new StudyError('CONFIG', 'Memory triage requires the admitted System One runtime')
 			const judge = new StudyAgentJudge(
-				router === undefined || runtime === undefined
+				triage === undefined || runtime === undefined
 					? second
 					: new StudyMemoryJudge({
 							first: runtime.createSystemOneJudge({
 								url: provider.url,
-								model: router.model,
+								model: triage.model,
 								timeout: options.profile.bounds.request.duration,
 								fetch: (input, init) =>
 									globalThis.fetch(input, {
@@ -367,7 +367,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#live.add(activity)
 		try {
 			const settings = this.#options.profile.settings
-			if (isStudyMemoryOptions(settings) && settings.router !== undefined) {
+			if (isStudyMemoryOptions(settings) && settings.triage !== undefined) {
 				this.#verification ??= this.#verify(AbortSignal.any([context.signal, context.meter.signal]))
 				await this.#verification
 			}
@@ -450,10 +450,10 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	async #verify(signal: AbortSignal): Promise<void> {
 		const settings = this.#options.profile.settings
-		const router = isStudyMemoryOptions(settings) ? settings.router : undefined
-		if (router === undefined) return
+		const triage = isStudyMemoryOptions(settings) ? settings.triage : undefined
+		if (triage === undefined) return
 		const provider = this.#options.profile.provider
-		if (provider === undefined) throw new StudyError('CONFIG', 'Memory router requires a provider')
+		if (provider === undefined) throw new StudyError('CONFIG', 'Memory triage requires a provider')
 		const response = await globalThis.fetch(new URL('/api/tags', provider.url), {
 			signal: AbortSignal.any([
 				signal,
@@ -462,14 +462,14 @@ export class StudyMemorySession implements StudySessionInterface {
 				AbortSignal.timeout(this.#options.profile.bounds.request.duration),
 			]),
 		})
-		if (!response.ok) throw new StudyError('CONFIG', 'Memory router inventory is unavailable')
+		if (!response.ok) throw new StudyError('CONFIG', 'Memory triage inventory is unavailable')
 		const inventory: unknown = parseJSON(await response.text())
 		const model =
 			isRecord(inventory) && isArray(inventory.models)
-				? inventory.models.find((entry: unknown) => isRecord(entry) && entry.name === router.model)
+				? inventory.models.find((entry: unknown) => isRecord(entry) && entry.name === triage.model)
 				: undefined
-		if (!isRecord(model) || model.digest !== router.digest)
-			throw new StudyError('CONFIG', 'Memory router model is absent or its digest differs')
+		if (!isRecord(model) || model.digest !== triage.digest)
+			throw new StudyError('CONFIG', 'Memory triage model is absent or its digest differs')
 	}
 
 	// Keys one dispatched call as `LedgerRequest` keys its own; the authority evaluates each call once.

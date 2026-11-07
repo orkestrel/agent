@@ -346,9 +346,9 @@ export function executeStudyProcess(
 	)
 }
 
-/** Captures and loads the actual q4 dependency topology in one disposable CPU process.
+/** Captures and loads the actual recommended dependency topology in one disposable CPU process.
  * @param scratch - Exclusive worker-file owner, cleaned by the caller in finally.
- * @param roots - Optional root selection for admission refusal controls; defaults to q4 roots.
+ * @param roots - Optional root selection for admission refusal controls; defaults to recommended roots.
  * @returns Native exit and JSON observations without instantiating sessions or providers.
  * @remarks Package imports remain at their installed native locations. No package bytes are copied.
  */
@@ -366,13 +366,13 @@ import { isArray, isRecord, parseJSON } from ${JSON.stringify(pathToFileURL(reso
 import { parseStudyProfile } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/core/index.js')).href)}
 import { ArtifactLoader } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
 
-const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')))
+const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')))
 const selection = parseJSON(readFileSync(${JSON.stringify(scratch.write('roots.json', JSON.stringify({ roots })))}, 'utf8'))
 if (!isRecord(selection) || (selection.roots !== undefined && (!isArray(selection.roots) || !selection.roots.every((root) => typeof root === 'string'))))
 	throw new Error('Invalid topology root selection')
 const roots = (selection.roots ?? profile.roots).map((root) => realpathSync(root))
 const subject = realpathSync(profile.subject)
-if (profile.provider === undefined) throw new Error('Missing q4 provider')
+if (profile.provider === undefined) throw new Error('Missing recommended provider')
 const provider = realpathSync(profile.provider.entry)
 const dependency = realpathSync(fileURLToPath(import.meta.resolve('@orkestrel/agent', pathToFileURL(provider).href)))
 const installed = realpathSync('node_modules/@orkestrel/agent')
@@ -4270,8 +4270,8 @@ export function computeMemoryPilot(
 	}
 }
 
-/** Pins the routing boundary and mixed question forms without embedding state in evidence. */
-export const MEMORY_ROUTE_REQUEST: agent.JudgeRequest = Object.freeze<agent.JudgeRequest>({
+/** Pins the triage boundary and mixed question forms without embedding state in evidence. */
+export const MEMORY_TRIAGE_REQUEST: agent.JudgeRequest = Object.freeze<agent.JudgeRequest>({
 	state: 'PRIVATE ROUTING STATE',
 	questions: {
 		low: { form: 'choice', criteria: { fact: 'fact', correction: 'correction' } },
@@ -4283,7 +4283,7 @@ export const MEMORY_ROUTE_REQUEST: agent.JudgeRequest = Object.freeze<agent.Judg
 })
 
 /** Pins complete first-leg distributions on both sides of the raw cutoff. */
-export const MEMORY_ROUTE_FIRST: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+export const MEMORY_TRIAGE_FIRST: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
 	model: 'first',
 	answers: {
 		low: { form: 'choice', probabilities: { fact: 0.64, correction: 0.36 } },
@@ -4294,7 +4294,7 @@ export const MEMORY_ROUTE_FIRST: agent.JudgeResult = Object.freeze<agent.JudgeRe
 })
 
 /** Pins fallback outcomes, including extraneous ids that must never be returned. */
-export const MEMORY_ROUTE_SECOND: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+export const MEMORY_TRIAGE_SECOND: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
 	model: 'second',
 	answers: {
 		low: { form: 'choice', probabilities: { fact: 0.9, correction: 0.1 } },
@@ -4322,7 +4322,7 @@ export function createMemoryRouting(
 		first: new MemoryRoutingJudge(
 			createLedgerJudge(
 				calls,
-				(request) => (first === undefined ? Promise.resolve(MEMORY_ROUTE_FIRST) : first(request)),
+				(request) => (first === undefined ? Promise.resolve(MEMORY_TRIAGE_FIRST) : first(request)),
 				models[0],
 			),
 			firstSignals,
@@ -4332,7 +4332,7 @@ export function createMemoryRouting(
 				calls,
 				(request) => {
 					requests.handler(request)
-					return second === undefined ? Promise.resolve(MEMORY_ROUTE_SECOND) : second(request)
+					return second === undefined ? Promise.resolve(MEMORY_TRIAGE_SECOND) : second(request)
 				},
 				models[1],
 			),
@@ -4345,7 +4345,7 @@ export function createMemoryRouting(
 }
 
 /** Pins unusable first-leg outcomes, all of which require the fallback leg. */
-export const MEMORY_ROUTE_UNUSABLE: readonly agent.JudgeResult[] = Object.freeze([
+export const MEMORY_TRIAGE_UNUSABLE: readonly agent.JudgeResult[] = Object.freeze([
 	{
 		model: 'first',
 		answers: { edge: { form: 'choice', probabilities: { fact: 0.9, correction: 0.9 } } },
@@ -4360,8 +4360,8 @@ export const MEMORY_ROUTE_UNUSABLE: readonly agent.JudgeResult[] = Object.freeze
 	},
 ])
 
-/** Pins malformed router declarations without changing any existing profile fixture. */
-export const MEMORY_ROUTE_INVALID: readonly unknown[] = Object.freeze([
+/** Pins malformed triage declarations without changing any existing profile fixture. */
+export const MEMORY_TRIAGE_INVALID: readonly unknown[] = Object.freeze([
 	{ model: 'tev1', digest: `${'a'.repeat(64)}\n` },
 	null,
 	[],
@@ -4374,25 +4374,25 @@ export const MEMORY_ROUTE_INVALID: readonly unknown[] = Object.freeze([
 ])
 
 /** Pins both inventory refusal cases. */
-export const MEMORY_ROUTE_UNAVAILABLE = Object.freeze([
+export const MEMORY_TRIAGE_UNAVAILABLE = Object.freeze([
 	{ model: 'model', digest: 'c'.repeat(64) },
 	{ model: 'absent', digest: 'c'.repeat(64) },
 ])
 
 /** Pins each unsupported custody collaborator independently. */
-export const MEMORY_ROUTE_CAPTURE = Object.freeze([
+export const MEMORY_TRIAGE_CAPTURE = Object.freeze([
 	{ exchanges: STUDY_MEMORY_INERT_EXCHANGES },
 	{ replay: STUDY_MEMORY_INERT_REPLAY },
 ])
 
 /** Pins a tie whose distribution order differs from its caller's criteria order. */
-export const MEMORY_ROUTE_TIE: agent.JudgeRequest = Object.freeze<agent.JudgeRequest>({
+export const MEMORY_TRIAGE_TIE: agent.JudgeRequest = Object.freeze<agent.JudgeRequest>({
 	state: '',
 	questions: { tie: { form: 'choice', criteria: { correction: 'change', fact: 'statement' } } },
 })
 
 /** Pins the tied response independently of the criteria order. */
-export const MEMORY_ROUTE_TIED: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+export const MEMORY_TRIAGE_TIED: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
 	model: 'first',
 	answers: { tie: { form: 'choice', probabilities: { fact: 0.5, correction: 0.5 } } },
 })
@@ -4423,27 +4423,27 @@ export function createMemoryIdentity(profile: StudyProfile) {
 }
 
 /** Pins an operational first-leg failure for a real composed session. */
-export const MEMORY_ROUTE_FAILURES: readonly MemoryWireFixture[] = Object.freeze([
+export const MEMORY_TRIAGE_FAILURES: readonly MemoryWireFixture[] = Object.freeze([
 	{ path: '/v1/systemone', status: 503, body: 'unavailable' },
 ])
 
 /** Holds a high-probability partial that an internal first-leg abort must discard. */
-export const MEMORY_ROUTE_PARTIAL: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+export const MEMORY_TRIAGE_PARTIAL: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
 	model: 'first',
 	answers: { low: { form: 'choice', probabilities: { fact: 0.9, correction: 0.1 } } },
 })
 
 /** Keeps inventory open until the caller aborts it. */
-export const MEMORY_ROUTE_OPEN: readonly MemoryWireFixture[] = Object.freeze([
+export const MEMORY_TRIAGE_OPEN: readonly MemoryWireFixture[] = Object.freeze([
 	{ path: '/api/tags', open: true, body: '' },
 ])
 
 /** Supplies one public request whose category can be retained over the actual System One protocol. */
-export const MEMORY_ROUTE_GOAL: StudyGoal = Object.freeze({
-	id: 'route',
+export const MEMORY_TRIAGE_GOAL: StudyGoal = Object.freeze({
+	id: 'triage',
 	input: {
 		prompt: 'Summarize the order count.',
-		arrivals: [{ id: 'route-source', content: 'The order count is two.' }],
+		arrivals: [{ id: 'triage-source', content: 'The order count is two.' }],
 		records: [],
 	},
 })
@@ -4494,7 +4494,7 @@ export async function createMemoryRouteServer(): Promise<MemoryServerFixture> {
 }
 
 /** Varies each fixed-policy member independently for identity proofs. */
-export const MEMORY_ROUTE_POLICIES = Object.freeze([
+export const MEMORY_TRIAGE_POLICIES = Object.freeze([
 	Object.freeze({ version: 1, probability: 0.65, referrals: Object.freeze(['correction']) }),
 	Object.freeze({ version: 2, probability: 0.65, referrals: Object.freeze(['correction']) }),
 	Object.freeze({ version: 1, probability: 0.66, referrals: Object.freeze(['correction']) }),

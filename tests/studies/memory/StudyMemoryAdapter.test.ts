@@ -18,8 +18,8 @@ describe('memory declaration and mechanical evidence', () => {
 	it('checks the list against the horizon', async () => {
 		const adapter = createStudyAdapter()
 		const url = 'http://127.0.0.1:7'
-		const q2 = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8')),
+		const smallest = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/smallest.json', 'utf8')),
 		)
 		const input = await loadMemoryInputs(buildMemoryProfile({ url }), 'qualification')
 		const declared = input.scenarios[0]?.goals.map((goal) => goal.id) ?? []
@@ -33,8 +33,8 @@ describe('memory declaration and mechanical evidence', () => {
 					`ev-${String(Math.ceil((index + 1) / 4)).padStart(2, '0')}-${(index % 4) + 1}`,
 			),
 		)
-		if (!isRecord(q2.settings)) throw new Error('Missing q2 settings')
-		expect(q2.settings.checkpoints).toEqual(declared)
+		if (!isRecord(smallest.settings)) throw new Error('Missing smallest settings')
+		expect(smallest.settings.checkpoints).toEqual(declared)
 		expect(() =>
 			adapter.validate({
 				...input,
@@ -65,12 +65,13 @@ describe('memory declaration and mechanical evidence', () => {
 		).toThrow(/horizon of 3/)
 	})
 
-	it('declares the narrow arm as q2 with one correction setting', async () => {
-		const q2 = parseJSON(await readFile('studies/memory/profiles/q2.json', 'utf8'))
-		if (!isRecord(q2) || !isRecord(q2.settings)) throw new Error('Missing q2 settings')
+	it('declares the narrow arm as smallest with one correction setting', async () => {
+		const smallest = parseJSON(await readFile('studies/memory/profiles/smallest.json', 'utf8'))
+		if (!isRecord(smallest) || !isRecord(smallest.settings))
+			throw new Error('Missing smallest settings')
 		for (const [name, correction] of [['narrow', { narrow: true }]] as const) {
 			const profile = parseJSON(await readFile(`studies/memory/profiles/${name}.json`, 'utf8'))
-			expect(profile).toEqual({ ...q2, name, settings: { ...q2.settings, correction } })
+			expect(profile).toEqual({ ...smallest, name, settings: { ...smallest.settings, correction } })
 			expect(isStudyMemoryOptions(parseStudyProfile(profile).settings)).toBe(true)
 		}
 	})

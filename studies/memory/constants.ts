@@ -4,7 +4,7 @@ import type { StudyMemoryPolicy, StudyMemoryParameters } from './types.js'
 /** Bounds floating-point error when checking a complete choice distribution. */
 export const STUDY_MEMORY_TOLERANCE = Object.freeze(1e-6)
 
-/** Pins the prospective routing policy independently of model identity and profile settings. */
+/** Pins the prospective triage policy independently of model identity and profile settings. */
 export const STUDY_MEMORY_POLICY: StudyMemoryPolicy = Object.freeze({
 	version: 1,
 	probability: 0.65,
@@ -51,9 +51,9 @@ export const STUDY_MEMORY_LOOKUPS: readonly string[] = Object.freeze(['lookup'])
 /**
  * Pins each role's effective sampling values, so no role's request takes a value from the daemon.
  * @remarks
- * `agent` and `summary` hold the 2B digest's stored values under temperature 0 and seed 0. `judge`
- * holds Ollama's v0.40.13 defaults under temperature 1 and seed 0, because the Mica digest stores no
- * parameters.
+ * The `agent` and `summary` values were read from the 2B digest under temperature 0 and seed 0;
+ * the `judge` values were read from Ollama v0.40.13 defaults under temperature 1 and seed 0.
+ * These values are pinned for every profile, so a request takes no value from the daemon.
  */
 export const STUDY_MEMORY_PARAMETERS: Readonly<
 	Record<'agent' | 'summary' | 'judge', StudyMemoryParameters>

@@ -18,7 +18,7 @@ import type {
 import type {
 	StudyMemoryArm,
 	StudyMemoryPolicy,
-	StudyMemoryRoute,
+	StudyMemoryTriage,
 	StudyMemoryCompaction,
 	StudyMemoryObservation,
 	StudyMemoryProvenance,
@@ -46,17 +46,17 @@ export function buildStudyMemoryJudgeModel(
 	second: string,
 ): string {
 	const model = canonicalStringify({ policy, first, second })
-	if (model === undefined) throw new StudyError('CONFIG', 'Router identity is not JSON')
+	if (model === undefined) throw new StudyError('CONFIG', 'Triage identity is not JSON')
 	return model
 }
 
 /** Selects a usable complete choice distribution in caller criteria order. */
-export function buildStudyMemoryRoute(
+export function buildStudyMemoryTriage(
 	id: string,
 	question: JudgeQuestion,
 	result: JudgeResult | undefined,
 	fault: boolean,
-): StudyMemoryRoute {
+): StudyMemoryTriage {
 	const answer =
 		result !== undefined && Object.hasOwn(result.answers, id) ? result.answers[id] : undefined
 	const candidates =

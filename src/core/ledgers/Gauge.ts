@@ -11,8 +11,9 @@ import { buildRecallMessage, fitSlope, resolvePredict } from './helpers.js'
  * has left.
  *
  * @remarks
- * `observe` rescales from the first call of each finished request with the overhead cost taken out,
- * and keeps that request's calls for the marginal rate and the longest final completion for the reply
+ * `observe` rescales from the first call only when `spared` is absent, zero, or at least `overhead`,
+ * with `max(0, overhead - spared)` taken out. A partially spared call keeps the existing scale.
+ * It keeps that request's calls for the marginal rate and the longest final completion for the reply
  * reserve after subtracting its thinking. `overhead` never changes after construction.
  * {@link GaugeOptions} defines the measured use, reply reserve, and recall-room formulas.
  * {@link LedgerOptions} defines the ledger's plan budget and recall close rule.
@@ -83,7 +84,7 @@ export class Gauge implements GaugeInterface {
 		const call = calls.at(-1)
 		const used = isFiniteNumber(call?.prompt)
 			? call.prompt + (call.completion ?? 0) - (this.#replay === 'none' ? (call.thinking ?? 0) : 0)
-			: this.#overhead + this.#scale * (call?.estimate ?? 0)
+			: Math.max(0, this.#overhead - (call?.spared ?? 0)) + this.#scale * (call?.estimate ?? 0)
 		return Math.max(0, this.#capacity - used)
 	}
 
@@ -108,8 +109,13 @@ export class Gauge implements GaugeInterface {
 
 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void {
 		const first = calls[0]
-		if (first !== undefined && isFiniteNumber(first.prompt) && first.estimate > 0) {
-			const priced = first.prompt - this.#overhead
+		if (
+			first !== undefined &&
+			isFiniteNumber(first.prompt) &&
+			first.estimate > 0 &&
+			((first.spared ?? 0) === 0 || (first.spared ?? 0) >= this.#overhead)
+		) {
+			const priced = first.prompt - Math.max(0, this.#overhead - (first.spared ?? 0))
 			if (priced > 0) this.#scale = priced / first.estimate
 		}
 		this.#history = [...this.#history, [...calls]]

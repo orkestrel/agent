@@ -242,7 +242,7 @@ it('leaves the tools requests unchanged', async () => {
 		],
 		[['escape', ['user', 'user assistant tool']]],
 		[['denied', ['user', 'user assistant tool']]],
-		[['cancel', ['user']]],
+		[['abort', ['user']]],
 		[
 			['save', ['user', 'user assistant tool']],
 			['continue', ['user assistant tool assistant user']],

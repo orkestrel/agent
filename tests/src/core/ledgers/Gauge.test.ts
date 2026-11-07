@@ -55,6 +55,30 @@ describe('Gauge construction', () => {
 })
 
 describe('Gauge.observe', () => {
+	it('retains scale for partial overhead and learns with all or no overhead', () => {
+		for (const spared of [undefined, 0, 150, 190, 300]) {
+			const gauge = new Gauge({ scale: 2, overhead: 190, capacity: 8192 })
+			gauge.observe([
+				{
+					estimate: 100,
+					prompt: 100 + Math.max(0, 190 - (spared ?? 0)),
+					tools: 1,
+					...(spared === undefined ? {} : { spared }),
+				},
+			])
+			expect(gauge.scale).toBe(spared === 150 ? 2 : 1)
+		}
+	})
+	it('subtracts only advertised overhead and floors spared overhead at zero', () => {
+		for (const spared of [0, 150, 190, 300]) {
+			const gauge = new Gauge({ scale: 1.16, overhead: 190, capacity: 8192 })
+			const overhead = Math.max(0, 190 - spared)
+			const call = { estimate: 201, tools: 1, spared }
+			expect(gauge.remainder([call])).toBeCloseTo(8192 - overhead - 201 * 1.16)
+			gauge.observe([{ ...call, prompt: 201 * 1.16 + overhead }])
+			expect(gauge.scale).toBeCloseTo(1.16)
+		}
+	})
 	it('rescales from the first call with the overhead cost taken out', () => {
 		const gauge = new Gauge(LEDGER_GAUGE_SEED)
 		gauge.observe([

@@ -45,7 +45,7 @@ import {
 	WINDOW_GOAL,
 } from '../../setupStudy.js'
 
-it('loads the actual q4 native topology with two distinct captured Agent occurrences', async () => {
+it('loads the actual recommended native topology with two distinct captured Agent occurrences', async () => {
 	const scratch = createScratch({ prefix: 'study-memory-topology-' })
 	try {
 		const result = await executeStudyTopology(scratch)
@@ -57,7 +57,7 @@ it('loads the actual q4 native topology with two distinct captured Agent occurre
 		if (!isRecord(selection) || !isArray(selection.identities))
 			throw new Error('Missing actual native selection evidence')
 		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')),
+			parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		const subject = realpathSync('dist/src/core/index.js')
 		const dependency = realpathSync('node_modules/@orkestrel/agent/dist/src/core/index.js')
@@ -113,11 +113,11 @@ it('loads the actual q4 native topology with two distinct captured Agent occurre
 	}
 })
 
-it('refuses a repeated canonical root in a fresh q4 native topology worker', async () => {
+it('refuses a repeated canonical root in a fresh recommended native topology worker', async () => {
 	const scratch = createScratch({ prefix: 'study-memory-repeated-root-' })
 	try {
 		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')),
+			parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		const roots = profile.roots.filter((root) => root !== 'node_modules/@orkestrel/agent')
 		const result = await executeStudyTopology(scratch, [...roots, realpathSync('.')])
@@ -130,11 +130,11 @@ it('refuses a repeated canonical root in a fresh q4 native topology worker', asy
 	}
 })
 
-it('refuses Ollama import when its installed Agent root is omitted in a fresh q4 native topology worker', async () => {
+it('refuses Ollama import when its installed Agent root is omitted in a fresh recommended native topology worker', async () => {
 	const scratch = createScratch({ prefix: 'study-memory-omitted-root-' })
 	try {
 		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/memory/profiles/q4.json', 'utf8')),
+			parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		const result = await executeStudyTopology(
 			scratch,

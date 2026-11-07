@@ -45,6 +45,8 @@ import {
 } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import {
+	seedLedgerRecall,
+	PricedLedgerProvider,
 	buildCategoryAnswer,
 	LEDGER_ADMISSION_SIZES,
 	LEDGER_LABEL_BREAKS,
@@ -116,6 +118,557 @@ import {
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it('retains calibrated scale for host subsets and learns from the full scope', async () => {
+		const provider = new PricedLedgerProvider(
+			[
+				{ content: '' },
+				{ content: '' },
+				{ content: 'Done.' },
+				{ content: 'Done.' },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildUncalibratedOptions(buildLedgerOptions({ capacity: 8192, share: { prompt: 1 } })),
+		)
+		await ledger.calibrate(new AbortController().signal)
+		expect(ledger.gauge).toEqual({ scale: 1.125, overhead: 190 })
+		seedLedgerRecall(ledger)
+		ledger.agent.context.apply(createScope({ name: 'recall-only', tools: ['recall'] }))
+		await ledger.respond('x'.repeat(100))
+		const recall = requireValue(provider.calls[2])
+		expect(recall.tools?.map((tool) => tool.name)).toEqual(['recall'])
+		expect(estimateMessages(recall.messages)).toBe(37)
+		expect(ledger.gauge?.scale).toBe(1.125)
+		ledger.agent.context.apply(createScope({ name: 'lookup-only', tools: ['lookup'] }))
+		await ledger.respond('Continue.')
+		expect(provider.calls[3]?.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+		expect(ledger.gauge?.scale).toBe(1.125)
+		ledger.agent.context.apply(createScope({ name: 'full', tools: ['lookup', 'recall'] }))
+		await ledger.respond('Continue again.')
+		const full = requireValue(provider.calls[4])
+		expect(full.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+		const units = estimateMessages(full.messages)
+		expect(ledger.gauge?.scale).toBe((Math.round(units * 1.16 + 190) - 190) / units)
+		expect(ledger.gauge?.scale).not.toBe(1.125)
+	})
+	it('keeps calibrated scale and capacity on the partially spared overflow input', async () => {
+		for (const lookup of [false, true]) {
+			const provider = new PricedLedgerProvider(
+				[
+					{ content: '' },
+					{ content: '' },
+					{ content: 'First.' },
+					{ content: 'x'.repeat(27000) },
+					{ content: 'Third.' },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildUncalibratedOptions(
+					buildLedgerOptions({
+						capacity: 8192,
+						share: { prompt: 1 },
+						...(lookup ? {} : { lookups: [] }),
+					}),
+				),
+			)
+			await ledger.calibrate(new AbortController().signal)
+			const calibrated = requireValue(ledger.gauge)
+			const head = requireValue(provider.calls[0]).messages
+			await ledger.respond('x'.repeat((201 - estimateMessages(head) - 4) * 4))
+			expect(estimateMessages(requireValue(provider.calls[2]).messages)).toBe(201)
+			const openingScale = ledger.gauge?.scale
+			await ledger.respond('Continue.')
+			const secondScale = ledger.gauge?.scale
+			const second = requireValue(provider.calls[3])
+			expect(
+				estimateMessages(second.messages) * 1.16 + (lookup ? 40 : 0) + (27000 / 4) * 1.16,
+			).toBeLessThan(8192)
+			await ledger.respond('Shorten. ' + 'x'.repeat(800))
+			const third = requireValue(provider.calls[4])
+			const tokens =
+				estimateMessages(third.messages) * 1.16 +
+				(third.tools ?? []).reduce((sum, tool) => sum + (tool.name === 'recall' ? 150 : 40), 0)
+			expect(tokens).toBeLessThan(8192)
+			expect(openingScale).toBeCloseTo(lookup ? calibrated.scale : Math.round(201 * 1.16) / 201, 12)
+			expect(tokens).toBeLessThan(
+				(8192 - calibrated.overhead) / (1 + LEDGER_SCALE_DRIFT) + calibrated.overhead,
+			)
+			expect(secondScale).toBeCloseTo(lookup ? calibrated.scale : 1.16, lookup ? 12 : 2)
+			console.log({ lookup, calibrated: calibrated.scale, scale: ledger.gauge?.scale, tokens })
+		}
+	})
+
+	it('keeps a host replacement applied during the answer pass', async () => {
+		const provider = createScriptedProvider([{ content: '' }, { content: 'Done.' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const entry = createScope({ name: 'entry', tools: ['lookup', 'recall'] })
+		const replacement = createScope({ name: 'replacement', tools: [] })
+		ledger.agent.context.apply(entry)
+		ledger.agent.emitter.on('select', () => {
+			if (ledger.agent.context.scope?.name === 'answer') ledger.agent.context.apply(replacement)
+		})
+		expect((await ledger.respond('Check.')).content).toBe('Done.')
+		expect(provider.calls).toHaveLength(2)
+		expect(ledger.agent.context.scope).toBe(replacement)
+	})
+
+	it('uses the final rung offer when the opening exceeds the plan budget', async () => {
+		for (const hidden of [false, true]) {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ capacity: 4096, share: { prompt: 0.1 }, lookups: [] }),
+			)
+			if (hidden) seedLedgerRecall(ledger)
+			await ledger.respond('x'.repeat(2000))
+			const sent = requireValue(provider.calls[0])
+			expect(estimateMessages(sent.messages)).toBeLessThan(4096)
+			expect(sent.tools?.some((tool) => tool.name === 'recall') ?? false).toBe(hidden)
+		}
+	})
+
+	it('keeps quiet word matches recallable and lets them open the offer', async () => {
+		for (const hidden of [false, true]) {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'quiet', name: 'recall', arguments: { topic: 'Rex' } }],
+					},
+					{ content: 'Done.' },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ share: { tail: 0.001 }, topics: [] }),
+			)
+			if (hidden) seedLedgerRecall(ledger)
+			const quiet = ledger.conversation.add({
+				role: 'user',
+				content: 'My dog is called Rex.',
+			})
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(quiet, { answer: buildCategoryAnswer({ chatter: 1 }) }),
+			)
+			await ledger.respond('Check.')
+			const sent = requireValue(provider.calls[0])
+			expect(sent.messages.some((message) => message.content === quiet.content)).toBe(false)
+			expect(sent.tools?.some((tool) => tool.name === 'recall') ?? false).toBe(true)
+			const recalled = ledger.conversation
+				.messages()
+				.find((message) => message.call === 'quiet')?.content
+			expect(recalled).toBe(quiet.content)
+		}
+	})
+
+	it('keeps a host scope applied during narrowed and unnarrowed requests', async () => {
+		for (const hidden of [false, true]) {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'lookup-host', name: 'lookup', arguments: { id: 'BW-20931' } }],
+					},
+					{ content: 'Done.' },
+					{ content: 'Next.' },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(provider, buildLedgerOptions())
+			if (hidden) seedLedgerRecall(ledger)
+			const entry = createScope({ name: 'entry', tools: ['lookup', 'recall'] })
+			const applied = createScope({ name: 'applied', tools: ['lookup'] })
+			ledger.agent.context.apply(entry)
+			ledger.agent.emitter.on('tool', () => ledger.agent.context.apply(applied))
+			await ledger.respond('Check BW-20931.')
+			expect(ledger.agent.context.scope).toBe(applied)
+			await ledger.respond('Check again.')
+			expect(provider.calls.at(-1)?.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+			expect(ledger.agent.context.scope).toBe(applied)
+		}
+	})
+
+	it('keeps a fitting exchange when recall has nothing hidden to read', async () => {
+		const reply = 'x'.repeat(6300)
+		const provider = createScriptedProvider(
+			[{ content: 'First.' }, { content: reply }, { content: 'Third.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 4096, lookups: [], gauge: { scale: 1.2, overhead: 0 } }),
+		)
+		await ledger.respond('Hello.')
+		await ledger.respond('Continue.')
+		await ledger.respond('Shorten.')
+		const third = requireValue(provider.calls[2])
+		expect(third.messages.some((message) => message.content === reply)).toBe(true)
+		expect(third.tools).toBeUndefined()
+		expect(estimateMessages(third.messages) * 1.2).toBeLessThan(4096 * 0.7)
+	})
+
+	it('does not offer recall for an empty finding', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.conversation.add(buildLedgerExchange('No record'))
+		await ledger.respond('Check BW-20931.')
+		await ledger.respond('Check again.')
+		expect(provider.calls.map((call) => call.tools?.map((tool) => tool.name))).toEqual([
+			['lookup'],
+			['lookup'],
+		])
+		expect(
+			provider.calls[0]?.messages.find((message) => message.role === 'tool')?.content,
+		).toContain('no record')
+	})
+
+	it('shows both identical seeds and withholds recall after a duplicate lookup', async () => {
+		const text = 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
+		const provider = createScriptedProvider(
+			[
+				{ content: 'First.' },
+				{
+					content: '',
+					tools: [{ id: 'duplicate', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				},
+				{ content: 'Second.' },
+				{ content: 'Third.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.conversation.add([
+			...buildLedgerExchange(text, 'a1'),
+			...buildLedgerExchange(text, 'a2'),
+		])
+		await ledger.respond('Check BW-20931.')
+		const stubs = requireValue(provider.calls[0]).messages.filter(
+			(message) => message.role === 'tool',
+		)
+		expect(stubs).toHaveLength(2)
+		expect(stubs.every((message) => message.content.includes('result shown'))).toBe(true)
+		await ledger.respond('Look up BW-20931 again.')
+		await ledger.respond('Check BW-20931.')
+		expect(provider.calls.at(-1)?.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+	})
+
+	it('keeps the account line after a correction and an identical lookup', async () => {
+		const text = 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.conversation.add(buildLedgerExchange(text, 'a1'))
+		const first = requireValue(
+			ledger.conversation.messages().find((message) => message.role === 'tool'),
+		)
+		const fix = ledger.conversation.add({
+			role: 'user',
+			content: 'Correction: BW-20931 refund is $149.50.',
+		})
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', first, fix, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', first, fix, 1))
+		ledger.conversation.add(buildLedgerExchange(text, 'a2'))
+		await ledger.respond('Check BW-20931.')
+		expect(extractLedgerRecords(requireValue(provider.calls[0]).messages)).toContain(
+			'Account BW-20931: Brightwater Studio.',
+		)
+	})
+
+	it('omits empty recall results from the final answer digest', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { topic: 'absent' } }] },
+				{ content: '' },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const hidden = seedLedgerRecall(ledger)
+		await ledger.respond('Check.')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'empty')?.content,
+		).toBe('nothing earlier on "absent"; answer from the messages you can see')
+		expect(provider.calls).toHaveLength(3)
+		expect(
+			provider.calls
+				.flatMap((call) => call.messages)
+				.some((message) => message.content === hidden.content),
+		).toBe(false)
+		expect(
+			requireValue(provider.calls[2]).messages.some((message) =>
+				message.content.startsWith(LEDGER_NOTES.results),
+			),
+		).toBe(false)
+	})
+
+	it('offers hidden statements equally on uninterrupted and hydrated ledgers', async () => {
+		const provider = createScriptedProvider([{ content: 'First.' }, { content: 'Next.' }], {
+			recorded: true,
+		})
+		const options = buildLedgerOptions({ share: { prompt: 1, tail: 0.001 } })
+		const ledger = createLedger(provider, options)
+		ledger.conversation.add({
+			role: 'user',
+			content: 'Saffron archive keeps an old parcel receipt.',
+		})
+		await ledger.respond('Check the desk.')
+		const restored = createScriptedProvider([{ content: 'Next.' }], { recorded: true })
+		const child = createLedger(restored, {
+			...options,
+			snapshot: requireValue(parseJSONAs(JSON.stringify(ledger.snapshot()), isLedgerSnapshot)),
+		})
+		await ledger.respond('Make that shorter.')
+		await child.respond('Make that shorter.')
+		expect(provider.calls.map((call) => call.tools?.map((tool) => tool.name))).toEqual([
+			['lookup', 'recall'],
+			['lookup', 'recall'],
+		])
+		expect(restored.calls[0]?.tools).toEqual(provider.calls[1]?.tools)
+		expect(
+			provider.calls
+				.flatMap((call) => call.messages)
+				.some((message) => message.content.includes('Saffron')),
+		).toBe(false)
+	})
+
+	it('denies a recall call when nothing earlier is hidden', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'recall-denied', name: 'recall', arguments: { topic: 'parcel' } }],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		await ledger.respond('Check the desk.')
+		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'recall-denied')?.content,
+		).toBe(
+			'"recall" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.',
+		)
+	})
+
+	it('narrows the host scope without widening another filter and restores its identity', async () => {
+		const provider = createScriptedProvider([{ content: '' }, { content: 'Answered.' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const host = createScope({
+			name: 'host',
+			tools: ['recall'],
+			instructions: [],
+			skills: [],
+			memos: [],
+			files: [],
+		})
+		ledger.agent.context.apply(host)
+		const selected = createRecorder<readonly [unknown]>()
+		ledger.agent.emitter.on('select', () => selected.handler(ledger.agent.context.scope))
+		await ledger.respond('Check the desk.')
+		expect(provider.calls.map((call) => call.tools)).toEqual([undefined, undefined])
+		expect(selected.calls.map(([scope]) => scope)).toEqual([
+			expect.objectContaining({
+				name: 'host',
+				tools: [],
+				instructions: [],
+				skills: [],
+				memos: [],
+				files: [],
+			}),
+			expect.objectContaining({ tools: [], instructions: [], skills: [], memos: [], files: [] }),
+		])
+		expect(ledger.agent.context.scope).toBe(host)
+	})
+
+	it('restores the host scope after a send rejection and an aborted provider call', async () => {
+		for (const cancelled of [false, true]) {
+			const abort = new AbortController()
+			const underlying = createScriptedProvider([], { repeat: false })
+			const ledger = createLedger(
+				{
+					id: underlying.id,
+					name: underlying.name,
+					generate: async () => {
+						if (cancelled) abort.abort('stop')
+						throw new Error('send rejected')
+					},
+					stream: () => {
+						if (cancelled) abort.abort('stop')
+						throw new Error('send rejected')
+					},
+				},
+				buildLedgerOptions(),
+			)
+			const host = createScope({ name: 'host', tools: ['lookup', 'recall'] })
+			ledger.agent.context.apply(host)
+			const selected = createRecorder<readonly [readonly string[] | undefined]>()
+			ledger.agent.emitter.on('select', () => selected.handler(ledger.agent.context.scope?.tools))
+			await ledger.respond('Check the desk.', abort.signal).catch(() => undefined)
+			expect(selected.calls[0]).toEqual([['lookup']])
+			expect(ledger.agent.context.scope).toBe(host)
+		}
+	})
+
+	it('preserves a host selector while it delegates to the ledger selection', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const invoked = createRecorder<readonly []>()
+		const host = createScope({
+			name: 'host',
+			tools: ['recall'],
+			files: [],
+			select: async (conversation, message, signal) => {
+				invoked.handler()
+				ledger.agent.context.apply(undefined)
+				const selected = ledger.agent.context.select(conversation, message, signal)
+				ledger.agent.context.apply(host)
+				return await requireValue(selected)
+			},
+		})
+		ledger.agent.context.apply(host)
+		const selected = createRecorder<readonly [unknown]>()
+		ledger.agent.emitter.on('select', () => selected.handler(ledger.agent.context.scope?.select))
+		await ledger.respond('Check.')
+		expect(invoked.count).toBe(1)
+		expect(selected.calls).toEqual([[host.select]])
+		expect(provider.calls[0]?.tools).toBeUndefined()
+		expect(ledger.agent.context.scope).toBe(host)
+	})
+
+	it('offers no recall when the seed and window hold every earlier word', async () => {
+		const provider = createScriptedProvider(
+			[{ content: 'First reply.' }, { content: 'Second reply.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.conversation.add({ role: 'user', content: 'Delivery costs $10.' })
+		await ledger.respond('Check delivery.')
+		await ledger.respond('Make that shorter.')
+		expect(provider.calls.map((call) => call.tools?.map((tool) => tool.name))).toEqual([
+			['lookup'],
+			['lookup'],
+		])
+		expect(ledger.agent.context.scope).toBeUndefined()
+	})
+
+	it('keeps twenty identical lookup turns extending without draining', async () => {
+		const provider = createScriptedProvider(
+			Array.from({ length: 20 }, (_, at) => [
+				{
+					content: '',
+					tools: [{ id: `lookup-${at}`, name: 'lookup', arguments: { id: 'BW-20931' } }],
+				},
+				{ content: `Reply ${at}.` },
+			]).flat(),
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions({ capacity: 100000 }))
+		ledger.conversation.add(
+			buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+		)
+		for (const at of Array.from({ length: 20 }, (_, index) => index)) {
+			await ledger.respond('Check Brightwater Studio.')
+			expect(ledger.snapshot().window?.exchanges).toHaveLength(at + 1)
+			const call = requireValue(provider.calls[at * 2])
+			const previous = provider.calls[(at - 1) * 2]
+			expect(call.messages.slice(1, previous?.messages.length ?? 1)).toEqual(
+				previous?.messages.slice(1) ?? [],
+			)
+			expect(call.messages.find((message) => message.role === 'tool')?.content).toContain(
+				'result shown',
+			)
+		}
+	})
+
+	it('moves an amendment to the shown live successor and drains its stale note', async () => {
+		const provider = createScriptedProvider(
+			[{ content: 'First reply.' }, { content: 'Second reply.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions({ topics: [] }))
+		ledger.conversation.add(buildLedgerExchange('Account BW-20931: Brightwater Studio.'))
+		const earlier = ledger.conversation.add({
+			role: 'user',
+			content: 'Brightwater Studio delivery for BW-20931 costs $10.',
+		})
+		const later = ledger.conversation.add({
+			role: 'user',
+			content: 'Correction: delivery for BW-20931 costs $12.',
+		})
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+		await ledger.respond('Check BW-20931.')
+		const newest = ledger.conversation.add({
+			role: 'user',
+			content: 'Correction: BW-20931 delivery goes to $14 from $12.',
+		})
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', later, newest, 1))
+		ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', later, newest, 1))
+		await ledger.respond('Check BW-20931 again.')
+		const text = extractLedgerRecords(requireValue(provider.calls[1]).messages)
+		expect(text).toContain(newest.content)
+		expect(text).not.toContain(later.content)
+		expect(text).not.toContain('A later change is not shown.')
+		expect(text).toMatch(/Changed later by \[(\d+)\]\./)
+		for (const reference of text.matchAll(/Changed later by \[(\d+)\]\./g))
+			expect(text).toContain(`[${reference[1]}]\n`)
+		expect(ledger.snapshot().window?.exchanges[0]?.copy).toBeUndefined()
+	})
+
+	it('discards a shaped window after a held source or sentence is removed', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ share: { prompt: 1, tail: 0.001 } }))
+		ledger.conversation.add(buildLedgerExchange('Account BW-20931: Brightwater Studio.'))
+		const source = ledger.conversation.add({
+			role: 'user',
+			content: 'Delivery BW-20931 costs $10. Private receipt BW-20931 is sealed.',
+		})
+		await ledger.respond('Check BW-20931.')
+		const snapshot = ledger.snapshot()
+		expect(
+			requireValue(snapshot.window)
+				.exchanges.flatMap((entry) => entry.lines)
+				.some((line) => line.source === source.id),
+		).toBe(true)
+		for (const removed of [true, false]) {
+			const changed = {
+				...snapshot,
+				conversation: {
+					...snapshot.conversation,
+					messages: snapshot.conversation.messages.flatMap((message) =>
+						message.id !== source.id
+							? [message]
+							: removed
+								? []
+								: [{ ...message, content: 'Delivery BW-20931 costs $10.' }],
+					),
+				},
+			}
+			expect(isLedgerSnapshot(changed)).toBe(true)
+			const resumed = createScriptedProvider([{ content: 'Next.' }], { recorded: true })
+			const restored = createLedger(resumed, buildLedgerOptions({ snapshot: changed }))
+			expect(restored.snapshot().window).toBeUndefined()
+			await restored.respond('Check BW-20931.')
+			expect(
+				requireValue(resumed.calls[0])
+					.messages.map((message) => message.content)
+					.join('\n'),
+			).not.toContain('Private receipt')
+		}
+	})
+
 	it.each(LEDGER_ADMISSION_SIZES)(
 		'preserves C2 records seed bytes and open recall at reply size %i',
 		async (size) => {
@@ -209,6 +762,7 @@ describe('Ledger', () => {
 					{ recorded: true },
 				)
 				const ledger = createLedger(provider, buildLedgerOptions({ topics: [] }))
+				seedLedgerRecall(ledger)
 				ledger.conversation.add(
 					lookup ? buildLedgerExchange(planted) : [{ role: 'user', content: planted }],
 				)
@@ -240,6 +794,7 @@ describe('Ledger', () => {
 				{ recorded: true },
 			)
 			const ledger = createLedger(provider, buildLedgerOptions({ topics: [] }))
+			seedLedgerRecall(ledger)
 			ledger.conversation.add({
 				role: 'user',
 				content: 'Parcel plain.\r\nKeep these bytes.\u2028End.',
@@ -275,6 +830,7 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, buildLedgerOptions({ topics: [], capacity: 1000 }))
+		seedLedgerRecall(ledger)
 		await ledger.respond('First request.')
 		await ledger.respond('Next request.')
 		expect(requireValue(provider.calls[1]).messages.map((message) => message.content)).toEqual([
@@ -1409,6 +1965,7 @@ describe('Ledger', () => {
 			]),
 			buildLedgerOptions({ judge: new SilentJudge(), topics: [] }),
 		)
+		seedLedgerRecall(ledger)
 		await ledger.respond(planted)
 		await ledger.respond('Find the parcel.')
 		const lines = requireValue(
@@ -1448,6 +2005,7 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
+		seedLedgerRecall(ledger)
 		await ledger.respond(request)
 		const snapshot = ledger.snapshot()
 		await ledger.respond('Find the earlier exchange.')
@@ -1521,6 +2079,7 @@ describe('Ledger', () => {
 			{ content: 'Answered.' },
 		])
 		const ledger = createLedger(provider, buildLedgerOptions())
+		seedLedgerRecall(ledger)
 		const controller = new AbortController()
 		ledger.agent.emitter.once('usage', () => controller.abort())
 		expect((await ledger.respond('Tell me the parcel code.', controller.signal)).partial).toBe(true)
@@ -1549,7 +2108,7 @@ describe('Ledger', () => {
 		await ledger.respond('Find the parcel code.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'current')?.content,
-		).toBe('nothing on "parcel code"; recall an owner name, an id, or one of refunds')
+		).toBe('nothing earlier on "parcel code"; answer from the messages you can see')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'repeat')?.content,
 		).toBe(LEDGER_NOTES.repeat)
@@ -1573,6 +2132,7 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, buildLedgerOptions())
+		seedLedgerRecall(ledger)
 		ledger.conversation.add([
 			{
 				role: 'assistant',
@@ -1597,7 +2157,7 @@ describe('Ledger', () => {
 		await ledger.respond('Find the delivery code.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'removed')?.content,
-		).toBe('nothing on "delivery code"; recall an owner name, an id, or one of refunds')
+		).toBe('nothing earlier on "delivery code"; answer from the messages you can see')
 	})
 
 	it.each(LEDGER_OWNER_RENDER_CASES)('$title', async (row) => {
@@ -1783,7 +2343,7 @@ describe('Ledger', () => {
 		await ledger.respond('Check codes.')
 		const text = extractLedgerRecords(requireValue(provider.calls[0]).messages)
 		expect(text).toContain('- Code MX-4471.\n- Code MX-4471 remains pending.')
-		expect(text).toContain('A later change is not shown.')
+		expect(text).not.toContain('A later change is not shown.')
 		expect(text).not.toContain(first.id)
 		expect(text).not.toContain(first.content)
 		expect(ledger.conversation.message(first.id)?.content).toBe(first.content)
@@ -1903,6 +2463,7 @@ describe('Ledger', () => {
 			capacity: 32_768,
 			agent: { strict: false },
 		})
+		seedLedgerRecall(ledger)
 		await ledger.respond('Check BW-20931.')
 		ledger.conversation.add({ role: 'user', content: 'Check it again.' })
 		await expect(ledger.agent.generate()).resolves.toMatchObject({
@@ -1910,7 +2471,7 @@ describe('Ledger', () => {
 			partial: false,
 		})
 		const read = 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
-		const recalled = 'nothing on "refunds"; recall an owner name, an id, or one of refunds'
+		const recalled = 'nothing earlier on "refunds"; answer from the messages you can see'
 		// The direct run's calls repeat the settled request's, and neither returns the repeat note.
 		expect(
 			ledger.conversation
@@ -2397,6 +2958,7 @@ describe('Ledger', () => {
 			share: { tail: 0.001 },
 		})
 		const text = 'Account BW-20931: Brightwater Studio. Refund is $140.'
+		seedLedgerRecall(ledger)
 		for (const id of ['earlier', 'later'])
 			ledger.conversation.add([
 				{
@@ -2459,6 +3021,7 @@ describe('Ledger', () => {
 				{ ...lookup, tool: createTool({ name: 'lookup', strict: false, execute: () => text }) },
 			],
 		})
+		seedLedgerRecall(ledger)
 		await ledger.respond('Check the account.')
 		expect(
 			ledger.conversation
@@ -2551,6 +3114,7 @@ describe('Ledger', () => {
 				},
 			],
 		})
+		seedLedgerRecall(ledger)
 		const source = ledger.conversation.add({
 			role: 'user',
 			content:
@@ -2901,6 +3465,7 @@ describe('Ledger', () => {
 				capacity: thinking === undefined ? 3072 : 4096,
 				...(thinking === undefined ? {} : { predict: 1024 }),
 			})
+			seedLedgerRecall(ledger)
 			ledger.conversation.add(buildDeliverySeed(20))
 			await ledger.respond('Review.')
 			const recalled = requireValue(
@@ -2931,12 +3496,13 @@ describe('Ledger', () => {
 				{ recorded: true, replay },
 			)
 			const ledger = createLedger(provider, { ...options, predict: 1024 })
+			seedLedgerRecall(ledger)
 			await ledger.respond('Review.')
 			expect(
 				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
 			).toBe(
 				replay === 'none'
-					? 'nothing on "absent"; recall an owner name, an id, or one of refunds'
+					? 'nothing earlier on "absent"; answer from the messages you can see'
 					: LEDGER_NOTES.closure,
 			)
 		}
@@ -2961,11 +3527,12 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, { ...options, predict: 1024 })
+		seedLedgerRecall(ledger)
 		await ledger.respond('First.')
 		await ledger.respond('Second.')
 		expect(
 			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing on "absent"; recall an owner name, an id, or one of refunds')
+		).toBe('nothing earlier on "absent"; answer from the messages you can see')
 	})
 
 	it('passes predict to a calibrated gauge while recall remains open', async () => {
@@ -2999,6 +3566,7 @@ describe('Ledger', () => {
 			const uncalibrated = buildUncalibratedOptions(options)
 			const ledger = createLedger(provider, { ...uncalibrated, predict })
 			await ledger.calibrate(new AbortController().signal)
+			seedLedgerRecall(ledger)
 			ledger.conversation.add(buildDeliverySeed(20))
 			await ledger.respond('Review.')
 			const recalled = requireValue(
@@ -3030,12 +3598,14 @@ describe('Ledger', () => {
 			)
 			const uncalibrated = buildUncalibratedOptions(options)
 			const ledger = createLedger(provider, { ...uncalibrated, predict: 1024 })
+			await ledger.calibrate(new AbortController().signal)
+			seedLedgerRecall(ledger)
 			await ledger.respond('Review.')
 			expect(
 				provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
 			).toBe(
 				replay === 'none'
-					? 'nothing on "absent"; recall an owner name, an id, or one of refunds'
+					? 'nothing earlier on "absent"; answer from the messages you can see'
 					: LEDGER_NOTES.closure,
 			)
 		}
@@ -3066,6 +3636,8 @@ describe('Ledger', () => {
 				...(calibrated ? uncalibrated : options),
 				predict: 1024,
 			})
+			if (calibrated) await ledger.calibrate(new AbortController().signal)
+			seedLedgerRecall(ledger)
 			await ledger.respond('Review.')
 			expect(
 				provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
@@ -3115,7 +3687,7 @@ describe('Ledger', () => {
 		)
 		expect(records).toContain('- Account BW-20931: Brightwater Studio.')
 		expect(records).not.toContain('lookup {"id":"BW-20931"}:')
-		expect(first.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+		expect(first.tools?.map((tool) => tool.name)).toEqual(['lookup'])
 		await ledger.respond('Check the desk again.')
 		const second = requireValue(provider.calls[1])
 		expect(
@@ -3373,6 +3945,7 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, { ...options, recall: { limit: 0 } })
+		seedLedgerRecall(ledger)
 		ledger.conversation.add({ role: 'user', content: 'Refunds over $200 need a manager.' })
 		await ledger.respond('Check the desk.')
 		expect(
@@ -3918,6 +4491,7 @@ describe('Ledger', () => {
 			{ content: 'Done.' },
 		])
 		const ledger = createLedger(provider, { ...options, recall: { limit: 1 } })
+		seedLedgerRecall(ledger)
 		await ledger.respond('Request.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'empty')?.content,
@@ -3936,6 +4510,7 @@ describe('Ledger', () => {
 			{ content: 'Done.' },
 		])
 		const ledger = createLedger(provider, options)
+		seedLedgerRecall(ledger)
 		await ledger.respond('Request.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'extra')?.content,
@@ -3950,6 +4525,7 @@ describe('Ledger', () => {
 			{ content: 'Done.' },
 		])
 		const ledger = createLedger(provider, { ...options, recall: { limit: 1 } })
+		seedLedgerRecall(ledger)
 		await ledger.respond('Request.')
 		expect(
 			ledger.conversation
@@ -3966,7 +4542,7 @@ describe('Ledger', () => {
 		])
 		expect(result[0]).toMatchObject({
 			success: true,
-			value: 'nothing on "absent"; recall an owner name, an id, or one of refunds',
+			value: 'nothing earlier on "absent"; answer from the messages you can see',
 		})
 	})
 
@@ -4025,7 +4601,7 @@ describe('Ledger', () => {
 		expect(description).not.toMatch(/handle/)
 		expect(description?.match(LEDGER_HANDLE) ?? []).toEqual([])
 		expect(description).toBe(
-			'Recall what the full conversation record holds on a topic: an owner name, an id, or one of the topics refunds. Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.',
+			"Find something said earlier that isn't in the messages you can see, by an owner name, an id, or one of the topics refunds. Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.",
 		)
 		const parameters = provider.calls[0]?.tools?.find((tool) => tool.name === 'recall')?.parameters
 		expect(JSON.stringify(parameters)).toBe(
@@ -4044,6 +4620,7 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(limited, { ...options, recall: { limit: 1 } })
+		seedLedgerRecall(ledger)
 		ledger.conversation.add({ role: 'user', content: 'Delivery arrived Tuesday.' })
 		await ledger.respond('Check the desk.')
 		expect(
@@ -4064,6 +4641,7 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const tight = createLedger(crowded, options)
+		seedLedgerRecall(tight)
 		await tight.respond('Check the desk.')
 		expect(tight.conversation.messages().find((message) => message.role === 'tool')?.content).toBe(
 			LEDGER_NOTES.closure,
@@ -4107,6 +4685,7 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
+		seedLedgerRecall(ledger)
 		const old = ledger.conversation.add({
 			role: 'user',
 			content: 'Refunds over $200 require approval. Use code MX-4471.',
@@ -4465,6 +5044,7 @@ describe('Ledger', () => {
 			share: { tail: 0.001 },
 			recall: { limit: 3 },
 		})
+		seedLedgerRecall(ledger)
 		ledger.conversation.add([
 			{
 				role: 'assistant',
@@ -4494,7 +5074,7 @@ describe('Ledger', () => {
 			).toContain('For Brightwater, keep receipt 42.')
 		expect(
 			provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing on "Brightwater unknown"; recall an owner name, an id, or one of refunds')
+		).toBe('nothing earlier on "Brightwater unknown"; answer from the messages you can see')
 	})
 
 	it('keeps replaced user messages in an otherwise uncut seed tail', async () => {
@@ -4540,11 +5120,12 @@ describe('Ledger', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, options)
+		seedLedgerRecall(ledger)
 		await ledger.respond('First request.')
 		await ledger.respond('Second request.')
 		expect(
 			provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing on "absent"; recall an owner name, an id, or one of refunds')
+		).toBe('nothing earlier on "absent"; answer from the messages you can see')
 	})
 
 	it('cuts off-topic rules before owner lines and keeps tail exchanges and call groups whole', async () => {
@@ -4780,6 +5361,7 @@ describe('Ledger', () => {
 			{ content: 'Done.' },
 		])
 		const limited = createLedger(recalls, options)
+		seedLedgerRecall(limited)
 		await limited.respond('Check the desk.')
 		expect(
 			limited.conversation
@@ -4787,8 +5369,8 @@ describe('Ledger', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual([
-			'nothing on "one"; recall an owner name, an id, or one of refunds',
-			'nothing on "two"; recall an owner name, an id, or one of refunds',
+			'nothing earlier on "one"; answer from the messages you can see',
+			'nothing earlier on "two"; answer from the messages you can see',
 			LEDGER_NOTES.closure,
 		])
 	})
@@ -5099,6 +5681,7 @@ describe('Ledger — its authority', () => {
 			{ recorded: true, repeat: false },
 		)
 		const ledger = createLedger(provider, buildLedgerOptions())
+		seedLedgerRecall(ledger)
 		await ledger.respond('Check the refund.')
 		const replies = ledger.conversation.messages().filter((message) => message.role === 'tool')
 		expect(replies.map((message) => message.call)).toEqual(['lookup-1', 'recall-1'])
@@ -6058,6 +6641,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			],
 		})
 		const parent = createLedger(provider, options)
+		if (fixture.name === 'recall label') seedLedgerRecall(parent)
 		if (fixture.role === 'user' && !fixture.unit)
 			parent.conversation.add(buildLedgerExchange('Account BW-20931: Brightwater Studio.'))
 		const added =
@@ -6314,6 +6898,9 @@ describe('Ledger — snapshot and hydrate', () => {
 					],
 				),
 			).toBe(JSON.stringify(provider.calls.slice(start).map((call) => call.messages)))
+			expect(boundary.calls.map((call) => call.tools)).toEqual(
+				provider.calls.slice(start).map((call) => call.tools),
+			)
 			const saved = child.snapshot()
 			snapshots.push(requireValue(parseJSONAs(JSON.stringify(saved), isLedgerSnapshot)))
 		}
@@ -6368,7 +6955,7 @@ describe('Ledger — snapshot and hydrate', () => {
 		expect(sent.at(-1)?.content).toContain('[2]')
 	})
 
-	it('omits the window member until an exchange completes and refuses a snapshot with a missing held reply', async () => {
+	it('omits the window member until an exchange completes and discards one with a missing held reply', async () => {
 		const ledger = createLedger(
 			createScriptedProvider([{ content: 'Done.' }]),
 			buildLedgerOptions({ topics: [] }),
@@ -6385,16 +6972,12 @@ describe('Ledger — snapshot and hydrate', () => {
 				messages: snapshot.conversation.messages.filter((message) => message.id !== reply),
 			},
 		}
-		expect(isLedgerSnapshot(broken)).toBe(false)
-		const error = captureError(() =>
-			createLedger(createScriptedProvider([]), { ...buildLedgerOptions(), snapshot: broken }),
-		)
-		expect(isLedgerError(error) && error.code).toBe('SNAPSHOT')
-		expect(isLedgerError(error) && error.context?.faults).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({ path: ['window', 'exchanges', '0', 'reply'] }),
-			]),
-		)
+		expect(isLedgerSnapshot(broken)).toBe(true)
+		const restored = createLedger(createScriptedProvider([]), {
+			...buildLedgerOptions(),
+			snapshot: broken,
+		})
+		expect(restored.snapshot().window).toBeUndefined()
 	})
 
 	it('replays the next request with the selections and judge keys of the uninterrupted ledger', async () => {

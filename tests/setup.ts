@@ -2429,6 +2429,24 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 	}
 }
 
+/** Prices scripted ledger calls at 1.16 tokens per unit, plus recall 150 and each lookup 40. */
+export class PricedLedgerProvider extends ScriptedProvider {
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const result = yield* super.stream(messages, signal, tools, options)
+		const prompt = Math.round(
+			estimateMessages(messages) * 1.16 +
+				(tools ?? []).reduce((sum, tool) => sum + (tool.name === 'recall' ? 150 : 40), 0),
+		)
+		const completion = Math.ceil((result.content.length / 4) * 1.16)
+		return { ...result, usage: { prompt, completion, total: prompt + completion } }
+	}
+}
+
 /** Replays a provider turn and then raises the supplied boundary failure. */
 export class FailingProvider extends ScriptedProvider {
 	readonly #failure: Error
@@ -5764,14 +5782,28 @@ export function checkLedgerProjection(
 	const lookups = new Map(input.findings.map((finding) => [finding.id, finding]))
 	const replaced = new Set(
 		[...lookups.values()]
-			.filter((finding) =>
-				[...lookups.values()].some(
-					(later) =>
-						(byId.get(later.id)?.at ?? -1) > (byId.get(finding.id)?.at ?? -1) &&
-						computeLedgerIdentity(later.name, later.arguments) ===
-							computeLedgerIdentity(finding.name, finding.arguments),
-				),
-			)
+			.filter((finding) => {
+				const identity = computeLedgerIdentity(finding.name, finding.arguments)
+				if (identity === undefined) return false
+				const siblings = [...lookups.values()]
+					.filter(
+						(other) =>
+							byId.has(other.id) && computeLedgerIdentity(other.name, other.arguments) === identity,
+					)
+					.toSorted((a, b) => (byId.get(a.id)?.at ?? -1) - (byId.get(b.id)?.at ?? -1))
+				const at = siblings.findIndex((other) => other.id === finding.id)
+				const preceding = siblings.slice(0, at)
+				const boundary = preceding.findLastIndex(
+					(other) => other.result === undefined || other.text !== finding.text,
+				)
+				const previous = preceding.slice(boundary + 1).find((other) => !supersessions.has(other.id))
+				return (
+					siblings
+						.slice(at + 1)
+						.some((other) => other.result === undefined || other.text !== finding.text) ||
+					(previous?.result !== undefined && previous.text === finding.text)
+				)
+			})
 			.map((finding) => finding.id),
 	)
 	const live = new Set(
@@ -5885,13 +5917,31 @@ export function checkLedgerProjection(
 	})
 
 	const expectedAmendments = [...live].flatMap((earlier) =>
-		input.messages
-			.filter(
-				(later) =>
-					(classification.amendments.get(earlier) ?? []).includes(later.id) &&
-					hasEffect(later.id, input, byId, live, excluded, supersessions),
-			)
-			.map((later) => ({ earlier, later: later.id })),
+		[
+			...new Set(
+				input.messages
+					.filter(
+						(later) =>
+							(classification.amendments.get(earlier) ?? []).includes(later.id) &&
+							hasEffect(later.id, input, byId, live, excluded, supersessions),
+					)
+					.map((later) => {
+						const successor = input.messages.findLast((candidate) => {
+							if (!live.has(candidate.id)) return false
+							const ancestors = new Set([candidate.id])
+							for (const id of ancestors) {
+								for (const [prior, next] of classification.supersessions) {
+									if (next.includes(id)) ancestors.add(prior)
+								}
+							}
+							return ancestors.has(later.id)
+						})
+						return successor?.id ?? later.id
+					}),
+			),
+		]
+			.sort((a, b) => (byId.get(a)?.at ?? -1) - (byId.get(b)?.at ?? -1))
+			.map((later) => ({ earlier, later })),
 	)
 	const amendments =
 		canonicalStringify(built.amendments) === canonicalStringify(expectedAmendments)
@@ -6182,6 +6232,22 @@ export function buildLedgerOptions(overrides: Partial<LedgerOptions> = {}): Ledg
 		],
 		...overrides,
 	}
+}
+
+/**
+ * Seeds a filed fact too large for the seed tail and unrelated to the desk's selected topics.
+ * It keeps recall reachable without matching the scenario's listing. Its size can also push later
+ * lookup calls and stubs out of the seed tail when they share its exchange.
+ * @param ledger - The ledger before its scenario's seed messages are added
+ * @returns The stored hidden statement
+ */
+export function seedLedgerRecall(ledger: LedgerInterface): Message {
+	const message = ledger.conversation.add({
+		role: 'user',
+		content: 'archived zephyr detail '.repeat(4096),
+	})
+	ledger.conversation.judgments.add(buildLedgerJudgment(message))
+	return message
 }
 
 /**
@@ -6782,6 +6848,7 @@ export async function serveAmendedDesk(): Promise<{
 			lookups: [LEDGER_ORDER_LOOKUP],
 		}),
 	)
+	seedLedgerRecall(ledger)
 	ledger.conversation.add([
 		{
 			role: 'assistant',

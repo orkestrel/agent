@@ -1,5 +1,5 @@
 import type { AgentInterface, AgentOptions, AgentResult } from '../agents/index.js'
-import type { Selection } from '../contexts/index.js'
+import type { ScopeInterface, Selection } from '../contexts/index.js'
 import type { ConversationInterface, ConversationSnapshot } from '../conversations/index.js'
 import type { ThinkingReplay } from '../types.js'
 import type {
@@ -363,7 +363,7 @@ export interface LedgerOptions {
  * prefix when the live and hydrated reserves admit the same exchange rung. A rung between those
  * reserves can differ because hydration carries no gauge observations; this moves the prefix,
  * never the record coverage. A plain request omits `copy` because its content already lives in `conversation`.
- * The required window `digest` checks canonical held messages and stored copies. A mismatch drains
+ * The required window `digest` checks canonical held messages, lookup call context, copies, and receipts. A mismatch drains
  * the window and its evidence; a missing digest refuses the snapshot. An unencodable held message
  * makes `snapshot()` omit the window. The checksum detects edits, not authenticity.
  */
@@ -384,7 +384,7 @@ export interface LedgerExchangeSnapshot {
 	readonly lines: readonly LedgerReceipt[]
 }
 
-/** Carries a nonempty exchange window, its held-message and copy checksum, and its accepted edges. */
+/** Carries a nonempty exchange window, its message, copy, and receipt checksum, and its accepted edges. */
 export interface LedgerWindowSnapshot {
 	readonly digest: string
 	readonly exchanges: readonly LedgerExchangeSnapshot[]
@@ -421,6 +421,10 @@ export interface LedgerResult extends AgentResult {
  * thinking, until its pass observes the next call, and is final from then on.
  */
 export interface LedgerRequestInterface {
+	/** Holds the scope last applied by the ledger's plan, or undefined before one. */
+	readonly scope: ScopeInterface | undefined
+	/** Records the scope applied by the ledger's plan for conditional restoration at settle. */
+	apply(scope: ScopeInterface): void
 	/** Holds the copy and receipts adopted by the last provider turn, or undefined for a view fallback. */
 	readonly sent: LedgerDraft | undefined
 	/** Records an error the request's run reported through its `fault` event. */
@@ -910,7 +914,10 @@ export interface ClassifierInterface {
  * @remarks
  * `estimate` is the `estimateMessages` estimate of the call's messages. `prompt` and `completion`
  * are the tokens the provider reported, absent when it reported none. `tools` is the count of tool
- * definitions the call advertised.
+ * definitions the call advertised. `spared` is the tokens of definitions it did not advertise;
+ * estimated use subtracts it from overhead, floored at 0. Omission means 0. Observation rescales
+ * only with exact overhead: `spared` absent or zero retains all overhead, and `spared` at or above
+ * overhead retains none. A partially spared first call keeps the prior scale.
  * `thinking` estimates the completion tokens spent on thinking from its share of the generated
  * characters, rounded to the nearest integer and capped at `completion`. With replay `'none'`,
  * the measured call uses `prompt + completion - thinking`; other policies retain the whole
@@ -918,6 +925,8 @@ export interface ClassifierInterface {
  */
 export interface GaugeCall {
 	readonly estimate: number
+	/** Tokens spared by tool definitions this call did not advertise. Default: 0. */
+	readonly spared?: number
 	readonly prompt?: number
 	readonly completion?: number
 	readonly thinking?: number
@@ -932,7 +941,8 @@ export interface GaugeCall {
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
  * Measured use is `prompt + completion - (thinking ?? 0)` for `'none'`, and `prompt + completion`
- * otherwise; absent completion counts as 0. Without prompt usage, use is `overhead + scale * estimate`.
+ * otherwise; absent completion counts as 0. Without prompt usage, use is
+ * `max(0, overhead - (spared ?? 0)) + scale * estimate`.
  * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall uniform at the marginal
  * rate to the largest observed reply's `completion - (thinking ?? 0)` for every policy.
  * Without a positive reply observation, it prices the longest reply text at that rate. Recall room is

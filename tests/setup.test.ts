@@ -2210,7 +2210,7 @@ describe('checkLedgerProjection', () => {
 			},
 		})
 		const built = buildRecords(supersessions)
-		expect(built.amendments).toEqual([{ earlier: 'user-01', later: 'user-04' }])
+		expect(built.amendments).toEqual([{ earlier: 'user-01', later: 'user-07' }])
 		expect(checkLedgerProjection(built, supersessions)).toEqual([])
 		expect(
 			checkLedgerProjection({ ...built, amendments: [] }, supersessions).some((fault) =>

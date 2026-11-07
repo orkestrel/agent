@@ -1,0 +1,14 @@
+{
+	"id": "abort",
+	"goals": [
+		{
+			"id": "abort",
+			"input": {
+				"prompt": "Stream a fragment and abort this workload separately from the enclosing study.",
+				"admitted": true,
+				"files": ["note.txt"],
+				"responses": [{ "content": "before-abort", "calls": [], "abort": true }]
+			}
+		}
+	]
+}
