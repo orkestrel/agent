@@ -556,3 +556,4 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-07 | The test of the determination, with probes | `reviewer` GPT-6 Astra | `plan.md` O196 |
 | 2026-11-07 | The test of the reserve candidate, with probes | `reviewer` GPT-6 Astra | `plan.md` O196 |
 | 2026-11-07 | The user's word: take care of all that is open, for a final version of 0.0.37 | user | `plan.md` O196 |
+| 2026-11-07 | The release wave: Agent 0.0.37, Ollama 0.0.31, Toolbox 0.0.26, Study 0.0.13, and Agent's development re-pin | Orchestrator, on the user's one-time codes | `plan.md` O197 |
