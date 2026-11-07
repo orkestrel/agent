@@ -11,7 +11,7 @@ import {
 } from '@orkestrel/study'
 import {
 	isStudyMemoryProvider,
-	isStudyMemoryRuntime,
+	isStudyMemoryAgent,
 	STUDY_MEMORY_REPEAT,
 	STUDY_MEMORY_SYSTEM,
 	StudyMemoryDriver,
@@ -2179,7 +2179,7 @@ describe('recording declarations of a memory session', () => {
 	const { agent: admitted, provider: ollama } = STUDY_MEMORY_MODULES
 
 	it('refuses recording without a sink', () => {
-		if (!isStudyMemoryRuntime(admitted) || !isStudyMemoryProvider(ollama))
+		if (!isStudyMemoryAgent(admitted) || !isStudyMemoryProvider(ollama))
 			throw new Error('Missing admitted modules')
 		expect(
 			() =>
@@ -2201,7 +2201,7 @@ describe('recording declarations of a memory session', () => {
 	})
 
 	it('refuses a sink without recording', () => {
-		if (!isStudyMemoryRuntime(admitted) || !isStudyMemoryProvider(ollama))
+		if (!isStudyMemoryAgent(admitted) || !isStudyMemoryProvider(ollama))
 			throw new Error('Missing admitted modules')
 		expect(
 			() =>

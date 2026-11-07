@@ -64,6 +64,10 @@
 	"settings": {
 		"observe": true,
 		"judge": { "gpu": 0 },
+		"router": {
+			"model": "tev1:0.8b",
+			"digest": "abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099"
+		},
 		"version": "0.40.15",
 		"metadata": {
 			"calls": 8192,
@@ -172,11 +176,6 @@
 			"ev-24-3",
 			"ev-24-4"
 		]
-	},
-	"record": {
-		"bytes": 536870912,
-		"calls": 4096,
-		"duration": 1800000
 	},
 	"bounds": {
 		"request": {

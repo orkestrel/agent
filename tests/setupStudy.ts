@@ -84,6 +84,7 @@ import {
 import {
 	STUDY_MEMORY_REPEAT,
 	StudyMemoryDriver,
+	StudyMemoryJudge,
 	isStudyMemoryArm,
 } from '../studies/memory/index.js'
 import { StudyToolsDriver } from '../studies/tools/index.js'
@@ -97,6 +98,7 @@ import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createLedgerJudge } from './setup.js'
 
 /** Composes the selected built Agent as both runtime and tested subject with the installed public Ollama provider; a distinct subject replaces only `subject`. */
 export const STUDY_MEMORY_MODULES = Object.freeze({ agent, subject: agent, provider })
@@ -4265,5 +4267,256 @@ export function computeMemoryPilot(
 				}).length,
 			}
 		}),
+	}
+}
+
+/** Pins the routing boundary and mixed question forms without embedding state in evidence. */
+export const MEMORY_ROUTE_REQUEST: agent.JudgeRequest = Object.freeze<agent.JudgeRequest>({
+	state: 'PRIVATE ROUTING STATE',
+	questions: {
+		low: { form: 'choice', criteria: { fact: 'fact', correction: 'correction' } },
+		edge: { form: 'choice', criteria: { fact: 'fact', correction: 'correction' } },
+		correction: { form: 'choice', criteria: { fact: 'fact', correction: 'correction' } },
+		noul: { form: 'noul' },
+		score: { form: 'score', criteria: ['low', 'high'] },
+	},
+})
+
+/** Pins complete first-leg distributions on both sides of the raw cutoff. */
+export const MEMORY_ROUTE_FIRST: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+	model: 'first',
+	answers: {
+		low: { form: 'choice', probabilities: { fact: 0.64, correction: 0.36 } },
+		edge: { form: 'choice', probabilities: { fact: 0.65, correction: 0.35 } },
+		correction: { form: 'choice', probabilities: { fact: 0.1, correction: 0.9 } },
+	},
+	usage: { prompt: 10, completion: 2, total: 12 },
+})
+
+/** Pins fallback outcomes, including extraneous ids that must never be returned. */
+export const MEMORY_ROUTE_SECOND: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+	model: 'second',
+	answers: {
+		low: { form: 'choice', probabilities: { fact: 0.9, correction: 0.1 } },
+		edge: { form: 'choice', probabilities: { fact: 0.99, correction: 0.01 } },
+		noul: { form: 'noul', noul: 0.8 },
+		score: { form: 'score', probabilities: [0.2, 0.8] },
+		unrequested: { form: 'noul', noul: 1 },
+	},
+	refusals: { correction: { missing: ['fact'] }, edge: { missing: ['fact'] } },
+	usage: { prompt: 20, completion: 3, total: 23 },
+})
+
+/** Builds serial recording legs using the existing judge boundary helper. */
+export function createMemoryRouting(
+	first?: (request: agent.JudgeRequest) => Promise<agent.JudgeResult>,
+	second?: (request: agent.JudgeRequest) => Promise<agent.JudgeResult>,
+	models: readonly [string, string] = ['first', 'second'],
+) {
+	const calls = createRecorder<readonly [string]>()
+	const evidence = createRecorder<readonly [string, JSONValue]>()
+	const firstSignals = createRecorder<readonly [AbortSignal]>()
+	const secondSignals = createRecorder<readonly [AbortSignal]>()
+	const requests = createRecorder<readonly [agent.JudgeRequest]>()
+	const judge = new StudyMemoryJudge({
+		first: new MemoryRoutingJudge(
+			createLedgerJudge(
+				calls,
+				(request) => (first === undefined ? Promise.resolve(MEMORY_ROUTE_FIRST) : first(request)),
+				models[0],
+			),
+			firstSignals,
+		),
+		second: new MemoryRoutingJudge(
+			createLedgerJudge(
+				calls,
+				(request) => {
+					requests.handler(request)
+					return second === undefined ? Promise.resolve(MEMORY_ROUTE_SECOND) : second(request)
+				},
+				models[1],
+			),
+			secondSignals,
+		),
+		runtime: agent,
+		evidence: { append: evidence.handler },
+	})
+	return { judge, calls, evidence, requests, first: firstSignals, second: secondSignals }
+}
+
+/** Pins unusable first-leg outcomes, all of which require the fallback leg. */
+export const MEMORY_ROUTE_UNUSABLE: readonly agent.JudgeResult[] = Object.freeze([
+	{
+		model: 'first',
+		answers: { edge: { form: 'choice', probabilities: { fact: 0.9, correction: 0.9 } } },
+	},
+	{ model: 'first', answers: {} },
+	{ model: 'first', answers: {}, refusals: { edge: { missing: ['fact'] } } },
+	{ model: 'first', answers: { edge: { form: 'noul', noul: 1 } } },
+	{ model: 'first', answers: { edge: { form: 'choice', probabilities: { fact: 1 } } } },
+	{
+		model: 'first',
+		answers: { edge: { form: 'choice', probabilities: { fact: Number.NaN, correction: 0 } } },
+	},
+])
+
+/** Pins malformed router declarations without changing any existing profile fixture. */
+export const MEMORY_ROUTE_INVALID: readonly unknown[] = Object.freeze([
+	{ model: 'tev1', digest: `${'a'.repeat(64)}\n` },
+	null,
+	[],
+	{},
+	{ model: '', digest: 'a'.repeat(64) },
+	{ model: 'tev1', digest: 'A'.repeat(64) },
+	{ model: 'tev1', digest: 'a'.repeat(63) },
+	{ model: 'tev1', digest: 'g'.repeat(64) },
+	{ model: 'tev1', digest: 'a'.repeat(64), extra: true },
+])
+
+/** Pins both inventory refusal cases. */
+export const MEMORY_ROUTE_UNAVAILABLE = Object.freeze([
+	{ model: 'model', digest: 'c'.repeat(64) },
+	{ model: 'absent', digest: 'c'.repeat(64) },
+])
+
+/** Pins each unsupported custody collaborator independently. */
+export const MEMORY_ROUTE_CAPTURE = Object.freeze([
+	{ exchanges: STUDY_MEMORY_INERT_EXCHANGES },
+	{ replay: STUDY_MEMORY_INERT_REPLAY },
+])
+
+/** Pins a tie whose distribution order differs from its caller's criteria order. */
+export const MEMORY_ROUTE_TIE: agent.JudgeRequest = Object.freeze<agent.JudgeRequest>({
+	state: '',
+	questions: { tie: { form: 'choice', criteria: { correction: 'change', fact: 'statement' } } },
+})
+
+/** Pins the tied response independently of the criteria order. */
+export const MEMORY_ROUTE_TIED: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+	model: 'first',
+	answers: { tie: { form: 'choice', probabilities: { fact: 0.5, correction: 0.5 } } },
+})
+
+/** Records identities while constructing the real Mica judge and real Ledger. */
+export function createMemoryIdentity(profile: StudyProfile) {
+	const models = createRecorder<readonly [string, string]>()
+	const driver = new StudyMemoryDriver({
+		agent: {
+			...agent,
+			createLedger: (...args: Parameters<typeof agent.createLedger>) => {
+				models.handler('ledger', args[1].judge.model)
+				return agent.createLedger(...args)
+			},
+		},
+		subject: agent,
+		provider: {
+			...provider,
+			createOllamaJudge: (...args: Parameters<typeof provider.createOllamaJudge>) => {
+				const judge = provider.createOllamaJudge(...args)
+				models.handler('mica', judge.model)
+				return judge
+			},
+		},
+		profile,
+	})
+	return { driver, models }
+}
+
+/** Pins an operational first-leg failure for a real composed session. */
+export const MEMORY_ROUTE_FAILURES: readonly MemoryWireFixture[] = Object.freeze([
+	{ path: '/v1/systemone', status: 503, body: 'unavailable' },
+])
+
+/** Holds a high-probability partial that an internal first-leg abort must discard. */
+export const MEMORY_ROUTE_PARTIAL: agent.JudgeResult = Object.freeze<agent.JudgeResult>({
+	model: 'first',
+	answers: { low: { form: 'choice', probabilities: { fact: 0.9, correction: 0.1 } } },
+})
+
+/** Keeps inventory open until the caller aborts it. */
+export const MEMORY_ROUTE_OPEN: readonly MemoryWireFixture[] = Object.freeze([
+	{ path: '/api/tags', open: true, body: '' },
+])
+
+/** Supplies one public request whose category can be retained over the actual System One protocol. */
+export const MEMORY_ROUTE_GOAL: StudyGoal = Object.freeze({
+	id: 'route',
+	input: {
+		prompt: 'Summarize the order count.',
+		arrivals: [{ id: 'route-source', content: 'The order count is two.' }],
+		records: [],
+	},
+})
+
+/** Builds a scripted System One answer keyed by the actual wire request's generated question ids. */
+export function buildMemoryRouteReply(
+	read: () => MemoryRequestFixture | undefined,
+): MemoryWireFixture {
+	return {
+		path: '/v1/systemone',
+		get body(): string {
+			const request = parseJSON(read()?.body ?? '')
+			if (!isRecord(request) || !isRecord(request.questions))
+				throw new Error('Missing System One questions')
+			return JSON.stringify({
+				model: 'model',
+				answers: Object.fromEntries(
+					Object.entries(request.questions).map(([id, question]) => {
+						if (!isRecord(question) || question.type !== 'choice' || !isRecord(question.criteria))
+							throw new Error('Expected a choice question')
+						const labels = Object.keys(question.criteria)
+						return [
+							id,
+							{
+								type: 'choice',
+								probabilities: Object.fromEntries(
+									labels.map((label) => [
+										label,
+										label === 'fact' ? 0.9 : 0.1 / (labels.length - 1),
+									]),
+								),
+							},
+						]
+					}),
+				),
+			})
+		},
+	}
+}
+
+/** Starts the existing native fixture with a successful direct-leg reply. */
+export async function createMemoryRouteServer(): Promise<MemoryServerFixture> {
+	const server: MemoryServer = new MemoryServer([
+		buildMemoryRouteReply(() => server.requests.at(-1)),
+	])
+	await server.start()
+	return server
+}
+
+/** Varies each fixed-policy member independently for identity proofs. */
+export const MEMORY_ROUTE_POLICIES = Object.freeze([
+	Object.freeze({ version: 1, probability: 0.65, referrals: Object.freeze(['correction']) }),
+	Object.freeze({ version: 2, probability: 0.65, referrals: Object.freeze(['correction']) }),
+	Object.freeze({ version: 1, probability: 0.66, referrals: Object.freeze(['correction']) }),
+	Object.freeze({ version: 1, probability: 0.65, referrals: Object.freeze(['fact']) }),
+])
+
+/** Records cancellation signals while delegating to the existing scripted judge boundary. */
+export class MemoryRoutingJudge implements agent.JudgeInterface {
+	readonly #inner: agent.JudgeInterface
+	readonly #signals: RecorderInterface<readonly [AbortSignal]>
+	readonly id: string
+	readonly name: string
+	readonly model: string
+	constructor(inner: agent.JudgeInterface, signals: RecorderInterface<readonly [AbortSignal]>) {
+		this.#inner = inner
+		this.#signals = signals
+		this.id = inner.id
+		this.name = inner.name
+		this.model = inner.model
+	}
+	ask(request: agent.JudgeRequest, signal: AbortSignal): Promise<agent.JudgeResult> {
+		this.#signals.handler(signal)
+		return this.#inner.ask(request, signal)
 	}
 }

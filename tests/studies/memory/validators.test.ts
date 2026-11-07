@@ -7,12 +7,34 @@ import {
 	isStudyMemoryLedger,
 	isStudyMemoryOptions,
 	isStudyMemoryProvider,
+	isStudyMemoryAgent,
 	isStudyMemoryRuntime,
 	isStudyMemoryWire,
 } from '../../../studies/memory/index.js'
-import { STUDY_MEMORY_MODULES } from '../../setupStudy.js'
+import { STUDY_MEMORY_MODULES, MEMORY_ROUTE_INVALID } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
+	it('requires the router primitives from the admitted Agent namespace', () => {
+		expect(isStudyMemoryRuntime(STUDY_MEMORY_MODULES.agent)).toBe(true)
+		expect(isStudyMemoryRuntime(null)).toBe(false)
+		expect(isStudyMemoryRuntime({})).toBe(false)
+		expect(
+			isStudyMemoryRuntime({ ...STUDY_MEMORY_MODULES.agent, createSystemOneJudge: undefined }),
+		).toBe(false)
+		expect(
+			isStudyMemoryRuntime({ ...STUDY_MEMORY_MODULES.agent, JudgeAbortError: undefined }),
+		).toBe(false)
+		expect(
+			isStudyMemoryRuntime({ ...STUDY_MEMORY_MODULES.agent, isJudgeAbortError: undefined }),
+		).toBe(false)
+		expect(
+			isStudyMemoryRuntime({ ...STUDY_MEMORY_MODULES.agent, buildJudgeResult: undefined }),
+		).toBe(false)
+	})
+	it('admits an exact router pin and rejects malformed router records', () => {
+		expect(isStudyMemoryOptions({ router: { model: 'tev1', digest: 'a'.repeat(64) } })).toBe(true)
+		for (const router of MEMORY_ROUTE_INVALID) expect(isStudyMemoryOptions({ router })).toBe(false)
+	})
 	it('accepts exactly the declared settings members and refuses unknown keys and invalid values', () => {
 		const gauge = { scale: 1.5, overhead: 0 }
 		const names = Array.from({ length: 13 }, (_, index) => `checkpoint-${index}`)
@@ -115,7 +137,7 @@ describe('memory declaration and mechanical evidence', () => {
 
 	it('checks each admitted capability its treatments invoke and tolerates a hostile namespace', () => {
 		const { agent, provider } = STUDY_MEMORY_MODULES
-		expect(isStudyMemoryRuntime(agent)).toBe(true)
+		expect(isStudyMemoryAgent(agent)).toBe(true)
 		expect(isStudyMemoryLedger(agent)).toBe(true)
 		expect(isStudyMemoryProvider(provider)).toBe(true)
 		expect(isStudyMemoryClassifier(provider)).toBe(true)
@@ -128,18 +150,15 @@ describe('memory declaration and mechanical evidence', () => {
 			measureRequest: agent.measureRequest,
 			isAgentError: agent.isAgentError,
 		}
-		expect(isStudyMemoryRuntime(surface)).toBe(true)
+		expect(isStudyMemoryAgent(surface)).toBe(true)
 		expect(isStudyMemoryLedger(surface)).toBe(false)
 		for (const missing of Object.keys(surface)) {
 			const remaining = Object.entries(surface).filter(([key]) => key !== missing)
-			expect([missing, isStudyMemoryRuntime(Object.fromEntries(remaining))]).toEqual([
-				missing,
-				false,
-			])
+			expect([missing, isStudyMemoryAgent(Object.fromEntries(remaining))]).toEqual([missing, false])
 		}
-		expect(isStudyMemoryRuntime({ ...surface, isAgentError: 'guard' })).toBe(false)
-		expect(isStudyMemoryRuntime({ ...surface, Agent: {} })).toBe(false)
-		expect(isStudyMemoryRuntime({ ...surface, createAuthority: {} })).toBe(false)
+		expect(isStudyMemoryAgent({ ...surface, isAgentError: 'guard' })).toBe(false)
+		expect(isStudyMemoryAgent({ ...surface, Agent: {} })).toBe(false)
+		expect(isStudyMemoryAgent({ ...surface, createAuthority: {} })).toBe(false)
 		const ledger = {
 			createLedger: agent.createLedger,
 			LEDGER_QUESTIONS: agent.LEDGER_QUESTIONS,
@@ -182,7 +201,7 @@ describe('memory declaration and mechanical evidence', () => {
 		)
 		for (const value of [{}, undefined, null, hostile])
 			expect([
-				isStudyMemoryRuntime(value),
+				isStudyMemoryAgent(value),
 				isStudyMemoryLedger(value),
 				isStudyMemoryProvider(value),
 				isStudyMemoryClassifier(value),
@@ -220,7 +239,7 @@ describe('memory declaration and mechanical evidence', () => {
 			}),
 		).toBe(true)
 		expect(isStudyMemoryInput({ prompt: 'x'.repeat(16385), arrivals: [], records: [] })).toBe(false)
-		expect(isStudyMemoryRuntime({})).toBe(false)
+		expect(isStudyMemoryAgent({})).toBe(false)
 		expect(isStudyMemoryProvider({})).toBe(false)
 		expect(isStudyMemoryArm('records')).toBe(true)
 		expect(isStudyMemoryArm('unsupported')).toBe(false)

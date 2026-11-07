@@ -1,5 +1,15 @@
 import type { StudyOllamaMetadata } from '@orkestrel/study/server'
-import type { StudyMemoryParameters } from './types.js'
+import type { StudyMemoryPolicy, StudyMemoryParameters } from './types.js'
+
+/** Bounds floating-point error when checking a complete choice distribution. */
+export const STUDY_MEMORY_TOLERANCE = Object.freeze(1e-6)
+
+/** Pins the prospective routing policy independently of model identity and profile settings. */
+export const STUDY_MEMORY_POLICY: StudyMemoryPolicy = Object.freeze({
+	version: 1,
+	probability: 0.65,
+	referrals: Object.freeze(['correction']),
+})
 
 /** Bounds trial-wide metadata independently of model calls, tokens and bytes. */
 export const STUDY_MEMORY_METADATA: StudyOllamaMetadata = Object.freeze({

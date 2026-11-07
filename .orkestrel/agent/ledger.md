@@ -526,3 +526,7 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-06 | S10's design round for rc-s2 and rc-s3 | `analyst` GPT-6 Astra | `plan.md` O185 |
 | 2026-11-06 | rc-s1, the 4B profile with the judge's placement | `builder` GPT-6.1 Sol | `plan.md` § S10 |
 | 2026-11-06 | rc-s1's conformance | `checker` GPT-6 Luna | `plan.md` § S10 |
+| 2026-11-06 | rc-s2, the Study judge asking `tev1` first | `astra` GPT-6 Astra | `plan.md` O185, O188 |
+| 2026-11-06 | rc-s2's review | `reviewer` Claude Opus 5.5 | `plan.md` O188 |
+| 2026-11-06 | rc-s3's first pass | `astra` GPT-6 Astra | `plan.md` O185, O186 |
+| 2026-11-06 | rc-s3's review | `reviewer` Claude Opus 5.5 | `plan.md` O186 |

@@ -14,7 +14,7 @@ import type {
 	StudyMemoryDriverOptions,
 	StudyMemoryLedger,
 	StudyMemoryProvider,
-	StudyMemoryRuntime,
+	StudyMemoryAgent,
 } from './types.js'
 import { StudyError } from '@orkestrel/study'
 import { validateStudyMemoryProfile } from './helpers.js'
@@ -25,13 +25,13 @@ import {
 	isStudyMemoryClassifier,
 	isStudyMemoryLedger,
 	isStudyMemoryProvider,
-	isStudyMemoryRuntime,
+	isStudyMemoryAgent,
 } from './validators.js'
 
 /** Opens fresh real runtime state for every arm and repetition. */
 export class StudyMemoryDriver implements StudyDriverInterface {
 	readonly #profile: StudyProfile
-	readonly #agent: StudyMemoryRuntime
+	readonly #agent: StudyMemoryAgent
 	readonly #provider: StudyMemoryProvider
 	// Present only when the admitted namespace exposes what the records arm alone invokes.
 	readonly #ledger: StudyMemoryLedger | undefined
@@ -41,7 +41,7 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 
 	/** Validates the admitted runtime surfaces and finite profile. @param options - Admitted Agent runtime, tested subject identity, provider, profile and the worker's recording collaborators. */
 	constructor(options: StudyMemoryDriverOptions) {
-		if (!isStudyMemoryRuntime(options.agent) || !isStudyMemoryProvider(options.provider))
+		if (!isStudyMemoryAgent(options.agent) || !isStudyMemoryProvider(options.provider))
 			throw new StudyError(
 				'CONFIG',
 				'Memory requires the admitted Agent runtime and Ollama public factories',

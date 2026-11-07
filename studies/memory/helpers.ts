@@ -1,5 +1,5 @@
 import type { JSONValue } from '@orkestrel/contract'
-import type { LedgerGauge, Message } from '@orkestrel/agent'
+import type { LedgerGauge, Message, JudgeQuestion, JudgeResult } from '@orkestrel/agent'
 import type {
 	StudyEvidence,
 	StudyJudgment,
@@ -17,6 +17,8 @@ import type {
 } from '@orkestrel/study/server'
 import type {
 	StudyMemoryArm,
+	StudyMemoryPolicy,
+	StudyMemoryRoute,
 	StudyMemoryCompaction,
 	StudyMemoryObservation,
 	StudyMemoryProvenance,
@@ -26,14 +28,102 @@ import type {
 	StudyMemoryRetentionInput,
 	StudyMemoryTally,
 } from './types.js'
-import { isArray, isRecord, parseJSON } from '@orkestrel/contract'
+import { canonicalStringify, isArray, isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
 import {
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_REPEAT,
 	STUDY_MEMORY_PARAMETERS,
+	STUDY_MEMORY_POLICY,
+	STUDY_MEMORY_TOLERANCE,
 } from './constants.js'
 import { isStudyMemoryAssertion, isStudyMemoryOptions, isStudyMemoryWire } from './validators.js'
+
+/** Serializes every policy and leg identity member in stable key order. */
+export function buildStudyMemoryJudgeModel(
+	policy: StudyMemoryPolicy,
+	first: string,
+	second: string,
+): string {
+	const model = canonicalStringify({ policy, first, second })
+	if (model === undefined) throw new StudyError('CONFIG', 'Router identity is not JSON')
+	return model
+}
+
+/** Selects a usable complete choice distribution in caller criteria order. */
+export function buildStudyMemoryRoute(
+	id: string,
+	question: JudgeQuestion,
+	result: JudgeResult | undefined,
+	fault: boolean,
+): StudyMemoryRoute {
+	const answer =
+		result !== undefined && Object.hasOwn(result.answers, id) ? result.answers[id] : undefined
+	const candidates =
+		question.form === 'choice' && answer?.form === 'choice'
+			? Object.keys(question.criteria).map((winner) => ({
+					winner,
+					probability: Object.hasOwn(answer.probabilities, winner)
+						? answer.probabilities[winner]
+						: undefined,
+				}))
+			: []
+	const usable =
+		answer?.form === 'choice' &&
+		candidates.length >= 2 &&
+		Object.keys(answer.probabilities).length === candidates.length &&
+		candidates.every(
+			({ probability }) =>
+				probability !== undefined &&
+				Number.isFinite(probability) &&
+				probability >= 0 &&
+				probability <= 1,
+		) &&
+		Math.abs(candidates.reduce((sum, entry) => sum + (entry.probability ?? 0), 0) - 1) <=
+			STUDY_MEMORY_TOLERANCE
+	const winner = usable
+		? candidates.reduce((top, entry) =>
+				(entry.probability ?? -1) > (top.probability ?? -1) ? entry : top,
+			)
+		: undefined
+	const kept =
+		!fault &&
+		(result?.refusals === undefined || !Object.hasOwn(result.refusals, id)) &&
+		winner?.probability !== undefined &&
+		winner.probability >= STUDY_MEMORY_POLICY.probability &&
+		!STUDY_MEMORY_POLICY.referrals.includes(winner.winner)
+	return {
+		id,
+		outcome: fault ? 'fault' : kept ? 'kept' : 'referred',
+		winner: winner?.winner ?? null,
+		probability: winner?.probability ?? null,
+	}
+}
+
+/** Filters outcomes to the requested ids, with an answer taking precedence over a conflicting refusal. */
+export function filterStudyMemoryResult(result: JudgeResult, ids: readonly string[]): JudgeResult {
+	const answers = Object.fromEntries(
+		ids.flatMap((id) => {
+			const answer = Object.hasOwn(result.answers, id) ? result.answers[id] : undefined
+			return answer === undefined ? [] : [[id, answer]]
+		}),
+	)
+	const refusals = Object.fromEntries(
+		ids.flatMap((id) => {
+			const refusal =
+				result.refusals !== undefined && Object.hasOwn(result.refusals, id)
+					? result.refusals[id]
+					: undefined
+			return Object.hasOwn(answers, id) || refusal === undefined ? [] : [[id, refusal]]
+		}),
+	)
+	return {
+		model: result.model,
+		answers,
+		...(Object.keys(refusals).length === 0 ? {} : { refusals }),
+		...(result.usage === undefined ? {} : { usage: result.usage }),
+	}
+}
 
 /** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
 export function readStudyMemoryGauge(settings: unknown): LedgerGauge {

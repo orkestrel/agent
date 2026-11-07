@@ -8,7 +8,11 @@ import {
 	parseStudyProfile,
 	validateStudyInputs,
 } from '@orkestrel/study'
-import { createStudyAdapter, isStudyMemoryInput } from '../../../studies/memory/index.js'
+import {
+	createStudyAdapter,
+	isStudyMemoryInput,
+	isStudyMemoryOptions,
+} from '../../../studies/memory/index.js'
 import {
 	buildCustodyManifest,
 	buildMemoryProfile,
@@ -290,6 +294,8 @@ describe('prospective public endurance declarations', () => {
 		const q4 = parseStudyProfile(
 			parseJSON(await readFile('studies/memory/profiles/q4.json', 'utf8')),
 		)
+		expect(q4.record).toBeUndefined()
+		expect(isStudyMemoryOptions(q4.settings)).toBe(true)
 		expect(q4).toMatchObject({
 			name: 'q4',
 			agent: 'dist/src/core/index.js',
@@ -331,11 +337,14 @@ describe('prospective public endurance declarations', () => {
 			settings: {
 				observe: true,
 				judge: { gpu: 0 },
+				router: {
+					model: 'tev1:0.8b',
+					digest: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
+				},
 				version: '0.40.15',
 				metadata: { calls: 8192, bytes: 67108864, duration: 600000 },
 				gauge: { scale: 1, overhead: 352 },
 			},
-			record: { bytes: 536870912, calls: 4096, duration: 1800000 },
 			bounds: {
 				request: { duration: 360000, calls: 1, tokens: 19968, bytes: 2097152 },
 				goal: { duration: 900000, calls: 512, tokens: 10223616, bytes: 536870912 },

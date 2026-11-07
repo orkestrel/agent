@@ -17,7 +17,15 @@ import type {
 	StudyMemoryObservation,
 } from './types.js'
 import { createBudget } from '@orkestrel/budget'
-import { canonicalStringify, cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
+import {
+	canonicalStringify,
+	cloneJSONValue,
+	isJSONValue,
+	isObject,
+	isRecord,
+	isArray,
+	parseJSON,
+} from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
@@ -45,7 +53,8 @@ import {
 	readStudyMemoryCompaction,
 	resolveStudyMemoryObservation,
 } from './helpers.js'
-import { isStudyMemoryInput, isStudyMemoryOptions } from './validators.js'
+import { isStudyMemoryInput, isStudyMemoryOptions, isStudyMemoryRuntime } from './validators.js'
+import { StudyMemoryJudge } from './StudyMemoryJudge.js'
 
 /** Preserves actual Agent, Ledger and conversation state across a trial's goals. */
 export class StudyMemorySession implements StudySessionInterface {
@@ -57,6 +66,8 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
+	#verification: Promise<void> | undefined
+	readonly #abort = new AbortController()
 	readonly #arrivals = new Set<string>()
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
 	// Message ids this consumer added or named, joined to their origin; the summary instruction is fixed.
@@ -92,6 +103,11 @@ export class StudyMemorySession implements StudySessionInterface {
 			? options.profile.settings
 			: undefined
 		const recorded = options.profile.record !== undefined
+		if (
+			settings?.router !== undefined &&
+			(options.exchanges !== undefined || options.replay !== undefined)
+		)
+			throw new StudyError('CONFIG', 'Memory router cannot record or replay its direct leg')
 		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
 			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
 		const declaration = options.exchanges?.declaration
@@ -182,15 +198,40 @@ export class StudyMemorySession implements StudySessionInterface {
 			const role = roles.judge
 			if (role === undefined) throw new StudyError('CONFIG', 'Memory records require a judge role')
 			const repeat = options.ledger.LEDGER_NOTES.repeat
+			const second = options.classifier.createOllamaJudge({
+				model: role.model,
+				system: STUDY_MEMORY_JUDGE,
+				url: provider.url,
+				timeout: options.profile.bounds.request.duration,
+				options: role.options,
+				fetch: (input, init) => this.#transport.fetch('judge', input, init),
+			})
+			const router = settings?.router
+			const runtime =
+				router !== undefined && isStudyMemoryRuntime(options.ledger) ? options.ledger : undefined
+			if (router !== undefined && runtime === undefined)
+				throw new StudyError('CONFIG', 'Memory router requires the admitted System One runtime')
 			const judge = new StudyAgentJudge(
-				options.classifier.createOllamaJudge({
-					model: role.model,
-					system: STUDY_MEMORY_JUDGE,
-					url: provider.url,
-					timeout: options.profile.bounds.request.duration,
-					options: role.options,
-					fetch: (input, init) => this.#transport.fetch('judge', input, init),
-				}),
+				router === undefined || runtime === undefined
+					? second
+					: new StudyMemoryJudge({
+							first: runtime.createSystemOneJudge({
+								url: provider.url,
+								model: router.model,
+								timeout: options.profile.bounds.request.duration,
+								fetch: (input, init) =>
+									globalThis.fetch(input, {
+										...init,
+										signal: AbortSignal.any([
+											this.#abort.signal,
+											...(init?.signal === undefined || init.signal === null ? [] : [init.signal]),
+										]),
+									}),
+							}),
+							second,
+							runtime,
+							evidence: this.#trace,
+						}),
 				this.#transport,
 			)
 			this.#ledger = options.ledger.createLedger(observer, {
@@ -325,6 +366,11 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#input = undefined
 		this.#live.add(activity)
 		try {
+			const settings = this.#options.profile.settings
+			if (isStudyMemoryOptions(settings) && settings.router !== undefined) {
+				this.#verification ??= this.#verify(AbortSignal.any([context.signal, context.meter.signal]))
+				await this.#verification
+			}
 			if (this.#goals === undefined || this.#goals[0] === goal) await this.#transport.verify()
 			for (const record of input.records) {
 				this.#records.set(record.id, Object.freeze({ ...record }))
@@ -400,6 +446,30 @@ export class StudyMemorySession implements StudySessionInterface {
 				this.#transport.clear()
 			}
 		}
+	}
+
+	async #verify(signal: AbortSignal): Promise<void> {
+		const settings = this.#options.profile.settings
+		const router = isStudyMemoryOptions(settings) ? settings.router : undefined
+		if (router === undefined) return
+		const provider = this.#options.profile.provider
+		if (provider === undefined) throw new StudyError('CONFIG', 'Memory router requires a provider')
+		const response = await globalThis.fetch(new URL('/api/tags', provider.url), {
+			signal: AbortSignal.any([
+				signal,
+				this.#options.signal,
+				this.#abort.signal,
+				AbortSignal.timeout(this.#options.profile.bounds.request.duration),
+			]),
+		})
+		if (!response.ok) throw new StudyError('CONFIG', 'Memory router inventory is unavailable')
+		const inventory: unknown = parseJSON(await response.text())
+		const model =
+			isRecord(inventory) && isArray(inventory.models)
+				? inventory.models.find((entry: unknown) => isRecord(entry) && entry.name === router.model)
+				: undefined
+		if (!isRecord(model) || model.digest !== router.digest)
+			throw new StudyError('CONFIG', 'Memory router model is absent or its digest differs')
 	}
 
 	// Keys one dispatched call as `LedgerRequest` keys its own; the authority evaluates each call once.
@@ -495,6 +565,7 @@ export class StudyMemorySession implements StudySessionInterface {
 	}
 
 	async #dispose(): Promise<void> {
+		this.#abort.abort(new StudyError('FAULT', 'Memory session closed'))
 		this.#agent.abort(new StudyError('FAULT', 'Memory session closed'))
 		await this.#transport.close()
 		await Promise.allSettled([...this.#flights])

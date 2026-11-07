@@ -1,14 +1,25 @@
 import { describe, expect, it } from 'vitest'
+import { canonicalStringify, isRecord, parseJSON } from '@orkestrel/contract'
+import { waitForCondition } from '@orkestrel/test'
 import {
 	isStudyMemoryProvider,
-	isStudyMemoryRuntime,
+	isStudyMemoryAgent,
 	StudyMemoryDriver,
 	StudyMemorySession,
+	isStudyMemoryCheckpoint,
+	STUDY_MEMORY_POLICY,
 } from '../../../studies/memory/index.js'
 import {
 	buildMemoryObservationResponses,
+	MEMORY_ROUTE_CAPTURE,
+	MEMORY_ROUTE_UNAVAILABLE,
+	MEMORY_ROUTE_FAILURES,
+	MEMORY_ROUTE_GOAL,
+	MEMORY_ROUTE_OPEN,
+	createMemoryRouteServer,
 	buildMemoryProfile,
 	createMemoryContext,
+	createMemoryIdentity,
 	createMemoryServer,
 	readMemoryCheckpoint,
 	runMemoryTrial,
@@ -22,6 +33,205 @@ import {
 } from '../../setupStudy.js'
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
+	it('keeps a real System One answer and stores its judgment under the composite model', async () => {
+		const server = await createMemoryRouteServer()
+		const profile = buildMemoryProfile({
+			url: server.url,
+			settings: {
+				router: { model: 'model', digest: 'a'.repeat(64) },
+				observe: true,
+				checkpoints: [MEMORY_ROUTE_GOAL.id],
+			},
+		})
+		const fixture = createMemoryContext(profile)
+		try {
+			const identity = createMemoryIdentity(profile)
+			const session = await identity.driver.open(
+				{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
+				fixture.context.signal,
+			)
+			try {
+				await expect(session.execute(MEMORY_ROUTE_GOAL, fixture.context)).resolves.toMatchObject({
+					partial: false,
+				})
+				const routes = fixture.evidence.filter((row) => row.event === 'route')
+				expect(routes).toHaveLength(1)
+				expect(routes[0]?.value).toMatchObject({
+					model: 'model',
+					questions: [{ outcome: 'kept', winner: 'fact', probability: 0.9 }],
+				})
+				expect(server.requests.filter((request) => request.path === '/v1/systemone')).toHaveLength(
+					1,
+				)
+				expect(server.responses).toHaveLength(0)
+				const category = STUDY_MEMORY_MODULES.agent.LEDGER_QUESTIONS.category.instructions
+				if (typeof category !== 'string') throw new Error('Missing category instructions')
+				expect(
+					server.requests
+						.filter((request) => request.path === '/api/generate')
+						.some((request) => {
+							const body = parseJSON(request.body)
+							return (
+								isRecord(body) && typeof body.prompt === 'string' && body.prompt.includes(category)
+							)
+						}),
+				).toBe(false)
+				const snapshot = readMemoryCheckpoint(fixture.evidence, MEMORY_ROUTE_GOAL.id)
+				if (!isStudyMemoryCheckpoint(snapshot) || snapshot.ledger === undefined)
+					throw new Error('Missing ledger checkpoint')
+				const judgments = snapshot.ledger.conversation.judgments?.filter(
+					(judgment) => judgment.question.form === 'choice',
+				)
+				expect(judgments).toHaveLength(1)
+				const mica = identity.models.calls.find(([label]) => label === 'mica')?.[1]
+				const model = identity.models.calls.find(([label]) => label === 'ledger')?.[1]
+				if (mica === undefined || model === undefined) throw new Error('Missing judge identity')
+				expect(model).toBe(
+					canonicalStringify({ policy: STUDY_MEMORY_POLICY, first: 'model', second: mica }),
+				)
+				expect(judgments?.[0]?.model).toBe(model)
+				expect(judgments?.[0]?.answer).toMatchObject({
+					form: 'choice',
+					probabilities: { fact: 0.9 },
+				})
+				expect(model).not.toBe(mica)
+			} finally {
+				await session.close()
+			}
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+	it('rejects execute when its context aborts an open router inventory request', async () => {
+		const server = await createMemoryServer(MEMORY_ROUTE_OPEN)
+		const profile = buildMemoryProfile({
+			url: server.url,
+			settings: { router: { model: 'model', digest: 'a'.repeat(64) } },
+		})
+		const controller = new AbortController()
+		const fixture = createMemoryContext(profile, controller.signal)
+		try {
+			const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+				{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
+				new AbortController().signal,
+			)
+			try {
+				const execution = session.execute(MEMORY_ROUTE_GOAL, fixture.context).then(
+					() => undefined,
+					(error: unknown) => error,
+				)
+				await waitForCondition(
+					'the open router inventory request',
+					() => server.requests.some((request) => request.path === '/api/tags'),
+					{ budget: 5000 },
+				)
+				controller.abort(new Error('Inventory cancelled by context'))
+				expect(await execution).toBeDefined()
+				expect(server.requests.map((request) => request.path)).toEqual(['/api/tags'])
+			} finally {
+				await session.close()
+			}
+		} finally {
+			fixture.close()
+			await server.close()
+		}
+	})
+	it('refuses a router session whose admitted namespace lacks the System One runtime', async () => {
+		const profile = buildMemoryProfile({
+			url: 'http://127.0.0.1:1',
+			settings: { router: { model: 'model', digest: 'a'.repeat(64) } },
+		})
+		const driver = new StudyMemoryDriver({
+			...STUDY_MEMORY_MODULES,
+			agent: { ...STUDY_MEMORY_MODULES.agent, createSystemOneJudge: undefined },
+			profile,
+		})
+		await expect(
+			driver.open(
+				{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
+				new AbortController().signal,
+			),
+		).rejects.toThrow('Memory router requires the admitted System One runtime')
+	})
+	it('runs a reused real records session through a direct-leg fault and retains route evidence', async () => {
+		const result = await runMemoryTrial({
+			arm: 'records',
+			responses: MEMORY_ROUTE_FAILURES,
+			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
+			settings: { router: { model: 'model', digest: 'a'.repeat(64) } },
+		})
+		expect(result.failure).toBeUndefined()
+		expect(result.products).toHaveLength(2)
+		expect(result.requests.filter((request) => request.path === '/api/tags')).toHaveLength(
+			result.evidence.filter(
+				(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.path === '/api/tags',
+			).length + 1,
+		)
+		expect(result.requests.some((request) => request.path === '/v1/systemone')).toBe(true)
+		expect(result.requests.some((request) => request.path === '/api/generate')).toBe(true)
+		const routes = result.evidence.filter((row) => row.event === 'route')
+		expect(routes.length).toBeGreaterThan(0)
+		expect(routes[0]?.value).toMatchObject({ model: 'model', questions: [{ outcome: 'fault' }] })
+	})
+	it('preserves the real Mica identity when the profile has no router', async () => {
+		const fixture = createMemoryIdentity(buildMemoryProfile({ url: 'http://127.0.0.1:1' }))
+		const session = await fixture.driver.open(
+			{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
+			new AbortController().signal,
+		)
+		try {
+			expect(fixture.models.calls.map(([label]) => label)).toEqual(['mica', 'ledger'])
+			expect(fixture.models.calls[0]?.[1]).toBe(fixture.models.calls[1]?.[1])
+		} finally {
+			await session.close()
+		}
+	})
+	it('refuses router exchanges and replay before opening a session', async () => {
+		const profile = buildMemoryProfile({
+			url: 'http://127.0.0.1:1',
+			settings: { router: { model: 'tev1', digest: 'c'.repeat(64) } },
+		})
+		for (const capture of MEMORY_ROUTE_CAPTURE) {
+			const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile, ...capture })
+			await expect(
+				driver.open(
+					{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
+					new AbortController().signal,
+				),
+			).rejects.toThrow('Memory router cannot record or replay its direct leg')
+		}
+	})
+	it('refuses an absent router model or digest mismatch before any goal request', async () => {
+		for (const router of MEMORY_ROUTE_UNAVAILABLE) {
+			const server = await createMemoryServer()
+			const profile = buildMemoryProfile({ url: server.url, settings: { router } })
+			const fixture = createMemoryContext(profile)
+			try {
+				const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
+				const session = await driver.open(
+					{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
+					fixture.context.signal,
+				)
+				try {
+					const goal = STUDY_MEMORY_OBSERVATION_GOALS[0]
+					if (goal === undefined) throw new Error('Missing goal')
+					await expect(session.execute(goal, fixture.context)).rejects.toMatchObject({
+						code: 'CONFIG',
+					})
+					await expect(session.execute(goal, fixture.context)).rejects.toMatchObject({
+						code: 'CONFIG',
+					})
+					expect(server.requests.map((request) => request.path)).toEqual(['/api/tags'])
+				} finally {
+					await session.close()
+				}
+			} finally {
+				fixture.close()
+				await server.close()
+			}
+		}
+	})
 	it('refuses a malformed seed', async () => {
 		const server = await createMemoryServer()
 		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })
@@ -229,7 +439,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('settings') }),
 			)
 			const { agent: admitted, provider: ollama } = STUDY_MEMORY_MODULES
-			if (!isStudyMemoryRuntime(admitted) || !isStudyMemoryProvider(ollama))
+			if (!isStudyMemoryAgent(admitted) || !isStudyMemoryProvider(ollama))
 				throw new Error('Missing admitted modules')
 			expect(
 				() =>

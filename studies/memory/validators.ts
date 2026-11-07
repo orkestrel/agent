@@ -7,6 +7,7 @@ import type {
 	StudyMemoryLedger,
 	StudyMemoryOptions,
 	StudyMemoryProvider,
+	StudyMemoryAgent,
 	StudyMemoryRuntime,
 	StudyMemoryWire,
 } from './types.js'
@@ -27,7 +28,7 @@ import { isStudyOllamaMetadata } from '@orkestrel/study/server'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
 /** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent, conversation and authority factories exist. */
-export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntime {
+export function isStudyMemoryAgent(value: unknown): value is StudyMemoryAgent {
 	return holds(
 		() =>
 			isStudyAgentRuntime(value) &&
@@ -56,6 +57,22 @@ export function isStudyMemoryLedger(value: unknown): value is StudyMemoryLedger 
 	)
 }
 
+/** Checks the admitted runtime primitives the optional direct router invokes. @param value - Admitted namespace. @returns Whether the first-leg factory, abort contract, and result merger exist. */
+export function isStudyMemoryRuntime(value: unknown): value is StudyMemoryRuntime {
+	return holds(
+		() =>
+			isObject(value) &&
+			'createSystemOneJudge' in value &&
+			typeof value.createSystemOneJudge === 'function' &&
+			'JudgeAbortError' in value &&
+			typeof value.JudgeAbortError === 'function' &&
+			'isJudgeAbortError' in value &&
+			typeof value.isJudgeAbortError === 'function' &&
+			'buildJudgeResult' in value &&
+			typeof value.buildJudgeResult === 'function',
+	)
+}
+
 /** Checks the driver-owned settings exactly. @param value - Profile settings. @returns Whether every present member is valid and no member is unknown. */
 export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOptions {
 	return holds(() => {
@@ -71,11 +88,20 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'metadata',
 						'correction',
 						'judge',
+						'router',
 					].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, version, metadata, correction, judge } = value
+		const { gauge, observe, checkpoints, version, metadata, correction, judge, router } = value
+		if (
+			router !== undefined &&
+			(!recordOf({ model: isNonEmptyString, digest: isNonEmptyString })(router) ||
+				Object.keys(router).length !== 2 ||
+				router.digest.length !== 64 ||
+				!/^[0-9a-f]{64}$/u.test(router.digest))
+		)
+			return false
 		if (
 			judge !== undefined &&
 			(!recordOf({ gpu: isFiniteNumber })(judge) ||

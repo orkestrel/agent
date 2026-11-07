@@ -1,4 +1,9 @@
 import type {
+	JudgeInterface,
+	JudgeAbortError,
+	isJudgeAbortError,
+	buildJudgeResult,
+	createSystemOneJudge,
 	Agent,
 	ConversationSnapshot,
 	LEDGER_NOTES,
@@ -10,6 +15,7 @@ import type {
 	createConversationManager,
 	createLedger,
 } from '@orkestrel/agent'
+import type { JSONValue } from '@orkestrel/contract'
 import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/ollama'
 import type { StudyAgentRuntime, StudyProfile } from '@orkestrel/study'
 import type {
@@ -20,6 +26,8 @@ import type {
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
+	/** Pins the direct System One leg; absent selects the Mica-only judge. */
+	readonly router?: { readonly model: string; readonly digest: string } | undefined
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */
@@ -95,7 +103,7 @@ export interface StudyMemoryProgress {
 }
 
 /** Holds the admitted Agent runtime capabilities every memory arm invokes, beyond the shared instrumentation's own. */
-export interface StudyMemoryRuntime extends StudyAgentRuntime {
+export interface StudyMemoryAgent extends StudyAgentRuntime {
 	readonly Agent: typeof Agent
 	readonly createConversationManager: typeof createConversationManager
 	readonly createAuthority: typeof createAuthority
@@ -106,6 +114,40 @@ export interface StudyMemoryLedger {
 	readonly createLedger: typeof createLedger
 	readonly LEDGER_QUESTIONS: typeof LEDGER_QUESTIONS
 	readonly LEDGER_NOTES: typeof LEDGER_NOTES
+}
+
+/** Holds the extra admitted Agent capabilities required only by the router. */
+export interface StudyMemoryRuntime {
+	readonly createSystemOneJudge: typeof createSystemOneJudge
+	readonly JudgeAbortError: typeof JudgeAbortError
+	readonly isJudgeAbortError: typeof isJudgeAbortError
+	readonly buildJudgeResult: typeof buildJudgeResult
+}
+
+/** Holds the serial judges and the admitted runtime, avoiding another Agent module occurrence. */
+export interface StudyMemoryJudgeOptions {
+	readonly first: JudgeInterface
+	readonly second: JudgeInterface
+	readonly runtime: Pick<
+		StudyMemoryRuntime,
+		'JudgeAbortError' | 'isJudgeAbortError' | 'buildJudgeResult'
+	>
+	readonly evidence: { readonly append: (event: string, value: JSONValue) => void }
+}
+
+/** Holds the frozen consumer routing rule. */
+export interface StudyMemoryPolicy {
+	readonly version: number
+	readonly probability: number
+	readonly referrals: readonly string[]
+}
+
+/** Holds the first leg's decision for one caller question without state text. */
+export interface StudyMemoryRoute {
+	readonly id: string
+	readonly outcome: 'kept' | 'referred' | 'fault'
+	readonly winner: string | null
+	readonly probability: number | null
 }
 
 /** Holds the admitted Ollama capabilities every memory arm invokes. */
@@ -188,7 +230,7 @@ export type StudyMemoryArm = 'records' | 'compaction' | 'full'
  * `seed` is the checkpoint a seeded execution hands the driver at `open`.
  */
 export interface StudyMemorySessionOptions {
-	readonly agent: StudyMemoryRuntime
+	readonly agent: StudyMemoryAgent
 	readonly ledger: StudyMemoryLedger | undefined
 	readonly provider: StudyMemoryProvider
 	readonly classifier: StudyMemoryClassifier | undefined

@@ -3,6 +3,9 @@ import type { StudyMemoryProvenance } from '../../../studies/memory/index.js'
 import { describe, expect, it } from 'vitest'
 import {
 	buildStudyMemoryOrigins,
+	buildStudyMemoryJudgeModel,
+	buildStudyMemoryRoute,
+	filterStudyMemoryResult,
 	buildStudyMemoryRoles,
 	computeStudyMemoryCacheShares,
 	computeStudyMemoryCarriage,
@@ -26,6 +29,10 @@ import {
 	buildMemoryProfile,
 	buildMemoryRecordProfile,
 	MEMORY_CARRIAGE,
+	MEMORY_ROUTE_POLICIES,
+	MEMORY_ROUTE_REQUEST,
+	MEMORY_ROUTE_FIRST,
+	MEMORY_ROUTE_SECOND,
 	MEMORY_EVIDENCE,
 	MEMORY_LITERALS,
 	MEMORY_RETENTION,
@@ -40,6 +47,37 @@ import {
 } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
+	it('keys the router identity by every policy member in canonical order', () => {
+		const models = MEMORY_ROUTE_POLICIES.map((policy) =>
+			buildStudyMemoryJudgeModel(policy, 'first', 'second'),
+		)
+		expect(new Set(models).size).toBe(MEMORY_ROUTE_POLICIES.length)
+		const policy = MEMORY_ROUTE_POLICIES[0]
+		if (policy === undefined) throw new Error('Missing policy')
+		expect(
+			buildStudyMemoryJudgeModel(
+				{ referrals: policy.referrals, probability: policy.probability, version: policy.version },
+				'first',
+				'second',
+			),
+		).toBe(models[0])
+	})
+	it('routes the raw cutoff and filters conflicting or unrequested outcomes directly', () => {
+		const edge = MEMORY_ROUTE_REQUEST.questions.edge
+		if (edge === undefined) throw new Error('Missing edge')
+		expect(buildStudyMemoryRoute('edge', edge, MEMORY_ROUTE_FIRST, false)).toEqual({
+			id: 'edge',
+			outcome: 'kept',
+			winner: 'fact',
+			probability: 0.65,
+		})
+		expect(filterStudyMemoryResult(MEMORY_ROUTE_SECOND, ['edge', 'correction'])).toEqual({
+			model: 'second',
+			answers: { edge: MEMORY_ROUTE_SECOND.answers.edge },
+			refusals: { correction: { missing: ['fact'] } },
+			usage: MEMORY_ROUTE_SECOND.usage,
+		})
+	})
 	it('validates finite room, actual digest syntax and exact uncredentialed origin', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const every = ['records', 'compaction', 'full'] as const
