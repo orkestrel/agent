@@ -52,6 +52,8 @@ Use the records strategy, the `createLedger` function of `@orkestrel/agent`, com
 - The judge on the CPU is one option on the `createOllamaJudge` function of `@orkestrel/ollama`.
 - The two-step judge is the application's to compose on the public `JudgeInterface` interface, with `studies/memory/StudyMemoryJudge.ts` as the worked example to adapt. Its mechanism moves to Agent core when the first application composes it, and its thresholds and model names stay in the application (`.orkestrel/agent/plan.md` O193).
 
+- A judge choosing the tools, instructions, memos, or skills of a request is the application's to compose on the `narrow` method of its scope. The recipe's last paragraph states what that costs.
+
 For the recipe and its tested fence, see [Composing a records desk for a small local GPU](../guides/agent.md#composing-a-records-desk-for-a-small-local-gpu).
 
 ## What it measured
@@ -69,7 +71,9 @@ The last row is the current strategy, read on 2026-11-07. Each cell is one read 
 
 That last step took answers both right and free of a denial from 30 to 47 of 58, and `recall` calls from 0.73 to 0.01 per follow-up.
 
-The weakest reading is a capacity far below this profile's. At a capacity of 1600 with 1024 of it reserved for output, the same battery reads 5 of 11, 2 of 23, and 1 of 24, against 3 of 11, 4 of 23, and 1 of 24 before that step. On the two dialogues traced at that capacity, every `recall` call answered that `recall` was closed for lack of room, because the reply reserve keeps the longest reply seen. A host with that little room can't rely on `recall`.
+The weakest reading is a capacity far below this profile's. At a capacity of 1600 with 1024 of it reserved for output, the same battery reads 5 of 11, 2 of 23, and 1 of 24, against 3 of 11, 4 of 23, and 1 of 24 before that step, so the middle depth misses its floor of 3 and the step stays by a ruling in `.orkestrel/agent/plan.md` O194. On the two dialogues traced at that capacity, every `recall` call answered that `recall` was closed, because the reply reserve keeps the longest reply seen and this build's replies run longer. Before that step, 7 of 15 calls stayed open, and one of them answered a lost row right. A host with that little room can't rely on `recall`.
+
+The same close shows at this profile's capacity after a long reply. A replay of the reported tokens on goals `ev-01-1` to `ev-04-4`, with the longest reply at 2123 tokens, reads it closed on 4 of 16 goals, though the model called `recall` on none of them. Counting only the part of a reply past `predict` read 10 of 11, 8 of 23, and 3 of 24 at capacity 1600 and changed nothing at the two larger capacities, but it dropped the exchange a request like `Make that shorter.` needs at 1600, and a whole first listing item then crossed the capacity. That change isn't in this build (O196).
 
 ## Running it
 
