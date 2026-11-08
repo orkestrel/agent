@@ -223,6 +223,7 @@ import {
 	RecordedBody,
 	RecordedProvider,
 	RecordedTransport,
+	buildSystemOnePositions,
 	SYSTEM_ONE_TEV1,
 	recordGlobalTransport,
 	rejectTransportOnAbort,
@@ -1905,7 +1906,10 @@ describe('createRecordedJudge', () => {
 		expect(judge.name).toBe('systemone')
 		expect(transport.requests).toEqual([])
 		const response = await transport.fetch('http://judge.test')
-		expect(await response.json()).toEqual(SYSTEM_ONE_TEV1)
+		expect(await response.json()).toEqual({
+			...SYSTEM_ONE_TEV1,
+			answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+		})
 		expect(transport.requests).toHaveLength(1)
 		expect(createRecordedJudge().transport.requests).toEqual([])
 	})

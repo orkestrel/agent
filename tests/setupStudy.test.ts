@@ -4,7 +4,7 @@ import type {
 	MemoryLabelRun,
 	MemoryLabelVerdict,
 } from './setupStudy.js'
-import { isRecord, parseJSON } from '@orkestrel/contract'
+import { isRecord, isArray, parseJSON } from '@orkestrel/contract'
 import type { StudyLabelAnswer, StudyLabelLane, StudyLabelMap } from '@orkestrel/study/server'
 import { parseStudyLabels } from '@orkestrel/study'
 import {
@@ -24,6 +24,10 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
 import {
+	assertMemoryReplay,
+	buildMemoryReplayEvidence,
+	mapMemoryReplayIds,
+	readMemoryReplayMessages,
 	MEMORY_EVIDENCE,
 	MEMORY_GATE_ROWS,
 	MEMORY_LABEL_ABSENT,
@@ -140,6 +144,299 @@ describe('study meter fixture lifecycle', () => {
 	})
 })
 
+describe('study replay content comparison', () => {
+	it('compares run-local conversation ids and wall clocks across every checkpoint', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'], 'record-conversation', 10)
+		const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b'], 'replay-conversation', 999)
+		expect(() =>
+			assertMemoryReplay([...recorded, ...recorded], [...replayed, ...replayed]),
+		).not.toThrow()
+	})
+	it('refuses a second conversation id that breaks the same bijection', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'], 'record-conversation')
+		expect(() =>
+			assertMemoryReplay(
+				[...recorded, ...recorded],
+				[
+					...buildMemoryReplayEvidence(['replay-a', 'replay-b'], 'first-conversation'),
+					...buildMemoryReplayEvidence(['replay-a', 'replay-b'], 'second-conversation'),
+				],
+			),
+		).toThrow(/changed position|bijective/)
+	})
+	it('refuses a changed held message through the recomputed window digest', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
+		// The changed replay has its own valid native checksum; only mapping and recomputing exposes it.
+		const replayed = buildMemoryReplayEvidence(
+			['replay-a', 'replay-b'],
+			'records',
+			0,
+			'Changed held message',
+		)
+		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Recomputed window digest differs/)
+	})
+	it('refuses changed held content that equals the corresponding message ids', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'], 'records', 0, 'record-a')
+		const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b'], 'records', 0, 'replay-a')
+		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Recomputed window digest differs/)
+		expect(() =>
+			assertMemoryReplay(
+				recorded,
+				buildMemoryReplayEvidence(['replay-a', 'replay-b'], 'records', 0, 'record-a'),
+			),
+		).not.toThrow()
+	})
+	it('refuses changed held content shaped like a Classifier tuple id', () => {
+		const recorded = buildMemoryReplayEvidence(
+			['record-a', 'record-b'],
+			'records',
+			0,
+			JSON.stringify(['topic', 'record-a', 'fixture']),
+		)
+		const replayed = buildMemoryReplayEvidence(
+			['replay-a', 'replay-b'],
+			'records',
+			0,
+			JSON.stringify(['topic', 'replay-a', 'fixture']),
+		)
+		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Recomputed window digest differs/)
+	})
+	it('preserves strings outside declared identity fields byte for byte', () => {
+		const ids = new Map([['record-a', 'replay-a']])
+		for (const member of [
+			'content',
+			'ledger.conversation.messages.content',
+			'ledger.conversation.messages.calls.id',
+			'ledger.conversation.sections.id',
+			'ledger.conversation.sections.summary',
+			'ledger.conversation.judgments.state',
+			'ledger.conversation.judgments.model',
+			'ledger.conversation.judgments.question.question',
+			'ledger.conversation.judgments.answer.choice',
+			'ledger.window.exchanges.copy',
+			'ledger.window.exchanges.lines.key',
+			'ledger.window.exchanges.lines.title',
+			'questions.winner',
+			'conversation.id\n',
+		]) {
+			for (const value of ['record-a', JSON.stringify(['category', 'record-a'])])
+				expect(mapMemoryReplayIds(value, ids, member)).toBe(value)
+		}
+		expect(mapMemoryReplayIds({ 'conversation.id': 'record-a' }, ids)).toEqual({
+			'conversation.id': 'record-a',
+		})
+	})
+	it('translates declared references and only the message positions of Classifier ids', () => {
+		const ids = new Map([
+			['record-a', 'replay-a'],
+			['record-b', 'replay-b'],
+		])
+		for (const member of [
+			'conversation.id',
+			'conversation.messages.id',
+			'conversation.sections.messages.id',
+			'conversation.judgments.sources',
+			'ledger.conversation.id',
+			'ledger.conversation.messages.id',
+			'ledger.conversation.sections.messages.id',
+			'ledger.conversation.judgments.sources',
+			'ledger.requests',
+			'ledger.notes',
+			'ledger.failures',
+			'ledger.window.exchanges.request',
+			'ledger.window.exchanges.reply',
+			'ledger.window.exchanges.lines.source',
+			'ledger.window.amendments.earlier',
+			'ledger.window.amendments.later',
+		]) {
+			expect(mapMemoryReplayIds('record-a', ids, member)).toBe('replay-a')
+			expect(() => mapMemoryReplayIds('orphan', ids, member)).toThrow(/Unmapped/)
+		}
+		for (const member of [
+			'questions.id',
+			'conversation.judgments.id',
+			'ledger.conversation.judgments.id',
+		]) {
+			expect(mapMemoryReplayIds('record-a', ids, member)).toBe('replay-a')
+			for (const [recorded, replayed] of [
+				[
+					['category', 'record-a'],
+					['category', 'replay-a'],
+				],
+				[
+					['topic', 'record-a', 'record-b'],
+					['topic', 'replay-a', 'record-b'],
+				],
+				[
+					['amends', 'record-a', 'record-b'],
+					['amends', 'replay-a', 'replay-b'],
+				],
+				[
+					['supersedes', 'record-a', 'record-b'],
+					['supersedes', 'replay-a', 'replay-b'],
+				],
+			])
+				expect(mapMemoryReplayIds(JSON.stringify(recorded), ids, member)).toBe(
+					JSON.stringify(replayed),
+				)
+		}
+	})
+	it('translates window unit-record keys while preserving named placements', () => {
+		const ids = new Map([['record-a', 'replay-a']])
+		for (const [key, title, expected] of [
+			['record-a', '', 'replay-a'],
+			['rules', '', 'rules'],
+			['record-a', 'Named placement', 'record-a'],
+			['owner:record-a', 'Owner', 'owner:record-a'],
+		] as const) {
+			const receipt = { key, title, source: 'record-a', sentence: 0 }
+			expect(mapMemoryReplayIds(receipt, ids, 'ledger.window.exchanges.lines')).toEqual({
+				...receipt,
+				key: expected,
+				source: 'replay-a',
+			})
+		}
+		expect(() =>
+			mapMemoryReplayIds(
+				{ key: 'orphan', title: '', source: 'record-a', sentence: 0 },
+				ids,
+				'ledger.window.exchanges.lines',
+			),
+		).toThrow(/Unmapped/)
+	})
+	it('refuses two judgments out of order even when their clocks are valid', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
+		const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b']).map((row) => {
+			if (
+				row.event !== 'checkpoint' ||
+				!isRecord(row.value) ||
+				!isRecord(row.value.ledger) ||
+				!isRecord(row.value.ledger.conversation) ||
+				!isArray(row.value.ledger.conversation.judgments)
+			)
+				return row
+			return {
+				...row,
+				value: {
+					...row.value,
+					ledger: {
+						...row.value.ledger,
+						conversation: {
+							...row.value.ledger.conversation,
+							judgments: [...row.value.ledger.conversation.judgments].reverse(),
+						},
+					},
+				},
+			}
+		})
+		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Checkpoint members differ/)
+	})
+	it('requires every judgment clock to be present, finite, non-negative, and integral', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
+		for (const time of [null, '10', -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+			const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b']).map((row) => {
+				if (
+					row.event !== 'checkpoint' ||
+					!isRecord(row.value) ||
+					!isRecord(row.value.ledger) ||
+					!isRecord(row.value.ledger.conversation) ||
+					!isArray(row.value.ledger.conversation.judgments)
+				)
+					return row
+				return {
+					...row,
+					value: {
+						...row.value,
+						ledger: {
+							...row.value.ledger,
+							conversation: {
+								...row.value.ledger.conversation,
+								judgments: row.value.ledger.conversation.judgments.map((judgment) => {
+									if (!isRecord(judgment)) throw new Error('Missing judgment')
+									const { time: prior, ...rest } = judgment
+									expect(prior).toBe(0)
+									return time === null ? rest : { ...rest, time }
+								}),
+							},
+						},
+					},
+				}
+			})
+			expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Judgment clock/)
+			expect(() => assertMemoryReplay(replayed, recorded)).toThrow(/Judgment clock/)
+		}
+	})
+	it('compares every decision and checkpoint field through a positional bijection', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
+		const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b'])
+		expect(() => assertMemoryReplay(recorded, replayed)).not.toThrow()
+		expect(readMemoryReplayMessages(recorded.at(-1)?.value ?? null)).toEqual([
+			'record-a',
+			'record-b',
+		])
+		expect(
+			mapMemoryReplayIds(
+				{ id: 'record-a' },
+				new Map([['record-a', 'replay-a']]),
+				'conversation.messages',
+			),
+		).toEqual({
+			id: 'replay-a',
+		})
+	})
+	it('refuses two decisions swapped while the conversation stays in order', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
+		const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b'])
+		const [first, second, checkpoint] = replayed
+		if (first === undefined || second === undefined || checkpoint === undefined)
+			throw new Error('Missing evidence')
+		expect(() =>
+			assertMemoryReplay(recorded, [
+				{ ...first, value: second.value },
+				{ ...second, value: first.value },
+				checkpoint,
+			]),
+		).toThrow(/Retained decisions differ/)
+	})
+	it('refuses duplicate ids, changing correspondence, and unaccounted message references', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
+		expect(() =>
+			assertMemoryReplay(recorded, buildMemoryReplayEvidence(['replay-a', 'replay-a'])),
+		).toThrow(/repeats a message id/)
+		expect(() =>
+			assertMemoryReplay(
+				[...recorded, ...recorded],
+				[
+					...buildMemoryReplayEvidence(['replay-a', 'replay-b']),
+					...buildMemoryReplayEvidence(['replay-b', 'replay-a']),
+				],
+			),
+		).toThrow(/changed position/)
+		expect(() =>
+			mapMemoryReplayIds({ sources: ['orphan'] }, new Map(), 'conversation.judgments'),
+		).toThrow(/Unmapped sources/)
+		expect(() =>
+			mapMemoryReplayIds(JSON.stringify(['category', 'orphan']), new Map(), 'questions.id'),
+		).toThrow(/Unmapped decision/)
+	})
+	it('retains every checkpoint member, including timestamps and checksums', () => {
+		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
+		const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b'])
+		for (const value of [{ time: 1 }, { digest: 'changed' }, { extra: true }]) {
+			expect(() =>
+				assertMemoryReplay(
+					recorded,
+					replayed.map((row) =>
+						row.event === 'checkpoint' && isRecord(row.value)
+							? { ...row, value: { ...row.value, ...value } }
+							: row,
+					),
+				),
+			).toThrow(/Checkpoint members differ/)
+		}
+	})
+})
+
 describe('study declaration fixtures', () => {
 	it('builds independent declarations and a grading horizon from their actual schedule', async () => {
 		const first = (await loadStudyToolsFixture()).manifest
@@ -236,7 +533,8 @@ describe('study install fixtures', () => {
 					readFileSync(join(entry.source, 'package.json')),
 				)
 			}
-			const entry = join(scratch.path, 'node_modules', '@orkestrel/agent/dist/src/core/index.js')
+			const entry = join(scratch.path, 'dist/src/core/index.js')
+			expect(readFileSync(entry)).toEqual(readFileSync(resolve('dist/src/core/index.js')))
 			expect(parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')).toMatchObject({
 				agent: entry,
 				subject: entry,
@@ -249,7 +547,7 @@ describe('study install fixtures', () => {
 					series: { duration: 240000 },
 				},
 				provider: { url: 'http://127.0.0.1:7', model: 'model', judge: 'judge' },
-				roots: fixture.packages.map((captured) => captured.target),
+				roots: [scratch.path, ...fixture.packages.map((captured) => captured.target)],
 			})
 			const help = await executeStudyInstall(fixture, ['--help'])
 			expect(help).toMatchObject({ code: 0 })

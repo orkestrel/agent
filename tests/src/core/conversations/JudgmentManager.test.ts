@@ -12,6 +12,7 @@ import { arrayOf, canonicalStringify, parseJSONAs } from '@orkestrel/contract'
 import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
+	buildSystemOnePositions,
 	JUDGMENT_INPUT,
 	JUDGMENT_QUESTION,
 	JUDGMENT_RECORD,
@@ -196,7 +197,12 @@ describe('JudgmentManager', () => {
 	})
 
 	it('asks only unmatched questions, records them, and returns request order without batch usage', async () => {
-		const { judge, transport } = createRecordedJudge()
+		const { judge, transport } = createRecordedJudge({
+			response: {
+				...SYSTEM_ONE_TEV1,
+				answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers, ['label', 'severity']),
+			},
+		})
 		const manager = new JudgmentManager()
 		const cached = manager.add({
 			id: 'refund',
@@ -219,10 +225,7 @@ describe('JudgmentManager', () => {
 		expect(manager.count).toBe(3)
 		expect(await requireValue(transport.requests[0]).json()).toEqual({
 			...SYSTEM_ONE_TEV1_REQUEST,
-			questions: {
-				label: SYSTEM_ONE_TEV1_REQUEST.questions.label,
-				severity: SYSTEM_ONE_TEV1_REQUEST.questions.severity,
-			},
+			questions: buildSystemOnePositions(SYSTEM_ONE_TEV1_REQUEST.questions, ['label', 'severity']),
 		})
 		expect(
 			await manager.resolve(
@@ -236,7 +239,16 @@ describe('JudgmentManager', () => {
 	})
 
 	it('attaches usage when the unmatched sub-request carries one question', async () => {
-		const { judge, transport } = createRecordedJudge()
+		const { judge, transport } = createRecordedJudge({
+			respond: (recorded) =>
+				Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(
+						SYSTEM_ONE_TEV1.answers,
+						recorded.requests.length === 1 ? ['label', 'refund', 'severity'] : ['refund'],
+					),
+				}),
+		})
 		const manager = new JudgmentManager()
 		await manager.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, [], new AbortController().signal)
 		manager.remove('refund')
@@ -252,12 +264,17 @@ describe('JudgmentManager', () => {
 		expect(transport.requests).toHaveLength(2)
 		expect(await requireValue(transport.requests[1]).json()).toEqual({
 			...SYSTEM_ONE_TEV1_REQUEST,
-			questions: { refund: SYSTEM_ONE_TEV1_REQUEST.questions.refund },
+			questions: buildSystemOnePositions(SYSTEM_ONE_TEV1_REQUEST.questions, ['refund']),
 		})
 	})
 
 	it('serializes structured state and reuses only the unchanged state and source order', async () => {
-		const { judge, transport } = createRecordedJudge({ response: SYSTEM_ONE_OBJECT })
+		const { judge, transport } = createRecordedJudge({
+			response: {
+				...SYSTEM_ONE_OBJECT,
+				answers: buildSystemOnePositions(SYSTEM_ONE_OBJECT.answers),
+			},
+		})
 		const manager = new JudgmentManager()
 		const first = await manager.resolve(
 			judge,
@@ -279,7 +296,16 @@ describe('JudgmentManager', () => {
 	})
 
 	it('reuses a hydrated judgment whose keys were sorted', async () => {
-		const { judge, transport } = createRecordedJudge()
+		const { judge, transport } = createRecordedJudge({
+			respond: (recorded) =>
+				Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(
+						SYSTEM_ONE_TEV1.answers,
+						recorded.requests.length === 1 ? ['label', 'refund', 'severity'] : ['refund'],
+					),
+				}),
+		})
 		const first = new JudgmentManager()
 		await first.resolve(judge, SYSTEM_ONE_JUDGE_REQUEST, ['a'], new AbortController().signal)
 		const sorted = requireValue(
@@ -317,7 +343,13 @@ describe('JudgmentManager', () => {
 			create: (options) => new SequentialSystemOneJudge({ ...options, batch: false }),
 			respond: (recorded) => {
 				if (recorded.requests.length === 2) controller.abort()
-				return Response.json(SYSTEM_ONE_TEV1)
+				return Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(
+						SYSTEM_ONE_TEV1.answers,
+						recorded.requests.length === 1 ? ['label'] : ['refund'],
+					),
+				})
 			},
 		})
 		const manager = new JudgmentManager()
@@ -580,7 +612,12 @@ describe('JudgmentManager — frozen records', () => {
 	})
 
 	it('resolves to the stored frozen records', async () => {
-		const { judge, transport } = createRecordedJudge()
+		const { judge, transport } = createRecordedJudge({
+			response: {
+				...SYSTEM_ONE_TEV1,
+				answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers, ['label', 'severity']),
+			},
+		})
 		const manager = new JudgmentManager()
 		const cached = manager.add({
 			id: 'refund',

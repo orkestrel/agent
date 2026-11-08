@@ -244,6 +244,8 @@ export function buildStudyMemoryRoles(
 	const { provider, room } = profile
 	if (provider === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
 	const compaction = arm === 'compaction'
+	if ((provider.triage === undefined) !== (provider.digest.triage === undefined))
+		throw new StudyError('CONFIG', 'Memory triage requires a model and digest together')
 	const placement = isStudyMemoryOptions(profile.settings) ? profile.settings.judge : undefined
 	return {
 		agent: {
@@ -257,6 +259,9 @@ export function buildStudyMemoryRoles(
 			strict: compaction,
 			length: true,
 		},
+		...(arm === 'records' && provider.triage !== undefined
+			? { triage: { model: provider.triage, tokens: profile.bounds.request.tokens } }
+			: {}),
 		...(compaction
 			? {
 					summary: {

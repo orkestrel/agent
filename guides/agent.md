@@ -805,7 +805,7 @@ The `JudgeInterface` contract is the decision boundary beside `ProviderInterface
 
 The `AgentJudge` class is the engine behind that boundary, as the `AgentProvider` class is the engine behind `ProviderInterface`. It owns each call's deadline, the transport, the `headers` hook, the validation before inference, the bounded error read, and the merge of every call's result, and it leaves the wire open: a subclass supplies `name`, `encode(request)`, which projects one call's `JudgeRequest` onto the protocol's request shape, and `read(value, request)`, which decodes one call's parsed response into a `JudgeResult`. A one-shot JSON response has no framing state and no buffered tail, so the engine has no `frame` or `finish` seam. In place of the `split` and `strict` switches it takes one `batch` switch: `true`, the default, sends every question in one call, and `false` sends one call per question in key order.
 
-The `SystemOneJudge` class is the wire this package ships on that engine, and the `createSystemOneJudge` factory returns it behind `JudgeInterface`. It speaks the System One decision protocol at `SYSTEM_ONE_PATH` and sends every question in one call. See [Asking a System One server a choice, a noul, and a score](#asking-a-system-one-server-a-choice-a-noul-and-a-score) for the servers it serves and a whole request; see [Writing a judge wire](#writing-a-judge-wire) for a wire of your own.
+The `SystemOneJudge` class is the wire this package ships on that engine, and the `createSystemOneJudge` factory returns it behind `JudgeInterface`. It speaks the System One decision protocol at `SYSTEM_ONE_PATH` and sends every question in one call. Wire keys are zero-based positions in the request's question entry order. It maps answers back to the caller's ids, and a missing or invalid answer names the caller's id in its `PROTOCOL` error. Changing only the caller's ids preserves the request bytes. See [Asking a System One server a choice, a noul, and a score](#asking-a-system-one-server-a-choice-a-noul-and-a-score) for the servers it serves and a whole request; see [Writing a judge wire](#writing-a-judge-wire) for a wire of your own.
 
 The engine's failures arrive as one error class. A `JudgeError` carries a machine-readable `code` and, for an HTTP failure alone, the response `status`; the `isJudgeError` function narrows a caught value so a caller can branch on the code:
 
@@ -1864,10 +1864,10 @@ The seams a judge wire fills, beneath the boundary method it inherits. `AgentJud
 
 The System One wire over `AgentJudge`: it fills both seams and inherits `ask` from the engine, so a caller drives it through `JudgeInterface` like any judge. Its `name` reports `'systemone'` and stays a data member.
 
-| Method   | Returns            | Summary                                                                                 |
-| -------- | ------------------ | --------------------------------------------------------------------------------------- |
-| `encode` | `SystemOneRequest` | Projects the state and questions onto the System One request with the configured model. |
-| `read`   | `JudgeResult`      | Decodes requested System One answers and reports the server model and available usage.  |
+| Method   | Returns            | Summary                                                                                                     |
+| -------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `encode` | `SystemOneRequest` | Projects the state and questions onto the System One request with the configured model and positional keys. |
+| `read`   | `JudgeResult`      | Decodes positional System One answers under caller ids and reports the server model and available usage.    |
 
 #### `ThinkSplitterInterface`
 

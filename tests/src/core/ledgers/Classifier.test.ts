@@ -419,23 +419,34 @@ describe('Classifier', () => {
 			},
 		})
 		const transport: RecordedTransport = new RecordedTransport(async () => {
+			const request = requireValue(transport.requests.at(-1))
+			const body: unknown = await request.clone().json()
+			if (!isRecord(body) || typeof body.state !== 'string') throw new Error('Missing wire state')
 			return buildLedgerResponse(
-				requireValue(transport.requests.at(-1)),
-				(key, question) =>
+				request,
+				(_key, question) =>
 					isRecord(question) && question.type === 'choice'
 						? {
 								type: 'choice',
 								probabilities: {
-									fact: key.includes('m1') ? 1 : 0,
+									fact: body.state === 'user: Refund AB-12 is 20.' ? 1 : 0,
 									rule: 0,
-									correction: key.includes('m2') ? 1 : 0,
+									correction:
+										body.state === 'user: Correction: refund AB-12 is 30, not 20.' ? 1 : 0,
 									request: 0,
 									opinion: 0,
-									chatter: key.includes('m3') ? 1 : 0,
+									chatter: body.state === 'user: Thanks.' ? 1 : 0,
 									distractor: 0,
 								},
 							}
-						: { type: 'noul', noul: key.includes('supersedes') ? 0.2 : 0.9 },
+						: {
+								type: 'noul',
+								noul:
+									isRecord(question) &&
+									question.instructions === LEDGER_QUESTIONS.supersedes.instructions
+										? 0.2
+										: 0.9,
+							},
 				{ input_tokens: 2, output_tokens: 1 },
 			)
 		})

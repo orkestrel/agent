@@ -31,8 +31,8 @@ describe('memory declaration and mechanical evidence', () => {
 			isStudyMemoryRuntime({ ...STUDY_MEMORY_MODULES.agent, buildJudgeResult: undefined }),
 		).toBe(false)
 	})
-	it('admits an exact triage pin and rejects malformed triage records', () => {
-		expect(isStudyMemoryOptions({ triage: { model: 'tev1', digest: 'a'.repeat(64) } })).toBe(true)
+	it('rejects legacy triage settings because the provider owns the pin', () => {
+		expect(isStudyMemoryOptions({ triage: { model: 'tev1', digest: 'a'.repeat(64) } })).toBe(false)
 		for (const triage of MEMORY_TRIAGE_INVALID) expect(isStudyMemoryOptions({ triage })).toBe(false)
 	})
 	it('accepts exactly the declared settings members and refuses unknown keys and invalid values', () => {

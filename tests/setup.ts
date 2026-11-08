@@ -4828,7 +4828,11 @@ export interface RecordedJudgeInterface {
 export function createRecordedJudge(options: RecordedJudgeOptions = {}): RecordedJudgeInterface {
 	const transport: RecordedTransport = new RecordedTransport(() =>
 		options.respond === undefined
-			? Response.json(options.response === undefined ? SYSTEM_ONE_TEV1 : options.response)
+			? Response.json(
+					options.response === undefined
+						? { ...SYSTEM_ONE_TEV1, answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers) }
+						: options.response,
+				)
 			: options.respond(transport),
 	)
 	const judge = (options.create ?? createSystemOneJudge)({
@@ -4837,6 +4841,16 @@ export function createRecordedJudge(options: RecordedJudgeOptions = {}): Recorde
 		fetch: transport.fetch,
 	})
 	return { judge, transport }
+}
+
+/** Projects recorded caller-keyed fixture members onto wire positions while preserving missing positions. */
+export function buildSystemOnePositions(
+	value: Readonly<Record<string, unknown>>,
+	ids: readonly string[] = Object.keys(value),
+): Readonly<Record<string, unknown>> {
+	return Object.fromEntries(
+		ids.flatMap((id, index) => (Object.hasOwn(value, id) ? [[String(index), value[id]]] : [])),
+	)
 }
 
 /**

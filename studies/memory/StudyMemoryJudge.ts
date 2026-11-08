@@ -87,6 +87,7 @@ export class StudyMemoryJudge implements JudgeInterface {
 		try {
 			return { result: await this.#options.first.ask(request, signal), fault: false }
 		} catch (error) {
+			if (!signal.aborted) throw error
 			return {
 				result: this.#options.runtime.isJudgeAbortError(error) ? error.partial : undefined,
 				fault: true,

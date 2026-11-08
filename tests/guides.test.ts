@@ -227,6 +227,7 @@ await new GuideCommand({
 		SYSTEM_ONE_ERRORS,
 		SYSTEM_ONE_JUDGE_REQUEST,
 		SYSTEM_ONE_MICA,
+		buildSystemOnePositions,
 		SYSTEM_ONE_TEV1,
 		SYSTEM_ONE_TEV1_REQUEST,
 		SYSTEM_ONE_UNREADABLE_ANSWERS,
@@ -769,7 +770,10 @@ await new GuideCommand({
 					path: SYSTEM_ONE_PATH,
 					handler: async (request) => {
 						posted.handler(await request.json())
-						return Response.json(SYSTEM_ONE_TEV1)
+						return Response.json({
+							...SYSTEM_ONE_TEV1,
+							answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers, ['refund']),
+						})
 					},
 				},
 			])
@@ -807,7 +811,7 @@ await new GuideCommand({
 					[
 						{
 							...SYSTEM_ONE_TEV1_REQUEST,
-							questions: { refund: SYSTEM_ONE_TEV1_REQUEST.questions.refund },
+							questions: { 0: SYSTEM_ONE_TEV1_REQUEST.questions.refund },
 						},
 					],
 				])
@@ -5209,7 +5213,10 @@ await new GuideCommand({
 					path: SYSTEM_ONE_PATH,
 					handler: async (request) => {
 						posted.handler(await request.json())
-						return Response.json(SYSTEM_ONE_TEV1)
+						return Response.json({
+							...SYSTEM_ONE_TEV1,
+							answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+						})
 					},
 				},
 			])
@@ -5258,7 +5265,14 @@ await new GuideCommand({
 
 				// One POST to the origin plus SYSTEM_ONE_PATH carried every question, and its body is the
 				// exact request Ollama accepted: `form` written as `type`, the undescribed option kept null.
-				expect(posted.calls).toEqual([[SYSTEM_ONE_TEV1_REQUEST]])
+				expect(posted.calls).toEqual([
+					[
+						{
+							...SYSTEM_ONE_TEV1_REQUEST,
+							questions: buildSystemOnePositions(SYSTEM_ONE_TEV1_REQUEST.questions),
+						},
+					],
+				])
 				expect(result.model).toBe('tev1:0.8b')
 				expect(result.usage).toEqual({ prompt: 975, completion: 4, total: 979 })
 				expect(result).not.toHaveProperty('refusals')
@@ -5321,7 +5335,12 @@ await new GuideCommand({
 
 		it('authenticates the Jev fence through its header hook on the System One path', async () => {
 			const key = 'fixture-key'
-			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const transport = new RecordedTransport(() =>
+				Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+				}),
+			)
 			const jev = createSystemOneJudge({
 				url: 'https://api.typesafe.ai',
 				model: 'jev-latest',
@@ -5484,18 +5503,26 @@ await new GuideCommand({
 			expect(isJudgeEntry(null)).toBe(false)
 
 			const judge = new SystemOneJudge({ url: 'http://localhost:11434', model: 'tev1:0.8b' })
-			expect(judge.encode(SYSTEM_ONE_JUDGE_REQUEST)).toEqual(SYSTEM_ONE_TEV1_REQUEST)
+			expect(judge.encode(SYSTEM_ONE_JUDGE_REQUEST)).toEqual({
+				...SYSTEM_ONE_TEV1_REQUEST,
+				questions: buildSystemOnePositions(SYSTEM_ONE_TEV1_REQUEST.questions),
+			})
 			expect(
 				judge.encode({ state: 'Ticket 4182', questions: { refund: { form: 'noul' } } }),
 			).toStrictEqual({
 				state: 'Ticket 4182',
 				model: 'tev1:0.8b',
-				questions: { refund: { type: 'noul' } },
+				questions: { 0: { type: 'noul' } },
 			})
 		})
 
 		it('refuses a malformed request before any call and reports a server refusal as HTTP (the validation clause)', async () => {
-			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const transport = new RecordedTransport(() =>
+				Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+				}),
+			)
 			const judge = new SystemOneJudge({
 				url: 'http://localhost:11434',
 				model: 'tev1:0.8b',
@@ -5591,7 +5618,12 @@ await new GuideCommand({
 
 		it('bounds each call by its own deadline and keeps the completed calls in the abort partial (the abort-partial clause)', async () => {
 			// An already-aborted signal: an empty partial, and no call.
-			const idle = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const idle = new RecordedTransport(() =>
+				Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+				}),
+			)
 			const early: unknown = await new SystemOneJudge({
 				url: 'http://localhost:11434',
 				model: 'tev1:0.8b',
@@ -5753,7 +5785,10 @@ await new GuideCommand({
 					new SystemOneJudge({
 						url: 'http://localhost:11434',
 						model: 'tev1:0.8b',
-						fetch: () => Promise.resolve(Response.json(body)),
+						fetch: () =>
+							Promise.resolve(
+								Response.json({ ...body, answers: buildSystemOnePositions(body.answers) }),
+							),
 					}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal),
 				),
 			)
@@ -5777,7 +5812,16 @@ await new GuideCommand({
 				const failure = new SystemOneJudge({
 					url: 'http://localhost:11434',
 					model: 'tev1:0.8b',
-					fetch: () => Promise.resolve(Response.json({ ...SYSTEM_ONE_TEV1, answers })),
+					fetch: () =>
+						Promise.resolve(
+							Response.json({
+								...SYSTEM_ONE_TEV1,
+								answers: buildSystemOnePositions(
+									answers,
+									Object.keys(SYSTEM_ONE_JUDGE_REQUEST.questions),
+								),
+							}),
+						),
 				}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal)
 				await expect(failure).rejects.toBeInstanceOf(JudgeError)
 				await expect(failure).rejects.toMatchObject({
@@ -5793,7 +5837,10 @@ await new GuideCommand({
 					new SystemOneJudge({
 						url: 'http://localhost:11434',
 						model: 'jev-latest',
-						fetch: () => Promise.resolve(Response.json(body)),
+						fetch: () =>
+							Promise.resolve(
+								Response.json({ ...body, answers: buildSystemOnePositions(body.answers) }),
+							),
 					}).ask(SYSTEM_ONE_JUDGE_REQUEST, new AbortController().signal),
 				),
 			)
@@ -5818,7 +5865,12 @@ await new GuideCommand({
 		it('aborts a header hook that never settles at the call’s deadline (the header-hook authentication clause)', async () => {
 			const caller = new AbortController()
 			const hook = new RecordedHeader({ authorization: 'Bearer fixture-key' })
-			const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const transport = new RecordedTransport(() =>
+				Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+				}),
+			)
 			await new SystemOneJudge({
 				url: 'https://api.typesafe.ai',
 				model: 'jev-latest',
@@ -5831,7 +5883,12 @@ await new GuideCommand({
 			expect(hook.signals[0]).not.toBe(caller.signal)
 
 			const stalled = new RecordedHeader(new Promise(() => {}))
-			const untouched = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+			const untouched = new RecordedTransport(() =>
+				Response.json({
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+				}),
+			)
 			const failure: unknown = await new SystemOneJudge({
 				url: 'https://api.typesafe.ai',
 				model: 'jev-latest',

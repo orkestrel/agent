@@ -29,7 +29,8 @@
 		"judge": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
 		"digest": {
 			"model": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
-			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b",
+			"triage": "abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099"
 		},
 		"daemon": {
 			"executable": "C:\\Users\\mikes\\WebstormProjects\\agent\\tmp\\studies\\runner\\ollama-0.40.15\\ollama.exe",
@@ -43,6 +44,10 @@
 				{
 					"name": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
 					"digest": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+				},
+				{
+					"name": "tev1:0.8b",
+					"digest": "abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099"
 				}
 			],
 			"environment": {
@@ -51,7 +56,8 @@
 				"LLAMA_ARG_CONTEXT_SHIFT": "0",
 				"OLLAMA_NOPRUNE": "1"
 			}
-		}
+		},
+		"triage": "tev1:0.8b"
 	},
 	"qualification": "tmp/studies/qualification",
 	"room": {
@@ -63,10 +69,8 @@
 	},
 	"settings": {
 		"observe": true,
-		"judge": { "gpu": 0 },
-		"triage": {
-			"model": "tev1:0.8b",
-			"digest": "abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099"
+		"judge": {
+			"gpu": 0
 		},
 		"version": "0.40.15",
 		"metadata": {
@@ -202,5 +206,10 @@
 			"tokens": 163577856,
 			"bytes": 2147483648
 		}
+	},
+	"record": {
+		"bytes": 536870912,
+		"calls": 4096,
+		"duration": 2400000
 	}
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { canonicalStringify, isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
+import { createScratch, destroyScratch } from '@orkestrel/test/server'
+import { collectStudyEvidence, readStudyResult, readStudyExchanges } from '@orkestrel/study/server'
+import { join } from 'node:path'
 import {
 	isStudyMemoryProvider,
 	isStudyMemoryAgent,
@@ -10,8 +13,15 @@ import {
 	STUDY_MEMORY_POLICY,
 } from '../../../studies/memory/index.js'
 import {
+	assertMemoryReplay,
+	assertMemoryDaemonClosed,
+	writeMemoryTriageDaemon,
 	buildMemoryObservationResponses,
-	MEMORY_TRIAGE_CAPTURE,
+	createStudyInstallFixture,
+	executeStudyInstall,
+	writeMemoryTriageInstall,
+	writeMemoryTriageHorizon,
+	MEMORY_TRIAGE_GOALS,
 	MEMORY_TRIAGE_UNAVAILABLE,
 	MEMORY_TRIAGE_FAILURES,
 	MEMORY_TRIAGE_GOAL,
@@ -37,8 +47,8 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const server = await createMemoryRouteServer()
 		const profile = buildMemoryProfile({
 			url: server.url,
+			triage: { model: 'model', digest: 'a'.repeat(64) },
 			settings: {
-				triage: { model: 'model', digest: 'a'.repeat(64) },
 				observe: true,
 				checkpoints: [MEMORY_TRIAGE_GOAL.id],
 			},
@@ -64,6 +74,14 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 					1,
 				)
 				expect(server.responses).toHaveLength(0)
+				expect(
+					fixture.evidence.filter(
+						(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.role === 'triage',
+					),
+				).toHaveLength(1)
+				expect(fixture.context.meter.usage.filter((row) => row.role === 'triage')).toMatchObject([
+					{ calls: 1 },
+				])
 				const category = STUDY_MEMORY_MODULES.agent.LEDGER_QUESTIONS.category.instructions
 				if (typeof category !== 'string') throw new Error('Missing category instructions')
 				expect(
@@ -107,7 +125,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		const server = await createMemoryServer(MEMORY_TRIAGE_OPEN)
 		const profile = buildMemoryProfile({
 			url: server.url,
-			settings: { triage: { model: 'model', digest: 'a'.repeat(64) } },
+			triage: { model: 'model', digest: 'a'.repeat(64) },
 		})
 		const controller = new AbortController()
 		const fixture = createMemoryContext(profile, controller.signal)
@@ -140,7 +158,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	it('refuses a triage session whose admitted namespace lacks the System One runtime', async () => {
 		const profile = buildMemoryProfile({
 			url: 'http://127.0.0.1:1',
-			settings: { triage: { model: 'model', digest: 'a'.repeat(64) } },
+			triage: { model: 'model', digest: 'a'.repeat(64) },
 		})
 		const driver = new StudyMemoryDriver({
 			...STUDY_MEMORY_MODULES,
@@ -154,25 +172,24 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			),
 		).rejects.toThrow('Memory triage requires the admitted System One runtime')
 	})
-	it('runs a reused real records session through a direct-leg fault and retains triage evidence', async () => {
+	it('fails a real records session on a triage transport fault before a referral or another goal', async () => {
 		const result = await runMemoryTrial({
 			arm: 'records',
 			responses: MEMORY_TRIAGE_FAILURES,
 			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
-			settings: { triage: { model: 'model', digest: 'a'.repeat(64) } },
+			triage: { model: 'model', digest: 'a'.repeat(64) },
 		})
-		expect(result.failure).toBeUndefined()
-		expect(result.products).toHaveLength(2)
+		expect(result.failure).toBeDefined()
+		expect(result.products).toHaveLength(0)
 		expect(result.requests.filter((request) => request.path === '/api/tags')).toHaveLength(
 			result.evidence.filter(
 				(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.path === '/api/tags',
-			).length + 1,
+			).length,
 		)
 		expect(result.requests.some((request) => request.path === '/v1/systemone')).toBe(true)
-		expect(result.requests.some((request) => request.path === '/api/generate')).toBe(true)
+		expect(result.requests.some((request) => request.path === '/api/generate')).toBe(false)
 		const decisions = result.evidence.filter((row) => row.event === 'triage')
-		expect(decisions.length).toBeGreaterThan(0)
-		expect(decisions[0]?.value).toMatchObject({ model: 'model', questions: [{ outcome: 'fault' }] })
+		expect(decisions).toMatchObject([{ value: { questions: [{ outcome: 'referred' }] } }])
 	})
 	it('preserves the real Mica identity when the profile has no triage', async () => {
 		const fixture = createMemoryIdentity(buildMemoryProfile({ url: 'http://127.0.0.1:1' }))
@@ -187,25 +204,158 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			await session.close()
 		}
 	})
-	it('refuses triage exchanges and replay before opening a session', async () => {
-		const profile = buildMemoryProfile({
-			url: 'http://127.0.0.1:1',
-			settings: { triage: { model: 'tev1', digest: 'c'.repeat(64) } },
-		})
-		for (const capture of MEMORY_TRIAGE_CAPTURE) {
-			const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile, ...capture })
-			await expect(
-				driver.open(
-					{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
-					new AbortController().signal,
-				),
-			).rejects.toThrow('Memory triage cannot record or replay its direct leg')
+	it('records and replays a reused triage session offline', async () => {
+		const scratch = createScratch({ prefix: 'study-triage-custody-' })
+		const server = await createMemoryRouteServer(32)
+		try {
+			expect(Number(new URL(server.url).port)).toBeGreaterThan(40000)
+			const fixture = createStudyInstallFixture(scratch, server.url)
+			writeMemoryTriageInstall(fixture)
+			const recorded = join(scratch.path, 'tmp', 'recorded')
+			const executed = await executeStudyInstall(
+				fixture,
+				['execute', 'capacity', '--profile', 'local', '--out', recorded],
+				260000,
+			)
+			if (executed.code !== 0) throw new Error(executed.stderr)
+			expect(executed).toMatchObject({ code: 0 })
+			const result = await readStudyResult(recorded)
+			if (result.status !== 'sealed') throw new Error('Recording did not seal')
+			expect(result.manifest.schedule).toHaveLength(1)
+			const trial = result.manifest.schedule[0]
+			if (trial === undefined) throw new Error('Missing trial')
+			const history = await readStudyExchanges(result, trial.id)
+			const roles = history.exchanges.map((exchange) => exchange.attempt.role)
+			expect(roles).toEqual(expect.arrayContaining(['triage', 'judge', 'metadata', 'agent']))
+			expect(
+				history.exchanges.filter((exchange) => exchange.attempt.path === '/api/tags'),
+			).toHaveLength(2)
+			expect(history.exchanges).toHaveLength(server.requests.length)
+			const evidence = (await collectStudyEvidence(result))[trial.id] ?? []
+			const checkpoints = evidence.filter((row) => row.event === 'checkpoint')
+			expect(checkpoints.map((row) => row.goal)).toEqual(['triage', 'followup'])
+			const final = checkpoints.at(-1)?.value
+			if (!isStudyMemoryCheckpoint(final)) throw new Error('Missing checkpoint')
+			expect(final.arrivals).toEqual(['triage-source', 'delivery'])
+			const decisions = evidence
+				.filter((row) => row.event === 'triage')
+				.map((row) => (isRecord(row.value) ? row.value.questions : undefined))
+			expect(decisions).toHaveLength(2)
+			const sent = server.requests.length
+			const replayed = join(scratch.path, 'tmp', 'replayed')
+			const replayedRun = await executeStudyInstall(
+				fixture,
+				[
+					'execute',
+					'capacity',
+					'--profile',
+					'local',
+					'--replay',
+					recorded,
+					'--prefix',
+					JSON.stringify({ [trial.id]: history.exchanges.length }),
+					'--offline',
+					'true',
+					'--out',
+					replayed,
+				],
+				260000,
+			)
+			if (replayedRun.code !== 0)
+				throw new Error(
+					replayedRun.stderr +
+						replayedRun.stdout +
+						(
+							scratch.read(
+								join('tmp', 'replayed', 'execution', 'trials', trial.id, 'exchanges.jsonl'),
+							) ?? ''
+						)
+							.split(/\r\n|\n/)
+							.filter((line) => line.includes('"phase":"failure"'))
+							.join('\n'),
+				)
+			expect(replayedRun.code).toBe(0)
+			expect(server.requests).toHaveLength(sent)
+			const replay = await readStudyResult(replayed)
+			if (replay.status !== 'sealed') throw new Error('Replay did not seal')
+			const replayEvidence = (await collectStudyEvidence(replay))[trial.id] ?? []
+			assertMemoryReplay(evidence, replayEvidence)
+		} finally {
+			await server.close()
+			await destroyScratch(scratch)
 		}
-	})
+	}, 540000)
+	it('extends a complete triage schedule through a scripted owned daemon', async () => {
+		const scratch = createScratch({ prefix: 'study-triage-daemon-' })
+		const server = await createMemoryRouteServer(32)
+		try {
+			const fixture = createStudyInstallFixture(scratch, server.url)
+			writeMemoryTriageInstall(fixture)
+			await writeMemoryTriageDaemon(fixture, server.url)
+			const recorded = join(scratch.path, 'tmp', 'recorded')
+			const executed = await executeStudyInstall(
+				fixture,
+				['execute', 'capacity', '--profile', 'local', '--out', recorded],
+				260000,
+			)
+			if (executed.code !== 0) throw new Error(executed.stderr + executed.stdout)
+			expect(executed.code).toBe(0)
+			assertMemoryDaemonClosed(scratch)
+			const result = await readStudyResult(recorded)
+			if (result.status !== 'sealed') throw new Error('Recording did not seal')
+			expect(result.manifest.schedule).toHaveLength(1)
+			const trial = result.manifest.schedule[0]
+			if (trial === undefined) throw new Error('Missing trial')
+			const history = await readStudyExchanges(result, trial.id)
+			expect(
+				history.exchanges
+					.filter((exchange) => exchange.attempt.role === 'triage')
+					.map((exchange) => exchange.attempt.goal),
+			).toEqual(['triage', 'followup'])
+			expect(history.exchanges.some((exchange) => exchange.attempt.stage === 'maintenance')).toBe(
+				true,
+			)
+			const sent = server.requests.length
+			writeMemoryTriageHorizon(scratch, 3)
+			const extended = join(scratch.path, 'tmp', 'extended')
+			const extendedRun = await executeStudyInstall(
+				fixture,
+				['execute', 'capacity', '--profile', 'local', '--extend', recorded, '--out', extended],
+				260000,
+			)
+			if (extendedRun.code !== 0) throw new Error(extendedRun.stderr + extendedRun.stdout)
+			expect(extendedRun.code).toBe(0)
+			assertMemoryDaemonClosed(scratch)
+			const continuation = await readStudyResult(extended)
+			if (continuation.status !== 'sealed') throw new Error('Continuation did not seal')
+			expect(continuation.manifest.scenarios[0]?.goals.map((goal) => goal.id)).toEqual(
+				MEMORY_TRIAGE_GOALS.map((goal) => goal.id),
+			)
+			const extendedHistory = await readStudyExchanges(continuation, trial.id)
+			const prefix = history.exchanges.findIndex(
+				(exchange) => exchange.attempt.stage === 'postflight',
+			)
+			expect(prefix).toBeGreaterThan(0)
+			expect(
+				extendedHistory.exchanges.slice(0, prefix).map((exchange) => exchange.attempt.body),
+			).toEqual(history.exchanges.slice(0, prefix).map((exchange) => exchange.attempt.body))
+			expect(
+				extendedHistory.exchanges
+					.filter((exchange) => exchange.attempt.role === 'triage')
+					.map((exchange) => exchange.attempt.goal),
+			).toEqual(['triage', 'followup', 'extended'])
+			expect(
+				server.requests.slice(sent).filter((request) => request.path === '/v1/systemone'),
+			).toHaveLength(1)
+		} finally {
+			await server.close()
+			await destroyScratch(scratch)
+		}
+	}, 540000)
 	it('refuses an absent triage model or digest mismatch before any goal request', async () => {
 		for (const triage of MEMORY_TRIAGE_UNAVAILABLE) {
 			const server = await createMemoryServer()
-			const profile = buildMemoryProfile({ url: server.url, settings: { triage } })
+			const profile = buildMemoryProfile({ url: server.url, triage })
 			const fixture = createMemoryContext(profile)
 			try {
 				const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
@@ -217,10 +367,10 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 					const goal = STUDY_MEMORY_OBSERVATION_GOALS[0]
 					if (goal === undefined) throw new Error('Missing goal')
 					await expect(session.execute(goal, fixture.context)).rejects.toMatchObject({
-						code: 'CONFIG',
+						code: 'FAULT',
 					})
 					await expect(session.execute(goal, fixture.context)).rejects.toMatchObject({
-						code: 'CONFIG',
+						code: 'FAULT',
 					})
 					expect(server.requests.map((request) => request.path)).toEqual(['/api/tags'])
 				} finally {

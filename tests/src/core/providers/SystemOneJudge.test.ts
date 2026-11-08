@@ -11,6 +11,7 @@ import { captureError, requireValue } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	RecordedTransport,
+	buildSystemOnePositions,
 	buildSystemOneProbabilityCases,
 	SYSTEM_ONE_ERRORS,
 	SYSTEM_ONE_INVALID_PROBABILITIES,
@@ -43,6 +44,40 @@ describe('SystemOneJudge — what it refuses', () => {
 })
 
 describe('SystemOneJudge', () => {
+	it('encodes identical bytes for equivalent questions under different caller ids', () => {
+		const judge = new SystemOneJudge({ url: 'http://judge.test', model: 'tev1:0.8b' })
+		const renamed = {
+			...SYSTEM_ONE_JUDGE_REQUEST,
+			questions: Object.fromEntries(
+				Object.values(SYSTEM_ONE_JUDGE_REQUEST.questions).map((question, index) => [
+					`caller-${index}`,
+					question,
+				]),
+			),
+		}
+		expect(JSON.stringify(judge.encode(renamed))).toBe(
+			JSON.stringify(judge.encode(SYSTEM_ONE_JUDGE_REQUEST)),
+		)
+		expect(Object.keys(judge.encode(renamed).questions)).toEqual(['0', '1', '2'])
+	})
+	it('maps positional answers to caller ids in request order and names a missing caller id', () => {
+		const judge = new SystemOneJudge({ url: 'http://judge.test', model: 'tev1:0.8b' })
+		const result = judge.read(
+			{
+				answers: {
+					0: SYSTEM_ONE_TEV1.answers.label,
+					1: SYSTEM_ONE_TEV1.answers.refund,
+					2: SYSTEM_ONE_TEV1.answers.severity,
+				},
+			},
+			SYSTEM_ONE_JUDGE_REQUEST,
+		)
+		expect(Object.keys(result.answers)).toEqual(['label', 'refund', 'severity'])
+		expect(result.answers).toEqual(TEV1_ANSWERS)
+		expect(() =>
+			judge.read({ answers: { 0: SYSTEM_ONE_TEV1.answers.label } }, SYSTEM_ONE_JUDGE_REQUEST),
+		).toThrow('question refund has no System One answer')
+	})
 	it('projects the TypeSafe quickstart with no extra members', () => {
 		const judge = new SystemOneJudge({ url: 'https://api.typesafe.ai', model: 'jev-latest' })
 		expect(judge.name).toBe('systemone')
@@ -57,12 +92,17 @@ describe('SystemOneJudge', () => {
 		).toEqual({
 			state: SYSTEM_ONE_QUICKSTART_STATE,
 			model: 'jev-latest',
-			questions: { urgency: { type: 'noul', instructions: 'Does this message express urgency?' } },
+			questions: { 0: { type: 'noul', instructions: 'Does this message express urgency?' } },
 		})
 	})
 
 	it('posts the exact recorded request once with authentication and decodes the recorded response', async () => {
-		const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_TEV1))
+		const transport = new RecordedTransport(() =>
+			Response.json({
+				...SYSTEM_ONE_TEV1,
+				answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+			}),
+		)
 		const judge = createSystemOneJudge({
 			url: 'http://judge.test',
 			model: 'tev1:0.8b',
@@ -84,7 +124,10 @@ describe('SystemOneJudge', () => {
 		expect(request.method).toBe('POST')
 		expect(request.headers.get('content-type')).toBe('application/json')
 		expect(request.headers.get('authorization')).toBe('Bearer fixture-key')
-		expect(await request.json()).toEqual(SYSTEM_ONE_TEV1_REQUEST)
+		expect(await request.json()).toEqual({
+			...SYSTEM_ONE_TEV1_REQUEST,
+			questions: buildSystemOnePositions(SYSTEM_ONE_TEV1_REQUEST.questions),
+		})
 		const choice = measureAnswer(requireValue(result.answers.label))
 		expect(choice.winner).toBe('bug')
 		expect(choice.confidence).toBeCloseTo(0.9536, 4)
@@ -92,13 +135,21 @@ describe('SystemOneJudge', () => {
 	})
 
 	it('preserves the recorded object state and instructions across the request', async () => {
-		const transport = new RecordedTransport(() => Response.json(SYSTEM_ONE_OBJECT))
+		const transport = new RecordedTransport(() =>
+			Response.json({
+				...SYSTEM_ONE_OBJECT,
+				answers: buildSystemOnePositions(SYSTEM_ONE_OBJECT.answers),
+			}),
+		)
 		const judge = new SystemOneJudge({
 			url: 'http://judge.test',
 			model: 'tev1:0.8b',
 			fetch: transport.fetch,
 		})
-		expect(judge.encode(SYSTEM_ONE_JUDGE_OBJECT)).toEqual(SYSTEM_ONE_OBJECT_REQUEST)
+		expect(judge.encode(SYSTEM_ONE_JUDGE_OBJECT)).toEqual({
+			...SYSTEM_ONE_OBJECT_REQUEST,
+			questions: buildSystemOnePositions(SYSTEM_ONE_OBJECT_REQUEST.questions),
+		})
 		expect(await judge.ask(SYSTEM_ONE_JUDGE_OBJECT, new AbortController().signal)).toEqual({
 			model: 'tev1:0.8b',
 			answers: {
@@ -109,17 +160,30 @@ describe('SystemOneJudge', () => {
 			},
 			usage: { prompt: 148, completion: 1, total: 149 },
 		})
-		expect(await requireValue(transport.requests[0]).json()).toEqual(SYSTEM_ONE_OBJECT_REQUEST)
+		expect(await requireValue(transport.requests[0]).json()).toEqual({
+			...SYSTEM_ONE_OBJECT_REQUEST,
+			questions: buildSystemOnePositions(SYSTEM_ONE_OBJECT_REQUEST.questions),
+		})
 	})
 
 	it('decodes transliterated llama.cpp arrays and ignores Mica server measures and extra fields', () => {
 		const judge = new SystemOneJudge({ url: 'http://judge.test', model: 'configured' })
-		expect(judge.read(SYSTEM_ONE_LLAMA, SYSTEM_ONE_JUDGE_REQUEST)).toEqual({
+		expect(
+			judge.read(
+				{ ...SYSTEM_ONE_LLAMA, answers: buildSystemOnePositions(SYSTEM_ONE_LLAMA.answers) },
+				SYSTEM_ONE_JUDGE_REQUEST,
+			),
+		).toEqual({
 			model: 'tev1:0.8b',
 			answers: TEV1_ANSWERS,
 			usage: { prompt: 975, completion: 4, total: 979 },
 		})
-		expect(judge.read(SYSTEM_ONE_MICA, SYSTEM_ONE_JUDGE_REQUEST)).toEqual({
+		expect(
+			judge.read(
+				{ ...SYSTEM_ONE_MICA, answers: buildSystemOnePositions(SYSTEM_ONE_MICA.answers) },
+				SYSTEM_ONE_JUDGE_REQUEST,
+			),
+		).toEqual({
 			model: 'mica-v0.1-4b',
 			answers: TEV1_ANSWERS,
 			usage: { prompt: 975, completion: 0, total: 975 },
@@ -129,22 +193,36 @@ describe('SystemOneJudge', () => {
 	it('reports gateway model names verbatim and falls back only when model is absent', () => {
 		const judge = new SystemOneJudge({ url: 'http://judge.test', model: 'jev-latest' })
 		expect(
-			judge.read({ ...SYSTEM_ONE_TEV1, model: 'typesafe/jev-1.13.0' }, SYSTEM_ONE_JUDGE_REQUEST)
-				.model,
+			judge.read(
+				{
+					...SYSTEM_ONE_TEV1,
+					answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+					model: 'typesafe/jev-1.13.0',
+				},
+				SYSTEM_ONE_JUDGE_REQUEST,
+			).model,
 		).toBe('typesafe/jev-1.13.0')
-		expect(judge.read({ answers: SYSTEM_ONE_TEV1.answers }, SYSTEM_ONE_JUDGE_REQUEST)).toEqual({
+		expect(
+			judge.read(
+				{ answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers) },
+				SYSTEM_ONE_JUDGE_REQUEST,
+			),
+		).toEqual({
 			model: 'jev-latest',
 			answers: TEV1_ANSWERS,
 		})
 		expect(
 			judge.read(
-				{ answers: SYSTEM_ONE_TEV1.answers, usage: { input_tokens: null, output_tokens: 4 } },
+				{
+					answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers),
+					usage: { input_tokens: null, output_tokens: 4 },
+				},
 				SYSTEM_ONE_JUDGE_REQUEST,
 			),
 		).not.toHaveProperty('usage')
 		expect(
 			judge.read(
-				{ answers: SYSTEM_ONE_TEV1.answers, usage: { input_tokens: 975 } },
+				{ answers: buildSystemOnePositions(SYSTEM_ONE_TEV1.answers), usage: { input_tokens: 975 } },
 				SYSTEM_ONE_JUDGE_REQUEST,
 			),
 		).not.toHaveProperty('usage')
@@ -154,7 +232,17 @@ describe('SystemOneJudge', () => {
 		'names $id for a missing, incomplete, or mismatched answer',
 		({ id, answers }) => {
 			const judge = new SystemOneJudge({ url: 'http://judge.test', model: 'tev1:0.8b' })
-			const error = captureError(() => judge.read({ answers }, SYSTEM_ONE_JUDGE_REQUEST))
+			const error = captureError(() =>
+				judge.read(
+					{
+						answers: buildSystemOnePositions(
+							answers,
+							Object.keys(SYSTEM_ONE_JUDGE_REQUEST.questions),
+						),
+					},
+					SYSTEM_ONE_JUDGE_REQUEST,
+				),
+			)
 			expect(error).toBeInstanceOf(JudgeError)
 			if (!isJudgeError(error)) throw new Error('expected JudgeError')
 			expect(error.code).toBe('PROTOCOL')
@@ -170,7 +258,7 @@ describe('SystemOneJudge', () => {
 			for (const [id, answer] of Object.entries(answers)) {
 				const error = captureError(() =>
 					judge.read(
-						{ answers: { ...SYSTEM_ONE_TEV1.answers, [id]: answer } },
+						{ answers: buildSystemOnePositions({ ...SYSTEM_ONE_TEV1.answers, [id]: answer }) },
 						SYSTEM_ONE_JUDGE_REQUEST,
 					),
 				)
@@ -190,12 +278,12 @@ describe('SystemOneJudge', () => {
 				['__proto__']: { form: 'choice', criteria: { ['__proto__']: null, other: null } },
 			},
 		}
-		expect(Object.keys(judge.encode(request).questions)).toEqual(['__proto__'])
+		expect(Object.keys(judge.encode(request).questions)).toEqual(['0'])
 		expect(
 			judge.read(
 				{
 					answers: {
-						['__proto__']: { type: 'choice', probabilities: { other: 0.1, ['__proto__']: 0.9 } },
+						0: { type: 'choice', probabilities: { other: 0.1, ['__proto__']: 0.9 } },
 						extra: null,
 					},
 				},

@@ -17,15 +17,7 @@ import type {
 	StudyMemoryObservation,
 } from './types.js'
 import { createBudget } from '@orkestrel/budget'
-import {
-	canonicalStringify,
-	cloneJSONValue,
-	isJSONValue,
-	isObject,
-	isRecord,
-	isArray,
-	parseJSON,
-} from '@orkestrel/contract'
+import { canonicalStringify, cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
@@ -66,7 +58,6 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #agent: AgentInterface
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
-	#verification: Promise<void> | undefined
 	readonly #abort = new AbortController()
 	readonly #arrivals = new Set<string>()
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
@@ -103,11 +94,6 @@ export class StudyMemorySession implements StudySessionInterface {
 			? options.profile.settings
 			: undefined
 		const recorded = options.profile.record !== undefined
-		if (
-			settings?.triage !== undefined &&
-			(options.exchanges !== undefined || options.replay !== undefined)
-		)
-			throw new StudyError('CONFIG', 'Memory triage cannot record or replay its direct leg')
 		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
 			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
 		const declaration = options.exchanges?.declaration
@@ -206,7 +192,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				options: role.options,
 				fetch: (input, init) => this.#transport.fetch('judge', input, init),
 			})
-			const triage = settings?.triage
+			const triage = roles.triage
 			const runtime =
 				triage !== undefined && isStudyMemoryRuntime(options.ledger) ? options.ledger : undefined
 			if (triage !== undefined && runtime === undefined)
@@ -219,14 +205,7 @@ export class StudyMemorySession implements StudySessionInterface {
 								url: provider.url,
 								model: triage.model,
 								timeout: options.profile.bounds.request.duration,
-								fetch: (input, init) =>
-									globalThis.fetch(input, {
-										...init,
-										signal: AbortSignal.any([
-											this.#abort.signal,
-											...(init?.signal === undefined || init.signal === null ? [] : [init.signal]),
-										]),
-									}),
+								fetch: (input, init) => this.#transport.fetch('triage', input, init),
 							}),
 							second,
 							runtime,
@@ -366,11 +345,6 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#input = undefined
 		this.#live.add(activity)
 		try {
-			const settings = this.#options.profile.settings
-			if (isStudyMemoryOptions(settings) && settings.triage !== undefined) {
-				this.#verification ??= this.#verify(AbortSignal.any([context.signal, context.meter.signal]))
-				await this.#verification
-			}
 			if (this.#goals === undefined || this.#goals[0] === goal) await this.#transport.verify()
 			for (const record of input.records) {
 				this.#records.set(record.id, Object.freeze({ ...record }))
@@ -446,30 +420,6 @@ export class StudyMemorySession implements StudySessionInterface {
 				this.#transport.clear()
 			}
 		}
-	}
-
-	async #verify(signal: AbortSignal): Promise<void> {
-		const settings = this.#options.profile.settings
-		const triage = isStudyMemoryOptions(settings) ? settings.triage : undefined
-		if (triage === undefined) return
-		const provider = this.#options.profile.provider
-		if (provider === undefined) throw new StudyError('CONFIG', 'Memory triage requires a provider')
-		const response = await globalThis.fetch(new URL('/api/tags', provider.url), {
-			signal: AbortSignal.any([
-				signal,
-				this.#options.signal,
-				this.#abort.signal,
-				AbortSignal.timeout(this.#options.profile.bounds.request.duration),
-			]),
-		})
-		if (!response.ok) throw new StudyError('CONFIG', 'Memory triage inventory is unavailable')
-		const inventory: unknown = parseJSON(await response.text())
-		const model =
-			isRecord(inventory) && isArray(inventory.models)
-				? inventory.models.find((entry: unknown) => isRecord(entry) && entry.name === triage.model)
-				: undefined
-		if (!isRecord(model) || model.digest !== triage.digest)
-			throw new StudyError('CONFIG', 'Memory triage model is absent or its digest differs')
 	}
 
 	// Keys one dispatched call as `LedgerRequest` keys its own; the authority evaluates each call once.

@@ -23,6 +23,7 @@ import {
 	rejectTransportOnAbort,
 	ScriptedJudge,
 	SYSTEM_ONE_JUDGE_REQUEST,
+	buildSystemOnePositions,
 	SYSTEM_ONE_TEV1,
 	SYSTEM_ONE_TEV1_REQUEST,
 	TEV1_ANSWERS,
@@ -152,10 +153,10 @@ describe('AgentJudge — identity and request composition', () => {
 			criteria.escalation = 'Needs a manager'
 			return Response.json({
 				...SYSTEM_ONE_TEV1,
-				answers: {
+				answers: buildSystemOnePositions({
 					...SYSTEM_ONE_TEV1.answers,
 					label: { ...label, probabilities: { ...label.probabilities, escalation: 0 } },
-				},
+				}),
 			})
 		})
 		const judge = new SystemOneJudge({
@@ -166,7 +167,10 @@ describe('AgentJudge — identity and request composition', () => {
 		const result = await judge.ask(request, new AbortController().signal)
 		expect(Object.keys(criteria)).toEqual(['billing', 'bug', 'account', 'escalation'])
 		expect(result.answers.label).toStrictEqual(TEV1_CHOICE)
-		expect(await requireValue(transport.requests[0]).json()).toEqual(SYSTEM_ONE_TEV1_REQUEST)
+		expect(await requireValue(transport.requests[0]).json()).toEqual({
+			...SYSTEM_ONE_TEV1_REQUEST,
+			questions: buildSystemOnePositions(SYSTEM_ONE_TEV1_REQUEST.questions),
+		})
 	})
 })
 

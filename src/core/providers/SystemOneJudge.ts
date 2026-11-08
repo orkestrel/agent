@@ -12,6 +12,7 @@ import { JudgeError } from './errors.js'
  *
  * @remarks
  * The caller supplies the server origin and model. Every question travels in one request.
+ * Wire keys are zero-based positions in question entry order; answers return under the caller's ids.
  * Server measures are ignored; the response model is preserved.
  * `headers` supplies authentication through the shared judge engine.
  * The example readings are those of the response Ollama 0.40.0 returned for that request on 2026-10-07.
@@ -66,7 +67,7 @@ export class SystemOneJudge extends AgentJudge {
 	readonly name = 'systemone'
 
 	/**
-	 * Projects the state and questions onto the System One request with the configured model.
+	 * Projects the state and questions onto the System One request with the configured model and positional keys.
 	 *
 	 * @param request - The state and questions keyed by caller id
 	 * @returns The System One request body
@@ -76,8 +77,8 @@ export class SystemOneJudge extends AgentJudge {
 			state: request.state,
 			model: this.model,
 			questions: Object.fromEntries(
-				Object.entries(request.questions).map(([id, question]) => [
-					id,
+				Object.values(request.questions).map((question, index) => [
+					String(index),
 					questionToSystemOne(question),
 				]),
 			),
@@ -85,7 +86,7 @@ export class SystemOneJudge extends AgentJudge {
 	}
 
 	/**
-	 * Decodes requested System One answers and reports the server model and available usage.
+	 * Decodes positional System One answers under caller ids and reports the server model and available usage.
 	 *
 	 * @param value - The parsed response body
 	 * @param request - The questions defining the expected answers
@@ -100,11 +101,12 @@ export class SystemOneJudge extends AgentJudge {
 				`judge error: invalid System One response envelope; received ${preview(value)}`,
 			)
 		}
-		const entries = Object.entries(request.questions).map(([id, question]) => {
-			if (!Object.hasOwn(value.answers, id)) {
+		const entries = Object.entries(request.questions).map(([id, question], index) => {
+			const position = String(index)
+			if (!Object.hasOwn(value.answers, position)) {
 				throw new JudgeError('PROTOCOL', `judge error: question ${id} has no System One answer`)
 			}
-			const wire = value.answers[id]
+			const wire = value.answers[position]
 			if (!isSystemOneAnswer(wire)) {
 				throw new JudgeError(
 					'PROTOCOL',

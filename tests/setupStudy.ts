@@ -92,8 +92,9 @@ import * as agent from '../src/core/index.js'
 import * as provider from '@orkestrel/ollama'
 import { createScratch } from '@orkestrel/test/server'
 import { createServer } from 'node:http'
+import { deepStrictEqual, strictEqual } from 'node:assert'
 import { execFile } from 'node:child_process'
-import { cpSync, lstatSync, mkdirSync, readFileSync } from 'node:fs'
+import { cpSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -273,7 +274,10 @@ export function createStudyInstallFixture(
 			},
 		),
 	)
-	const entry = join(scratch.path, 'node_modules/@orkestrel/agent/dist/src/core/index.js')
+	// The selected subject is distinct from Study's installed Agent protocol dependency.
+	cpSync(resolve('dist'), scratch.ensure('dist'), { recursive: true, dereference: true })
+	cpSync(resolve('package.json'), join(scratch.path, 'package.json'))
+	const entry = join(scratch.path, 'dist/src/core/index.js')
 	scratch.write(
 		'studies/memory/profiles/local.json',
 		JSON.stringify({
@@ -282,7 +286,7 @@ export function createStudyInstallFixture(
 			settings: STUDY_MEMORY_SETTINGS,
 			agent: entry,
 			subject: entry,
-			roots: packages.map((captured) => captured.target),
+			roots: [scratch.path, ...packages.map((captured) => captured.target)],
 			bounds,
 			provider: {
 				entry: join(scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
@@ -510,6 +514,17 @@ export class MemoryServer implements MemoryServerFixture {
 			return
 		}
 		if (request.url === '/api/generate') {
+			const value = parseJSON(body)
+			if (isRecord(value) && value.prompt === '' && value.keep_alive === 0) {
+				response.end(
+					JSON.stringify({
+						model: readMemoryModel(body, 'model'),
+						done: true,
+						done_reason: 'unload',
+					}),
+				)
+				return
+			}
 			response.end(
 				JSON.stringify({
 					model: readMemoryModel(body, 'judge'),
@@ -763,6 +778,7 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 	const server = await createMemoryServer(options.responses)
 	const profile = buildMemoryProfile({
 		url: server.url,
+		...(options.triage === undefined ? {} : { triage: options.triage }),
 		...(options.settings === undefined ? {} : { settings: options.settings }),
 		...(options.duration === undefined ? {} : { duration: options.duration }),
 		...(options.room === undefined ? {} : { room: options.room }),
@@ -815,6 +831,7 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 	const server = await createMemoryServer(options.responses)
 	const profile = buildMemoryProfile({
 		url: server.url,
+		...(options.triage === undefined ? {} : { triage: options.triage }),
 		...(options.settings === undefined ? {} : { settings: options.settings }),
 		...(options.duration === undefined ? {} : { duration: options.duration }),
 		...(options.room === undefined ? {} : { room: options.room }),
@@ -1201,7 +1218,12 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 			url: options.url,
 			model: 'model',
 			judge: 'judge',
-			digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+			...(options.triage === undefined ? {} : { triage: options.triage.model }),
+			digest: {
+				model: 'a'.repeat(64),
+				judge: 'b'.repeat(64),
+				...(options.triage === undefined ? {} : { triage: options.triage.digest }),
+			},
 		},
 		room,
 		bounds: {
@@ -1566,6 +1588,7 @@ export interface MemoryContextFixture {
 }
 /** Holds pure profile fixture overrides. */
 export interface MemoryProfileFixture {
+	readonly triage?: { readonly model: string; readonly digest: string }
 	readonly url: string
 	readonly room?: Partial<StudyProfile['room']>
 	/** Supplies driver-owned settings verbatim; omission and `undefined` both emit an absent profile setting. */
@@ -1593,6 +1616,7 @@ export interface MemoryUsageFixture {
 }
 /** Holds a real trial's inputs: queued protocol replies, ordered goals and optional driver settings. */
 export interface MemoryTrialFixture {
+	readonly triage?: MemoryProfileFixture['triage']
 	readonly arm: 'records' | 'compaction' | 'full'
 	readonly responses: readonly MemoryWireFixture[]
 	readonly goals: readonly StudyGoal[]
@@ -4485,12 +4509,478 @@ export function buildMemoryRouteReply(
 }
 
 /** Starts the existing native fixture with a successful direct-leg reply. */
-export async function createMemoryRouteServer(): Promise<MemoryServerFixture> {
-	const server: MemoryServer = new MemoryServer([
-		buildMemoryRouteReply(() => server.requests.at(-1)),
-	])
+export async function createMemoryRouteServer(count = 1): Promise<MemoryServerFixture> {
+	const server: MemoryServer = new MemoryServer(
+		Array.from({ length: count }, () => buildMemoryRouteReply(() => server.requests.at(-1))),
+	)
 	await server.start()
 	return server
+}
+
+/** Holds an append-only horizon for the installed triage continuation proof. */
+export const MEMORY_TRIAGE_GOALS: readonly StudyGoal[] = Object.freeze([
+	MEMORY_TRIAGE_GOAL,
+	{
+		id: 'followup',
+		input: {
+			prompt: 'Summarize the delivery date.',
+			arrivals: [{ id: 'delivery', content: 'Delivery is Friday.' }],
+			records: [],
+		},
+	},
+	{
+		id: 'extended',
+		input: {
+			prompt: 'Summarize the receiver.',
+			arrivals: [{ id: 'receiver', content: 'The receiver is Bea.' }],
+			records: [],
+		},
+	},
+])
+
+/** Reads the conversation carried by either memory checkpoint strategy. */
+export function readMemoryReplayConversation(
+	checkpoint: JSONValue,
+): Readonly<Record<string, unknown>> {
+	if (!isRecord(checkpoint)) throw new Error('Missing checkpoint')
+	const conversation = isRecord(checkpoint.ledger)
+		? checkpoint.ledger.conversation
+		: checkpoint.conversation
+	if (!isRecord(conversation)) throw new Error('Missing checkpoint conversation')
+	return conversation
+}
+
+/** Reads every message in checkpoint conversation order, including folded originals. */
+export function readMemoryReplayMessages(checkpoint: JSONValue): readonly string[] {
+	const conversation = readMemoryReplayConversation(checkpoint)
+	if (!isRecord(conversation) || !isArray(conversation.messages) || !isArray(conversation.sections))
+		throw new Error('Missing checkpoint conversation')
+	const messages = [
+		...conversation.sections.flatMap((section) => {
+			if (!isRecord(section) || !isArray(section.messages))
+				throw new Error('Missing section messages')
+			return section.messages
+		}),
+		...conversation.messages,
+	]
+	const ids = messages.map((message) => {
+		if (!isRecord(message) || typeof message.id !== 'string') throw new Error('Missing message id')
+		return message.id
+	})
+	strictEqual(new Set(ids).size, ids.length, 'Conversation repeats a message id')
+	return ids
+}
+
+/** Translates declared identity fields and references while preserving every other member verbatim. */
+export function mapMemoryReplayIds(
+	value: JSONValue,
+	ids: ReadonlyMap<string, string>,
+	member = '',
+): JSONValue {
+	if (typeof value === 'string') {
+		const judgment =
+			member === 'questions.id' || /^(ledger\.)?conversation\.judgments\.id$/.test(member)
+		const tuple = judgment && value.startsWith('[') ? parseJSON(value) : undefined
+		if (
+			isArray(tuple) &&
+			['category', 'topic', 'amends', 'supersedes'].includes(String(tuple[0]))
+		) {
+			const count = tuple[0] === 'amends' || tuple[0] === 'supersedes' ? 2 : 1
+			return JSON.stringify(
+				tuple.map((part, index) => {
+					if (index === 0 || index > count) return part
+					if (typeof part !== 'string' || !ids.has(part))
+						throw new Error('Unmapped decision message id')
+					return ids.get(part)
+				}),
+			)
+		}
+		if (judgment) return ids.get(value) ?? value
+		const reference =
+			/^(ledger\.)?conversation\.(id|(sections\.)?messages\.id|judgments\.sources)$/.test(member) ||
+			/^ledger\.(requests|notes|failures)$/.test(member) ||
+			/^ledger\.window\.(exchanges\.(request|reply|lines\.source)|amendments\.(earlier|later))$/.test(
+				member,
+			)
+		if (!reference) return value
+		const mapped = ids.get(value)
+		if (mapped === undefined) throw new Error(`Unmapped ${member.split('.').at(-1)} message id`)
+		return mapped
+	}
+	if (isArray(value)) return value.map((part) => mapMemoryReplayIds(part, ids, member))
+	if (isRecord(value)) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, part]) => {
+				// Untitled unit records use a source id as their key; the rules record keeps its literal key.
+				if (
+					member === 'ledger.window.exchanges.lines' &&
+					key === 'key' &&
+					value.title === '' &&
+					part !== agent.LEDGER_RULES_KEY
+				) {
+					const mapped = typeof part === 'string' ? ids.get(part) : undefined
+					if (mapped === undefined) throw new Error('Unmapped receipt key message id')
+					return [key, mapped]
+				}
+				return [
+					key,
+					key.includes('.')
+						? part
+						: mapMemoryReplayIds(part, ids, member === '' ? key : `${member}.${key}`),
+				]
+			}),
+		)
+	}
+	return value
+}
+
+/** Validates wall clocks and recomputes the mapped replay checksum against the recorded window. */
+export function normalizeMemoryReplayCheckpoint(
+	value: JSONValue,
+	ids: ReadonlyMap<string, string>,
+	recorded: JSONValue = value,
+): JSONValue {
+	const mapped = mapMemoryReplayIds(value, ids)
+	const conversation = readMemoryReplayConversation(mapped)
+	const judgments = conversation.judgments
+	if (judgments !== undefined && !isArray(judgments))
+		throw new Error('Invalid checkpoint judgments')
+	const normalized = {
+		...conversation,
+		...(judgments === undefined
+			? {}
+			: {
+					judgments: judgments.map((judgment) => {
+						if (
+							!isRecord(judgment) ||
+							!Object.hasOwn(judgment, 'time') ||
+							typeof judgment.time !== 'number' ||
+							!Number.isFinite(judgment.time) ||
+							!Number.isInteger(judgment.time) ||
+							judgment.time < 0
+						)
+							throw new Error('Judgment clock must be present and a finite non-negative integer')
+						return { ...judgment, time: 0 }
+					}),
+				}),
+	}
+	if (!isRecord(mapped) || !isRecord(value) || !isRecord(recorded))
+		throw new Error('Invalid checkpoint')
+	if (mapped.ledger === undefined) {
+		const result = { ...mapped, conversation: normalized }
+		if (!isJSONValue(result)) throw new Error('Invalid normalized checkpoint')
+		return result
+	}
+	const ledger: unknown = mapped.ledger
+	if (!agent.isLedgerSnapshot(value.ledger) || !agent.isLedgerSnapshot(ledger))
+		throw new Error('Invalid ledger checkpoint')
+	const window = ledger.window
+	if (value.ledger.window !== undefined)
+		strictEqual(
+			value.ledger.window.digest,
+			agent.digestLedgerWindow(value.ledger.window.exchanges, value.ledger.conversation.messages),
+			'Original window digest differs',
+		)
+	const digest =
+		window === undefined
+			? undefined
+			: agent.digestLedgerWindow(window.exchanges, ledger.conversation.messages)
+	if (window !== undefined) {
+		if (digest === undefined) throw new Error('Recomputed window digest is absent')
+		if (!isRecord(recorded.ledger) || !isRecord(recorded.ledger.window))
+			throw new Error('Missing recorded window digest')
+		strictEqual(digest, recorded.ledger.window.digest, 'Recomputed window digest differs')
+	}
+	const result = {
+		...mapped,
+		ledger: {
+			...ledger,
+			conversation: normalized,
+			...(window === undefined ? {} : { window: { ...window, digest } }),
+		},
+	}
+	if (!isJSONValue(result)) throw new Error('Invalid normalized checkpoint')
+	return result
+}
+
+/** Asserts the identity bijection and strict content equality with only the ruled run-local projections. */
+export function assertMemoryReplay(
+	recorded: readonly StudyEvidence[],
+	replayed: readonly StudyEvidence[],
+): void {
+	const checkpoints = recorded.filter((row) => row.event === 'checkpoint')
+	const replay = replayed.filter((row) => row.event === 'checkpoint')
+	strictEqual(replay.length, checkpoints.length, 'Checkpoint count differs')
+	const pairs = checkpoints.flatMap((row, index) => {
+		const other = replay[index]
+		if (other === undefined) throw new Error('Missing replay checkpoint')
+		strictEqual(other.goal, row.goal, 'Checkpoint goal differs')
+		const conversation = readMemoryReplayConversation(row.value).id
+		const replayConversation = readMemoryReplayConversation(other.value).id
+		if (typeof conversation !== 'string' || typeof replayConversation !== 'string')
+			throw new Error('Missing conversation id')
+		const expected = readMemoryReplayMessages(row.value)
+		const actual = readMemoryReplayMessages(other.value)
+		strictEqual(actual.length, expected.length, 'Conversation message count differs')
+		return [
+			[conversation, replayConversation] as const,
+			...expected.map((id, position) => {
+				const target = actual[position]
+				if (target === undefined) throw new Error('Missing replay message')
+				return [id, target] as const
+			}),
+		]
+	})
+	const ids = new Map(pairs)
+	const inverse = new Map(pairs.map(([left, right]) => [right, left]))
+	strictEqual(ids.size, inverse.size, 'Message id mapping is not bijective')
+	for (const [left, right] of pairs) {
+		strictEqual(ids.get(left), right, 'Message id changed position')
+		strictEqual(inverse.get(right), left, 'Message id mapping is not bijective')
+	}
+	const decisions = recorded
+		.filter((row) => row.event === 'triage')
+		.map((row) => {
+			if (!isRecord(row.value) || !isJSONValue(row.value.questions))
+				throw new Error('Missing decisions')
+			return { goal: row.goal, questions: row.value.questions }
+		})
+	const answers = replayed
+		.filter((row) => row.event === 'triage')
+		.map((row) => {
+			if (!isRecord(row.value) || !isJSONValue(row.value.questions))
+				throw new Error('Missing replay decisions')
+			return { goal: row.goal, questions: row.value.questions }
+		})
+	// Validate references on both sides, including ids that would otherwise match by accident.
+	mapMemoryReplayIds(answers, inverse)
+	mapMemoryReplayIds(
+		replay.map((row) => row.value),
+		inverse,
+	)
+	deepStrictEqual(
+		answers,
+		mapMemoryReplayIds(decisions, ids),
+		'Retained decisions differ after message id mapping',
+	)
+	const identity = new Map([...ids.keys()].map((id) => [id, id]))
+	const expected = checkpoints.map((row) => normalizeMemoryReplayCheckpoint(row.value, identity))
+	const actual = replay.map((row, index) => {
+		const reference = checkpoints[index]
+		if (reference === undefined) throw new Error('Missing recorded checkpoint')
+		return normalizeMemoryReplayCheckpoint(row.value, inverse, reference.value)
+	})
+	deepStrictEqual(actual, expected, 'Checkpoint members differ after message id mapping')
+}
+
+/** Builds decisions with identical answers so only their identities distinguish a positional swap. */
+export function buildMemoryReplayEvidence(
+	ids: readonly string[],
+	conversation = 'records',
+	time = 0,
+	held = 'Message 0',
+): readonly StudyEvidence[] {
+	const [request, reply] = ids
+	if (request === undefined || reply === undefined) throw new Error('Missing fixture exchange')
+	const messages: readonly agent.Message[] = ids.map((id, index) => ({
+		id,
+		role: 'user',
+		content: index === 0 ? held : `Message ${index}`,
+	}))
+	const exchanges: readonly agent.LedgerExchangeSnapshot[] = [
+		{
+			request,
+			reply,
+			copy: 'Held request copy',
+			lines: [{ key: 'fixture', title: 'Fixture', source: request, sentence: 0 }],
+		},
+	]
+	const digest = agent.digestLedgerWindow(exchanges, messages)
+	if (digest === undefined) throw new Error('Missing fixture digest')
+	const checkpoint: unknown = {
+		ledger: {
+			conversation: {
+				id: conversation,
+				sections: [],
+				messages,
+				judgments: ids.map((id) => ({
+					id: JSON.stringify(['topic', id, 'fixture']),
+					question: { form: 'noul' },
+					answer: { form: 'noul', noul: 0.9 },
+					model: 'fixture',
+					sources: [id],
+					state: 'Fixture state',
+					time,
+				})),
+			},
+			requests: [],
+			notes: [...ids],
+			failures: [],
+			window: { exchanges, amendments: [], digest },
+		},
+		records: [],
+		arrivals: [],
+	}
+	if (!isJSONValue(checkpoint)) throw new Error('Invalid fixture checkpoint')
+	return [
+		...ids.map((id, index) => ({
+			goal: String(index),
+			event: 'triage',
+			value: {
+				questions: [
+					{
+						id: JSON.stringify(['category', id]),
+						outcome: 'kept',
+						probability: 0.9,
+						winner: 'fact',
+					},
+				],
+			},
+		})),
+		{
+			goal: 'final',
+			event: 'checkpoint',
+			value: checkpoint,
+		},
+	]
+}
+
+/** Writes a complete schedule and a provider-owned triage pin without selecting a trial or goal range. */
+export function writeMemoryTriageInstall(fixture: StudyInstallFixture): void {
+	const { scratch } = fixture
+	writeStudyInstallRecord(
+		scratch,
+		MEMORY_TRIAGE_GOALS.slice(0, 2).map((goal) => goal.id),
+	)
+	const path = 'studies/memory/profiles/local.json'
+	const profile = parseStudyProfile(parseJSON(scratch.read(path) ?? ''))
+	if (profile.provider === undefined) throw new Error('Missing fixture provider')
+	scratch.write(
+		path,
+		JSON.stringify({
+			...profile,
+			provider: {
+				...profile.provider,
+				triage: 'model',
+				digest: { ...profile.provider.digest, triage: 'a'.repeat(64) },
+			},
+		}),
+	)
+	scratch.write(
+		'studies/capacity/study.json',
+		JSON.stringify({
+			name: 'capacity',
+			version: '1',
+			question: 'Does the triage transport retain a reused session?',
+			purpose: 'capacity',
+			driver: 'memory',
+			arms: ['records'],
+			scenarios: ['handoff'],
+			order: [['records']],
+			retries: 0,
+			rubric: 'rubric.json',
+		}),
+	)
+	writeMemoryTriageHorizon(scratch, 2)
+}
+
+/** Grows the fixture's declared horizon and its independent operational criteria together. */
+export function writeMemoryTriageHorizon(scratch: ScratchInterface, count: number): void {
+	const goals = MEMORY_TRIAGE_GOALS.slice(0, count)
+	scratch.write(
+		'studies/capacity/rubric.json',
+		JSON.stringify({
+			version: '1',
+			criteria: goals.map((goal) => ({
+				id: goal.id,
+				scenario: 'handoff',
+				goal: goal.id,
+				method: 'state',
+				critical: true,
+				assertion: { observation: 'operational' },
+			})),
+		}),
+	)
+	scratch.write('studies/memory/scenarios/handoff.json', JSON.stringify({ id: 'handoff', goals }))
+}
+
+/** Declares a pinned Node protocol daemon that Study owns, forwarding only to a scripted loopback server. */
+export async function writeMemoryTriageDaemon(
+	fixture: StudyInstallFixture,
+	upstream: string,
+): Promise<void> {
+	const reservation = await createMemoryServer()
+	const url = reservation.url
+	await reservation.close()
+	if (Number(new URL(url).port) <= 40000 || Number(new URL(upstream).port) <= 40000)
+		throw new Error('Dedicated fixture ports above 40000 are required')
+	fixture.scratch.write('daemon.ts', renderMemoryTriageDaemon())
+	const profile = parseStudyProfile(
+		parseJSON(fixture.scratch.read('studies/memory/profiles/local.json') ?? ''),
+	)
+	if (profile.provider === undefined) throw new Error('Missing provider')
+	fixture.scratch.write(
+		'studies/memory/profiles/local.json',
+		JSON.stringify({
+			...profile,
+			provider: {
+				...profile.provider,
+				url,
+				daemon: {
+					executable: realpathSync(process.execPath),
+					digest: hashStudyBytes(readFileSync(process.execPath)),
+					version: 'fixture-1',
+					environment: {
+						NODE_OPTIONS: `--experimental-strip-types --import=${pathToFileURL(join(fixture.scratch.path, 'daemon.ts')).href}`,
+						STUDY_FIXTURE_UPSTREAM: upstream,
+						STUDY_FIXTURE_PIDS: join(fixture.scratch.path, 'daemon-pids.jsonl'),
+					},
+					models: [
+						{ name: 'model', digest: 'a'.repeat(64) },
+						{ name: 'judge', digest: 'b'.repeat(64) },
+					],
+				},
+			},
+		}),
+	)
+}
+
+/** Renders the node:-only preload for Study's owned daemon; the manager launches and stops it. */
+export function renderMemoryTriageDaemon(): string {
+	return `import { createServer, request } from 'node:http'
+import { appendFileSync } from 'node:fs'
+const origin = new URL('http://' + process.env.OLLAMA_HOST)
+const upstream = new URL(process.env.STUDY_FIXTURE_UPSTREAM)
+if ([origin, upstream].some((url) => url.hostname !== '127.0.0.1' || Number(url.port) <= 40000)) throw new Error('Dedicated loopback ports required')
+appendFileSync(process.env.STUDY_FIXTURE_PIDS, JSON.stringify(process.pid) + '\\n')
+const server = createServer((incoming, outgoing) => {
+	const forward = request(new URL(incoming.url, upstream), { method: incoming.method, headers: incoming.headers }, (response) => {
+		outgoing.writeHead(response.statusCode, response.headers)
+		response.pipe(outgoing)
+	})
+	forward.on('error', (error) => outgoing.destroy(error))
+	incoming.pipe(forward)
+})
+server.listen(Number(origin.port), '127.0.0.1', () => process.stderr.write('Listening on ' + origin.host + ' (version fixture-1)\\n'))
+await new Promise(() => {})
+`
+}
+
+/** Checks that every process started by the scripted daemon has already been reaped by Study. */
+export function assertMemoryDaemonClosed(scratch: ScratchInterface): void {
+	const pids = (scratch.read('daemon-pids.jsonl') ?? '').trim().split(/\r?\n/).filter(Boolean)
+	if (pids.length === 0) throw new Error('The owned daemon never started')
+	for (const line of pids) {
+		const pid = Number(line)
+		if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('Invalid daemon pid')
+		try {
+			process.kill(pid, 0)
+		} catch (error) {
+			if (error instanceof Error && 'code' in error && error.code === 'ESRCH') continue
+			throw error
+		}
+		throw new Error(`Owned daemon ${pid} survived execution`)
+	}
 }
 
 /** Varies each fixed-policy member independently for identity proofs. */

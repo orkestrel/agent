@@ -47,6 +47,33 @@ import {
 } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
+	it('declares triage only for records and reserves the profile request ceiling', () => {
+		const profile = buildMemoryProfile({
+			url: 'http://127.0.0.1:1',
+			triage: { model: 'tev1', digest: 'c'.repeat(64) },
+		})
+		expect(buildStudyMemoryRoles(profile, 'records').triage).toEqual({
+			model: 'tev1',
+			tokens: 32640,
+		})
+		expect(buildStudyMemoryRoles(profile, 'full').triage).toBeUndefined()
+		expect(buildStudyMemoryRoles(profile, 'compaction').triage).toBeUndefined()
+		const provider = profile.provider
+		if (provider === undefined) throw new Error('Missing provider')
+		const { triage, ...untriaged } = provider
+		expect(triage).toBe('tev1')
+		for (const broken of [
+			untriaged,
+			{ ...provider, digest: { model: provider.digest.model, judge: provider.digest.judge } },
+		]) {
+			expect(() =>
+				validateStudyMemoryProfile({ ...profile, provider: broken }, ['records']),
+			).toThrow('Memory provider declaration is invalid')
+			expect(() => buildStudyMemoryRoles({ ...profile, provider: broken }, 'records')).toThrow(
+				'Memory triage requires a model and digest together',
+			)
+		}
+	})
 	it('keys the triage identity by every policy member in canonical order', () => {
 		const models = MEMORY_TRIAGE_POLICIES.map((policy) =>
 			buildStudyMemoryJudgeModel(policy, 'first', 'second'),

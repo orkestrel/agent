@@ -26,8 +26,6 @@ import type {
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
-	/** Pins the direct System One leg; absent selects the Mica-only judge. */
-	readonly triage?: { readonly model: string; readonly digest: string } | undefined
 	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
 	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */

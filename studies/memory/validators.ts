@@ -23,7 +23,7 @@ import {
 	isString,
 	recordOf,
 } from '@orkestrel/contract'
-import { isStudyAgentRuntime, isStudyAgentGauge, isStudyDigest } from '@orkestrel/study'
+import { isStudyAgentRuntime, isStudyAgentGauge } from '@orkestrel/study'
 import { isStudyOllamaMetadata } from '@orkestrel/study/server'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
@@ -88,19 +88,11 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 						'metadata',
 						'correction',
 						'judge',
-						'triage',
 					].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, version, metadata, correction, judge, triage } = value
-		if (
-			triage !== undefined &&
-			(!recordOf({ model: isNonEmptyString, digest: isStudyDigest })(triage) ||
-				Object.keys(triage).length !== 2 ||
-				triage.digest.length !== 64)
-		)
-			return false
+		const { gauge, observe, checkpoints, version, metadata, correction, judge } = value
 		if (
 			judge !== undefined &&
 			(!recordOf({ gpu: isFiniteNumber })(judge) ||

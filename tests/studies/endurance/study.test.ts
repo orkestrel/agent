@@ -294,7 +294,7 @@ describe('prospective public endurance declarations', () => {
 		const recommended = parseStudyProfile(
 			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
 		)
-		expect(recommended.record).toBeUndefined()
+		expect(recommended.record).toEqual({ bytes: 536870912, calls: 4096, duration: 2400000 })
 		expect(isStudyMemoryOptions(recommended.settings)).toBe(true)
 		expect(recommended).toMatchObject({
 			name: 'recommended',
@@ -306,9 +306,11 @@ describe('prospective public endurance declarations', () => {
 				url: 'http://127.0.0.1:11435',
 				model: 'qwen3.5:4b-q4_K_M',
 				judge: 'hf.co/sky7350/Mica-v0.1-4B:Q4_K_M',
+				triage: 'tev1:0.8b',
 				digest: {
 					model: 'd8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04',
 					judge: 'ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b',
+					triage: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
 				},
 				daemon: {
 					executable:
@@ -324,6 +326,10 @@ describe('prospective public endurance declarations', () => {
 							name: 'hf.co/sky7350/Mica-v0.1-4B:Q4_K_M',
 							digest: 'ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b',
 						},
+						{
+							name: 'tev1:0.8b',
+							digest: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
+						},
 					],
 					environment: {
 						OLLAMA_NUM_PARALLEL: '1',
@@ -333,14 +339,11 @@ describe('prospective public endurance declarations', () => {
 					},
 				},
 			},
+			record: { bytes: 536870912, calls: 4096, duration: 2400000 },
 			room: { context: 20480, output: 8192, safety: 512, recap: 2048, think: false },
 			settings: {
 				observe: true,
 				judge: { gpu: 0 },
-				triage: {
-					model: 'tev1:0.8b',
-					digest: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
-				},
 				version: '0.40.15',
 				metadata: { calls: 8192, bytes: 67108864, duration: 600000 },
 				gauge: { scale: 1, overhead: 352 },

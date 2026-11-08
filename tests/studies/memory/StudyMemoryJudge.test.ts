@@ -35,12 +35,11 @@ describe('StudyMemoryJudge', () => {
 			Promise.reject(new JudgeAbortError(MEMORY_TRIAGE_PARTIAL)),
 		)
 		const signal = new AbortController().signal
-		const result = await fixture.judge.ask(MEMORY_TRIAGE_REQUEST, signal)
+		await expect(fixture.judge.ask(MEMORY_TRIAGE_REQUEST, signal)).rejects.toBeInstanceOf(
+			JudgeAbortError,
+		)
 		expect(signal.aborted).toBe(false)
-		expect(fixture.requests.count).toBe(1)
-		expect(fixture.requests.calls[0]?.[0].questions.low).toBe(MEMORY_TRIAGE_REQUEST.questions.low)
-		expect(result.answers.low).toBe(MEMORY_TRIAGE_SECOND.answers.low)
-		expect(result.answers.low).not.toBe(MEMORY_TRIAGE_PARTIAL.answers.low)
+		expect(fixture.requests.count).toBe(0)
 	})
 	it('uses caller criteria order for a tied winner', async () => {
 		const fixture = createMemoryRouting(() => Promise.resolve(MEMORY_TRIAGE_TIED))
@@ -153,13 +152,13 @@ describe('StudyMemoryJudge', () => {
 		expect(fixture.calls.calls.map((call) => call[0])).toEqual(['noul', 'edge'])
 		expect(fixture.evidence.count).toBe(1)
 	})
-	it('refers a first fault and records it, but propagates a second fault', async () => {
+	it('propagates a first fault without referring, and propagates a second fault', async () => {
 		const fault = new Error('first unavailable')
 		const fixture = createMemoryRouting(() => Promise.reject(fault))
-		const result = await fixture.judge.ask(MEMORY_TRIAGE_REQUEST, new AbortController().signal)
-		expect(result.answers.low).toBe(MEMORY_TRIAGE_SECOND.answers.low)
-		expect(fixture.evidence.count).toBe(1)
-		expect(JSON.stringify(fixture.evidence.calls)).toContain('fault')
+		await expect(
+			fixture.judge.ask(MEMORY_TRIAGE_REQUEST, new AbortController().signal),
+		).rejects.toBe(fault)
+		expect(fixture.calls.count).toBe(3)
 		const failed = createMemoryRouting(undefined, () => Promise.reject(fault))
 		await expect(
 			failed.judge.ask(MEMORY_TRIAGE_REQUEST, new AbortController().signal),
@@ -197,14 +196,15 @@ describe('StudyMemoryJudge', () => {
 		expect(error.partial.refusals?.edge).toBeUndefined()
 		expect(error.partial.usage).toEqual({ prompt: 30, completion: 5, total: 35 })
 	})
-	it('refers an internal first abort with a live caller and preserves unknown usage', async () => {
+	it('propagates an internal first abort with a live caller', async () => {
 		const fixture = createMemoryRouting(
 			() => Promise.reject(new JudgeAbortError({ model: 'first', answers: {} })),
 			() => Promise.resolve({ model: 'second', answers: {} }),
 		)
-		const result = await fixture.judge.ask(MEMORY_TRIAGE_REQUEST, new AbortController().signal)
-		expect(fixture.calls.count).toBe(8)
-		expect(result.usage).toBeUndefined()
+		await expect(
+			fixture.judge.ask(MEMORY_TRIAGE_REQUEST, new AbortController().signal),
+		).rejects.toBeInstanceOf(JudgeAbortError)
+		expect(fixture.calls.count).toBe(3)
 	})
 	it('includes both legs and the policy in a canonical model identity', () => {
 		const fixture = createMemoryRouting()
