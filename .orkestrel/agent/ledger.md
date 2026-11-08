@@ -557,3 +557,8 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-07 | The test of the reserve candidate, with probes | `reviewer` GPT-6 Astra | `plan.md` O196 |
 | 2026-11-07 | The user's word: take care of all that is open, for a final version of 0.0.37 | user | `plan.md` O196 |
 | 2026-11-07 | The release wave: Agent 0.0.37, Ollama 0.0.31, Toolbox 0.0.26, Study 0.0.13, and Agent's development re-pin | Orchestrator, on the user's one-time codes | `plan.md` O197 |
+| 2026-11-07 | rc-v1's two designs, read-only | `analyst` GPT-6 Astra; `planner` Claude Fable 5.1 | `plan.md` O199 |
+| 2026-11-07 | rc-v1's candidate test, the build in three rounds, its acceptance test, and its closure check | `reviewer` GPT-6 Astra; `astra` GPT-6 Astra | `plan.md` O199 |
+| 2026-11-07 | rc-v1's tree-wide gates | `verifier` GPT-6 Luna | `plan.md` O199 |
+| 2026-11-07 | rc-v2's design and its reading's build | `planner` Claude Fable 5.1; `builder` GPT-6.1 Sol | `plan.md` O199 |
+| 2026-11-07 | rc-v3's census, plan, Study build, and review | `checker` GPT-6 Luna; `planner` GPT-6 Astra; `astra` GPT-6 Astra; `reviewer` GPT-6 Astra | `plan.md` O199 |
