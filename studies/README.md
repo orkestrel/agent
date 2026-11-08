@@ -58,7 +58,7 @@ For the recipe and its tested fence, see [Composing a records desk for a small l
 
 ## What it measured
 
-The last row is the current strategy, read on 2026-11-07. Each cell is one read on one host, on the 4B agent model and runner 0.40.15, so it reports what that host read and nothing about another. `.orkestrel/agent/plan.md` O187 to O194 holds each reading. First text and recall read a chat battery sealed before any arm ran, and first token and mechanical results read goals `ev-01-1` to `ev-04-4`:
+The last row is the current strategy, read on 2026-11-07. Each cell is one read on one host, on the 4B agent model and runner 0.40.15, so it reports what that host read and nothing about another. `.orkestrel/agent/plan.md` O187 to O199 holds each reading. First text and recall read a chat battery sealed before any arm ran, and first token and mechanical results read goals `ev-01-1` to `ev-04-4`:
 
 | Arm                                     | First text in a chat, median | Recall at the last turn, two or three back, and further back | First token on a long goal, median | Mechanical results |
 | --------------------------------------- | ---------------------------- | ------------------------------------------------------------ | ---------------------------------- | ------------------ |
@@ -68,12 +68,13 @@ The last row is the current strategy, read on 2026-11-07. Each cell is one read 
 | Adding the two-step judge               | not read                     | not read                                                     | 10.2 s                             | 16 of 16           |
 | Adding the window                       | 1.24 s                       | 10 of 11, 21 of 23, and 20 of 24                             | 10.0 s                             | 16 of 16           |
 | Offering `recall` only when it can help | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.5 s                             | 16 of 16           |
+| Fitting `recall` to the measured room   | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.4 s                             | 16 of 16           |
 
 That last step took answers both right and free of a denial from 30 to 47 of 58, and `recall` calls from 0.73 to 0.01 per follow-up.
 
-The weakest reading is a capacity far below this profile's. At a capacity of 1600 with 1024 of it reserved for output, the same battery reads 5 of 11, 2 of 23, and 1 of 24, against 3 of 11, 4 of 23, and 1 of 24 before that step, so the middle depth misses its floor of 3 and the step stays by a ruling in `.orkestrel/agent/plan.md` O194. On the two dialogues traced at that capacity, every `recall` call answered that `recall` was closed, because the reply reserve keeps the longest reply seen and this build's replies run longer. Before that step, 7 of 15 calls stayed open, and one of them answered a lost row right. A host with that little room can't rely on `recall`.
+The last step changes nothing at this profile's capacity and is for a host with less room. `recall` used to close whenever the room under `predict` fell below twice the longest reply the ledger had seen; it now fits whole results into the room the request's own prompt leaves. At a capacity of 1600 with 1024 of it reserved for output, the battery reads 7 of 11, 9 of 23, and 9 of 24, against 5 of 11, 2 of 23, and 1 of 24 before that step, and 3 of 11, 4 of 23, and 1 of 24 before the one ahead of it, while the follow-up `Make that shorter.` keeps its exchange in 6 of 6. A host with that little room still recalls less than one with room to spare.
 
-The same close shows at this profile's capacity after a long reply. A replay of the reported tokens on goals `ev-01-1` to `ev-04-4`, with the longest reply at 2123 tokens, reads it closed on 4 of 16 goals, though the model called `recall` on none of them. Counting only the part of a reply past `predict` read 10 of 11, 8 of 23, and 3 of 24 at capacity 1600 and changed nothing at the two larger capacities, but it dropped the exchange a request like `Make that shorter.` needs at 1600, and a whole first listing item then crossed the capacity. That change isn't in this build (O196).
+Two readings rule options out. A judge narrowing a request to its desk area's tools doesn't help the 4B model: with all 36 tools of a fictional catalog offered it chose right on 42 of 42 requests, and narrowed to the known area's 6 it chose right on 35 of 42, answering some requests in text with no call, though its prompt fell from 2416 to 699 tokens. Correction narrowing (`settings.correction.narrow`) read no change on these goals: 47 judge calls with it and without, with byte-identical results.
 
 ## Running it
 
