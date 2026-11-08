@@ -1203,14 +1203,19 @@ export function splitTopic(topic: string): readonly string[] {
  * Cuts entries to a room and names how many it left out.
  *
  * @remarks
- * The cut keeps at least one entry. When it leaves entries out, its last line reads
+ * By default the cut keeps at least one entry. With `first: false`, it keeps whole entries only
+ * when the joined result, tool framing, and omission line fit, and considers later entries after
+ * an oversized group. When it leaves some entries out, its last line reads
  * `N older items not shown; name a narrower topic to narrow the recall`, which
  * {@link matchesCutLine} recognizes. Pass `more` when the entries aren't in age order, so the line
- * doesn't claim an omitted entry is older than a kept one.
+ * doesn't claim an omitted entry is older than a kept one. A fitted cut also uses `more` when it
+ * skips an entry before a kept one. With no kept entry it reads
+ * `N older items didn't fit in this request; answer from the messages you can see`.
  *
  * @param entries - The entries in the order they are kept
  * @param room - The estimate units the joined entries can take
  * @param kind - What the cut line calls an omitted entry. Default: `older`
+ * @param first - If `true`, keeps the first entry regardless of room; if `false`, fits every entry and the omission line. Default: `true`
  * @returns The kept entries followed by the cut line when any were left out, joined by newlines
  *
  * @example
@@ -1222,7 +1227,38 @@ export function cutListing(
 	entries: readonly string[],
 	room: number,
 	kind: 'older' | 'more' = 'older',
+	first = true,
 ): string {
+	if (!first) {
+		if (estimateMessages([{ id: 'recall', role: 'tool', content: entries.join('\n') }]) <= room)
+			return entries.join('\n')
+		const kept = entries.reduce<readonly number[]>((accepted, entry, at) => {
+			const left = entries.length - accepted.length - 1
+			const omitted = accepted.length < at ? 'more' : kind
+			const text = [
+				...accepted.map((index) => entries[index]),
+				entry,
+				...(left > 0
+					? [
+							`${left} ${omitted} item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
+						]
+					: []),
+			].join('\n')
+			return estimateMessages([{ id: 'recall', role: 'tool', content: text }]) <= room
+				? [...accepted, at]
+				: accepted
+		}, [])
+		const left = entries.length - kept.length
+		const omitted = kept.some((at, index) => at !== index) ? 'more' : kind
+		return [
+			...kept.map((at) => entries[at]),
+			...(left > 0
+				? [
+						`${left} ${omitted} item${left === 1 ? '' : 's'} ${kept.length === 0 ? "didn't fit in this request; answer from the messages you can see" : 'not shown; name a narrower topic to narrow the recall'}`,
+					]
+				: []),
+		].join('\n')
+	}
 	// The cut keeps at least one entry, and stops at the first entry whose addition passes the room.
 	const stop = [...entries.keys()].findIndex(
 		(at) =>
@@ -1259,7 +1295,9 @@ export function cutListing(
  * ```
  */
 export function matchesCutLine(line: string): boolean {
-	return /^\d+ (?:older|more) items? not shown; /.test(line)
+	return /^\d+ (?:older|more) items? (?:not shown; |didn't fit in this request; answer from the messages you can see$)/.test(
+		line,
+	)
 }
 
 /**

@@ -315,7 +315,10 @@ export type LedgerAgentOptions = Pick<
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. The plan budgets
  * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
- * Recall closes when `remainder - predict < 2 * reserve`. `snapshot` hydrates the conversation and
+ * The plan retains its `remainder - predict < 2 * reserve` admission rule. Runtime recall fits whole
+ * results to measured remaining capacity at the larger of the gauge rate and the request's measured
+ * rate, allowing `LEDGER_SCALE_DRIFT` for new text. Lack of room omits results without closing recall.
+ * `snapshot` hydrates the conversation and
  * the marked ids a ledger's `snapshot()` returned; construction throws `LedgerError` with code
  * `'SNAPSHOT'` when `isLedgerSnapshot` refuses it, and `ConversationError` with code `'ROLE'` or
  * `'SNAPSHOT'` when its conversation holds a `system` message or repeats an id.
@@ -406,6 +409,20 @@ export interface LedgerWindowSnapshot {
 export interface LedgerResult extends AgentResult {
 	readonly passes: readonly AgentResult[]
 	readonly attempts: readonly ClassifierAttempt[]
+}
+
+/** Carries a recall result, its accepted whole groups, lookup line translations, and provider-turn position. */
+export interface LedgerListing {
+	readonly result: string
+	readonly lines: ReadonlyMap<string, string>
+	readonly groups: readonly string[]
+	readonly turn: number
+}
+
+/** Carries the answer note and the partial messages omitted from its prompt. */
+export interface LedgerRecovery {
+	readonly digest: string | undefined
+	readonly omitted: ReadonlySet<string>
 }
 
 /**
@@ -524,8 +541,11 @@ export interface LedgerRequestInterface {
 	 *
 	 * @param result - The recall result text
 	 * @param lines - Each listed lookup line mapped to the first line of its stored content
+	 * @param groups - The complete candidate groups, in listing order; only groups present in the result are retained
 	 */
-	list(result: string, lines: ReadonlyMap<string, string>): void
+	list(result: string, lines: ReadonlyMap<string, string>, groups: readonly string[]): void
+	/** Holds each recall result with its accepted groups and provider-turn position. */
+	readonly listings: readonly LedgerListing[]
 	/**
 	 * Returns the stored first lines a recall result listed.
 	 *
@@ -945,8 +965,12 @@ export interface GaugeCall {
  * `max(0, overhead - (spared ?? 0)) + scale * estimate`.
  * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall uniform at the marginal
  * rate to the largest observed reply's `completion - (thinking ?? 0)` for every policy.
- * Without a positive reply observation, it prices the longest reply text at that rate. Recall room is
- * `max(0, (remainder - predict - reserve) / 2 / rate)`; recall closes at `remainder - predict < 2 * reserve`.
+ * Without a positive reply observation, it prices the longest reply text at that rate. The room formula
+ * `max(0, (remainder - predict - reserve) / 2 / rate)` is the planning forecast. The ledger's runtime
+ * recall instead fits results below `capacity - predict`, anchoring the prefix to reported usage
+ * and pricing additions at the larger of the marginal rate and the request's measured rate, with
+ * `LEDGER_SCALE_DRIFT` headroom. The measured rate subtracts overhead only where `observe` would
+ * rescale; partially spared calls retain the marginal rate. Missing usage uses an estimate.
  */
 export interface GaugeOptions extends LedgerGauge {
 	readonly capacity: number

@@ -2447,6 +2447,103 @@ export class PricedLedgerProvider extends ScriptedProvider {
 	}
 }
 
+/** Serves whole hidden sources through measured recall and its optional answer pass. */
+export async function serveLedgerFit(options: {
+	readonly capacity: number
+	readonly predict: number
+	readonly reply: number
+	readonly fraction?: number
+	readonly sources: readonly string[]
+	readonly topics?: readonly string[]
+	readonly partial?: number
+	readonly request?: string
+}) {
+	const topics = options.topics ?? ['vault']
+	const warm = 'R'.repeat(Math.floor((options.reply * 4) / 1.16))
+	const partial = 'P'.repeat(options.partial ?? 0)
+	const provider = new PricedLedgerProvider(
+		[
+			{ content: warm },
+			...topics.map((topic, index) => ({
+				content: '',
+				tools: [{ id: `fit-${index}`, name: 'recall', arguments: { topic } }],
+			})),
+			{ content: partial },
+			{ content: 'Finished.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			capacity: options.capacity,
+			predict: options.predict,
+			lookups: [],
+			share: { prompt: 1, tail: 0.001 },
+			gauge: { scale: 1.16, overhead: 150 },
+		}),
+	)
+	for (const content of options.sources) {
+		const message = ledger.conversation.add({ role: 'user', content })
+		ledger.conversation.judgments.add(buildLedgerJudgment(message))
+	}
+	seedLedgerRecall(ledger)
+	await ledger.respond('Warm.')
+	ledger.agent.emitter.on('usage', () => {
+		if (options.partial !== undefined && provider.calls.length === topics.length + 2)
+			ledger.agent.abort('partial')
+	})
+	const result = await ledger.respond(
+		options.request ??
+			`Find the vault code.${'q'.repeat(Math.floor(((options.capacity - options.predict) * (options.fraction ?? 0) * 4) / 1.16))}`,
+	)
+	return { ledger, provider, result, warm, partial }
+}
+
+/** Serves a hidden code at a reported prompt boundary with supplied or calibrated gauge options. */
+export async function serveLedgerBoundary(options: {
+	readonly calibrated?: boolean
+	readonly predict: number
+	readonly replay?: ThinkingReplay
+	readonly prompt: number
+	readonly thinking?: number
+}) {
+	const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'vault' } }]
+	const completion = JSON.stringify(calls).length + (options.thinking ?? 0)
+	const provider = createScriptedProvider(
+		[
+			...(options.calibrated
+				? [
+						{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+						{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
+					]
+				: []),
+			{
+				content: '',
+				tools: calls,
+				thinking: 'a'.repeat(options.thinking ?? 0),
+				usage: { prompt: options.prompt, completion, total: options.prompt + completion },
+			},
+			{ content: 'Done.' },
+		],
+		{ recorded: true, replay: options.replay ?? 'none' },
+	)
+	const configured = buildLedgerOptions({
+		predict: options.predict,
+		share: { prompt: 1, tail: 0.001 },
+	})
+	const ledger = createLedger(
+		provider,
+		options.calibrated ? buildUncalibratedOptions(configured) : configured,
+	)
+	if (options.calibrated) await ledger.calibrate(new AbortController().signal)
+	const source = ledger.conversation.add({ role: 'user', content: 'The vault code is 7391.' })
+	ledger.conversation.judgments.add(buildLedgerJudgment(source))
+	seedLedgerRecall(ledger)
+	await ledger.respond('Review.' + 'q'.repeat(options.prompt * 4 - 200))
+	return { ledger, provider, source }
+}
+
 /** Replays a provider turn and then raises the supplied boundary failure. */
 export class FailingProvider extends ScriptedProvider {
 	readonly #failure: Error

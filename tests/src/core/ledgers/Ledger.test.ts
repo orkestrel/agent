@@ -46,6 +46,8 @@ import {
 import { describe, expect, expectTypeOf, it, onTestFinished } from 'vitest'
 import {
 	seedLedgerRecall,
+	serveLedgerBoundary,
+	serveLedgerFit,
 	PricedLedgerProvider,
 	buildCategoryAnswer,
 	LEDGER_ADMISSION_SIZES,
@@ -118,6 +120,398 @@ import {
 } from '../../../setup.js'
 
 describe('Ledger', () => {
+	it('holds the drift margin for an estimated prefix when usage is absent', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'r', name: 'recall', arguments: { topic: 'vault' } }] },
+				{ content: 'Finished.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 4096,
+				predict: 1024,
+				lookups: [],
+				gauge: { scale: 1, overhead: 150 },
+				share: { prompt: 1, tail: 0.001 },
+			}),
+		)
+		const message = ledger.conversation.add({
+			role: 'user',
+			content: 'The vault code is 7391. ' + 'v'.repeat(1200),
+		})
+		ledger.conversation.judgments.add(buildLedgerJudgment(message))
+		ledger.conversation.add({ role: 'assistant', content: 'R'.repeat(1500) })
+		await ledger.respond('Find the vault code. ' + 'q'.repeat(10000))
+		expect(
+			provider.calls.every(
+				(call) =>
+					Math.round(
+						estimateMessages(call.messages) * (1 + LEDGER_SCALE_DRIFT) +
+							(call.tools?.length ?? 0) * 150,
+					) <= 3072,
+			),
+		).toBe(true)
+	})
+	it('shares measured room across sibling recall calls', async () => {
+		const sources = [
+			'The vault code is 7391. ' + 'v'.repeat(6000),
+			'The parcel code is 4471. ' + 'p'.repeat(6000),
+		]
+		const provider = new PricedLedgerProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'a', name: 'recall', arguments: { topic: 'vault' } },
+						{ id: 'b', name: 'recall', arguments: { topic: 'parcel' } },
+					],
+				},
+				{ content: 'Finished.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 4096,
+				predict: 1024,
+				lookups: [],
+				gauge: { scale: 1.16, overhead: 150 },
+				share: { prompt: 1, tail: 0.001 },
+			}),
+		)
+		for (const content of sources) {
+			const message = ledger.conversation.add({ role: 'user', content })
+			ledger.conversation.judgments.add(buildLedgerJudgment(message))
+		}
+		await ledger.respond('Find both codes.')
+		expect(ledger.conversation.messages().find((message) => message.call === 'a')?.content).toBe(
+			sources[0],
+		)
+		expect(ledger.conversation.messages().find((message) => message.call === 'b')?.content).toBe(
+			"1 older item didn't fit in this request; answer from the messages you can see",
+		)
+		expect(
+			provider.calls.every(
+				(call) =>
+					Math.round(estimateMessages(call.messages) * 1.16 + (call.tools?.length ?? 0) * 150) <=
+					3072,
+			),
+		).toBe(true)
+	})
+	it('keeps recall open after omitting a whole group that cannot fit', async () => {
+		const short = 'The code is 7391.'
+		const { ledger } = await serveLedgerFit({
+			capacity: 4096,
+			predict: 1024,
+			reply: 2,
+			sources: ['vault ' + 'v'.repeat(16000), short],
+			topics: ['vault '.repeat(1000), 'code'],
+		})
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
+		).toBe("1 older item didn't fit in this request; answer from the messages you can see")
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'fit-1')?.content,
+		).toBe(short)
+	})
+	it('fits the union of lookup result groups in recovery', async () => {
+		const first = 'The vault code is 7391. ' + 'v'.repeat(7000) + '\nCorrection: use 7392.'
+		const second = 'The parcel code is 4471. ' + 'p'.repeat(7000)
+		const provider = new PricedLedgerProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'a', name: 'lookup', arguments: {} },
+						{ id: 'b', name: 'parcel', arguments: {} },
+					],
+				},
+				{ content: 'Finished.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 4096,
+				predict: 1024,
+				gauge: { scale: 1.16, overhead: 230 },
+				agent: { limit: 1 },
+				lookups: [
+					{
+						tool: createTool({
+							name: 'lookup',
+							description: 'Reads the vault.',
+							execute: () => first,
+						}),
+						read: () => ({ ids: [], owners: [] }),
+					},
+					{
+						tool: createTool({
+							name: 'parcel',
+							description: 'Reads the parcel.',
+							execute: () => second,
+						}),
+						read: () => ({ ids: [], owners: [] }),
+					},
+				],
+			}),
+		)
+		seedLedgerRecall(ledger)
+		await ledger.respond('Check both codes.')
+		const answer = requireValue(provider.calls.at(-1)).messages
+		const digest = requireValue(
+			answer.find((message) => message.content.startsWith(LEDGER_NOTES.results)),
+		).content
+		expect(digest).toContain(first)
+		expect(digest).not.toContain(second)
+		expect(digest).toContain('1 more item not shown;')
+		expect(Math.round(estimateMessages(answer) * 1.16)).toBeLessThanOrEqual(3072)
+	})
+	it('fits a short recall after a long reply using the measured request', async () => {
+		const source = 'The vault code is 7391.'
+		const { ledger, provider } = await serveLedgerFit({
+			capacity: 19968,
+			predict: 8192,
+			reply: 2100,
+			fraction: 0.7,
+			sources: [source],
+		})
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
+		).toBe(source)
+		expect(
+			provider.calls.every(
+				(call) =>
+					Math.round(estimateMessages(call.messages) * 1.16 + (call.tools?.length ?? 0) * 150) +
+						8192 <=
+					19968,
+			),
+		).toBe(true)
+	})
+	it.each([6000, 8000])(
+		'fits or omits a whole source with %i padding characters',
+		async (padding) => {
+			const source = 'The vault code is 7391. ' + 'v'.repeat(padding)
+			const { ledger, provider } = await serveLedgerFit({
+				capacity: 4096,
+				predict: 1024,
+				reply: 614,
+				sources: [source],
+			})
+			expect(
+				ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
+			).toBe(
+				padding === 6000
+					? source
+					: "1 older item didn't fit in this request; answer from the messages you can see",
+			)
+			expect(
+				provider.calls.every(
+					(call) =>
+						Math.round(estimateMessages(call.messages) * 1.16 + (call.tools?.length ?? 0) * 150) +
+							1024 <=
+						4096,
+				),
+			).toBe(true)
+		},
+	)
+	it.each([4096, 19968])('omits an oversized source at capacity %i', async (capacity) => {
+		const predict = capacity === 4096 ? 1024 : 8192
+		const source =
+			'The vault code is 7391. ' +
+			'vault detail '.repeat(Math.ceil((capacity * 0.8 * 4) / 1.16 / 13))
+		const { ledger, provider } = await serveLedgerFit({
+			capacity,
+			predict,
+			reply: capacity === 4096 ? 614 : 2100,
+			fraction: capacity === 4096 ? 0.6 : 0.7,
+			sources: [source],
+		})
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
+		).toBe("1 older item didn't fit in this request; answer from the messages you can see")
+		expect(
+			provider.calls.every(
+				(call) =>
+					Math.round(estimateMessages(call.messages) * 1.16 + (call.tools?.length ?? 0) * 150) +
+						predict <=
+					capacity,
+			),
+		).toBe(true)
+	})
+	it('keeps the newest whole statements that fit a small prompt allowance', async () => {
+		const sources = Array.from(
+			{ length: 12 },
+			(_, index) => `The vault code is ${7391 + index}. ` + 'vault detail '.repeat(35),
+		)
+		const { ledger, provider } = await serveLedgerFit({
+			capacity: 1600,
+			predict: 1024,
+			reply: 153.6,
+			sources,
+		})
+		const listing = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'fit-0'),
+		).content
+		expect(listing).toContain(requireValue(sources.at(-1)))
+		expect(listing).toContain('older items not shown;')
+		expect(
+			provider.calls.every(
+				(call) =>
+					Math.round(estimateMessages(call.messages) * 1.16 + (call.tools?.length ?? 0) * 150) +
+						1024 <=
+					1600,
+			),
+		).toBe(true)
+	})
+	it('keeps recall open for a distinct short topic after a long topic', async () => {
+		const source = 'The vault code is 7391.'
+		const { ledger } = await serveLedgerFit({
+			capacity: 4096,
+			predict: 1024,
+			reply: 2,
+			sources: [source],
+			topics: ['vault '.repeat(1000), 'vault'],
+		})
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'fit-1')?.content,
+		).toBe(source)
+	})
+	it('drops a partial from the recovery prompt while retaining its stored text', async () => {
+		const source = 'The vault code is 7391. ' + 'v'.repeat(6000)
+		const { ledger, provider, partial } = await serveLedgerFit({
+			capacity: 4096,
+			predict: 1024,
+			reply: 614,
+			sources: [source],
+			partial: 6000,
+		})
+		const answer = requireValue(provider.calls.at(-1))
+		expect(answer.messages.some((message) => message.content === partial)).toBe(false)
+		expect(ledger.conversation.messages().some((message) => message.content === partial)).toBe(true)
+		expect(Math.round(estimateMessages(answer.messages) * 1.16)).toBeLessThanOrEqual(3072)
+		expect(answer.messages.some((message) => message.content.includes(source))).toBe(true)
+	})
+	it('retains the shorter exchange with request-local recall fitting', async () => {
+		const { provider, warm } = await serveLedgerFit({
+			capacity: 19968,
+			predict: 8192,
+			reply: 2100,
+			sources: ['The vault code is 7391.'],
+			request: 'Make that shorter.',
+		})
+		expect(
+			requireValue(provider.calls[1]).messages.some((message) => message.content === warm),
+		).toBe(true)
+	})
+	it('names a skipped newer vault source more when an older code fits', async () => {
+		const { ledger } = await serveLedgerFit({
+			capacity: 4096,
+			predict: 1024,
+			reply: 1,
+			sources: [
+				'The old vault code is 7391.',
+				'The newest vault code is 4471. ' + 'v'.repeat(16000),
+			],
+		})
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
+		).toBe(
+			'The old vault code is 7391.\n1 more item not shown; name a narrower topic to narrow the recall',
+		)
+	})
+
+	it('preserves literal omission lines in accepted source groups live and hydrated', async () => {
+		for (const hydrated of [false, true]) {
+			const provider = new PricedLedgerProvider(
+				[
+					{ content: '', tools: [{ id: 'vault', name: 'recall', arguments: { topic: 'vault' } }] },
+					{ content: '' },
+					{ content: 'Finished.' },
+				],
+				{ recorded: true },
+			)
+			const options = buildLedgerOptions({
+				predict: 1024,
+				lookups: [],
+				gauge: { scale: 1.16, overhead: 150 },
+				share: { prompt: 1, tail: 0.001 },
+			})
+			const original = createLedger(provider, options)
+			const source = original.conversation.add({
+				role: 'user',
+				content:
+					"Vault note.\n1 older item didn't fit in this request; answer from the messages you can see",
+			})
+			const amendment = original.conversation.add({
+				role: 'user',
+				content: 'Correction: vault is closed; do not enter.',
+			})
+			original.conversation.judgments.add(buildLedgerJudgment(source))
+			original.conversation.judgments.add(
+				buildLedgerJudgment(amendment, { answer: buildCategoryAnswer({ correction: 1 }) }),
+			)
+			original.conversation.judgments.add(buildLedgerPairJudgment('amends', source, amendment, 1))
+			seedLedgerRecall(original)
+			const ledger = hydrated
+				? createLedger(provider, {
+						...options,
+						snapshot: requireValue(
+							parseJSONAs(JSON.stringify(original.snapshot()), isLedgerSnapshot),
+						),
+					})
+				: original
+			await ledger.respond('Find the vault note.')
+			expect(
+				ledger.conversation.messages().find((message) => message.call === 'vault')?.content,
+			).toBe(`${amendment.content}\n${source.content}`)
+			expect(
+				provider.calls
+					.at(-1)
+					?.messages.find((message) => message.content.startsWith(LEDGER_NOTES.results))?.content,
+			).toBe(`${LEDGER_NOTES.results}\n${amendment.content}\n${source.content}`)
+		}
+	})
+
+	it('prices recall at the request measured rate when its supplied gauge underprices', async () => {
+		const source = 'The vault code is 7391. ' + 'v'.repeat(16000)
+		const provider = new PricedLedgerProvider(
+			[
+				{ content: '', tools: [{ id: 'r1', name: 'recall', arguments: { topic: 'vault' } }] },
+				{ content: 'Finished.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 4096,
+				predict: 1024,
+				lookups: [],
+				share: { prompt: 1, tail: 0.001 },
+				gauge: { scale: 0.1, overhead: 150 },
+			}),
+		)
+		const hidden = ledger.conversation.add({ role: 'user', content: source })
+		ledger.conversation.judgments.add(buildLedgerJudgment(hidden))
+		ledger.conversation.add({ role: 'assistant', content: 'R'.repeat(60000) })
+		await ledger.respond('Find the vault code.')
+		expect(ledger.conversation.messages().find((message) => message.call === 'r1')?.content).toBe(
+			"1 older item didn't fit in this request; answer from the messages you can see",
+		)
+		expect(
+			provider.calls.every(
+				(call) =>
+					Math.round(estimateMessages(call.messages) * 1.16 + (call.tools?.length ?? 0) * 150) <=
+					3072,
+			),
+		).toBe(true)
+	})
 	it('retains calibrated scale for host subsets and learns from the full scope', async () => {
 		const provider = new PricedLedgerProvider(
 			[
@@ -841,7 +1235,7 @@ describe('Ledger', () => {
 		])
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'closed')?.content,
-		).toBe(LEDGER_NOTES.closure)
+		).toBe('nothing earlier on "parcel"; answer from the messages you can see')
 	})
 
 	it('hydrates a legacy-shaped snapshot without adding a stored byte and carries its final reply', async () => {
@@ -2044,7 +2438,7 @@ describe('Ledger', () => {
 		).toBe(`Earlier reply: ${reply}\nEarlier request: ${request}`)
 	})
 
-	it('keeps one oversized earlier reply when a hydrated ledger has little recall room', async () => {
+	it('omits oversized earlier replies when a hydrated ledger has little recall room', async () => {
 		const reply = `Parcel code 4471. ${'Keep the receipt. '.repeat(300)}`
 		const parent = createLedger(createScriptedProvider([{ content: reply }]), buildLedgerOptions())
 		await parent.respond('Tell me the parcel code.')
@@ -2063,9 +2457,7 @@ describe('Ledger', () => {
 		await ledger.respond('Find it again.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'oversized')?.content,
-		).toBe(
-			`Earlier reply: ${reply}\n1 more item not shown; name a narrower topic to narrow the recall`,
-		)
+		).toBe("2 more items didn't fit in this request; answer from the messages you can see")
 	})
 
 	it('recalls a committed partial reply after an abort', async () => {
@@ -2868,73 +3260,94 @@ describe('Ledger', () => {
 	})
 
 	it('recalls a call-free, non-quiet seed assistant statement and lists its amender after it in one item', async () => {
-		const options = buildLedgerOptions()
-		const provider = createScriptedProvider(
-			[
-				{ content: 'Refunds from a later assistant.' },
-				{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }] },
-				{ content: '', tools: [{ id: 'repeat', name: 'recall', arguments: { topic: 'refunds' } }] },
-				{ content: 'Done.' },
-			],
-			{ recorded: true },
-		)
-		const ledger = createLedger(provider, { ...options, capacity: 800, share: { tail: 0.001 } })
-		const older = ledger.conversation.add({
-			role: 'assistant',
-			content: 'Older refunds statement.',
-		})
-		const source = ledger.conversation.add({
-			role: 'assistant',
-			content: 'Refunds use code AA-10.',
-		})
-		const first = ledger.conversation.add({
-			role: 'user',
-			content: `Replace AA-10 with AA-11. ${'Keep the receipt. '.repeat(300)}`,
-		})
-		const second = ledger.conversation.add({ role: 'user', content: 'Replace AA-10 with AA-12.' })
-		const last = ledger.conversation.add({ role: 'user', content: 'Replace AA-11 with AA-13.' })
-		const quiet = ledger.conversation.add({ role: 'assistant', content: 'Quiet refunds opinion.' })
-		const called = ledger.conversation.add({
-			role: 'assistant',
-			content: 'Refunds beside a call.',
-			calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'missing' } }],
-		})
-		ledger.conversation.add({ role: 'tool', call: 'seed', content: 'No record' })
-		for (const message of [older, source, quiet, called]) {
-			ledger.conversation.judgments.add(
-				buildLedgerTopicJudgment(message, requireValue(options.topics[0]), 1),
-			)
+		for (const padding of [70, 300]) {
+			for (const capacity of [800, 2400]) {
+				const options = buildLedgerOptions()
+				const provider = createScriptedProvider(
+					[
+						{ content: 'Refunds from a later assistant.' },
+						{
+							content: '',
+							tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }],
+						},
+						{
+							content: '',
+							tools: [{ id: 'repeat', name: 'recall', arguments: { topic: 'refunds' } }],
+						},
+						{ content: 'Done.' },
+					],
+					{ recorded: true },
+				)
+				const ledger = createLedger(provider, { ...options, capacity, share: { tail: 0.001 } })
+				const older = ledger.conversation.add({
+					role: 'assistant',
+					content: 'Older refunds statement.',
+				})
+				const source = ledger.conversation.add({
+					role: 'assistant',
+					content: 'Refunds use code AA-10.',
+				})
+				const first = ledger.conversation.add({
+					role: 'user',
+					content: `Replace AA-10 with AA-11. ${'Keep the receipt. '.repeat(padding)}`,
+				})
+				const second = ledger.conversation.add({
+					role: 'user',
+					content: 'Replace AA-10 with AA-12.',
+				})
+				const last = ledger.conversation.add({ role: 'user', content: 'Replace AA-11 with AA-13.' })
+				const quiet = ledger.conversation.add({
+					role: 'assistant',
+					content: 'Quiet refunds opinion.',
+				})
+				const called = ledger.conversation.add({
+					role: 'assistant',
+					content: 'Refunds beside a call.',
+					calls: [{ id: 'seed', name: 'lookup', arguments: { id: 'missing' } }],
+				})
+				ledger.conversation.add({ role: 'tool', call: 'seed', content: 'No record' })
+				for (const message of [older, source, quiet, called]) {
+					ledger.conversation.judgments.add(
+						buildLedgerTopicJudgment(message, requireValue(options.topics[0]), 1),
+					)
+				}
+				ledger.conversation.judgments.add(
+					buildLedgerJudgment(quiet, {
+						answer: buildCategoryAnswer({ chatter: 1 }),
+					}),
+				)
+				for (const [earlier, later] of [
+					[source, first],
+					[source, second],
+					[first, last],
+				] as const) {
+					ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+				}
+				await ledger.respond('First request.')
+				await ledger.respond('Second request about refunds.')
+				const recalled = ledger.conversation
+					.messages()
+					.find((message) => message.role === 'tool' && message.call === 'recall')?.content
+				const omitted = padding === 300 && capacity === 800
+				expect(recalled).toBe(
+					omitted
+						? `${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}\n1 more item not shown; name a narrower topic to narrow the recall`
+						: `${source.content}\n${first.content}\n${second.content}\n${last.content}\n${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}`,
+				)
+				expect(
+					provider.calls[3]?.messages.find((message) =>
+						message.content.startsWith(LEDGER_NOTES.results),
+					)?.content,
+				).toBe(
+					omitted
+						? `${LEDGER_NOTES.results}\n${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}`
+						: `${LEDGER_NOTES.results}\n${source.content}\n${first.content}\n${second.content}\n${last.content}\n${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}`,
+				)
+				expect(extractLedgerRecords(requireValue(provider.calls[1]).messages)).not.toContain(
+					source.content,
+				)
+			}
 		}
-		ledger.conversation.judgments.add(
-			buildLedgerJudgment(quiet, {
-				answer: buildCategoryAnswer({ chatter: 1 }),
-			}),
-		)
-		for (const [earlier, later] of [
-			[source, first],
-			[source, second],
-			[first, last],
-		] as const) {
-			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
-		}
-		await ledger.respond('First request.')
-		await ledger.respond('Second request about refunds.')
-		const recalled = ledger.conversation
-			.messages()
-			.find((message) => message.role === 'tool' && message.call === 'recall')?.content
-		expect(recalled).toBe(
-			`${source.content}\n${first.content}\n${second.content}\n${last.content}\n3 more items not shown; name a narrower topic to narrow the recall`,
-		)
-		expect(
-			provider.calls[3]?.messages.find((message) =>
-				message.content.startsWith(LEDGER_NOTES.results),
-			)?.content,
-		).toBe(
-			`${LEDGER_NOTES.results}\n${source.content}\n${first.content}\n${second.content}\n${last.content}`,
-		)
-		expect(extractLedgerRecords(requireValue(provider.calls[1]).messages)).not.toContain(
-			source.content,
-		)
 	})
 
 	it('recalls both seed findings of one lookup and lists each once in the answer note', async () => {
@@ -3466,8 +3879,13 @@ describe('Ledger', () => {
 				...(thinking === undefined ? {} : { predict: 1024 }),
 			})
 			seedLedgerRecall(ledger)
-			ledger.conversation.add(buildDeliverySeed(20))
-			await ledger.respond('Review.')
+			ledger.conversation.add(
+				buildDeliverySeed(20).map((message) => ({
+					...message,
+					content: message.content + ' Completed handoff.',
+				})),
+			)
+			await ledger.respond('Review.' + 'q'.repeat(10600))
 			const recalled = requireValue(
 				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
 			)
@@ -3478,33 +3896,23 @@ describe('Ledger', () => {
 		expect(results[1]).toBe(results[0])
 	})
 
-	it('reserves the generation cap and retains within-pass thinking when closing recall', async () => {
-		const options = buildLedgerOptions()
-		for (const replay of ['none', 'turn', 'all'] as const) {
-			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }]
-			const completion = JSON.stringify(calls).length + 800
-			const provider = createScriptedProvider(
-				[
-					{
-						content: '',
-						tools: calls,
-						thinking: 'a'.repeat(800),
-						usage: { prompt: 2700, completion, total: 2700 + completion },
-					},
-					{ content: 'Done.' },
-				],
-				{ recorded: true, replay },
-			)
-			const ledger = createLedger(provider, { ...options, predict: 1024 })
-			seedLedgerRecall(ledger)
-			await ledger.respond('Review.')
-			expect(
-				provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
-			).toBe(
-				replay === 'none'
-					? 'nothing earlier on "absent"; answer from the messages you can see'
-					: LEDGER_NOTES.closure,
-			)
+	it('reserves the generation cap and retains within-pass thinking when fitting recall', async () => {
+		for (const predict of [0, 1024]) {
+			for (const replay of ['none', 'turn', 'all'] as const) {
+				const { provider, source } = await serveLedgerBoundary({
+					predict,
+					replay,
+					prompt: 2700,
+					thinking: 800,
+				})
+				expect(
+					provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
+				).toBe(
+					predict === 0 || replay === 'none'
+						? source.content
+						: "1 older item didn't fit in this request; answer from the messages you can see",
+				)
+			}
 		}
 	})
 
@@ -3567,8 +3975,13 @@ describe('Ledger', () => {
 			const ledger = createLedger(provider, { ...uncalibrated, predict })
 			await ledger.calibrate(new AbortController().signal)
 			seedLedgerRecall(ledger)
-			ledger.conversation.add(buildDeliverySeed(20))
-			await ledger.respond('Review.')
+			ledger.conversation.add(
+				buildDeliverySeed(20).map((message) => ({
+					...message,
+					content: message.content + ' Completed handoff.',
+				})),
+			)
+			await ledger.respond('Review.' + 'q'.repeat(10600))
 			const recalled = requireValue(
 				provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
 			)
@@ -3579,69 +3992,41 @@ describe('Ledger', () => {
 		}
 	})
 
-	it('passes replay to a calibrated gauge when deciding whether recall closes', async () => {
-		const options = buildLedgerOptions()
+	it('passes replay to a calibrated gauge when fitting recall', async () => {
 		for (const replay of ['none', 'turn'] as const) {
-			const provider = createScriptedProvider(
-				[
-					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
-					{ content: '', usage: { prompt: 8, completion: 0, total: 8 } },
-					{
-						content: '',
-						thinking: 'a'.repeat(800),
-						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
-						usage: { prompt: 2700, completion: 865, total: 3565 },
-					},
-					{ content: 'Done.' },
-				],
-				{ recorded: true, replay },
-			)
-			const uncalibrated = buildUncalibratedOptions(options)
-			const ledger = createLedger(provider, { ...uncalibrated, predict: 1024 })
-			await ledger.calibrate(new AbortController().signal)
-			seedLedgerRecall(ledger)
-			await ledger.respond('Review.')
+			const { provider, source } = await serveLedgerBoundary({
+				calibrated: true,
+				predict: 1024,
+				replay,
+				prompt: 2700,
+				thinking: 800,
+			})
 			expect(
-				provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
+				provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
 			).toBe(
 				replay === 'none'
-					? 'nothing earlier on "absent"; answer from the messages you can see'
-					: LEDGER_NOTES.closure,
+					? source.content
+					: "1 older item didn't fit in this request; answer from the messages you can see",
 			)
 		}
 	})
 
 	it('passes the generation reserve to supplied and calibrated gauges', async () => {
-		const options = buildLedgerOptions()
 		for (const calibrated of [false, true]) {
-			const provider = createScriptedProvider(
-				[
-					...(calibrated
-						? [
-								{ content: '', usage: { prompt: 8, completion: 1, total: 9 } },
-								{ content: '', usage: { prompt: 8, completion: 1, total: 9 } },
-							]
-						: []),
-					{
-						content: '',
-						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
-						usage: { prompt: 3500, completion: 1, total: 3501 },
-					},
-					{ content: 'Done.' },
-				],
-				{ recorded: true },
-			)
-			const uncalibrated = buildUncalibratedOptions(options)
-			const ledger = createLedger(provider, {
-				...(calibrated ? uncalibrated : options),
-				predict: 1024,
-			})
-			if (calibrated) await ledger.calibrate(new AbortController().signal)
-			seedLedgerRecall(ledger)
-			await ledger.respond('Review.')
-			expect(
-				provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
-			).toBe(LEDGER_NOTES.closure)
+			for (const predict of [0, 1024]) {
+				const { provider, source } = await serveLedgerBoundary({
+					calibrated,
+					predict,
+					prompt: 3500,
+				})
+				expect(
+					provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
+				).toBe(
+					predict === 0
+						? source.content
+						: "1 older item didn't fit in this request; answer from the messages you can see",
+				)
+			}
 		}
 	})
 
@@ -4609,7 +4994,7 @@ describe('Ledger', () => {
 		)
 	})
 
-	it('closes recall at its limit and when the provider leaves insufficient room', async () => {
+	it('closes recall at its limit but not for insufficient room', async () => {
 		const options = buildLedgerOptions()
 		const limited = createScriptedProvider(
 			[
@@ -4644,7 +5029,7 @@ describe('Ledger', () => {
 		seedLedgerRecall(tight)
 		await tight.respond('Check the desk.')
 		expect(tight.conversation.messages().find((message) => message.role === 'tool')?.content).toBe(
-			LEDGER_NOTES.closure,
+			'nothing earlier on "refunds"; answer from the messages you can see',
 		)
 	})
 
@@ -5395,7 +5780,7 @@ describe('Ledger', () => {
 		)
 		const ledger = createLedger(provider, {
 			...options,
-			capacity: 350,
+			capacity: 250,
 			share: { prompt: 0.2, tail: 0.1 },
 		})
 		ledger.conversation.add(buildDeliverySeed(20))

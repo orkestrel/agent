@@ -186,9 +186,16 @@ describe('LedgerRequest', () => {
 		const request = new LedgerRequest('Check.')
 		const lines = new Map([['lookup {"id":"BW-20931"}: Account BW-20931.', 'Account BW-20931.']])
 		expect(request.lines('Account BW-20931.')).toBeUndefined()
-		request.list('first result', new Map())
-		request.list('first result', lines)
+		request.list('first result', new Map(), ['first result'])
+		request.list('first result', lines, ['first result'])
 		expect(request.lines('first result')).toBe(lines)
 		expect(request.lines('other result')).toBeUndefined()
+		expect(request.listings.at(-1)?.groups).toEqual(['first result'])
+		request.list(
+			'second group\n1 older item not shown; name a narrower topic to narrow the recall',
+			new Map(),
+			['first oversized group', 'second group'],
+		)
+		expect(request.listings.at(-1)?.groups).toEqual(['second group'])
 	})
 })

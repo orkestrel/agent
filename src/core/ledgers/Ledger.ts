@@ -22,6 +22,7 @@ import type {
 	LedgerRecord,
 	LedgerRenderContext,
 	LedgerResult,
+	LedgerRecovery,
 	LedgerShare,
 	LedgerSnapshot,
 } from './types.js'
@@ -96,7 +97,6 @@ import {
 	rankLedgerCut,
 	resolvePredict,
 	findLedgerCall,
-	matchesCutLine,
 	renderLedgerAnnotation,
 	renderLedgerPinned,
 	renderLedgerRecord,
@@ -413,9 +413,11 @@ export class Ledger implements LedgerInterface {
 			)
 			const passes = [first]
 			if (!caller.aborted && (first.partial || first.content.trim() === '')) {
-				const digest = this.#buildDigest(request, entered)
-				if (digest !== undefined)
-					this.#annotations.add(this.#conversation.add({ role: 'user', content: digest }).id)
+				const recovery = this.#buildDigest(request, entered)
+				if (recovery.digest !== undefined)
+					this.#annotations.add(
+						this.#conversation.add({ role: 'user', content: recovery.digest }).id,
+					)
 				this.#annotations.add(
 					this.#conversation.add({ role: 'user', content: LEDGER_NOTES.cue }).id,
 				)
@@ -429,7 +431,9 @@ export class Ledger implements LedgerInterface {
 						if (selection.fault !== undefined) return selection
 						return {
 							...selection,
-							messages: selection.messages.filter((one) => one.role !== 'tool' && !hasCalls(one)),
+							messages: selection.messages.filter(
+								(one) => one.role !== 'tool' && !hasCalls(one) && !recovery.omitted.has(one.id),
+							),
 						}
 					},
 				})
@@ -1558,17 +1562,39 @@ export class Ledger implements LedgerInterface {
 		request?.admit('recall', { topic })
 		const gauge = this.#gauge
 		const calls = request?.calls ?? []
-		if (
-			gauge !== undefined &&
-			calls.length > 0 &&
-			gauge.remainder(calls) - this.#predict < 2 * gauge.reserve(calls, this.#findLongest())
-		)
-			request?.close()
 		request?.recall()
 		const guidance = `an owner name, an id, or one of ${renderTopicNames(this.#options.topics)}`
 		if (topic === '') throw new Error(`recall needs a topic: ${guidance}`)
+		const rate = this.#recallRate(request) * (1 + LEDGER_SCALE_DRIFT)
+		const call = calls.at(-1)
+		const carried =
+			request === undefined
+				? 0
+				: estimateMessages(
+						stripThinking(
+							[
+								...this.#agent.context.build(request.selection),
+								...this.#conversation.messages().slice(request.boundary),
+							],
+							this.#replay,
+						),
+					)
+		const completion = isFiniteNumber(call?.prompt)
+			? (call.completion ?? 0) - (this.#replay === 'none' ? (call.thinking ?? 0) : 0)
+			: 0
+		const extra = Math.max(0, (carried - (call?.estimate ?? carried)) * rate - completion)
+		const drift = isFiniteNumber(call?.prompt)
+			? 0
+			: Math.max(0, (call?.estimate ?? 0) * (rate - (gauge?.scale ?? rate)))
+		const siblings = estimateMessages(
+			(request?.listings ?? [])
+				.filter((listing) => listing.turn === calls.length)
+				.map((listing) => ({ id: 'result', role: 'tool', content: listing.result })),
+		)
 		const room =
-			(gauge?.room(calls, this.#findLongest()) ?? 0) - estimateMessages([buildRecallMessage(topic)])
+			gauge === undefined
+				? -estimateMessages([buildRecallMessage(topic)])
+				: (gauge.remainder(calls) - this.#predict - extra - drift) / rate - siblings
 		const scan = this.#scan(this.#conversation.messages())
 		// A recall while a selection holds its scan, which only another conversation's run can make,
 		// holds no scan of its own, so the classifier's handlers read the selection's.
@@ -1705,31 +1731,103 @@ export class Ledger implements LedgerInterface {
 			const result =
 				listed.length === 0
 					? `nothing earlier on "${topic}"; answer from the messages you can see`
-					: cutListing(listed, room, earlier.length > 0 ? 'more' : 'older')
-			request?.list(result, gathered.recalled)
+					: cutListing(listed, room, earlier.length > 0 ? 'more' : 'older', gauge === undefined)
+			request?.list(result, gathered.recalled, listed)
 			return result
 		} finally {
 			if (added) this.#scans.delete(scan)
 		}
 	}
 
-	#buildDigest(request: LedgerRequest, entered: Message): string | undefined {
+	#buildDigest(request: LedgerRequest, entered: Message): LedgerRecovery {
 		this.#flush()
-		// Each line once, at its first occurrence.
-		const lines = [
+		const groups = [
 			...new Set(
 				this.#collectAfter(entered).flatMap((message) => {
 					const result = this.#results.get(message.id)
 					if (message.role !== 'tool' || result?.success !== true) return []
 					const recalled = result.name === 'recall'
 					if (recalled && /^nothing earlier on /.test(message.content)) return []
-					const stored = recalled ? request.lines(message.content) : undefined
-					return splitResultLines(message.content)
-						.filter((line) => !recalled || !matchesCutLine(line))
-						.map((line) => stored?.get(line) ?? line)
+					const listing = recalled
+						? request.listings.findLast((one) => one.result === message.content)
+						: undefined
+					return (listing?.groups ?? [message.content])
+						.map((group) =>
+							splitResultLines(group)
+								.map((line) => listing?.lines.get(line) ?? line)
+								.join('\n'),
+						)
+						.filter((group) => group !== '')
 				}),
 			),
 		]
-		return lines.length === 0 ? undefined : `${LEDGER_NOTES.results}\n${lines.join('\n')}`
+		const unique = groups.filter(
+			(group, at) =>
+				!splitResultLines(group).every((line) =>
+					groups.slice(0, at).some((earlier) => splitResultLines(earlier).includes(line)),
+				),
+		)
+		const digest = unique.length === 0 ? undefined : `${LEDGER_NOTES.results}\n${unique.join('\n')}`
+		const omitted: ReadonlySet<string> = new Set()
+		const rate = this.#recallRate(request) * (1 + LEDGER_SCALE_DRIFT)
+		const allowance = (this.#options.capacity - this.#predict) / rate
+		const after = this.#collectAfter(entered)
+		const recovery: readonly Message[] = [
+			...(request.plan?.messages ?? request.selection?.messages ?? []),
+			...after,
+			{ id: 'cue', role: 'user', content: LEDGER_NOTES.cue },
+		]
+		const messages = recovery.filter((message) => message.role !== 'tool' && !hasCalls(message))
+		const note: readonly Message[] =
+			digest === undefined ? [] : [{ id: 'results', role: 'user', content: digest }]
+		if (
+			this.#gauge === undefined ||
+			estimateMessages(
+				stripThinking(
+					this.#agent.context.build({ messages: [...messages, ...note], judgments: [] }),
+					this.#replay,
+				),
+			) <= allowance
+		)
+			return { digest, omitted }
+		const partials = new Set(
+			after
+				.filter((message) => message.role === 'assistant' && !hasCalls(message))
+				.map((message) => message.id),
+		)
+		const base = estimateMessages(
+			stripThinking(
+				this.#agent.context.build({
+					messages: messages.filter((message) => !partials.has(message.id)),
+					judgments: [],
+				}),
+				this.#replay,
+			),
+		)
+		const fitted = cutListing(
+			unique,
+			allowance - base - estimateTokens(`${LEDGER_NOTES.results}\n`),
+			'more',
+			false,
+		)
+		return {
+			digest: fitted === '' ? undefined : `${LEDGER_NOTES.results}\n${fitted}`,
+			omitted: partials,
+		}
+	}
+
+	#recallRate(request: LedgerRequest | undefined): number {
+		const gauge = this.#gauge
+		if (gauge === undefined) return 1
+		const calls = request?.calls ?? []
+		const last = calls.findLast((call) => isFiniteNumber(call.prompt))
+		const measured =
+			last !== undefined &&
+			isFiniteNumber(last.prompt) &&
+			last.estimate > 0 &&
+			((last.spared ?? 0) === 0 || (last.spared ?? 0) >= gauge.overhead)
+				? (last.prompt - Math.max(0, gauge.overhead - (last.spared ?? 0))) / last.estimate
+				: 0
+		return Math.max(gauge.rate(calls), measured)
 	}
 }

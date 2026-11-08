@@ -2800,7 +2800,7 @@ await new GuideCommand({
 				`${seeds.length - kept.length} older items not shown; name a narrower topic to narrow the recall`,
 			)
 			expect(guideText).toContain(
-				'The tool cuts the list by whole items to the room the gauge leaves for the reply, retaining the first item even when it exceeds the room and naming how many items it left out.',
+				"The tool fits whole items, including each source's amenders, into what the measured request leaves below capacity less predict, and names how many items it left out.",
 			)
 		})
 
@@ -3284,14 +3284,14 @@ await new GuideCommand({
 			expect(estimateMessages(first)).toBeGreaterThan(capacity)
 			expect(second.findLast(({ role }) => role === 'tool')?.content).toBe(reading)
 			expect(guideText).toContain(
-				"The budget bounds only the records, the tail, and the window of a request's first call: the plan prices the built head, the tail, the window, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The plan budget bounds the records, the tail, and the window of a request's first call: it prices the built head, the tail, the window, and the copy with its records and images. Runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
 			)
 			expect(guideText).toContain(
-				"A request, a lookup result, the pass's own turns, the answer note, or the whole view a faulted selection builds from reaches the provider whole when it's larger than the room the `capacity` option leaves, and the provider's own context limit decides what happens to it.",
+				'A request, a lookup result, or the whole view a faulted selection builds from can exceed the room the `capacity` option leaves.',
 			)
 		})
 
-		it("sends the pass's own turns, the answer note, and a faulted selection's view over the budget whole, as the plan claims", async () => {
+		it('fits the answer note while own turns and a faulted selection can exceed the plan budget', async () => {
 			const capacity = 600
 			const budget = (capacity * DEFAULT_LEDGER_SHARE.prompt) / (1 + LEDGER_SCALE_DRIFT)
 			const bulk = 'Delivery arrived Tuesday with a completed receipt. '.repeat(200).trim()
@@ -3349,8 +3349,10 @@ await new GuideCommand({
 				answer
 					.filter((message) => message.content.startsWith(LEDGER_NOTES.results))
 					.map(({ content }) => content),
-			).toEqual([`${LEDGER_NOTES.results}\n${reading}`])
-			expect(estimateMessages(answer)).toBeGreaterThan(budget)
+			).toEqual([
+				`${LEDGER_NOTES.results}\n1 more item didn't fit in this request; answer from the messages you can see`,
+			])
+			expect(estimateMessages(answer)).toBeLessThanOrEqual(capacity)
 			expect(
 				estimateMessages(
 					answer.filter((message) => !message.content.startsWith(LEDGER_NOTES.results)),
@@ -3361,7 +3363,7 @@ await new GuideCommand({
 			)
 			expect(estimateMessages(direct)).toBeGreaterThan(budget)
 			expect(guideText).toContain(
-				"The budget bounds only the records, the tail, and the window of a request's first call: the plan prices the built head, the tail, the window, and the copy of the request turn with the records and images it carries. The request, each lookup result, the pass's own assistant turns with their calls and replayed thinking, the answer note and the `cue` note, and the whole view a faulted selection builds from enter the prompt unbounded, so any of them can carry a prompt past the budget.",
+				"The plan budget bounds the records, the tail, and the window of a request's first call: it prices the built head, the tail, the window, and the copy with its records and images. Runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
 			)
 		})
 
@@ -3526,6 +3528,7 @@ await new GuideCommand({
 			request.list(
 				listed,
 				new Map([[listed, 'Order BW-5512 for account BW-20931: Brightwater Studio.']]),
+				[listed],
 			)
 			expect(request.lines(listed)?.get(listed)).toBe(
 				'Order BW-5512 for account BW-20931: Brightwater Studio.',
@@ -3801,7 +3804,7 @@ await new GuideCommand({
 						{
 							content: '',
 							...(thinking === undefined ? {} : { thinking }),
-							tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+							tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'code' } }],
 							usage: { prompt: 2700, completion: 865, total: 3565 },
 						},
 						{ content: 'Done.' },
@@ -3818,7 +3821,8 @@ await new GuideCommand({
 					}),
 				)
 				seedLedgerRecall(ledger)
-				await ledger.respond('Review.')
+				ledger.conversation.add({ role: 'user', content: 'The code is 7391.' })
+				await ledger.respond('Review.' + 'q'.repeat(10600))
 				expect(provider.calls).toHaveLength(2)
 				expect(
 					provider.calls.flatMap((call) => call.messages).some((message) => 'thinking' in message),
@@ -3830,8 +3834,8 @@ await new GuideCommand({
 				)
 			}
 			expect(recalled).toEqual([
-				barrel.LEDGER_NOTES.closure,
-				'nothing earlier on "absent"; answer from the messages you can see',
+				"1 older item didn't fit in this request; answer from the messages you can see",
+				'The code is 7391.',
 			])
 			expect(guideText).toContain(
 				'a ledger still reads recorded thinking to measure what a call left.',
@@ -6944,50 +6948,68 @@ await new GuideCommand({
 			)
 		})
 
-		it('enters a memo written between passes', async () => {
-			const memos = barrel.createMemoManager()
-			const note = 'Order BW-5512 was read.'
-			const provider = createScriptedProvider(
-				[
-					{
-						content: '',
-						tools: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
-					},
-					{ content: '' },
-					{ content: 'Order BW-5512 qualifies.' },
-				],
-				{ recorded: true, repeat: false },
-			)
-			const ledger = createLedger(
-				provider,
-				buildGuideLedgerOptions({
-					judge: createPhraseJudge([]),
-					gauge: { scale: 1, overhead: 0 },
-					agent: { memos },
-					lookups: [
+		it('fits the answer note around a memo written between passes', async () => {
+			for (const written of [false, true]) {
+				const memos = barrel.createMemoManager()
+				const note = 'Order BW-5512 was read. ' + 'm'.repeat(3000)
+				const evidence =
+					'Order BW-5512 for account BW-20931: Brightwater Studio. ' + 'v'.repeat(9000)
+				const provider = createScriptedProvider(
+					[
 						{
-							...LEDGER_ORDER_LOOKUP,
-							tool: {
-								...LEDGER_ORDER_LOOKUP.tool,
-								execute: (args) => {
-									memos.add({ name: 'order', description: note, content: note })
-									return `Order ${String(args.id)} for account BW-20931: Brightwater Studio.`
+							content: '',
+							tools: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+						},
+						{ content: '' },
+						{ content: 'Order BW-5512 qualifies.' },
+					],
+					{ recorded: true, repeat: false },
+				)
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						judge: createPhraseJudge([]),
+						capacity: 4096,
+						predict: 1024,
+						gauge: { scale: 1, overhead: 0 },
+						agent: { memos },
+						lookups: [
+							{
+								...LEDGER_ORDER_LOOKUP,
+								tool: {
+									...LEDGER_ORDER_LOOKUP.tool,
+									execute: () => {
+										if (written) memos.add({ name: 'order', description: note, content: note })
+										return evidence
+									},
 								},
 							},
-						},
-					],
-				}),
-			)
-			const result = await ledger.respond('Is order BW-5512 refundable?')
+						],
+					}),
+				)
+				const result = await ledger.respond('Is order BW-5512 refundable?')
 
-			expect(result.content).toBe('Order BW-5512 qualifies.')
-			expect(
-				provider.calls.map((call) => call.messages.some(({ content }) => content.includes(note))),
-			).toEqual([false, false, true])
-			expect(provider.calls[2]?.messages[0]?.content).toBe(provider.calls[0]?.messages[0]?.content)
-			expect(guideText).toContain(
-				"A memo written during a request's first pass, by a lookup or a host tool, enters the answer pass's context message unpriced",
-			)
+				expect(result.content).toBe('Order BW-5512 qualifies.')
+				const recovery = requireValue(provider.calls[2])
+				expect(
+					recovery.messages.find((message) => message.content.startsWith(LEDGER_NOTES.results))
+						?.content,
+				).toBe(
+					written
+						? `${LEDGER_NOTES.results}\n1 more item didn't fit in this request; answer from the messages you can see`
+						: `${LEDGER_NOTES.results}\n${evidence}`,
+				)
+				expect(barrel.estimateMessages(recovery.messages)).toBeLessThanOrEqual(4096 - 1024)
+				expect(
+					provider.calls.map((call) => call.messages.some(({ content }) => content.includes(note))),
+				).toEqual([false, false, written])
+				expect(provider.calls[2]?.messages[0]?.content).toBe(
+					provider.calls[0]?.messages[0]?.content,
+				)
+				expect(guideText).toContain(
+					"A memo written during a request's first pass enters the rebuilt answer context and consumes its fitting allowance.",
+				)
+			}
 		})
 
 		it('keeps a fold when its merge digest fails', async () => {

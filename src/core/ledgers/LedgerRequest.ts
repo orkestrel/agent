@@ -1,7 +1,13 @@
 import type { ScopeInterface, Selection } from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
 import type { Message } from '../types.js'
-import type { ClassifierAttempt, GaugeCall, LedgerDraft, LedgerRequestInterface } from './types.js'
+import type {
+	ClassifierAttempt,
+	GaugeCall,
+	LedgerDraft,
+	LedgerListing,
+	LedgerRequestInterface,
+} from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { canonicalStringify } from '@orkestrel/contract'
 import { isNonNegativeSafeInteger } from '../validators.js'
@@ -42,7 +48,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	#passes: readonly LedgerPass[] = []
 	#attempts: readonly ClassifierAttempt[] = []
 	#admitted: ReadonlySet<string> = new Set()
-	#listed: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map()
+	#listed: readonly LedgerListing[] = []
 	#recalls = 0
 	#closed = false
 
@@ -210,11 +216,22 @@ export class LedgerRequest implements LedgerRequestInterface {
 		this.#closed = true
 	}
 
-	list(result: string, lines: ReadonlyMap<string, string>): void {
-		this.#listed = new Map([...this.#listed, [result, lines]])
+	list(result: string, lines: ReadonlyMap<string, string>, groups: readonly string[]): void {
+		const accepted = groups.reduce<readonly string[]>((kept, group) => {
+			const offset = kept.length === 0 ? 0 : kept.join('\n').length + 1
+			return result.slice(offset) === group || result.slice(offset).startsWith(`${group}\n`)
+				? [...kept, group]
+				: kept
+		}, [])
+		this.#listed = [...this.#listed, { result, lines, groups: accepted, turn: this.calls.length }]
+	}
+
+	/** Returns recall results with their accepted whole groups and provider-turn positions. */
+	get listings(): readonly LedgerListing[] {
+		return this.#listed
 	}
 
 	lines(result: string): ReadonlyMap<string, string> | undefined {
-		return this.#listed.get(result)
+		return this.#listed.findLast((listing) => listing.result === result)?.lines
 	}
 }

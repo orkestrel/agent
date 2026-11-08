@@ -2422,6 +2422,21 @@ describe('splitTopic', () => {
 
 describe('cutListing and matchesCutLine', () => {
 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
+	it('omits an oversized first group and keeps a later fitting group with its marker', () => {
+		const short = 'The vault is closed.\nCorrection: the vault is open.'
+		const expected = `${short}\n1 more item not shown; name a narrower topic to narrow the recall`
+		const room = measureRoom([expected])
+		expect(cutListing(['v'.repeat(4000), short], room, 'older', false)).toBe(expected)
+		expect(cutListing(['v'.repeat(4000), short], room - 1, 'older', false)).toBe(
+			"2 older items didn't fit in this request; answer from the messages you can see",
+		)
+		expect(matchesCutLine(cutListing([short], 0, 'more', false))).toBe(true)
+		expect(cutListing([short], 0, 'more', false)).toBe(
+			"1 more item didn't fit in this request; answer from the messages you can see",
+		)
+		expect(cutListing([short], measureRoom([short]), 'older', false)).toBe(short)
+		expect(cutListing([], -1, 'older', false)).toBe('')
+	})
 
 	it('keeps every item that fits and adds no cut line', () => {
 		expect(cutListing(items, measureRoom(items))).toBe(items.join('\n'))
