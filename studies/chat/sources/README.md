@@ -4,7 +4,7 @@ The seal supplies 38 conversations, 294 requests, and 102 primary graded rows. T
 
 ## Provenance
 
-The 24 picked and 8 changed dialogues excerpt user turns from MultiWOZ 2.4. The supplied dataset README identifies Fanghua Ye, Jarana Manotumruksa, and Emine Yilmaz, _MultiWOZ 2.4: A Multi-Domain Task-Oriented Dialogue Dataset with Essential Annotation Corrections to Improve State Tracking Evaluation_, SIGDIAL 2022; see [the paper](https://arxiv.org/abs/2104.00773). The exact upstream dataset revision has not been established. The six order conversations are authored fictional scripts, not corpus excerpts. The [MIT notice](LICENSE) retains the supplied Copyright (c) 2022 Fanghua Ye notice verbatim.
+The 24 picked and 8 changed dialogues excerpt user turns from MultiWOZ 2.4. The supplied dataset README identifies Fanghua Ye, Jarana Manotumruksa, and Emine Yilmaz, _MultiWOZ 2.4: A Multi-Domain Task-Oriented Dialogue Dataset with Essential Annotation Corrections to Improve State Tracking Evaluation_, SIGDIAL 2022; see [the paper](https://arxiv.org/abs/2104.00773). The exact upstream dataset revision has not been established. The six order conversations are authored fictional scripts, not corpus excerpts. The [MIT notice](LICENSE) retains the supplied Copyright (c) 2022 Fanghua Ye notice verbatim, stored with LF line endings; the supplied copy uses CRLF and reads SHA-256 `fe9ac1fecd745958e6f59b229540fcfa052c3bb94d97a30d024c1cc84f16f7b6`.
 
 The original seal SHA-256 is `3635e05278e78347f1d51208ff2d77ff170f26e5e68c6f16ae270dfeba85bba4`. Repository formatting rewrites its whitespace; the tracked formatted representation has SHA-256 `6c50bc254a746c9fef0a6371067ad9463ced107b8c63f4dad60aecd24bb2b791`. The conversion helper accepts exactly these two byte identities. The original digest describes provenance, not the generated scenarios. No formatter exclusion applies.
 
@@ -102,7 +102,7 @@ The generated declarations and copied source artifacts have the following digest
 | ------------------------------- | ------------------------------------------------------------------ |
 | study.json                      | `16db6386d5609b743a71c70684d61aa58664bb77ce1fa2e821721509e7c0b03b` |
 | rubric.json                     | `594f2c60db63a39dc0065e9b88201bce85142943a6ba82df07262dda9cd56345` |
-| sources/LICENSE                 | `fe9ac1fecd745958e6f59b229540fcfa052c3bb94d97a30d024c1cc84f16f7b6` |
+| sources/LICENSE                 | `9f7e5026730439fc5835d3cd84ba46e2c23534cc29e1a6c65401b5f2bdd5c6c0` |
 | sources/sealed.json             | `6c50bc254a746c9fef0a6371067ad9463ced107b8c63f4dad60aecd24bb2b791` |
 | scenarios/changed-mul0354.json  | `f806c1867e78c9d279c2ff441d2785406d1f71695361da515e7a5e604ce2543c` |
 | scenarios/changed-mul0941.json  | `f0ae4160fc6cea1a0fbc47c63e1b51d1a277ee84ab091fc3b0c5312c9174d43d` |
