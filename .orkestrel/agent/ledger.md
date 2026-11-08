@@ -564,3 +564,4 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-07 | rc-v3's census, plan, Study build, and review | `checker` GPT-6 Luna; `planner` GPT-6 Astra; `astra` GPT-6 Astra; `reviewer` GPT-6 Astra | `plan.md` O199 |
 | 2026-11-07 | rc-v3's V3-A build in four rounds, its review, and its gates; V3-M's copy count | `astra` GPT-6 Astra; `reviewer` GPT-6 Astra; `verifier` GPT-6 Luna; `builder` GPT-6.1 Sol | `plan.md` O200 |
 | 2026-11-07 | Study 0.0.14 published on the user's code and pushed | Orchestrator | `plan.md` O200 |
+| 2026-11-08 | The 0.0.38 release wave: Study 0.0.14 and 0.0.15, Agent 0.0.38, Ollama 0.0.32, Toolbox 0.0.27, and Agent's development re-pin | Orchestrator, on the user's one-time codes; `builder` GPT-6.1 Sol for Ollama's fixture | `plan.md` O201 |
