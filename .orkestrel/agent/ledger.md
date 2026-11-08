@@ -562,3 +562,5 @@ One row per dispatched unit and per user ruling on routing or scope. The carrier
 | 2026-11-07 | rc-v1's tree-wide gates | `verifier` GPT-6 Luna | `plan.md` O199 |
 | 2026-11-07 | rc-v2's design and its reading's build | `planner` Claude Fable 5.1; `builder` GPT-6.1 Sol | `plan.md` O199 |
 | 2026-11-07 | rc-v3's census, plan, Study build, and review | `checker` GPT-6 Luna; `planner` GPT-6 Astra; `astra` GPT-6 Astra; `reviewer` GPT-6 Astra | `plan.md` O199 |
+| 2026-11-07 | rc-v3's V3-A build in four rounds, its review, and its gates; V3-M's copy count | `astra` GPT-6 Astra; `reviewer` GPT-6 Astra; `verifier` GPT-6 Luna; `builder` GPT-6.1 Sol | `plan.md` O200 |
+| 2026-11-07 | Study 0.0.14 published on the user's code and pushed | Orchestrator | `plan.md` O200 |
