@@ -1,0 +1,77 @@
+{
+	"id": "picked-pmul0095",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "I am looking for a Europeon restaurant in the west of Cambridge.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Is that an expensive restaraunt? I really need someplace expensive, it is a special occasion for me.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Yes, please make the reservation for me.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Make the reservation for 3 people on Friday at 20:00. Thank you!",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "Thanks.  Can you also give me some information about Finches Bed and Breakfast?  We're thinking of staying there.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Can I book a room there for 3 for 3 nights starting friday?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-7",
+			"input": {
+				"prompt": "How many people did I say the hotel was for?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-8",
+			"input": {
+				"prompt": "What day did I want the table?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-9",
+			"input": {
+				"prompt": "Which part of town did I want the restaurant in?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		}
+	]
+}

@@ -1,0 +1,109 @@
+{
+	"id": "script-or-7",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Look up OR-7 and write a three-sentence update to the customer about the refund and when it ships.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Make that shorter.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Now make it friendlier.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "My delivery code is 4471. Please note it.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "What is my delivery code?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Which depot did you mention in your first update?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		},
+		{
+			"id": "turn-7",
+			"input": {
+				"prompt": "Actually my delivery code changed to 9182.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		},
+		{
+			"id": "turn-8",
+			"input": {
+				"prompt": "What is my delivery code now?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "OR-7",
+					"name": "Dana Reyes",
+					"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+				}
+			}
+		}
+	]
+}

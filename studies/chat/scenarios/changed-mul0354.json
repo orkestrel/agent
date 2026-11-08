@@ -1,0 +1,37 @@
+{
+	"id": "changed-mul0354",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Hello, can you tell me about the options for moderately priced dining in Cambridge that are centrally located?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Are there any that serve Irish food?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Perhaps a gastropub?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "What kind of food did I ask for? I mean the latest thing I told you.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		}
+	]
+}

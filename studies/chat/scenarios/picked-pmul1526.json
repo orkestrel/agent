@@ -1,0 +1,77 @@
+{
+	"id": "picked-pmul1526",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "I need to find a train from cambridge to ely that leaves after 09:00",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "I will be traveling on Monday.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "What is the travel time and price?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "i also need somewhere to sleep",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "I need a 4 star hotel.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "How about something in the expensive price range with free wifi?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-7",
+			"input": {
+				"prompt": "What price range did I want for the hotel?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-8",
+			"input": {
+				"prompt": "How many stars did I ask for?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-9",
+			"input": {
+				"prompt": "What time did I say the train should leave after?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		}
+	]
+}

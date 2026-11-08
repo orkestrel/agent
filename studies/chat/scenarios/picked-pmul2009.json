@@ -1,0 +1,69 @@
+{
+	"id": "picked-pmul2009",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "I would like to find an architectural attraction to go to in the centre. Can you help me?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "I would like to get the entrance fee and address of them please",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Yes, that would be great.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Okay thank you.  That is all I needed.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "We are looking for a place to dine, preferably expensive Italian food in the same area as the attraction. What do you suggest? I need an address and postcode please.",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Can you book it for me and get a reference number ?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-7",
+			"input": {
+				"prompt": "What kind of food did I ask for?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		},
+		{
+			"id": "turn-8",
+			"input": {
+				"prompt": "Which part of town did I want the attraction in?",
+				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+				"topic": "bookings"
+			}
+		}
+	]
+}

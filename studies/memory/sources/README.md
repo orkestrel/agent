@@ -12,4 +12,4 @@ Custody rules:
 - No oracle text enters an agent prompt, a query, a label, or a selection rule. A loader reads only a named public file and rejects unknown structural fields, nested private objects included.
 - The bytes are pinned. A change to any file makes a different source with its own manifest, provenance, and test pins.
 
-These sources establish no live inference result, no calibration, no selection or exposure measurement, and no adoption verdict. The series evidence lives in `.orkestrel/agent/research/evidence.md`.
+These sources establish no live inference result, no calibration, no selection or exposure measurement, and no adoption verdict. The series evidence is recorded in `.orkestrel/agent/research/evidence.md` at commit `db86a3eb`. The manifest's `path` fields name where each file sat in the campaign folder; commit `c179eddc` retired them, and its parent holds every byte the hashes pin.

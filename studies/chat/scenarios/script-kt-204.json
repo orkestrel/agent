@@ -1,0 +1,109 @@
+{
+	"id": "script-kt-204",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Look up KT-204 and write a three-sentence update to the customer about the refund and when it ships.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Make that shorter.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Now make it friendlier.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "My delivery code is 5518. Please note it.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "What is my delivery code?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Which depot did you mention in your first update?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		},
+		{
+			"id": "turn-7",
+			"input": {
+				"prompt": "Actually my delivery code changed to 6043.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		},
+		{
+			"id": "turn-8",
+			"input": {
+				"prompt": "What is my delivery code now?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "KT-204",
+					"name": "Sam Okafor",
+					"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+				}
+			}
+		}
+	]
+}

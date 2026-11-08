@@ -1,0 +1,1248 @@
+{
+	"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+	"desk": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+	"picked": [
+		{
+			"id": "MUL2162.json",
+			"turns": [
+				"I'm looking for a train to London Kings Cross to arrive at 16:00. Can you help with that?",
+				"Saturday departing from Cambridge.",
+				"I need a price and make sure it arrives by 16:00.",
+				"No need to book it for me. Are there any 3 star hotels in the moderate price range?",
+				"I would like it to be a guesthouse that has free wifi.",
+				"Do any/all of them have free parking as well?"
+			],
+			"probes": [
+				{
+					"slot": "hotel.pricerange",
+					"question": "What price range did I want for the hotel?",
+					"gold": "moderate",
+					"accept": ["moderate"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "london kings cross",
+					"accept": ["london kings cross"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL0454.json",
+			"turns": [
+				"I am looking for a train that leaves on thursday going to cambridge.",
+				"London kings cross, it should also leave after 16:30.",
+				"Yes it will. Can you book that for just me, and provide the reference number?",
+				"I need one ticket and can I please have the reference number?",
+				"I am also looking for places to go int town. I'd love for it to be sports related in the town centre.",
+				"Do you have anything else that is not swimming?"
+			],
+			"probes": [
+				{
+					"slot": "attraction.area",
+					"question": "Which part of town did I want the attraction in?",
+					"gold": "centre",
+					"accept": ["centre", "center"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "cambridge",
+					"accept": ["cambridge"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL1137.json",
+			"turns": [
+				"Yes I am looking for a place to stay in Cambridge that is 3 stars and expensive.  Can you help me?",
+				"Do those both have 3 star ratings and are expensive?",
+				"Do they have free parking?",
+				"Not today thanks. I'm also want to find a cinema in the west part of town.",
+				"Are there any colleges in the West that I could visit instead?",
+				"What is the one that is free? Can I get the phone number and postcode?"
+			],
+			"probes": [
+				{
+					"slot": "attraction.type",
+					"question": "What type of attraction did I ask about?",
+					"gold": "cinema",
+					"accept": ["cinema"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "hotel.pricerange",
+					"question": "What price range did I want for the hotel?",
+					"gold": "expensive",
+					"accept": ["expensive"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL4234.json",
+			"turns": [
+				"Can you help me find a nice restaurant?",
+				"I was thinking some indian food would be great.",
+				"No, I don't care where it is. I'm thinking I'd like an expensive restaurant.",
+				"That is fine book me a table for 6 on Sat at 17:30. I also need a train for the same and should leave leicester for cambridge",
+				"it doesn't matter as long as I am there by 13:45 leaving leicester going to cambridge, I'll need the reference number too  please",
+				"That will be all for today. Thanks so much for all your help. Goodbye"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.people",
+					"question": "How many people did I say the table was for?",
+					"gold": "6",
+					"accept": ["6", "six"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for?",
+					"gold": "indian",
+					"accept": ["indian"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL2290.json",
+			"turns": [
+				"Can you help me find a train?",
+				"From cambridge to petersborough. I am looking for thursday after 12:15",
+				"It should, how much is that ticket?",
+				"Ok, I also need a 2 star place to stay with free parking.",
+				"I'd like a recommendation.",
+				"Sounds good. I need the postcode please."
+			],
+			"probes": [
+				{
+					"slot": "hotel.stars",
+					"question": "How many stars did I ask for?",
+					"gold": "2",
+					"accept": ["2", "two"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "train.leaveAt",
+					"question": "What time did I say the train should leave after?",
+					"gold": "12:15",
+					"accept": ["12:15", "12:15", "12.15", "12:15"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL3162.json",
+			"turns": [
+				"I need to dine on british food in the west.",
+				"I do not care.",
+				"No, I don't need a reservation right now, just their phone number.",
+				"Yes, I need to see if there's a train from london liverpool street that arrives by 8:00 on Saturday.",
+				"no, i am also looking for a train. The train should arrive by 08:00 and should go to cambridge.\nThe train should depart from london liverpool street and should leave on saturday.",
+				"No thank you, that's all I needed! Thanks!"
+			],
+			"probes": [
+				{
+					"slot": "train.day",
+					"question": "What day did I say I would take the train?",
+					"gold": "saturday",
+					"accept": ["saturday"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for?",
+					"gold": "british",
+					"accept": ["british"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL1537.json",
+			"turns": [
+				"I would like to book a room in a hotel, please.",
+				"Yes, I would like a hotel in the north please.",
+				"i would like to hear about the ashley hotel please",
+				"Sounds promising. Do tell, what would be the Ashley's phone number and postcode?",
+				"Yes you can help me find a train from Kings Lynn to Cambridge",
+				"I would like to depart on saturday and arrive by 16:30. What is the exact departure time, price, and train ID?"
+			],
+			"probes": [
+				{
+					"slot": "train.day",
+					"question": "What day did I say I would take the train?",
+					"gold": "saturday",
+					"accept": ["saturday"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "cambridge",
+					"accept": ["cambridge"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "hotel.area",
+					"question": "Which part of town did I want to stay in?",
+					"gold": "north",
+					"accept": ["north"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL2489.json",
+			"turns": [
+				"I'm looking for a nice place to eat.",
+				"I don't care about the cuisine type, but I want it to be somewhere expensive and in the centre please.",
+				"Okay. Can you book me a table for 3 people for 16:15 on a Thursday? I will need the reference number.",
+				"Great, can't wait.  I am also looking for some places to go in the same area as the restaurant.",
+				"What would you recommend?",
+				"Okay, well, what's a good museum to try?"
+			],
+			"probes": [
+				{
+					"slot": "attraction.type",
+					"question": "What type of attraction did I ask about?",
+					"gold": "museum",
+					"accept": ["museum"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "restaurant.pricerange",
+					"question": "What price range did I want for the restaurant?",
+					"gold": "expensive",
+					"accept": ["expensive"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL0095.json",
+			"turns": [
+				"I am looking for a Europeon restaurant in the west of Cambridge.",
+				"Is that an expensive restaraunt? I really need someplace expensive, it is a special occasion for me.",
+				"Yes, please make the reservation for me.",
+				"Make the reservation for 3 people on Friday at 20:00. Thank you!",
+				"Thanks.  Can you also give me some information about Finches Bed and Breakfast?  We're thinking of staying there.",
+				"Can I book a room there for 3 for 3 nights starting friday?"
+			],
+			"probes": [
+				{
+					"slot": "hotel.people",
+					"question": "How many people did I say the hotel was for?",
+					"gold": "3",
+					"accept": ["3", "three"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "restaurant.day",
+					"question": "What day did I want the table?",
+					"gold": "friday",
+					"accept": ["friday"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "restaurant.area",
+					"question": "Which part of town did I want the restaurant in?",
+					"gold": "west",
+					"accept": ["west"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "SNG01165.json",
+			"turns": [
+				"I am looking for a restaurant. The restaurant should be in the moderate price range and should be in the east",
+				"The restaurant should serve italian food.",
+				"What other restaurants in that area serve Italian food?",
+				"No, that will do.  Can I book a table for monday?",
+				"I will have 5 people and we would like 12:15 if possible. Thanks.",
+				"Thanks for you help. I only need the restaurant reservation. Goodbye."
+			],
+			"probes": [
+				{
+					"slot": "restaurant.day",
+					"question": "What day did I want the table?",
+					"gold": "monday",
+					"accept": ["monday"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "restaurant.pricerange",
+					"question": "What price range did I want for the restaurant?",
+					"gold": "moderate",
+					"accept": ["moderate"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL1137.json",
+			"turns": [
+				"I want to find a nightclub.",
+				"May I please have the postcode, and entrance fees for the nightclubs?",
+				"Actually, yes. I'm looking for a train from ely.",
+				"My destination is Cambridge and I would like to arrive by 11:30 on Thursday.",
+				"The one for 7:35 is fine. Can I get the ID # and price, too?",
+				"Thank you. Have a good day."
+			],
+			"probes": [
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "cambridge",
+					"accept": ["cambridge"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "attraction.type",
+					"question": "What type of attraction did I ask about?",
+					"gold": "nightclub",
+					"accept": ["nightclub"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL2119.json",
+			"turns": [
+				"I'd like to find a hotel with free wifi and free parking, please.",
+				"Cambridge, in the east with a 4 star rating I am sparing no expense.",
+				"Yes I just am looking to get the phone number of one.",
+				"Thank you so much. I would also like help finding a train to Cambridge on Tuesday.",
+				"I will be leaving leicester and would like to arrive by 20:45 in cambridge.",
+				"I will book it later but can you tell me the price per ticket."
+			],
+			"probes": [
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "cambridge",
+					"accept": ["cambridge"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "hotel.area",
+					"question": "Which part of town did I want to stay in?",
+					"gold": "east",
+					"accept": ["east"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL2009.json",
+			"turns": [
+				"I would like to find an architectural attraction to go to in the centre. Can you help me?",
+				"I would like to get the entrance fee and address of them please",
+				"Yes, that would be great.",
+				"Okay thank you.  That is all I needed.",
+				"We are looking for a place to dine, preferably expensive Italian food in the same area as the attraction. What do you suggest? I need an address and postcode please.",
+				"Can you book it for me and get a reference number ?"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for?",
+					"gold": "italian",
+					"accept": ["italian"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "attraction.area",
+					"question": "Which part of town did I want the attraction in?",
+					"gold": "centre",
+					"accept": ["centre", "center"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL2074.json",
+			"turns": [
+				"I'm looking for a train that goes to kings lynn and departs from cambridge.",
+				"Yes, I need to leave on Sunday and arrive at Kings Lynn by 08:45 for a meeting.",
+				"Please book that for 4 people. Can i get the reference number please?",
+				"I need to book at a hotel called home from home.",
+				"Please book for 4 people starting Friday for 2 nights.",
+				"Nope, that's all I need today. Thanks for your help. Goodbye!"
+			],
+			"probes": [
+				{
+					"slot": "hotel.name",
+					"question": "Which hotel did I name?",
+					"gold": "home from home",
+					"accept": ["home from home"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "kings lynn",
+					"accept": ["kings lynn"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL0912.json",
+			"turns": [
+				"I am looking forward to trying local restaurants but would like help finding a place to go in town. I would like it to be in the south and a swimmingpool",
+				"I want a place to go in the south, a swimmingpool. Or another type of entertainment, if there is no pool?",
+				"Yes, are there any entertainment attractions then?",
+				"Can I have the entrance fee for the Nusha, as well as the phone number?",
+				"Yes, can you please find me a good Indian restaurant in the same area as the attraction? Money is no object.",
+				"Sure. Book it for 14:30 on saturday for 3 people."
+			],
+			"probes": [
+				{
+					"slot": "restaurant.time",
+					"question": "What time did I want the table?",
+					"gold": "14:30",
+					"accept": ["14:30", "14:30", "14.30", "2:30"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "attraction.name",
+					"question": "Which attraction did I name?",
+					"gold": "nusha",
+					"accept": ["nusha"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "attraction.area",
+					"question": "Which part of town did I want the attraction in?",
+					"gold": "south",
+					"accept": ["south"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL0079.json",
+			"turns": [
+				"Where is a 4 star hotel located in North Cambridge?",
+				"Sure , that could be nice",
+				"I actually don't need reservations I just need the phone number, price range.",
+				"Okay. now could you help me find a restaurant in the expensive price range that is in the same area as the hotel?",
+				"Before we do that, what is the name of the guesthouse? And also, do they have free parking?",
+				"Could you recommend an expensive restaurant in the same area?"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.pricerange",
+					"question": "What price range did I want for the restaurant?",
+					"gold": "expensive",
+					"accept": ["expensive"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "hotel.area",
+					"question": "Which part of town did I want to stay in?",
+					"gold": "north",
+					"accept": ["north"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL3858.json",
+			"turns": [
+				"I'm looking for info on expensive south indian restaurants in Cambridge.",
+				"Are you sure? Could you please check again?",
+				"No how about British food instead?",
+				"The restaurant should be  in the east.",
+				"No, I just need the post code and phone number, please.",
+				"Yes I would like to also find a hotel called  a and b guest house."
+			],
+			"probes": [
+				{
+					"slot": "hotel.name",
+					"question": "Which hotel did I name?",
+					"gold": "a and b guest house",
+					"accept": ["a and b guest house"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "restaurant.area",
+					"question": "Which part of town did I want the restaurant in?",
+					"gold": "east",
+					"accept": ["east"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for?",
+					"gold": "south indian",
+					"accept": ["south indian"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL2137.json",
+			"turns": [
+				"We're looking for a place to stay in Cambridge.  We're looking for a hotel with free wifi and free parking.",
+				"I would prefer a hotel in the moderate price range.",
+				"I don't have a preference. I need to make a reservation for 6 people for 5 nights starting Wednesday.",
+				"I am also in need of a train leaving peterborough.",
+				"I need to leave after 21:45. Do you have maybe more you didn't see?",
+				"I want to leave the same day as the hotel booking which is Wednesday. By the way, may I have the reference number for Lovell Lodge, too?"
+			],
+			"probes": [
+				{
+					"slot": "hotel.name",
+					"question": "Which hotel did I name?",
+					"gold": "lovell lodge",
+					"accept": ["lovell lodge"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "train.departure",
+					"question": "Where did I say the train was leaving from?",
+					"gold": "peterborough",
+					"accept": ["peterborough"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "hotel.pricerange",
+					"question": "What price range did I want for the hotel?",
+					"gold": "moderate",
+					"accept": ["moderate"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL1526.json",
+			"turns": [
+				"I need to find a train from cambridge to ely that leaves after 09:00",
+				"I will be traveling on Monday.",
+				"What is the travel time and price?",
+				"i also need somewhere to sleep",
+				"I need a 4 star hotel.",
+				"How about something in the expensive price range with free wifi?"
+			],
+			"probes": [
+				{
+					"slot": "hotel.pricerange",
+					"question": "What price range did I want for the hotel?",
+					"gold": "expensive",
+					"accept": ["expensive"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "hotel.stars",
+					"question": "How many stars did I ask for?",
+					"gold": "4",
+					"accept": ["4", "four"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "train.leaveAt",
+					"question": "What time did I say the train should leave after?",
+					"gold": "09:00",
+					"accept": ["9:00", "09:00", "9.00", "9:00", "9 am", "9am"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL1627.json",
+			"turns": [
+				"Hi there, I'm looking for a place to eat that serves Indian food in the city centre. Do you have any good recommendations?",
+				"No particular price range, but I do need a restaurant that is available to book 7 people on Friday at 19:15.  I also need a reference number.",
+				"No thank you. I do need to book a train departing from Cambridge though.",
+				"I would like to leave on Saturday and go to Ely.",
+				"I would like to leave after 17:15.",
+				"That would be fine. I need you to book seats on that train for 7 people."
+			],
+			"probes": [
+				{
+					"slot": "train.people",
+					"question": "How many train tickets did I ask for?",
+					"gold": "7",
+					"accept": ["7", "seven"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "ely",
+					"accept": ["ely"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for?",
+					"gold": "indian",
+					"accept": ["indian"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL1491.json",
+			"turns": [
+				"I need to take a train from cambridge, I need to arrive at my destination by 17:00/",
+				"I would like to leave on Saturday.",
+				"I need to get to Norwich please.",
+				"That cuts it a little close but it will do. I don't need it booked, though. Can you also find me a place to get some food?",
+				"I would like an indian restaurant in the centre, please.",
+				"Whichever ever one has 11:00 for two people on the same day available, that one would be fine."
+			],
+			"probes": [
+				{
+					"slot": "restaurant.time",
+					"question": "What time did I want the table?",
+					"gold": "11:00",
+					"accept": ["11:00", "11:00", "11.00", "11:00", "11 am", "11am"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for?",
+					"gold": "indian",
+					"accept": ["indian"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "train.arriveBy",
+					"question": "What time did I say the train had to arrive by?",
+					"gold": "17:00",
+					"accept": ["17:00", "17:00", "17.00", "5:00", "5 pm", "5pm"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL2123.json",
+			"turns": [
+				"I'm looking for a multiple sports location in the centre of town.",
+				"Actually, I really want something in the centre of town. How about nightclubs? Any good ones in the centre of town?",
+				"We would like to try that Club. Can you tell me the postcode and if they have an entrance fee? Thanks!",
+				"What is the postcode for that? I am also looking for an indian restaurant near the nightclub, are there any?",
+				"Postcode please, than search for an indian restaurant if you are able to",
+				"Great, as long as the restaurant is near the nightclub. Do you happen to know the postcode for the restaurant?"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for?",
+					"gold": "indian",
+					"accept": ["indian"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "attraction.type",
+					"question": "What type of attraction did I ask about?",
+					"gold": "multiple sports",
+					"accept": ["multiple sports"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "MUL1612.json",
+			"turns": [
+				"I am looking for a train that leaves Sunday and heading to London Liverpool Street.",
+				"Depart time does not matter but I need it to arrive at 18:00.",
+				"Yes, for one please.",
+				"Excellent. I also am looking for a restaurant as well. It's called the sitar tandoori.",
+				"No, any location is fine.",
+				"Please make sure you reserve my table for 13:30 on the same day and I'll need a reference number."
+			],
+			"probes": [
+				{
+					"slot": "restaurant.time",
+					"question": "What time did I want the table?",
+					"gold": "13:30",
+					"accept": ["13:30", "13:30", "13.30", "1:30"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "restaurant.name",
+					"question": "Which restaurant did I name?",
+					"gold": "sitar tandoori",
+					"accept": ["sitar tandoori"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to?",
+					"gold": "london liverpool street",
+					"accept": ["london liverpool street"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		},
+		{
+			"id": "PMUL1002.json",
+			"turns": [
+				"Hi, I'd like some information on nightclubs located in the west please.",
+				"How about a college to visit in the same area.",
+				"What is the postcode there?",
+				"Yes I need a train that is departing on Wednesday from London Kings cross.",
+				"Yes, I'm headed to Cambridge and need to leave after 09:30.",
+				"Yes, can you book that for 2 people and give me a reference number?"
+			],
+			"probes": [
+				{
+					"slot": "train.people",
+					"question": "How many train tickets did I ask for?",
+					"gold": "2",
+					"accept": ["2", "two"],
+					"refuse": [],
+					"depth": "last"
+				},
+				{
+					"slot": "train.day",
+					"question": "What day did I say I would take the train?",
+					"gold": "wednesday",
+					"accept": ["wednesday"],
+					"refuse": [],
+					"depth": "near"
+				},
+				{
+					"slot": "attraction.area",
+					"question": "Which part of town did I want the attraction in?",
+					"gold": "west",
+					"accept": ["west"],
+					"refuse": [],
+					"depth": "far"
+				}
+			]
+		}
+	],
+	"changed": [
+		{
+			"id": "MUL1860.json",
+			"turns": [
+				"Hi, I am looking for some architecture to go to in the centre of town. Any ideas?",
+				"Great, can I have the address and postcode?",
+				"I'm also going to need to catch a train into Cambridge for Sunday.",
+				"I'd like to go from Cambridge to Ely, and I need to be there by 18:00 for a wedding I'm attending."
+			],
+			"probes": [
+				{
+					"slot": "train.destination",
+					"question": "Where did I say the train was going to? I mean the latest thing I told you.",
+					"gold": "ely",
+					"accept": ["ely"],
+					"refuse": ["cambridge"],
+					"depth": "changed"
+				}
+			]
+		},
+		{
+			"id": "MUL1493.json",
+			"turns": [
+				"Hello, I'm trying to find a train that leaves from Cambridge and arrives here by 13:45 today. Can you help me book a ticket?",
+				"That's fine. I don't want to book yet. Is the train you found going to Ely and leaving on Wednesday?",
+				"Could I have the departure time for that particular train please?",
+				"Thank you very much.",
+				"Are there any restaurants that serve cantonese food in the east part of town?",
+				"Try anything with Indian food, that would work as well. I will need the address if you find one, thanks!"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for? I mean the latest thing I told you.",
+					"gold": "indian",
+					"accept": ["indian"],
+					"refuse": ["cantonese"],
+					"depth": "changed"
+				}
+			]
+		},
+		{
+			"id": "MUL0354.json",
+			"turns": [
+				"Hello, can you tell me about the options for moderately priced dining in Cambridge that are centrally located?",
+				"Are there any that serve Irish food?",
+				"Perhaps a gastropub?"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for? I mean the latest thing I told you.",
+					"gold": "gastropub",
+					"accept": ["gastropub"],
+					"refuse": ["irish"],
+					"depth": "changed"
+				}
+			]
+		},
+		{
+			"id": "SNG0840.json",
+			"turns": [
+				"I need a five starts hotel close to a mall and main restaurants. The hotel should include free wifi in the room.",
+				"How about something with 4 stars and something expensive.",
+				"Maybe.  Is either one a 4 star hotel?  If so, I'd like to book a room for 4 nights.",
+				"I need a reservation for 4 nights starting Saturday.",
+				"3 people. Can I get the reference number please?",
+				"Will you try Sunday arrival?"
+			],
+			"probes": [
+				{
+					"slot": "hotel.day",
+					"question": "What day did I want the hotel to start? I mean the latest thing I told you.",
+					"gold": "sunday",
+					"accept": ["sunday"],
+					"refuse": ["saturday"],
+					"depth": "changed"
+				}
+			]
+		},
+		{
+			"id": "MUL0941.json",
+			"turns": [
+				"I am looking for a museum in the west to go to.",
+				"Yes, please. Can I get the address and postcode?",
+				"I am most interested in a museum. Can you send me postcode and address. I also would like a cheap catalan restaurant, please.",
+				"I'll try the Folk Museum. Where can I find it?",
+				"Could you also provide the museum's postcode please?",
+				"I'm also looking for a cheap Catalan restaurant.",
+				"Yes, can you find a Chinese food restaurant in that post code instead?"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for? I mean the latest thing I told you.",
+					"gold": "chinese",
+					"accept": ["chinese"],
+					"refuse": ["catalan"],
+					"depth": "changed"
+				}
+			]
+		},
+		{
+			"id": "PMUL3940.json",
+			"turns": [
+				"I need some information on taking a train from Kings Lynn to Cambridge.",
+				"Wednesday, and can you please make sure I get there before 19:00.  I don't want to miss Wheel of fortune.",
+				"Thank you. What is the price for that train with ID TR3677?",
+				"Thank you. I am also looking for a multiple sports type attraction in the town centre. Can you tell me what is available?",
+				"what about the type of a museum?"
+			],
+			"probes": [
+				{
+					"slot": "attraction.type",
+					"question": "What type of attraction did I ask about? I mean the latest thing I told you.",
+					"gold": "museum",
+					"accept": ["museum"],
+					"refuse": ["multiple sports"],
+					"depth": "changed"
+				}
+			]
+		},
+		{
+			"id": "PMUL0795.json",
+			"turns": [
+				"Hi, can you help me find a Caribbean restaurant to eat at on my upcoming visit?",
+				"Can you please look for an Italian food restaurant?"
+			],
+			"probes": [
+				{
+					"slot": "restaurant.food",
+					"question": "What kind of food did I ask for? I mean the latest thing I told you.",
+					"gold": "italian",
+					"accept": ["italian"],
+					"refuse": ["caribbean"],
+					"depth": "changed"
+				}
+			]
+		},
+		{
+			"id": "PMUL1521.json",
+			"turns": [
+				"I need a train leaving on Saturday.",
+				"I am leaving from cambridge.",
+				"I am leaving leicester and coming to cambridge."
+			],
+			"probes": [
+				{
+					"slot": "train.departure",
+					"question": "Where did I say the train was leaving from? I mean the latest thing I told you.",
+					"gold": "leicester",
+					"accept": ["leicester"],
+					"refuse": ["cambridge"],
+					"depth": "changed"
+				}
+			]
+		}
+	],
+	"scripted": [
+		{
+			"id": "OR-7",
+			"record": {
+				"id": "OR-7",
+				"name": "Dana Reyes",
+				"text": "Order OR-7: Dana Reyes. Refund $12.50. Ships Friday from the Tacoma depot."
+			},
+			"steps": [
+				{
+					"request": "Look up OR-7 and write a three-sentence update to the customer about the refund and when it ships.",
+					"accept": ["12.50"],
+					"check": "lookup"
+				},
+				{
+					"request": "Make that shorter.",
+					"accept": ["12.50", "Friday"],
+					"check": "shorter"
+				},
+				{
+					"request": "Now make it friendlier.",
+					"accept": ["12.50", "Friday"],
+					"check": "any"
+				},
+				{
+					"request": "My delivery code is 4471. Please note it.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code?",
+					"accept": ["4471"],
+					"check": "any"
+				},
+				{
+					"request": "Which depot did you mention in your first update?",
+					"accept": ["Tacoma"],
+					"check": "any"
+				},
+				{
+					"request": "Actually my delivery code changed to 9182.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code now?",
+					"accept": ["9182"],
+					"refuse": ["4471"],
+					"check": "changed"
+				}
+			]
+		},
+		{
+			"id": "OR-31",
+			"record": {
+				"id": "OR-31",
+				"name": "Priya Nand",
+				"text": "Order OR-31: Priya Nand. Refund $48.00. Ships Monday from the Spokane depot."
+			},
+			"steps": [
+				{
+					"request": "Look up OR-31 and write a three-sentence update to the customer about the refund and when it ships.",
+					"accept": ["48.00"],
+					"check": "lookup"
+				},
+				{
+					"request": "Make that shorter.",
+					"accept": ["48.00", "Monday"],
+					"check": "shorter"
+				},
+				{
+					"request": "Now make it friendlier.",
+					"accept": ["48.00", "Monday"],
+					"check": "any"
+				},
+				{
+					"request": "My delivery code is 7306. Please note it.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code?",
+					"accept": ["7306"],
+					"check": "any"
+				},
+				{
+					"request": "Which depot did you mention in your first update?",
+					"accept": ["Spokane"],
+					"check": "any"
+				},
+				{
+					"request": "Actually my delivery code changed to 2259.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code now?",
+					"accept": ["2259"],
+					"refuse": ["7306"],
+					"check": "changed"
+				}
+			]
+		},
+		{
+			"id": "KT-204",
+			"record": {
+				"id": "KT-204",
+				"name": "Sam Okafor",
+				"text": "Order KT-204: Sam Okafor. Refund $9.75. Ships Thursday from the Boise depot."
+			},
+			"steps": [
+				{
+					"request": "Look up KT-204 and write a three-sentence update to the customer about the refund and when it ships.",
+					"accept": ["9.75"],
+					"check": "lookup"
+				},
+				{
+					"request": "Make that shorter.",
+					"accept": ["9.75", "Thursday"],
+					"check": "shorter"
+				},
+				{
+					"request": "Now make it friendlier.",
+					"accept": ["9.75", "Thursday"],
+					"check": "any"
+				},
+				{
+					"request": "My delivery code is 5518. Please note it.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code?",
+					"accept": ["5518"],
+					"check": "any"
+				},
+				{
+					"request": "Which depot did you mention in your first update?",
+					"accept": ["Boise"],
+					"check": "any"
+				},
+				{
+					"request": "Actually my delivery code changed to 6043.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code now?",
+					"accept": ["6043"],
+					"refuse": ["5518"],
+					"check": "changed"
+				}
+			]
+		},
+		{
+			"id": "BX-88",
+			"record": {
+				"id": "BX-88",
+				"name": "Lena Fuchs",
+				"text": "Order BX-88: Lena Fuchs. Refund $130.20. Ships Tuesday from the Fresno depot."
+			},
+			"steps": [
+				{
+					"request": "Look up BX-88 and write a three-sentence update to the customer about the refund and when it ships.",
+					"accept": ["130.20"],
+					"check": "lookup"
+				},
+				{
+					"request": "Make that shorter.",
+					"accept": ["130.20", "Tuesday"],
+					"check": "shorter"
+				},
+				{
+					"request": "Now make it friendlier.",
+					"accept": ["130.20", "Tuesday"],
+					"check": "any"
+				},
+				{
+					"request": "My delivery code is 1927. Please note it.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code?",
+					"accept": ["1927"],
+					"check": "any"
+				},
+				{
+					"request": "Which depot did you mention in your first update?",
+					"accept": ["Fresno"],
+					"check": "any"
+				},
+				{
+					"request": "Actually my delivery code changed to 8364.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code now?",
+					"accept": ["8364"],
+					"refuse": ["1927"],
+					"check": "changed"
+				}
+			]
+		},
+		{
+			"id": "RM-1402",
+			"record": {
+				"id": "RM-1402",
+				"name": "Tomas Ruiz",
+				"text": "Order RM-1402: Tomas Ruiz. Refund $27.40. Ships Saturday from the Reno depot."
+			},
+			"steps": [
+				{
+					"request": "Look up RM-1402 and write a three-sentence update to the customer about the refund and when it ships.",
+					"accept": ["27.40"],
+					"check": "lookup"
+				},
+				{
+					"request": "Make that shorter.",
+					"accept": ["27.40", "Saturday"],
+					"check": "shorter"
+				},
+				{
+					"request": "Now make it friendlier.",
+					"accept": ["27.40", "Saturday"],
+					"check": "any"
+				},
+				{
+					"request": "My delivery code is 3650. Please note it.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code?",
+					"accept": ["3650"],
+					"check": "any"
+				},
+				{
+					"request": "Which depot did you mention in your first update?",
+					"accept": ["Reno"],
+					"check": "any"
+				},
+				{
+					"request": "Actually my delivery code changed to 7712.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code now?",
+					"accept": ["7712"],
+					"refuse": ["3650"],
+					"check": "changed"
+				}
+			]
+		},
+		{
+			"id": "ZD-56",
+			"record": {
+				"id": "ZD-56",
+				"name": "Ana Silva",
+				"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+			},
+			"steps": [
+				{
+					"request": "Look up ZD-56 and write a three-sentence update to the customer about the refund and when it ships.",
+					"accept": ["64.10"],
+					"check": "lookup"
+				},
+				{
+					"request": "Make that shorter.",
+					"accept": ["64.10", "Wednesday"],
+					"check": "shorter"
+				},
+				{
+					"request": "Now make it friendlier.",
+					"accept": ["64.10", "Wednesday"],
+					"check": "any"
+				},
+				{
+					"request": "My delivery code is 8145. Please note it.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code?",
+					"accept": ["8145"],
+					"check": "any"
+				},
+				{
+					"request": "Which depot did you mention in your first update?",
+					"accept": ["Dayton"],
+					"check": "any"
+				},
+				{
+					"request": "Actually my delivery code changed to 4097.",
+					"accept": [],
+					"check": "none"
+				},
+				{
+					"request": "What is my delivery code now?",
+					"accept": ["4097"],
+					"refuse": ["8145"],
+					"check": "changed"
+				}
+			]
+		}
+	]
+}

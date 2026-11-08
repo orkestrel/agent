@@ -9,6 +9,7 @@ The `@orkestrel/study` package fixes the shape: `studies/<name>/study.json` decl
 | Study           | Driver   | Purpose   | What it's for                                                                                                     |
 | --------------- | -------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
 | `capacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory within its bounds.                                      |
+| `chat`          | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                |
 | `context`       | `tools`  | mechanism | Whether the built Agent carries a memo set and a skill registry across conversations, loads, and scopes.          |
 | `endurance`     | `memory` | quality   | How records and compaction compare over the whole public endurance workload.                                      |
 | `memory`        | `memory` | quality   | How records, compaction, and the full conversation keep corrections and obligations on the `handoff` trajectory.  |
@@ -20,6 +21,7 @@ The following table lists each driver bundle:
 | Bundle            | What it's for                                                                                             |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | `studies/memory/` | The records, compaction, and full-conversation arms over a support desk, with their session and profiles. |
+| `studies/chat/`   | The sealed chat battery over fresh ledgers with one Mica judge and three ledger capacities.               |
 | `studies/tools/`  | One agent over real scratch tools, with its one `local` profile.                                          |
 
 The following table lists the memory profiles under `studies/memory/profiles/`:
@@ -50,7 +52,7 @@ Use the records strategy, the `createLedger` function of `@orkestrel/agent`, com
 
 - The ledger's behavior comes with `@orkestrel/agent`: the records, the window, and the `recall` offer.
 - The judge on the CPU is one option on the `createOllamaJudge` function of `@orkestrel/ollama`.
-- The two-step judge is the application's to compose on the public `JudgeInterface` interface, with `studies/memory/StudyMemoryJudge.ts` as the worked example to adapt. Its mechanism moves to Agent core when the first application composes it, and its thresholds and model names stay in the application (`.orkestrel/agent/plan.md` O193).
+- The two-step judge is the application's to compose on the public `JudgeInterface` interface, with `studies/memory/StudyMemoryJudge.ts` as the worked example to adapt. Its mechanism moves to Agent core when the first application composes it, and its thresholds and model names stay in the application (ruling O193, in `.orkestrel/agent/plan.md` at commit `db86a3eb`).
 
 - A judge choosing the tools, instructions, memos, or skills of a request is the application's to compose on the `narrow` method of its scope. The recipe's last paragraph states what that costs.
 
@@ -58,23 +60,25 @@ For the recipe and its tested fence, see [Composing a records desk for a small l
 
 ## What it measured
 
-The last row is the current strategy, read on 2026-11-07. Each cell is one read on one host, on the 4B agent model and runner 0.40.15, so it reports what that host read and nothing about another. `.orkestrel/agent/plan.md` O187 to O199 holds each reading. First text and recall read a chat battery sealed before any arm ran, and first token and mechanical results read goals `ev-01-1` to `ev-04-4`:
+The last row is the current strategy. Each cell is one read on one host, on the 4B agent model and runner 0.40.15, so it reports what that host read and nothing about another. Rulings O187 to O199, in `.orkestrel/agent/plan.md` at commit `db86a3eb`, hold each reading. First text and recall read a chat battery sealed before any arm ran, and first token and mechanical results read goals `ev-01-1` to `ev-04-4`:
 
-| Arm                                     | First text in a chat, median | Recall at the last turn, two or three back, and further back | First token on a long goal, median | Mechanical results |
-| --------------------------------------- | ---------------------------- | ------------------------------------------------------------ | ---------------------------------- | ------------------ |
-| Agent 0.0.36, as installed              | 2.34 s                       | 0 of 58 in all                                               | not read                           | not read           |
-| Records, judge on the GPU               | not read                     | not read                                                     | 23.9 s                             | 16 of 16           |
-| Records, judge on the CPU               | 2.77 s                       | 7 of 11, 12 of 23, and 6 of 24                               | 14.5 s                             | 16 of 16           |
-| Adding the two-step judge               | not read                     | not read                                                     | 10.2 s                             | 16 of 16           |
-| Adding the window                       | 1.24 s                       | 10 of 11, 21 of 23, and 20 of 24                             | 10.0 s                             | 16 of 16           |
-| Offering `recall` only when it can help | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.5 s                             | 16 of 16           |
-| Fitting `recall` to the measured room   | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.4 s                             | 16 of 16           |
+| Arm                                                  | Read on                               | First text in a chat, median | Recall at the last turn, two or three back, and further back | First token on a long goal, median | Mechanical results |
+| ---------------------------------------------------- | ------------------------------------- | ---------------------------- | ------------------------------------------------------------ | ---------------------------------- | ------------------ |
+| Agent 0.0.36, as installed                           | 2026-11-07                            | 2.34 s                       | 0 of 58 in all                                               | not read                           | not read           |
+| Records, judge on the GPU                            | 2026-11-06                            | not read                     | not read                                                     | 23.9 s                             | 16 of 16           |
+| Records, judge on the CPU                            | chat 2026-11-07, long goal 2026-11-06 | 2.77 s                       | 7 of 11, 12 of 23, and 6 of 24                               | 14.5 s                             | 16 of 16           |
+| Adding the two-step judge                            | 2026-11-06                            | not read                     | not read                                                     | 10.2 s                             | 16 of 16           |
+| Adding the window (`c9a651b2`)                       | 2026-11-07                            | 1.24 s                       | 10 of 11, 21 of 23, and 20 of 24                             | 10.0 s                             | 16 of 16           |
+| Offering `recall` only when it can help (`513a9a31`) | 2026-11-07                            | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.5 s                             | 16 of 16           |
+| Fitting `recall` to the measured room (`c915224d`)   | 2026-11-07                            | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.4 s                             | 16 of 16           |
 
-That last step took answers both right and free of a denial from 30 to 47 of 58, and `recall` calls from 0.73 to 0.01 per follow-up.
+Offering `recall` only when it can help took answers both right and free of a denial from 30 to 47 of 58, and `recall` calls from 0.73 to 0.01 per follow-up, on 2026-11-07.
 
-The last step changes nothing at this profile's capacity and is for a host with less room. `recall` used to close whenever the room under `predict` fell below twice the longest reply the ledger had seen; it now fits whole results into the room the request's own prompt leaves. At a capacity of 1600 with 1024 of it reserved for output, the battery reads 7 of 11, 9 of 23, and 9 of 24, against 5 of 11, 2 of 23, and 1 of 24 before that step, and 3 of 11, 4 of 23, and 1 of 24 before the one ahead of it, while the follow-up `Make that shorter.` keeps its exchange in 6 of 6. A host with that little room still recalls less than one with room to spare.
+The last step changes nothing at this profile's capacity and is for a host with less room. `recall` used to close whenever the room under `predict` fell below twice the longest reply the ledger had seen; it now fits whole results into the room the request's own prompt leaves. At a capacity of 1600 with 1024 of it reserved for output, the battery read on 2026-11-07 7 of 11, 9 of 23, and 9 of 24, against 5 of 11, 2 of 23, and 1 of 24 before that step, and 3 of 11, 4 of 23, and 1 of 24 before the one ahead of it, while the follow-up `Make that shorter.` keeps its exchange in 6 of 6. A host with that little room still recalls less than one with room to spare.
 
-Two readings rule options out. A judge narrowing a request to its desk area's tools doesn't help the 4B model: with all 36 tools of a fictional catalog offered it chose right on 42 of 42 requests, and narrowed to the known area's 6 it chose right on 35 of 42, answering some requests in text with no call, though its prompt fell from 2416 to 699 tokens. Correction narrowing (`settings.correction.narrow`) read no change on these goals: 47 judge calls with it and without, with byte-identical results.
+Two readings of 2026-11-07 rule options out. A judge narrowing a request to its desk area's tools doesn't help the 4B model: with all 36 tools of a fictional catalog offered it chose right on 42 of 42 requests, and narrowed to the known area's 6 it chose right on 35 of 42, answering some requests in text with no call, though its prompt fell from 2416 to 699 tokens. Correction narrowing (`settings.correction.narrow`) read no change on these goals: 47 judge calls with it and without, with byte-identical results.
+
+The `chat` study is that battery, tracked. On 2026-11-08, on the 0.0.38 build and the same runner, its 102 graded rows matched the battery's last reading row for row at each of its three capacities, primary, denial, and older-value outcomes alike, with follow-up first text at a median of 0.42, 0.43, and 1.78 s against the battery's 0.42, 0.43, and 1.80 s.
 
 ## Running it
 
@@ -111,3 +115,25 @@ npx study execute qualification --profile recommended --closure ABSOLUTE_GROWN_C
 ```
 
 Study replays the ancestor's retained prefix and sends only the appended goals, with the owned daemon's maintenance retained as well. Segmented selectors cannot accompany `--extend`; an unchanged horizon is not an extension.
+
+## Running the chat instrument
+
+The `chat` mechanism study preserves 38 conversations, 294 requests, and 102 primary mechanical checks. Its profiles are `full` (ledger capacity 19968), `compact` (2400), and `tight` (1600). The agent context remains 20480 and its output limit 1024 in all three. Each profile composes Mica alone and pins the same runner and model identities. See [Chat source and treatment](chat/sources/README.md) for provenance, the original-to-scenario mapping, effective wire policies, allowances, and grading semantics. No model reading of this Study bundle is recorded yet.
+
+Build the package before freezing because the profiles load `dist/src/core/index.js`. The following commands freeze, check, and record the full schedule; replace `full` with the chosen capacity profile. `ABSOLUTE_CHAT_CLOSURE_PATH` names a new absolute directory under `tmp/` with an existing parent, and `STEM` names the result.
+
+```sh
+npx study freeze chat --profile full --to ABSOLUTE_CHAT_CLOSURE_PATH
+npx study check chat --profile full --closure ABSOLUTE_CHAT_CLOSURE_PATH
+npx study execute chat --profile full --closure ABSOLUTE_CHAT_CLOSURE_PATH --out tmp/studies/STEM
+```
+
+Grade and report through the captured entry from the closure's directory. `ABSOLUTE_RESULT_PATH` is the path printed by execution, and `ASSESSMENT_ID` is the identity printed by grading.
+
+```sh
+cd ABSOLUTE_CHAT_CLOSURE_PATH
+node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CHAT_CLOSURE_PATH/studies/chat/rubric.json
+node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js report ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID
+```
+
+Study's generic report includes the separate diagnostic and completion criteria. For the battery's 102-row primary denominator and latency reading, use the tested `buildStudyChatSummary` consumer in `chat/helpers.ts` with the verified assessment, rubric, scenarios, and evidence returned by Study's `collectStudyEvidence` helper. Its rows preserve original conversation ids and turn numbers for external pairing. Offline replay checks custody without model sends and contributes no first-text timing.

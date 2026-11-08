@@ -1,0 +1,109 @@
+{
+	"id": "script-zd-56",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Look up ZD-56 and write a three-sentence update to the customer about the refund and when it ships.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Make that shorter.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Now make it friendlier.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "My delivery code is 8145. Please note it.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "What is my delivery code?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Which depot did you mention in your first update?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		},
+		{
+			"id": "turn-7",
+			"input": {
+				"prompt": "Actually my delivery code changed to 4097.",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		},
+		{
+			"id": "turn-8",
+			"input": {
+				"prompt": "What is my delivery code now?",
+				"system": "You operate a support desk. Answer the current request from the available conversation and references. Be brief.",
+				"topic": "orders",
+				"record": {
+					"id": "ZD-56",
+					"name": "Ana Silva",
+					"text": "Order ZD-56: Ana Silva. Refund $64.10. Ships Wednesday from the Dayton depot."
+				}
+			}
+		}
+	]
+}

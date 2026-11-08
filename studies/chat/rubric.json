@@ -1,0 +1,6167 @@
+{
+	"version": "1",
+	"criteria": [
+		{
+			"id": "picked-mul2162-turn-7-primary",
+			"scenario": "picked-mul2162",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2162.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["moderate"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-7-denial",
+			"scenario": "picked-mul2162",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2162.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["moderate"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-8-primary",
+			"scenario": "picked-mul2162",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2162.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["london kings cross"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-8-denial",
+			"scenario": "picked-mul2162",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2162.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["london kings cross"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-7-primary",
+			"scenario": "picked-mul0454",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL0454.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["centre", "center"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-7-denial",
+			"scenario": "picked-mul0454",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL0454.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["centre", "center"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-8-primary",
+			"scenario": "picked-mul0454",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL0454.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-8-denial",
+			"scenario": "picked-mul0454",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL0454.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-7-primary",
+			"scenario": "picked-mul1137",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1137.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["cinema"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-7-denial",
+			"scenario": "picked-mul1137",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1137.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["cinema"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-8-primary",
+			"scenario": "picked-mul1137",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1137.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-8-denial",
+			"scenario": "picked-mul1137",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1137.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-7-primary",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL4234.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["6", "six"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-7-denial",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL4234.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["6", "six"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-8-primary",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL4234.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-8-denial",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL4234.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-7-primary",
+			"scenario": "picked-mul2290",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2290.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["2", "two"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-7-denial",
+			"scenario": "picked-mul2290",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2290.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["2", "two"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-8-primary",
+			"scenario": "picked-mul2290",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2290.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["12:15", "12:15", "12.15", "12:15"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-8-denial",
+			"scenario": "picked-mul2290",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2290.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["12:15", "12:15", "12.15", "12:15"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-7-primary",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL3162.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["saturday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-7-denial",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL3162.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["saturday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-8-primary",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL3162.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["british"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-8-denial",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL3162.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["british"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-7-primary",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1537.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["saturday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-7-denial",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1537.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["saturday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-8-primary",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1537.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-8-denial",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1537.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-9-primary",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1537.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["north"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-9-denial",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1537.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["north"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-7-primary",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL2489.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["museum"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-7-denial",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL2489.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["museum"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-8-primary",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL2489.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-8-denial",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL2489.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-7-primary",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL0095.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["3", "three"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-7-denial",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL0095.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["3", "three"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-8-primary",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL0095.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["friday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-8-denial",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL0095.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["friday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-9-primary",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL0095.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["west"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-9-denial",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL0095.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["west"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-7-primary",
+			"scenario": "picked-sng01165",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "SNG01165.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["monday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-7-denial",
+			"scenario": "picked-sng01165",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "SNG01165.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["monday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-8-primary",
+			"scenario": "picked-sng01165",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "SNG01165.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["moderate"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-8-denial",
+			"scenario": "picked-sng01165",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "SNG01165.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["moderate"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-7-primary",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1137.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-7-denial",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1137.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-8-primary",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1137.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["nightclub"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-8-denial",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1137.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["nightclub"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-7-primary",
+			"scenario": "picked-mul2119",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2119.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-7-denial",
+			"scenario": "picked-mul2119",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2119.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["cambridge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-8-primary",
+			"scenario": "picked-mul2119",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2119.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["east"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-8-denial",
+			"scenario": "picked-mul2119",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2119.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["east"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-7-primary",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL2009.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["italian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-7-denial",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL2009.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["italian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-8-primary",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL2009.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["centre", "center"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-8-denial",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL2009.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["centre", "center"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-7-primary",
+			"scenario": "picked-mul2074",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2074.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["home from home"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-7-denial",
+			"scenario": "picked-mul2074",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2074.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["home from home"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-8-primary",
+			"scenario": "picked-mul2074",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2074.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["kings lynn"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-8-denial",
+			"scenario": "picked-mul2074",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2074.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["kings lynn"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-7-primary",
+			"scenario": "picked-mul0912",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL0912.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["14:30", "14:30", "14.30", "2:30"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-7-denial",
+			"scenario": "picked-mul0912",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL0912.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["14:30", "14:30", "14.30", "2:30"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-8-primary",
+			"scenario": "picked-mul0912",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL0912.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["nusha"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-8-denial",
+			"scenario": "picked-mul0912",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL0912.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["nusha"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-9-primary",
+			"scenario": "picked-mul0912",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL0912.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["south"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-9-denial",
+			"scenario": "picked-mul0912",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL0912.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["south"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-7-primary",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL0079.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-7-denial",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL0079.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-8-primary",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL0079.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["north"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-8-denial",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL0079.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["north"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-7-primary",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL3858.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["a and b guest house"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-7-denial",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL3858.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["a and b guest house"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-8-primary",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL3858.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["east"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-8-denial",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL3858.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["east"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-9-primary",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL3858.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["south indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-9-denial",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL3858.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["south indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-7-primary",
+			"scenario": "picked-mul2137",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2137.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["lovell lodge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-7-denial",
+			"scenario": "picked-mul2137",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2137.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["lovell lodge"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-8-primary",
+			"scenario": "picked-mul2137",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2137.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["peterborough"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-8-denial",
+			"scenario": "picked-mul2137",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2137.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["peterborough"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-9-primary",
+			"scenario": "picked-mul2137",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL2137.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["moderate"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-9-denial",
+			"scenario": "picked-mul2137",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL2137.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["moderate"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-7-primary",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1526.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-7-denial",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1526.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["expensive"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-8-primary",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1526.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["4", "four"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-8-denial",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1526.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["4", "four"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-9-primary",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1526.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["9:00", "09:00", "9.00", "9:00", "9 am", "9am"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-9-denial",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1526.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["9:00", "09:00", "9.00", "9:00", "9 am", "9am"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-7-primary",
+			"scenario": "picked-mul1627",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1627.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["7", "seven"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-7-denial",
+			"scenario": "picked-mul1627",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1627.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["7", "seven"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-8-primary",
+			"scenario": "picked-mul1627",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1627.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["ely"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-8-denial",
+			"scenario": "picked-mul1627",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1627.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["ely"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-9-primary",
+			"scenario": "picked-mul1627",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1627.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-9-denial",
+			"scenario": "picked-mul1627",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1627.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-7-primary",
+			"scenario": "picked-mul1491",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1491.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["11:00", "11:00", "11.00", "11:00", "11 am", "11am"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-7-denial",
+			"scenario": "picked-mul1491",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1491.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["11:00", "11:00", "11.00", "11:00", "11 am", "11am"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-8-primary",
+			"scenario": "picked-mul1491",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1491.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-8-denial",
+			"scenario": "picked-mul1491",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1491.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-9-primary",
+			"scenario": "picked-mul1491",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1491.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["17:00", "17:00", "17.00", "5:00", "5 pm", "5pm"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-9-denial",
+			"scenario": "picked-mul1491",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1491.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["17:00", "17:00", "17.00", "5:00", "5 pm", "5pm"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-7-primary",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL2123.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-7-denial",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL2123.json",
+				"turn": 7,
+				"group": "near",
+				"accept": ["indian"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-8-primary",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL2123.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["multiple sports"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-8-denial",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL2123.json",
+				"turn": 8,
+				"group": "far",
+				"accept": ["multiple sports"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-7-primary",
+			"scenario": "picked-mul1612",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1612.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["13:30", "13:30", "13.30", "1:30"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-7-denial",
+			"scenario": "picked-mul1612",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1612.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["13:30", "13:30", "13.30", "1:30"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-8-primary",
+			"scenario": "picked-mul1612",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1612.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["sitar tandoori"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-8-denial",
+			"scenario": "picked-mul1612",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1612.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["sitar tandoori"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-9-primary",
+			"scenario": "picked-mul1612",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1612.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["london liverpool street"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-9-denial",
+			"scenario": "picked-mul1612",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1612.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["london liverpool street"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-7-primary",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1002.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["2", "two"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-7-denial",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1002.json",
+				"turn": 7,
+				"group": "last",
+				"accept": ["2", "two"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-8-primary",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1002.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["wednesday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-8-denial",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1002.json",
+				"turn": 8,
+				"group": "near",
+				"accept": ["wednesday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-9-primary",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1002.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["west"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-9-denial",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-9",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1002.json",
+				"turn": 9,
+				"group": "far",
+				"accept": ["west"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1860-turn-5-primary",
+			"scenario": "changed-mul1860",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1860.json",
+				"turn": 5,
+				"group": "changed dialogue",
+				"accept": ["ely"],
+				"refuse": ["cambridge"]
+			}
+		},
+		{
+			"id": "changed-mul1860-turn-5-denial",
+			"scenario": "changed-mul1860",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1860.json",
+				"turn": 5,
+				"group": "changed dialogue",
+				"accept": ["ely"],
+				"refuse": ["cambridge"]
+			}
+		},
+		{
+			"id": "changed-mul1860-turn-5-older",
+			"scenario": "changed-mul1860",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "MUL1860.json",
+				"turn": 5,
+				"group": "changed dialogue",
+				"accept": ["ely"],
+				"refuse": ["cambridge"]
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-7-primary",
+			"scenario": "changed-mul1493",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL1493.json",
+				"turn": 7,
+				"group": "changed dialogue",
+				"accept": ["indian"],
+				"refuse": ["cantonese"]
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-7-denial",
+			"scenario": "changed-mul1493",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL1493.json",
+				"turn": 7,
+				"group": "changed dialogue",
+				"accept": ["indian"],
+				"refuse": ["cantonese"]
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-7-older",
+			"scenario": "changed-mul1493",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "MUL1493.json",
+				"turn": 7,
+				"group": "changed dialogue",
+				"accept": ["indian"],
+				"refuse": ["cantonese"]
+			}
+		},
+		{
+			"id": "changed-mul0354-turn-4-primary",
+			"scenario": "changed-mul0354",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL0354.json",
+				"turn": 4,
+				"group": "changed dialogue",
+				"accept": ["gastropub"],
+				"refuse": ["irish"]
+			}
+		},
+		{
+			"id": "changed-mul0354-turn-4-denial",
+			"scenario": "changed-mul0354",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL0354.json",
+				"turn": 4,
+				"group": "changed dialogue",
+				"accept": ["gastropub"],
+				"refuse": ["irish"]
+			}
+		},
+		{
+			"id": "changed-mul0354-turn-4-older",
+			"scenario": "changed-mul0354",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "MUL0354.json",
+				"turn": 4,
+				"group": "changed dialogue",
+				"accept": ["gastropub"],
+				"refuse": ["irish"]
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-7-primary",
+			"scenario": "changed-sng0840",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "SNG0840.json",
+				"turn": 7,
+				"group": "changed dialogue",
+				"accept": ["sunday"],
+				"refuse": ["saturday"]
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-7-denial",
+			"scenario": "changed-sng0840",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "SNG0840.json",
+				"turn": 7,
+				"group": "changed dialogue",
+				"accept": ["sunday"],
+				"refuse": ["saturday"]
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-7-older",
+			"scenario": "changed-sng0840",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "SNG0840.json",
+				"turn": 7,
+				"group": "changed dialogue",
+				"accept": ["sunday"],
+				"refuse": ["saturday"]
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-8-primary",
+			"scenario": "changed-mul0941",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "MUL0941.json",
+				"turn": 8,
+				"group": "changed dialogue",
+				"accept": ["chinese"],
+				"refuse": ["catalan"]
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-8-denial",
+			"scenario": "changed-mul0941",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "MUL0941.json",
+				"turn": 8,
+				"group": "changed dialogue",
+				"accept": ["chinese"],
+				"refuse": ["catalan"]
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-8-older",
+			"scenario": "changed-mul0941",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "MUL0941.json",
+				"turn": 8,
+				"group": "changed dialogue",
+				"accept": ["chinese"],
+				"refuse": ["catalan"]
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-6-primary",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL3940.json",
+				"turn": 6,
+				"group": "changed dialogue",
+				"accept": ["museum"],
+				"refuse": ["multiple sports"]
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-6-denial",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL3940.json",
+				"turn": 6,
+				"group": "changed dialogue",
+				"accept": ["museum"],
+				"refuse": ["multiple sports"]
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-6-older",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "PMUL3940.json",
+				"turn": 6,
+				"group": "changed dialogue",
+				"accept": ["museum"],
+				"refuse": ["multiple sports"]
+			}
+		},
+		{
+			"id": "changed-pmul0795-turn-3-primary",
+			"scenario": "changed-pmul0795",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL0795.json",
+				"turn": 3,
+				"group": "changed dialogue",
+				"accept": ["italian"],
+				"refuse": ["caribbean"]
+			}
+		},
+		{
+			"id": "changed-pmul0795-turn-3-denial",
+			"scenario": "changed-pmul0795",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL0795.json",
+				"turn": 3,
+				"group": "changed dialogue",
+				"accept": ["italian"],
+				"refuse": ["caribbean"]
+			}
+		},
+		{
+			"id": "changed-pmul0795-turn-3-older",
+			"scenario": "changed-pmul0795",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "PMUL0795.json",
+				"turn": 3,
+				"group": "changed dialogue",
+				"accept": ["italian"],
+				"refuse": ["caribbean"]
+			}
+		},
+		{
+			"id": "changed-pmul1521-turn-4-primary",
+			"scenario": "changed-pmul1521",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "PMUL1521.json",
+				"turn": 4,
+				"group": "changed dialogue",
+				"accept": ["leicester"],
+				"refuse": ["cambridge"]
+			}
+		},
+		{
+			"id": "changed-pmul1521-turn-4-denial",
+			"scenario": "changed-pmul1521",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "PMUL1521.json",
+				"turn": 4,
+				"group": "changed dialogue",
+				"accept": ["leicester"],
+				"refuse": ["cambridge"]
+			}
+		},
+		{
+			"id": "changed-pmul1521-turn-4-older",
+			"scenario": "changed-pmul1521",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "PMUL1521.json",
+				"turn": 4,
+				"group": "changed dialogue",
+				"accept": ["leicester"],
+				"refuse": ["cambridge"]
+			}
+		},
+		{
+			"id": "script-or-7-turn-1-primary",
+			"scenario": "script-or-7",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-7",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["12.50"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-1-denial",
+			"scenario": "script-or-7",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-7",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["12.50"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-2-primary",
+			"scenario": "script-or-7",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-7",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["12.50", "Friday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-or-7-turn-2-denial",
+			"scenario": "script-or-7",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-7",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["12.50", "Friday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-or-7-turn-3-primary",
+			"scenario": "script-or-7",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-7",
+				"turn": 3,
+				"group": "any",
+				"accept": ["12.50", "Friday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-3-denial",
+			"scenario": "script-or-7",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-7",
+				"turn": 3,
+				"group": "any",
+				"accept": ["12.50", "Friday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-5-primary",
+			"scenario": "script-or-7",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-7",
+				"turn": 5,
+				"group": "any",
+				"accept": ["4471"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-5-denial",
+			"scenario": "script-or-7",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-7",
+				"turn": 5,
+				"group": "any",
+				"accept": ["4471"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-6-primary",
+			"scenario": "script-or-7",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-7",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Tacoma"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-6-denial",
+			"scenario": "script-or-7",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-7",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Tacoma"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-8-primary",
+			"scenario": "script-or-7",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-7",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["9182"],
+				"refuse": ["4471"]
+			}
+		},
+		{
+			"id": "script-or-7-turn-8-denial",
+			"scenario": "script-or-7",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-7",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["9182"],
+				"refuse": ["4471"]
+			}
+		},
+		{
+			"id": "script-or-7-turn-8-older",
+			"scenario": "script-or-7",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "OR-7",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["9182"],
+				"refuse": ["4471"]
+			}
+		},
+		{
+			"id": "script-or-31-turn-1-primary",
+			"scenario": "script-or-31",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-31",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["48.00"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-1-denial",
+			"scenario": "script-or-31",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-31",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["48.00"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-2-primary",
+			"scenario": "script-or-31",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-31",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["48.00", "Monday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-or-31-turn-2-denial",
+			"scenario": "script-or-31",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-31",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["48.00", "Monday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-or-31-turn-3-primary",
+			"scenario": "script-or-31",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-31",
+				"turn": 3,
+				"group": "any",
+				"accept": ["48.00", "Monday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-3-denial",
+			"scenario": "script-or-31",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-31",
+				"turn": 3,
+				"group": "any",
+				"accept": ["48.00", "Monday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-5-primary",
+			"scenario": "script-or-31",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-31",
+				"turn": 5,
+				"group": "any",
+				"accept": ["7306"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-5-denial",
+			"scenario": "script-or-31",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-31",
+				"turn": 5,
+				"group": "any",
+				"accept": ["7306"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-6-primary",
+			"scenario": "script-or-31",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-31",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Spokane"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-6-denial",
+			"scenario": "script-or-31",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-31",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Spokane"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-8-primary",
+			"scenario": "script-or-31",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "OR-31",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["2259"],
+				"refuse": ["7306"]
+			}
+		},
+		{
+			"id": "script-or-31-turn-8-denial",
+			"scenario": "script-or-31",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "OR-31",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["2259"],
+				"refuse": ["7306"]
+			}
+		},
+		{
+			"id": "script-or-31-turn-8-older",
+			"scenario": "script-or-31",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "OR-31",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["2259"],
+				"refuse": ["7306"]
+			}
+		},
+		{
+			"id": "script-kt-204-turn-1-primary",
+			"scenario": "script-kt-204",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "KT-204",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["9.75"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-1-denial",
+			"scenario": "script-kt-204",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "KT-204",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["9.75"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-2-primary",
+			"scenario": "script-kt-204",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "KT-204",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["9.75", "Thursday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-kt-204-turn-2-denial",
+			"scenario": "script-kt-204",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "KT-204",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["9.75", "Thursday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-kt-204-turn-3-primary",
+			"scenario": "script-kt-204",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "KT-204",
+				"turn": 3,
+				"group": "any",
+				"accept": ["9.75", "Thursday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-3-denial",
+			"scenario": "script-kt-204",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "KT-204",
+				"turn": 3,
+				"group": "any",
+				"accept": ["9.75", "Thursday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-5-primary",
+			"scenario": "script-kt-204",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "KT-204",
+				"turn": 5,
+				"group": "any",
+				"accept": ["5518"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-5-denial",
+			"scenario": "script-kt-204",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "KT-204",
+				"turn": 5,
+				"group": "any",
+				"accept": ["5518"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-6-primary",
+			"scenario": "script-kt-204",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "KT-204",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Boise"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-6-denial",
+			"scenario": "script-kt-204",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "KT-204",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Boise"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-8-primary",
+			"scenario": "script-kt-204",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "KT-204",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["6043"],
+				"refuse": ["5518"]
+			}
+		},
+		{
+			"id": "script-kt-204-turn-8-denial",
+			"scenario": "script-kt-204",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "KT-204",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["6043"],
+				"refuse": ["5518"]
+			}
+		},
+		{
+			"id": "script-kt-204-turn-8-older",
+			"scenario": "script-kt-204",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "KT-204",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["6043"],
+				"refuse": ["5518"]
+			}
+		},
+		{
+			"id": "script-bx-88-turn-1-primary",
+			"scenario": "script-bx-88",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "BX-88",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["130.20"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-1-denial",
+			"scenario": "script-bx-88",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "BX-88",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["130.20"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-2-primary",
+			"scenario": "script-bx-88",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "BX-88",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["130.20", "Tuesday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-bx-88-turn-2-denial",
+			"scenario": "script-bx-88",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "BX-88",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["130.20", "Tuesday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-bx-88-turn-3-primary",
+			"scenario": "script-bx-88",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "BX-88",
+				"turn": 3,
+				"group": "any",
+				"accept": ["130.20", "Tuesday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-3-denial",
+			"scenario": "script-bx-88",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "BX-88",
+				"turn": 3,
+				"group": "any",
+				"accept": ["130.20", "Tuesday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-5-primary",
+			"scenario": "script-bx-88",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "BX-88",
+				"turn": 5,
+				"group": "any",
+				"accept": ["1927"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-5-denial",
+			"scenario": "script-bx-88",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "BX-88",
+				"turn": 5,
+				"group": "any",
+				"accept": ["1927"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-6-primary",
+			"scenario": "script-bx-88",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "BX-88",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Fresno"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-6-denial",
+			"scenario": "script-bx-88",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "BX-88",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Fresno"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-8-primary",
+			"scenario": "script-bx-88",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "BX-88",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["8364"],
+				"refuse": ["1927"]
+			}
+		},
+		{
+			"id": "script-bx-88-turn-8-denial",
+			"scenario": "script-bx-88",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "BX-88",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["8364"],
+				"refuse": ["1927"]
+			}
+		},
+		{
+			"id": "script-bx-88-turn-8-older",
+			"scenario": "script-bx-88",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "BX-88",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["8364"],
+				"refuse": ["1927"]
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-1-primary",
+			"scenario": "script-rm-1402",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "RM-1402",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["27.40"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-1-denial",
+			"scenario": "script-rm-1402",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "RM-1402",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["27.40"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-2-primary",
+			"scenario": "script-rm-1402",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "RM-1402",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["27.40", "Saturday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-2-denial",
+			"scenario": "script-rm-1402",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "RM-1402",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["27.40", "Saturday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-3-primary",
+			"scenario": "script-rm-1402",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "RM-1402",
+				"turn": 3,
+				"group": "any",
+				"accept": ["27.40", "Saturday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-3-denial",
+			"scenario": "script-rm-1402",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "RM-1402",
+				"turn": 3,
+				"group": "any",
+				"accept": ["27.40", "Saturday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-5-primary",
+			"scenario": "script-rm-1402",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "RM-1402",
+				"turn": 5,
+				"group": "any",
+				"accept": ["3650"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-5-denial",
+			"scenario": "script-rm-1402",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "RM-1402",
+				"turn": 5,
+				"group": "any",
+				"accept": ["3650"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-6-primary",
+			"scenario": "script-rm-1402",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "RM-1402",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Reno"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-6-denial",
+			"scenario": "script-rm-1402",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "RM-1402",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Reno"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-8-primary",
+			"scenario": "script-rm-1402",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "RM-1402",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["7712"],
+				"refuse": ["3650"]
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-8-denial",
+			"scenario": "script-rm-1402",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "RM-1402",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["7712"],
+				"refuse": ["3650"]
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-8-older",
+			"scenario": "script-rm-1402",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "RM-1402",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["7712"],
+				"refuse": ["3650"]
+			}
+		},
+		{
+			"id": "script-zd-56-turn-1-primary",
+			"scenario": "script-zd-56",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "ZD-56",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["64.10"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-1-denial",
+			"scenario": "script-zd-56",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "ZD-56",
+				"turn": 1,
+				"group": "lookup",
+				"accept": ["64.10"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-2-primary",
+			"scenario": "script-zd-56",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "ZD-56",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["64.10", "Wednesday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-zd-56-turn-2-denial",
+			"scenario": "script-zd-56",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "ZD-56",
+				"turn": 2,
+				"group": "shorter",
+				"accept": ["64.10", "Wednesday"],
+				"refuse": [],
+				"previous": "turn-1"
+			}
+		},
+		{
+			"id": "script-zd-56-turn-3-primary",
+			"scenario": "script-zd-56",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "ZD-56",
+				"turn": 3,
+				"group": "any",
+				"accept": ["64.10", "Wednesday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-3-denial",
+			"scenario": "script-zd-56",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "ZD-56",
+				"turn": 3,
+				"group": "any",
+				"accept": ["64.10", "Wednesday"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-5-primary",
+			"scenario": "script-zd-56",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "ZD-56",
+				"turn": 5,
+				"group": "any",
+				"accept": ["8145"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-5-denial",
+			"scenario": "script-zd-56",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "ZD-56",
+				"turn": 5,
+				"group": "any",
+				"accept": ["8145"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-6-primary",
+			"scenario": "script-zd-56",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "ZD-56",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Dayton"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-6-denial",
+			"scenario": "script-zd-56",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "ZD-56",
+				"turn": 6,
+				"group": "any",
+				"accept": ["Dayton"],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-8-primary",
+			"scenario": "script-zd-56",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "primary",
+				"conversation": "ZD-56",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["4097"],
+				"refuse": ["8145"]
+			}
+		},
+		{
+			"id": "script-zd-56-turn-8-denial",
+			"scenario": "script-zd-56",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "denial",
+				"conversation": "ZD-56",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["4097"],
+				"refuse": ["8145"]
+			}
+		},
+		{
+			"id": "script-zd-56-turn-8-older",
+			"scenario": "script-zd-56",
+			"goal": "turn-8",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "older",
+				"conversation": "ZD-56",
+				"turn": 8,
+				"group": "changed script",
+				"accept": ["4097"],
+				"refuse": ["8145"]
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-1-completion",
+			"scenario": "picked-mul2162",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2162",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-2-completion",
+			"scenario": "picked-mul2162",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2162",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-3-completion",
+			"scenario": "picked-mul2162",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2162",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-4-completion",
+			"scenario": "picked-mul2162",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2162",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-5-completion",
+			"scenario": "picked-mul2162",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2162",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2162-turn-6-completion",
+			"scenario": "picked-mul2162",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2162",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-1-completion",
+			"scenario": "picked-mul0454",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0454",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-2-completion",
+			"scenario": "picked-mul0454",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0454",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-3-completion",
+			"scenario": "picked-mul0454",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0454",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-4-completion",
+			"scenario": "picked-mul0454",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0454",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-5-completion",
+			"scenario": "picked-mul0454",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0454",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0454-turn-6-completion",
+			"scenario": "picked-mul0454",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0454",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-1-completion",
+			"scenario": "picked-mul1137",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1137",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-2-completion",
+			"scenario": "picked-mul1137",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1137",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-3-completion",
+			"scenario": "picked-mul1137",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1137",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-4-completion",
+			"scenario": "picked-mul1137",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1137",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-5-completion",
+			"scenario": "picked-mul1137",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1137",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1137-turn-6-completion",
+			"scenario": "picked-mul1137",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1137",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-1-completion",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul4234",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-2-completion",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul4234",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-3-completion",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul4234",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-4-completion",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul4234",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-5-completion",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul4234",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul4234-turn-6-completion",
+			"scenario": "picked-pmul4234",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul4234",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-1-completion",
+			"scenario": "picked-mul2290",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2290",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-2-completion",
+			"scenario": "picked-mul2290",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2290",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-3-completion",
+			"scenario": "picked-mul2290",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2290",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-4-completion",
+			"scenario": "picked-mul2290",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2290",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-5-completion",
+			"scenario": "picked-mul2290",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2290",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2290-turn-6-completion",
+			"scenario": "picked-mul2290",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2290",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-1-completion",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3162",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-2-completion",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3162",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-3-completion",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3162",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-4-completion",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3162",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-5-completion",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3162",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3162-turn-6-completion",
+			"scenario": "picked-pmul3162",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3162",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-1-completion",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1537",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-2-completion",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1537",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-3-completion",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1537",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-4-completion",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1537",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-5-completion",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1537",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1537-turn-6-completion",
+			"scenario": "picked-pmul1537",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1537",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-1-completion",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2489",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-2-completion",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2489",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-3-completion",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2489",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-4-completion",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2489",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-5-completion",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2489",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2489-turn-6-completion",
+			"scenario": "picked-pmul2489",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2489",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-1-completion",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0095",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-2-completion",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0095",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-3-completion",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0095",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-4-completion",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0095",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-5-completion",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0095",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0095-turn-6-completion",
+			"scenario": "picked-pmul0095",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0095",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-1-completion",
+			"scenario": "picked-sng01165",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-sng01165",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-2-completion",
+			"scenario": "picked-sng01165",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-sng01165",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-3-completion",
+			"scenario": "picked-sng01165",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-sng01165",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-4-completion",
+			"scenario": "picked-sng01165",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-sng01165",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-5-completion",
+			"scenario": "picked-sng01165",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-sng01165",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-sng01165-turn-6-completion",
+			"scenario": "picked-sng01165",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-sng01165",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-1-completion",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1137",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-2-completion",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1137",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-3-completion",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1137",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-4-completion",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1137",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-5-completion",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1137",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1137-turn-6-completion",
+			"scenario": "picked-pmul1137",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1137",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-1-completion",
+			"scenario": "picked-mul2119",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2119",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-2-completion",
+			"scenario": "picked-mul2119",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2119",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-3-completion",
+			"scenario": "picked-mul2119",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2119",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-4-completion",
+			"scenario": "picked-mul2119",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2119",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-5-completion",
+			"scenario": "picked-mul2119",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2119",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2119-turn-6-completion",
+			"scenario": "picked-mul2119",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2119",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-1-completion",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2009",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-2-completion",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2009",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-3-completion",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2009",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-4-completion",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2009",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-5-completion",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2009",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2009-turn-6-completion",
+			"scenario": "picked-pmul2009",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2009",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-1-completion",
+			"scenario": "picked-mul2074",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2074",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-2-completion",
+			"scenario": "picked-mul2074",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2074",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-3-completion",
+			"scenario": "picked-mul2074",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2074",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-4-completion",
+			"scenario": "picked-mul2074",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2074",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-5-completion",
+			"scenario": "picked-mul2074",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2074",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2074-turn-6-completion",
+			"scenario": "picked-mul2074",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2074",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-1-completion",
+			"scenario": "picked-mul0912",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0912",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-2-completion",
+			"scenario": "picked-mul0912",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0912",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-3-completion",
+			"scenario": "picked-mul0912",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0912",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-4-completion",
+			"scenario": "picked-mul0912",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0912",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-5-completion",
+			"scenario": "picked-mul0912",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0912",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul0912-turn-6-completion",
+			"scenario": "picked-mul0912",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul0912",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-1-completion",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0079",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-2-completion",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0079",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-3-completion",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0079",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-4-completion",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0079",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-5-completion",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0079",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul0079-turn-6-completion",
+			"scenario": "picked-pmul0079",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul0079",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-1-completion",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3858",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-2-completion",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3858",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-3-completion",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3858",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-4-completion",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3858",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-5-completion",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3858",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul3858-turn-6-completion",
+			"scenario": "picked-pmul3858",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul3858",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-1-completion",
+			"scenario": "picked-mul2137",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2137",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-2-completion",
+			"scenario": "picked-mul2137",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2137",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-3-completion",
+			"scenario": "picked-mul2137",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2137",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-4-completion",
+			"scenario": "picked-mul2137",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2137",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-5-completion",
+			"scenario": "picked-mul2137",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2137",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul2137-turn-6-completion",
+			"scenario": "picked-mul2137",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul2137",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-1-completion",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1526",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-2-completion",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1526",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-3-completion",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1526",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-4-completion",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1526",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-5-completion",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1526",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1526-turn-6-completion",
+			"scenario": "picked-pmul1526",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1526",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-1-completion",
+			"scenario": "picked-mul1627",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1627",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-2-completion",
+			"scenario": "picked-mul1627",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1627",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-3-completion",
+			"scenario": "picked-mul1627",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1627",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-4-completion",
+			"scenario": "picked-mul1627",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1627",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-5-completion",
+			"scenario": "picked-mul1627",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1627",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1627-turn-6-completion",
+			"scenario": "picked-mul1627",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1627",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-1-completion",
+			"scenario": "picked-mul1491",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1491",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-2-completion",
+			"scenario": "picked-mul1491",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1491",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-3-completion",
+			"scenario": "picked-mul1491",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1491",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-4-completion",
+			"scenario": "picked-mul1491",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1491",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-5-completion",
+			"scenario": "picked-mul1491",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1491",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1491-turn-6-completion",
+			"scenario": "picked-mul1491",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1491",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-1-completion",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2123",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-2-completion",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2123",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-3-completion",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2123",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-4-completion",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2123",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-5-completion",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2123",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul2123-turn-6-completion",
+			"scenario": "picked-pmul2123",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul2123",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-1-completion",
+			"scenario": "picked-mul1612",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1612",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-2-completion",
+			"scenario": "picked-mul1612",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1612",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-3-completion",
+			"scenario": "picked-mul1612",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1612",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-4-completion",
+			"scenario": "picked-mul1612",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1612",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-5-completion",
+			"scenario": "picked-mul1612",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1612",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-mul1612-turn-6-completion",
+			"scenario": "picked-mul1612",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-mul1612",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-1-completion",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1002",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-2-completion",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1002",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-3-completion",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1002",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-4-completion",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1002",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-5-completion",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1002",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "picked-pmul1002-turn-6-completion",
+			"scenario": "picked-pmul1002",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "picked-pmul1002",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1860-turn-1-completion",
+			"scenario": "changed-mul1860",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1860",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1860-turn-2-completion",
+			"scenario": "changed-mul1860",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1860",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1860-turn-3-completion",
+			"scenario": "changed-mul1860",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1860",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1860-turn-4-completion",
+			"scenario": "changed-mul1860",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1860",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-1-completion",
+			"scenario": "changed-mul1493",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1493",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-2-completion",
+			"scenario": "changed-mul1493",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1493",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-3-completion",
+			"scenario": "changed-mul1493",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1493",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-4-completion",
+			"scenario": "changed-mul1493",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1493",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-5-completion",
+			"scenario": "changed-mul1493",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1493",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul1493-turn-6-completion",
+			"scenario": "changed-mul1493",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul1493",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0354-turn-1-completion",
+			"scenario": "changed-mul0354",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0354",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0354-turn-2-completion",
+			"scenario": "changed-mul0354",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0354",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0354-turn-3-completion",
+			"scenario": "changed-mul0354",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0354",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-1-completion",
+			"scenario": "changed-sng0840",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-sng0840",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-2-completion",
+			"scenario": "changed-sng0840",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-sng0840",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-3-completion",
+			"scenario": "changed-sng0840",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-sng0840",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-4-completion",
+			"scenario": "changed-sng0840",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-sng0840",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-5-completion",
+			"scenario": "changed-sng0840",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-sng0840",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-sng0840-turn-6-completion",
+			"scenario": "changed-sng0840",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-sng0840",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-1-completion",
+			"scenario": "changed-mul0941",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0941",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-2-completion",
+			"scenario": "changed-mul0941",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0941",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-3-completion",
+			"scenario": "changed-mul0941",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0941",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-4-completion",
+			"scenario": "changed-mul0941",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0941",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-5-completion",
+			"scenario": "changed-mul0941",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0941",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-6-completion",
+			"scenario": "changed-mul0941",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0941",
+				"turn": 6,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-mul0941-turn-7-completion",
+			"scenario": "changed-mul0941",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-mul0941",
+				"turn": 7,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-1-completion",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul3940",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-2-completion",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul3940",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-3-completion",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul3940",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-4-completion",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul3940",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul3940-turn-5-completion",
+			"scenario": "changed-pmul3940",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul3940",
+				"turn": 5,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul0795-turn-1-completion",
+			"scenario": "changed-pmul0795",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul0795",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul0795-turn-2-completion",
+			"scenario": "changed-pmul0795",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul0795",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul1521-turn-1-completion",
+			"scenario": "changed-pmul1521",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul1521",
+				"turn": 1,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul1521-turn-2-completion",
+			"scenario": "changed-pmul1521",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul1521",
+				"turn": 2,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "changed-pmul1521-turn-3-completion",
+			"scenario": "changed-pmul1521",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "changed-pmul1521",
+				"turn": 3,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-4-completion",
+			"scenario": "script-or-7",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-or-7",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-7-turn-7-completion",
+			"scenario": "script-or-7",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-or-7",
+				"turn": 7,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-4-completion",
+			"scenario": "script-or-31",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-or-31",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-or-31-turn-7-completion",
+			"scenario": "script-or-31",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-or-31",
+				"turn": 7,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-4-completion",
+			"scenario": "script-kt-204",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-kt-204",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-kt-204-turn-7-completion",
+			"scenario": "script-kt-204",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-kt-204",
+				"turn": 7,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-4-completion",
+			"scenario": "script-bx-88",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-bx-88",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-bx-88-turn-7-completion",
+			"scenario": "script-bx-88",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-bx-88",
+				"turn": 7,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-4-completion",
+			"scenario": "script-rm-1402",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-rm-1402",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-rm-1402-turn-7-completion",
+			"scenario": "script-rm-1402",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-rm-1402",
+				"turn": 7,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-4-completion",
+			"scenario": "script-zd-56",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-zd-56",
+				"turn": 4,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		},
+		{
+			"id": "script-zd-56-turn-7-completion",
+			"scenario": "script-zd-56",
+			"goal": "turn-7",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"observation": "completion",
+				"conversation": "script-zd-56",
+				"turn": 7,
+				"group": "ungraded",
+				"accept": [],
+				"refuse": []
+			}
+		}
+	]
+}
