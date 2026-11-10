@@ -111,7 +111,9 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | Design round | both lanes returned, each revised for the scope ruling; they agree on the ceiling and disclosure split, built-in tools under authority, the head refresh, advertised-set pricing, and closing ROADMAP items 67 and 68; 14 points are incompatible |
 | Final design | decided by the consultant on every input. Its four phases are scope and the ceiling; disclosure in the agent; disclosure in the ledger, with the consumer run and the 4B reading; and delegation behind a checkpoint. Two refutations read 255 claims and found 36 failures, 1 stale fact, and 14 unverifiable claims. The design repaired 65 findings and refuted 1. A re-audit closed 57 of the repairs, a closure pass corrected the other 8, and the closure check closed all 8. Its estimate is 19.5 units, about 66 lane hours at 3.4 hours a unit (wall time, `git log 19f72405~1..7718f390`), plus at most 2.4 runner hours. |
 | Decisions | the user ruled each phase estimated as reached, prototype first, the reading reported and not holding the release, durable jobs built, and ROADMAP item 9 as phase 5 |
-| Next | the final design enters `designs/disclosure.md`, then phase 0's probes and prototype |
+| Design record | `designs/disclosure.md`, with the user's later rulings folded in. The durable-job unit brings the provisional total to 20.5 units, about 70 lane hours. |
+| Phase 0 | running: the base's defects red first, the derivation table, the delegation checkpoint probes, and the density and efficacy harnesses, scripted first |
+| Next | phase 0's answers; then the two 4B runs on the held runner, then phase 1's estimate to the user |
 
 ## Sequence
 
