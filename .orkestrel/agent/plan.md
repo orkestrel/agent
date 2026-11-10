@@ -28,18 +28,20 @@ A `Ledger` admits tools with a consequence the host gates, and a write's result 
 ## Claims
 
 1. A write runs through the agent's scope, the host's authority, the `consequential` floor, and the host's approver, like any tool. An unregistered name is still denied.
-2. Construction refuses with `LedgerError` `'WRITE'` in four cases: a write without `consequential`, writes without `agent.authority`, a write named `recall`, and a name already taken by a lookup or a write.
-3. A successful write is filed as a finding. Its `targets` supersede every earlier finding that names one of them, and every finding in its own tool group that names one. The next request's copy holds the new state and not the old read.
+2. Construction refuses with `LedgerError` `'WRITE'` in four cases: a write without `consequential`, a non-empty `writes` list without `agent.authority`, a write named `recall`, and a name already taken by a lookup or a write.
+3. A successful write is filed as a finding. Its `targets` supersede every earlier finding that names one of them, and every finding without `targets` in its own tool group that names one; of two writes to one record in one batch, the later stands. The next request's copy holds the new state and not the old read.
 4. A refused, declined, thrown, unanswered, or aborted write files nothing and retires nothing.
 5. The retired state comes back from the conversation alone after a snapshot and hydrate. The snapshot shape is unchanged.
 6. With `writes` absent, every request is byte-identical to 0.0.39's.
+7. In one request, a lookup the write retired can be read again in a later turn and holds the new state; a read in the same batch as the write stays refused. Any other repeated identical lookup still stops as `repeat`. This is the review's F1, and it was ruled a fix on 2026-11-09.
 
 ## State
 
 | Item | State |
 | --- | --- |
 | Design | read-only consult, 2026-11-09 |
-| Next | the build unit |
+| Build | committed with this record; independent review PASS on claims 1 to 6, F1 fixed as claim 7 |
+| Next | release 0.0.40 on the user's code; taverna takes the build through a local pin meanwhile |
 
 ## Sequence
 

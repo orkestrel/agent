@@ -111,6 +111,7 @@ await new GuideCommand({
 		createGuideScriptProvider,
 		createGuideLedgerJudge,
 		createGuideOrderLookup,
+		createGuideContactWrite,
 		createMeasuredGuideProvider,
 	} = await import('./setup.js')
 	const { captureError, createRecorder, requireValue, waitForCondition, waitForDelay } =
@@ -237,6 +238,8 @@ await new GuideCommand({
 		TEV1_SCORE,
 		LEDGER_DESK_THRESHOLDS,
 		AGENT_AUTHORITY,
+		LedgerContactBook,
+		createScriptedApprover,
 	} = await import('./setup.js')
 	const { createFixtureServer, stopTimed } = await import('./setupServer.js')
 	const { describe, expect, expectTypeOf, it } = await import('vitest')
@@ -3491,7 +3494,7 @@ await new GuideCommand({
 				expect(records).not.toContain(caller)
 			}
 			expect(guideText).toContain(
-				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later finding of the same lookup with different text or an empty result replaces it, or a later answer files it quiet.',
+				'No age or request count retires a message: it leaves the records only when a later message supersedes it, a later finding of the same lookup with different text or an empty result replaces it, a write names it among its `targets`, or a later answer files it quiet.',
 			)
 		})
 
@@ -3525,6 +3528,8 @@ await new GuideCommand({
 
 			request.admit('lookup_order', { id: 'BW-5512' })
 			expect(() => request.admit('lookup_order', { id: 'BW-5512' })).toThrow(LEDGER_NOTES.repeat)
+			request.release('lookup_order', { id: 'BW-5512' })
+			expect(() => request.admit('lookup_order', { id: 'BW-5512' })).not.toThrow()
 			request.recall()
 			expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)
 
@@ -3546,6 +3551,12 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				"request.admit('lookup_order', { id: 'BW-5512' }) // throws Error(LEDGER_NOTES.repeat)",
+			)
+			expect(guideText).toContain(
+				"request.release('lookup_order', { id: 'BW-5512' }) // as a write that retired its finding does",
+			)
+			expect(guideText).toContain(
+				"request.admit('lookup_order', { id: 'BW-5512' }) // passes once more",
 			)
 			expect(guideText).toContain(
 				'request.recall() // throws Error(LEDGER_NOTES.closure) — the 1 recall call is spent',
@@ -6322,7 +6333,191 @@ await new GuideCommand({
 				`"lookup_order" did not run: ${barrel.AUTHORITY_NOTES.unanswered}`,
 			)
 			expect(guideText).toContain(
-				'A ledger lookup is a read; a tool whose call has a consequence is not a lookup, and a ledger refuses a `consequential` lookup at every call.',
+				'Without that member, the ledger allows each lookup itself and holds no approver, so a `consequential` lookup meets the floor and is denied as unanswered at every call.',
+			)
+		})
+
+		it('asks the host approver for a consequential lookup under agent.authority', async () => {
+			const executed: unknown[] = []
+			const approver = createScriptedApprover([true])
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'It qualifies.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					judge: createPhraseJudge([]),
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [
+						{
+							...LEDGER_ORDER_LOOKUP,
+							tool: {
+								...LEDGER_ORDER_LOOKUP.tool,
+								annotations: { consequential: true },
+								execute: (args) => {
+									executed.push(args)
+									return 'Order found.'
+								},
+							},
+						},
+					],
+					agent: {
+						authority: barrel.createAuthority({
+							fallback: { zone: 'desk', verdict: 'allow' },
+							ask: approver.ask,
+						}),
+					},
+				}),
+			)
+			await ledger.respond('Can order BW-5512 get a refund?')
+
+			expect(approver.calls.map(([context]) => context.call.name)).toEqual(['lookup_order'])
+			expect(executed).toEqual([{ id: 'BW-5512' }])
+			expect(guideText).toContain(
+				'**Lookups read, writes change; both answer to `agent.authority`.**',
+			)
+			expect(guideText).toContain(
+				'A tool a host adds later reads `the ledger advertises no such tool` under either.',
+			)
+		})
+
+		it('runs a read again after a write retired it, as the repeat stop claims', async () => {
+			const book = new LedgerContactBook()
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+					},
+					{
+						content: '',
+						tools: [
+							{
+								id: 'write-1',
+								name: 'update_contact',
+								arguments: { id: 'C-12', phone: '555-0102' },
+							},
+						],
+					},
+					{
+						content: '',
+						tools: [{ id: 'read-2', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+					},
+					{
+						content: '',
+						tools: [{ id: 'read-3', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+					},
+					{ content: 'She is on 555-0102.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [book.lookup],
+					writes: [book.write],
+					agent: {
+						authority: barrel.createAuthority({
+							fallback: { zone: 'desk', verdict: 'allow' },
+							ask: () => true,
+						}),
+					},
+				}),
+			)
+			await ledger.respond("Change Mara Quill's phone to 555-0102 and check it.")
+
+			expect(
+				ledger.conversation
+					.messages()
+					.filter((message) => message.role === 'tool')
+					.map((message) => message.content),
+			).toEqual([
+				'Contact C-12: Mara Quill. Phone 555-0101.',
+				'Contact C-12: Mara Quill. Phone 555-0102.',
+				'Contact C-12: Mara Quill. Phone 555-0102.',
+				barrel.LEDGER_NOTES.repeat,
+			])
+			expect(guideText).toContain(
+				'A write that runs admits again each lookup call whose finding it retired, so a read in a later turn that checks the write runs, and a second identical read with no write between is still a repeat.',
+			)
+		})
+
+		it('stubs a seed write that changed nothing as such, as the stub limit claims', () => {
+			expect(barrel.renderStub('update_contact', { id: 'C-12' }, 'empty', true)).toBe(
+				'update_contact {"id":"C-12"}: changed nothing',
+			)
+			expect(barrel.renderStub('lookup_contact', { id: 'C-12' }, 'empty')).toBe(
+				'lookup_contact {"id":"C-12"}: no record',
+			)
+			expect(guideText).toContain(
+				'A seed write whose handler reads no change stubs as `changed nothing`, where an empty lookup stubs as `no record`.',
+			)
+		})
+
+		it('retires the read a write made stale, as the ledger write fence claims', async () => {
+			const book = new LedgerContactBook()
+			const approver = createScriptedApprover([true])
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+					},
+					{
+						content: '',
+						tools: [
+							{
+								id: 'write-1',
+								name: 'update_contact',
+								arguments: { id: 'C-12', phone: '555-0102' },
+							},
+						],
+					},
+					{ content: 'Updated.' },
+					{ content: 'She is on 555-0102.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const write = createGuideContactWrite()
+			const ledger = createLedger(provider, {
+				...buildGuideLedgerOptions({
+					judge: createGuideLedgerJudge(),
+					gauge: { scale: 1, overhead: 0 },
+				}),
+				lookups: [book.lookup],
+				writes: [write],
+				agent: {
+					authority: barrel.createAuthority({
+						fallback: { zone: 'desk', verdict: 'allow' },
+						ask: approver.ask,
+					}),
+				},
+			})
+			const copies: Array<string | undefined> = []
+			ledger.agent.emitter.on('select', (selection) =>
+				copies.push(selection.messages.at(-1)?.content),
+			)
+			await ledger.respond("Change Mara Quill's phone to 555-0102.")
+			await ledger.respond("What is Mara Quill's phone?")
+
+			expect(approver.calls.map(([context]) => context.call.name)).toEqual(['update_contact'])
+			expect(copies[1]).toBe(
+				"## Records\n### Mara Quill (C-12)\n- Contact C-12: Mara Quill.\n- Phone 555-0102.\n\n## Request\nWhat is Mara Quill's phone?",
+			)
+			expect(guideText).toContain(
+				'targets: [String(args.id)], // the contact whose earlier reads this call made stale',
+			)
+			expect(guideText).toContain('ask: (context) => confirm(context.call.name),')
+			expect(guideText).toContain(
+				'// "## Records\\n### Mara Quill (C-12)\\n- Contact C-12: Mara Quill.\\n- Phone 555-0102.\\n\\n## Request\\nWhat is Mara Quill\'s phone?" — the write retired the read of 555-0101',
 			)
 		})
 

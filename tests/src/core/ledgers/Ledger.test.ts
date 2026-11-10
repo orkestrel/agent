@@ -8,10 +8,12 @@ import type {
 } from '@src/core'
 import { createFailingJudge, createSecondTurnFailureProvider } from '../../../setup.js'
 import {
+	AUTHORITY_NOTES,
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
 	Ledger,
 	IMAGE_TOKEN_ESTIMATE,
+	createAuthority,
 	createConversation,
 	createInstructionManager,
 	createLedger,
@@ -80,6 +82,10 @@ import {
 	translateLedgerIds,
 	buildDeliverySeed,
 	buildCorrectionSeed,
+	buildLedgerContactOptions,
+	createScriptedApprover,
+	LedgerContactBook,
+	serveLedgerContactWrite,
 	buildGuideLedgerOptions,
 	buildLedgerOptions,
 	buildLedgerResponse,
@@ -6071,6 +6077,789 @@ describe('Ledger — its authority', () => {
 		const replies = ledger.conversation.messages().filter((message) => message.role === 'tool')
 		expect(replies.map((message) => message.call)).toEqual(['lookup-1', 'recall-1'])
 		expect(replies.every((message) => !message.content.includes('did not run'))).toBe(true)
+	})
+
+	it('denies a tool it does not advertise under a host authority that allows everything', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'late-1', name: 'late', arguments: {} }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				agent: {
+					authority: createAuthority({
+						fallback: { zone: 'records', verdict: 'allow' },
+						ask: () => true,
+					}),
+				},
+			}),
+		)
+		ledger.agent.context.tools.add(createRecordedTool('late', executed))
+		await ledger.respond('Check the refund.')
+		expect(executed.calls).toEqual([])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'late-1')?.content,
+		).toBe('"late" did not run: the ledger advertises no such tool')
+	})
+})
+
+describe('Ledger — writes through the host authority', () => {
+	it('asks the host approver for a write, then runs it once', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([true])
+		const events = createRecorder<readonly [event: string, name: string]>()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{ content: 'Updated.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: approver.ask }),
+			),
+		)
+		ledger.agent.emitter.on('ask', (call) => events.handler('ask', call.name))
+		ledger.agent.emitter.on('allow', (call) => events.handler('allow', call.name))
+		ledger.agent.emitter.on('deny', (call) => events.handler('deny', call.name))
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		expect(events.calls).toEqual([
+			['ask', 'update_contact'],
+			['allow', 'update_contact'],
+		])
+		expect(approver.calls.map(([context, decision]) => [context.call, decision])).toEqual([
+			[
+				{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+				{ zone: 'records', verdict: 'ask' },
+			],
+		])
+		expect(book.runs).toEqual([['update_contact', 'C-12']])
+	})
+
+	it('runs no write the host authority denies, and asks nobody', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([true])
+		const events = createRecorder<readonly [event: string, name: string, reason: unknown]>()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{ content: 'Not allowed.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({
+					rules: [
+						{
+							match: (context) => context.call.name === 'update_contact',
+							zone: 'records',
+							verdict: 'deny',
+							reason: 'contacts are read-only',
+						},
+					],
+					fallback: { zone: 'records', verdict: 'allow' },
+					ask: approver.ask,
+				}),
+			),
+		)
+		ledger.agent.emitter.on('ask', (call) => events.handler('ask', call.name, undefined))
+		ledger.agent.emitter.on('deny', (call, reason) => events.handler('deny', call.name, reason))
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		expect(events.calls).toEqual([['deny', 'update_contact', 'contacts are read-only']])
+		expect(approver.calls).toEqual([])
+		expect(book.runs).toEqual([])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'write-1')?.content,
+		).toBe('"update_contact" did not run: contacts are read-only')
+	})
+
+	it('asks the host approver for a consequential lookup, and runs it on approval', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([true])
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{ content: 'Found.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: approver.ask }),
+				{
+					lookups: [
+						{ ...book.lookup, tool: { ...book.lookup.tool, annotations: { consequential: true } } },
+					],
+				},
+			),
+		)
+		await ledger.respond("What is Mara Quill's phone?")
+		expect(approver.calls.map(([context]) => context.call.name)).toEqual(['lookup_contact'])
+		expect(book.runs).toEqual([['lookup_contact', 'C-12']])
+	})
+})
+
+describe('Ledger — what a write retires', () => {
+	it("retires the read a write made stale, and the next request's copy holds the new value", async () => {
+		const book = new LedgerContactBook()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{ content: 'Mara Quill is on 555-0101.' },
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{ content: 'Updated.' },
+				{ content: 'She is on 555-0102.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+			),
+		)
+		await ledger.respond("What is Mara Quill's phone?")
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		const messages = ledger.conversation.messages()
+		const read = requireValue(messages.find((message) => message.call === 'read-1'))
+		const write = requireValue(messages.find((message) => message.call === 'write-1'))
+		expect(
+			ledger
+				.snapshot()
+				.window?.exchanges.flatMap((exchange) => exchange.lines.map((line) => line.source)),
+		).toContain(read.id)
+		await ledger.respond("What is Mara Quill's phone?")
+		const sent = requireValue(provider.calls[4]).messages
+		expect(extractLedgerRecords(sent)).toContain('Phone 555-0102.')
+		expect(sent.filter((message) => message.content.includes('555-0101'))).toEqual([])
+		const lines =
+			ledger
+				.snapshot()
+				.window?.exchanges.flatMap((exchange) => exchange.lines.map((line) => line.source)) ?? []
+		expect(lines).toContain(write.id)
+		expect(lines).not.toContain(read.id)
+	})
+
+	it('keeps a read made after the write live', async () => {
+		const book = new LedgerContactBook()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{ content: '', tools: [{ id: 'list-1', name: 'list_contacts', arguments: {} }] },
+				{ content: 'Updated and checked.' },
+				{ content: 'She is on 555-0102.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+			),
+		)
+		await ledger.respond("Change Mara Quill's phone to 555-0102 and check it.")
+		await ledger.respond("What is Mara Quill's phone?")
+		const messages = ledger.conversation.messages()
+		const lines =
+			ledger
+				.snapshot()
+				.window?.exchanges.flatMap((exchange) => exchange.lines.map((line) => line.source)) ?? []
+		expect(lines).toContain(requireValue(messages.find((message) => message.call === 'list-1')).id)
+		expect(lines).not.toContain(
+			requireValue(messages.find((message) => message.call === 'read-1')).id,
+		)
+		const records = extractLedgerRecords(requireValue(provider.calls[4]).messages)
+		expect(records).toContain('Phone 555-0177.')
+		expect(records).not.toContain('555-0101')
+	})
+
+	it.each([
+		['the write first', ['write-1', 'list-1']],
+		['the list first', ['list-1', 'write-1']],
+	])("retires a list read in the write's own tool group, with %s", async (_order, ids) => {
+		const book = new LedgerContactBook()
+		const calls = {
+			'write-1': {
+				id: 'write-1',
+				name: 'update_contact',
+				arguments: { id: 'C-12', phone: '555-0102' },
+			},
+			'list-1': { id: 'list-1', name: 'list_contacts', arguments: {} },
+		}
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: ids.map((id) => (id === 'list-1' ? calls['list-1'] : calls['write-1'])),
+				},
+				{ content: 'Updated.' },
+				{ content: 'She is on 555-0102.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+			),
+		)
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		await ledger.respond("What is Mara Quill's phone?")
+		const records = extractLedgerRecords(requireValue(provider.calls[2]).messages)
+		expect(records).toContain('Phone 555-0102.')
+		expect(records).not.toContain('555-0177')
+		expect(records).not.toContain('555-0101')
+	})
+})
+
+describe('Ledger — a read after a write', () => {
+	it('runs a read again after a write retired it, and refuses a second one', async () => {
+		const book = new LedgerContactBook()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{
+					content: '',
+					tools: [{ id: 'read-2', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{
+					content: '',
+					tools: [{ id: 'read-3', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{ content: 'She is on 555-0102.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+			),
+		)
+		await ledger.respond("Change Mara Quill's phone to 555-0102 and check it.")
+		const messages = ledger.conversation.messages()
+		expect(book.runs).toEqual([
+			['lookup_contact', 'C-12'],
+			['update_contact', 'C-12'],
+			['lookup_contact', 'C-12'],
+		])
+		expect(messages.find((message) => message.call === 'read-2')?.content).toBe(
+			'Contact C-12: Mara Quill. Phone 555-0102.',
+		)
+		expect(messages.find((message) => message.call === 'read-3')?.content).toBe(LEDGER_NOTES.repeat)
+	})
+
+	it('keeps a read the write did not retire refused as a repeat', async () => {
+		const book = new LedgerContactBook()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-14' } }],
+				},
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{
+					content: '',
+					tools: [{ id: 'read-2', name: 'lookup_contact', arguments: { id: 'C-14' } }],
+				},
+				{ content: 'Tomas Reyes is on 555-0177.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+			),
+		)
+		await ledger.respond("Change Mara Quill's phone and check Tomas Reyes.")
+		expect(book.runs).toEqual([
+			['lookup_contact', 'C-14'],
+			['update_contact', 'C-12'],
+		])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'read-2')?.content,
+		).toBe(LEDGER_NOTES.repeat)
+	})
+})
+
+describe('Ledger — a write that names no owner', () => {
+	it('joins the owner record of the read it retired', async () => {
+		const book = new LedgerContactBook()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{ content: 'Updated.' },
+				{ content: 'She is on 555-0102.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+				{
+					writes: [
+						{
+							tool: {
+								...book.write.tool,
+								execute: (args) => `Phone set to ${String(args.phone)}.`,
+							},
+							read: (args) => ({ ids: [], owners: [], targets: [String(args.id)] }),
+						},
+					],
+				},
+			),
+		)
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		await ledger.respond("What is Mara Quill's phone?")
+		const records = extractLedgerRecords(requireValue(provider.calls[3]).messages)
+		expect(records).toContain('### Mara Quill (C-12)\n- Phone set to 555-0102.')
+		expect(records).not.toContain('555-0101')
+	})
+})
+
+describe('Ledger — a write that did not happen', () => {
+	it.each([
+		[
+			'the approver declines',
+			{
+				answers: [false],
+				deny: false,
+				abort: false,
+				content: `"update_contact" did not run: ${AUTHORITY_NOTES.refused}`,
+				failed: true,
+			},
+		],
+		[
+			'the host authority denies',
+			{
+				answers: [true],
+				deny: true,
+				abort: false,
+				content: '"update_contact" did not run: contacts are read-only',
+				failed: true,
+			},
+		],
+		[
+			'the request aborts during the ask',
+			{ answers: [], deny: false, abort: true, content: undefined, failed: false },
+		],
+	])(
+		'retires nothing when %s, and runs no tool',
+		async (_label, { answers, deny, abort, content, failed }) => {
+			const book = new LedgerContactBook()
+			const { ledger, provider } = await serveLedgerContactWrite({
+				book,
+				abort,
+				authority: createAuthority({
+					rules: [
+						{
+							match: (context) => deny && context.call.name === 'update_contact',
+							zone: 'records',
+							verdict: 'deny',
+							reason: 'contacts are read-only',
+						},
+					],
+					fallback: { zone: 'records', verdict: 'allow' },
+					ask: createScriptedApprover(answers).ask,
+				}),
+			})
+			const records = extractLedgerRecords(requireValue(provider.calls.at(-1)).messages)
+			expect(records).toContain('Phone 555-0101.')
+			expect(records).not.toContain('555-0102')
+			expect(book.runs).toEqual([['lookup_contact', 'C-12']])
+			const written = ledger.conversation.messages().find((message) => message.call === 'write-1')
+			expect(written?.content).toBe(content)
+			expect(ledger.snapshot().failures.includes(written?.id ?? '')).toBe(failed)
+		},
+	)
+
+	it.each([
+		[
+			'the tool throws',
+			'offline' as const,
+			'the contact store is offline',
+			[['lookup_contact', 'C-12']],
+		],
+		[
+			'the handler throws',
+			'unreadable' as const,
+			'Phone 555-0102.',
+			[
+				['lookup_contact', 'C-12'],
+				['update_contact', 'C-12'],
+			],
+		],
+	])('retires nothing and marks the write failed when %s', async (_label, fault, text, runs) => {
+		const book = new LedgerContactBook()
+		const { ledger, provider } = await serveLedgerContactWrite({
+			book,
+			authority: createAuthority({
+				fallback: { zone: 'records', verdict: 'allow' },
+				ask: () => true,
+			}),
+			write: book[fault],
+		})
+		const records = extractLedgerRecords(requireValue(provider.calls.at(-1)).messages)
+		expect(records).toContain('Phone 555-0101.')
+		expect(records).not.toContain('555-0102')
+		const written = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'write-1'),
+		)
+		expect(ledger.snapshot().failures).toContain(written.id)
+		expect(written.content).toContain(text)
+		expect(book.runs).toEqual(runs)
+	})
+
+	it('retires nothing when the handler reads the result as no change', async () => {
+		const book = new LedgerContactBook()
+		const { ledger, provider } = await serveLedgerContactWrite({
+			book,
+			authority: createAuthority({
+				fallback: { zone: 'records', verdict: 'allow' },
+				ask: () => true,
+			}),
+			write: { ...book.write, read: () => undefined },
+		})
+		const records = extractLedgerRecords(requireValue(provider.calls.at(-1)).messages)
+		expect(records).toContain('Phone 555-0101.')
+		expect(records).not.toContain('555-0102')
+		const written = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'write-1'),
+		)
+		expect(ledger.snapshot().failures).not.toContain(written.id)
+	})
+})
+
+describe('Ledger — an unanswered write', () => {
+	it.each([
+		[
+			'an approver that throws',
+			createAuthority({
+				fallback: { zone: 'records', verdict: 'allow' },
+				ask: () => {
+					throw new Error('the approver is offline')
+				},
+			}),
+		],
+		[
+			'an authority with no approver',
+			createAuthority({ fallback: { zone: 'records', verdict: 'allow' } }),
+		],
+		[
+			'an authority with no ask member',
+			{ evaluate: () => ({ zone: 'records', verdict: 'allow' as const }) },
+		],
+	])('retires nothing under %s, and runs no write', async (_label, authority) => {
+		const book = new LedgerContactBook()
+		const { ledger, provider } = await serveLedgerContactWrite({ book, authority })
+		const records = extractLedgerRecords(requireValue(provider.calls.at(-1)).messages)
+		expect(records).toContain('Phone 555-0101.')
+		expect(records).not.toContain('555-0102')
+		expect(book.runs).toEqual([['lookup_contact', 'C-12']])
+		const written = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'write-1'),
+		)
+		expect(written.content).toBe(`"update_contact" did not run: ${AUTHORITY_NOTES.unanswered}`)
+		expect(ledger.snapshot().failures).toContain(written.id)
+	})
+})
+
+describe('Ledger — recall after a write', () => {
+	it('lists a retired read after the write that retired it', async () => {
+		const book = new LedgerContactBook()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{ content: 'Updated.' },
+				{ content: '', tools: [{ id: 'recall-1', name: 'recall', arguments: { topic: 'C-12' } }] },
+				{ content: 'It was 555-0101.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+			),
+		)
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		await ledger.respond("What was Mara Quill's phone before?")
+		const listing = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'recall-1'),
+		).content
+		expect(listing).toContain('update_contact {"id":"C-12","phone":"555-0102"}: Contact C-12')
+		expect(listing).toContain(
+			'lookup_contact {"id":"C-12"}: Contact C-12: Mara Quill. Phone 555-0101.',
+		)
+		expect(listing.indexOf('555-0102')).toBeLessThan(listing.indexOf('555-0101'))
+	})
+})
+
+describe('Ledger — a seed write that changed nothing', () => {
+	it('stubs its result as a call that changed nothing', async () => {
+		const book = new LedgerContactBook()
+		const provider = createScriptedProvider([{ content: 'She is on 555-0101.' }], {
+			recorded: true,
+			repeat: false,
+		})
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+				{ writes: [{ ...book.write, read: () => undefined }] },
+			),
+		)
+		ledger.conversation.add([
+			{ role: 'user', content: 'Keep Mara Quill on 555-0101.' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [
+					{ id: 'seed-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0101' } },
+				],
+			},
+			{ role: 'tool', call: 'seed-1', content: 'No change: C-12 already has 555-0101.' },
+		])
+		await ledger.respond("What is Mara Quill's phone?")
+		expect(
+			requireValue(provider.calls[0]).messages.find((message) => message.role === 'tool')?.content,
+		).toBe('update_contact {"id":"C-12","phone":"555-0101"}: changed nothing')
+	})
+})
+
+describe('Ledger — a write across a snapshot', () => {
+	it('brings the retired read back retired after a hydrate, byte for byte', async () => {
+		const book = new LedgerContactBook()
+		const authority = createAuthority({
+			fallback: { zone: 'records', verdict: 'allow' },
+			ask: () => true,
+		})
+		const parentProvider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+				},
+				{
+					content: '',
+					tools: [
+						{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					],
+				},
+				{ content: 'Updated.' },
+				{ content: 'She is on 555-0102.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const parent = createLedger(parentProvider, buildLedgerContactOptions(book, authority))
+		await parent.respond("Change Mara Quill's phone to 555-0102.")
+		const parsed: unknown = JSON.parse(JSON.stringify(parent.snapshot()))
+		if (!isLedgerSnapshot(parsed)) throw new Error('Not a ledger snapshot')
+		const childProvider = createScriptedProvider([{ content: 'She is on 555-0102.' }], {
+			recorded: true,
+			repeat: false,
+		})
+		const child = createLedger(
+			childProvider,
+			buildLedgerContactOptions(new LedgerContactBook(), authority, { snapshot: parsed }),
+		)
+		await parent.respond("What is Mara Quill's phone?")
+		await child.respond("What is Mara Quill's phone?")
+		// Each agent mints its own system message id, so the comparison reads the conversation's messages.
+		const [system, ...expected] = requireValue(parentProvider.calls[3]).messages
+		const [head, ...actual] = requireValue(childProvider.calls[0]).messages
+		expect(head?.content).toBe(system?.content)
+		expect(
+			translateLedgerIds(actual, child.conversation.messages(), parent.conversation.messages()),
+		).toBe(JSON.stringify(expected))
+		expect(extractLedgerRecords(actual)).toContain('Phone 555-0102.')
+		expect(extractLedgerRecords(actual)).not.toContain('555-0101')
+	})
+
+	it('keeps a refused write refused after a hydrate', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([false])
+		const { ledger } = await serveLedgerContactWrite({
+			book,
+			authority: createAuthority({
+				fallback: { zone: 'records', verdict: 'allow' },
+				ask: approver.ask,
+			}),
+		})
+		expect(approver.calls.map(([context]) => context.call.name)).toEqual(['update_contact'])
+		const parsed: unknown = JSON.parse(JSON.stringify(ledger.snapshot()))
+		if (!isLedgerSnapshot(parsed)) throw new Error('Not a ledger snapshot')
+		const provider = createScriptedProvider([{ content: 'She is on 555-0101.' }], {
+			recorded: true,
+			repeat: false,
+		})
+		const child = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				new LedgerContactBook(),
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+				{ snapshot: parsed },
+			),
+		)
+		await child.respond("What is Mara Quill's phone?")
+		const records = extractLedgerRecords(requireValue(provider.calls[0]).messages)
+		expect(records).toContain('Phone 555-0101.')
+		expect(records).not.toContain('555-0102')
+		expect(child.snapshot().failures).toEqual(parsed.failures)
+	})
+})
+
+describe('Ledger — write construction', () => {
+	it.each([
+		['a write without the consequential annotation', 'unmarked'],
+		['writes without a host authority', 'unauthorized'],
+		['a write named recall', 'recall'],
+		["a write named for a lookup's tool", 'lookup'],
+		['two writes with one name', 'twice'],
+	])('refuses %s with WRITE', (_label, shape) => {
+		const book = new LedgerContactBook()
+		const authority = createAuthority({ fallback: { zone: 'records', verdict: 'allow' } })
+		const write = book.write
+		expect(
+			computeLedgerErrorCode(() =>
+				createLedger(
+					createScriptedProvider([{ content: 'Done.' }]),
+					buildLedgerContactOptions(book, authority, {
+						...(shape === 'unauthorized' ? { agent: {} } : {}),
+						writes:
+							shape === 'unmarked'
+								? [{ ...write, tool: { ...write.tool, annotations: {} } }]
+								: shape === 'recall'
+									? [{ ...write, tool: { ...write.tool, name: 'recall' } }]
+									: shape === 'lookup'
+										? [{ ...write, tool: { ...write.tool, name: 'lookup_contact' } }]
+										: shape === 'twice'
+											? [write, write]
+											: [write],
+					}),
+				),
+			),
+		).toBe('WRITE')
+	})
+
+	it('accepts an empty write list without a host authority', () => {
+		expect(
+			computeLedgerErrorCode(() =>
+				createLedger(
+					createScriptedProvider([{ content: 'Done.' }]),
+					buildLedgerOptions({ writes: [] }),
+				),
+			),
+		).toBeUndefined()
+	})
+
+	it("advertises each write's definition in the priced calibration call", async () => {
+		const book = new LedgerContactBook()
+		const provider = new PricedLedgerProvider([{ content: '' }, { content: '' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(
+			provider,
+			buildUncalibratedOptions(
+				buildLedgerContactOptions(
+					book,
+					createAuthority({ fallback: { zone: 'records', verdict: 'allow' } }),
+				),
+			),
+		)
+		await ledger.calibrate(new AbortController().signal)
+		expect(requireValue(provider.calls[0]).tools?.map((tool) => tool.name)).toEqual([
+			'lookup_contact',
+			'list_contacts',
+			'update_contact',
+			'recall',
+		])
+		expect(ledger.gauge?.overhead).toBe(270)
 	})
 })
 

@@ -39,9 +39,10 @@ import {
 	stringShape,
 } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
-import { createAgent, createAuthority } from '../agents/factories.js'
+import { Authority } from '../agents/Authority.js'
+import { createAgent } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
-import { estimateMessages } from '../agents/helpers.js'
+import { estimateMessages, settleToolResult } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
 import { createConversationManager } from '../conversations/factories.js'
 import {
@@ -71,6 +72,8 @@ import { isLedgerError, LedgerError } from './errors.js'
 import {
 	hasHiddenRecall,
 	matchesLookup,
+	collectWriteSupersessions,
+	mergeSupersessions,
 	digestLedgerWindow,
 	buildLedgerCut,
 	buildLedgerLineKey,
@@ -144,6 +147,7 @@ export class Ledger implements LedgerInterface {
 	 * @param provider - The provider that serves the conversation
 	 * @param options - The filing policy, capacity, and request bounds
 	 * @throws {LedgerError} Thrown when a threshold, share, capacity, limit, topic, lookup, or gauge is invalid
+	 * @throws {LedgerError} Thrown when a write lacks the `consequential` annotation, writes come without `agent.authority`, or a write is named `recall` or shares a lookup's or another write's name (code `'WRITE'`)
 	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
 	 * @throws {LedgerError} Thrown when `questions` fails `isLedgerQuestion` (code `'QUESTION'`)
 	 * @throws {LedgerError} Thrown when `snapshot` is malformed or marks an id its conversation does not hold (code `'SNAPSHOT'`, its faults under `context.faults`)
@@ -173,6 +177,21 @@ export class Ledger implements LedgerInterface {
 		const lookups = ['recall', ...Array.from(options.lookups ?? [], (lookup) => lookup.tool.name)]
 		if (new Set(lookups).size !== lookups.length)
 			throw new LedgerError('LOOKUP', 'lookup names must be unique and cannot be recall')
+		const writes = Array.from(options.writes ?? [], (write) => write.tool)
+		const names = [...lookups, ...writes.map((tool) => tool.name)]
+		if (new Set(names).size !== names.length)
+			throw new LedgerError(
+				'WRITE',
+				'write names must be unique and cannot be recall or the name of a lookup',
+			)
+		if (writes.some((tool) => tool.annotations?.consequential !== true))
+			throw new LedgerError(
+				'WRITE',
+				'a write tool must carry annotations.consequential: true, so the host approves each call',
+			)
+		const host = options.agent?.authority
+		if (writes.length > 0 && host === undefined)
+			throw new LedgerError('WRITE', 'writes need an agent.authority that gates each call')
 		if (!isLedgerQuestion(options.questions))
 			throw new LedgerError(
 				'QUESTION',
@@ -229,20 +248,16 @@ export class Ledger implements LedgerInterface {
 			...(options.agent?.strict === undefined ? {} : { strict: options.agent.strict }),
 		})
 		const tools = createToolManager()
-		for (const lookup of options.lookups ?? []) {
+		for (const { tool } of [...(options.lookups ?? []), ...(options.writes ?? [])]) {
 			tools.add(
 				createTool({
-					name: lookup.tool.name,
-					...(lookup.tool.parameters === undefined ? {} : { parameters: lookup.tool.parameters }),
-					...(lookup.tool.description === undefined
-						? {}
-						: { description: lookup.tool.description }),
-					...(lookup.tool.summary === undefined ? {} : { summary: lookup.tool.summary }),
-					...(lookup.tool.title === undefined ? {} : { title: lookup.tool.title }),
-					...(lookup.tool.annotations === undefined
-						? {}
-						: { annotations: lookup.tool.annotations }),
-					execute: (args, context) => this.#lookup(lookup.tool.name, args, context),
+					name: tool.name,
+					...(tool.parameters === undefined ? {} : { parameters: tool.parameters }),
+					...(tool.description === undefined ? {} : { description: tool.description }),
+					...(tool.summary === undefined ? {} : { summary: tool.summary }),
+					...(tool.title === undefined ? {} : { title: tool.title }),
+					...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
+					execute: (args, context) => this.#lookup(tool.name, args, context),
 				}),
 			)
 		}
@@ -256,33 +271,46 @@ export class Ledger implements LedgerInterface {
 				execute: (args) => this.#recall(args),
 			}),
 		)
-		// The ledger holds no approver, and it allows exactly the names it advertises, so a tool a host
-		// adds to the agent's manager later is denied instead of inheriting those names' trust.
+		// The ledger allows exactly the names it advertises, so a tool a host adds to the agent's manager
+		// later is denied instead of inheriting those names' trust. With a host authority, the ledger keeps
+		// that deny and its own allow for recall, and every lookup and write answers to the host.
+		const advertised = new Authority({
+			rules: [
+				{
+					match: (context) => names.includes(context.call.name),
+					zone: 'ledger',
+					verdict: 'allow',
+				},
+			],
+			fallback: { zone: 'ledger', verdict: 'deny', reason: 'the ledger advertises no such tool' },
+		})
 		this.#agent = createAgent(provider, {
 			...options.agent,
 			conversations,
 			system: options.system,
 			tools,
-			authority: createAuthority({
-				rules: [
-					{
-						match: (context) => lookups.includes(context.call.name),
-						zone: 'ledger',
-						verdict: 'allow',
-					},
-				],
-				fallback: { zone: 'ledger', verdict: 'deny', reason: 'the ledger advertises no such tool' },
-			}),
+			authority: {
+				evaluate: (context) =>
+					host === undefined || context.call.name === 'recall' || !names.includes(context.call.name)
+						? advertised.evaluate(context)
+						: host.evaluate(context),
+				// A host without an approver leaves each asked call unanswered, as the ledger's own does.
+				ask: (context, decision, signal) =>
+					host?.ask === undefined
+						? advertised.ask(context, decision, signal)
+						: host.ask(context, decision, signal),
+			},
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),
 		})
-		this.#agent.emitter.on('tool', (_call, result) => {
+		this.#agent.emitter.on('tool', (call, result) => {
 			this.#flush()
 			this.#pending.set(this.#conversation.messages().length, result)
 			if (!result.success && result.error === LEDGER_NOTES.repeat) {
 				this.#current()?.close()
 				this.#agent.abort('repeat')
 			}
+			this.#release(call, result)
 		})
 		this.#agent.emitter.on('select', (selection) => {
 			if (isLedgerError(selection.fault) && selection.fault.code === 'REQUEST') return
@@ -644,24 +672,32 @@ export class Ledger implements LedgerInterface {
 			group.slice(1).flatMap((message): LedgerLookupFinding[] => {
 				const call = findLedgerCall(group, message)
 				const lookup = this.#options.lookups?.find((one) => one.tool.name === call?.name)
+				const write = this.#options.writes?.find((one) => one.tool.name === call?.name)
 				if (
 					call === undefined ||
-					lookup === undefined ||
+					(lookup === undefined && write === undefined) ||
 					this.#results.get(message.id)?.success === false
 				)
 					return []
-				const read = attempt(() => lookup.read(call.arguments, message.content))
-				if (!read.success) {
+				// Construction keeps lookup and write names apart, so one of these handlers runs.
+				const read = attempt(() => lookup?.read(call.arguments, message.content))
+				const written = attempt(() => write?.read(call.arguments, message.content))
+				if (!read.success || !written.success) {
+					const error = read.success ? (written.success ? undefined : written.error) : read.error
 					// Caches the failed read, so no later reading calls its handler again.
 					this.#results.set(message.id, {
 						success: false,
 						id: call.id,
 						name: call.name,
-						error: isError(read.error) ? read.error.message : String(read.error),
+						error: isError(error) ? error.message : String(error),
 					})
 					return []
 				}
+				const literals = Object.values(call.arguments)
+					.filter(isString)
+					.flatMap((value) => [...extractLiterals(value).ids])
 				const result = read.value
+				const change = written.value
 				return [
 					{
 						id: message.id,
@@ -669,19 +705,12 @@ export class Ledger implements LedgerInterface {
 						arguments: call.arguments,
 						text: message.content,
 						result:
-							result === undefined
-								? undefined
-								: {
-										...result,
-										ids: [
-											...new Set([
-												...result.ids,
-												...Object.values(call.arguments)
-													.filter(isString)
-													.flatMap((value) => [...extractLiterals(value).ids]),
-											]),
-										],
-									},
+							result !== undefined
+								? { ...result, ids: [...new Set([...result.ids, ...literals])] }
+								: change !== undefined
+									? { ids: [...new Set([...change.ids, ...literals])], owners: change.owners }
+									: undefined,
+						...(change === undefined ? {} : { targets: [...change.targets] }),
 					},
 				]
 			}),
@@ -704,7 +733,11 @@ export class Ledger implements LedgerInterface {
 					[...matchEntities(scan.index, message.content, true)],
 				]),
 			),
-			classification: this.#classifier.classification(),
+			classification: mergeSupersessions(
+				this.#classifier.classification(),
+				collectWriteSupersessions(scan.messages, scan.findings),
+				scan.messages,
+			),
 		}
 		return { input, projection: buildRecords(input) }
 	}
@@ -1384,7 +1417,9 @@ export class Ledger implements LedgerInterface {
 				const message = group.slice(1).find((result) => findLedgerCall(group, result) === call)
 				const result = message === undefined ? undefined : this.#results.get(message.id)
 				return message === undefined ||
-					!this.#options.lookups?.some((lookup) => lookup.tool.name === call.name) ||
+					![...(this.#options.lookups ?? []), ...(this.#options.writes ?? [])].some(
+						(entry) => entry.tool.name === call.name,
+					) ||
 					(result?.success === false && result.error === LEDGER_NOTES.repeat)
 					? []
 					: [{ call, message }]
@@ -1483,6 +1518,7 @@ export class Ledger implements LedgerInterface {
 	#renderTailStub(message: Message, scan: LedgerScan, shown?: ReadonlySet<string>): Message {
 		const group = scan.group(message.id)
 		const call = group === undefined ? undefined : findLedgerCall(group, message)
+		const write = this.#options.writes?.some((one) => one.tool.name === call?.name) === true
 		const finding = scan.finding(message.id)
 		const hidden = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'hidden')
 		const visible = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'shown')
@@ -1502,8 +1538,47 @@ export class Ledger implements LedgerInterface {
 							: scan.findings.some((other) => shown.has(other.id) && matchesLookup(finding, other))
 								? 'shown'
 								: 'hidden',
+				write,
 			),
 		}
+	}
+
+	// A write that ran retires the findings its targets name, so the request admits again each lookup
+	// call whose finding it retired: a later read that checks the write reads changed state. The write's
+	// message isn't stored yet, so the scan reads its result as the message the loop stores next.
+	#release(call: ToolCall, result: ToolResult): void {
+		const request = this.#current()
+		const write = this.#options.writes?.find((one) => one.tool.name === call.name)
+		if (request === undefined || write === undefined || !result.success) return
+		const text = settleToolResult(result).content
+		const read = attempt(() => {
+			const change = write.read(call.arguments, text)
+			return change === undefined ? [] : [...change.targets]
+		})
+		if (!read.success || read.value.length === 0) return
+		const messages = this.#conversation.messages()
+		const findings = this.#readLookups(messages)
+		const id = crypto.randomUUID()
+		const edges = collectWriteSupersessions(
+			[...messages, { id, role: 'tool', content: text, call: call.id }],
+			[
+				...findings,
+				{
+					id,
+					name: call.name,
+					arguments: call.arguments,
+					text,
+					result: undefined,
+					targets: read.value,
+				},
+			],
+		)
+		for (const finding of findings)
+			if (
+				(edges.get(finding.id) ?? []).includes(id) &&
+				this.#options.lookups?.some((lookup) => lookup.tool.name === finding.name) === true
+			)
+				request.release(finding.name, finding.arguments)
 	}
 
 	#observeTurn(): void {
@@ -1550,9 +1625,11 @@ export class Ledger implements LedgerInterface {
 
 	#lookup(name: string, args: Readonly<Record<string, unknown>>, context: ToolContext): unknown {
 		this.#current()?.admit(name, args)
-		const lookup = this.#options.lookups?.find((one) => one.tool.name === name)
-		if (lookup === undefined) throw new Error(`unknown lookup ${name}`)
-		return lookup.tool.execute(args, context)
+		const entry =
+			this.#options.lookups?.find((one) => one.tool.name === name) ??
+			this.#options.writes?.find((one) => one.tool.name === name)
+		if (entry === undefined) throw new Error(`unknown lookup or write ${name}`)
+		return entry.tool.execute(args, context)
 	}
 
 	#recall(args: Readonly<Record<string, unknown>>): string {

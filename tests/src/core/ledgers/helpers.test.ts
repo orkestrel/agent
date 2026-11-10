@@ -34,6 +34,7 @@ import {
 	collectNames,
 	collectRegistry,
 	collectAmendments,
+	collectWriteSupersessions,
 	computeThinking,
 	resolvePredict,
 	findLedgerCall,
@@ -44,6 +45,7 @@ import {
 	linkOwners,
 	matchEntities,
 	matchesCutLine,
+	mergeSupersessions,
 	normalizeArgument,
 	normalizeWord,
 	placeMember,
@@ -63,9 +65,12 @@ import {
 	buildGaugeCall,
 	measureRoom,
 	LEDGER_EMPTY_FOUND,
+	buildLedgerClassification,
 	buildLedgerInput,
 	buildLedgerMessage,
 	buildLedgerFinding,
+	buildLedgerWriteScenario,
+	LEDGER_WRITE_SUPERSESSIONS,
 	checkLedgerProjection,
 	createLedgerDesk,
 	createLedgerRequest,
@@ -1351,6 +1356,103 @@ describe('collectLive', () => {
 	})
 })
 
+describe('collectWriteSupersessions', () => {
+	it.each(LEDGER_WRITE_SUPERSESSIONS)(
+		'maps %s to the writes that supersede it',
+		(_label, id, writes) => {
+			const { messages, findings } = buildLedgerWriteScenario()
+			expect(collectWriteSupersessions(messages, findings).get(id) ?? []).toEqual(writes)
+		},
+	)
+
+	it('keys only superseded findings, in conversation order', () => {
+		const { messages, findings } = buildLedgerWriteScenario()
+		expect([...collectWriteSupersessions(messages, findings).keys()]).toEqual([
+			'read',
+			'order',
+			'missing',
+			'write',
+			'list',
+			'rewrite',
+		])
+	})
+
+	it('maps nothing when no finding carries targets', () => {
+		const { messages, findings } = buildLedgerWriteScenario()
+		const reads = findings.map(({ targets: _targets, ...finding }) => finding)
+		expect(collectWriteSupersessions(messages, reads)).toEqual(new Map())
+	})
+
+	it('skips a finding or a write the messages do not hold', () => {
+		const { messages, findings } = buildLedgerWriteScenario()
+		const held = messages.filter((message) => message.id !== 'write' && message.id !== 'read')
+		const edges = collectWriteSupersessions(held, findings)
+		expect(edges.has('read')).toBe(false)
+		expect(edges.get('order')).toEqual(['rewrite', 'final'])
+	})
+})
+
+describe('mergeSupersessions', () => {
+	const messages = ['a', 'b', 'c', 'd', 'e'].map((id) => buildLedgerMessage(id, 'tool', id))
+
+	it('adds each edge to the supersessions and the amendments, in conversation order', () => {
+		const classification = buildLedgerClassification({
+			quiet: ['e'],
+			categories: { a: 'fact' },
+			topics: { a: ['refunds'] },
+			amendments: { a: ['d'], c: ['d'] },
+			supersessions: { a: ['d'] },
+		})
+		const merged = mergeSupersessions(
+			classification,
+			new Map([
+				['a', ['b']],
+				['c', ['d']],
+				['b', ['e']],
+			]),
+			messages,
+		)
+		expect(merged.supersessions).toEqual(
+			new Map([
+				['a', ['b', 'd']],
+				['c', ['d']],
+				['b', ['e']],
+			]),
+		)
+		expect(merged.amendments).toEqual(
+			new Map([
+				['a', ['b', 'd']],
+				['c', ['d']],
+				['b', ['e']],
+			]),
+		)
+		expect(merged.quiet).toEqual(classification.quiet)
+		expect(merged.categories).toEqual(classification.categories)
+		expect(merged.topics).toEqual(classification.topics)
+	})
+
+	it('keeps every supersession an amendment', () => {
+		const merged = mergeSupersessions(
+			buildLedgerClassification({
+				amendments: { a: ['c'], b: ['c'] },
+				supersessions: { b: ['c'] },
+			}),
+			new Map([['a', ['d']]]),
+			messages,
+		)
+		for (const [earlier, laters] of merged.supersessions)
+			expect(merged.amendments.get(earlier)).toEqual(expect.arrayContaining([...laters]))
+	})
+
+	it('returns an equal classification for an empty edge map', () => {
+		const classification = buildLedgerClassification({
+			amendments: { a: ['c'] },
+			supersessions: { a: ['c'] },
+		})
+		expect(mergeSupersessions(classification, new Map(), messages)).toEqual(classification)
+	})
+})
+
 describe('placeMember', () => {
 	const desk = createLedgerDesk()
 	const links = linkOwners(desk.findings, desk.owners)
@@ -2493,6 +2595,18 @@ describe('renderStub', () => {
 		)
 		expect(renderStub('lookup_order', args, 'hidden')).toBe(
 			'lookup_order {"id":" BW-5512 "}: result not shown; call recall with BW-5512',
+		)
+	})
+
+	it("reads a write's empty state as a call that changed nothing", () => {
+		expect(renderStub('update_contact', { id: 'C-12' }, 'empty', true)).toBe(
+			'update_contact {"id":"C-12"}: changed nothing',
+		)
+		expect(renderStub('update_contact', { id: 'C-12' }, 'empty', false)).toBe(
+			'update_contact {"id":"C-12"}: no record',
+		)
+		expect(renderStub('update_contact', { id: 'C-12' }, 'failed', true)).toBe(
+			'update_contact {"id":"C-12"}: failed',
 		)
 	})
 

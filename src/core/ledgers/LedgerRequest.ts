@@ -206,6 +206,11 @@ export class LedgerRequest implements LedgerRequestInterface {
 		this.#admitted = new Set([...this.#admitted, key])
 	}
 
+	release(name: string, args: Readonly<Record<string, unknown>>): void {
+		const key = canonicalStringify([name, args])
+		this.#admitted = new Set([...this.#admitted].filter((admitted) => admitted !== key))
+	}
+
 	recall(): void {
 		if (this.#recalls >= this.#limit) this.#closed = true
 		if (this.#closed) throw new Error(LEDGER_NOTES.closure)

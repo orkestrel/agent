@@ -167,6 +167,17 @@ describe('LedgerRequest', () => {
 		)
 	})
 
+	it('admits a released call again, and only that call', () => {
+		const request = new LedgerRequest('Check.')
+		request.admit('lookup', { id: 'C-12' })
+		request.admit('lookup', { id: 'C-14' })
+		request.release('lookup', { id: 'C-12' })
+		request.release('lookup', { id: 'C-99' })
+		request.admit('lookup', { id: 'C-12' })
+		expect(() => request.admit('lookup', { id: 'C-12' })).toThrow(LEDGER_NOTES.repeat)
+		expect(() => request.admit('lookup', { id: 'C-14' })).toThrow(LEDGER_NOTES.repeat)
+	})
+
 	it('counts recalls up to its limit and closes after it', () => {
 		const request = new LedgerRequest('Check.')
 		Array.from({ length: DEFAULT_RECALL_LIMIT }).forEach(() => request.recall())

@@ -5,6 +5,7 @@ import type {
 	LedgerEvidence,
 	LedgerExchangeSnapshot,
 	LedgerCategory,
+	LedgerClassification,
 	LedgerIndex,
 	LedgerLine,
 	LedgerOccurrence,
@@ -24,7 +25,7 @@ import type {
 import type { ToolCall } from '@orkestrel/tool'
 import { attempt, canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { extractLiterals, hasCalls, renderJSON } from '../helpers.js'
+import { collectToolGroups, extractLiterals, hasCalls, renderJSON } from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 import {
 	LEDGER_OWNER_PREFIX,
@@ -1306,6 +1307,7 @@ export function matchesCutLine(line: string): boolean {
  * @param name - The lookup tool name
  * @param args - The arguments the call carried; arguments JSON cannot carry leave the call as its bare tool name, per {@link renderLookupCall}
  * @param state - What became of the result: `failed`, `empty`, `shown` in the records, or `hidden` from them
+ * @param write - If `true`, the call is a write's, whose `empty` state reads `changed nothing`; if `false`, a lookup's, whose `empty` state reads `no record`. Default: `false`
  * @returns The stub text, which carries the call and its state
  *
  * @example
@@ -1318,10 +1320,11 @@ export function renderStub(
 	name: string,
 	args: Readonly<Record<string, unknown>>,
 	state: LedgerLookupState,
+	write = false,
 ): string {
 	const head = renderLookupCall(name, args)
 	if (state === 'failed') return `${head}: failed`
-	if (state === 'empty') return `${head}: no record`
+	if (state === 'empty') return write ? `${head}: changed nothing` : `${head}: no record`
 	if (state === 'shown') return `${head}: result shown under Records below`
 	const id = Object.values(args).find(isString)
 	return `${head}: result not shown; call recall with ${(id ?? '').trim() || 'its id'}`
@@ -1375,7 +1378,8 @@ export function fitSlope(groups: ReadonlyArray<readonly GaugeCall[]>): number | 
  * or superseded. When the whole run is superseded, its first finding reaches that final filter.
  * Different text or an undefined result replaces the earlier run, so an empty lookup leaves the
  * earlier result out of every record. A thrown lookup leaves the earlier result live. A finding
- * with no canonical identity participates in no replacement.
+ * with no canonical identity participates in no replacement. A finding a write retired is
+ * superseded once {@link mergeSupersessions} merges the write's edges into the classification.
  *
  * @param input - The messages, findings, and classification to read
  * @returns The live message ids
@@ -1424,6 +1428,111 @@ export function collectLive(input: LedgerProjectionInput): readonly string[] {
 				!classification.quiet.has(id) &&
 				(classification.supersessions.get(id) ?? []).length === 0,
 		)
+}
+
+/**
+ * Collects each finding a write made stale, mapped to the writes that supersede it.
+ *
+ * @remarks
+ * A write is a finding with `targets`. It supersedes another finding whose names meet its targets
+ * when that finding comes before it in conversation order, or sits in its own tool group and
+ * carries no targets, because one batch dispatches its calls at once. So the later of two writes in
+ * one group supersedes the earlier, and never the reverse. A finding's names are its result's `ids`
+ * and owner ids, or, for an empty finding, the ids its string arguments name, as `extractLiterals`
+ * reads them. Names and targets compare exactly. A write never supersedes itself, a finding with
+ * empty `targets` supersedes nothing, and a finding the messages don't hold takes no part.
+ *
+ * @param messages - The conversation's messages, which fix each finding's position and tool group
+ * @param findings - The lookup and write findings of those messages
+ * @returns Each superseded finding's id, in conversation order, mapped to the ids of the writes that supersede it, in conversation order
+ *
+ * @example
+ * ```ts
+ * collectWriteSupersessions(messages, findings) // Map { 'tool-1' => ['tool-2'] } when tool-2 wrote what tool-1 read
+ * ```
+ */
+export function collectWriteSupersessions(
+	messages: readonly Message[],
+	findings: readonly LedgerLookupFinding[],
+): ReadonlyMap<string, readonly string[]> {
+	// A conversation with no write result does no further work.
+	if (!findings.some((finding) => (finding.targets ?? []).length > 0)) return new Map()
+	const positions = new Map(messages.map((message, at) => [message.id, at]))
+	const groups = new Map(
+		collectToolGroups(messages).flatMap((group, at) =>
+			group.map((message) => [message.id, at] as const),
+		),
+	)
+	const held = findings
+		.filter((finding) => positions.has(finding.id))
+		.toSorted((left, right) => (positions.get(left.id) ?? 0) - (positions.get(right.id) ?? 0))
+	const writes = held.filter((finding) => (finding.targets ?? []).length > 0)
+	return new Map(
+		held.flatMap((finding) => {
+			const names = new Set(
+				finding.result === undefined
+					? Object.values(finding.arguments)
+							.filter(isString)
+							.flatMap((value) => [...extractLiterals(value).ids])
+					: [...finding.result.ids, ...finding.result.owners.map((owner) => owner.id)],
+			)
+			const at = positions.get(finding.id) ?? 0
+			const group = groups.get(finding.id)
+			const targeted = (finding.targets ?? []).length > 0
+			const superseders = writes.filter(
+				(write) =>
+					write.id !== finding.id &&
+					(write.targets ?? []).some((target) => names.has(target)) &&
+					((positions.get(write.id) ?? 0) > at ||
+						(!targeted && group !== undefined && groups.get(write.id) === group)),
+			)
+			return superseders.length === 0
+				? []
+				: [[finding.id, superseders.map((write) => write.id)] as const]
+		}),
+	)
+}
+
+/**
+ * Merges supersession edges into a classification, adding each edge to both its supersessions and its amendments.
+ *
+ * @remarks
+ * Each earlier message's later ids stay distinct and in conversation order, so every supersession
+ * is still an amendment, as the classifier files one. An empty edge map returns the classification
+ * itself.
+ *
+ * @param classification - The judged classification
+ * @param edges - The later ids that supersede each earlier id, such as {@link collectWriteSupersessions} returns
+ * @param messages - The conversation's messages, which order the later ids
+ * @returns The classification with the edges merged
+ *
+ * @example
+ * ```ts
+ * mergeSupersessions(classification, new Map([['tool-1', ['tool-2']]]), messages).supersessions.get('tool-1') // ['tool-2']
+ * ```
+ */
+export function mergeSupersessions(
+	classification: LedgerClassification,
+	edges: ReadonlyMap<string, readonly string[]>,
+	messages: readonly Message[],
+): LedgerClassification {
+	if (edges.size === 0) return classification
+	const positions = new Map(messages.map((message, at) => [message.id, at]))
+	const [amendments = classification.amendments, supersessions = classification.supersessions] = [
+		classification.amendments,
+		classification.supersessions,
+	].map(
+		(laters) =>
+			new Map(
+				[...new Set([...laters.keys(), ...edges.keys()])].map((earlier) => [
+					earlier,
+					[...new Set([...(laters.get(earlier) ?? []), ...(edges.get(earlier) ?? [])])].toSorted(
+						(left, right) => (positions.get(left) ?? 0) - (positions.get(right) ?? 0),
+					),
+				]),
+			),
+	)
+	return { ...classification, amendments, supersessions }
 }
 
 /**

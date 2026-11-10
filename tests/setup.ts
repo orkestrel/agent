@@ -225,6 +225,28 @@ export function createGuideOrderLookup(): LedgerLookup {
 	}
 }
 
+/** Supplies the ledger write fence's `update_contact` write, as the guide declares it. */
+export function createGuideContactWrite(): LedgerWrite {
+	return {
+		tool: {
+			name: 'update_contact',
+			description: "Set a contact's phone.",
+			parameters: {
+				type: 'object',
+				properties: { id: { type: 'string' }, phone: { type: 'string' } },
+				required: ['id', 'phone'],
+			},
+			annotations: { consequential: true },
+			execute: (args) => `Contact ${String(args.id)}: Mara Quill. Phone ${String(args.phone)}.`,
+		},
+		read: (args) => ({
+			ids: [String(args.id)],
+			owners: [{ id: String(args.id), names: ['Mara Quill'] }],
+			targets: [String(args.id)], // the contact whose earlier reads this call made stale
+		}),
+	}
+}
+
 /** Supplies the documented guide scenario fixture. */
 export function createMeasuredGuideProvider(
 	usage: TokenUsage,
@@ -250,6 +272,7 @@ import type {
 	LedgerLookup,
 	LedgerTopic,
 	LedgerResult,
+	LedgerWrite,
 	RelayOptions,
 	RelayProviderOptions,
 	RelayRefusal,
@@ -290,6 +313,7 @@ import type {
 	LedgerLine,
 	LedgerLookupFinding,
 	LedgerLookupResult,
+	LedgerOwner,
 	LedgerOptions,
 	LedgerProjection,
 	LedgerProjectionInput,
@@ -6796,6 +6820,391 @@ export const LEDGER_ORDER_LOOKUP: LedgerLookup = Object.freeze<LedgerLookup>({
 		owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
 	}),
 })
+
+/** Names the fictional contacts of a {@link LedgerContactBook} by id. */
+export const LEDGER_CONTACT_NAMES: Readonly<Record<string, string>> = Object.freeze({
+	'C-12': 'Mara Quill',
+	'C-14': 'Tomas Reyes',
+})
+
+/**
+ * Renders the text every tool of a {@link LedgerContactBook} returns for one contact.
+ *
+ * @param id - The contact id
+ * @param phone - The contact's phone
+ * @returns The contact line, such as `Contact C-12: Mara Quill. Phone 555-0101.`
+ */
+export function renderLedgerContact(id: string, phone: string): string {
+	return `Contact ${id}: ${LEDGER_CONTACT_NAMES[id] ?? 'unknown'}. Phone ${phone}.`
+}
+
+/**
+ * Builds the owner a contact read names.
+ *
+ * @param id - The contact id
+ * @returns The owner: the id and the contact's name
+ */
+export function buildLedgerContactOwner(id: string): LedgerOwner {
+	return { id, names: [LEDGER_CONTACT_NAMES[id] ?? ''] }
+}
+
+/**
+ * Holds a fictional contact book that a ledger reads and writes: each contact's phone, the lookups
+ * that read it, and the write that changes it.
+ *
+ * @remarks
+ * Contact C-12 opens with phone 555-0101 and contact C-14 with phone 555-0177. `lookup` reads one
+ * contact by id, `list` reads every contact, and `write` is the `consequential` tool
+ * `update_contact`, whose handler names the contact it changed as its only target. `runs` records
+ * each tool that ran, by tool name and contact id, in run order.
+ *
+ * @example
+ * ```ts
+ * const book = new LedgerContactBook()
+ * createLedger(provider, buildLedgerOptions({ lookups: [book.lookup], writes: [book.write], agent: { authority } }))
+ * ```
+ */
+export class LedgerContactBook {
+	readonly #phones = new Map([
+		['C-12', '555-0101'],
+		['C-14', '555-0177'],
+	])
+	readonly #runs = createRecorder<readonly [name: string, id: string]>()
+
+	/** Each tool that ran, by tool name and contact id, in run order. */
+	get runs(): ReadonlyArray<readonly [name: string, id: string]> {
+		return this.#runs.calls
+	}
+
+	/** The lookup `lookup_contact`, which reads one contact by its id. */
+	get lookup(): LedgerLookup {
+		return {
+			tool: {
+				name: 'lookup_contact',
+				description: 'Read a contact by its id.',
+				parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+				execute: (args) => {
+					this.#runs.handler('lookup_contact', String(args.id))
+					return this.#describe(String(args.id))
+				},
+			},
+			read: (args) => ({
+				ids: [String(args.id)],
+				owners: [buildLedgerContactOwner(String(args.id))],
+			}),
+		}
+	}
+
+	/** The lookup `list_contacts`, which reads every contact. */
+	get list(): LedgerLookup {
+		return {
+			tool: {
+				name: 'list_contacts',
+				description: 'Read every contact.',
+				parameters: { type: 'object', properties: {} },
+				execute: () => {
+					this.#runs.handler('list_contacts', '')
+					return [...this.#phones.keys()].map((id) => this.#describe(id)).join('\n')
+				},
+			},
+			read: () => ({
+				ids: [...this.#phones.keys()],
+				owners: [...this.#phones.keys()].map((id) => buildLedgerContactOwner(id)),
+			}),
+		}
+	}
+
+	/** The `consequential` write `update_contact`, which sets one contact's phone. */
+	get write(): LedgerWrite {
+		return {
+			tool: {
+				name: 'update_contact',
+				description: "Set a contact's phone.",
+				parameters: {
+					type: 'object',
+					properties: { id: { type: 'string' }, phone: { type: 'string' } },
+					required: ['id', 'phone'],
+				},
+				annotations: { consequential: true },
+				execute: (args) => {
+					this.#runs.handler('update_contact', String(args.id))
+					this.#phones.set(String(args.id), String(args.phone))
+					return this.#describe(String(args.id))
+				},
+			},
+			read: (args) => ({
+				ids: [String(args.id)],
+				owners: [buildLedgerContactOwner(String(args.id))],
+				targets: [String(args.id)],
+			}),
+		}
+	}
+
+	/** The book's write, whose tool throws before it changes the phone. */
+	get offline(): LedgerWrite {
+		const write = this.write
+		return {
+			...write,
+			tool: {
+				...write.tool,
+				execute: () => {
+					throw new Error('the contact store is offline')
+				},
+			},
+		}
+	}
+
+	/** The book's write, whose handler throws after the tool ran. */
+	get unreadable(): LedgerWrite {
+		return {
+			...this.write,
+			read: () => {
+				throw new Error('the result is unreadable')
+			},
+		}
+	}
+
+	// The text every tool of the book returns for one contact.
+	#describe(id: string): string {
+		return renderLedgerContact(id, this.#phones.get(id) ?? 'none')
+	}
+}
+
+/**
+ * Builds a conversation of contact reads and writes, with the finding the ledger reads from each tool result.
+ *
+ * @remarks
+ * The first group reads contacts C-12 and C-14. The second reads an order whose owner is C-12 and
+ * a contact lookup that found nothing for the argument `c-12`. The third writes C-12 and then lists
+ * every contact. The fourth writes C-12 twice. The fifth reads C-12 again and runs a write that
+ * changed nothing, whose result names no target.
+ *
+ * @returns The messages in conversation order and one finding per tool result
+ */
+export function buildLedgerWriteScenario(): {
+	readonly messages: readonly Message[]
+	readonly findings: readonly LedgerLookupFinding[]
+} {
+	const groups: ReadonlyArray<{
+		readonly leader: string
+		readonly results: ReadonlyArray<{
+			readonly id: string
+			readonly call: ToolCall
+			readonly text: string
+			readonly result: LedgerLookupResult | undefined
+			readonly targets?: readonly string[]
+		}>
+	}> = [
+		{
+			leader: 'call-1',
+			results: [
+				{
+					id: 'read',
+					call: { id: 'r1', name: 'lookup_contact', arguments: { id: 'C-12' } },
+					text: renderLedgerContact('C-12', '555-0101'),
+					result: { ids: ['C-12'], owners: [buildLedgerContactOwner('C-12')] },
+				},
+				{
+					id: 'other',
+					call: { id: 'r2', name: 'lookup_contact', arguments: { id: 'C-14' } },
+					text: renderLedgerContact('C-14', '555-0177'),
+					result: { ids: ['C-14'], owners: [buildLedgerContactOwner('C-14')] },
+				},
+			],
+		},
+		{
+			leader: 'call-2',
+			results: [
+				{
+					id: 'order',
+					call: { id: 'o1', name: 'lookup_order', arguments: { id: 'ORD-7' } },
+					text: 'Order ORD-7 for contact C-12.',
+					result: { ids: ['ORD-7'], owners: [buildLedgerContactOwner('C-12')] },
+				},
+				{
+					id: 'missing',
+					call: { id: 'e1', name: 'lookup_contact', arguments: { id: 'c-12' } },
+					text: 'No contact on file.',
+					result: undefined,
+				},
+			],
+		},
+		{
+			leader: 'call-3',
+			results: [
+				{
+					id: 'write',
+					call: { id: 'w1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+					text: renderLedgerContact('C-12', '555-0102'),
+					result: { ids: ['C-12', '555-0102'], owners: [buildLedgerContactOwner('C-12')] },
+					targets: ['C-12'],
+				},
+				{
+					id: 'list',
+					call: { id: 'l1', name: 'list_contacts', arguments: {} },
+					text: `${renderLedgerContact('C-12', '555-0102')}\n${renderLedgerContact('C-14', '555-0177')}`,
+					result: {
+						ids: ['C-12', 'C-14'],
+						owners: [buildLedgerContactOwner('C-12'), buildLedgerContactOwner('C-14')],
+					},
+				},
+			],
+		},
+		{
+			leader: 'call-4',
+			results: [
+				{
+					id: 'rewrite',
+					call: { id: 'w2', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0103' } },
+					text: renderLedgerContact('C-12', '555-0103'),
+					result: { ids: ['C-12', '555-0103'], owners: [buildLedgerContactOwner('C-12')] },
+					targets: ['C-12'],
+				},
+				{
+					id: 'final',
+					call: { id: 'w3', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0104' } },
+					text: renderLedgerContact('C-12', '555-0104'),
+					result: { ids: ['C-12', '555-0104'], owners: [buildLedgerContactOwner('C-12')] },
+					targets: ['C-12'],
+				},
+			],
+		},
+		{
+			leader: 'call-5',
+			results: [
+				{
+					id: 'after',
+					call: { id: 'r3', name: 'lookup_contact', arguments: { id: 'C-12' } },
+					text: renderLedgerContact('C-12', '555-0104'),
+					result: { ids: ['C-12'], owners: [buildLedgerContactOwner('C-12')] },
+				},
+				{
+					id: 'noop',
+					call: { id: 'w4', name: 'update_contact', arguments: { id: 'C-14', phone: '555-0177' } },
+					text: renderLedgerContact('C-14', '555-0177'),
+					result: { ids: ['C-14', '555-0177'], owners: [buildLedgerContactOwner('C-14')] },
+					targets: [],
+				},
+			],
+		},
+	]
+	return {
+		messages: [
+			buildLedgerMessage('request', 'user', "Update Mara Quill's phone."),
+			...groups.flatMap((group) => [
+				{
+					id: group.leader,
+					role: 'assistant' as const,
+					content: '',
+					calls: group.results.map((result) => result.call),
+				},
+				...group.results.map((result) => ({
+					id: result.id,
+					role: 'tool' as const,
+					content: result.text,
+					call: result.call.id,
+				})),
+			]),
+		],
+		findings: groups.flatMap((group) =>
+			group.results.map((result) => ({
+				...buildLedgerFinding(
+					result.id,
+					result.call.name,
+					result.call.arguments,
+					result.text,
+					result.result,
+				),
+				...(result.targets === undefined ? {} : { targets: result.targets }),
+			})),
+		),
+	}
+}
+
+/** Lists, for each finding of {@link buildLedgerWriteScenario}, the case it covers and the writes that supersede it. */
+export const LEDGER_WRITE_SUPERSESSIONS: ReadonlyArray<
+	readonly [label: string, id: string, writes: readonly string[]]
+> = Object.freeze([
+	['an earlier read of a target', 'read', ['write', 'rewrite', 'final']],
+	['an earlier read of no target', 'other', []],
+	['a read naming a target as its owner', 'order', ['write', 'rewrite', 'final']],
+	['an empty read naming a target by argument', 'missing', ['write', 'rewrite', 'final']],
+	["a read after the write in the write's own group", 'list', ['write', 'rewrite', 'final']],
+	['an earlier write of the same target', 'write', ['rewrite', 'final']],
+	['the earlier of two writes in one group', 'rewrite', ['final']],
+	['the later of two writes in one group', 'final', []],
+	['a read in a group after every write', 'after', []],
+	['a write whose result names no target', 'noop', []],
+])
+
+/**
+ * Builds ledger options over a contact book: a phrase judge that files every message as a fact, the
+ * book's `lookup_contact` and `list_contacts` lookups, its `update_contact` write, and a host authority.
+ *
+ * @param book - The contact book whose tools the ledger registers
+ * @param authority - The host authority every lookup and write answers to
+ * @param overrides - The fields to replace
+ * @returns The options, with the gauge `buildLedgerOptions` supplies
+ */
+export function buildLedgerContactOptions(
+	book: LedgerContactBook,
+	authority: AuthorityInterface,
+	overrides: Partial<LedgerOptions> = {},
+): LedgerOptions {
+	return buildLedgerOptions({
+		judge: createPhraseJudge([]),
+		lookups: [book.lookup, book.list],
+		writes: [book.write],
+		agent: { authority },
+		...overrides,
+	})
+}
+
+/**
+ * Serves two contact requests through a ledger: the first reads contact C-12 and then writes its
+ * phone to 555-0102, and the second asks for the phone.
+ *
+ * @remarks
+ * With `abort`, the first request's signal aborts at the write's `ask` event, so the second request
+ * takes the turn the first one left unread as its reply.
+ *
+ * @param options - The book, the host authority, the write replacing the book's, and whether the write's `ask` aborts the first request
+ * @returns The ledger and its recorded provider
+ */
+export async function serveLedgerContactWrite(options: {
+	readonly book: LedgerContactBook
+	readonly authority: AuthorityInterface
+	readonly write?: LedgerWrite
+	readonly abort?: boolean
+}): Promise<{ readonly ledger: LedgerInterface; readonly provider: ScriptedProviderInterface }> {
+	const provider = createScriptedProvider(
+		[
+			{ content: '', tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }] },
+			{
+				content: '',
+				tools: [
+					{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+				],
+			},
+			{ content: 'Done.' },
+			{ content: 'Answer.' },
+		],
+		{ recorded: true, repeat: false },
+	)
+	const ledger = createLedger(
+		provider,
+		buildLedgerContactOptions(
+			options.book,
+			options.authority,
+			options.write === undefined ? {} : { writes: [options.write] },
+		),
+	)
+	const controller = new AbortController()
+	if (options.abort === true) ledger.agent.emitter.on('ask', () => controller.abort('stop'))
+	await ledger.respond("Change Mara Quill's phone to 555-0102.", controller.signal)
+	await ledger.respond("What is Mara Quill's phone?")
+	return { ledger, provider }
+}
 
 /**
  * Files a correction with the supplied topic inventory.

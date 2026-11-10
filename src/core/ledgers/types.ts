@@ -180,7 +180,8 @@ export type LedgerLookupHandler = (
  *
  * @remarks
  * The ledger registers the tool behind a repeat stop beside its own `recall` tool, so the tool must
- * not be named `recall`, and no two lookups can share a tool name.
+ * not be named `recall`, and no two lookups can share a tool name. A lookup is a read: a tool whose
+ * call changes a record is a {@link LedgerWrite}.
  * The repeat stop compares the tool name and canonical arguments without normalizing strings.
  * The projection uses {@link identifyLookup}, which trims and uppercases top-level string
  * arguments when deciding which finding replaces an earlier one.
@@ -196,13 +197,66 @@ export interface LedgerLookup {
 	readonly read: LedgerLookupHandler
 }
 
+/** Carries what a write handler read from one write result: the ids and owners it names, and the ids whose state the call changed or removed. */
+export interface LedgerWriteResult extends LedgerLookupResult {
+	readonly targets: readonly string[]
+}
+
+/**
+ * Reads one successful write result into the ids and owners it names and the ids whose state it changed.
+ *
+ * @param args - The arguments the model called the write with
+ * @param text - The result text the tool returned
+ * @returns The ids, owners, and targets the result names, or undefined when the call changed nothing
+ *
+ * @example
+ * ```ts
+ * const read: LedgerWriteHandler = (args, text) => {
+ * 	if (text.startsWith('No change')) return undefined
+ * 	const id = String(args.id ?? '').trim().toUpperCase()
+ * 	return { ids: [id], owners: [{ id, names: [] }], targets: [id] }
+ * }
+ * ```
+ */
+export type LedgerWriteHandler = (
+	args: Readonly<Record<string, unknown>>,
+	text: string,
+) => LedgerWriteResult | undefined
+
+/**
+ * Carries one application write: the `consequential` tool the model calls and the handler that reads its results.
+ *
+ * @remarks
+ * The ledger registers the tool beside its lookups and `recall`, behind the same repeat stop. The
+ * tool must carry `annotations.consequential: true`, must not be named `recall`, and can share no
+ * name with a lookup or another write, and a ledger with writes requires `agent.authority`;
+ * construction throws `LedgerError` with code `'WRITE'` otherwise. A write runs through the agent's
+ * scope, the host authority, the `consequential` floor, and the host's approver like any tool.
+ * The ledger files a successful result as a finding, as it files a lookup's, adding the ids its
+ * string arguments name to `ids` and never to `targets`. The finding supersedes every earlier
+ * finding whose `ids` or owner ids meet its `targets`, and every such finding without targets in
+ * its own tool group, as {@link collectWriteSupersessions} reads them. A handler that returns
+ * undefined reads a call that changed nothing, which retires nothing. A refused, denied, aborted,
+ * or thrown call, and a throwing handler, file nothing and retire nothing. The ledger reads the
+ * targets again from the conversation on every scan, so pass the same writes on every hydrate.
+ * When a write runs, the ledger also calls the handler on its result once, and the request admits
+ * again each lookup call whose finding the write retired, so a later read that checks the write
+ * passes the repeat stop; a second identical read with no write between is still a repeat.
+ */
+export interface LedgerWrite {
+	readonly tool: ToolInterface
+	readonly read: LedgerWriteHandler
+}
+
 /**
  * Carries one successful lookup result as the ledger read it.
  *
  * @remarks
  * `id` is the tool message's id, `name` and `arguments` come from the call it answers, and `text`
  * is the result text. `result` is what the lookup's handler read, undefined for a lookup that found
- * nothing; an empty finding still replaces an earlier finding of the same call.
+ * nothing; an empty finding still replaces an earlier finding of the same call. `targets` is present
+ * on the finding of a write whose handler read a result: the ids whose state the call changed or
+ * removed, which supersede the earlier findings that name them.
  */
 export interface LedgerLookupFinding {
 	readonly id: string
@@ -210,6 +264,7 @@ export interface LedgerLookupFinding {
 	readonly arguments: Readonly<Record<string, unknown>>
 	readonly text: string
 	readonly result: LedgerLookupResult | undefined
+	readonly targets?: readonly string[]
 }
 
 /** Names what became of a lookup of an earlier request, as the tail stub of its result reports it. */
@@ -285,7 +340,11 @@ export interface LedgerGauge {
  * that `respond` call after the `fault` event, and the next call asks the judge again about whatever is
  * still unanswered. With `strict: false` the request goes on with that question undecided, or from the
  * conversation's `view()`. A provider failure in the first pass is the one
- * failure the answer pass recovers under either value.
+ * failure the answer pass recovers under either value. `authority` gates every lookup and write:
+ * the ledger passes its agent one authority that denies a name the ledger doesn't advertise, allows
+ * `recall`, and hands every other call to this authority's `evaluate`, and every asked call to its
+ * `ask`. Without it, the ledger allows each lookup and holds no approver, so a `consequential`
+ * lookup is denied as unanswered at every call.
  */
 export type LedgerAgentOptions = Pick<
 	AgentOptions,
@@ -298,12 +357,13 @@ export type LedgerAgentOptions = Pick<
 	| 'memos'
 	| 'workspaces'
 	| 'strict'
+	| 'authority'
 >
 
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
- * context capacity, and the optional first-pass thinking, lookups, gauge, shares, snapshot, recall
- * limit, correction filter, and agent options.
+ * context capacity, and the optional first-pass thinking, lookups, writes, gauge, shares, snapshot,
+ * recall limit, correction filter, and agent options.
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
@@ -318,7 +378,8 @@ export type LedgerAgentOptions = Pick<
  * The plan retains its `remainder - predict < 2 * reserve` admission rule. Runtime recall fits whole
  * results to measured remaining capacity at the larger of the gauge rate and the request's measured
  * rate, allowing `LEDGER_SCALE_DRIFT` for new text. Lack of room omits results without closing recall.
- * `snapshot` hydrates the conversation and
+ * `writes` lists the {@link LedgerWrite} entries the model can call; a ledger with writes requires
+ * `agent.authority`. `snapshot` hydrates the conversation and
  * the marked ids a ledger's `snapshot()` returned; construction throws `LedgerError` with code
  * `'SNAPSHOT'` when `isLedgerSnapshot` refuses it, and `ConversationError` with code `'ROLE'` or
  * `'SNAPSHOT'` when its conversation holds a `system` message or repeats an id.
@@ -341,6 +402,7 @@ export interface LedgerOptions {
 	readonly think?: boolean
 	readonly gauge?: LedgerGauge
 	readonly lookups?: readonly LedgerLookup[]
+	readonly writes?: readonly LedgerWrite[]
 	readonly share?: Partial<LedgerShare>
 	readonly recall?: LedgerRecallOptions
 	readonly correction?: LedgerCorrectionOptions
@@ -368,7 +430,9 @@ export interface LedgerOptions {
  * never the record coverage. A plain request omits `copy` because its content already lives in `conversation`.
  * The required window `digest` checks canonical held messages, lookup call context, copies, and receipts. A mismatch drains
  * the window and its evidence; a missing digest refuses the snapshot. An unencodable held message
- * makes `snapshot()` omit the window. The checksum detects edits, not authenticity.
+ * makes `snapshot()` omit the window. The checksum detects edits, not authenticity. A write's
+ * retirements carry no member: the hydrated ledger reads each write's targets again from the
+ * conversation and its failures, so a changed `writes` list brings retired reads back live.
  */
 export interface LedgerSnapshot {
 	readonly conversation: ConversationSnapshot
@@ -528,6 +592,17 @@ export interface LedgerRequestInterface {
 	 * @throws {Error} Thrown when the arguments have no canonical identity
 	 */
 	admit(name: string, args: Readonly<Record<string, unknown>>): void
+	/**
+	 * Releases one tool call the request admitted, so a later `admit` of the same call passes.
+	 *
+	 * @remarks
+	 * The call is compared as `admit` compares it. A call the request never admitted, or one whose
+	 * arguments have no canonical identity, changes nothing.
+	 *
+	 * @param name - The tool name
+	 * @param args - The call's arguments
+	 */
+	release(name: string, args: Readonly<Record<string, unknown>>): void
 	/**
 	 * Counts one `recall` call, closing the request's recall tool when its recalls reach the limit.
 	 *
@@ -1061,6 +1136,8 @@ export type LedgerErrorCode =
 	| 'SNAPSHOT'
 	/** Reports filing wording that `isLedgerQuestion` refuses. */
 	| 'QUESTION'
+	/** Reports a write without the `consequential` annotation, writes without `agent.authority`, or a write named `recall` or with a name a lookup or another write carries. */
+	| 'WRITE'
 
 /** Carries the lowercase words and non-opening capitalized names of a message. */
 export interface LedgerWordSet {

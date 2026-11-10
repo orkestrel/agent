@@ -17,6 +17,7 @@ describe('createLedger', () => {
 	it('exports the entity, classifier, gauge, and factory through the core barrel', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		expectTypeOf<LedgerAgentOptions>().toHaveProperty('strict')
+		expectTypeOf<LedgerAgentOptions>().toHaveProperty('authority')
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('budget')
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('signal')
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('error')

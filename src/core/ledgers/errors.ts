@@ -7,7 +7,7 @@ import { INTRINSICS, holds, isFunction, isObject } from '@orkestrel/contract'
  * carrying the machine-readable `code`.
  *
  * @remarks
- * A threshold, share, capacity, limit, topic, lookup, question, or gauge outside its bounds is a
+ * A threshold, share, capacity, limit, topic, lookup, write, question, or gauge outside its bounds is a
  * programmer error and throws this with the matching {@link LedgerErrorCode}. A calibration call that reports
  * no prompt usage throws this with `'GAUGE'`. A snapshot option that `isLedgerSnapshot` refuses
  * throws this with `'SNAPSHOT'`, its `context` holding the `faults`. Narrow a caught value with {@link isLedgerError} and
@@ -72,7 +72,8 @@ export function isLedgerError(value: unknown): value is LedgerError {
 				code === 'GAUGE' ||
 				code === 'REFERENCE' ||
 				code === 'SNAPSHOT' ||
-				code === 'QUESTION'
+				code === 'QUESTION' ||
+				code === 'WRITE'
 			)
 		)
 			return false
