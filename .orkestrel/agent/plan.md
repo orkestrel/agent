@@ -62,6 +62,17 @@ A host gives a small local model progressive reach to everything its principal m
   - Every disclosure capability lives in Agent's core.
   - Agent never depends on `@orkestrel/toolbox`.
   - Toolbox may later build on Agent's built-ins, and § Deferred carries that.
+- **The user, 2026-11-10, on scope ownership:** "we need to make this especially aware of scope, from what I understand that would set the scope for a new agent not the current agent, which I think would make sense, but I feel like it's something you mentioned and something we need to think about and how scope works and how agents work within the scope they are giving, it wouldn't really make sense for an agent to manage it's own scope but still have the capability to work and manage what it slows given and securely and efficiently."
+  - The scope a host gives an agent is its ceiling, and no call the model makes changes it.
+  - The model manages only what it shows within that ceiling.
+  - Work that needs a scope the agent wasn't given goes to a new agent, whose ceiling narrows its parent's.
+- **The user, 2026-11-10, on delegation:** "I think agent delegation should be built in like any other agent and it can be scoped out if we don't want to give an agent the capability. We also have a workflow package that can help with that, not sure if we already use it or not but it's supposed to handle workflows of agents, tools, and functions."
+  - Delegation ships in this campaign as a built-in, and a host scopes it out like any other.
+  - It composes on `@orkestrel/workflow`, which Agent already uses for pacing, fan-out, and durable jobs.
+- **The user, 2026-11-10, on the final design:** the read-only consultant decides it, "just make sure to provide the information upfront and that they follow AGENTS.md/agents/skills/rules strictly".
+  - The design round reconciles into a draft.
+  - A read-only consultant decides the final design from every input, given up front.
+  - Refuters test its claims before any unit is briefed.
 - **Authorship:**
   - Host-authored text alone enters privileged context.
   - A model-authored memo, a record, and workspace data stay data.
@@ -88,7 +99,8 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | Item | State |
 | --- | --- |
 | Absorb | three distiller reads and a module map, 2026-11-10 |
-| Next | the design round: `planner` and `analyst` on one brief, in clean contexts, blind to each other |
+| Design round | both lanes returned, each revised for the scope ruling; they agree on the ceiling and disclosure split, built-in tools under authority, the head refresh, advertised-set pricing, and closing ROADMAP items 67 and 68; 14 points are incompatible |
+| Next | the final design from the consultant, on the reconciliation of both lanes |
 
 ## Sequence
 
