@@ -15,3 +15,7 @@
 | 2026-11-10 | The review's repair: `limit: 1` dropped, the `'stray'` abort event tested, `abort` and `aborted` named | `builder` on `opus` | the commit that carries this row |
 | 2026-11-10 | Re-check of the repair: PASS, the stray-stop mutation replayed | `reviewer` on `sonnet` | the commit that carries this row |
 | 2026-11-10 | Gates on the repaired tree: format, lint, check, `test:src` 2684, `test:policy` 179 plus 1 skipped, `test:config` 544 plus 1 skipped, `test:setup` 353, `test:guides` 207 | `verifier` on `haiku` | the commit that carries this row |
+| 2026-11-10 | The gauge identity across a hydrate, claim 10, on taverna's CRM premise probes | `opus` on `opus` | the commit that carries this row |
+| 2026-11-10 | Independent review of claim 10: FAIL 7 on one guide sentence that overclaimed for a tool added after construction; claims 1 to 6 held, the mutation replayed | `reviewer` on `sonnet` | the commit that carries this row |
+| 2026-11-10 | The prose correction in the guide, its guide test, and the plan; format, lint, and `test:guides` 208 rerun | Orchestrator | the commit that carries this row |
+| 2026-11-10 | Gates: format, lint, check, `test:src` 2696, `test:policy` 179 plus 1 skipped, `test:config` 544 plus 1 skipped, `test:setup` 353, `test:guides` 208 | `verifier` on `haiku` | the commit that carries this row |

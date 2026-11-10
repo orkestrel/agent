@@ -20,6 +20,7 @@ import {
 	createInstructionManager,
 	createLedger,
 	createMemoManager,
+	digestLedgerTools,
 	createScope,
 	createSkillManager,
 	estimateMessages,
@@ -52,6 +53,9 @@ import {
 	seedLedgerRecall,
 	serveLedgerBoundary,
 	serveLedgerFit,
+	serveLedgerGauge,
+	buildLedgerGaugeVariants,
+	MeteredLedgerProvider,
 	PricedLedgerProvider,
 	buildCategoryAnswer,
 	LEDGER_ADMISSION_SIZES,
@@ -1252,8 +1256,16 @@ describe('Ledger', () => {
 	})
 
 	it('hydrates a legacy-shaped snapshot without adding a stored byte and carries its final reply', async () => {
+		const uncalibrated = buildUncalibratedOptions(buildLedgerOptions({ topics: [] }))
+		// A gauge priced on the definitions these options give the ledger, so the hydrate keeps it.
+		const digest = requireValue(
+			digestLedgerTools(
+				createLedger(createScriptedProvider([]), uncalibrated).agent.context.tools.definitions(),
+			),
+		)
 		const snapshot: LedgerSnapshot = {
 			...LEDGER_SNAPSHOT_SEED,
+			gauge: { scale: 2, overhead: 10, digest },
 			conversation: {
 				...LEDGER_SNAPSHOT_SEED.conversation,
 				messages: [
@@ -1263,7 +1275,6 @@ describe('Ledger', () => {
 			},
 		}
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const { gauge: _gauge, ...uncalibrated } = buildLedgerOptions({ topics: [] })
 		const ledger = createLedger(provider, { ...uncalibrated, snapshot })
 		expect(JSON.stringify(ledger.snapshot())).toBe(JSON.stringify(snapshot))
 		await ledger.respond('Make that shorter.')
@@ -7313,6 +7324,115 @@ describe('Ledger — write construction', () => {
 	})
 })
 
+describe('Ledger — a gauge across a changed tool set', () => {
+	it.each(buildLedgerGaugeVariants())(
+		'recalibrates a hydrated ledger before its first pass after %s',
+		async (_title, overrides) => {
+			const base = buildUncalibratedOptions(buildLedgerOptions())
+			const { snapshot } = await serveLedgerGauge(base)
+			const options = { ...base, ...overrides }
+			const fresh = createLedger(new MeteredLedgerProvider([{ content: '' }]), options)
+			const measured = await fresh.calibrate(new AbortController().signal)
+			const provider = new MeteredLedgerProvider([{ content: 'Noted.' }], { recorded: true })
+			const ledger = createLedger(provider, { ...options, snapshot })
+			const before = ledger.gauge
+			await ledger.respond('Who works the Brightwater Studio account?')
+			const names = ledger.agent.context.tools.definitions().map((tool) => tool.name)
+			expect({
+				before,
+				count: provider.calls.length,
+				calibration: provider.calls
+					.slice(0, 2)
+					.map((call) => [call.tools?.map((tool) => tool.name), call.options?.think]),
+				overhead: ledger.gauge?.overhead,
+			}).toEqual({
+				before: undefined,
+				count: 3,
+				calibration: [
+					[names, false],
+					[undefined, false],
+				],
+				overhead: measured.overhead,
+			})
+			expect(measured.overhead).not.toBe(snapshot.gauge?.overhead)
+			expect(ledger.snapshot().gauge?.digest).toBe(fresh.snapshot().gauge?.digest)
+		},
+	)
+
+	it('reuses the stored gauge with no calibration call when the tool definitions are the same', async () => {
+		const options = buildUncalibratedOptions(buildLedgerOptions())
+		const parent = await serveLedgerGauge(options)
+		const stored = requireValue(parent.snapshot.gauge)
+		expect(stored.digest).toMatch(/^[0-9a-f]{16}$/)
+		const provider = new MeteredLedgerProvider([{ content: 'Noted.' }], { recorded: true })
+		const ledger = createLedger(provider, { ...options, snapshot: parent.snapshot })
+		expect(ledger.gauge).toEqual({ scale: stored.scale, overhead: stored.overhead })
+		await ledger.respond('Who works the Brightwater Studio account?')
+		await parent.ledger.respond('Who works the Brightwater Studio account?')
+		const [hydrated] = provider.calls
+		const live = requireValue(parent.provider.calls.at(-1))
+		expect(provider.calls).toHaveLength(1)
+		expect({
+			messages: requireValue(hydrated).messages.map(({ role, content }) => [role, content]),
+			tools: requireValue(hydrated).tools,
+		}).toEqual({
+			messages: live.messages.map(({ role, content }) => [role, content]),
+			tools: live.tools,
+		})
+		expect(ledger.snapshot().gauge?.digest).toBe(stored.digest)
+	})
+
+	it('refuses a snapshot whose gauge carries no digest with SNAPSHOT', async () => {
+		const options = buildUncalibratedOptions(buildLedgerOptions())
+		const { snapshot } = await serveLedgerGauge(options)
+		const { digest, ...price } = requireValue(snapshot.gauge)
+		expect(digest).toMatch(/^[0-9a-f]{16}$/)
+		const missing = { ...snapshot, gauge: price }
+		expect(isLedgerSnapshot(missing)).toBe(false)
+		const error = captureError(() =>
+			Reflect.construct(Ledger, [createScriptedProvider([]), { ...options, snapshot: missing }]),
+		)
+		expect(isLedgerError(error) && error.code).toBe('SNAPSHOT')
+	})
+
+	it('omits the gauge from the snapshot when JSON cannot render the tool definitions', () => {
+		const tool = createTool({
+			name: 'lookup_order',
+			description: 'Read an order by its id.',
+			parameters: { type: 'object', maximum: 10n },
+			execute: () => 'Order BW-5512: $148.50.',
+		})
+		const ledger = createLedger(createScriptedProvider([]), {
+			...buildLedgerOptions(),
+			lookups: [{ tool, read: () => undefined }],
+		})
+		expect(ledger.gauge).toEqual({ scale: 1, overhead: 0 })
+		expect(ledger.snapshot()).not.toHaveProperty('gauge')
+	})
+
+	it('stores the identity of the definitions an on-demand calibration priced', async () => {
+		const base = buildUncalibratedOptions(buildLedgerOptions())
+		const { snapshot } = await serveLedgerGauge(base)
+		const [, overrides] = requireValue(buildLedgerGaugeVariants()[0])
+		const options = { ...base, ...overrides }
+		const stale = createLedger(new MeteredLedgerProvider([{ content: '' }]), {
+			...options,
+			snapshot,
+		})
+		const gauge = await stale.calibrate(new AbortController().signal)
+		const fresh = createLedger(new MeteredLedgerProvider([{ content: '' }]), options)
+		expect(gauge.overhead).toBe((await fresh.calibrate(new AbortController().signal)).overhead)
+		const stored = stale.snapshot()
+		expect(stored.gauge?.digest).toBe(fresh.snapshot().gauge?.digest)
+		expect(stored.gauge?.digest).not.toBe(snapshot.gauge?.digest)
+		const provider = new MeteredLedgerProvider([{ content: 'Noted.' }], { recorded: true })
+		await createLedger(provider, { ...options, snapshot: stored }).respond(
+			'Who works the Brightwater Studio account?',
+		)
+		expect(provider.calls).toHaveLength(1)
+	})
+})
+
 describe('Ledger — head pricing', () => {
 	it('keeps a long head under the plan cap', async () => {
 		const fixture = LEDGER_TRIM_ORDER_FIXTURE
@@ -8702,7 +8822,11 @@ describe('Ledger — snapshot and hydrate', () => {
 		expect(snapshot.requests).toEqual(requests.map((message) => message.id))
 		expect(snapshot.notes).toEqual(notes.map((message) => message.id))
 		expect(snapshot.failures).toEqual(failures.map((message) => message.id))
-		expect(snapshot.gauge).toEqual({ scale: 1, overhead: 0 })
+		expect(snapshot.gauge).toEqual({
+			scale: 1,
+			overhead: 0,
+			digest: expect.stringMatching(/^[0-9a-f]{16}$/),
+		})
 		expect(snapshot.conversation.messages).toEqual(messages)
 	})
 
@@ -8734,7 +8858,10 @@ describe('Ledger — snapshot and hydrate', () => {
 		const gauge = await measured
 		expect(isAgentError(calibrationFault)).toBe(true)
 		expect(calibrationFault).toMatchObject({ code: 'CONCURRENCY' })
-		expect(calibrating.snapshot().gauge).toEqual(gauge)
+		expect(calibrating.snapshot().gauge).toEqual({
+			...gauge,
+			digest: expect.stringMatching(/^[0-9a-f]{16}$/),
+		})
 	})
 
 	it('files a pending failed tool result before capturing the snapshot', async () => {
@@ -8840,7 +8967,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			...buildUncalibratedOptions(buildLedgerOptions()),
 			snapshot: LEDGER_SNAPSHOT_SEED,
 		})
-		expect(ledger.gauge).toEqual(LEDGER_SNAPSHOT_SEED.gauge)
+		expect(ledger.gauge).toEqual({ scale: 2, overhead: 10 })
 		expect((await ledger.respond('Next request.')).content).toBe('Done.')
 		expect(provider.calls).toHaveLength(1)
 		expect(requireValue(provider.calls[0]).messages.at(-1)?.content).toContain('Next request.')
@@ -8890,14 +9017,14 @@ describe('Ledger — snapshot and hydrate', () => {
 		const second = createLedger(without, { ...base, snapshot: LEDGER_SNAPSHOT_SEED })
 		expect(LEDGER_SNAPSHOT_SEED.gauge).not.toEqual(supplied)
 		expect(first.gauge).toEqual(supplied)
-		expect(second.gauge).toEqual(LEDGER_SNAPSHOT_SEED.gauge)
+		expect(second.gauge).toEqual({ scale: 2, overhead: 10 })
 		await first.respond('Next request.')
 		await second.respond('Next request.')
 		expect(withOption.calls).toHaveLength(1)
 		expect(without.calls).toHaveLength(1)
 		expect(first.gauge?.scale).toBe(supplied.scale)
 		expect(first.gauge?.overhead).toBe(supplied.overhead)
-		expect(second.gauge).toEqual(LEDGER_SNAPSHOT_SEED.gauge)
+		expect(second.gauge).toEqual({ scale: 2, overhead: 10 })
 	})
 
 	it('calibrates before the first request when neither the options nor a snapshot supply a gauge', async () => {

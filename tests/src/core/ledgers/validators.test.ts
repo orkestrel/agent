@@ -112,7 +112,7 @@ describe('isLedgerSnapshot', () => {
 		expect(isLedgerSnapshot(LEDGER_SNAPSHOT_SEED)).toBe(true)
 		expect(isLedgerSnapshot({ conversation, requests, notes, failures })).toBe(true)
 		expect(isLedgerSnapshot({ ...LEDGER_SNAPSHOT_SEED, version: 2 })).toBe(false)
-		const free = { ...LEDGER_SNAPSHOT_SEED, gauge: { scale: 2, overhead: 0 } }
+		const free = { ...LEDGER_SNAPSHOT_SEED, gauge: { ...LEDGER_SNAPSHOT_SEED.gauge, overhead: 0 } }
 		expect(isLedgerSnapshot(free)).toBe(true)
 	})
 
@@ -253,7 +253,7 @@ describe('isLedgerSnapshot is exact, in lockstep with its shape', () => {
 			requests: [],
 			notes: [],
 			failures: [],
-			gauge: { scale: 1, overhead: 0 },
+			gauge: { scale: 1, overhead: 0, digest: 'checksum' },
 		}
 		expect(isLedgerSnapshot(snapshot)).toBe(true)
 		expect(ledgerSnapshotContract.is(snapshot)).toBe(true)
@@ -278,7 +278,17 @@ describe('isLedgerSnapshot is exact, in lockstep with its shape', () => {
 				requests: [],
 				notes: [],
 				failures: [],
-				gauge: { scale: 1, overhead: 0, at: 1 },
+				gauge: { scale: 1, overhead: 0, digest: 'checksum', at: 1 },
+			},
+		],
+		[
+			'a gauge with no digest',
+			{
+				conversation,
+				requests: [],
+				notes: [],
+				failures: [],
+				gauge: { scale: 1, overhead: 0 },
 			},
 		],
 	])('refuses %s', (_title, snapshot) => {

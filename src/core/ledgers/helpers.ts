@@ -22,7 +22,7 @@ import type {
 	LedgerWordSet,
 	LedgerReceipt,
 } from './types.js'
-import type { ToolCall } from '@orkestrel/tool'
+import type { ToolCall, ToolDefinition } from '@orkestrel/tool'
 import { attempt, canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { collectToolGroups, extractLiterals, hasCalls, renderJSON } from '../helpers.js'
@@ -69,7 +69,44 @@ export function digestLedgerWindow(
 			: canonicalStringify([values, exchanges.map((entry) => [entry.copy ?? null, entry.lines])])
 	})
 	if (!encoded.success || encoded.value === undefined) return undefined
-	const text = encoded.value
+	return computeLedgerChecksum(encoded.value)
+}
+
+/**
+ * Digests tool definitions as the JSON a provider request carries them, in order.
+ *
+ * @remarks
+ * A ledger stores this digest with its gauge, so a hydrate reuses the gauge only for the same
+ * definitions: an added, removed, reordered, or edited definition changes the digest. The digest is
+ * a {@link computeLedgerChecksum} checksum and makes no security claim.
+ *
+ * @param definitions - The tool definitions, as a tool manager's `definitions` method returns them
+ * @returns The 16-digit hexadecimal digest, or undefined when JSON cannot render the definitions
+ * @example
+ * ```ts
+ * digestLedgerTools([{ name: 'lookup_order', description: 'Read an order by its id.' }]) // '1eff754a69b7128c'
+ * ```
+ */
+export function digestLedgerTools(definitions: readonly ToolDefinition[]): string | undefined {
+	const text = renderJSON(definitions)
+	return text === undefined ? undefined : computeLedgerChecksum(text)
+}
+
+/**
+ * Computes a checksum of text: two 32-bit FNV-1a lanes over its code points, as 16 hexadecimal digits.
+ *
+ * @remarks
+ * The checksum detects an edit, can collide, and makes no security claim. Over ASCII text, the first
+ * lane is the standard 32-bit FNV-1a hash.
+ *
+ * @param text - The text to checksum
+ * @returns The 16-digit lowercase hexadecimal checksum
+ * @example
+ * ```ts
+ * computeLedgerChecksum('a') // 'e40c292ce457465e'
+ * ```
+ */
+export function computeLedgerChecksum(text: string): string {
 	const hash = [...text].reduce(
 		(prior, character) => {
 			const code = character.codePointAt(0) ?? 0

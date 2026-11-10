@@ -75,6 +75,7 @@ import {
 	collectRetiredFindings,
 	collectWriteSupersessions,
 	mergeSupersessions,
+	digestLedgerTools,
 	digestLedgerWindow,
 	buildLedgerCut,
 	buildLedgerLineKey,
@@ -140,6 +141,8 @@ export class Ledger implements LedgerInterface {
 	readonly #scans = new Set<LedgerScan>()
 	readonly #calibrations = new Set<AbortSignal>()
 	#gauge: Gauge | undefined
+	// The digest of the tool definitions `#gauge` priced, set with it.
+	#digest: string | undefined
 	#window: readonly LedgerExchange[] = []
 	#evidence: LedgerEvidence = collectLedgerEvidence([], new Set(), [])
 
@@ -212,14 +215,6 @@ export class Ledger implements LedgerInterface {
 		this.#replay = provider.replay ?? 'none'
 		this.#options = options
 		this.#share = { ...DEFAULT_LEDGER_SHARE, ...options.share }
-		const gauge = options.gauge ?? snapshot?.gauge
-		if (gauge !== undefined)
-			this.#gauge = new Gauge({
-				...gauge,
-				capacity: options.capacity,
-				predict: this.#predict,
-				replay: this.#replay,
-			})
 		const conversations = createConversationManager()
 		this.#conversation =
 			snapshot === undefined
@@ -304,6 +299,21 @@ export class Ledger implements LedgerInterface {
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),
 		})
+		// A stored gauge holds only for the definitions its digest names, so a hydrate with others
+		// calibrates before its first pass. A supplied gauge prices the definitions held now.
+		const digest = digestLedgerTools(this.#agent.context.tools.definitions())
+		const gauge =
+			options.gauge ?? (snapshot?.gauge?.digest === digest ? snapshot?.gauge : undefined)
+		if (gauge !== undefined) {
+			this.#gauge = new Gauge({
+				scale: gauge.scale,
+				overhead: gauge.overhead,
+				capacity: options.capacity,
+				predict: this.#predict,
+				replay: this.#replay,
+			})
+			this.#digest = digest
+		}
 		this.#agent.emitter.on('tool', (call, result) => {
 			this.#flush()
 			this.#pending.set(this.#conversation.messages().length, result)
@@ -377,6 +387,7 @@ export class Ledger implements LedgerInterface {
 		const conversation = this.#conversation.snapshot()
 		const ids = conversation.messages.map((message) => message.id)
 		const gauge = this.gauge
+		const priced = this.#digest
 		const window = {
 			exchanges: this.#window.map((entry) => ({
 				request: entry.request.id,
@@ -402,7 +413,9 @@ export class Ledger implements LedgerInterface {
 			requests: ids.filter((id) => this.#requests.has(id)),
 			notes: ids.filter((id) => this.#annotations.has(id)),
 			failures: ids.filter((id) => this.#results.get(id)?.success === false),
-			...(gauge === undefined ? {} : { gauge }),
+			...(gauge === undefined || priced === undefined
+				? {}
+				: { gauge: { ...gauge, digest: priced } }),
 			...(window.exchanges.length === 0 || digest === undefined
 				? {}
 				: { window: { ...window, digest } }),
@@ -529,12 +542,10 @@ export class Ledger implements LedgerInterface {
 				}),
 				this.#replay,
 			).slice(0, -1)
-			const priced = await this.#provider.generate(
-				messages,
-				signal,
-				this.#agent.context.tools.definitions(),
-				{ think: false },
-			)
+			const definitions = this.#agent.context.tools.definitions()
+			const priced = await this.#provider.generate(messages, signal, definitions, {
+				think: false,
+			})
 			const bare = await this.#provider.generate(messages, signal, undefined, { think: false })
 			if (
 				!isFiniteNumber(priced.usage?.prompt) ||
@@ -550,6 +561,7 @@ export class Ledger implements LedgerInterface {
 				scale: bare.usage.prompt / estimateMessages(messages),
 				overhead: Math.max(0, priced.usage.prompt - bare.usage.prompt),
 			})
+			this.#digest = digestLedgerTools(definitions)
 			return { scale: this.#gauge.scale, overhead: this.#gauge.overhead }
 		} catch (error) {
 			signal.throwIfAborted()

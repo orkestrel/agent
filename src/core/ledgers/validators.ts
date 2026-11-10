@@ -100,8 +100,8 @@ export function isLedgerQuestion(value: unknown): value is LedgerQuestion {
  * `conversation` must pass `isConversationSnapshot`, and `requests`, `notes`, and `failures` must be
  * dense arrays of strings. Each request and note id must name a `user` message of
  * `conversation.messages` and each failure id a `tool` message, so an id only a section original
- * holds is refused. A `gauge`, when present, must hold a finite `scale` greater than 0 and a finite
- * `overhead` of at least 0. The guard is exact: an unknown member and an own `undefined` `gauge` return
+ * holds is refused. A `gauge`, when present, must hold a finite `scale` greater than 0, a finite
+ * `overhead` of at least 0, and a string `digest`. The guard is exact: an unknown member and an own `undefined` `gauge` return
  * false, at the snapshot and in its `gauge`. Unreadable members and untrusted inputs return false. The
  * guard is structural: it admits a conversation holding a stored `system` role
  * or a repeated id, which `requireConversationSnapshot` and the `Conversation` constructor then
@@ -131,9 +131,15 @@ export function isLedgerSnapshot(value: unknown): value is LedgerSnapshot {
 		const isIds = arrayOf(isString)
 		if (!isIds(requests) || !isIds(notes) || !isIds(failures)) return false
 		if (gauge !== undefined) {
-			if (!isRecord(gauge) || Object.keys(gauge).length !== 2) return false
-			const { scale, overhead } = gauge
-			if (!isFiniteNumber(scale) || scale <= 0 || !isFiniteNumber(overhead) || overhead < 0)
+			if (!isRecord(gauge) || Object.keys(gauge).length !== 3) return false
+			const { scale, overhead, digest } = gauge
+			if (
+				!isFiniteNumber(scale) ||
+				scale <= 0 ||
+				!isFiniteNumber(overhead) ||
+				overhead < 0 ||
+				!isString(digest)
+			)
 				return false
 		}
 		const roles = new Map(conversation.messages.map((message) => [message.id, message.role]))

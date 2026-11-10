@@ -2473,6 +2473,37 @@ export class PricedLedgerProvider extends ScriptedProvider {
 	}
 }
 
+/**
+ * Reports each scripted call's prompt usage as the `estimateRequest` estimate of that call, so a
+ * gauge calibrated through it holds the estimated price of the tool definitions it saw as its overhead.
+ */
+export class MeteredLedgerProvider extends ScriptedProvider {
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const result = yield* super.stream(messages, signal, tools, options)
+		const prompt = estimateRequest(tools === undefined ? { messages } : { messages, tools })
+		return { ...result, usage: { prompt, completion: 0, total: prompt } }
+	}
+}
+
+/**
+ * Serves one request through a ledger that calibrates through a {@link MeteredLedgerProvider}, then
+ * snapshots it.
+ *
+ * @param options - The ledger options, which carry no gauge
+ * @returns The ledger, its provider, and the snapshot after the request
+ */
+export async function serveLedgerGauge(options: Omit<LedgerOptions, 'gauge'>) {
+	const provider = new MeteredLedgerProvider([{ content: 'Noted.' }], { recorded: true })
+	const ledger = createLedger(provider, options)
+	await ledger.respond('Brightwater Studio renews in May.')
+	return { ledger, provider, snapshot: ledger.snapshot() }
+}
+
 /** Serves whole hidden sources through measured recall and its optional answer pass. */
 export async function serveLedgerFit(options: {
 	readonly capacity: number
@@ -6644,6 +6675,87 @@ export function buildUncalibratedOptions(options: LedgerOptions): Omit<LedgerOpt
 }
 
 /**
+ * Builds the changes to `buildLedgerOptions` that each change a tool definition a calibration request
+ * carries: an added write, an added lookup, a removed lookup, an edited lookup, and an edited `recall`.
+ *
+ * @returns The titled option overrides, each changing one definition
+ */
+export function buildLedgerGaugeVariants(): ReadonlyArray<
+	readonly [string, Partial<LedgerOptions>]
+> {
+	const [lookup] = buildLedgerOptions().lookups ?? []
+	if (lookup === undefined) throw new Error('buildLedgerOptions supplies no lookup')
+	const authority = createAuthority({ fallback: { zone: 'desk', verdict: 'allow' } })
+	return Object.freeze<ReadonlyArray<readonly [string, Partial<LedgerOptions>]>>([
+		[
+			'an added write',
+			{
+				writes: [
+					{
+						tool: createTool({
+							name: 'update_account',
+							description: "Set an account's refund amount.",
+							parameters: {
+								type: 'object',
+								properties: { id: { type: 'string' }, refund: { type: 'number' } },
+								required: ['id', 'refund'],
+							},
+							annotations: { consequential: true },
+							execute: () => 'Account updated.',
+						}),
+						read: () => undefined,
+					},
+				],
+				agent: { authority },
+			},
+		],
+		[
+			'an added lookup',
+			{
+				lookups: [
+					lookup,
+					{
+						tool: createTool({
+							name: 'lookup_order',
+							description: 'Read an order by its id.',
+							parameters: { type: 'object', properties: { id: { type: 'string' } } },
+							execute: () => 'Order BW-5512: $148.50.',
+						}),
+						read: () => undefined,
+					},
+				],
+			},
+		],
+		['a removed lookup', { lookups: [] }],
+		[
+			'an edited lookup',
+			{
+				lookups: [
+					{
+						tool: createTool({
+							name: 'lookup',
+							description: 'Read an owner record by its account id.',
+							parameters: { type: 'object' },
+							execute: () => 'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+						}),
+						read: lookup.read,
+					},
+				],
+			},
+		],
+		[
+			'an edited recall',
+			{
+				topics: [
+					{ name: 'refunds', criterion: 'Refund amounts' },
+					{ name: 'deliveries', criterion: 'Delivery dates' },
+				],
+			},
+		],
+	])
+}
+
+/**
  * Builds the delivery history that fills a conversation with distinct user statements.
  * @param count - The number of deliveries
  * @returns The user messages to append to a conversation
@@ -9107,7 +9219,8 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	requests: ['request'],
 	notes: ['note'],
 	failures: ['failure'],
-	gauge: { scale: 2, overhead: 10 },
+	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-10.
+	gauge: { scale: 2, overhead: 10, digest: '4acdf10651327774' },
 })
 
 /**
@@ -9118,6 +9231,8 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
  */
 export function buildLedgerSnapshotRefusals(): ReadonlyArray<readonly [string, LedgerSnapshot]> {
 	const seed = LEDGER_SNAPSHOT_SEED
+	const gauge = seed.gauge
+	if (gauge === undefined) throw new Error('LEDGER_SNAPSHOT_SEED carries no gauge')
 	const sparse: string[] = []
 	sparse[1] = 'note'
 	const folded: Message = { id: 'folded', role: 'user', content: 'Check order FX-110.' }
@@ -9140,11 +9255,11 @@ export function buildLedgerSnapshotRefusals(): ReadonlyArray<readonly [string, L
 		['a note id on an assistant message', { ...seed, notes: ['call'] }],
 		['a failure id on a user message', { ...seed, failures: ['request'] }],
 		['a sparse note list', { ...seed, notes: sparse }],
-		['a gauge scale of 0', { ...seed, gauge: { scale: 0, overhead: 10 } }],
-		['a NaN gauge scale', { ...seed, gauge: { scale: NaN, overhead: 10 } }],
-		['an infinite gauge scale', { ...seed, gauge: { scale: Infinity, overhead: 10 } }],
-		['a negative gauge overhead', { ...seed, gauge: { scale: 2, overhead: -1 } }],
-		['an infinite gauge overhead', { ...seed, gauge: { scale: 2, overhead: Infinity } }],
+		['a gauge scale of 0', { ...seed, gauge: { ...gauge, scale: 0 } }],
+		['a NaN gauge scale', { ...seed, gauge: { ...gauge, scale: NaN } }],
+		['an infinite gauge scale', { ...seed, gauge: { ...gauge, scale: Infinity } }],
+		['a negative gauge overhead', { ...seed, gauge: { ...gauge, overhead: -1 } }],
+		['an infinite gauge overhead', { ...seed, gauge: { ...gauge, overhead: Infinity } }],
 	])
 }
 
@@ -9174,6 +9289,8 @@ export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [stri
 		['a failures list holding a number', { ...seed, failures: [1] }],
 		['a gauge that is a number', { ...seed, gauge: 2 }],
 		['a gauge missing its overhead', { ...seed, gauge: { scale: 2 } }],
+		['a gauge missing its digest', { ...seed, gauge: { scale: 2, overhead: 10 } }],
+		['a gauge digest that is a number', { ...seed, gauge: { scale: 2, overhead: 10, digest: 1 } }],
 		['a throwing getter', thrown],
 		['a revoked proxy', revoked.proxy],
 	])

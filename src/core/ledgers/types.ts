@@ -327,6 +327,18 @@ export interface LedgerGauge {
 }
 
 /**
+ * Carries a stored gauge: its price and the digest of the tool definitions that price measured.
+ *
+ * @remarks
+ * `digest` is what the `digestLedgerTools` helper returns for the definitions the calibration request
+ * carried, or for the ledger's definitions at construction when the options supplied the gauge. A
+ * hydrate reuses the price only when the hydrated ledger's definitions have the same digest.
+ */
+export interface LedgerGaugeSnapshot extends LedgerGauge {
+	readonly digest: string
+}
+
+/**
  * Selects the agent bounds, hooks, scheduler, and context libraries a ledger passes through to the agent it builds.
  *
  * @remarks
@@ -370,7 +382,7 @@ export type LedgerAgentOptions = Pick<
  * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it, and the records go into a copy of each request turn. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
- * integer. Without `gauge`, the ledger calibrates before its first pass. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
+ * integer. Without `gauge`, or a `snapshot` gauge priced on the same tool definitions, the ledger calibrates before its first pass. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
  * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. The plan budgets
@@ -407,7 +419,7 @@ export interface LedgerOptions {
 	readonly recall?: LedgerRecallOptions
 	readonly correction?: LedgerCorrectionOptions
 	readonly agent?: LedgerAgentOptions
-	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none, because a `gauge` option wins over `snapshot.gauge`. */
+	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none and the gauge priced the same tool definitions, because a `gauge` option wins over `snapshot.gauge`. */
 	readonly snapshot?: LedgerSnapshot
 }
 
@@ -419,7 +431,10 @@ export interface LedgerOptions {
  * `respond` appended, `notes` the user messages carrying `LEDGER_NOTES` text, and `failures` the
  * tool messages whose call or reading failed, each in conversation order. Each id names a message
  * of `conversation.messages`: a request or note a `user` message and a failure a `tool` message.
- * `gauge` carries the scale and overhead alone. The gauge's observations of earlier requests are
+ * `gauge` carries the scale, the overhead, and the required `digest` of the tool definitions they
+ * priced. A hydrated ledger whose definitions have another digest drops the gauge and calibrates
+ * before its first pass; a gauge with no `digest` refuses the snapshot, and `snapshot()` omits a gauge
+ * whose definitions JSON cannot render. The gauge's observations of earlier requests are
  * not carried, so a hydrated ledger sizes and closes `recall` from its fallback reserve until it
  * completes a request. A question a `strict: false` classifier held after a deterministic judge
  * failure is not carried, so a hydrated ledger asks it again. Hydrating a second ledger from one snapshot forks
@@ -439,7 +454,7 @@ export interface LedgerSnapshot {
 	readonly requests: readonly string[]
 	readonly notes: readonly string[]
 	readonly failures: readonly string[]
-	readonly gauge?: LedgerGauge
+	readonly gauge?: LedgerGaugeSnapshot
 	readonly window?: LedgerWindowSnapshot
 }
 
@@ -658,7 +673,7 @@ export interface LedgerInterface {
 	readonly agent: AgentInterface
 	/** Holds the one conversation the ledger files and serves. */
 	readonly conversation: ConversationInterface
-	/** Holds the measured price of a prompt, or undefined until the ledger calibrates when the options supplied none. */
+	/** Holds the measured price of a prompt, or undefined until the ledger calibrates when neither the options nor a snapshot priced on the same tool definitions supplied one. */
 	readonly gauge: LedgerGauge | undefined
 	/**
 	 * Appends `content` as a user message and serves it through to its reply.
@@ -700,7 +715,8 @@ export interface LedgerInterface {
 	 * @remarks
 	 * The ledger sends the head its agent's context builds and its conversation's view to the provider twice, with
 	 * and without the tool definitions. The call without tools prices the messages and the
-	 * difference between the calls is the overhead cost.
+	 * difference between the calls is the overhead cost. The ledger records the digest of the
+	 * definitions the call with tools carried, and its snapshot stores that digest with the gauge.
 	 * An abort during calibration rejects with the abort reason. A call during `respond` or `calibrate` rejects
 	 * with `AgentError` code `'CONCURRENCY'`.
 	 *
@@ -717,9 +733,10 @@ export interface LedgerInterface {
 	 * The ledger first files every tool result whose message is appended, so a failure a direct
 	 * agent run left is marked; a result whose tool message is not yet appended is not captured. A
 	 * call while a `respond` or `calibrate` call is in flight throws, because an entered, unanswered
-	 * request would hydrate as a dangling request; a direct agent run is not refused.
+	 * request would hydrate as a dangling request; a direct agent run is not refused. The `gauge`
+	 * member carries the digest of the tool definitions the gauge priced.
 	 *
-	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one
+	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one whose definitions JSON renders
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	snapshot(): LedgerSnapshot

@@ -11,6 +11,8 @@ import {
 	collectRetiredFindings,
 	matchesLookup,
 	hasHiddenRecall,
+	computeLedgerChecksum,
+	digestLedgerTools,
 	digestLedgerWindow,
 	buildLedgerCut,
 	buildLedgerLineKey,
@@ -222,6 +224,38 @@ describe('extracted ledger leaves', () => {
 		expect(collectRetiredFindings(messages.slice(1), [first, changed])).toEqual(new Set())
 	})
 
+	it('computes two FNV-1a lanes whose first is the standard 32-bit hash of ASCII text', () => {
+		// The published 32-bit FNV-1a vectors: the offset basis for '', 0xe40c292c for 'a', and
+		// 0xbf9cf968 for 'foobar'; the second lane starts from the offset 3335557771.
+		expect(computeLedgerChecksum('').slice(0, 8)).toBe('811c9dc5')
+		expect(computeLedgerChecksum('a').slice(0, 8)).toBe('e40c292c')
+		expect(computeLedgerChecksum('foobar').slice(0, 8)).toBe('bf9cf968')
+		expect(computeLedgerChecksum('').slice(8)).toBe((3335557771).toString(16))
+		expect(computeLedgerChecksum('Refund due $148.50.')).toMatch(/^[0-9a-f]{16}$/)
+		expect(computeLedgerChecksum('Refund due $148.50.')).not.toBe(
+			computeLedgerChecksum('Refund due $148.60.'),
+		)
+	})
+	it('digests tool definitions as JSON renders them, in order', () => {
+		const lookup = { name: 'lookup_order', description: 'Read an order by its id.' }
+		const write = {
+			name: 'update_order',
+			description: "Set an order's refund.",
+			parameters: { type: 'object', properties: { id: { type: 'string' } } },
+			annotations: { consequential: true },
+		}
+		const digest = requireValue(digestLedgerTools([lookup]))
+		expect(digest).toBe('1eff754a69b7128c')
+		expect(digestLedgerTools([{ ...lookup }])).toBe(digest)
+		expect(
+			digestLedgerTools([{ ...lookup, parameters: { type: 'object', title: undefined } }]),
+		).toBe(digestLedgerTools([{ ...lookup, parameters: { type: 'object' } }]))
+		expect(digestLedgerTools([lookup, write])).not.toBe(digest)
+		expect(digestLedgerTools([write, lookup])).not.toBe(digestLedgerTools([lookup, write]))
+		expect(digestLedgerTools([])).not.toBe(digest)
+		expect(digestLedgerTools([{ ...lookup, description: 'Read an order by id.' }])).not.toBe(digest)
+		expect(digestLedgerTools([{ ...lookup, parameters: { limit: 10n } }])).toBeUndefined()
+	})
 	it('includes every receipt field in the window digest', () => {
 		const messages = [
 			buildLedgerMessage('request', 'user', 'Check.'),

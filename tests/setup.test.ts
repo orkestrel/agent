@@ -3138,7 +3138,7 @@ describe('ledger snapshot fixtures', () => {
 		expect(result.keys).toHaveLength(replay.asked.count - asked)
 		const hydrated = createLedgerReplay(snapshot)
 		expect(hydrated.ledger.conversation.messages()).toEqual(served)
-		expect(hydrated.ledger.gauge).toEqual(snapshot.gauge)
+		expect(hydrated.ledger.snapshot().gauge).toEqual(snapshot.gauge)
 		expect(hydrated.selections.count).toBe(0)
 	})
 

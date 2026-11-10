@@ -240,6 +240,11 @@ await new GuideCommand({
 		AGENT_AUTHORITY,
 		LedgerContactBook,
 		createScriptedApprover,
+		MeteredLedgerProvider,
+		buildLedgerGaugeVariants,
+		buildLedgerOptions,
+		buildUncalibratedOptions,
+		serveLedgerGauge,
 	} = await import('./setup.js')
 	const { createFixtureServer, stopTimed } = await import('./setupServer.js')
 	const { describe, expect, expectTypeOf, it } = await import('vitest')
@@ -1814,7 +1819,10 @@ await new GuideCommand({
 
 			expect(snapshot.requests).toHaveLength(2)
 			expect(overhead).toBe(120)
-			expect(restored.gauge).toEqual(snapshot.gauge)
+			expect(restored.gauge).toEqual({
+				scale: snapshot.gauge?.scale,
+				overhead: snapshot.gauge?.overhead,
+			})
 			expect(third.content).toBe(answer)
 			expect(replies.next()).toEqual({ done: true, value: undefined })
 			expect(copies).toEqual([request])
@@ -2007,6 +2015,48 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				'The digest detects an edit, can collide, and makes no security claim.',
+			)
+		})
+
+		it('recalibrates a ledger hydrated with other tool definitions and reuses the gauge for the same ones, as the stored gauge limit claims', async () => {
+			const { isLedgerSnapshot } = barrel
+			const base = buildUncalibratedOptions(buildLedgerOptions())
+			const parsed: unknown = JSON.parse(JSON.stringify((await serveLedgerGauge(base)).snapshot))
+			const snapshot = requireValue(isLedgerSnapshot(parsed) ? parsed : undefined)
+			const gauge = requireValue(snapshot.gauge, 'Missing stored gauge')
+			const [, write] = requireValue(buildLedgerGaugeVariants()[0])
+			const same = new MeteredLedgerProvider([{ content: 'Done.' }], { recorded: true })
+			const reused = createLedger(same, { ...base, snapshot })
+			const kept = reused.gauge
+			await reused.respond('Next.')
+			const wider = new MeteredLedgerProvider([{ content: 'Done.' }], { recorded: true })
+			const changed = createLedger(wider, { ...base, ...write, snapshot })
+			const dropped = changed.gauge
+			await changed.respond('Next.')
+			const supplied = new MeteredLedgerProvider([{ content: 'Done.' }], { recorded: true })
+			await createLedger(supplied, {
+				...base,
+				...write,
+				gauge: { scale: 1, overhead: 0 },
+				snapshot,
+			}).respond('Next.')
+
+			expect(kept).toEqual({ scale: gauge.scale, overhead: gauge.overhead })
+			expect(same.calls).toHaveLength(1)
+			expect(dropped).toBeUndefined()
+			expect(wider.calls.map((call) => call.options?.think)).toEqual([false, false, undefined])
+			expect(changed.gauge?.overhead).toBeGreaterThan(gauge.overhead)
+			expect(changed.snapshot().gauge?.digest).not.toBe(gauge.digest)
+			expect(supplied.calls).toHaveLength(1)
+			expect(isLedgerSnapshot({ ...snapshot, gauge: { scale: 1, overhead: 0 } })).toBe(false)
+			expect(guideText).toContain(
+				"drops the stored gauge, reads `undefined` from its `gauge` member, and calibrates before its first pass, so a hydrated ledger never plans with an overhead priced on other definitions. The comparison reads the definitions at construction, so a tool a host adds to the agent's tools afterward isn't compared.",
+			)
+			expect(guideText).toContain(
+				'With the same definitions, the hydrated ledger reuses the gauge and makes no calibration call.',
+			)
+			expect(guideText).toContain(
+				"A `gauge` option is the application's own price and is never compared.",
 			)
 		})
 
