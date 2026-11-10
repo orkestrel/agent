@@ -435,7 +435,7 @@ import {
 	waitForAbort,
 	waitForDelay,
 } from '@orkestrel/test'
-import { createTool, ToolManager } from '@orkestrel/tool'
+import { createTool, ToolError, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
 
 /** Supplies usage shared by agent runs. */
@@ -6962,6 +6962,28 @@ export function buildLedgerContactOwner(id: string): LedgerOwner {
 	return { id, names: [LEDGER_CONTACT_NAMES[id] ?? ''] }
 }
 
+/** Holds the parameters of the generic tools of {@link LedgerContactBook}: a record kind and an open `input` object. */
+export const LEDGER_RECORD_PARAMETERS: Readonly<Record<string, unknown>> = Object.freeze({
+	type: 'object',
+	properties: { kind: { type: 'string' }, input: { type: 'object' } },
+	required: ['kind', 'input'],
+})
+
+/**
+ * Lists the faults a ledger tool's handler can throw that refuse no argument, so the ledger counts
+ * each as a run: a plain error, a `ToolError` of another code, and an unbranded error that only
+ * carries an argument refusal's `name` and `code`.
+ */
+export const LEDGER_COUNTED_FAULTS: ReadonlyArray<readonly [label: string, fault: Error]> =
+	Object.freeze([
+		['a plain error', new Error('the record store is offline')],
+		['a tool error of another code', new ToolError('SCHEMA', 'the record schema cannot compile')],
+		[
+			'an unbranded look-alike of an argument refusal',
+			Object.assign(new Error('input.id: missing'), { name: 'ToolError', code: 'ARGUMENTS' }),
+		],
+	])
+
 /**
  * Holds a fictional contact book that a ledger reads and writes: each contact's phone, the lookups
  * that read it, and the write that changes it.
@@ -7074,6 +7096,127 @@ export class LedgerContactBook {
 			...this.write,
 			read: () => {
 				throw new Error('the result is unreadable')
+			},
+		}
+	}
+
+	/**
+	 * The lookup `read_record`, which reads a record of any kind through an open `input` object.
+	 *
+	 * @remarks
+	 * Its handler hands `input` to the book's typed `lookup_contact` tool. Any `input` object passes
+	 * the door the ledger compiles from {@link LEDGER_RECORD_PARAMETERS}, and the typed tool's own door
+	 * throws a `ToolError` with code `'ARGUMENTS'` for an `input` with no string `id`, synchronously.
+	 */
+	get record(): LedgerLookup {
+		const lookup = this.lookup
+		const typed = createTool(lookup.tool)
+		return {
+			tool: {
+				name: 'read_record',
+				description: 'Read a record of any kind.',
+				parameters: LEDGER_RECORD_PARAMETERS,
+				execute: (args, context) => typed.execute(isRecord(args.input) ? args.input : {}, context),
+			},
+			read: (args, text) => lookup.read(isRecord(args.input) ? args.input : {}, text),
+		}
+	}
+
+	/**
+	 * The `consequential` write `write_record`, which changes a record of any kind through an open
+	 * `input` object.
+	 *
+	 * @remarks
+	 * Its asynchronous handler hands `input` to the book's typed `update_contact` tool, so the typed
+	 * door's `ToolError` with code `'ARGUMENTS'`, for an `input` with no string `id` or `phone`,
+	 * rejects the call rather than throwing.
+	 */
+	get change(): LedgerWrite {
+		const write = this.write
+		const typed = createTool(write.tool)
+		return {
+			tool: {
+				name: 'write_record',
+				description: 'Change a record of any kind.',
+				parameters: LEDGER_RECORD_PARAMETERS,
+				annotations: { consequential: true },
+				execute: async (args, context) =>
+					typed.execute(isRecord(args.input) ? args.input : {}, context),
+			},
+			read: (args, text) => write.read(isRecord(args.input) ? args.input : {}, text),
+		}
+	}
+
+	/**
+	 * Builds the book's `write_record` whose handler throws one value on every call before it runs.
+	 *
+	 * @param fault - The value the handler throws
+	 * @returns The write
+	 */
+	fail(fault: unknown): LedgerWrite {
+		const change = this.change
+		return {
+			...change,
+			tool: {
+				...change.tool,
+				execute: () => {
+					throw fault
+				},
+			},
+		}
+	}
+
+	/**
+	 * Builds the book's `write_record` whose handler asks a person first, as a host registry's
+	 * confirm raised after the ledger admitted the call.
+	 *
+	 * @remarks
+	 * The handler rejects with a plain `Error` when `ask` declines, and with what `ask` throws when it
+	 * throws; on an approval it runs the typed write.
+	 *
+	 * @param ask - The person's approver, asked with the call and an `ask` decision in the `records` zone
+	 * @returns The write
+	 */
+	confirm(ask: AuthorityHandler): LedgerWrite {
+		const change = this.change
+		return {
+			...change,
+			tool: {
+				...change.tool,
+				execute: async (args, context) => {
+					const call = { id: 'confirm', name: 'write_record', arguments: args }
+					if ((await ask({ call }, { zone: 'records', verdict: 'ask' }, context.signal)) !== true)
+						throw new Error('the person declined the change')
+					return change.tool.execute(args, context)
+				},
+			},
+		}
+	}
+
+	/**
+	 * The book's `write_record` routed through a host's own tool registry, which answers the typed
+	 * door's refusal as a failure result that the handler rethrows as a plain `Error`.
+	 */
+	get routed(): LedgerWrite {
+		const change = this.change
+		const registry = createToolManager()
+		registry.add(createTool(this.write.tool))
+		return {
+			...change,
+			tool: {
+				...change.tool,
+				execute: async (args, context) => {
+					const result = await registry.execute(
+						{
+							id: 'routed',
+							name: 'update_contact',
+							arguments: isRecord(args.input) ? args.input : {},
+						},
+						context,
+					)
+					if (!result.success) throw new Error(result.error)
+					return result.value
+				},
 			},
 		}
 	}
@@ -7318,6 +7461,36 @@ export async function serveLedgerContactWrite(options: {
 	await ledger.respond("Change Mara Quill's phone to 555-0102.", controller.signal)
 	await ledger.respond("What is Mara Quill's phone?")
 	return { ledger, provider }
+}
+
+/**
+ * Serves one request through a ledger whose model sends each call alone in its own turn and then
+ * answers, recording each tool result and each abort of the request.
+ *
+ * @param options - The ledger options
+ * @param calls - The calls the model sends, one per turn, in order
+ * @returns The ledger, its recorded provider, and the recorded tool results and aborts
+ */
+export async function serveLedgerCalls(
+	options: LedgerOptions,
+	calls: readonly ToolCall[],
+): Promise<{
+	readonly ledger: LedgerInterface
+	readonly provider: ScriptedProviderInterface
+	readonly tools: RecorderInterface<AgentEventMap['tool']>
+	readonly aborts: RecorderInterface<AgentEventMap['abort']>
+}> {
+	const provider = createScriptedProvider(
+		[...calls.map((call) => ({ content: '', tools: [call] })), { content: 'Done.' }],
+		{ recorded: true, repeat: false },
+	)
+	const ledger = createLedger(provider, options)
+	const tools = createRecorder<AgentEventMap['tool']>()
+	const aborts = createRecorder<AgentEventMap['abort']>()
+	ledger.agent.emitter.on('tool', tools.handler)
+	ledger.agent.emitter.on('abort', aborts.handler)
+	await ledger.respond("Change Mara Quill's phone to 555-0102.")
+	return { ledger, provider, tools, aborts }
 }
 
 /** Lists ten follow-up requests that each name Mara Quill, contact C-12 of {@link LedgerContactBook}. */

@@ -183,6 +183,9 @@ export type LedgerLookupHandler = (
  * not be named `recall`, and no two lookups can share a tool name. A lookup is a read: a tool whose
  * call changes a record is a {@link LedgerWrite}.
  * The repeat stop compares the tool name and canonical arguments without normalizing strings.
+ * A call the tool refuses for its arguments never counts as a run: when `execute` throws, or
+ * returns a promise that rejects with, an error `isToolError` admits whose code is `'ARGUMENTS'`,
+ * the request releases the call, so the identical call runs again. Every other failure counts.
  * The projection uses {@link identifyLookup}, which trims and uppercases top-level string
  * arguments when deciding which finding replaces an earlier one.
  * A throwing `read` handler makes the lookup failed: it files as chatter and replaces no finding.
@@ -227,7 +230,8 @@ export type LedgerWriteHandler = (
  * Carries one application write: the `consequential` tool the model calls and the handler that reads its results.
  *
  * @remarks
- * The ledger registers the tool beside its lookups and `recall`, behind the same repeat stop. The
+ * The ledger registers the tool beside its lookups and `recall`, behind the same repeat stop, which
+ * releases a call the tool refuses for its arguments as a lookup's does. The
  * tool must carry `annotations.consequential: true`, must not be named `recall`, and can share no
  * name with a lookup or another write, and a ledger with writes requires `agent.authority`;
  * construction throws `LedgerError` with code `'WRITE'` otherwise. A write runs through the agent's

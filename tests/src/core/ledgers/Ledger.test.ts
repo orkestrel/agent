@@ -91,6 +91,8 @@ import {
 	buildLedgerContactOptions,
 	createScriptedApprover,
 	LedgerContactBook,
+	LEDGER_COUNTED_FAULTS,
+	serveLedgerCalls,
 	serveLedgerContactWrite,
 	serveLedgerAnswer,
 	LEDGER_ANSWER_FOLLOWUP,
@@ -6653,6 +6655,271 @@ describe('Ledger — an unanswered write', () => {
 		)
 		expect(written.content).toBe(`"update_contact" did not run: ${AUTHORITY_NOTES.unanswered}`)
 		expect(ledger.snapshot().failures).toContain(written.id)
+	})
+})
+
+describe('Ledger — a call its tool refuses for its arguments', () => {
+	it.each([
+		['a lookup whose typed tool throws the refusal', 'record', 'lookup_contact'],
+		['a write whose handler rejects with the refusal', 'change', 'update_contact'],
+	] as const)(
+		'runs the identical retry of %s, then the repaired call, and stops the repaired repeat',
+		async (_label, member, typed) => {
+			const book = new LedgerContactBook()
+			const approver = createScriptedApprover([true, true, true, true])
+			const tool = book[member]
+			const name = tool.tool.name
+			const bad = { kind: 'contact', input: { name: 'Mara Quill', phone: '555-0102' } }
+			const good = { kind: 'contact', input: { id: 'C-12', phone: '555-0102' } }
+			const { ledger, provider, tools, aborts } = await serveLedgerCalls(
+				buildLedgerContactOptions(
+					book,
+					createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: approver.ask }),
+					member === 'record'
+						? { lookups: [book.record], writes: [] }
+						: { lookups: [], writes: [book.change] },
+				),
+				[
+					{ id: 'bad-1', name, arguments: bad },
+					{ id: 'bad-2', name, arguments: bad },
+					{ id: 'good-1', name, arguments: good },
+					{ id: 'good-2', name, arguments: good },
+				],
+			)
+			const messages = ledger.conversation.messages()
+			const refusal = requireValue(messages.find((message) => message.call === 'bad-1')).content
+			expect(refusal).toContain('id')
+			expect(refusal).not.toBe(LEDGER_NOTES.repeat)
+			expect(tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+				['bad-1', false],
+				['bad-2', false],
+				['good-1', true],
+				['good-2', false],
+			])
+			expect(messages.find((message) => message.call === 'bad-2')?.content).toBe(refusal)
+			expect(messages.find((message) => message.call === 'good-2')?.content).toBe(
+				LEDGER_NOTES.repeat,
+			)
+			expect(aborts.calls).toEqual([['repeat']])
+			expect(book.runs).toEqual([[typed, 'C-12']])
+			expect(provider.calls).toHaveLength(5)
+			expect(approver.calls.map(([context]) => context.call.id)).toEqual(
+				member === 'record' ? [] : ['bad-1', 'bad-2', 'good-1', 'good-2'],
+			)
+		},
+	)
+
+	it.each([
+		['runs the twin of a refusal its tool threw', 'record', false],
+		['stops the twin of a refusal still pending as a repeat', 'change', true],
+	] as const)('in one batch, %s', async (_label, member, stopped) => {
+		const book = new LedgerContactBook()
+		const name = book[member].tool.name
+		const bad = { kind: 'contact', input: { name: 'Mara Quill', phone: '555-0102' } }
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'bad-1', name, arguments: bad },
+						{ id: 'bad-2', name, arguments: bad },
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const aborts = createRecorder<AgentEventMap['abort']>()
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+				member === 'record'
+					? { lookups: [book.record], writes: [] }
+					: { lookups: [], writes: [book.change] },
+			),
+		)
+		ledger.agent.emitter.on('abort', aborts.handler)
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		const messages = ledger.conversation.messages()
+		const refusal = requireValue(messages.find((message) => message.call === 'bad-1')).content
+		expect(refusal).not.toBe(LEDGER_NOTES.repeat)
+		expect(messages.find((message) => message.call === 'bad-2')?.content).toBe(
+			stopped ? LEDGER_NOTES.repeat : refusal,
+		)
+		expect(aborts.calls).toEqual(stopped ? [['repeat']] : [])
+	})
+
+	it.each([3, 12])(
+		'bounds a model that sends the same refused call forever at a limit of %i',
+		async (limit) => {
+			const book = new LedgerContactBook()
+			const tools = createRecorder<AgentEventMap['tool']>()
+			const exhausted = createRecorder<AgentEventMap['exhaust']>()
+			const aborted = createRecorder<AgentEventMap['abort']>()
+			const call = {
+				id: 'bad',
+				name: 'read_record',
+				arguments: { kind: 'contact', input: { name: 'Mara Quill' } },
+			}
+			const provider = createScriptedProvider([{ content: '', tools: [call] }], { recorded: true })
+			const authority = createAuthority({ fallback: { zone: 'records', verdict: 'allow' } })
+			const ledger = createLedger(
+				provider,
+				buildLedgerContactOptions(book, authority, {
+					lookups: [book.record],
+					writes: [],
+					agent: {
+						authority,
+						limit,
+						on: { tool: tools.handler, exhaust: exhausted.handler, abort: aborted.handler },
+					},
+				}),
+			)
+			const result = await ledger.respond("What is Mara Quill's phone?")
+			expect(provider.calls.map((one) => one.tools?.map((tool) => tool.name))).toEqual([
+				...Array.from({ length: limit }, () => ['read_record']),
+				undefined,
+			])
+			expect(tools.calls.map(([one, outcome]) => [one.id, outcome.success])).toEqual(
+				Array.from({ length: limit + 1 }, () => ['bad', false]),
+			)
+			expect(
+				tools.calls
+					.slice(0, limit)
+					.every(
+						([, outcome]) => outcome.success === false && outcome.error !== LEDGER_NOTES.repeat,
+					),
+			).toBe(true)
+			expect(exhausted.calls).toEqual([[limit]])
+			expect(aborted.calls).toEqual([['stray']])
+			expect(book.runs).toEqual([])
+			expect(result.passes.map((pass) => pass.partial)).toEqual([true, true])
+		},
+	)
+
+	it.each([
+		['lookup', 'lookup_contact', { name: 'Mara Quill' }],
+		['write', 'update_contact', { id: 'C-12' }],
+	] as const)(
+		'leaves a typed %s refused at the ledger door as it was: its identical retry is refused there again',
+		async (_label, name, args) => {
+			const book = new LedgerContactBook()
+			const { ledger, tools, aborts } = await serveLedgerCalls(
+				buildLedgerContactOptions(
+					book,
+					createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+				),
+				[
+					{ id: 'bad-1', name, arguments: args },
+					{ id: 'bad-2', name, arguments: args },
+				],
+			)
+			const messages = ledger.conversation.messages()
+			const refusal = requireValue(messages.find((message) => message.call === 'bad-1')).content
+			expect(refusal).not.toBe(LEDGER_NOTES.repeat)
+			expect(messages.find((message) => message.call === 'bad-2')?.content).toBe(refusal)
+			expect(tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+				['bad-1', false],
+				['bad-2', false],
+			])
+			expect(aborts.calls).toEqual([])
+			expect(book.runs).toEqual([])
+		},
+	)
+
+	it.each(LEDGER_COUNTED_FAULTS)(
+		'still counts a write whose handler throws %s as a run, so its identical retry is a repeat',
+		async (_label, fault) => {
+			const book = new LedgerContactBook()
+			const call = {
+				name: 'write_record',
+				arguments: { kind: 'contact', input: { id: 'C-12', phone: '555-0102' } },
+			}
+			const { ledger, aborts } = await serveLedgerCalls(
+				buildLedgerContactOptions(
+					book,
+					createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+					{ writes: [book.fail(fault)] },
+				),
+				[
+					{ id: 'write-1', ...call },
+					{ id: 'write-2', ...call },
+				],
+			)
+			const messages = ledger.conversation.messages()
+			expect(messages.find((message) => message.call === 'write-1')?.content).toBe(fault.message)
+			expect(messages.find((message) => message.call === 'write-2')?.content).toBe(
+				LEDGER_NOTES.repeat,
+			)
+			expect(aborts.calls).toEqual([['repeat']])
+		},
+	)
+
+	it.each([
+		['declines', false],
+		['never answers', undefined],
+	] as const)(
+		'still counts a write whose host confirm the person %s after admission, and asks the person once',
+		async (_label, answer) => {
+			const book = new LedgerContactBook()
+			const person = createRecorder<[name: string]>()
+			const call = {
+				name: 'write_record',
+				arguments: { kind: 'contact', input: { id: 'C-12', phone: '555-0102' } },
+			}
+			const { ledger, aborts } = await serveLedgerCalls(
+				buildLedgerContactOptions(
+					book,
+					createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+					{
+						writes: [
+							book.confirm((context) => {
+								person.handler(context.call.name)
+								if (answer === undefined) throw new Error('the confirm expired')
+								return answer
+							}),
+						],
+					},
+				),
+				[
+					{ id: 'write-1', ...call },
+					{ id: 'write-2', ...call },
+				],
+			)
+			expect(person.calls).toEqual([['write_record']])
+			expect(
+				ledger.conversation.messages().find((message) => message.call === 'write-2')?.content,
+			).toBe(LEDGER_NOTES.repeat)
+			expect(aborts.calls).toEqual([['repeat']])
+			expect(book.runs).toEqual([])
+		},
+	)
+
+	it("still counts a write whose argument refusal the host's registry answered as a plain failure", async () => {
+		const book = new LedgerContactBook()
+		const call = {
+			name: 'write_record',
+			arguments: { kind: 'contact', input: { name: 'Mara Quill' } },
+		}
+		const { ledger, aborts } = await serveLedgerCalls(
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+				{ writes: [book.routed] },
+			),
+			[
+				{ id: 'write-1', ...call },
+				{ id: 'write-2', ...call },
+			],
+		)
+		const messages = ledger.conversation.messages()
+		expect(messages.find((message) => message.call === 'write-1')?.content).toContain('id')
+		expect(messages.find((message) => message.call === 'write-2')?.content).toBe(
+			LEDGER_NOTES.repeat,
+		)
+		expect(aborts.calls).toEqual([['repeat']])
 	})
 })
 

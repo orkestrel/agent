@@ -6500,6 +6500,53 @@ await new GuideCommand({
 			)
 		})
 
+		it('runs the identical retry of a call its tool refused for its arguments and stops a thrown one, as the repeat stop claims', async () => {
+			const book = new LedgerContactBook()
+			const refused = { kind: 'contact', input: { name: 'Mara Quill' } }
+			const thrown = { id: 'C-12', phone: '555-0102' }
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'refused-1', name: 'write_record', arguments: refused }] },
+					{ content: '', tools: [{ id: 'refused-2', name: 'write_record', arguments: refused }] },
+					{ content: '', tools: [{ id: 'thrown-1', name: 'update_contact', arguments: thrown }] },
+					{ content: '', tools: [{ id: 'thrown-2', name: 'update_contact', arguments: thrown }] },
+					{ content: 'The store is offline.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [],
+					writes: [book.change, book.offline],
+					agent: {
+						authority: barrel.createAuthority({
+							fallback: { zone: 'desk', verdict: 'allow' },
+							ask: () => true,
+						}),
+					},
+				}),
+			)
+			await ledger.respond("Change Mara Quill's phone to 555-0102.")
+
+			const replies = ledger.conversation
+				.messages()
+				.filter((message) => message.role === 'tool')
+				.map((message) => message.content)
+			expect(replies).toHaveLength(4)
+			expect(replies[0]).not.toBe(barrel.LEDGER_NOTES.repeat)
+			expect(replies[1]).toBe(replies[0])
+			expect(replies.slice(2)).toEqual(['the contact store is offline', barrel.LEDGER_NOTES.repeat])
+			expect(book.runs).toEqual([])
+			expect(guideText).toContain(
+				"A lookup or write call its tool refuses for its arguments is never a run: when the tool's `execute` throws, or returns a promise that rejects with, an error `isToolError` admits whose code is `'ARGUMENTS'`, from the tool's own door or its handler, the request releases the call, so the identical call runs again",
+			)
+			expect(guideText).toContain(
+				'Every other failure of a call that reached its tool counts as a run',
+			)
+		})
+
 		it('stubs a seed write that changed nothing as such, as the stub limit claims', () => {
 			expect(barrel.renderStub('update_contact', { id: 'C-12' }, 'empty', true)).toBe(
 				'update_contact {"id":"C-12"}: changed nothing',

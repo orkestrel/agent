@@ -34,11 +34,12 @@ import {
 	attempt,
 	isError,
 	isFiniteNumber,
+	isPromiseLike,
 	isString,
 	objectShape,
 	stringShape,
 } from '@orkestrel/contract'
-import { createTool, createToolManager } from '@orkestrel/tool'
+import { createTool, createToolManager, isToolError } from '@orkestrel/tool'
 import { Authority } from '../agents/Authority.js'
 import { createAgent } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
@@ -1678,12 +1679,31 @@ export class Ledger implements LedgerInterface {
 	}
 
 	#lookup(name: string, args: Readonly<Record<string, unknown>>, context: ToolContext): unknown {
-		this.#current()?.admit(name, args)
+		const request = this.#current()
+		request?.admit(name, args)
 		const entry =
 			this.#options.lookups?.find((one) => one.tool.name === name) ??
 			this.#options.writes?.find((one) => one.tool.name === name)
 		if (entry === undefined) throw new Error(`unknown lookup or write ${name}`)
-		return entry.tool.execute(args, context)
+		const ran = attempt(() => entry.tool.execute(args, context))
+		if (!ran.success) return this.#reject(request, name, args, ran.error)
+		return isPromiseLike(ran.value)
+			? Promise.resolve(ran.value).catch((error: unknown) =>
+					this.#reject(request, name, args, error),
+				)
+			: ran.value
+	}
+
+	// A call its tool refuses for its arguments, from the tool's door or its handler, leaves the repeat
+	// stop, so the identical call runs again and the model can repair it. Every other failure stays a run.
+	#reject(
+		request: LedgerRequest | undefined,
+		name: string,
+		args: Readonly<Record<string, unknown>>,
+		error: unknown,
+	): never {
+		if (isToolError(error) && error.code === 'ARGUMENTS') request?.release(name, args)
+		throw error
 	}
 
 	#recall(args: Readonly<Record<string, unknown>>): string {
