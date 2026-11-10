@@ -34,6 +34,8 @@ A `Ledger` admits tools with a consequence the host gates, and a write's result 
 5. The retired state comes back from the conversation alone after a snapshot and hydrate. The snapshot shape is unchanged.
 6. With `writes` absent, every request is byte-identical to 0.0.39's.
 7. In one request, a lookup the write retired can be read again in a later turn and holds the new state; a read in the same batch as the write stays refused. Any other repeated identical lookup still stops as `repeat`. This is the review's F1, and it was ruled a fix on 2026-11-09.
+8. Any ledger pass whose scope advertises no tools makes at most one model generation, whatever the agent's `limit`, the first pass and the answer pass alike. A call the model makes in a turn that advertises no tools runs nothing, loops nothing, and ends its pass. When every call of that turn failed, the ledger stores the reply without its calls and their refusals, so the call files no finding, retires nothing, and leaves the records, the window, the snapshot, and `recall` as a call-free turn leaves them, through a hydrate too. A reply with text beside the call ends the pass with that text and `partial: false`; a reply with no text ends it partial with empty content. A pass that advertises any tool keeps its `limit`, its repeat stop, and the write admission of claim 7, an answer pass a host's scope widens to a tool included, and with no stray call every request is byte-identical to `90e852a0`'s. Trigger: taverna's ledger cutover, 2026-11-10, which read 24 tool frames under `limit: 12`, 12 of them refused in the answer pass; the first pass joined on 2026-11-10, when the build's census found a ledger with no lookup and no write running its first pass with no tools, and the user asked for the gap fixed.
+9. The user, 2026-11-10, on items 1 and 57: superseded findings leave the `recall` offer. A finding a write's `targets` superseded, or a later finding of the same lookup identity replaced, neither opens the `recall` offer nor appears in its listing. A live hidden finding still opens the offer and stays recallable, and a snapshot and hydrate keep the same offer. One write, then ten follow-ups naming the written record, reads `recall` offered on 0 of 10, as the read-only control does. With `writes` absent and no lookup replacement, every request is byte-identical to `90e852a0`'s. Trigger: the offer-rate reading of the build, 10 of 10 follow-ups offered `recall` after one write against 0 of 10 without it.
 
 ## State
 
@@ -41,7 +43,8 @@ A `Ledger` admits tools with a consequence the host gates, and a write's result 
 | --- | --- |
 | Design | read-only consult, 2026-11-09 |
 | Build | committed with this record; independent review PASS on claims 1 to 6, F1 fixed as claim 7 |
-| Next | release 0.0.40 on the user's code; taverna takes the build through a local pin meanwhile |
+| Claims 8 and 9 | built on `90e852a0`, uncommitted; the builder's gates read green; awaiting one independent review and `verifier` |
+| Next | one independent review on claims 8 and 9, then `verifier` on the gates; release 0.0.40 on the user's code after them; taverna takes the build through a local pin meanwhile |
 
 ## Sequence
 
@@ -53,5 +56,4 @@ A `Ledger` admits tools with a consequence the host gates, and a write's result 
 ## Deferred
 
 - Item 1's `replaced` state, when the user rules it, reads "not live, neither failed nor empty", which covers write supersession too. Owner: the user.
-- Excluding superseded findings from the `recall` offer, items 1 and 57. Trigger: the offer-rate probe reads the offer opening on most requests after a write. Owner: the user.
 - Renaming `LedgerLookupFinding` and its family, item 62. Trigger: the next ledger API audit.

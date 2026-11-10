@@ -1,11 +1,13 @@
 import type { Selection } from '../contexts/types.js'
 import type { GaugeCall } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
+import { createAbort } from '@orkestrel/abort'
 import { sumUsage } from '../helpers.js'
 
 /**
  * Holds what one pass of a ledger request keeps: the selection its run adopted last, the
- * conversation boundary its calls count additions from, its summed usage, and its gauge calls.
+ * conversation boundary its calls count additions from, its summed usage, its gauge calls, and the
+ * abort that ends its run.
  *
  * @remarks
  * A `LedgerRequest` opens one pass per agent run and exposes only projections of it, so no public
@@ -23,6 +25,8 @@ export class LedgerPass {
 	#selection: Selection | undefined
 	#boundary: number
 	#usage: TokenUsage | undefined
+	// The pass's own abort, apart from the caller's signal, so `aborted` reads this pass's abort alone.
+	readonly #abort = createAbort()
 
 	/**
 	 * Opens the pass at a conversation boundary.
@@ -58,6 +62,24 @@ export class LedgerPass {
 	 */
 	get usage(): TokenUsage | undefined {
 		return this.#usage
+	}
+
+	/**
+	 * Returns the signal `abort` aborts.
+	 *
+	 * @returns The pass's abort signal
+	 */
+	get signal(): AbortSignal {
+		return this.#abort.signal
+	}
+
+	/**
+	 * Reports whether `abort` ended the pass.
+	 *
+	 * @returns True if the pass was aborted; false otherwise
+	 */
+	get aborted(): boolean {
+		return this.#abort.signal.aborted
 	}
 
 	/**
@@ -150,5 +172,10 @@ export class LedgerPass {
 	 */
 	think(thinking: number): void {
 		this.#log = [...this.#log, { thinking }]
+	}
+
+	/** Aborts the pass's run through `signal`, with the reason `'stray'`; a later call changes nothing. */
+	abort(): void {
+		this.#abort.abort('stray')
 	}
 }

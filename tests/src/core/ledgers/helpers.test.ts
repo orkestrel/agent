@@ -8,6 +8,7 @@ import type {
 import type { Message } from '@src/core'
 import {
 	collectRecallMessages,
+	collectRetiredFindings,
 	matchesLookup,
 	hasHiddenRecall,
 	digestLedgerWindow,
@@ -175,6 +176,50 @@ describe('extracted ledger leaves', () => {
 			),
 		).toBe(false)
 		expect(hasHiddenRecall(input, 'absent', requests, notes, [], [])).toBe(false)
+	})
+
+	it('leaves findings a write retired or a later read replaced out of the recall offer', () => {
+		const input = buildLedgerInput(buildLedgerWriteScenario())
+		expect(collectRecallMessages(input, new Set(), new Set()).map((message) => message.id)).toEqual(
+			['request', 'other', 'final', 'after', 'noop'],
+		)
+	})
+
+	it('collects findings a write superseded or a later finding of the same lookup replaced', () => {
+		const scenario = buildLedgerWriteScenario()
+		expect(collectRetiredFindings(scenario.messages, scenario.findings)).toEqual(
+			new Set(['read', 'order', 'missing', 'list', 'write', 'rewrite']),
+		)
+		const messages = ['first', 'second', 'third'].map((id) => buildLedgerMessage(id, 'tool', id))
+		const first = buildLedgerFinding('first', 'lookup', { id: 'BW-1' }, 'One.', LEDGER_EMPTY_FOUND)
+		const changed = buildLedgerFinding(
+			'second',
+			'lookup',
+			{ id: ' bw-1' },
+			'Two.',
+			LEDGER_EMPTY_FOUND,
+		)
+		expect(collectRetiredFindings(messages, [first, changed])).toEqual(new Set(['first']))
+		expect(
+			collectRetiredFindings(messages, [first, { ...changed, arguments: { id: 'BW-2' } }]),
+		).toEqual(new Set())
+		expect(collectRetiredFindings(messages, [first, { ...changed, text: 'One.' }])).toEqual(
+			new Set(),
+		)
+		expect(
+			collectRetiredFindings(messages, [
+				first,
+				{ ...changed, text: 'No record.', result: undefined },
+			]),
+		).toEqual(new Set(['first']))
+		expect(collectRetiredFindings(messages, [first, changed, { ...first, id: 'third' }])).toEqual(
+			new Set(['first', 'second']),
+		)
+		const unkeyable = { ...first, arguments: { id: 1n } }
+		expect(
+			collectRetiredFindings(messages, [unkeyable, { ...unkeyable, id: 'second', text: 'Two.' }]),
+		).toEqual(new Set())
+		expect(collectRetiredFindings(messages.slice(1), [first, changed])).toEqual(new Set())
 	})
 
 	it('includes every receipt field in the window digest', () => {

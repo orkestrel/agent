@@ -497,7 +497,8 @@ export interface LedgerRecovery {
  * @remarks
  * A ledger creates one request per `respond` call and drops it when the call settles, so no request
  * state reaches a later call or a run no call owns. Each agent run the call makes is a pass: `open`
- * starts one, and `selection`, `boundary`, and `usage` read the current pass, the last one opened.
+ * starts one, and `selection`, `boundary`, `usage`, `signal`, and `aborted` read the current pass,
+ * the last one opened.
  * `calls` lists the gauge calls of every pass in order. A call stays in flight, taking its usage and
  * thinking, until its pass observes the next call, and is final from then on.
  */
@@ -531,6 +532,18 @@ export interface LedgerRequestInterface {
 	readonly calls: readonly GaugeCall[]
 	/** Holds the filing attempts of every planning selection the request made, in asking order. */
 	readonly attempts: readonly ClassifierAttempt[]
+	/** Holds the signal `abort` aborts for the current pass's run, or undefined before a pass. */
+	readonly signal: AbortSignal | undefined
+	/** Reports whether `abort` ended the current pass, read from `signal`; false before a pass. */
+	readonly aborted: boolean
+	/**
+	 * Aborts the current pass's run through `signal`, with the reason `'stray'`, so the run ends after its turn.
+	 *
+	 * @remarks
+	 * The ledger calls it when a turn that advertised no tools made a call. A later call, and a call
+	 * before a pass opens, changes nothing.
+	 */
+	abort(): void
 	/**
 	 * Appends the request's content to a conversation as a user message, once, and holds it as `message`.
 	 *
@@ -653,7 +666,11 @@ export interface LedgerInterface {
 	 * @remarks
 	 * The ledger calibrates first while `gauge` is undefined. When the first pass ends without final
 	 * text and the caller did not abort, the ledger adds the results and cue notes and makes one
-	 * answer pass that advertises no tools. A rejected first pass counts as unfinished; when the
+	 * answer pass that advertises no tools. In either pass, a call the model makes in a turn that
+	 * advertises no tools runs nothing and ends the pass after that turn, so such a pass makes one
+	 * model generation, whatever the agent's `limit`; when every call of that turn failed, the ledger
+	 * stores the reply without its calls, as a call-free turn stores it. That pass ends with the
+	 * reply's text and `partial: false`, or partial with empty content when the reply carries no text. A rejected first pass counts as unfinished; when the
 	 * answer pass rejects as well, `respond` rejects with that pass's error. A `respond` or `calibrate` call while either is in flight
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.

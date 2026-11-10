@@ -129,4 +129,14 @@ describe('LedgerPass', () => {
 			{ estimate: 2, tools: 0 },
 		])
 	})
+
+	it('aborts its signal once, with the stray reason, and reads aborted from the signal', () => {
+		const pass = new LedgerPass(0)
+		expect(pass.aborted).toBe(false)
+		expect(pass.signal.aborted).toBe(false)
+		pass.abort()
+		pass.abort()
+		expect(pass.aborted).toBe(true)
+		expect(pass.signal.reason).toBe('stray')
+	})
 })

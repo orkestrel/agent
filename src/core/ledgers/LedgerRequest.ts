@@ -142,6 +142,24 @@ export class LedgerRequest implements LedgerRequestInterface {
 		return this.#attempts
 	}
 
+	/**
+	 * Returns the signal `abort` aborts for the current pass's run.
+	 *
+	 * @returns The current pass's abort signal, or undefined before a pass
+	 */
+	get signal(): AbortSignal | undefined {
+		return this.#passes.at(-1)?.signal
+	}
+
+	/**
+	 * Reports whether `abort` ended the current pass.
+	 *
+	 * @returns True if the current pass was aborted; false otherwise, and before a pass
+	 */
+	get aborted(): boolean {
+		return this.#passes.at(-1)?.aborted ?? false
+	}
+
 	enter(conversation: ConversationInterface): Message {
 		if (this.#message !== undefined) return this.#message
 		this.#message = conversation.add({ role: 'user', content: this.#content })
@@ -154,6 +172,10 @@ export class LedgerRequest implements LedgerRequestInterface {
 
 	adopt(selection: Selection, boundary: number): void {
 		this.#passes.at(-1)?.adopt(selection, boundary)
+	}
+
+	abort(): void {
+		this.#passes.at(-1)?.abort()
 	}
 
 	observe(call: GaugeCall, position: number): void {

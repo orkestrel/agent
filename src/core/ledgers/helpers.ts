@@ -86,12 +86,13 @@ export function digestLedgerWindow(
 /**
  * Collects stored messages eligible to open the recall offer.
  * @remarks
- * Notes and findings without a result do not open the offer. User statements, including quiet
- * statements available through recall's word route, can open it; this helper does not filter results.
+ * Notes, findings without a result, and findings {@link collectRetiredFindings} names do not open
+ * the offer. User statements, including quiet statements available through recall's word route,
+ * can open it; this helper does not filter results.
  * @param input - The messages, findings, and classification
  * @param requests - The marked request ids
  * @param notes - The annotation ids to exclude
- * @returns User statements, lookup findings with results, marked requests, and nonblank call-free replies
+ * @returns User statements, lookup findings with results that no write superseded and no later finding replaced, marked requests, and nonblank call-free replies
  * @example
  * ```ts
  * collectRecallMessages(input, new Set(), new Set()) // eligible stored messages
@@ -102,8 +103,11 @@ export function collectRecallMessages(
 	requests: ReadonlySet<string>,
 	notes: ReadonlySet<string>,
 ): readonly Message[] {
+	const retired = collectRetiredFindings(input.messages, input.findings)
 	const findings = new Set(
-		input.findings.filter((finding) => finding.result !== undefined).map((finding) => finding.id),
+		input.findings
+			.filter((finding) => finding.result !== undefined && !retired.has(finding.id))
+			.map((finding) => finding.id),
 	)
 	return input.messages.filter(
 		(message) =>
@@ -1491,6 +1495,54 @@ export function collectWriteSupersessions(
 				: [[finding.id, superseders.map((write) => write.id)] as const]
 		}),
 	)
+}
+
+/**
+ * Collects the findings a write superseded or a later finding of the same lookup replaced.
+ *
+ * @remarks
+ * A write supersedes the findings {@link collectWriteSupersessions} maps. A later finding of the
+ * same canonical lookup identity, as {@link identifyLookup} writes it, replaces an earlier one when
+ * its text differs or it holds no result, and a later finding with the same text replaces nothing.
+ * A finding with no canonical identity is never replaced, and a finding the messages don't hold
+ * takes no part. A supersession the judge files is not read here.
+ *
+ * @param messages - The conversation's messages, which fix each finding's position
+ * @param findings - The lookup and write findings of those messages
+ * @returns The ids of the superseded and replaced findings
+ *
+ * @example
+ * ```ts
+ * collectRetiredFindings(messages, findings) // Set { 'tool-1' } when tool-2 wrote what tool-1 read
+ * ```
+ */
+export function collectRetiredFindings(
+	messages: readonly Message[],
+	findings: readonly LedgerLookupFinding[],
+): ReadonlySet<string> {
+	const positions = new Map(messages.map((message, at) => [message.id, at]))
+	const held = findings.filter((finding) => positions.has(finding.id))
+	const replaced = [
+		...Map.groupBy(
+			held,
+			(finding) => identifyLookup(finding.name, finding.arguments) ?? finding,
+		).values(),
+	].flatMap((group) => {
+		const ordered = group.toSorted(
+			(left, right) => (positions.get(left.id) ?? 0) - (positions.get(right.id) ?? 0),
+		)
+		const last = ordered.at(-1)
+		// Every finding up to the last one whose text differs from the newest, or that holds no result,
+		// has a later finding that replaces it; the newest itself has none.
+		const boundary =
+			last === undefined
+				? -1
+				: ordered.findLastIndex(
+						(finding) => finding.result === undefined || finding.text !== last.text,
+					)
+		return ordered.slice(0, Math.min(boundary + 1, ordered.length - 1)).map((finding) => finding.id)
+	})
+	return new Set([...collectWriteSupersessions(messages, findings).keys(), ...replaced])
 }
 
 /**

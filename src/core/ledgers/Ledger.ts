@@ -72,6 +72,7 @@ import { isLedgerError, LedgerError } from './errors.js'
 import {
 	hasHiddenRecall,
 	matchesLookup,
+	collectRetiredFindings,
 	collectWriteSupersessions,
 	mergeSupersessions,
 	digestLedgerWindow,
@@ -310,6 +311,9 @@ export class Ledger implements LedgerInterface {
 				this.#current()?.close()
 				this.#agent.abort('repeat')
 			}
+			// A call in a turn that advertised no tools ends its pass, so the pass makes one generation.
+			const request = this.#current()
+			if (request?.calls.at(-1)?.tools === 0) request.abort()
 			this.#release(call, result)
 		})
 		this.#agent.emitter.on('select', (selection) => {
@@ -407,6 +411,7 @@ export class Ledger implements LedgerInterface {
 
 	/**
 	 * Appends a request and serves it, recovering an unfinished or rejected first pass with one answer pass.
+	 * In either pass, a call the model makes in a turn that advertises no tools runs nothing and ends the pass after that generation, whatever the agent's `limit`, and when every call of that turn failed, the ledger stores the reply without its calls: a reply with text ends the pass complete, and one without text ends it partial with empty content.
 	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
 	 * When the answer pass rejects, `respond` rejects with that error, and under the default `strict` a judge failure or another selection failure rejects it too. A rejection belongs to its own call: the ledger stays free, and the next call asks the judge again about whatever is still unanswered.
 	 * @param content - The request text
@@ -429,15 +434,18 @@ export class Ledger implements LedgerInterface {
 			this.#requests.add(entered.id)
 			// The answer pass recovers a provider failure in the first pass; the agent's error event carries
 			// its cause. A selection failure that reached here rejected under `strict`, and it stands.
-			const first = await this.#generatePass(request, caller, this.#options.think).catch(
-				(error: unknown): AgentResult => {
-					if (request.faulted(error)) throw error
-					return {
-						content: '',
-						partial: true,
-						...(request.usage === undefined ? {} : { usage: request.usage }),
-					}
-				},
+			const first = this.#dropStrayCalls(
+				request,
+				await this.#generatePass(request, caller, this.#options.think).catch(
+					(error: unknown): AgentResult => {
+						if (request.faulted(error)) throw error
+						return {
+							content: '',
+							partial: true,
+							...(request.usage === undefined ? {} : { usage: request.usage }),
+						}
+					},
+				),
 			)
 			const passes = [first]
 			if (!caller.aborted && (first.partial || first.content.trim() === '')) {
@@ -467,7 +475,9 @@ export class Ledger implements LedgerInterface {
 				})
 				this.#agent.context.apply(answer)
 				try {
-					passes.push(await this.#generatePass(request, caller, false))
+					passes.push(
+						this.#dropStrayCalls(request, await this.#generatePass(request, caller, false)),
+					)
 				} finally {
 					if (this.#agent.context.scope === answer) this.#agent.context.apply(previous)
 				}
@@ -553,11 +563,42 @@ export class Ledger implements LedgerInterface {
 		think?: boolean,
 	): Promise<AgentResult> {
 		request.open(this.#conversation.messages().length)
+		const stop = request.signal
 		return await this.#agent.generate({
-			signal,
+			signal: stop === undefined ? signal : AbortSignal.any([signal, stop]),
 			conversation: this.#conversation,
 			...(think === undefined ? {} : { think }),
 		})
+	}
+
+	// An aborted pass's last turn advertised no tools and still made a call, which the agent stored with
+	// the reply and refused. When every call of that turn failed, so none filed a finding, the reply is
+	// stored again alone, as a call-free turn stores it, and it ends the pass: complete with its text, or
+	// partial with empty content.
+	#dropStrayCalls(request: LedgerRequest, pass: AgentResult): AgentResult {
+		const boundary = request.boundary
+		if (!request.aborted || boundary === undefined) return pass
+		this.#flush()
+		const messages = this.#conversation.messages().slice(boundary)
+		const at = messages.findLastIndex((message) => message.role === 'assistant')
+		const reply = messages[at]
+		const replies = messages.slice(at + 1)
+		if (
+			reply === undefined ||
+			!hasCalls(reply) ||
+			!replies.every(
+				(message) => message.role === 'tool' && this.#results.get(message.id)?.success === false,
+			)
+		)
+			return pass
+		this.#conversation.remove([reply.id, ...replies.map((message) => message.id)])
+		for (const message of replies) this.#results.delete(message.id)
+		this.#conversation.add({
+			role: 'assistant',
+			content: reply.content,
+			...(reply.thinking === undefined ? {} : { thinking: reply.thinking }),
+		})
+		return { ...pass, content: reply.content, partial: reply.content.trim() === '' }
 	}
 
 	// The live `respond` call's request after it has entered its message; a run during the call's
@@ -1585,7 +1626,8 @@ export class Ledger implements LedgerInterface {
 		this.#flush()
 		const request = this.#current()
 		const boundary = request?.boundary
-		if (request === undefined || boundary === undefined) return
+		// An aborted pass makes no further call, so the turn its abort cancels observes none.
+		if (request === undefined || boundary === undefined || request.aborted) return
 		const additions = this.#conversation.messages().slice(boundary)
 		const messages = this.#agent.context.build(request.selection)
 		const names = this.#agent.context.scope?.tools
@@ -1697,11 +1739,14 @@ export class Ledger implements LedgerInterface {
 				return { words, matched }
 			})
 			const start = request?.message === undefined ? -1 : (scan.position(request.message.id) ?? -1)
+			const retired = collectRetiredFindings(scan.messages, scan.findings)
 			const listable = new Map(
 				input.messages
 					.filter(
 						(message, at) =>
-							!this.#requests.has(message.id) && (at < start || message.role === 'tool'),
+							!this.#requests.has(message.id) &&
+							!retired.has(message.id) &&
+							(at < start || message.role === 'tool'),
 					)
 					.map((message) => [message.id, message]),
 			)

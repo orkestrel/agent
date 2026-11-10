@@ -1,5 +1,6 @@
 import type { ClassifierAttempt, Selection } from '@src/core'
 import { createConversation, DEFAULT_RECALL_LIMIT, LEDGER_NOTES, LedgerRequest } from '@src/core'
+import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import { LEDGER_INVALID_LIMITS, computeLedgerErrorCode } from '../../../setup.js'
 
@@ -61,6 +62,23 @@ describe('LedgerRequest', () => {
 		expect(request.boundary).toBe(5)
 		expect(request.selection).toBeUndefined()
 		expect(request.usage).toBeUndefined()
+	})
+
+	it('aborts the current pass alone and reads its abort', () => {
+		const request = new LedgerRequest('Check.')
+		expect(request.signal).toBeUndefined()
+		expect(request.aborted).toBe(false)
+		request.abort()
+		request.open(0)
+		const first = requireValue(request.signal)
+		expect(request.aborted).toBe(false)
+		request.abort()
+		expect(request.aborted).toBe(true)
+		expect(first.reason).toBe('stray')
+		request.open(2)
+		expect(request.aborted).toBe(false)
+		expect(request.signal?.aborted).toBe(false)
+		expect(first.aborted).toBe(true)
 	})
 
 	it('adopts a selection into the current pass and sums the usage each selection spent', () => {

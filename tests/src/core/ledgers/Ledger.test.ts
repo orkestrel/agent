@@ -1,4 +1,5 @@
 import type {
+	AgentEventMap,
 	ConversationInterface,
 	LedgerSnapshot,
 	Message,
@@ -12,6 +13,7 @@ import {
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
 	Ledger,
+	SCOPE_NOTE,
 	IMAGE_TOKEN_ESTIMATE,
 	createAuthority,
 	createConversation,
@@ -86,6 +88,11 @@ import {
 	createScriptedApprover,
 	LedgerContactBook,
 	serveLedgerContactWrite,
+	serveLedgerAnswer,
+	LEDGER_ANSWER_FOLLOWUP,
+	serveLedgerOfferRate,
+	projectLedgerCalls,
+	projectLedgerSnapshot,
 	buildGuideLedgerOptions,
 	buildLedgerOptions,
 	buildLedgerResponse,
@@ -6639,13 +6646,16 @@ describe('Ledger — an unanswered write', () => {
 })
 
 describe('Ledger — recall after a write', () => {
-	it('lists a retired read after the write that retired it', async () => {
+	it('leaves a retired read out of the listing and lists a live hidden read', async () => {
 		const book = new LedgerContactBook()
 		const provider = createScriptedProvider(
 			[
 				{
 					content: '',
-					tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }],
+					tools: [
+						{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } },
+						{ id: 'read-2', name: 'lookup_contact', arguments: { id: 'C-14' } },
+					],
 				},
 				{
 					content: '',
@@ -6654,8 +6664,14 @@ describe('Ledger — recall after a write', () => {
 					],
 				},
 				{ content: 'Updated.' },
-				{ content: '', tools: [{ id: 'recall-1', name: 'recall', arguments: { topic: 'C-12' } }] },
-				{ content: 'It was 555-0101.' },
+				{
+					content: '',
+					tools: [
+						{ id: 'recall-1', name: 'recall', arguments: { topic: 'C-12' } },
+						{ id: 'recall-2', name: 'recall', arguments: { topic: 'C-14' } },
+					],
+				},
+				{ content: 'It is 555-0102.' },
 			],
 			{ recorded: true, repeat: false },
 		)
@@ -6668,14 +6684,448 @@ describe('Ledger — recall after a write', () => {
 		)
 		await ledger.respond("Change Mara Quill's phone to 555-0102.")
 		await ledger.respond("What was Mara Quill's phone before?")
+		expect(requireValue(provider.calls[3]).tools?.map((tool) => tool.name)).toContain('recall')
 		const listing = requireValue(
 			ledger.conversation.messages().find((message) => message.call === 'recall-1'),
 		).content
 		expect(listing).toContain('update_contact {"id":"C-12","phone":"555-0102"}: Contact C-12')
-		expect(listing).toContain(
-			'lookup_contact {"id":"C-12"}: Contact C-12: Mara Quill. Phone 555-0101.',
+		expect(listing).not.toContain('555-0101')
+		expect(
+			requireValue(ledger.conversation.messages().find((message) => message.call === 'recall-2'))
+				.content,
+		).toContain('lookup_contact {"id":"C-14"}: Contact C-14')
+	})
+
+	it('offers recall on no follow-up that names the written record, as on no read-only follow-up', async () => {
+		expect(await serveLedgerOfferRate({ write: true, hidden: false, hydrate: false })).toEqual({
+			offered: 0,
+			total: 10,
+		})
+		expect(await serveLedgerOfferRate({ write: false, hidden: false, hydrate: false })).toEqual({
+			offered: 0,
+			total: 10,
+		})
+	})
+
+	it('offers recall on every follow-up while a live finding is hidden', async () => {
+		expect(await serveLedgerOfferRate({ write: true, hidden: true, hydrate: false })).toEqual({
+			offered: 10,
+			total: 10,
+		})
+	})
+
+	it.each([false, true])(
+		'keeps the offer through a snapshot and hydrate, with a hidden live finding: %s',
+		async (hidden) => {
+			expect(await serveLedgerOfferRate({ write: true, hidden, hydrate: true })).toEqual({
+				offered: hidden ? 10 : 0,
+				total: 10,
+			})
+		},
+	)
+})
+
+describe('Ledger — recall after a replaced lookup', () => {
+	it('leaves a replaced lookup out of the offer', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+		ledger.conversation.add([
+			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+			...buildLedgerExchange(
+				'Account BW-20931: Brightwater Studio. Delivery costs $12.',
+				'replacement',
+			),
+		])
+		await ledger.respond('Check Brightwater Studio.')
+		expect(requireValue(provider.calls[0]).tools?.map((tool) => tool.name)).toEqual(['lookup'])
+	})
+
+	it('leaves a replaced lookup out of the listing', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'recall-1', name: 'recall', arguments: { topic: 'Brightwater Studio' } }],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
 		)
-		expect(listing.indexOf('555-0102')).toBeLessThan(listing.indexOf('555-0101'))
+		const ledger = createLedger(provider, buildLedgerOptions())
+		seedLedgerRecall(ledger)
+		ledger.conversation.add([
+			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+			...buildLedgerExchange(
+				'Account BW-20931: Brightwater Studio. Delivery costs $12.',
+				'replacement',
+			),
+		])
+		await ledger.respond('Check Brightwater Studio.')
+		const listing = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'recall-1'),
+		).content
+		expect(listing).toContain('Delivery costs $12.')
+		expect(listing).not.toContain('Delivery costs $10.')
+	})
+})
+
+describe('Ledger — a call in the answer pass', () => {
+	it.each([3, 12])(
+		'makes one answer generation after a first pass of %i turns, and its call runs nothing',
+		async (limit) => {
+			const tools = createRecorder<AgentEventMap['tool']>()
+			const provider = createScriptedProvider(
+				[
+					...Array.from({ length: limit }, (_, at) => ({
+						content: '',
+						tools: [{ id: `read-${at}`, name: 'lookup', arguments: { id: `BW-${at}` } }],
+					})),
+					{ content: '', tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ agent: { limit, on: { tool: tools.handler } } }),
+			)
+			const result = await ledger.respond('Read every account.')
+			expect(provider.calls).toHaveLength(limit + 1)
+			expect(provider.calls.at(-1)?.tools).toBeUndefined()
+			expect(tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+				...Array.from({ length: limit }, (_, at) => [`read-${at}`, true]),
+				['stray', false],
+			])
+			expect(tools.calls.at(-1)?.[1]).toMatchObject({
+				error: `"lookup" did not run: ${SCOPE_NOTE}`,
+			})
+			expect(result.passes.map((pass) => pass.partial)).toEqual([true, true])
+		},
+	)
+
+	it('returns the text beside a stray call and leaves what a call-free answer leaves, through a hydrate', async () => {
+		const stray = await serveLedgerAnswer({
+			turns: [
+				{ content: '' },
+				{
+					content: 'The receipt is in the blue folder.',
+					tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				},
+			],
+			followup: LEDGER_ANSWER_FOLLOWUP,
+			hidden: true,
+		})
+		const control = await serveLedgerAnswer({
+			turns: [{ content: '' }, { content: 'The receipt is in the blue folder.' }],
+			followup: LEDGER_ANSWER_FOLLOWUP,
+			hidden: true,
+		})
+		expect(stray.result.content).toBe('The receipt is in the blue folder.')
+		expect(stray.result.partial).toBe(false)
+		expect(stray.result.passes).toEqual(control.result.passes)
+		expect(stray.tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+			['stray', false],
+			['recall-1', true],
+		])
+		const from = stray.ledger.conversation.messages()
+		const to = control.ledger.conversation.messages()
+		expect(translateLedgerIds(from, from, to)).toBe(JSON.stringify(to))
+		expect(stray.restored).toEqual(stray.snapshot)
+		expect(translateLedgerIds(projectLedgerSnapshot(stray.snapshot), from, to)).toBe(
+			JSON.stringify(projectLedgerSnapshot(control.snapshot)),
+		)
+		const sent = JSON.stringify(projectLedgerCalls(control.provider.calls.slice(2)))
+		expect(translateLedgerIds(projectLedgerCalls(stray.provider.calls.slice(2)), from, to)).toBe(
+			sent,
+		)
+		expect(
+			translateLedgerIds(
+				projectLedgerCalls(stray.hydrated.calls),
+				stray.child.conversation.messages(),
+				to,
+			),
+		).toBe(sent)
+		expect(requireValue(from.find((message) => message.call === 'recall-1')).content).toContain(
+			'Earlier reply: The receipt is in the blue folder.',
+		)
+	})
+
+	it('ends partial with empty content beside a stray call and leaves what a call-free answer leaves, through a hydrate', async () => {
+		const stray = await serveLedgerAnswer({
+			turns: [
+				{ content: '' },
+				{ content: '', tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+			],
+			followup: LEDGER_ANSWER_FOLLOWUP,
+			hidden: true,
+		})
+		const control = await serveLedgerAnswer({
+			turns: [{ content: '' }, { content: '' }],
+			followup: LEDGER_ANSWER_FOLLOWUP,
+			hidden: true,
+		})
+		expect(stray.result.content).toBe('')
+		expect(stray.result.partial).toBe(true)
+		expect(control.result.partial).toBe(false)
+		const from = stray.ledger.conversation.messages()
+		const to = control.ledger.conversation.messages()
+		expect(translateLedgerIds(from, from, to)).toBe(JSON.stringify(to))
+		expect(stray.restored).toEqual(stray.snapshot)
+		expect(translateLedgerIds(projectLedgerSnapshot(stray.snapshot), from, to)).toBe(
+			JSON.stringify(projectLedgerSnapshot(control.snapshot)),
+		)
+		const sent = JSON.stringify(projectLedgerCalls(control.provider.calls.slice(2)))
+		expect(translateLedgerIds(projectLedgerCalls(stray.provider.calls.slice(2)), from, to)).toBe(
+			sent,
+		)
+		expect(
+			translateLedgerIds(
+				projectLedgerCalls(stray.hydrated.calls),
+				stray.child.conversation.messages(),
+				to,
+			),
+		).toBe(sent)
+		expect(requireValue(from.find((message) => message.call === 'recall-1')).content).toContain(
+			'Earlier request: Where is the receipt?',
+		)
+	})
+
+	it('leaves a call-free answer pass as it was', async () => {
+		const tools = createRecorder<AgentEventMap['tool']>()
+		const exhausted = createRecorder<AgentEventMap['exhaust']>()
+		const provider = createScriptedProvider([{ content: '' }, { content: 'Answer.' }], {
+			recorded: true,
+			repeat: false,
+		})
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ agent: { on: { tool: tools.handler, exhaust: exhausted.handler } } }),
+		)
+		const result = await ledger.respond('Answer this.')
+		expect(result.passes).toEqual([
+			{ content: '', partial: false },
+			{ content: 'Answer.', partial: false },
+		])
+		expect(provider.calls).toHaveLength(2)
+		expect(provider.calls[1]?.tools).toBeUndefined()
+		expect(tools.calls).toEqual([])
+		expect(exhausted.calls).toEqual([])
+		expect(
+			ledger.conversation.messages().map((message) => [message.role, message.content]),
+		).toEqual([
+			['user', 'Answer this.'],
+			['assistant', ''],
+			['user', LEDGER_NOTES.cue],
+			['assistant', 'Answer.'],
+		])
+	})
+
+	it('runs an answer pass a host scope widens to a lookup on to the agent limit', async () => {
+		const aborted = createRecorder<AgentEventMap['abort']>()
+		const exhausted = createRecorder<AgentEventMap['exhaust']>()
+		const provider = createScriptedProvider(
+			[
+				{ content: '' },
+				...Array.from({ length: 3 }, (_, at) => ({
+					content: '',
+					tools: [{ id: `read-${at}`, name: 'lookup', arguments: { id: `BW-${at}` } }],
+				})),
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				agent: { limit: 3, on: { abort: aborted.handler, exhaust: exhausted.handler } },
+			}),
+		)
+		const replacement = createScope({ name: 'replacement', tools: ['lookup'] })
+		ledger.agent.emitter.on('select', () => {
+			if (ledger.agent.context.scope?.name === 'answer') ledger.agent.context.apply(replacement)
+		})
+		const result = await ledger.respond('Read the account.')
+		expect(provider.calls.slice(1).map((call) => call.tools?.map((tool) => tool.name))).toEqual([
+			['lookup'],
+			['lookup'],
+			['lookup'],
+		])
+		expect(result.passes.map((pass) => pass.partial)).toEqual([false, true])
+		expect(exhausted.calls).toEqual([[3]])
+		expect(aborted.calls).toEqual([])
+	})
+})
+
+describe('Ledger — the stray abort', () => {
+	it('fires the agent abort event with the stray reason in the first pass and the answer pass', async () => {
+		const aborted = createRecorder<AgentEventMap['abort']>()
+		const exhausted = createRecorder<AgentEventMap['exhaust']>()
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }] }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				lookups: [],
+				agent: { limit: 3, on: { abort: aborted.handler, exhaust: exhausted.handler } },
+			}),
+		)
+		await ledger.respond('Where is the receipt?')
+		expect(provider.calls).toHaveLength(2)
+		expect(aborted.calls).toEqual([['stray'], ['stray']])
+		expect(exhausted.calls).toEqual([])
+	})
+
+	it('fires the stray abort in an answer pass after a first pass that advertised a lookup', async () => {
+		const aborted = createRecorder<AgentEventMap['abort']>()
+		const exhausted = createRecorder<AgentEventMap['exhaust']>()
+		const provider = createScriptedProvider(
+			[
+				{ content: '' },
+				{ content: '', tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				agent: { limit: 3, on: { abort: aborted.handler, exhaust: exhausted.handler } },
+			}),
+		)
+		await ledger.respond('Where is the receipt?')
+		expect(provider.calls.map((call) => call.tools?.map((tool) => tool.name))).toEqual([
+			['lookup'],
+			undefined,
+		])
+		expect(aborted.calls).toEqual([['stray']])
+		expect(exhausted.calls).toEqual([])
+	})
+})
+
+describe('Ledger — a call in a first pass that advertises no tools', () => {
+	it.each([3, 12])(
+		'makes one first-pass generation at a limit of %i, and its call runs nothing',
+		async (limit) => {
+			const tools = createRecorder<AgentEventMap['tool']>()
+			const provider = createScriptedProvider(
+				[{ content: '', tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }] }],
+				{ recorded: true },
+			)
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ lookups: [], agent: { limit, on: { tool: tools.handler } } }),
+			)
+			const result = await ledger.respond('Where is the receipt?')
+			expect(provider.calls.map((call) => call.tools)).toEqual([undefined, undefined])
+			expect(tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+				['stray', false],
+				['stray', false],
+			])
+			expect(result.passes).toEqual([
+				{ content: '', partial: true },
+				{ content: '', partial: true },
+			])
+		},
+	)
+
+	it('returns the text beside a stray call and leaves what a call-free first pass leaves, through a hydrate', async () => {
+		const stray = await serveLedgerAnswer({
+			turns: [
+				{
+					content: 'The receipt is in the blue folder.',
+					tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }],
+				},
+			],
+			followup: [{ content: 'Next.' }],
+			hidden: false,
+			overrides: { lookups: [] },
+		})
+		const control = await serveLedgerAnswer({
+			turns: [{ content: 'The receipt is in the blue folder.' }],
+			followup: [{ content: 'Next.' }],
+			hidden: false,
+			overrides: { lookups: [] },
+		})
+		expect(stray.provider.calls[0]?.tools).toBeUndefined()
+		expect(stray.result.content).toBe('The receipt is in the blue folder.')
+		expect(stray.result.partial).toBe(false)
+		expect(stray.result.passes).toEqual(control.result.passes)
+		expect(stray.tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+			['stray', false],
+		])
+		const from = stray.ledger.conversation.messages()
+		const to = control.ledger.conversation.messages()
+		expect(translateLedgerIds(from, from, to)).toBe(JSON.stringify(to))
+		expect(stray.restored).toEqual(stray.snapshot)
+		expect(translateLedgerIds(projectLedgerSnapshot(stray.snapshot), from, to)).toBe(
+			JSON.stringify(projectLedgerSnapshot(control.snapshot)),
+		)
+		const sent = JSON.stringify(projectLedgerCalls(control.provider.calls.slice(1)))
+		expect(translateLedgerIds(projectLedgerCalls(stray.provider.calls.slice(1)), from, to)).toBe(
+			sent,
+		)
+		expect(
+			translateLedgerIds(
+				projectLedgerCalls(stray.hydrated.calls),
+				stray.child.conversation.messages(),
+				to,
+			),
+		).toBe(sent)
+	})
+
+	it('ends the first pass partial with empty content beside a stray call and leaves what a call-free first pass leaves, through a hydrate', async () => {
+		const stray = await serveLedgerAnswer({
+			turns: [
+				{ content: '', tools: [{ id: 'stray', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				{ content: 'The receipt is in the blue folder.' },
+			],
+			followup: [{ content: 'Next.' }],
+			hidden: false,
+			overrides: { lookups: [] },
+		})
+		const control = await serveLedgerAnswer({
+			turns: [{ content: '' }, { content: 'The receipt is in the blue folder.' }],
+			followup: [{ content: 'Next.' }],
+			hidden: false,
+			overrides: { lookups: [] },
+		})
+		expect(stray.provider.calls[0]?.tools).toBeUndefined()
+		expect(stray.result.passes[0]).toEqual({ content: '', partial: true })
+		expect(control.result.passes[0]).toEqual({ content: '', partial: false })
+		expect(stray.result.passes[1]).toEqual(control.result.passes[1])
+		expect(stray.result.content).toBe('The receipt is in the blue folder.')
+		const from = stray.ledger.conversation.messages()
+		const to = control.ledger.conversation.messages()
+		expect(translateLedgerIds(from, from, to)).toBe(JSON.stringify(to))
+		expect(stray.restored).toEqual(stray.snapshot)
+		expect(translateLedgerIds(projectLedgerSnapshot(stray.snapshot), from, to)).toBe(
+			JSON.stringify(projectLedgerSnapshot(control.snapshot)),
+		)
+		expect(translateLedgerIds(projectLedgerCalls(stray.provider.calls.slice(1)), from, to)).toBe(
+			JSON.stringify(projectLedgerCalls(control.provider.calls.slice(1))),
+		)
+		expect(
+			translateLedgerIds(
+				projectLedgerCalls(stray.hydrated.calls),
+				stray.child.conversation.messages(),
+				to,
+			),
+		).toBe(JSON.stringify(projectLedgerCalls(control.provider.calls.slice(2))))
+	})
+
+	it('keeps the limit of a first pass that advertises a lookup, whatever the model calls', async () => {
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [{ id: 'other', name: 'archive', arguments: {} }] }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions({ agent: { limit: 3 } }))
+		const result = await ledger.respond('Where is the receipt?')
+		expect(provider.calls.map((call) => call.tools?.map((tool) => tool.name))).toEqual([
+			['lookup'],
+			['lookup'],
+			['lookup'],
+			undefined,
+		])
+		expect(result.passes.map((pass) => pass.partial)).toEqual([true, true])
 	})
 })
 

@@ -288,6 +288,7 @@ import {
 } from '@src/core'
 import { createBudget } from '@orkestrel/budget'
 import type {
+	AgentEventMap,
 	AgentFrame,
 	AgentResult,
 	AgentRegistryInterface,
@@ -386,6 +387,7 @@ import {
 import {
 	buildRecords,
 	collectNames,
+	isLedgerSnapshot,
 	linkOwners,
 	splitSentences,
 	estimateMessages,
@@ -7204,6 +7206,195 @@ export async function serveLedgerContactWrite(options: {
 	await ledger.respond("Change Mara Quill's phone to 555-0102.", controller.signal)
 	await ledger.respond("What is Mara Quill's phone?")
 	return { ledger, provider }
+}
+
+/** Lists ten follow-up requests that each name Mara Quill, contact C-12 of {@link LedgerContactBook}. */
+export const LEDGER_OFFER_FOLLOWUPS: readonly string[] = Object.freeze([
+	"What is Mara Quill's phone?",
+	"Is Mara Quill's number current?",
+	'Which number reaches Mara Quill?',
+	'Did the phone for Mara Quill get saved?',
+	'Read me the phone on file for Mara Quill.',
+	"Has Mara Quill's contact changed today?",
+	'Can I text Mara Quill on that number?',
+	'Confirm the phone for Mara Quill.',
+	"What did we set Mara Quill's phone to?",
+	'Is Mara Quill reachable by phone?',
+])
+
+/**
+ * Serves one contact request, then each {@link LEDGER_OFFER_FOLLOWUPS} request, and counts the
+ * follow-up calls that offered `recall`.
+ *
+ * @remarks
+ * The first request reads contact C-12, and writes its phone to 555-0102 when `write` is true. With
+ * `hidden`, it also reads contact C-14, a live finding no follow-up names. With `hydrate`, the
+ * follow-ups run on a ledger hydrated from the snapshot the first request left, read back from JSON.
+ *
+ * @param options - Whether the first request writes, reads a contact the follow-ups don't name, and hands the follow-ups to a hydrated ledger
+ * @returns The follow-up calls that offered `recall`, and every follow-up call
+ */
+export async function serveLedgerOfferRate(options: {
+	readonly write: boolean
+	readonly hidden: boolean
+	readonly hydrate: boolean
+}): Promise<{ readonly offered: number; readonly total: number }> {
+	const authority = createAuthority({
+		fallback: { zone: 'records', verdict: 'allow' },
+		ask: () => true,
+	})
+	const provider = createScriptedProvider(
+		[
+			{
+				content: '',
+				tools: [
+					{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } },
+					...(options.hidden
+						? [{ id: 'read-2', name: 'lookup_contact', arguments: { id: 'C-14' } }]
+						: []),
+				],
+			},
+			...(options.write
+				? [
+						{
+							content: '',
+							tools: [
+								{
+									id: 'write-1',
+									name: 'update_contact',
+									arguments: { id: 'C-12', phone: '555-0102' },
+								},
+							],
+						},
+					]
+				: []),
+			{ content: 'Done.' },
+			{ content: 'Answer.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildLedgerContactOptions(new LedgerContactBook(), authority),
+	)
+	await ledger.respond("Change Mara Quill's phone to 555-0102.")
+	const parsed: unknown = JSON.parse(JSON.stringify(ledger.snapshot()))
+	if (!isLedgerSnapshot(parsed)) throw new Error('Not a ledger snapshot')
+	const hydrated = createScriptedProvider([{ content: 'Answer.' }], { recorded: true })
+	const served = options.hydrate
+		? createLedger(
+				hydrated,
+				buildLedgerContactOptions(new LedgerContactBook(), authority, { snapshot: parsed }),
+			)
+		: ledger
+	const calls = options.hydrate ? hydrated : provider
+	const before = calls.calls.length
+	for (const request of LEDGER_OFFER_FOLLOWUPS) await served.respond(request)
+	const followups = calls.calls.slice(before)
+	return {
+		offered: followups.filter((call) => call.tools?.some((tool) => tool.name === 'recall') === true)
+			.length,
+		total: followups.length,
+	}
+}
+
+/** Holds follow-up turns for {@link serveLedgerAnswer}: a `recall` call for the receipt, then a reply. */
+export const LEDGER_ANSWER_FOLLOWUP: readonly ScriptedTurn[] = Object.freeze([
+	{ content: '', tools: [{ id: 'recall-1', name: 'recall', arguments: { topic: 'receipt' } }] },
+	{ content: 'Next.' },
+])
+
+/** Carries one answer-pass scenario {@link serveLedgerAnswer} served, and the ledger hydrated after it. */
+export interface LedgerAnswerCase {
+	readonly ledger: LedgerInterface
+	readonly provider: ScriptedProviderInterface
+	readonly result: LedgerResult
+	readonly snapshot: LedgerSnapshot
+	readonly tools: RecorderInterface<AgentEventMap['tool']>
+	readonly child: LedgerInterface
+	readonly restored: LedgerSnapshot
+	readonly hydrated: ScriptedProviderInterface
+}
+
+/**
+ * Serves a request on the scripted `turns`, then a follow-up on the `followup` turns. A ledger
+ * hydrated from the snapshot taken between the two serves the same follow-up.
+ *
+ * @remarks
+ * With `hidden`, a hidden seeded statement keeps the `recall` offer open on both requests; without
+ * it, nothing is hidden. `overrides` reach the ledger and the hydrated ledger alike. Each provider
+ * refuses a call past its script, so a pass that takes a follow-up turn fails the follow-up.
+ *
+ * @param options - The first request's turns, the follow-up's turns, whether a statement is hidden, and the ledger option overrides
+ * @returns The ledger, its provider, the first request's result, the snapshot, the agent's `tool` events, and the hydrated ledger with the snapshot it took before its follow-up and its provider
+ */
+export async function serveLedgerAnswer(options: {
+	readonly turns: readonly ProviderResult[]
+	readonly followup: readonly ScriptedTurn[]
+	readonly hidden: boolean
+	readonly overrides?: Partial<LedgerOptions>
+}): Promise<LedgerAnswerCase> {
+	const tools = createRecorder<AgentEventMap['tool']>()
+	const provider = createScriptedProvider([...options.turns, ...options.followup], {
+		recorded: true,
+		repeat: false,
+	})
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			...options.overrides,
+			agent: { ...options.overrides?.agent, on: { tool: tools.handler } },
+		}),
+	)
+	if (options.hidden) seedLedgerRecall(ledger)
+	const result = await ledger.respond('Where is the receipt?')
+	const parsed: unknown = JSON.parse(JSON.stringify(ledger.snapshot()))
+	if (!isLedgerSnapshot(parsed)) throw new Error('Not a ledger snapshot')
+	const hydrated = createScriptedProvider(options.followup, { recorded: true, repeat: false })
+	const child = createLedger(
+		hydrated,
+		buildLedgerOptions({ ...options.overrides, snapshot: parsed }),
+	)
+	const restored = child.snapshot()
+	await ledger.respond('Find the receipt again.')
+	await child.respond('Find the receipt again.')
+	return { ledger, provider, result, snapshot: parsed, tools, child, restored, hydrated }
+}
+
+/**
+ * Projects a ledger snapshot to what two ledgers that served the same turns share, leaving out the
+ * conversation id each one minted, the wall-clock time each judgment was recorded at, and the
+ * window's digest, which covers the minted message ids.
+ *
+ * @param snapshot - The snapshot to project
+ * @returns The snapshot without those fields
+ */
+export function projectLedgerSnapshot(snapshot: LedgerSnapshot): unknown {
+	const { id: _id, judgments, ...conversation } = snapshot.conversation
+	const { digest: _digest, ...window } = snapshot.window ?? { digest: '' }
+	return {
+		...snapshot,
+		conversation: {
+			...conversation,
+			judgments: judgments?.map(({ time: _time, ...judgment }) => judgment),
+		},
+		...(snapshot.window === undefined ? {} : { window }),
+	}
+}
+
+/**
+ * Projects recorded provider calls to what a ledger chose to send, without the system message,
+ * whose id each agent mints for itself.
+ *
+ * @param calls - The recorded calls
+ * @returns Each call's messages after the system message, its advertised tools, and its options
+ */
+export function projectLedgerCalls(calls: readonly ScriptedCall[]): readonly unknown[] {
+	return calls.map((call) => ({
+		messages: call.messages.slice(1),
+		tools: call.tools,
+		options: call.options,
+	}))
 }
 
 /**

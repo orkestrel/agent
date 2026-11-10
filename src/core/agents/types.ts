@@ -97,8 +97,8 @@ export interface AgentResult {
 	readonly usage?: TokenUsage
 	/**
 	 * Reports cancellation or a turn limit reached with unresolved tool intent.
-	 * A reply to a turn advertising no tools is a complete answer (`false`), even if it
-	 * contains calls: those calls are dropped and observed through the `deny` event.
+	 * A call in a reply to a turn advertising no tools is denied like any scoped-out call and the
+	 * loop runs another turn, so a run whose last allowed turn still carried a call is partial (`true`).
 	 */
 	readonly partial: boolean
 	/**
