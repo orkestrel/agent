@@ -17,3 +17,4 @@
 | 2026-11-10 | Refutation of the final design in two shares: 255 claims, 36 failures, 1 stale fact, 14 unverifiable | `reviewer` on `sonnet` | `plan.md` § State |
 | 2026-11-10 | Re-audit of the repaired rows in two shares: 57 of 65 closed, 1 open, 7 new from the repairs | `reviewer` on `sonnet` | `plan.md` § State |
 | 2026-11-10 | Closure check of the 8 remaining rows: all closed | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-10 | The user's rulings: estimate each phase as it is reached and prototype first, breadth over depth; the 4B reading reported and not holding the release; durable jobs built; ROADMAP item 9 as phase 5 | user | `plan.md` § Rulings |

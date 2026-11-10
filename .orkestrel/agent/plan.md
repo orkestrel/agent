@@ -76,6 +76,12 @@ A host gives a small local model progressive reach to everything its principal m
 - **The user, 2026-11-10, on phases:** "it may be worth splitting the work into phases since they are heavy work and need refinement, especially the delegation and how scope works with proper care for security. I think you named what the biggest points about what is incompatible is what we need to work out thoroughly"
   - The campaign runs in four phases. Each phase closes on its own claims, review, and tree-wide gates before the next phase's units start.
   - Delegation is the last phase, behind a design checkpoint.
+- **The user, 2026-11-10, on the campaign's size:** "Estimate as we reach each phase, the key is to prototype early, keep it concise and focused to gather the evidence we need and find out if it actually works, that will save us time and useless runs. It's about breadth rather than depth, fail early and fast to decide definitively."
+  - Each phase is estimated as it's reached.
+  - Phase 0, a short breadth-first round, runs every deciding probe and a thin efficacy prototype before any phase builds.
+- **The user, 2026-11-10, on the 4B reading:** it's reported before the phase 3 release, and an efficacy miss doesn't hold the release. A design claim the live run falsifies does.
+- **The user, 2026-11-10, on durable jobs:** built in this campaign, as one unit after phase 2. A job's input carries a narrowing scope and disclosure, checked against its parent.
+- **The user, 2026-11-10, on delegation under a ledger:** ROADMAP item 9, binding the ledger's recall and lookup tools to the run, becomes phase 5. A ledger can then take delegates, behind its own design checkpoint and estimate.
 - **Authorship:**
   - Host-authored text alone enters privileged context.
   - A model-authored memo, a record, and workspace data stay data.
@@ -88,7 +94,7 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 
 ## Open decisions
 
-- **The campaign's size:** the estimate, the spend ceiling, and the stop line, agreed with the user after the design round.
+- **Each phase's estimate,** from the measurements phase 0 takes, brought to the user as that phase is reached.
 
 ## Deferred
 
@@ -104,14 +110,23 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | Absorb | three distiller reads and a module map, 2026-11-10 |
 | Design round | both lanes returned, each revised for the scope ruling; they agree on the ceiling and disclosure split, built-in tools under authority, the head refresh, advertised-set pricing, and closing ROADMAP items 67 and 68; 14 points are incompatible |
 | Final design | decided by the consultant on every input. Its four phases are scope and the ceiling; disclosure in the agent; disclosure in the ledger, with the consumer run and the 4B reading; and delegation behind a checkpoint. Two refutations read 255 claims and found 36 failures, 1 stale fact, and 14 unverifiable claims. The design repaired 65 findings and refuted 1. A re-audit closed 57 of the repairs, a closure pass corrected the other 8, and the closure check closed all 8. Its estimate is 19.5 units, about 66 lane hours at 3.4 hours a unit (wall time, `git log 19f72405~1..7718f390`), plus at most 2.4 runner hours. |
-| Next | the user rules the estimate, the spend ceiling, the stop line, and the open decisions; then the design's claims, bar, stops, and deferrals enter this record before the first phase's units start |
+| Decisions | the user ruled each phase estimated as reached, prototype first, the reading reported and not holding the release, durable jobs built, and ROADMAP item 9 as phase 5 |
+| Next | the final design enters `designs/disclosure.md`, then phase 0's probes and prototype |
 
 ## Sequence
 
-1. The design round, then its reconciliation into claims, a release bar, a stop per seam, units, and a deferral list.
-2. The estimate, ceiling, and stop line, agreed with the user.
-3. The units, tests first, with each unit's review.
-4. A real consumer run on taverna's catalog.
-5. One `orkestrel-falsify` round, then `verifier` tree-wide.
-6. The model-driven reading on the 4B.
-7. The release, with taverna's re-pin.
+0. **Phase 0, prototype and probes,** breadth-first, each throwaway under `tmp/probes/`:
+   - red-first readings on the base for ROADMAP items 67 and 68, the fan-out hole, the hidden stub, and the plan charging hidden definitions
+   - the derivation table for disclosure derived from the conversation
+   - definition density on the 4B
+   - the delegation checkpoint probes K1a to K5
+   - a thin efficacy prototype: does the 4B, given a skill index and a load tool, load the right area and then call the right tool, on the desk catalog of `studies/tools` against its known readings
+
+   A probe that fails opens its design question before any phase builds on it.
+1. **Phase 1, scope and the ceiling.** It is releasable alone.
+2. **Phase 2, disclosure in the agent,** then the durable-job unit.
+3. **Phase 3, disclosure in the ledger,** with the consumer run on taverna's catalog and the 4B reading, reported and not holding the release. This is the release taverna adopts.
+4. **Phase 4, delegation on a bare agent,** behind its checkpoint.
+5. **Phase 5, ROADMAP item 9,** so a ledger can take delegates, behind its own checkpoint.
+
+Each phase is estimated as it is reached. Its units run tests first, each with a review. Then one `orkestrel-falsify` round on the phase, and `verifier` tree-wide, close it before the next phase starts. Publication is the user's at each release.
