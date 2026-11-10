@@ -100,8 +100,9 @@ export interface LedgerShare {
  * @remarks
  * `cue` is the last user message of an answer pass. `results` heads the note that carries what the
  * first pass's lookups and recalls returned. `repeat` is the failure a repeated tool call returns,
- * and the ledger reads a failure with exactly this text as a repeat. `closure` is the failure a
- * `recall` call returns after the request's recalls are spent, repeated, or out of room.
+ * and the reason of the denial the ledger gives the identical retry of a call the authority denied;
+ * the ledger reads a failure with exactly this text, or that denial, as a repeat. `closure` is the
+ * failure a `recall` call returns after the request's recalls are spent, repeated, or out of room.
  */
 export interface LedgerNote {
 	readonly cue: string
@@ -186,6 +187,12 @@ export type LedgerLookupHandler = (
  * A call the tool refuses for its arguments never counts as a run: when `execute` throws, or
  * returns a promise that rejects with, an error `isToolError` admits whose code is `'ARGUMENTS'`,
  * the request releases the call, so the identical call runs again. Every other failure counts.
+ * A call the authority denies, or whose ask is declined or left unanswered, never runs, and the
+ * request records it. Its identical retry in a later turn of the same request is denied with the
+ * {@link LedgerNote} `repeat` text before the authority evaluates or asks it, and ends the pass as a
+ * repeat does. Its identical twin in the same batch was evaluated with it: the twin of a denied call
+ * is denied as that retry is, and the twin of a declined or unanswered ask is refused without
+ * entering the host's approver, after the agent reports its `ask` event, and the pass goes on.
  * The projection uses {@link identifyLookup}, which trims and uppercases top-level string
  * arguments when deciding which finding replaces an earlier one.
  * A throwing `read` handler makes the lookup failed: it files as chatter and replaces no finding.
@@ -231,7 +238,11 @@ export type LedgerWriteHandler = (
  *
  * @remarks
  * The ledger registers the tool beside its lookups and `recall`, behind the same repeat stop, which
- * releases a call the tool refuses for its arguments as a lookup's does. The
+ * releases a call the tool refuses for its arguments and refuses, without entering the host's
+ * approver, the identical retry or batch twin of a call the authority denied, declined, or left
+ * unanswered, as a lookup's does: a retry in a later turn, and the twin of a denied call, end the
+ * pass as a repeat, and the twin of a declined or unanswered ask is refused after the agent reports
+ * its `ask` event, and the pass goes on. The
  * tool must carry `annotations.consequential: true`, must not be named `recall`, and can share no
  * name with a lookup or another write, and a ledger with writes requires `agent.authority`;
  * construction throws `LedgerError` with code `'WRITE'` otherwise. A write runs through the agent's
@@ -360,7 +371,12 @@ export interface LedgerGaugeSnapshot extends LedgerGauge {
  * the ledger passes its agent one authority that denies a name the ledger doesn't advertise, allows
  * `recall`, and hands every other call to this authority's `evaluate`, and every asked call to its
  * `ask`. Without it, the ledger allows each lookup and holds no approver, so a `consequential`
- * lookup is denied as unanswered at every call.
+ * lookup is denied as unanswered at every call. In one request, the ledger denies the identical
+ * retry in a later turn of a lookup or write call the authority denied, declined, or left
+ * unanswered as a repeat, before its `evaluate` method and with no ask, and its `ask` refuses the
+ * identical twin in the same batch of a declined or unanswered ask without calling this authority's
+ * `ask`, so a person is asked about such a call once per request. The agent still reports that
+ * twin's `ask` event.
  */
 export type LedgerAgentOptions = Pick<
 	AgentOptions,
@@ -635,6 +651,26 @@ export interface LedgerRequestInterface {
 	 * @param args - The call's arguments
 	 */
 	release(name: string, args: Readonly<Record<string, unknown>>): void
+	/**
+	 * Records one tool call the authority denied, declined, or left unanswered, so `denied` reports it for the rest of the request.
+	 *
+	 * @remarks
+	 * The call is compared as `admit` compares it, and a denial admits nothing. A call whose arguments
+	 * have no canonical identity changes nothing. The ledger records each lookup or write call the
+	 * agent's `deny` event reports with a decision.
+	 *
+	 * @param name - The tool name
+	 * @param args - The call's arguments
+	 */
+	deny(name: string, args: Readonly<Record<string, unknown>>): void
+	/**
+	 * Reports whether the request recorded this tool call as denied.
+	 *
+	 * @param name - The tool name
+	 * @param args - The call's arguments
+	 * @returns True if `deny` recorded the same call, compared as `admit` compares it; false otherwise
+	 */
+	denied(name: string, args: Readonly<Record<string, unknown>>): boolean
 	/**
 	 * Counts one `recall` call, closing the request's recall tool when its recalls reach the limit.
 	 *

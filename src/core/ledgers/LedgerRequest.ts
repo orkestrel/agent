@@ -48,6 +48,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	#passes: readonly LedgerPass[] = []
 	#attempts: readonly ClassifierAttempt[] = []
 	#admitted: ReadonlySet<string> = new Set()
+	#denials: ReadonlySet<string> = new Set()
 	#listed: readonly LedgerListing[] = []
 	#recalls = 0
 	#closed = false
@@ -231,6 +232,16 @@ export class LedgerRequest implements LedgerRequestInterface {
 	release(name: string, args: Readonly<Record<string, unknown>>): void {
 		const key = canonicalStringify([name, args])
 		this.#admitted = new Set([...this.#admitted].filter((admitted) => admitted !== key))
+	}
+
+	deny(name: string, args: Readonly<Record<string, unknown>>): void {
+		const key = canonicalStringify([name, args])
+		if (key !== undefined) this.#denials = new Set([...this.#denials, key])
+	}
+
+	denied(name: string, args: Readonly<Record<string, unknown>>): boolean {
+		const key = canonicalStringify([name, args])
+		return key !== undefined && this.#denials.has(key)
 	}
 
 	recall(): void {

@@ -6923,6 +6923,331 @@ describe('Ledger — a call its tool refuses for its arguments', () => {
 	})
 })
 
+describe('Ledger — a call the authority denied', () => {
+	it.each([
+		[
+			'declines',
+			'update_contact',
+			{ id: 'C-12', phone: '555-0102' },
+			'ask',
+			false,
+			AUTHORITY_NOTES.refused,
+		],
+		[
+			'leaves unanswered',
+			'update_contact',
+			{ id: 'C-12', phone: '555-0102' },
+			'ask',
+			undefined,
+			AUTHORITY_NOTES.unanswered,
+		],
+		[
+			'denies',
+			'update_contact',
+			{ id: 'C-12', phone: '555-0102' },
+			'deny',
+			true,
+			'contacts are read-only',
+		],
+		['declines', 'lookup_contact', { id: 'C-12' }, 'ask', false, AUTHORITY_NOTES.refused],
+		[
+			'leaves unanswered',
+			'lookup_contact',
+			{ id: 'C-12' },
+			'ask',
+			undefined,
+			AUTHORITY_NOTES.unanswered,
+		],
+		['denies', 'lookup_contact', { id: 'C-12' }, 'deny', true, 'contacts are read-only'],
+	] as const)(
+		'stops the identical retry of a call the authority %s, %s, as a repeat, evaluating and asking once',
+		async (_label, name, args, verdict, answer, reason) => {
+			const book = new LedgerContactBook()
+			const evaluated = createRecorder<[id: string]>()
+			const asked = createRecorder<[id: string]>()
+			const denies = createRecorder<AgentEventMap['deny']>()
+			const asks = createRecorder<AgentEventMap['ask']>()
+			const authority = createAuthority({
+				rules: [
+					{
+						match: (context) => {
+							evaluated.handler(context.call.id)
+							return context.call.name === name
+						},
+						zone: 'records',
+						verdict,
+						reason: 'contacts are read-only',
+					},
+				],
+				fallback: { zone: 'records', verdict: 'allow' },
+				ask: (context) => {
+					asked.handler(context.call.id)
+					if (answer === undefined) throw new Error('the approver is offline')
+					return answer
+				},
+			})
+			const { ledger, provider, tools, aborts } = await serveLedgerCalls(
+				buildLedgerContactOptions(book, authority, {
+					agent: { authority, on: { deny: denies.handler, ask: asks.handler } },
+				}),
+				[
+					{ id: 'call-1', name, arguments: args },
+					{ id: 'call-2', name, arguments: args },
+				],
+			)
+			const messages = ledger.conversation.messages()
+			expect(messages.find((message) => message.call === 'call-1')?.content).toBe(
+				`"${name}" did not run: ${reason}`,
+			)
+			expect(messages.find((message) => message.call === 'call-2')?.content).toBe(
+				`"${name}" did not run: ${LEDGER_NOTES.repeat}`,
+			)
+			expect(evaluated.calls).toEqual([['call-1']])
+			expect(asked.calls).toEqual(verdict === 'ask' ? [['call-1']] : [])
+			expect(asks.calls.map(([call]) => call.id)).toEqual(verdict === 'ask' ? ['call-1'] : [])
+			expect(denies.calls.map(([call, why, decision]) => [call.id, why, decision?.zone])).toEqual([
+				[
+					'call-1',
+					answer === undefined
+						? 'the approver is offline'
+						: verdict === 'deny'
+							? reason
+							: undefined,
+					'records',
+				],
+				['call-2', LEDGER_NOTES.repeat, 'ledger'],
+			])
+			expect(tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+				['call-1', false],
+				['call-2', false],
+			])
+			expect(aborts.calls).toEqual([['repeat']])
+			expect(book.runs).toEqual([])
+			expect(provider.calls.map((call) => call.tools === undefined)).toEqual([false, false, true])
+		},
+	)
+
+	it('asks again for a retry with changed arguments, and runs it when the person approves', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([false, true])
+		const { ledger, tools, aborts } = await serveLedgerCalls(
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: approver.ask }),
+			),
+			[
+				{ id: 'write-1', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } },
+				{ id: 'write-2', name: 'update_contact', arguments: { id: 'C-12', phone: '555-0103' } },
+			],
+		)
+		expect(approver.calls.map(([context]) => context.call.id)).toEqual(['write-1', 'write-2'])
+		expect(tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+			['write-1', false],
+			['write-2', true],
+		])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'write-2')?.content,
+		).toBe('Contact C-12: Mara Quill. Phone 555-0103.')
+		expect(aborts.calls).toEqual([])
+		expect(book.runs).toEqual([['update_contact', 'C-12']])
+	})
+
+	it('asks again in a later request, which can approve the call an earlier request declined', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([false, true])
+		const aborts = createRecorder<AgentEventMap['abort']>()
+		const write = { name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } }
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'write-1', ...write }] },
+				{ content: '', tools: [{ id: 'write-2', ...write }] },
+				{ content: 'Not changed.' },
+				{ content: '', tools: [{ id: 'write-3', ...write }] },
+				{ content: 'Updated.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: approver.ask }),
+			),
+		)
+		ledger.agent.emitter.on('abort', aborts.handler)
+		await ledger.respond("Change Mara Quill's phone to 555-0102.")
+		const second = await ledger.respond("Change Mara Quill's phone to 555-0102 now.")
+		expect(approver.calls.map(([context]) => context.call.id)).toEqual(['write-1', 'write-3'])
+		expect(aborts.calls).toEqual([['repeat']])
+		expect(book.runs).toEqual([['update_contact', 'C-12']])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'write-3')?.content,
+		).toBe('Contact C-12: Mara Quill. Phone 555-0102.')
+		expect(second.content).toBe('Updated.')
+	})
+
+	it.each([
+		[
+			'declines',
+			'update_contact',
+			{ id: 'C-12', phone: '555-0102' },
+			'ask',
+			false,
+			AUTHORITY_NOTES.refused,
+		],
+		[
+			'leaves unanswered',
+			'update_contact',
+			{ id: 'C-12', phone: '555-0102' },
+			'ask',
+			undefined,
+			AUTHORITY_NOTES.unanswered,
+		],
+		[
+			'denies',
+			'update_contact',
+			{ id: 'C-12', phone: '555-0102' },
+			'deny',
+			true,
+			'contacts are read-only',
+		],
+		['declines', 'lookup_contact', { id: 'C-12' }, 'ask', false, AUTHORITY_NOTES.refused],
+		[
+			'leaves unanswered',
+			'lookup_contact',
+			{ id: 'C-12' },
+			'ask',
+			undefined,
+			AUTHORITY_NOTES.unanswered,
+		],
+		['denies', 'lookup_contact', { id: 'C-12' }, 'deny', true, 'contacts are read-only'],
+	] as const)(
+		'in one batch, never enters the approver for the identical twin of a call the authority %s, %s, and reports the ask event of each call it asks',
+		async (_label, name, args, verdict, answer, first) => {
+			const book = new LedgerContactBook()
+			const evaluated = createRecorder<[id: string]>()
+			const asked = createRecorder<[id: string]>()
+			const asks = createRecorder<[id: string]>()
+			const denies = createRecorder<AgentEventMap['deny']>()
+			const aborts = createRecorder<AgentEventMap['abort']>()
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [
+							{ id: 'call-1', name, arguments: args },
+							{ id: 'call-2', name, arguments: args },
+						],
+					},
+					{ content: 'Not changed.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildLedgerContactOptions(
+					book,
+					createAuthority({
+						rules: [
+							{
+								match: (context) => {
+									evaluated.handler(context.call.id)
+									return true
+								},
+								zone: 'records',
+								verdict,
+								reason: 'contacts are read-only',
+							},
+						],
+						fallback: { zone: 'records', verdict: 'allow' },
+						ask: (context) => {
+							asked.handler(context.call.id)
+							if (answer === undefined) throw new Error('the approver is offline')
+							return answer
+						},
+					}),
+				),
+			)
+			ledger.agent.emitter.on('ask', (call) => asks.handler(call.id))
+			ledger.agent.emitter.on('deny', denies.handler)
+			ledger.agent.emitter.on('abort', aborts.handler)
+			await ledger.respond("Change Mara Quill's phone to 555-0102.")
+			const messages = ledger.conversation.messages()
+			expect(messages.find((message) => message.call === 'call-1')?.content).toBe(
+				`"${name}" did not run: ${first}`,
+			)
+			expect(messages.find((message) => message.call === 'call-2')?.content).toBe(
+				`"${name}" did not run: ${verdict === 'ask' ? AUTHORITY_NOTES.refused : LEDGER_NOTES.repeat}`,
+			)
+			expect(evaluated.calls).toEqual(verdict === 'ask' ? [['call-1'], ['call-2']] : [['call-1']])
+			expect(asked.calls).toEqual(verdict === 'ask' ? [['call-1']] : [])
+			expect(asks.calls).toEqual(verdict === 'ask' ? [['call-1'], ['call-2']] : [])
+			expect(denies.calls.map(([call, why, decision]) => [call.id, why, decision?.zone])).toEqual(
+				verdict === 'ask'
+					? [
+							['call-1', answer === undefined ? 'the approver is offline' : undefined, 'records'],
+							['call-2', undefined, 'records'],
+						]
+					: [
+							['call-1', 'contacts are read-only', 'records'],
+							['call-2', LEDGER_NOTES.repeat, 'ledger'],
+						],
+			)
+			expect(aborts.calls).toEqual(verdict === 'ask' ? [] : [['repeat']])
+			expect(book.runs).toEqual([])
+		},
+	)
+
+	it('still asks for the identical retry of an approved write, then stops it as a repeat', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([true, true])
+		const write = { name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } }
+		const { ledger, aborts } = await serveLedgerCalls(
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: approver.ask }),
+			),
+			[
+				{ id: 'write-1', ...write },
+				{ id: 'write-2', ...write },
+			],
+		)
+		expect(approver.calls.map(([context]) => context.call.id)).toEqual(['write-1', 'write-2'])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'write-2')?.content,
+		).toBe(LEDGER_NOTES.repeat)
+		expect(aborts.calls).toEqual([['repeat']])
+		expect(book.runs).toEqual([['update_contact', 'C-12']])
+	})
+
+	it('still runs the identical retry of a write its tool refused for its arguments', async () => {
+		const book = new LedgerContactBook()
+		const approver = createScriptedApprover([true, true])
+		const bad = { kind: 'contact', input: { name: 'Mara Quill', phone: '555-0102' } }
+		const { ledger, tools, aborts } = await serveLedgerCalls(
+			buildLedgerContactOptions(
+				book,
+				createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: approver.ask }),
+				{ lookups: [], writes: [book.change] },
+			),
+			[
+				{ id: 'bad-1', name: 'write_record', arguments: bad },
+				{ id: 'bad-2', name: 'write_record', arguments: bad },
+			],
+		)
+		const messages = ledger.conversation.messages()
+		const refusal = requireValue(messages.find((message) => message.call === 'bad-1')).content
+		expect(refusal).toContain('id')
+		expect(messages.find((message) => message.call === 'bad-2')?.content).toBe(refusal)
+		expect(tools.calls.map(([call, outcome]) => [call.id, outcome.success])).toEqual([
+			['bad-1', false],
+			['bad-2', false],
+		])
+		expect(approver.calls.map(([context]) => context.call.id)).toEqual(['bad-1', 'bad-2'])
+		expect(aborts.calls).toEqual([])
+	})
+})
+
 describe('Ledger — recall after a write', () => {
 	it('leaves a retired read out of the listing and lists a live hidden read', async () => {
 		const book = new LedgerContactBook()

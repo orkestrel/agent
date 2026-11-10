@@ -196,6 +196,25 @@ describe('LedgerRequest', () => {
 		expect(() => request.admit('lookup', { id: 'C-14' })).toThrow(LEDGER_NOTES.repeat)
 	})
 
+	it('reports a denied call by tool name and canonical arguments, apart from its admissions', () => {
+		const request = new LedgerRequest('Check.')
+		expect(request.denied('update', { id: 'C-12', phone: '555-0102' })).toBe(false)
+		request.deny('update', { id: 'C-12', phone: '555-0102' })
+		expect(request.denied('update', { phone: '555-0102', id: 'C-12' })).toBe(true)
+		expect(request.denied('update', { id: 'C-12', phone: '555-0103' })).toBe(false)
+		expect(request.denied('lookup', { id: 'C-12', phone: '555-0102' })).toBe(false)
+		request.admit('update', { id: 'C-12', phone: '555-0102' })
+		request.release('update', { id: 'C-12', phone: '555-0102' })
+		expect(request.denied('update', { id: 'C-12', phone: '555-0102' })).toBe(true)
+		expect(new LedgerRequest('Check.').denied('update', { id: 'C-12', phone: '555-0102' })).toBe(
+			false,
+		)
+		const cycle: Record<string, unknown> = {}
+		cycle.self = cycle
+		request.deny('update', cycle)
+		expect(request.denied('update', cycle)).toBe(false)
+	})
+
 	it('counts recalls up to its limit and closes after it', () => {
 		const request = new LedgerRequest('Check.')
 		Array.from({ length: DEFAULT_RECALL_LIMIT }).forEach(() => request.recall())

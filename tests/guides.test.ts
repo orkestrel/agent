@@ -14,6 +14,7 @@ import type {
 	JudgeInterface,
 	JudgeRequest,
 	JudgeResult,
+	LedgerInterface,
 	LedgerLine,
 	Message,
 	MessageInput,
@@ -3580,6 +3581,9 @@ await new GuideCommand({
 			expect(() => request.admit('lookup_order', { id: 'BW-5512' })).toThrow(LEDGER_NOTES.repeat)
 			request.release('lookup_order', { id: 'BW-5512' })
 			expect(() => request.admit('lookup_order', { id: 'BW-5512' })).not.toThrow()
+			request.deny('refund_order', { id: 'BW-5512' })
+			expect(request.denied('refund_order', { id: 'BW-5512' })).toBe(true)
+			expect(request.denied('refund_order', { id: 'BW-5513' })).toBe(false)
 			request.recall()
 			expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)
 
@@ -3607,6 +3611,12 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				"request.admit('lookup_order', { id: 'BW-5512' }) // passes once more",
+			)
+			expect(guideText).toContain(
+				"request.denied('refund_order', { id: 'BW-5512' }) // true — the ledger denies its identical retry as a repeat",
+			)
+			expect(guideText).toContain(
+				"request.denied('refund_order', { id: 'BW-5513' }) // false — other arguments are another call",
 			)
 			expect(guideText).toContain(
 				'request.recall() // throws Error(LEDGER_NOTES.closure) — the 1 recall call is spent',
@@ -6544,6 +6554,185 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				'Every other failure of a call that reached its tool counts as a run',
+			)
+		})
+
+		it('denies the identical retry of a declined write as a repeat and asks the person once, as the repeat stop claims', async () => {
+			const book = new LedgerContactBook()
+			const approver = createScriptedApprover([false, true])
+			const aborts = createRecorder<readonly [reason: unknown]>()
+			const write = { name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } }
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'write-1', ...write }] },
+					{ content: '', tools: [{ id: 'write-2', ...write }] },
+					{ content: 'Not changed.' },
+					{ content: '', tools: [{ id: 'write-3', ...write }] },
+					{ content: 'Updated.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [book.lookup],
+					writes: [book.write],
+					agent: {
+						authority: barrel.createAuthority({
+							fallback: { zone: 'desk', verdict: 'allow' },
+							ask: approver.ask,
+						}),
+					},
+				}),
+			)
+			ledger.agent.emitter.on('abort', aborts.handler)
+			await ledger.respond("Change Mara Quill's phone to 555-0102.")
+			await ledger.respond("Change Mara Quill's phone to 555-0102 now.")
+
+			expect(
+				ledger.conversation
+					.messages()
+					.filter((message) => message.role === 'tool')
+					.map((message) => message.content),
+			).toEqual([
+				`"update_contact" did not run: ${barrel.AUTHORITY_NOTES.refused}`,
+				`"update_contact" did not run: ${barrel.LEDGER_NOTES.repeat}`,
+				'Contact C-12: Mara Quill. Phone 555-0102.',
+			])
+			expect(approver.calls.map(([context]) => context.call.id)).toEqual(['write-1', 'write-3'])
+			expect(aborts.calls).toEqual([['repeat']])
+			expect(book.runs).toEqual([['update_contact', 'C-12']])
+			expect(guideText).toContain(
+				"When the authority's `evaluate` method denies a lookup or write call, or its ask is declined or left unanswered, the request records the call as denied, and its identical retry in a later turn of the same request is denied with the `repeat` note as its reason before the authority's `evaluate` method reads it and with no ask, so the ledger aborts the pass and the person is asked once.",
+			)
+			expect(guideText).toContain(
+				'A later request asks again, and a call with other arguments is evaluated and asked as before.',
+			)
+			expect(guideText).toContain(
+				'A write that repeats a call the authority denied, declined, or left unanswered in the same request is denied as a repeat before the ask instead.',
+			)
+		})
+
+		it('refuses the batch twin of a declined write without entering the approver and reports its ask event, as the repeat stop claims', async () => {
+			const book = new LedgerContactBook()
+			const approver = createScriptedApprover([false, true])
+			const events = createRecorder<readonly [event: string, id: string]>()
+			const aborts = createRecorder<readonly [reason: unknown]>()
+			const write = { name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } }
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [
+							{ id: 'write-1', ...write },
+							{ id: 'write-2', ...write },
+						],
+					},
+					{ content: 'Not changed.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [book.lookup],
+					writes: [book.write],
+					agent: {
+						authority: barrel.createAuthority({
+							fallback: { zone: 'desk', verdict: 'allow' },
+							ask: approver.ask,
+						}),
+					},
+				}),
+			)
+			ledger.agent.emitter.on('ask', (call) => events.handler('ask', call.id))
+			ledger.agent.emitter.on('deny', (call) => events.handler('deny', call.id))
+			ledger.agent.emitter.on('abort', aborts.handler)
+			await ledger.respond("Change Mara Quill's phone to 555-0102.")
+
+			expect(
+				ledger.conversation
+					.messages()
+					.filter((message) => message.role === 'tool')
+					.map((message) => message.content),
+			).toEqual([
+				`"update_contact" did not run: ${barrel.AUTHORITY_NOTES.refused}`,
+				`"update_contact" did not run: ${barrel.AUTHORITY_NOTES.refused}`,
+			])
+			expect(events.calls).toEqual([
+				['ask', 'write-1'],
+				['deny', 'write-1'],
+				['ask', 'write-2'],
+				['deny', 'write-2'],
+			])
+			expect(approver.calls.map(([context]) => context.call.id)).toEqual(['write-1'])
+			expect(aborts.calls).toEqual([])
+			expect(book.runs).toEqual([])
+			expect(guideText).toContain(
+				"Every call of a batch is evaluated before the first ask, so the identical twin in one batch of a call whose ask was declined or left unanswered reaches the ledger's `ask`, which refuses it without entering the host's approver: the agent reports the twin's `ask` event, then its `deny` event, the twin reads the `refused` note, and its pass goes on.",
+			)
+			expect(guideText).toContain(
+				'The twin of a call the `evaluate` method denied stops as a repeat.',
+			)
+		})
+
+		it('records an approved write whose tool changed before its approval returned, as the repeat stop claims', async () => {
+			const book = new LedgerContactBook()
+			const asked = createRecorder<readonly [id: string]>()
+			const aborts = createRecorder<readonly [reason: unknown]>()
+			const write = { name: 'update_contact', arguments: { id: 'C-12', phone: '555-0102' } }
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'write-1', ...write }] },
+					{ content: '', tools: [{ id: 'write-2', ...write }] },
+					{ content: 'Not changed.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger: LedgerInterface = createLedger(
+				provider,
+				buildGuideLedgerOptions({
+					gauge: { scale: 1, overhead: 0 },
+					lookups: [book.lookup],
+					writes: [book.write],
+					agent: {
+						authority: barrel.createAuthority({
+							fallback: { zone: 'desk', verdict: 'allow' },
+							ask: (context) => {
+								asked.handler(context.call.id)
+								// The host replaces the write's tool while its ask is open, then approves.
+								ledger.agent.context.tools.remove('update_contact')
+								ledger.agent.context.tools.add(
+									createTool({ name: 'update_contact', execute: () => 'replaced' }),
+								)
+								return true
+							},
+						}),
+					},
+				}),
+			)
+			ledger.agent.emitter.on('abort', aborts.handler)
+			await ledger.respond("Change Mara Quill's phone to 555-0102.")
+
+			expect(
+				ledger.conversation
+					.messages()
+					.filter((message) => message.role === 'tool')
+					.map((message) => message.content),
+			).toEqual([
+				`"update_contact" did not run: ${barrel.AUTHORITY_NOTES.unanswered}`,
+				`"update_contact" did not run: ${barrel.LEDGER_NOTES.repeat}`,
+			])
+			expect(asked.calls).toEqual([['write-1']])
+			expect(aborts.calls).toEqual([['repeat']])
+			expect(book.runs).toEqual([])
+			expect(guideText).toContain(
+				"A denial that the agent's `deny` event reports with no decision records nothing: a scope miss, a throwing `evaluate` method or an invalid decision, and a cleared call whose tool changed before dispatch.",
+			)
+			expect(guideText).toContain(
+				'An asked call whose tool changed before its approval returned is denied as unanswered with its decision, so the request records it.',
 			)
 		})
 

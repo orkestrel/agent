@@ -22,3 +22,11 @@
 | 2026-11-10 | The argument refusal release, claim 11, on taverna's surface design | `opus` on `opus` | the commit that carries this row |
 | 2026-11-10 | Independent review of claim 11: PASS; notes on the Agent-level decline retry, a refusal wrapped as an `Error`'s cause, and a bash script the builder left under `tmp/` (deleted) | `reviewer` on `sonnet` | the commit that carries this row |
 | 2026-11-10 | Gates: format, lint, check, `test:src` 2710, `test:policy` 179 plus 1 skipped, `test:config` 544 plus 1 skipped, `test:setup` 353, `test:guides` 209 | `verifier` on `haiku` | the commit that carries this row |
+| 2026-11-10 | The user's ruling: the identical retry of a call the authority denied stops as `repeat`, with the person asked once, and ships in 0.0.40 as claim 12 | user | `plan.md` § Claims |
+| 2026-11-10 | The denied-call repeat stop, claim 12 | `opus` on `opus` | the commit that carries this row |
+| 2026-11-10 | Independent review of claim 12: PASS; notes on the batch twin's TSDoc, the `ask` event and chunk a refused twin still drew, the guide sentence about a changed tool, and the write-only batch test, each ruled in by the Orchestrator | `reviewer` on `sonnet` | the commit that carries this row |
+| 2026-11-10 | The review's four notes: the twin's TSDoc, a `refused` member of `AuthorityInterface` that kept a refused call unannounced, the changed-tool guide sentence, and the lookup batch-twin test | `opus` on `opus` | the commit that carries this row |
+| 2026-11-10 | Design pass on the `refused` member: remove it and keep the ledger's composed `ask` refusal, which leaves the person asked once with the twin's `ask` event announced | `planner` on `opus` | the commit that carries this row |
+| 2026-11-10 | The `refused` member removed, the composed `ask` refusal restored, and the twin's `ask` event documented | `opus` on `opus` | the commit that carries this row |
+| 2026-11-10 | Independent review of claim 12 under option (b): PASS, the `ask`-check mutation replayed | `reviewer` on `sonnet` | the commit that carries this row |
+| 2026-11-10 | Gates: format, lint, check, `test:src` 2727, `test:policy` 179 plus 1 skipped, `test:config` 544 plus 1 skipped, `test:setup` 353, `test:guides` 212 | `verifier` on `haiku` | the commit that carries this row |

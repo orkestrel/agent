@@ -43,7 +43,7 @@ import { createTool, createToolManager, isToolError } from '@orkestrel/tool'
 import { Authority } from '../agents/Authority.js'
 import { createAgent } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
-import { estimateMessages, settleToolResult } from '../agents/helpers.js'
+import { denyCall, estimateMessages, settleToolResult } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
 import { createConversationManager } from '../conversations/factories.js'
 import {
@@ -287,15 +287,23 @@ export class Ledger implements LedgerInterface {
 			system: options.system,
 			tools,
 			authority: {
+				// In one request, the identical retry of a call the authority denied stops as a repeat, unevaluated.
 				evaluate: (context) =>
-					host === undefined || context.call.name === 'recall' || !names.includes(context.call.name)
-						? advertised.evaluate(context)
-						: host.evaluate(context),
-				// A host without an approver leaves each asked call unanswered, as the ledger's own does.
+					this.#current()?.denied(context.call.name, context.call.arguments) === true
+						? { zone: 'ledger', verdict: 'deny', reason: LEDGER_NOTES.repeat }
+						: host === undefined ||
+							  context.call.name === 'recall' ||
+							  !names.includes(context.call.name)
+							? advertised.evaluate(context)
+							: host.evaluate(context),
+				// A host without an approver leaves each asked call unanswered, as the ledger's own does. A
+				// batch twin of a call whose ask was declined or left unanswered is refused unasked.
 				ask: (context, decision, signal) =>
-					host?.ask === undefined
-						? advertised.ask(context, decision, signal)
-						: host.ask(context, decision, signal),
+					this.#current()?.denied(context.call.name, context.call.arguments) === true
+						? Promise.resolve(false)
+						: host?.ask === undefined
+							? advertised.ask(context, decision, signal)
+							: host.ask(context, decision, signal),
 			},
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),
@@ -315,10 +323,22 @@ export class Ledger implements LedgerInterface {
 			})
 			this.#digest = digest
 		}
+		// A lookup or write call the authority denies, or whose ask is declined or left unanswered, stays
+		// denied for the rest of the request.
+		this.#agent.emitter.on('deny', (call, _reason, decision) => {
+			if (decision !== undefined && call.name !== 'recall' && names.includes(call.name))
+				this.#current()?.deny(call.name, call.arguments)
+		})
 		this.#agent.emitter.on('tool', (call, result) => {
 			this.#flush()
 			this.#pending.set(this.#conversation.messages().length, result)
-			if (!result.success && result.error === LEDGER_NOTES.repeat) {
+			// A repeated call, and the identical retry of a denied one, end the pass.
+			const stopped = denyCall(call, LEDGER_NOTES.repeat)
+			if (
+				!result.success &&
+				(result.error === LEDGER_NOTES.repeat ||
+					(!stopped.success && result.error === stopped.error))
+			) {
 				this.#current()?.close()
 				this.#agent.abort('repeat')
 			}
