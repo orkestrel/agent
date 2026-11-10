@@ -19,9 +19,6 @@ A host gives a small local model progressive reach to everything its principal m
 | Repository | URL |
 | --- | --- |
 | agent | https://github.com/orkestrel/agent |
-| toolbox | https://github.com/orkestrel/toolbox |
-
-`@orkestrel/toolbox` changes only where the design round places a piece there.
 
 ## Governing skills
 
@@ -61,6 +58,10 @@ A host gives a small local model progressive reach to everything its principal m
 ## Rulings
 
 - **The user, 2026-11-10:** the capabilities above are built into the Agent stack, with proper authority, before taverna writes its own. Taverna's surface, harness, retire, and ingress units wait on this campaign.
+- **The user, 2026-11-10, on placement:** "I don't want toolbox to be a dependency … In my mind toolbox is really going to be for a general use MCP type of package for all orkestrel packages that we can have not specifically agent. I can see how it can have some agent stuff that would work internally and that we can simplify what toolbox has with what agent will now have built in but not the other way around."
+  - Every disclosure capability lives in Agent's core.
+  - Agent never depends on `@orkestrel/toolbox`.
+  - Toolbox may later build on Agent's built-ins, and § Deferred carries that.
 - **Authorship:**
   - Host-authored text alone enters privileged context.
   - A model-authored memo, a record, and workspace data stay data.
@@ -73,8 +74,14 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 
 ## Open decisions
 
-- **Placement:** whether each loader sits in Agent's core or in `@orkestrel/toolbox`. The method's example names toolbox as the model-driven loader's owner (`4d897eec`), and the user's ruling of 2026-11-10 asks for the capability built in.
 - **The campaign's size:** the estimate, the spend ceiling, and the stop line, agreed with the user after the design round.
+
+## Deferred
+
+| Item | Trigger | Owner |
+| --- | --- | --- |
+| `@orkestrel/toolbox`'s agent-facing tools (`createWorkspaceTool`'s switch, `createDescribeTool`, `createAgentTool`) simplified onto Agent's built-ins | This campaign's release, at toolbox's next visit | `@orkestrel/toolbox` |
+| The method's example naming `@orkestrel/toolbox` as the owner of the model-driven loader (`orkestrel-harden` `references/methods.md`, Agent `4d897eec`) | This campaign's release | the scaffold session |
 
 ## State
 
