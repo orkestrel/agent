@@ -73,6 +73,9 @@ A host gives a small local model progressive reach to everything its principal m
   - The design round reconciles into a draft.
   - A read-only consultant decides the final design from every input, given up front.
   - Refuters test its claims before any unit is briefed.
+- **The user, 2026-11-10, on phases:** "it may be worth splitting the work into phases since they are heavy work and need refinement, especially the delegation and how scope works with proper care for security. I think you named what the biggest points about what is incompatible is what we need to work out thoroughly"
+  - The campaign runs in four phases. Each phase closes on its own claims, review, and tree-wide gates before the next phase's units start.
+  - Delegation is the last phase, behind a design checkpoint.
 - **Authorship:**
   - Host-authored text alone enters privileged context.
   - A model-authored memo, a record, and workspace data stay data.
@@ -100,7 +103,8 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | --- | --- |
 | Absorb | three distiller reads and a module map, 2026-11-10 |
 | Design round | both lanes returned, each revised for the scope ruling; they agree on the ceiling and disclosure split, built-in tools under authority, the head refresh, advertised-set pricing, and closing ROADMAP items 67 and 68; 14 points are incompatible |
-| Next | the final design from the consultant, on the reconciliation of both lanes |
+| Final design | decided by the consultant on every input. Its four phases are scope and the ceiling; disclosure in the agent; disclosure in the ledger, with the consumer run and the 4B reading; and delegation behind a checkpoint. Two refutations read 255 claims and found 36 failures, 1 stale fact, and 14 unverifiable claims. The design repaired 65 findings and refuted 1. A re-audit closed 57 of the repairs, a closure pass corrected the other 8, and the closure check closed all 8. Its estimate is 19.5 units, about 66 lane hours at 3.4 hours a unit (wall time, `git log 19f72405~1..7718f390`), plus at most 2.4 runner hours. |
+| Next | the user rules the estimate, the spend ceiling, the stop line, and the open decisions; then the design's claims, bar, stops, and deferrals enter this record before the first phase's units start |
 
 ## Sequence
 
