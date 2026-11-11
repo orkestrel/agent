@@ -85,6 +85,14 @@ A host gives a small local model progressive reach to everything its principal m
 - **The user's standing ruling, 2026-11-10, for every session:** "Honestly, these continuous questions about how many hours are getting annoying, you need to reassess by yourself in terms of reasonability and if it is within what is needed for quality and performance, it's something I want you and the other sessions to do and stop with the annoying checks about how many hours work is and just do the best to get stuff done well and fast."
   - The Orchestrator sets each phase's estimate and ceiling, keeps the work proportionate, and reports the figures in § State.
   - Publishing codes, credentials, scope, and product decisions still go to the user.
+- **The user, 2026-11-11, on phase 0's probes:** "to bring more context to the value of the upfront work is that it is evidence that is also front loading with the work for both the implementation and the tests/studies/journeys that would be promoted if they are adopted."
+  - Each phase promotes the phase 0 probes it adopts:
+    - phase 1: the fan-out probe into 1A, and the scope, digest, stub, and room probes into 1B and 1C
+    - phase 2: the derivation table into `collectDisclosure`'s tests
+    - phase 3: the density harness into the ledger's pricing proof, and the efficacy harness into the 4B reading's study under `studies/`
+    - phase 4: the checkpoint probes into the delegation tests
+- **The user, 2026-11-11, on promotion:** "make sure they are not just copy and pasted either, you usually get plenty of leeway to do what you want when you come up with these probes but when you promote them they must strictly follow our conventions and rules and be adopted accordingly making sure they are renamed, organized, placed, and written correctly as expected of any other part of the project."
+  - Each unit's review judges promoted code as it judges any other code.
 - **Authorship:**
   - Host-authored text alone enters privileged context.
   - A model-authored memo, a record, and workspace data stay data.
@@ -101,6 +109,7 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | --- | --- | --- |
 | `@orkestrel/toolbox`'s agent-facing tools (`createWorkspaceTool`'s switch, `createDescribeTool`, `createAgentTool`) simplified onto Agent's built-ins | This campaign's release, at toolbox's next visit | `@orkestrel/toolbox` |
 | The method's example naming `@orkestrel/toolbox` as the owner of the model-driven loader (`orkestrel-harden` `references/methods.md`, Agent `4d897eec`) | This campaign's release | the scaffold session |
+| Phase 1's five deferrals, each with its trigger in `designs/disclosure.md` § The deferral list: `scanJobTree`'s cost on deep job trees, the scan and spawn reading `children` more than once, a malformed child bound refused only at the child's build, a supplied `gauge` refusing after a tool is added, and `ledger.agent.emitter`'s write members | each row's own | Agent |
 
 ## State
 
@@ -118,8 +127,12 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | Phase 0, density on the 4B | YES on 9 samples with noise 0, 54 calls in 125 s, on runner 0.40.15. The addition term ships as written. Margins under the bound run 4% to 8% on desk areas and 11% on areas of taverna's mean size. The runner counts cached tokens inside the prompt. |
 | Phase 0, efficacy on the 4B | It ran on a rebuilt desk catalog of 36 tools in 6 areas, because the original was swept on 2026-11-08 with no commit. Index plus `load`: 41 of 42 right, 15 of 15 loads opening the right area, median prompt 2721. All 36 tools: 42 of 42 at 6502. The oracle area: 42 of 42 at 1948. Each opened area costs one turn. The one miss called a shown tool when the needed area was hidden. Area guidance arrived as the `load` result, standing in for phase 2's head refresh. |
 | Runner | Ollama v0.40.16 is the latest stable, published 2026-11-09; the runner and taverna's profiles pin 0.40.15. A new lineage comes before phase 3's reading and taverna's first sealed run. |
-| Phase 1 estimate | weight 4.75, about 16 lane hours, set by the Orchestrator |
-| Next | phase 1: units 1A (the fan-out check) and 1B (the run scope and the `request` event) in parallel, then 1C (the ledger) |
+| Phase 1 estimate | weight 4.75, about 16 lane hours, set by the Orchestrator; the round's repair adds 0.75 |
+| Phase 1, units | Built and closed, uncommitted. 1A (the fan-out check) closed after two repair briefs and a closure check. 1B (the run scope and the `request` event) closed after a follow-up killed its review's five surviving mutations. 1C (the ledger) failed its review on the plan's scope and closed after one repair and a re-check that passed. The integrated tree passes 2868 `test:src` tests. |
+| Phase 1, the round | Both lanes confirmed every composed claim but one. A run on another conversation of a ledger's agent still reached the ledger through every listener but `request`, as at 0.0.40. The consultant ruled that `ledger.agent` holds no member that starts a run (claims 1.18 to 1.23). Five findings below the bar entered § Deferred. The 160-scenario differential against `e6a3ae75` is byte-identical. |
+| Phase 1, documentation | 1D's guide pass is done, with `test:guides` at 220 of 220 and items 67 and 68 removed from `ROADMAP.md`. Its TSDoc pass follows the repair. |
+| ROADMAP item 66 | prepared ahead of workflow's layer-4 release as one batched run: the runtime closure of eleven packages moves to the contract 0.0.23 wave, with the release proof red on the old range and no change in `src/` |
+| Next | the repair unit (the ledger's agent), with its re-audit and closure check; then 1D's TSDoc pass, `verifier` tree-wide, and the phase 1 commit |
 
 ## Sequence
 

@@ -26,3 +26,14 @@
 | 2026-11-11 | Phase 0, the delegation checkpoint probes K1a to K5 | `builder` on `sonnet` | `plan.md` § State |
 | 2026-11-11 | Phase 0, the density and efficacy harnesses, scripted | `opus` on `opus` | `plan.md` § State |
 | 2026-11-11 | Phase 0, the density probe and the efficacy prototype on the 4B | Orchestrator | `plan.md` § State |
+| 2026-11-11 | The user's rulings: phase 0's probes are front-loaded work, promoted into the tests, studies, and journeys that adopt them, and adopted to the repository's rules rather than copied | user | `plan.md` § Rulings |
+| 2026-11-11 | Phase 1 unit 1A, the fan-out check, with two repair briefs | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 1 unit 1A's review, re-check, and closure check | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 1 unit 1B, the run scope and the `request` event, with the follow-up that killed five surviving mutations | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 1 unit 1B's review | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 1 unit 1C, the ledger, with one repair of the plan's scope | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 1 unit 1C's review (fail on the plan's scope) and re-check (pass) | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 1's falsify round, subjective and objective lanes: every composed claim confirmed but one, a run on another conversation of a ledger's agent | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | The design question that finding opened: `ledger.agent` holds no member that starts a run, claims 1.18 to 1.23 | `planner` on `fable` | `designs/disclosure.md` § Phase 1 |
+| 2026-11-11 | Phase 1 unit 1D's guide pass | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | ROADMAP item 66 prepared ahead of workflow's layer-4 release | `opus` on `opus` | `plan.md` § State |

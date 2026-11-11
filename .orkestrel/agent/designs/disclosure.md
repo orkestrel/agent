@@ -173,12 +173,13 @@ Phases 1 to 4 alone weigh 19.5 units, about 66 lane hours. The probe rows inside
 | 1B run scope and the `request` event | `contexts/types.ts` (`ContextBuildOptions` with `selection` and `scope`; `select`'s fourth parameter), `contexts/AgentContext.ts`, `contexts/helpers.ts` (`intersectFilters`), `contexts/validators.ts` (`isScope`), `scopes/Scope.ts`, `agents/types.ts` (`AgentRunOptions.scope`, `AgentEventMap.request`), `agents/helpers.ts` (`requireScope`), `agents/Agent.ts`, their tests; the call form of all seven `build` callers (F45) and of each existing guide fence that calls `build` | — | first | medium: a public type, concurrency | 1.25 |
 | 1C ledger | `ledgers/Ledger.ts`, `ledgers/helpers.ts` (`renderStub`), their tests | 1B | serial | medium | 1.25 |
 | Falsify round and its repairs | — | 1C | — | — | 0.75 |
+| Repair: the ledger's agent (claims 1.18 to 1.23) | `ledgers/types.ts` (`LedgerAgentInterface`, `LedgerInterface.agent`), `ledgers/Ledger.ts` (the `agent` record and getter, the `request` listener), their tests, the direct-run proofs in `tests/setup.ts` and `tests/guides.test.ts`, and each guide sentence a removed proof pinned | the round | before 1D's TSDoc pass | medium: a public type | 0.75 |
 | 1D documentation | `guides/agent.md`, `tests/guides.test.ts`, TSDoc of 1A to 1C, `ROADMAP.md` | the round | after the round | medium | 0.5 |
 | Verifier, tree-wide, one time | — | 1D | — | — | 0.25 |
 
 **What 1C changes.**
 
-- A `request` listener replaces the `turn` listener (L:355). It reads only an event whose conversation is the ledger's. The gauge call's estimate is `estimateMessages(request.messages)` and its `tools` is the length of `request.tools`. `#observeTurn` builds nothing, so the caller at L:1665 goes.
+- A `request` listener replaces the `turn` listener (L:355). After the round's repair it reads every `request` event, because every run on the ledger's agent is a pass of the active `respond` call (claim 1.19). The gauge call's estimate is `estimateMessages(request.messages)` and its `tools` is the length of `request.tools`. `#observeTurn` builds nothing, so the caller at L:1665 goes.
 - A run takes one scope, so each pass builds one. The first pass's run scope is the scope the request entered with (L:463). The answer pass's run scope is that entry scope intersected with `{ tools: [] }` through `intersectFilters`, under the name `answer` and with the answer's `select`; with no entry scope it is `createScope({ name: 'answer', tools: [], select })`. The answer pass never touches `context.scope` (F17).
 - A scope widened during a request therefore adds no tool, instruction, skill, memo, or file to either pass before the next request, and a scope narrowed during it still reaches the next turn's tools.
 - The plan's `recall` narrowing keeps its `apply` and restore (F1).
@@ -207,7 +208,22 @@ Phases 1 to 4 alone weigh 19.5 units, about 66 lane hours. The probe rows inside
 - **1.16** `scaffold surface` reports no collision for `ContextBuildOptions`, `intersectFilters`, `isScope`, `requireScope`, and `scanJobTree`. *Gate.*
 - **1.17** The fan-out check walks the whole tree under a root job before that root spawns or runs: a violation at any depth refuses the root with `AgentError('REGISTRY')`, and no unit of the tree has run. Each descendant is audited through `agentJobContract` first, so a malformed child refuses with `'REGISTRY'` and its faults, never a `TypeError`. *Scripted with a depth-2 violation and a malformed grandchild, counting provider calls.*
 
-**Release bar.** Claims 1.1 to 1.17 closed with independent receipts; the round all-confirmed or repaired, re-audited one time, and closed; the tree-wide gates green, with the `distribution` project. A finding outside the claims blocks only on a consequence § The release bar lists.
+**The round's repair: the ledger's agent.** The falsify round found that a run on another conversation of a ledger's agent still reaches the ledger. Of the ledger's listeners, only `request` read the conversation, so such a run moved the gauge, shared the repeat stop, aborted the ledger's pass, and read the ledger's conversation through `recall` and the lookups. The listeners were already unscoped at `e6a3ae75`.
+
+The consultant ruled that the ledger removes the capability rather than check each event. `LedgerInterface.agent` becomes `LedgerAgentInterface`, `Pick<AgentInterface, 'emitter' | 'id' | 'status' | 'context' | 'abort'>`, one frozen record built in the constructor, so `respond` is the only caller that can start a run on the ledger's agent. The ledger starts a run at one site, bound to its conversation, and `respond` admits one call at a time, so every unscoped read of the listeners reads the request of the run that emitted the event. The `request` listener drops its conversation comparison, which no reachable input can make false. `#select`'s ownership check stays, because a host can still call `agent.context.select` by hand. Nothing changes in `Agent.ts` or `AgentEventMap`; claim 1.7 stands for a bare agent's overlapping runs.
+
+Two alternatives were ruled out:
+- Per-run identity on events leaves the tool half open, because `ToolContext` and `AuthorityContext` carry no run.
+- Stating the rule and deferring leaves open a run whose newest message isn't a user message, which reaches the provider under the default `strict`.
+
+- **1.18** `ledger.agent` holds `emitter`, `id`, `status`, `context`, and `abort`, and no `generate` or `stream` member, own or inherited, on a ledger built bare and on one hydrated from a snapshot. The value is frozen. `ledger.agent.generate` and `ledger.agent.stream` do not typecheck. *Scripted, with a type proof; red on `e6a3ae75`; mutation that returns the agent itself.*
+- **1.19** Every run on the ledger's agent is a pass of the active `respond` call. Over requests that take one pass and requests that take the answer pass, the `start` events equal the passes the results report, and each `request` event's conversation is the ledger's. *Scripted.*
+- **1.20** The record is live: `agent.status` reads `running` during a pass and the settled status after it, and `agent.abort(reason)` ends the active pass partial with that reason. *Scripted; mutation that copies `status` at construction.*
+- **1.21** A direct `agent.context.select` for a message no active `respond` call owns returns a selection whose `fault` is `LedgerError('REQUEST')`, on the ledger's conversation and on another one, and the refusal over another conversation carries that conversation's view alone. *Scripted, restating the existing cases without a run; mutation of the conversation comparison in `#select`.*
+- **1.22** A lookup tool that awaits a second thread, written the only way the surface allows (a second ledger or a second agent), leaves the first ledger's gauge after both requests equal to its control arm's. *Scripted, on a deterministic provider.*
+- **1.23** `scaffold surface` reports no collision for `LedgerAgentInterface`. *Gate.*
+
+**Release bar.** Claims 1.1 to 1.23 closed with independent receipts; the round all-confirmed or repaired, re-audited one time, and closed; the tree-wide gates green, with the `distribution` project. A finding outside the claims blocks only on a consequence § The release bar lists.
 
 **Stops.**
 
@@ -1436,6 +1452,7 @@ remember:  admit when (committed + scale × estimateTokens(the index line)) × (
 | A child's conversation, budget, and window | created for one delegate call | one call |
 | Memos | the agent's `MemoManager` (AC:105, AC:125) | every run of the agent. It holds one principal's memos only where the host builds one agent, or one memo set, per principal (G:2584). On an agent that serves several threads, a run reads what its ceiling's `memos` list admits, and writes only where that list is defined and only what its own conversation wrote. |
 | The agent's workspace pointer | `WorkspaceManager` | never moved by a built-in |
+| A ledger's agent | the ledger, which exposes it as `LedgerAgentInterface` | no run but the active `respond` call's pass (claim 1.19) |
 
 No per-run instruction text exists: a run selects instructions through its scope's list, and adds guidance by showing a skill.
 
@@ -1524,8 +1541,13 @@ Every other finding enters the deferral list.
 | The generic-surface arm of the reading | taverna's gate, on its own catalog | taverna |
 | `@orkestrel/toolbox`'s `createWorkspaceTool` switch, `createDescribeTool`, and `createAgentTool` rebuilt on Agent's built-ins and delegates; `createAgentTool` lets a call's arguments set the child's `tools` and `system` (`@orkestrel/toolbox` `src/core/types.ts:371-375` [lane]) | the phase 3 release for the first two, the phase 4 release for the third, at toolbox's next visit | `@orkestrel/toolbox` |
 | The `methods.md` example that names `@orkestrel/toolbox` as the loader's owner (`methods.md:406`) | the phase 3 release | `@orkestrel/scaffold` |
+| `scanJobTree`'s cost: each node's audit reads its whole subtree, and each spawned unit scans its own again, so a chain costs about depth squared (54 ms at depth 160, 1.9 s at 1000, 7.7 s at 2000, with the event loop blocked) | a consumer with job trees deeper than a few levels | Agent |
+| The scan and the spawn each read a job's `children`, so a getter-backed job that answers differently by read could pass the scan and spawn another set. The job record is host data. | a host whose job records are not plain data | Agent |
+| A child with a negative or fractional `limit`, `timeout`, or `budget` passes the scan and refuses at its own build, after the root has run, as at 0.0.40 | a consumer that needs a malformed child refused before the root runs | Agent |
+| A host-supplied `gauge` recalibrates once the definitions change (claim 1.11), so a host whose provider reports no prompt usage gets `LedgerError('GAUGE')` after adding a tool | such a host | Agent |
+| `ledger.agent.emitter` exposes `emit`, `clear`, and `destroy`, as every agent's does, so host code holding it can emit a `usage` event or clear the ledger's listeners | a host that hands a ledger's emitter to code it does not trust | Agent |
 
-ROADMAP items the campaign closes: 67 and 68 in phase 1; the first clause of 37 in phase 2; 6 at the end of phase 3, after its reading; 9 in phase 5. Item 8 is ruled in phase 3.
+ROADMAP items the campaign closes: 67 and 68 in phase 1; the first clause of 37 in phase 2; 6 at the end of phase 3, after its reading; 9 in phase 5. Item 8 is ruled in phase 3. Phase 1's repair also removes item 9's second trigger, "an application runs a ledger's agent on another conversation", because the ledger holds no member that starts such a run. Item 9's other trigger and phase 5's binding stay.
 
 ## The 4B reading
 
