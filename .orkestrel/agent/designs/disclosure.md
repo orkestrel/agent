@@ -1546,6 +1546,7 @@ Every other finding enters the deferral list.
 | A child with a negative or fractional `limit`, `timeout`, or `budget` passes the scan and refuses at its own build, after the root has run, as at 0.0.40 | a consumer that needs a malformed child refused before the root runs | Agent |
 | A host-supplied `gauge` recalibrates once the definitions change (claim 1.11), so a host whose provider reports no prompt usage gets `LedgerError('GAUGE')` after adding a tool | such a host | Agent |
 | `ledger.agent.emitter` exposes `emit`, `clear`, and `destroy`, as every agent's does, so host code holding it can emit a `usage` event or clear the ledger's listeners | a host that hands a ledger's emitter to code it does not trust | Agent |
+| A host's own call to `agent.context.select` with the active request's message, during a pass, files that request again, so the result's `attempts` doubles. No message is stored twice. | a host that calls `select` itself during a pass | Agent |
 
 ROADMAP items the campaign closes: 67 and 68 in phase 1; the first clause of 37 in phase 2; 6 at the end of phase 3, after its reading; 9 in phase 5. Item 8 is ruled in phase 3. Phase 1's repair also removes item 9's second trigger, "an application runs a ledger's agent on another conversation", because the ledger holds no member that starts such a run. Item 9's other trigger and phase 5's binding stay.
 

@@ -310,6 +310,7 @@ import type {
 	GaugeOptions,
 	LedgerCategory,
 	LedgerClassification,
+	LedgerGauge,
 	LedgerInterface,
 	LedgerLine,
 	LedgerLookupFinding,
@@ -403,6 +404,7 @@ import {
 	agentFrameContract,
 	CONVERSATION_RECAP_PREFIX,
 	CONVERSATION_ROLES,
+	DEFAULT_AGENT_LIMIT,
 	createAgent,
 	createAuthority,
 	createChannel,
@@ -980,6 +982,43 @@ export function seedCompactionAgent(
 	return { agent, conversation, provider }
 }
 
+/**
+ * Seeds an agent over one recorded `lookup` tool whose first `turn` listener records the context
+ * scope's `tools` list, the read a later listener or the scheduler yield can outdate, beside
+ * recorders for each `request` and `deny`.
+ *
+ * @param turns - The scripted provider turns
+ * @param options - The agent's scope, limit, and scheduler
+ * @returns The agent, its provider, and its recorders
+ */
+export function seedLookupAgent(
+	turns: readonly ScriptedTurn[],
+	options?: Pick<AgentOptions, 'scope' | 'limit' | 'scheduler'>,
+): {
+	readonly agent: AgentInterface
+	readonly provider: ScriptedProviderInterface
+	readonly executed: RecorderInterface<[Readonly<Record<string, unknown>>]>
+	readonly reads: RecorderInterface<readonly [tools: readonly string[] | undefined]>
+	readonly requests: RecorderInterface<AgentEventMap['request']>
+	readonly denied: RecorderInterface<AgentEventMap['deny']>
+} {
+	const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+	const reads = createRecorder<readonly [tools: readonly string[] | undefined]>()
+	const requests = createRecorder<AgentEventMap['request']>()
+	const denied = createRecorder<AgentEventMap['deny']>()
+	const tools = createToolManager()
+	tools.add(createRecordedTool('lookup', executed))
+	const provider = createScriptedProvider(turns, AGENT_SCRIPT_OPTIONS)
+	const agent = createAgent(provider, {
+		...options,
+		tools,
+		authority: AGENT_AUTHORITY,
+		on: { request: requests.handler, deny: denied.handler },
+	})
+	agent.emitter.on('turn', () => reads.handler(agent.context.scope?.tools))
+	return { agent, provider, executed, reads, requests, denied }
+}
+
 /** Creates the final-answer provider used by compaction cases. */
 export const createAnswerProvider = (): ReturnType<typeof createScriptedProvider> =>
 	createScriptedProvider([{ result: { content: 'final answer' } }], {
@@ -1431,6 +1470,177 @@ export const AGENT_JOB_CASES = [
 export const PARTIAL_TURNS = Object.freeze([
 	{ content: 'a', tools: [{ id: 'c', name: 'loop', arguments: {} }], usage: JOB_USAGE },
 ] as const)
+
+/** Holds the seed every fan-out job starts from. */
+export const FANOUT_SEED = Object.freeze<readonly MessageInput[]>([{ role: 'user', content: 'go' }])
+
+/** Holds the job the fan-out cases start from: provider `main`, the `loop` tool, and the `allow` authority. */
+export const FANOUT_JOB = Object.freeze<AgentJobInput>({
+	provider: 'main',
+	messages: FANOUT_SEED,
+	tools: ['loop'],
+	authority: 'allow',
+})
+
+/** Pairs a named parent job with one child job. */
+export interface FanoutCase {
+	readonly name: string
+	readonly parent: AgentJobInput
+	readonly child: AgentJobInput
+}
+
+/** Pairs a parent job with a child job that exceeds it on one member, named by that member. */
+export interface FanoutExcessCase extends FanoutCase {
+	readonly member: string
+}
+
+/** Lists a parent and a child that exceeds it on one member, for every member the fan-out check holds. */
+export const FANOUT_EXCESS_CASES = Object.freeze<readonly FanoutExcessCase[]>([
+	{
+		name: 'a tool its parent does not name',
+		member: 'tools',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, tools: ['loop', 'add'] },
+	},
+	{
+		name: 'a tool under a parent with an empty tools list',
+		member: 'tools',
+		parent: { ...FANOUT_JOB, tools: [] },
+		child: FANOUT_JOB,
+	},
+	{
+		name: 'a tool under a parent with no tools',
+		member: 'tools',
+		parent: { provider: 'main', messages: FANOUT_SEED, authority: 'allow' },
+		child: FANOUT_JOB,
+	},
+	{
+		name: 'another authority',
+		member: 'authority',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, authority: 'other' },
+	},
+	{
+		name: 'an authority under a parent with none',
+		member: 'authority',
+		parent: { provider: 'main', messages: FANOUT_SEED },
+		child: { provider: 'main', messages: FANOUT_SEED, authority: 'allow' },
+	},
+	{
+		name: 'another provider',
+		member: 'provider',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, provider: 'other' },
+	},
+	{
+		name: 'a scheduler under a parent with none',
+		member: 'scheduler',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, scheduler: 'pace' },
+	},
+	{
+		name: 'another scheduler',
+		member: 'scheduler',
+		parent: { ...FANOUT_JOB, scheduler: 'pace' },
+		child: { ...FANOUT_JOB, scheduler: 'other' },
+	},
+	{
+		name: 'a larger limit',
+		member: 'limit',
+		parent: { ...FANOUT_JOB, limit: 2 },
+		child: { ...FANOUT_JOB, limit: 5 },
+	},
+	{
+		name: 'no limit, which reads the default, under a smaller one',
+		member: 'limit',
+		parent: { ...FANOUT_JOB, limit: 2 },
+		child: FANOUT_JOB,
+	},
+	{
+		name: 'a larger timeout',
+		member: 'timeout',
+		parent: { ...FANOUT_JOB, timeout: 1000 },
+		child: { ...FANOUT_JOB, timeout: 5000 },
+	},
+	{
+		name: 'no timeout under a parent with one',
+		member: 'timeout',
+		parent: { ...FANOUT_JOB, timeout: 1000 },
+		child: FANOUT_JOB,
+	},
+	{
+		name: 'a larger budget',
+		member: 'budget',
+		parent: { ...FANOUT_JOB, budget: 1000 },
+		child: { ...FANOUT_JOB, budget: 5000 },
+	},
+	{
+		name: 'no budget under a parent with one',
+		member: 'budget',
+		parent: { ...FANOUT_JOB, budget: 1000 },
+		child: FANOUT_JOB,
+	},
+])
+
+/** Lists parent and child pairs that sit within the fan-out check on every member. */
+export const FANOUT_WITHIN_CASES = Object.freeze<readonly FanoutCase[]>([
+	{
+		name: 'equal to its parent on every member',
+		parent: { ...FANOUT_JOB, scheduler: 'pace', limit: 2, timeout: 1000, budget: 1000 },
+		child: { ...FANOUT_JOB, scheduler: 'pace', limit: 2, timeout: 1000, budget: 1000 },
+	},
+	{
+		name: 'absent where a member admits absence',
+		parent: { ...FANOUT_JOB, scheduler: 'pace' },
+		child: { provider: 'main', messages: FANOUT_SEED },
+	},
+	{
+		name: 'smaller on every bound',
+		parent: { ...FANOUT_JOB, tools: ['loop', 'add'], limit: 4, timeout: 1000, budget: 1000 },
+		child: { ...FANOUT_JOB, limit: 2, timeout: 500, budget: 500 },
+	},
+	{
+		name: 'with the default limit under a parent with none',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, limit: DEFAULT_AGENT_LIMIT },
+	},
+	{
+		name: 'with another system prompt and seed',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, system: 'Child.', messages: [{ role: 'user', content: 'child' }] },
+	},
+])
+
+/** Holds the fan-out fixture: a registry and the two recorded providers it serves. */
+export interface FanoutFixture {
+	readonly registry: AgentRegistryInterface
+	readonly main: ScriptedProviderInterface
+	readonly other: ScriptedProviderInterface
+}
+
+/**
+ * Creates the fan-out fixture: a registry over the recorded providers `main` and `other`, the
+ * `loop` and `add` tools, the authorities `allow` and `other`, and the scheduler `pace`.
+ *
+ * @param turns - The turns each provider answers. Default: one `done` reply
+ * @returns The registry and its two providers
+ */
+export function createFanoutFixture(
+	turns: readonly ScriptedTurn[] = [{ content: 'done' }],
+): FanoutFixture {
+	const main = createScriptedProvider(turns, { recorded: true, repeat: false })
+	const other = createScriptedProvider(turns, { recorded: true, repeat: false })
+	return {
+		main,
+		other,
+		registry: createAgentRegistry({
+			providers: { main, other },
+			tools: { loop: createLoopTool(), add: createAddTool() },
+			authorities: { allow: AGENT_AUTHORITY, other: AGENT_AUTHORITY },
+			schedulers: { pace: createRecordedScheduler() },
+		}),
+	}
+}
 
 /**
  * Describes the serializable job fields exercised by durable queue cases, narrower than the published
@@ -2505,6 +2715,86 @@ export async function serveLedgerGauge(options: Omit<LedgerOptions, 'gauge'>) {
 	const ledger = createLedger(provider, options)
 	await ledger.respond('Brightwater Studio renews in May.')
 	return { ledger, provider, snapshot: ledger.snapshot() }
+}
+
+/** Names the second thread a ledger's lookup awaits in {@link serveLedgerThread}: none, a second ledger, or a second agent. */
+export type LedgerThreadArm = 'none' | 'ledger' | 'agent'
+
+/** Carries what {@link serveLedgerThread} read after both requests. */
+export interface LedgerThread {
+	/** Holds the first ledger's gauge after both requests. */
+	readonly gauge: LedgerGauge | undefined
+	/** Lists the roles the second thread's conversation holds after both requests. */
+	readonly roles: readonly string[]
+	/** Counts the provider calls both threads made. */
+	readonly calls: number
+}
+
+/**
+ * Serves two requests through a ledger whose lookup awaits a second thread on the same provider,
+ * started the only ways a ledger's agent allows: through a second ledger or a second agent.
+ *
+ * @remarks
+ * The provider prices each call at 1.16 tokens per unit, and the second thread's prompt is long, so
+ * a gauge that read the second thread's usage would differ from the control arm's, whose lookup
+ * awaits nothing.
+ *
+ * @param arm - The second thread the lookup awaits
+ * @returns The first ledger's gauge, the second thread's roles, and the provider call count
+ */
+export async function serveLedgerThread(arm: LedgerThreadArm): Promise<LedgerThread> {
+	const lookup = {
+		content: '',
+		tools: [{ id: 'look', name: 'lookup', arguments: { id: 'BW-20931' } }],
+	}
+	const elsewhere = arm === 'none' ? [] : [{ content: 'Elsewhere.' }]
+	const provider = new PricedLedgerProvider(
+		[
+			lookup,
+			...elsewhere,
+			{ content: 'Answered.' },
+			lookup,
+			...elsewhere,
+			{ content: 'Answered.' },
+		],
+		{ recorded: true, repeat: false },
+	)
+	const text = 'archived zephyr detail '.repeat(100)
+	const other = createConversation()
+	const second = arm === 'ledger' ? createLedger(provider, buildLedgerOptions()) : undefined
+	const agent = arm === 'agent' ? createAgent(provider) : undefined
+	const ledger = createLedger(
+		provider,
+		buildLedgerOptions({
+			gauge: { scale: 1.25, overhead: 0 },
+			lookups: [
+				{
+					tool: createTool({
+						name: 'lookup',
+						description: 'Read an owner record.',
+						parameters: { type: 'object' },
+						execute: async () => {
+							await second?.respond(text)
+							await agent?.generate({ conversation: other, prompt: { content: text } })
+							return 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
+						},
+					}),
+					read: () => ({
+						ids: ['BW-20931'],
+						owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+					}),
+				},
+			],
+		}),
+	)
+	ledger.conversation.add({ role: 'user', content: 'Seed.' })
+	await ledger.respond('What is the refund on BW-20931?')
+	await ledger.respond('And the owner of BW-20931?')
+	return {
+		gauge: ledger.gauge,
+		roles: (second?.conversation ?? other).messages().map((message) => message.role),
+		calls: provider.calls.length,
+	}
 }
 
 /** Serves whole hidden sources through measured recall and its optional answer pass. */
@@ -6805,6 +7095,53 @@ export function buildLedgerGaugeVariants(): ReadonlyArray<
 	])
 }
 
+/** Holds lookups beside `buildLedgerOptions`'s own that a host scope can hide from a ledger's plan, each finding nothing. */
+export const LEDGER_HIDDEN_LOOKUPS: readonly LedgerLookup[] = Object.freeze(
+	['east', 'west', 'north', 'south'].map((desk): LedgerLookup => ({
+		tool: createTool({
+			name: `desk_${desk}`,
+			description: `Reads one ${desk} desk record and reports every field it holds. `.repeat(6),
+			parameters: { type: 'object' },
+			execute: () => 'No record',
+		}),
+		read: () => undefined,
+	})),
+)
+
+/** Holds the user text of each seed exchange a plan-budget case fills its tail with. */
+export const LEDGER_PLAN_REMARK = 'Plain remark about the desk.'
+
+/** Holds the seed exchanges of a plan-budget case: more remark and reply pairs than any case's tail keeps. */
+export const LEDGER_PLAN_SEED: readonly MessageInput[] = Object.freeze(
+	Array.from({ length: 30 }, (): readonly MessageInput[] => [
+		{ role: 'user', content: LEDGER_PLAN_REMARK },
+		{ role: 'assistant', content: 'Noted.' },
+	]).flat(),
+)
+
+/**
+ * Holds plan-budget cases over `buildLedgerOptions` with {@link LEDGER_HIDDEN_LOOKUPS}: a calibrated
+ * overhead below and above the room, a prompt share, and the tools a host scope admits, which leave
+ * nothing hidden, hide some definitions, or hide every one.
+ */
+export const LEDGER_PLAN_CASES: ReadonlyArray<{
+	readonly capacity: number
+	readonly prompt: number
+	readonly overhead: number
+	readonly tools: readonly string[] | undefined
+}> = Object.freeze(
+	[120, 900, 3000].flatMap((overhead) =>
+		[1, 0.5].flatMap((prompt) =>
+			[undefined, ['lookup', 'recall'], ['lookup'], ['desk_east'], []].map((tools) => ({
+				capacity: 2048,
+				prompt,
+				overhead,
+				tools,
+			})),
+		),
+	),
+)
+
 /**
  * Builds the delivery history that fills a conversation with distinct user statements.
  * @param count - The number of deliveries
@@ -9137,9 +9474,9 @@ export async function seedCanaryContext(): Promise<AgentContextInterface> {
 
 /** Carries what {@link serveCanaryDesk} sent and recorded. */
 export interface CanaryDesk {
-	/** Lists each provider call's messages: the first pass's two calls, the answer pass, the late request, then the direct run. */
+	/** Lists each provider call's messages: the first pass's two calls, the answer pass, and the late request. */
 	readonly calls: ReadonlyArray<readonly Message[]>
-	/** Lists every selection the ledger's agent emitted, in order. */
+	/** Lists every selection the ledger's agent emitted, in order, then the direct selection's. */
 	readonly selections: readonly Selection[]
 	/** Lists the judgment records the canary judge's results produced. */
 	readonly judgments: readonly Judgment[]
@@ -9155,7 +9492,8 @@ export interface CanaryDesk {
  * {@link createCanaryJudge}. The first request carries the user sentinel, and its first pass calls
  * a note lookup whose result carries the tool sentinel, under content carrying the assistant
  * sentinel, then ends empty, so an answer pass runs. A late request follows, then a direct
- * `agent.generate()` with a user message newest, whose selection faults with code `'REQUEST'`.
+ * `agent.context.select` for a user message no request owns, whose selection faults with code
+ * `'REQUEST'`.
  * The `agent` option takes {@link createCanarySkills} and {@link createCanaryMemos}, which supply the
  * skill and memo sentinels.
  *
@@ -9221,11 +9559,18 @@ export async function serveCanaryDesk(): Promise<CanaryDesk> {
 		`Does the Brightwater Studio refund need a manager for ${CANARY_SENTINELS.user}?`,
 	)
 	await ledger.respond('Is the Brightwater Studio order still open?')
-	ledger.conversation.add({ role: 'user', content: 'One more thing.' })
-	await ledger.agent.generate()
+	const direct = ledger.conversation.add({ role: 'user', content: 'One more thing.' })
+	const refused = await ledger.agent.context.select(
+		ledger.conversation,
+		direct,
+		new AbortController().signal,
+	)
 	return {
 		calls: provider.calls.map((call) => call.messages),
-		selections: selections.calls.map(([selection]) => selection),
+		selections: [
+			...selections.calls.map(([selection]) => selection),
+			...(refused === undefined ? [] : [refused]),
+		],
 		judgments: ledger.conversation.judgments.judgments(),
 	}
 }

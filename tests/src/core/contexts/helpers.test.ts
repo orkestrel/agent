@@ -6,11 +6,12 @@ import {
 	attachUserImages,
 	collectImageData,
 	renderFencedFile,
+	intersectFilters,
 	intersectKeys,
 	renderIndexEntry,
 	renderSection,
 } from '@src/core'
-import { captureError } from '@orkestrel/test'
+import { captureError, createRecorder } from '@orkestrel/test'
 import {
 	createBinaryContent,
 	createFile,
@@ -302,5 +303,69 @@ describe('intersectKeys — the scope narrow primitive', () => {
 
 	it('yields an empty list when nothing is shared', () => {
 		expect(intersectKeys(['read'], ['write'])).toEqual([])
+	})
+})
+
+describe('intersectFilters — the scope layers composed list by list', () => {
+	it('intersects each list and omits a list neither side constrains', () => {
+		expect(
+			intersectFilters(
+				{ instructions: ['tone', 'safety'], tools: ['read', 'write'], files: ['a.md'] },
+				{ instructions: ['safety'], skills: ['triage'], tools: ['write', 'admin'] },
+			),
+		).toStrictEqual({
+			instructions: ['safety'],
+			skills: ['triage'],
+			tools: ['write'],
+			files: ['a.md'],
+		})
+		expect(intersectFilters({}, {})).toStrictEqual({})
+	})
+
+	it('treats an absent side as constraining nothing, and keeps an empty list as none', () => {
+		const filter = { memos: [], tools: ['read'] }
+		expect(intersectFilters(undefined, filter)).toStrictEqual(filter)
+		expect(intersectFilters(filter, undefined)).toStrictEqual(filter)
+		expect(intersectFilters(undefined, undefined)).toStrictEqual({})
+		expect(intersectFilters({ memos: ['tone'] }, { memos: [] })).toStrictEqual({ memos: [] })
+	})
+
+	it('can only tighten: a key one side excludes never returns', () => {
+		const parent = { tools: ['read'] }
+		const child = { tools: ['read', 'write'] }
+		expect(intersectFilters(parent, child).tools).toEqual(['read'])
+		expect(intersectFilters(child, parent).tools).toEqual(['read'])
+	})
+
+	it('returns fresh lists, so a later mutation of an input cannot leak in', () => {
+		const tools = ['read', 'write']
+		const result = intersectFilters({ tools }, undefined)
+		tools.push('admin')
+		expect(result.tools).toEqual(['read', 'write'])
+		expect(result.tools).not.toBe(tools)
+	})
+
+	it('reads each list of each side once', () => {
+		const reads = createRecorder<readonly [member: string]>()
+		const result = intersectFilters(
+			{
+				get tools() {
+					reads.handler('parent.tools')
+					return ['read', 'write']
+				},
+			},
+			{
+				get tools() {
+					reads.handler('child.tools')
+					return ['write']
+				},
+				get files() {
+					reads.handler('child.files')
+					return ['a.md']
+				},
+			},
+		)
+		expect(result).toStrictEqual({ tools: ['write'], files: ['a.md'] })
+		expect(reads.calls).toEqual([['parent.tools'], ['child.tools'], ['child.files']])
 	})
 })

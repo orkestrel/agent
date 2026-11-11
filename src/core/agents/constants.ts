@@ -8,6 +8,18 @@ import type { AuthorityNote } from './types.js'
 export const DEFAULT_AGENT_LIMIT = 10
 
 /**
+ * Opens a job tree finding that refuses a whole job, which sets it apart from a finding that names an exceeded member.
+ *
+ * @remarks
+ * The `scanJobTree` helper writes it before the path of a job the contract refuses or a member read
+ * makes unreadable, and the `AgentFanout` class reads it to open its refusal with the rule that
+ * finding breaks. An
+ * exceeded member's finding opens with `job`, so text later in a finding cannot pass for this
+ * prefix.
+ */
+export const JOB_REFUSAL_PREFIX = 'refused '
+
+/**
  * Holds the model-facing texts the loop writes after a tool name in a denial result — the
  * `denied` note for a deny with no reason, an evaluate throw, an invalid decision, or a tool
  * changed after its decision; the `refused` note for an ask the approver refused; and the
@@ -22,7 +34,8 @@ export const AUTHORITY_NOTES: AuthorityNote = Object.freeze({
 
 /**
  * Holds the model-facing text the loop writes after a tool name in the denial result of a call
- * outside the active scope's tool allow-list or whose name no definition advertises this turn.
+ * outside the turn's tool ceiling, the context scope's tool allow-list intersected with the run
+ * scope's, or whose name no definition advertises this turn.
  */
 export const SCOPE_NOTE =
 	'it is not one of the listed tools. Use a listed tool or answer with what you have.'

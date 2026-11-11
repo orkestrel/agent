@@ -1,12 +1,7 @@
 import type { AgentJobInput, AgentResult } from '@src/core'
 import type { QueueEventMap } from '@orkestrel/queue'
 import { createRecorder, waitForCondition, waitForEvent } from '@orkestrel/test'
-import {
-	JOB_USAGE,
-	PARTIAL_TURNS,
-	createObservedGatedProvider,
-	createTurnRegistry,
-} from '../../../setup.js'
+import { JOB_USAGE, PARTIAL_TURNS, createObservedGatedProvider } from '../../../setup.js'
 import { numberShape, objectShape } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createWorkspaceManager } from '@orkestrel/workspace'
@@ -805,40 +800,55 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 
 	it("spawns a parent's declared children once when its failed first attempt retries", async () => {
 		// Attempt 1 exhausts `limit: 1` on a tool turn (partial ⇒ AgentJobError ⇒ retry); attempt 2
-		// answers. The child provider's start count shows how many times the child ran.
-		const parent = createScriptedProvider(
-			[{ content: '', tools: [{ id: 'c', name: 'loop', arguments: {} }] }, { content: 'parent' }],
-			{ repeat: false },
+		// answers. One slot runs both attempts before the child, so the turns answer in that order, and
+		// the calls that carry the child's seed show how many times the child ran.
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'c', name: 'loop', arguments: {} }] },
+				{ content: 'parent' },
+				{ content: 'child' },
+			],
+			{ repeat: false, recorded: true },
 		)
-		const child = createScriptedProvider([{ content: 'child' }])
 		const registry = createAgentRegistry({
 			authorities: { allow: AGENT_AUTHORITY },
-			providers: { main: parent, child },
+			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
-		const runner = createAgentRunner({ registry, retries: 1, concurrency: 2 })
+		const runner = createAgentRunner({ registry, retries: 1, concurrency: 1 })
 		const results = await runner.execute([
 			createAgentJob({
 				tools: ['loop'],
 				authority: 'allow',
 				limit: 1,
-				children: [createAgentJob({ provider: 'child' })],
+				children: [createAgentJob({ messages: [{ role: 'user', content: 'child' }], limit: 1 })],
 			}),
 		])
-		expect(parent.started).toBe(2)
-		expect(child.started).toBe(1)
+		expect(provider.started).toBe(3)
+		expect(provider.calls.filter((call) => call.messages.at(-1)?.content === 'child')).toHaveLength(
+			1,
+		)
 		expect(results.map((result) => result.content)).toEqual(['parent', 'child'])
 	})
 
 	it('fails the run with the error of a child that cannot be rehydrated', async () => {
-		const runner = createAgentRunner({ registry: createTurnRegistry({ content: 'parent' }) })
-		const caught = await runner
-			.execute([createAgentJob({ children: [createAgentJob({ provider: 'ghost' })] })])
-			.catch((error: unknown) => error)
-		expect(isAgentError(caught) ? caught.context : undefined).toEqual({
-			category: 'provider',
-			name: 'ghost',
+		// The child stays within its parent, which holds `loop` under `allow`, yet names a tool and no
+		// authority, which only its own rehydration refuses.
+		const registry = createAgentRegistry({
+			authorities: { allow: AGENT_AUTHORITY },
+			providers: { main: createScriptedProvider([{ content: 'parent' }]) },
+			tools: { loop: createLoopTool() },
 		})
+		const caught = await createAgentRunner({ registry })
+			.execute([
+				createAgentJob({
+					tools: ['loop'],
+					authority: 'allow',
+					children: [createAgentJob({ tools: ['loop'] })],
+				}),
+			])
+			.catch((error: unknown) => error)
+		expect(isAgentError(caught) ? caught.context : undefined).toEqual({ tools: ['loop'] })
 	})
 
 	it("bounds each unit with the runner's per-attempt timeout and cancels its agent", async () => {

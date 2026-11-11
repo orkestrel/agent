@@ -68,10 +68,12 @@ import {
 	AUTHORITY_NOTES,
 	CONVERSATION_RECAP_PREFIX,
 	createAgent,
+	createAgentContext,
 	createApprover,
 	createAuthority,
 	createConversation,
 	createConversationManager,
+	createInstructionManager,
 	createMemoManager,
 	createScope,
 	createSkillManager,
@@ -122,6 +124,8 @@ import {
 	serveIngressCanary,
 	SELECTION_USAGE,
 	RecordedTransport,
+	ScriptedReads,
+	seedLookupAgent,
 	ScriptedWire,
 } from '../../../setup.js'
 import {
@@ -9888,5 +9892,648 @@ describe('Agent — the prompt option', () => {
 
 		expect(isAgentError(refused) && refused.code).toBe('LIMIT')
 		expect([limited.messages().length, provider.calls.length]).toEqual([0, settled])
+	})
+})
+
+describe('Agent — a run scope narrows each turn ceiling', () => {
+	it('advertises and runs no tool outside the context scope intersected with the run scope, over seeded sequences', async () => {
+		const names = ['alpha', 'beta', 'gamma', 'delta']
+		// Each seed derives every list from a hash of its slot: 16 of 17 values pick a subset of
+		// `names` by bit, and the 17th leaves the list absent. Slot 0 is the context scope, slot 1 the
+		// run scope, and slot 2 + k the scope a `turn` listener applies at turn k.
+		for (const seed of Array.from({ length: 48 }, (_, index) => index)) {
+			const lists = Array.from({ length: 6 }, (_, slot) => {
+				const value = ((Math.imul(seed + 1, 2654435761) ^ Math.imul(slot + 1, 40503)) >>> 0) % 17
+				return value === 16 ? undefined : names.filter((_name, bit) => ((value >> bit) & 1) === 1)
+			})
+			const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+			const tools = createToolManager()
+			tools.add(names.map((name) => createRecordedTool(name, executed)))
+			const provider = createScriptedProvider(
+				[
+					...[0, 1, 2].map((turn) => ({
+						content: '',
+						tools: names.map((name) =>
+							createToolCall({ id: `${name}-${turn}`, name, arguments: { name, turn } }),
+						),
+					})),
+					{ content: 'done' },
+				],
+				AGENT_SCRIPT_OPTIONS,
+			)
+			const context = lists[0]
+			const run = lists[1]
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				...(context === undefined ? {} : { scope: createScope({ name: 'host', tools: context }) }),
+			})
+			agent.emitter.on('turn', (index) => {
+				const applied = lists[2 + index]
+				agent.context.apply(
+					applied === undefined ? undefined : createScope({ name: 'applied', tools: applied }),
+				)
+			})
+			const result = await agent.generate({
+				prompt: { content: 'Check every desk.' },
+				...(run === undefined ? {} : { scope: createScope({ name: 'run', tools: run }) }),
+			})
+			const ceilings = [0, 1, 2, 3].map((turn) =>
+				names.filter(
+					(name) => (lists[2 + turn]?.includes(name) ?? true) && (run?.includes(name) ?? true),
+				),
+			)
+
+			expect(result.content).toBe('done')
+			expect(
+				provider.calls.map((call) => call.tools?.map((definition) => definition.name)),
+			).toEqual(ceilings.map((ceiling) => (ceiling.length === 0 ? undefined : ceiling)))
+			expect(executed.calls.map(([args]) => args)).toEqual(
+				[0, 1, 2].flatMap((turn) => ceilings[turn]?.map((name) => ({ name, turn })) ?? []),
+			)
+		}
+	})
+
+	it('hides a tool at the next turn after a narrower apply, and denies a call from the earlier advertisement by scope', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add([createRecordedTool('alpha', executed), createRecordedTool('beta', executed)])
+		const call = createToolCall({ id: 'alpha-1', name: 'alpha' })
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [createToolCall({ id: 'alpha-0', name: 'alpha' })] },
+				{ content: '', tools: [call] },
+				{ content: 'done' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { deny: denied.handler },
+		})
+		agent.emitter.on('tool', () =>
+			agent.context.apply(createScope({ name: 'narrow', tools: ['beta'] })),
+		)
+
+		const result = await agent.generate({
+			prompt: { content: 'Check the desk.' },
+			scope: createScope({ name: 'run', tools: ['alpha', 'beta'] }),
+		})
+
+		expect(result.content).toBe('done')
+		expect(provider.calls.map((one) => one.tools?.map((definition) => definition.name))).toEqual([
+			['alpha', 'beta'],
+			['beta'],
+			['beta'],
+		])
+		expect(executed.calls).toHaveLength(1)
+		expect(denied.calls).toEqual([[call, 'alpha is not in the active scope', undefined]])
+		expect(provider.calls[2]?.messages.at(-1)).toMatchObject({
+			role: 'tool',
+			call: 'alpha-1',
+			content: `"alpha" did not run: ${SCOPE_NOTE}`,
+		})
+	})
+
+	it('never advertises a tool the run scope excludes after a wider apply', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add([createRecordedTool('alpha', executed), createRecordedTool('beta', executed)])
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [createToolCall({ id: 'alpha-0', name: 'alpha' })] },
+				{ content: '', tools: [createToolCall({ id: 'beta-1', name: 'beta' })] },
+				{ content: 'done' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			scope: createScope({ name: 'host', tools: ['alpha'] }),
+		})
+		agent.emitter.on('tool', () => agent.context.apply(undefined))
+
+		await agent.generate({
+			prompt: { content: 'Check the desk.' },
+			scope: createScope({ name: 'run', tools: ['alpha'] }),
+		})
+
+		expect(provider.calls.map((one) => one.tools?.map((definition) => definition.name))).toEqual([
+			['alpha'],
+			['alpha'],
+			['alpha'],
+		])
+		expect(executed.calls).toHaveLength(1)
+	})
+
+	it('runs the run scope handler over the context scope handler, which runs over the agent default', async () => {
+		const fallback = createRecordedSelection()
+		const active = createRecordedSelection()
+		const run = createRecordedSelection()
+		const provider = createScriptedProvider([{ content: 'done' }], {
+			...AGENT_SCRIPT_OPTIONS,
+			repeat: true,
+		})
+		const agent = createAgent(provider, { select: fallback.handler })
+
+		await agent.generate({ prompt: { content: 'One.' }, scope: createScope({ name: 'plain' }) })
+		agent.context.apply(createScope({ name: 'triage', select: active.handler }))
+		await agent.generate({ prompt: { content: 'Two.' }, scope: createScope({ name: 'plain' }) })
+		await agent.generate({
+			prompt: { content: 'Three.' },
+			scope: createScope({ name: 'mode', select: run.handler }),
+		})
+
+		expect([fallback.calls.length, active.calls.length, run.calls.length]).toEqual([1, 1, 1])
+		expect(run.calls[0]?.[1]).toMatchObject({ role: 'user', content: 'Three.' })
+	})
+
+	it('builds the head under the run scope at run entry', async () => {
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, { system: 'Desk.' })
+		agent.context.instructions.add([
+			{ name: 'tone', content: 'TONE TEXT' },
+			{ name: 'safety', content: 'SAFETY TEXT' },
+		])
+
+		await agent.generate({
+			prompt: { content: 'Check the desk.' },
+			scope: createScope({ name: 'run', instructions: ['safety'] }),
+		})
+
+		expect(provider.calls[0]?.messages[0]?.content).toBe('Desk.\n\n## Instructions\n\nSAFETY TEXT')
+	})
+
+	it.each([
+		{ title: 'a selected build', select: createRecordedSelection().handler },
+		{ title: 'the build after a rejected selection', select: rejectSelection },
+	])('builds the head under the run scope on $title', async ({ select }) => {
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, { system: 'Desk.', select, strict: false })
+		agent.context.instructions.add([
+			{ name: 'tone', content: 'TONE TEXT' },
+			{ name: 'safety', content: 'SAFETY TEXT' },
+		])
+
+		await agent.generate({
+			prompt: { content: 'Check the desk.' },
+			scope: createScope({ name: 'run', instructions: ['safety'] }),
+		})
+
+		expect(provider.calls[0]?.messages[0]?.content).toBe('Desk.\n\n## Instructions\n\nSAFETY TEXT')
+	})
+
+	it.each([
+		{ title: 'its default build', selected: false, selections: 0 },
+		{ title: 'the run scope handler', selected: true, selections: 2 },
+	])(
+		'rebuilds the head under the run scope after a fold, through $title',
+		async ({ selected, selections }) => {
+			const conversations = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+				keep: 0,
+			})
+			const conversation = conversations.add()
+			conversation.add([
+				{ role: 'user', content: 'h'.repeat(40) },
+				{ role: 'assistant', content: 'k'.repeat(40) },
+				{ role: 'user', content: 'go' },
+			])
+			const tools = createToolManager()
+			tools.add(createAddTool())
+			const run = createRecordedSelection()
+			const scope = createScope({
+				name: 'run',
+				instructions: ['safety'],
+				...(selected ? { select: run.handler } : {}),
+			})
+			const instructions = createInstructionManager()
+			instructions.add([
+				{ name: 'tone', content: 'TONE TEXT' },
+				{ name: 'safety', content: 'SAFETY TEXT' },
+			])
+			const opening = createAgentContext({ system: 'Desk.', instructions })
+			const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+			const agent = createAgent(provider, {
+				system: 'Desk.',
+				instructions,
+				strict: false,
+				conversations,
+				tools,
+				authority: AGENT_AUTHORITY,
+				limit: 5,
+				// The window sits one token over the scoped opening prompt, so a later turn folds.
+				window: createBudget({
+					max:
+						estimateMessages(
+							opening.build({
+								selection: { messages: conversation.view(), judgments: [] },
+								scope,
+							}),
+						) + 1,
+					consumer: measureMessages,
+				}),
+			})
+
+			await agent.generate({ scope })
+
+			expect(conversation.sections).toHaveLength(1)
+			expect(provider.calls.map((call) => call.messages[0]?.content)).toEqual(
+				provider.calls.map(() => 'Desk.\n\n## Instructions\n\nSAFETY TEXT'),
+			)
+			expect(run.calls).toHaveLength(selections)
+		},
+	)
+
+	it('gives overlapping runs on distinct conversations of one agent their own run scopes', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add([createRecordedTool('alpha', executed), createRecordedTool('beta', executed)])
+		const provider = createScriptedProvider([{ content: 'done' }], {
+			...AGENT_SCRIPT_OPTIONS,
+			delay: 1,
+			repeat: true,
+		})
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
+		const first = createConversation()
+		const second = createConversation()
+
+		const results = await Promise.all([
+			agent.generate({
+				conversation: first,
+				prompt: { content: 'First desk.' },
+				scope: createScope({ name: 'first', tools: ['alpha'] }),
+			}),
+			agent.generate({
+				conversation: second,
+				prompt: { content: 'Second desk.' },
+				scope: createScope({ name: 'second', tools: ['beta'] }),
+			}),
+		])
+
+		expect(results.map((result) => result.content)).toEqual(['done', 'done'])
+		expect(provider.peak).toBe(2)
+		expect(
+			provider.calls.map((call) => [
+				call.messages.at(-1)?.content,
+				call.tools?.map((definition) => definition.name),
+			]),
+		).toEqual([
+			['First desk.', ['alpha']],
+			['Second desk.', ['beta']],
+		])
+	})
+
+	it('reads the run scope tools one time a turn, so a turn advertises and checks by one reading', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const denied = createRecorder<AgentEventMap['deny']>()
+		const tools = createToolManager()
+		tools.add([createRecordedTool('alpha', executed), createRecordedTool('beta', executed)])
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [createToolCall({ id: 'alpha-0', name: 'alpha' })] },
+				{ content: 'done' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { deny: denied.handler },
+		})
+		// The guard at `stream()` reads first, the entry build second, and each turn once after that.
+		const reads = new ScriptedReads<readonly string[]>([['beta'], ['beta'], ['alpha']], ['beta'])
+		const narrow = createScope({ name: 'run' })
+
+		const result = await agent.generate({
+			prompt: { content: 'Check the desk.' },
+			scope: {
+				id: 'shifting',
+				name: 'run',
+				get tools() {
+					return reads.read()
+				},
+				narrow: (config) => narrow.narrow(config),
+			},
+		})
+
+		expect(result.content).toBe('done')
+		expect(provider.calls.map((call) => call.tools?.map((definition) => definition.name))).toEqual([
+			['alpha'],
+			['beta'],
+		])
+		expect(executed.calls).toEqual([[{}]])
+		expect(denied.calls).toEqual([])
+		expect(reads.reported).toEqual([['beta'], ['beta'], ['alpha'], ['beta']])
+	})
+})
+
+describe('Agent — a run scope that is not a scope', () => {
+	it('throws a placement error synchronously, before any state changes', () => {
+		const revoked = Proxy.revocable({}, {})
+		revoked.revoke()
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const started = createRecorder<AgentEventMap['start']>()
+		const agent = createAgent(provider, { on: { start: started.handler } })
+		const conversation = createConversation()
+
+		const caught = [
+			captureError(() =>
+				invokeUnchecked<AgentStreamInterface>(agent, agent.stream, [
+					{
+						conversation,
+						prompt: { content: 'Check the desk.' },
+						scope: {
+							id: 's1',
+							name: 'run',
+							get tools(): never {
+								throw new Error('unreadable')
+							},
+							narrow: () => createScope({ name: 'run' }),
+						},
+					},
+				]),
+			),
+			captureError(() =>
+				invokeUnchecked<AgentStreamInterface>(agent, agent.stream, [
+					{ conversation, prompt: { content: 'Check the desk.' }, scope: revoked.proxy },
+				]),
+			),
+			captureError(() =>
+				invokeUnchecked<AgentStreamInterface>(agent, agent.stream, [
+					{
+						conversation,
+						prompt: { content: 'Check the desk.' },
+						scope: { id: 's1', name: 'run', tools: ['alpha'] },
+					},
+				]),
+			),
+		]
+
+		expect(
+			caught.map((error) => (isContractError(error) ? [error.code, error.context?.path] : error)),
+		).toEqual([
+			['placement', ['options', 'scope']],
+			['placement', ['options', 'scope']],
+			['placement', ['options', 'scope']],
+		])
+
+		expect(conversation.messages()).toEqual([])
+		expect(started.calls).toEqual([])
+		expect(agent.status).toBe('idle')
+		expect(provider.started).toBe(0)
+	})
+
+	it('admits a class instance and a transparent proxy over one', async () => {
+		const provider = createScriptedProvider([{ content: 'done' }], {
+			...AGENT_SCRIPT_OPTIONS,
+			repeat: true,
+		})
+		const agent = createAgent(provider)
+		const scope = new Scope({ name: 'run', tools: [] })
+
+		const results = [
+			await agent.generate({ prompt: { content: 'One.' }, scope }),
+			await agent.generate({ prompt: { content: 'Two.' }, scope: new Proxy(scope, {}) }),
+		]
+
+		expect(results.map((result) => result.content)).toEqual(['done', 'done'])
+	})
+})
+
+describe('Agent — the request event', () => {
+	it('carries each dispatched request, frozen, with the run conversation', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(createRecordedTool('alpha', executed))
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [createToolCall({ id: 'alpha-0', name: 'alpha' })] },
+				{ content: 'done' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
+		const conversation = createConversation()
+		const requests = createRecorder<AgentEventMap['request']>()
+		const writes = createRecorder<readonly [error: unknown]>()
+		agent.emitter.on('request', requests.handler)
+		agent.emitter.on('request', (_index, request) => {
+			writes.handler(
+				captureError(() =>
+					Reflect.apply(Array.prototype.push, request.messages, [
+						{ id: 'late', role: 'user', content: 'Injected.' },
+					]),
+				),
+			)
+			writes.handler(captureError(() => Reflect.apply(Array.prototype.pop, request.tools, [])))
+			writes.handler(
+				captureError(() => Object.defineProperty(request, 'options', { value: { think: true } })),
+			)
+		})
+
+		await agent.generate({ conversation, prompt: { content: 'Check the desk.' } })
+
+		expect(requests.calls.map(([index]) => index)).toEqual([0, 1])
+		for (const [index, request, owner] of requests.calls) {
+			expect(owner).toBe(conversation)
+			expect(Object.isFrozen(request)).toBe(true)
+			expect(Object.isFrozen(request.messages)).toBe(true)
+			expect(Object.isFrozen(request.tools)).toBe(true)
+			expect(request).toEqual(readCallRequest(requireValue(provider.calls[index])))
+		}
+		expect(writes.calls.map(([error]) => error instanceof TypeError)).toEqual([
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+		])
+		expect(provider.calls.map((call) => call.messages.some((one) => one.id === 'late'))).toEqual([
+			false,
+			false,
+		])
+	})
+
+	it('carries the request a fold rebuilt, frozen', async () => {
+		const conversations = createConversationManager({
+			summarize: createStubSummarizer().summarize,
+			keep: 0,
+		})
+		const conversation = conversations.add()
+		conversation.add([
+			{ role: 'user', content: 'h'.repeat(40) },
+			{ role: 'assistant', content: 'k'.repeat(40) },
+			{ role: 'user', content: 'go' },
+		])
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+		const requests = createRecorder<AgentEventMap['request']>()
+		const agent = createAgent(provider, {
+			strict: false,
+			conversations,
+			tools,
+			authority: AGENT_AUTHORITY,
+			window: createBudget({
+				max: estimateMessages(conversation.view()) + 1,
+				consumer: measureMessages,
+			}),
+			limit: 5,
+			on: { request: requests.handler },
+		})
+
+		await agent.generate()
+
+		expect(conversation.sections).toHaveLength(1)
+		expect(requests.calls.map(([, request]) => request.messages.length)).toEqual([3, 4, 6])
+		for (const [index, request] of requests.calls) {
+			expect(Object.isFrozen(request.messages)).toBe(true)
+			expect(request).toEqual(readCallRequest(requireValue(provider.calls[index])))
+		}
+	})
+
+	it('freezes its own copy of the advertised definitions, never the array a tool manager returns', async () => {
+		const manager = createSeededToolManager()
+		const definitions = manager.definitions()
+		const tools = new Proxy(manager, {
+			get(target, key) {
+				if (key === 'definitions') return () => definitions
+				const value: unknown = Reflect.get(target, key)
+				return typeof value === 'function' ? value.bind(target) : value
+			},
+		})
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const requests = createRecorder<AgentEventMap['request']>()
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { request: requests.handler },
+		})
+
+		await agent.generate({ prompt: { content: 'Add the totals.' } })
+
+		expect(requests.calls[0]?.[1].tools).toEqual(definitions)
+		expect(Object.isFrozen(requests.calls[0]?.[1].tools)).toBe(true)
+		expect(Object.isFrozen(definitions)).toBe(false)
+	})
+
+	it('emits none for a turn cancelled before dispatch', async () => {
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const requests = createRecorder<AgentEventMap['request']>()
+		const agent = createAgent(provider, { on: { request: requests.handler } })
+		agent.emitter.on('turn', () => agent.abort())
+
+		const result = await agent.generate({ prompt: { content: 'Check the desk.' } })
+
+		expect(result.partial).toBe(true)
+		expect(requests.calls).toEqual([])
+		expect(provider.started).toBe(0)
+	})
+
+	it('reports no tools on each turn a later turn listener hides them from, while a tool listener restores them', async () => {
+		const open = createScope({ name: 'open', tools: ['lookup'] })
+		const shut = createScope({ name: 'shut', tools: [] })
+		const seeded = seedLookupAgent(
+			[0, 1, 2].map((turn) => ({
+				content: '',
+				tools: [createToolCall({ id: `lookup-${turn}`, name: 'lookup' })],
+			})),
+			{ scope: open, limit: 3 },
+		)
+		seeded.agent.emitter.on('turn', () => seeded.agent.context.apply(shut))
+		seeded.agent.emitter.on('tool', () => seeded.agent.context.apply(open))
+
+		const result = await seeded.agent.generate({ prompt: { content: 'Check the desk.' } })
+
+		expect(result.partial).toBe(true)
+		expect(seeded.reads.calls).toEqual([[['lookup']], [['lookup']], [['lookup']]])
+		expect(seeded.requests.calls.map(([, request]) => request.tools)).toEqual([
+			undefined,
+			undefined,
+			undefined,
+		])
+		expect(seeded.provider.calls.map((call) => call.tools)).toEqual([
+			undefined,
+			undefined,
+			undefined,
+		])
+		expect(seeded.executed.calls).toEqual([])
+		expect(seeded.denied.calls.map(([call, reason]) => [call.id, reason])).toEqual([
+			['lookup-0', 'lookup is not in the active scope'],
+			['lookup-1', 'lookup is not in the active scope'],
+			['lookup-2', 'lookup is not in the active scope'],
+		])
+	})
+
+	it('reports no tools from the first turn a later turn listener leaves advertising nothing', async () => {
+		const seeded = seedLookupAgent([
+			{ content: '', tools: [createToolCall({ id: 'lookup-0', name: 'lookup' })] },
+			{ content: 'Done.' },
+		])
+		seeded.agent.emitter.on('turn', () =>
+			seeded.agent.context.apply(createScope({ name: 'shut', tools: [] })),
+		)
+
+		const result = await seeded.agent.generate({ prompt: { content: 'Check the desk.' } })
+
+		expect(result.content).toBe('Done.')
+		expect(seeded.reads.calls[0]).toEqual([undefined])
+		expect(seeded.requests.calls.map(([index, request]) => [index, request.tools])).toEqual([
+			[0, undefined],
+			[1, undefined],
+		])
+		expect(seeded.executed.calls).toEqual([])
+	})
+
+	it('reports no tools on each turn after the scheduler yield hides them', async () => {
+		// The loop yields before every turn after the first, so the yield hides the tools from turn 1 on.
+		const seeded = seedLookupAgent(
+			[
+				{ content: '', tools: [createToolCall({ id: 'lookup-0', name: 'lookup' })] },
+				{ content: '', tools: [createToolCall({ id: 'lookup-1', name: 'lookup' })] },
+				{ content: 'Done.' },
+			],
+			{
+				scope: createScope({ name: 'open', tools: ['lookup'] }),
+				scheduler: {
+					yield: async () => seeded.agent.context.apply(createScope({ name: 'shut', tools: [] })),
+					delay: async () => {},
+				},
+			},
+		)
+
+		await seeded.agent.generate({ prompt: { content: 'Check the desk.' } })
+
+		expect(seeded.reads.calls.slice(0, 2)).toEqual([[['lookup']], [['lookup']]])
+		expect(
+			seeded.requests.calls.map(([, request]) => request.tools?.map((tool) => tool.name)),
+		).toEqual([['lookup'], undefined, undefined])
+		expect(seeded.executed.calls).toHaveLength(1)
+	})
+
+	it('reports and runs the tool a later turn listener admits after an earlier read saw none', async () => {
+		const seeded = seedLookupAgent(
+			[
+				{ content: '', tools: [createToolCall({ id: 'lookup-0', name: 'lookup' })] },
+				{ content: 'Done.' },
+			],
+			{ scope: createScope({ name: 'shut', tools: [] }) },
+		)
+		seeded.agent.emitter.on('turn', () =>
+			seeded.agent.context.apply(createScope({ name: 'open', tools: ['lookup'] })),
+		)
+
+		const result = await seeded.agent.generate({ prompt: { content: 'Check the desk.' } })
+
+		expect(result.content).toBe('Done.')
+		expect(seeded.reads.calls[0]).toEqual([[]])
+		expect(seeded.requests.calls[0]?.[1].tools?.map((tool) => tool.name)).toEqual(['lookup'])
+		expect(seeded.provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+		expect(seeded.executed.calls).toHaveLength(1)
 	})
 })

@@ -55,7 +55,8 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #trace: StudyAgentTrace
 	readonly #tools: ToolManagerInterface
 	readonly #observation: StudyMemoryObservation
-	readonly #agent: AgentInterface
+	// The agent of the arm without a ledger; the ledger arm runs through its ledger alone.
+	readonly #agent: AgentInterface | undefined
 	readonly #conversation: ConversationInterface
 	readonly #ledger: LedgerInterface | undefined
 	readonly #abort = new AbortController()
@@ -252,7 +253,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					},
 				},
 			})
-			this.#agent = this.#ledger.agent
+			this.#agent = undefined
 			this.#conversation = this.#ledger.conversation
 		} else {
 			this.#ledger = undefined
@@ -375,7 +376,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			}
 			const result: unknown =
 				this.#ledger === undefined
-					? await this.#agent.generate({ signal })
+					? await this.#agent?.generate({ signal })
 					: await this.#ledger.respond(input.prompt, signal)
 			this.#transport.check()
 			signal.throwIfAborted()
@@ -516,11 +517,13 @@ export class StudyMemorySession implements StudySessionInterface {
 
 	async #dispose(): Promise<void> {
 		this.#abort.abort(new StudyError('FAULT', 'Memory session closed'))
-		this.#agent.abort(new StudyError('FAULT', 'Memory session closed'))
+		this.#agent?.abort(new StudyError('FAULT', 'Memory session closed'))
+		this.#ledger?.agent.abort(new StudyError('FAULT', 'Memory session closed'))
 		await this.#transport.close()
 		await Promise.allSettled([...this.#flights])
 		this.#tools.destroy()
-		this.#agent.emitter.destroy()
+		this.#agent?.emitter.destroy()
+		this.#ledger?.agent.emitter.destroy()
 		this.#conversation.emitter.destroy()
 	}
 }

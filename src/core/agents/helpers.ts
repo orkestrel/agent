@@ -1,6 +1,7 @@
 import type { Message } from '../types.js'
 import type { ProviderRequest } from '../providers/index.js'
 import type { ConversationInterface } from '../conversations/index.js'
+import type { ScopeInterface } from '../contexts/index.js'
 import type {
 	AgentChunk,
 	AgentFrame,
@@ -40,9 +41,17 @@ import {
 	preview,
 	schemaToShape,
 } from '@orkestrel/contract'
-import { AUTHORITY_NOTES, IMAGE_TOKEN_ESTIMATE, MESSAGE_TOKEN_OVERHEAD } from './constants.js'
+import {
+	AUTHORITY_NOTES,
+	DEFAULT_AGENT_LIMIT,
+	IMAGE_TOKEN_ESTIMATE,
+	JOB_REFUSAL_PREFIX,
+	MESSAGE_TOKEN_OVERHEAD,
+} from './constants.js'
+import { agentJobContract } from './contracts.js'
 import { AgentError, AgentJobError } from './errors.js'
 import { isConversation } from '../conversations/index.js'
+import { isScope } from '../contexts/index.js'
 import { isAuthorityDecision, isAuthorityVerdict } from './validators.js'
 import { estimateTokens, hasCalls, renderJSON } from '../helpers.js'
 import { isPositiveSafeInteger } from '../validators.js'
@@ -569,6 +578,89 @@ export function handleAgentQueueJob(
 }
 
 /**
+ * Scans every job under a root for a member that exceeds its own parent's; an empty result clears the tree.
+ *
+ * @remarks
+ * The walk audits each job, the root included, through `agentJobContract` before it reads a member,
+ * because a job's `children` cross that contract as JSON records. A refused job yields one finding
+ * with its faults, or with an unreadable note when a member read throws, and the walk reads
+ * nothing under it. A child is within its parent when each of
+ * its `tools` is one its parent names (a parent with no `tools` names none), its `authority` and
+ * `scheduler` are absent or its parent's, its `provider` is its parent's, its `limit` is at most its
+ * parent's (an absent `limit` reads `DEFAULT_AGENT_LIMIT`), and, where its parent holds a `timeout`
+ * or a `budget`, it holds one no larger. `system` and `messages` are free. A refused job's finding
+ * opens with `JOB_REFUSAL_PREFIX` and then the job's path from `job`; an exceeded member's opens
+ * with that path, a dot, and the member. The walk is total: an unreadable job yields a finding,
+ * never a throw. The `AgentFanout` class runs it on every attempt of a unit, before the unit spawns
+ * or runs.
+ *
+ * @param root - The root job of the tree
+ * @returns One finding per refused job and per exceeded member, in walk order
+ *
+ * @example
+ * ```ts
+ * scanJobTree({ provider: 'main', children: [{ provider: 'other' }] })
+ * // ['job.children[0].provider: "other" differs from its parent\'s, which is "main"']
+ * ```
+ */
+export function scanJobTree(root: AgentJobInput): readonly string[] {
+	const findings: string[] = []
+	const pending: Array<
+		readonly [
+			job: unknown,
+			path: string,
+			parent: Omit<AgentJobInput, 'messages' | 'children'> | undefined,
+		]
+	> = [[root, 'job', undefined]]
+	for (const [job, path, parent] of pending) {
+		if (!agentJobContract.is(job)) {
+			// An unreadable member makes the audit throw, so the walk reports the job as unreadable.
+			const faults = attempt(() => agentJobContract.audit(job))
+			findings.push(
+				`${JOB_REFUSAL_PREFIX}${path}: ${faults.success ? describeFaults(faults.value, agentJobContract.schema) : 'a member read threw, so the job cannot be read'}`,
+			)
+			continue
+		}
+		if (parent !== undefined) {
+			const held = parent.tools ?? []
+			const outside = (job.tools ?? []).filter((name) => !held.includes(name))
+			const limit = job.limit ?? DEFAULT_AGENT_LIMIT
+			const bound = parent.limit ?? DEFAULT_AGENT_LIMIT
+			findings.push(
+				...[
+					outside.length === 0
+						? undefined
+						: `${path}.tools: names ${outside.map((name) => preview(name)).join(', ')}, which its parent does not hold`,
+					job.authority === undefined || job.authority === parent.authority
+						? undefined
+						: `${path}.authority: ${preview(job.authority)} is neither absent nor its parent's, which is ${parent.authority === undefined ? 'none' : preview(parent.authority)}`,
+					job.provider === parent.provider
+						? undefined
+						: `${path}.provider: ${preview(job.provider)} differs from its parent's, which is ${preview(parent.provider)}`,
+					job.scheduler === undefined || job.scheduler === parent.scheduler
+						? undefined
+						: `${path}.scheduler: ${preview(job.scheduler)} is neither absent nor its parent's, which is ${parent.scheduler === undefined ? 'none' : preview(parent.scheduler)}`,
+					limit <= bound
+						? undefined
+						: `${path}.limit: ${job.limit === undefined ? `none reads ${limit}, which exceeds` : `${limit} exceeds`} its parent's ${bound}`,
+					parent.timeout === undefined ||
+					(job.timeout !== undefined && job.timeout <= parent.timeout)
+						? undefined
+						: `${path}.timeout: ${job.timeout ?? 'none'} exceeds its parent's ${parent.timeout}`,
+					parent.budget === undefined || (job.budget !== undefined && job.budget <= parent.budget)
+						? undefined
+						: `${path}.budget: ${job.budget ?? 'none'} exceeds its parent's ${parent.budget}`,
+				].filter((finding) => finding !== undefined),
+			)
+		}
+		for (const [index, child] of (job.children ?? []).entries()) {
+			pending.push([child, `${path}.children[${index}]`, job])
+		}
+	}
+	return findings
+}
+
+/**
  * Assembles the settled {@link AgentResult} from a run's {@link AgentRunResult} — `thinking`,
  * `usage`, and `stop` are carried only when the run surfaced them, and the loop-internal
  * `exhausted` flag is left out.
@@ -924,6 +1016,34 @@ export function requireConversation(value: unknown): ConversationInterface | und
 			limit: 'ConversationInterface',
 			received: preview(value),
 		},
+	})
+}
+
+/**
+ * Returns a scope a run can bind, or throws a `ContractError` coded `'placement'`; `undefined`
+ * passes through.
+ *
+ * @remarks
+ * The check is {@link isScope}, a total guard that reads each member one time and admits any
+ * implementation of `ScopeInterface`. `undefined` passes, because an absent option leaves the
+ * context scope alone as the run's ceiling. The error's `context` carries the option path, the
+ * limit `'ScopeInterface'`, and a preview of the refused value.
+ *
+ * @param value - The run's `scope` option, or `undefined`
+ * @returns The value unchanged
+ * @throws {ContractError} Thrown when `value` is defined and does not implement `ScopeInterface` (code `'placement'`)
+ *
+ * @example
+ * ```ts
+ * requireScope(createScope({ name: 'reader', tools: ['search'] })) // the scope
+ * requireScope({ id: 's1', name: 'reader' }) // throws ContractError ('placement')
+ * ```
+ */
+export function requireScope(value: unknown): ScopeInterface | undefined {
+	if (value === undefined || isScope(value)) return value
+	throw new ContractError('Agent: scope must implement ScopeInterface', {
+		code: 'placement',
+		context: { path: ['options', 'scope'], limit: 'ScopeInterface', received: preview(value) },
 	})
 }
 

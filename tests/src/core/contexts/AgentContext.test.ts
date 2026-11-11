@@ -1474,7 +1474,7 @@ describe('AgentContext — build(selection) folds the selected messages in place
 		])
 		const plain = context.build()
 
-		const built = context.build({ messages: [requireValue(first)], judgments: [] })
+		const built = context.build({ selection: { messages: [requireValue(first)], judgments: [] } })
 
 		expect(built).toHaveLength(3)
 		expect(built[0]).toEqual({ ...requireValue(plain[0]), id: requireValue(built[0]).id })
@@ -1486,11 +1486,13 @@ describe('AgentContext — build(selection) folds the selected messages in place
 	})
 
 	it('folds an empty selection to the system and context messages alone, and refuses one with images to carry', () => {
-		const error = captureError(() => seedWorkspaceContext().build({ messages: [], judgments: [] }))
+		const error = captureError(() =>
+			seedWorkspaceContext().build({ selection: { messages: [], judgments: [] } }),
+		)
 		const context = new AgentContext({ system: 'sys' })
 		context.workspaces.add().write('notes.txt', 'KEPT FILE')
 
-		const built = context.build({ messages: [], judgments: [] })
+		const built = context.build({ selection: { messages: [], judgments: [] } })
 
 		expect(isContextError(error) && error.code).toBe('IMAGES')
 		expect(built.map((message) => message.role)).toEqual(['system', 'user'])
@@ -1505,7 +1507,7 @@ describe('AgentContext — build(selection) folds the selected messages in place
 			content: `Plan: refund invoice 42.\n\n## Request\n${request.content}`,
 		}
 
-		const built = context.build({ messages: [copy], judgments: [] })
+		const built = context.build({ selection: { messages: [copy], judgments: [] } })
 
 		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'user'])
 		expect(built[0]?.content).toBe('sys')
@@ -1523,7 +1525,7 @@ describe('AgentContext — build(selection) folds the selected messages in place
 		]
 
 		for (const selection of selections) {
-			expect(context.build(selection).map(({ id, ...body }) => body)).toEqual(expected)
+			expect(context.build({ selection }).map(({ id, ...body }) => body)).toEqual(expected)
 		}
 		expect(expected.map((message) => message.role)).toEqual(['system', 'user', 'user'])
 	})
@@ -1533,7 +1535,7 @@ describe('AgentContext — build(selection) folds the selected messages in place
 		context.instructions.add({ name: 'tone', content: 'Be terse.' })
 		context.apply(new Scope({ name: 'narrow', instructions: [] }))
 
-		const built = context.build({ messages: [], judgments: [] })
+		const built = context.build({ selection: { messages: [], judgments: [] } })
 
 		expect(built.map(({ id, ...body }) => body)).toEqual([{ role: 'system', content: 'Be brief.' }])
 	})
@@ -1692,7 +1694,9 @@ describe('AgentContext — the system boundary canary', () => {
 		const stored = context.messages.add({ role: 'user', content: 'hi' })
 
 		expect(context.build()).toStrictEqual([stored])
-		expect(context.build({ messages: [stored], judgments: [] })).toStrictEqual([stored])
+		expect(context.build({ selection: { messages: [stored], judgments: [] } })).toStrictEqual([
+			stored,
+		])
 	})
 })
 
@@ -2026,5 +2030,95 @@ describe('AgentContext — select over a given conversation', () => {
 			`conversation ${passed.id} changed during selection: 1 messages before, 2 after`,
 		)
 		expect(selected?.messages).toEqual(passed.view())
+	})
+})
+
+describe('AgentContext — a run scope narrows the build and the select', () => {
+	it('filters every list by the context scope intersected with the run scope', () => {
+		const context = new AgentContext({
+			system: 'Desk.',
+			scope: new Scope({ name: 'desk', instructions: ['tone', 'safety'], skills: ['triage'] }),
+		})
+		context.instructions.add([
+			{ name: 'tone', content: 'TONE TEXT' },
+			{ name: 'safety', content: 'SAFETY TEXT' },
+		])
+		context.skills.add([
+			{ name: 'triage', description: 'TRIAGE SKILL', content: 'triage body' },
+			{ name: 'refund', description: 'REFUND SKILL', content: 'refund body' },
+		])
+		context.memos.add({ name: 'pref', description: 'PREF MEMO', content: 'Short replies.' })
+		context.workspaces.add().write('notes.txt', 'NOTES FILE')
+		context.messages.add({ role: 'user', content: 'Check invoice 42.' })
+		const scope = new Scope({
+			name: 'mode',
+			instructions: ['safety'],
+			skills: ['triage', 'refund'],
+			memos: [],
+			files: ['other.txt'],
+		})
+
+		const built = context.build({ scope })
+		const text = built.map((message) => message.content).join('\n')
+
+		expect(built.map((message) => message.role)).toEqual(['system', 'user'])
+		expect(text).toContain('SAFETY TEXT')
+		expect(text).not.toContain('TONE TEXT')
+		// The run scope lists `refund`; the context scope does not, so it stays out.
+		expect(text).toContain('TRIAGE SKILL')
+		expect(text).not.toContain('REFUND SKILL')
+		expect(text).not.toContain('PREF MEMO')
+		expect(text).not.toContain('NOTES FILE')
+		expect(
+			context
+				.build()
+				.map((message) => message.content)
+				.join('\n'),
+		).toContain('TONE TEXT')
+	})
+
+	it('narrows with the run scope alone when no context scope is applied, and leaves an unlisted list open', () => {
+		const context = new AgentContext()
+		context.instructions.add([
+			{ name: 'tone', content: 'TONE TEXT' },
+			{ name: 'safety', content: 'SAFETY TEXT' },
+		])
+		context.memos.add({ name: 'pref', description: 'PREF MEMO', content: 'Short replies.' })
+		const request = context.messages.add({ role: 'user', content: 'Check invoice 42.' })
+
+		const built = context.build({
+			selection: { messages: [request], judgments: [] },
+			scope: new Scope({ name: 'mode', instructions: ['tone'] }),
+		})
+
+		expect(built.map(({ id, ...body }) => body)).toEqual([
+			{ role: 'system', content: '## Instructions\n\nTONE TEXT' },
+			{ role: 'user', content: '## Memos\n\n- pref: PREF MEMO' },
+			{ role: 'user', content: 'Check invoice 42.' },
+		])
+		expect(built.at(-1)).toBe(request)
+	})
+
+	it('runs the run scope handler over the active scope handler, which runs over the default', async () => {
+		const fallback = createRecordedSelection()
+		const active = createRecordedSelection()
+		const run = createRecordedSelection()
+		const context = new AgentContext({ select: fallback.handler })
+		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
+		const signal = new AbortController().signal
+
+		await context.select(context.messages, request, signal, new Scope({ name: 'plain' }))
+		context.apply(new Scope({ name: 'triage', select: active.handler }))
+		await context.select(context.messages, request, signal, new Scope({ name: 'plain' }))
+		await context.select(
+			context.messages,
+			request,
+			signal,
+			new Scope({ name: 'mode', select: run.handler }),
+		)
+		await context.select(context.messages, request, signal)
+
+		expect([fallback.calls.length, active.calls.length, run.calls.length]).toEqual([1, 2, 1])
+		expect(run.calls).toEqual([[context.messages, request, signal]])
 	})
 })

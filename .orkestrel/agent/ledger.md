@@ -37,3 +37,9 @@
 | 2026-11-11 | The design question that finding opened: `ledger.agent` holds no member that starts a run, claims 1.18 to 1.23 | `planner` on `fable` | `designs/disclosure.md` § Phase 1 |
 | 2026-11-11 | Phase 1 unit 1D's guide pass | `opus` on `opus` | `plan.md` § State |
 | 2026-11-11 | ROADMAP item 66 prepared ahead of workflow's layer-4 release | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 1's repair: the ledger's agent, claims 1.18 to 1.23 | `opus` on `opus` | `designs/disclosure.md` § Phase 1 |
+| 2026-11-11 | Phase 1's repair re-audit: pass, with nothing above the bar | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 1 unit 1D's TSDoc pass, and its fixes after review | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 1 unit 1D's review: pass | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | ROADMAP item 66 released alone as Agent 0.0.41, from a standalone clone, with its full chain run | Orchestrator | `ad13d4d0` |
+| 2026-11-11 | Phase 1's tree-wide chain on the 0.0.23 ranges, and the comment fixes from 1D's review | Orchestrator | `plan.md` § State |

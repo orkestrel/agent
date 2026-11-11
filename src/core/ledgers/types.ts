@@ -347,7 +347,9 @@ export interface LedgerGauge {
  * @remarks
  * `digest` is what the `digestLedgerTools` helper returns for the definitions the calibration request
  * carried, or for the ledger's definitions at construction when the options supplied the gauge. A
- * hydrate reuses the price only when the hydrated ledger's definitions have the same digest.
+ * hydrate reuses the price only when the hydrated ledger's definitions have the same digest, and
+ * each `respond` call compares the digest again, so a definition added or removed since drops
+ * the gauge.
  */
 export interface LedgerGaugeSnapshot extends LedgerGauge {
 	readonly digest: string
@@ -531,7 +533,7 @@ export interface LedgerRecovery {
  *
  * @remarks
  * A ledger creates one request per `respond` call and drops it when the call settles, so no request
- * state reaches a later call or a run no call owns. Each agent run the call makes is a pass: `open`
+ * state reaches a later call or a ledger tool a host calls by hand between requests. Each agent run the call makes is a pass: `open`
  * starts one, and `selection`, `boundary`, `usage`, `signal`, and `aborted` read the current pass,
  * the last one opened.
  * `calls` lists the gauge calls of every pass in order. A call stays in flight, taking its usage and
@@ -699,6 +701,33 @@ export interface LedgerRequestInterface {
 }
 
 /**
+ * Holds the members of a ledger's agent a host reads: its emitter, id, status, context, and abort.
+ *
+ * @remarks
+ * It is one frozen record the ledger builds at construction, and it holds no `generate` or `stream`
+ * member, own or inherited, so the ledger's `respond` method is the only caller that starts a run on
+ * the agent: every run is a pass of the active `respond` call, on the ledger's `conversation`. The
+ * `emitter`, `id`, and `context` members are the agent's own. The `status` member reads the agent's
+ * live status, and `abort` ends the active pass partial with the reason it takes; because the caller
+ * did not abort, the ledger then runs the answer pass. To serve another conversation, build another
+ * ledger or another agent for it.
+ *
+ * @example
+ * ```ts
+ * import { createLedger } from '@orkestrel/agent'
+ *
+ * const ledger = createLedger(provider, options) // `provider` and `options` come from the host
+ * ledger.agent.emitter.on('request', (_index, request) => log(request.tools?.length))
+ * ledger.agent.status // 'idle'
+ * 'generate' in ledger.agent // false
+ * ```
+ */
+export type LedgerAgentInterface = Pick<
+	AgentInterface,
+	'emitter' | 'id' | 'status' | 'context' | 'abort'
+>
+
+/**
  * Serves the requests of one conversation through an agent whose prompt the ledger projects from
  * what the judge filed.
  *
@@ -709,8 +738,11 @@ export interface LedgerRequestInterface {
  * selection handler.
  */
 export interface LedgerInterface {
-	/** Holds the agent the ledger drives, with the ledger's tools and selection handler. */
-	readonly agent: AgentInterface
+	/**
+	 * Holds the record of the agent the ledger drives, with the ledger's tools and selection handler;
+	 * it starts no run, so the `respond` method runs every pass.
+	 */
+	readonly agent: LedgerAgentInterface
 	/** Holds the one conversation the ledger files and serves. */
 	readonly conversation: ConversationInterface
 	/** Holds the measured price of a prompt, or undefined until the ledger calibrates when neither the options nor a snapshot priced on the same tool definitions supplied one. */
@@ -719,7 +751,9 @@ export interface LedgerInterface {
 	 * Appends `content` as a user message and serves it through to its reply.
 	 *
 	 * @remarks
-	 * The ledger calibrates first while `gauge` is undefined. When the first pass ends without final
+	 * The ledger calibrates first while `gauge` is undefined, and again when the digest of its tool
+	 * definitions at this call differs from the one its gauge priced. When the first pass ends
+	 * without final
 	 * text and the caller did not abort, the ledger adds the results and cue notes and makes one
 	 * answer pass that advertises no tools. In either pass, a call the model makes in a turn that
 	 * advertises no tools runs nothing and ends the pass after that turn, so such a pass makes one
@@ -729,17 +763,16 @@ export interface LedgerInterface {
 	 * answer pass rejects as well, `respond` rejects with that pass's error. A `respond` or `calibrate` call while either is in flight
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
-	 * A direct agent run on `conversation` while a `respond` call's pass runs is refused with an
-	 * `AgentError` whose `code` is `'CONCURRENCY'`. Under the default `strict`, any other run no active
-	 * `respond` call owns rejects with a `LedgerError` whose `code` is `'REQUEST'`: a direct run between
-	 * requests, one during calibration, and a run on another conversation during a call. Under
-	 * `strict: false` that run goes on over the whole view with no ledger selection; a run on another
-	 * conversation then adds its turns and usage to that call's gauge readings and shares its repeat
-	 * stop, and it can still reach the `recall` and lookup tools, which read `conversation`. The
-	 * ledger's own guard refuses only `respond`, `calibrate`, and `snapshot` calls.
-	 * Under `strict: false`, a run no `respond` call owns, including a run during calibration, reads no
-	 * request's state: its lookup and `recall` calls run with no repeat stop, recall limit, or close rule.
-	 * Every rejection leaves the ledger free for a later call.
+	 * Every run on the ledger's agent is a pass of this method, because `agent` holds no `generate` or
+	 * `stream` member. A direct call to `agent.context.select` for a message no active `respond` call
+	 * owns returns a selection whose `fault` is a `LedgerError` with code `'REQUEST'`, on
+	 * `conversation` or another one, and asks the judge nothing; over another conversation, that
+	 * selection carries that conversation's view alone. Calibration owns no message, so a direct
+	 * selection during it faults the same way. Host code that calls a ledger tool by hand through
+	 * `agent.context.tools` while a request runs reaches that request's state: a lookup or a write
+	 * meets its repeat stop, and a `recall` call spends its recall limit. Between requests, and during
+	 * calibration, such a call reads no request's state and runs with no repeat stop, recall limit, or
+	 * close rule. Every rejection leaves the ledger free for a later call.
 	 *
 	 * @param content - The request text
 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
@@ -770,10 +803,9 @@ export interface LedgerInterface {
 	 * Serializes the conversation, the marked ids, and the gauge into a snapshot a later ledger hydrates from.
 	 *
 	 * @remarks
-	 * The ledger first files every tool result whose message is appended, so a failure a direct
-	 * agent run left is marked; a result whose tool message is not yet appended is not captured. A
-	 * call while a `respond` or `calibrate` call is in flight throws, because an entered, unanswered
-	 * request would hydrate as a dangling request; a direct agent run is not refused. The `gauge`
+	 * The ledger first files every tool result whose message is appended; a result whose tool message
+	 * is not yet appended is not captured. A call while a `respond` or `calibrate` call is in flight
+	 * throws, because an entered, unanswered request would hydrate as a dangling request. The `gauge`
 	 * member carries the digest of the tool definitions the gauge priced.
 	 *
 	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one whose definitions JSON renders

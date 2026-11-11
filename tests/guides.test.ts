@@ -771,6 +771,76 @@ await new GuideCommand({
 			)
 		})
 
+		it('narrows each turn to the context scope intersected with the run scope as the run-scope fence claims', async () => {
+			const tools = createToolManager()
+			tools.add(
+				['search', 'refund', 'delete'].map((name) => createTool({ name, execute: () => name })),
+			)
+			const provider = createScriptedProvider(
+				[
+					{ content: 'Invoice 42 is paid.' },
+					{ content: '', tools: [{ id: 'search-1', name: 'search', arguments: {} }] },
+					{ content: 'Invoice 42 was refunded.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const desk = createRecordedSelection()
+			const own = createRecordedSelection()
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				scope: createScope({ name: 'desk', tools: ['search', 'refund'], select: desk.handler }),
+			})
+			const logged: Array<readonly string[] | undefined> = []
+			agent.emitter.on('request', (_index, request) =>
+				logged.push(request.tools?.map(({ name }) => name)),
+			)
+			agent.context.messages.add({ role: 'user', content: 'Is invoice 42 paid?' })
+			const reader = createScope({ name: 'reader', tools: ['search', 'delete'] })
+			const result = await agent.generate({ scope: reader })
+			// A wider `apply` reaches the run's next turn and never passes the run scope.
+			agent.emitter.on('tool', () => agent.context.apply(createScope({ name: 'everything' })))
+			agent.context.messages.add({ role: 'user', content: 'Was it refunded?' })
+			await agent.generate({
+				scope: createScope({ name: 'own', tools: ['search', 'delete'], select: own.handler }),
+			})
+			const counted = agent.context.messages.count
+			const { proxy, revoke } = Proxy.revocable(createScope({ name: 'revoked' }), {})
+			revoke()
+			const refused = captureError(() =>
+				agent.stream({ prompt: { content: 'Delete invoice 42.' }, scope: proxy }),
+			)
+
+			expect(result).toEqual({ content: 'Invoice 42 is paid.', partial: false })
+			expect(logged).toEqual([['search'], ['search'], ['search', 'delete']])
+			// The first run selects through the desk scope; the second through its own run scope alone.
+			expect([desk.calls.length, own.calls.length]).toEqual([1, 1])
+			expect(refused).toMatchObject({ code: 'placement' })
+			expect(agent.context.messages.count).toBe(counted)
+			expect(provider.calls).toHaveLength(3)
+			expect(guideText).toContain(
+				"agent.emitter.on('request', (_index, request) => log(request.tools?.map(({ name }) => name))) // ['search']",
+			)
+			expect(guideText).toContain(
+				"const result = await agent.generate({ scope: reader }) // { content: 'Invoice 42 is paid.', partial: false }",
+			)
+			expect(guideText).toContain(
+				"\tscope: createScope({ name: 'desk', tools: ['search', 'refund'] }),\n})",
+			)
+			expect(guideText).toContain(
+				"const reader = createScope({ name: 'reader', tools: ['search', 'delete'] })",
+			)
+			expect(guideText).toContain(
+				'A `context.apply` still reaches the run at its next turn, and never past the run scope. An agent never widens its own ceiling: a run scope only narrows the context scope, so a run that needs a wider scope than the context scope needs another agent.',
+			)
+			expect(guideText).toContain(
+				"The run scope's `select` runs in place of the context scope's, which runs in place of the agent default.",
+			)
+			expect(guideText).toContain(
+				'The `context.select` method takes the run scope as its fourth argument, resolves `run?.select ?? scope?.select ?? default` once per call',
+			)
+		})
+
 		it('resolves the judgments fence’s question once over a started listener and reuses the record', async () => {
 			const posted = createRecorder<readonly [unknown]>()
 			const server = createFixtureServer([
@@ -900,7 +970,94 @@ await new GuideCommand({
 				| 'exhaust'
 				| 'fault'
 				| 'select'
+				| 'request'
 			>()
+			expect(guideText).toContain(
+				'`AgentEventMap` (`start`, `turn`, `tool`, `usage`, `allow`, `ask`, `deny`, `finish`, `error`, `abort`, `exhaust`, `fault`, `select`, `request`)',
+			)
+		})
+
+		it('carries each turn index and the rebuilt request after a compaction fold, as the request event claims', async () => {
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
+			const conversations = createConversationManager({
+				summarize: createStubSummarizer().summarize,
+				keep: 0,
+			})
+			// An earlier exchange gives the fold a slice before the run's request.
+			conversations.add().add([
+				{ role: 'user', content: 'Earlier question.' },
+				{ role: 'assistant', content: 'Earlier answer.' },
+			])
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
+					{ content: 'Ticket 7 is open.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			// The window reads turn 1's first request as over its limit, and every other request as within it.
+			const readings = [0, 10, 0]
+			const measured: ProviderRequest[] = []
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				conversations,
+				window: createBudget({
+					max: 10,
+					consumer: (request: ProviderRequest) => {
+						measured.push(request)
+						return readings.shift() ?? 0
+					},
+				}),
+			})
+			const events: Array<readonly [index: number, request: ProviderRequest]> = []
+			agent.emitter.on('request', (index, request) => events.push([index, request]))
+			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
+			await agent.generate()
+
+			expect(events.map(([index]) => index)).toEqual([0, 1])
+			expect(measured).toHaveLength(3)
+			// Turn 1 dispatches the rebuilt request, which the event carries, and not the over-window one.
+			expect(events[1]?.[1]).toEqual(measured[2])
+			expect(events[1]?.[1].messages).toEqual(provider.calls[1]?.messages)
+			expect(events[1]?.[1].messages).not.toEqual(measured[1]?.messages)
+			expect(guideText).toContain(
+				'The `request` event fires once a turn, after the loop admits the request and before the provider receives it, so after a compaction fold it carries the rebuilt request. Its listener receives the turn index, the request the provider receives, and the conversation the run is bound to,',
+			)
+		})
+
+		it('reads the frozen request each turn of one thread dispatches, as the request event fence claims', async () => {
+			const provider = createScriptedProvider(
+				[{ content: 'Ticket 7 is open.' }, { content: 'Ticket 8 is closed.' }],
+				{ recorded: true, repeat: false },
+			)
+			const agent = createAgent(provider, { system: 'You triage tickets.' })
+			const thread = agent.context.conversations.add()
+			const sent: ProviderRequest[] = []
+			agent.emitter.on('request', (_index, request, conversation) => {
+				if (conversation === thread) sent.push(request)
+			})
+			await agent.generate({ conversation: thread, prompt: { content: 'Is ticket 7 open?' } })
+			// A run on the agent's other thread dispatches a request the listener leaves out.
+			await agent.generate({ prompt: { content: 'Is ticket 8 closed?' } })
+			const [request] = sent
+
+			expect(sent.map((one) => one.messages.map(({ role }) => role))).toEqual([['system', 'user']])
+			expect(request?.messages).toEqual(provider.calls[0]?.messages)
+			expect([Object.isFrozen(request), Object.isFrozen(request?.messages)]).toEqual([true, true])
+			expect(Reflect.set(requireValue(request), 'options', {})).toBe(false)
+			expect(request).not.toHaveProperty('tools')
+			expect(provider.calls).toHaveLength(2)
+			expect(guideText).toContain(
+				"sent.map((request) => request.messages.map(({ role }) => role)) // [['system', 'user']]\nObject.isFrozen(sent[0]?.messages) // true",
+			)
+			expect(guideText).toContain(
+				'A `request` listener is host code: it reads the request and never writes to it.',
+			)
+			expect(guideText).toContain(
+				'Forward no `error`, `fault`, `select`, or `request` value, because `error` and `fault` carry provider error text, `select` carries the request copy, and `request` carries the whole request a turn dispatches, the system message and the tool definitions included.',
+			)
 		})
 
 		it('mints, lists, and drops scopes as the removal fence shows', () => {
@@ -1438,6 +1595,67 @@ await new GuideCommand({
 			])
 			expect(guideText).toContain(
 				'Overlapping runs on one agent share its scope and its default handler, so an `apply` made for one run reaches every run in flight at its next site.',
+			)
+		})
+
+		it('runs overlapping threads each under its own mode passed as a run scope (the overlapping-runs fence)', async () => {
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
+			const judged = createRecordedSelection()
+			const recent = createRecordedSelection()
+			const none = createRecordedSelection()
+			const provider = createScriptedProvider([{ content: 'Answered.' }], { recorded: true })
+			const agent = createAgent(provider, {
+				tools,
+				authority: AGENT_AUTHORITY,
+				select: judged.handler,
+			})
+			const modes = new Map<string, ScopeInterface>([
+				['triage', createScope({ name: 'triage', tools: ['lookup'], select: recent.handler })],
+				['verbatim', createScope({ name: 'verbatim', tools: [], select: none.handler })],
+			])
+			const triage = requireValue(modes.get('triage'), 'Missing mode')
+			const verbatim = requireValue(modes.get('verbatim'), 'Missing mode')
+			const advertised = new Map<unknown, readonly string[] | undefined>()
+			agent.emitter.on('request', (_index, request, conversation) =>
+				advertised.set(
+					conversation,
+					request.tools?.map(({ name }) => name),
+				),
+			)
+			const triageThread = agent.context.conversations.add()
+			const verbatimThread = agent.context.conversations.add()
+			agent.context.apply(undefined)
+			const [sorted, quoted] = await Promise.all([
+				agent.generate({
+					conversation: triageThread,
+					prompt: { content: 'Sort ticket 7.' },
+					scope: triage,
+				}),
+				agent.generate({
+					conversation: verbatimThread,
+					prompt: { content: 'Quote the thread.' },
+					scope: verbatim,
+				}),
+			])
+
+			expect([sorted.content, quoted.content]).toEqual(['Answered.', 'Answered.'])
+			expect([advertised.get(triageThread), advertised.get(verbatimThread)]).toEqual([
+				['lookup'],
+				undefined,
+			])
+			expect([judged.calls.length, recent.calls.length, none.calls.length]).toEqual([0, 1, 1])
+			expect(guideText).toContain(
+				'scope: triage,\n\t}), // `recent` selects; `lookup` is advertised',
+			)
+			expect(guideText).toContain(
+				'scope: verbatim,\n\t}), // the pass-through selects; no tool is advertised',
+			)
+			expect(guideText).toContain(
+				"const verbatim = modes.get('verbatim')\nif (triage === undefined || verbatim === undefined) throw new Error('Missing mode')",
+			)
+			expect(guideText).toContain(
+				'A run scope narrows the shared scope and never widens it, so a run that needs a mode wider than the shared scope needs another agent.',
 			)
 		})
 
@@ -2051,13 +2269,87 @@ await new GuideCommand({
 			expect(supplied.calls).toHaveLength(1)
 			expect(isLedgerSnapshot({ ...snapshot, gauge: { scale: 1, overhead: 0 } })).toBe(false)
 			expect(guideText).toContain(
-				"drops the stored gauge, reads `undefined` from its `gauge` member, and calibrates before its first pass, so a hydrated ledger never plans with an overhead priced on other definitions. The comparison reads the definitions at construction, so a tool a host adds to the agent's tools afterward isn't compared.",
+				'drops the stored gauge, reads `undefined` from its `gauge` member, and calibrates before its first pass, so a hydrated ledger never plans with an overhead priced on other definitions.',
 			)
 			expect(guideText).toContain(
 				'With the same definitions, the hydrated ledger reuses the gauge and makes no calibration call.',
 			)
+		})
+
+		it('calibrates again before a request that finds a tool added after construction, a supplied gauge included, as the stored gauge limit and the added-definition fence claim', async () => {
+			// The fence's `ledger`: one calibrated through its first request, and one built on a supplied gauge.
+			const { ledger, provider } = await serveLedgerGauge(
+				buildUncalibratedOptions(buildLedgerOptions()),
+			)
+			// The supplied-gauge ledger's provider answers its first request, takes two calibration calls,
+			// then calls the added tool, which the ledger denies, and answers.
+			const supplier = new MeteredLedgerProvider(
+				[
+					{ content: 'Noted.' },
+					{ content: 'Noted.' },
+					{ content: 'Noted.' },
+					{
+						content: '',
+						tools: [{ id: 'invoice-1', name: 'lookup_invoice', arguments: { id: '42' } }],
+					},
+					{ content: 'Paid.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const supplied = createLedger(supplier, buildLedgerOptions())
+			const denials: Array<readonly [string, string | undefined]> = []
+			supplied.agent.emitter.on('deny', (call, reason) => denials.push([call.name, reason]))
+			await supplied.respond('Brightwater Studio renews in May.')
+			const priced = [ledger.gauge?.overhead, supplied.gauge?.overhead]
+			const unchanged = provider.calls.length
+			await ledger.respond('Brightwater Studio pays in June.')
+			const repeated = provider.calls.length
+			for (const served of [ledger, supplied]) {
+				served.agent.context.tools.add(
+					createTool({
+						name: 'lookup_invoice',
+						description: 'Read an invoice by its id.',
+						parameters: { type: 'object', properties: { id: { type: 'string' } } },
+						execute: () => 'Invoice 42 is paid.',
+					}),
+				)
+				await served.respond('Is invoice 42 paid?')
+			}
+
+			// The same definitions cost no calibration; an added one costs two calibration calls
+			// (`think: false`) before the request's pass, and the overhead prices it.
+			expect(repeated - unchanged).toBe(1)
+			expect(provider.calls.slice(repeated).map((call) => call.options?.think)).toEqual([
+				false,
+				false,
+				undefined,
+			])
+			expect(supplier.calls.map((call) => call.options?.think)).toEqual([
+				undefined,
+				false,
+				false,
+				undefined,
+				undefined,
+			])
+			// The added definition is advertised and priced, and the ledger denies its call.
+			expect(supplier.calls[3]?.tools?.map(({ name }) => name)).toContain('lookup_invoice')
+			expect(denials).toEqual([['lookup_invoice', 'the ledger advertises no such tool']])
+			expect(ledger.gauge?.overhead).toBeGreaterThan(requireValue(priced[0]))
+			expect(supplied.gauge?.overhead).toBeGreaterThan(requireValue(priced[1]))
 			expect(guideText).toContain(
-				"A `gauge` option is the application's own price and is never compared.",
+				"Each `respond` call compares the digest again at its entry, over the definitions the agent's tools hold then, so a tool a host adds or removes between requests drops the gauge and calibrates before that request's first pass.",
+			)
+			expect(guideText).toContain(
+				"A `gauge` option is the application's own price for the definitions the agent's tools hold at construction: the ledger keeps it while those definitions stay the same, and a `respond` call that finds others drops it and calibrates, as it does a stored gauge.",
+			)
+			expect(guideText).toContain(
+				"await ledger.respond('Is invoice 42 paid?') // calibrates before its first pass\nledger.gauge?.overhead // above `before`: the overhead prices the added definition",
+			)
+			expect(guideText).toContain(
+				"\t\tname: 'lookup_invoice',\n\t\tdescription: 'Read an invoice by its id.',\n\t\tparameters: { type: 'object', properties: { id: { type: 'string' } } },\n\t\texecute: () => 'Invoice 42 is paid.',",
+			)
+			expect(guideText).toContain(
+				'The following ledger prices a definition added after construction, whose calls the ledger still denies:',
 			)
 		})
 
@@ -2225,7 +2517,7 @@ await new GuideCommand({
 			for (const row of [
 				{
 					id: 'bw-5512',
-					stub: 'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512',
+					stub: 'lookup_order {"id":"BW-5512"}: result not shown',
 				},
 				{
 					id: 'BW-5512',
@@ -2269,6 +2561,9 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				'That full receipt makes a duplicate stub read `shown`, even when its own source is retired.',
+			)
+			expect(guideText).toContain(
+				'A `hidden` stub names the `recall` call that finds its result only when the window rung the plan admits offers `recall` and the scope admits it; otherwise it reads `result not shown`.',
 			)
 		})
 
@@ -2618,7 +2913,60 @@ await new GuideCommand({
 					(1 + LEDGER_SCALE_DRIFT),
 			)
 			expect(guideText).toContain(
-				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the gauge and held back by the `LEDGER_SCALE_DRIFT` constant, of which the seed tail takes at most the `tail` share',
+				'the `capacity` option less the `predict` option, times the `prompt` share, less the overhead cost of the definitions the first pass can advertise and held back by the `LEDGER_SCALE_DRIFT` constant, of which the seed tail takes at most the `tail` share',
+			)
+		})
+
+		it('returns the overhead a scope hides to the plan, so a ledger whose request entered under a scope that hides every definition plans as one with no overhead, as the plan claims', async () => {
+			const capacity = 600
+			const tails: number[] = []
+			// A lookup whose definition prices well under the overhead, so hiding it alone spares part of it.
+			const catalog = createTool({
+				name: 'lookup_catalog',
+				description: Array.from(
+					{ length: 8 },
+					(_unused, at) => `Read catalog section ${at} by its code, with prices and stock.`,
+				).join(' '),
+				parameters: { type: 'object', properties: { code: { type: 'string' } } },
+				execute: () => 'Section 4: in stock.',
+			})
+			const cases: ReadonlyArray<
+				readonly [overhead: number, tools: readonly string[] | undefined]
+			> = [
+				[0, undefined],
+				[200, undefined],
+				[200, ['recall']],
+				[200, []],
+			]
+			for (const [overhead, tools] of cases) {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildGuideLedgerOptions({
+						judge: createPhraseJudge([]),
+						capacity,
+						gauge: { scale: 1, overhead },
+						lookups: [{ tool: catalog, read: () => undefined }],
+					}),
+				)
+				if (tools !== undefined) ledger.agent.context.apply(createScope({ name: 'host', tools }))
+				ledger.conversation.add(
+					Array.from({ length: 40 }, (_unused, at): MessageInput => ({
+						role: 'user',
+						content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
+					})),
+				)
+				await ledger.respond('Review the desk.')
+				tails.push(estimateMessages(requireValue(provider.calls[0]).messages.slice(1)))
+			}
+
+			// The whole overhead shrinks the tail while every definition is admitted; hiding the lookup
+			// returns its part, and hiding every definition returns all of it.
+			expect(tails[1]).toBeLessThan(requireValue(tails[2]))
+			expect(tails[2]).toBeLessThan(requireValue(tails[0]))
+			expect(tails[3]).toBe(tails[0])
+			expect(guideText).toContain(
+				"The definitions the first pass can advertise are those the scope the request entered with admits, `recall` included, so a scope that hides definitions returns their price to the plan: the plan subtracts the gauge's overhead less the price of the hidden definitions, the gauge's scale times their estimate and never more than the overhead, and a scope that hides every definition costs the plan no overhead.",
 			)
 		})
 
@@ -2886,11 +3234,9 @@ await new GuideCommand({
 			expect(contents.at(-1)).toBe(LEDGER_NOTES.cue)
 		})
 
-		it('faults an unowned run whose newest message is a user message and selects nothing for any other run, as the ledger section claims', async () => {
+		it('faults a selection no active respond call owns, as the ledger section claims', async () => {
 			const provider = createScriptedProvider(
 				[
-					{ content: 'Done.' },
-					{ content: 'Done.' },
 					{ content: 'Done.' },
 					{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
 					{ content: '', usage: { prompt: 10, completion: 1, total: 11 } },
@@ -2901,7 +3247,7 @@ await new GuideCommand({
 			const release = Promise.withResolvers<void>()
 			const asks = createRecorder<readonly [questions: readonly string[]]>()
 			const phrases = createPhraseJudge(['Refunds over'])
-			// The supplied gauge skips calibration in `respond`, and the agent runs reach the provider
+			// The supplied gauge skips calibration in `respond`, and the pass reaches the provider
 			// through `stream`, so only the `calibrate` call reaches `generate` and parks there.
 			const ledger = createLedger(
 				{
@@ -2915,7 +3261,6 @@ await new GuideCommand({
 					stream: (...args) => provider.stream(...args),
 				},
 				buildGuideLedgerOptions({
-					agent: { strict: false },
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
@@ -2938,66 +3283,81 @@ await new GuideCommand({
 					.find((message) => message.content === 'Does a $148.50 refund need a manager?'),
 				'Missing request message',
 			)
-			// The asks the owned `respond` call made; the unowned runs that follow add none.
+			// The asks the owned `respond` call made; the unowned selections that follow add none.
 			const asked = [...asks.calls]
 			expect(asked).toEqual([
 				[[JSON.stringify(['category', rule.id])]],
 				[[JSON.stringify(['topic', rule.id, 'refunds'])]],
 				[[JSON.stringify(['topic', owned.id, 'refunds'])]],
 			])
-			const faults = createRecorder<readonly [unknown]>()
-			const selections = createRecorder<readonly [Selection]>()
-			ledger.agent.emitter.on('fault', faults.handler)
-			ledger.agent.emitter.on('select', selections.handler)
 
-			// The newest message is the reply, so the run has no request to select for.
-			const replied = ledger.conversation.view()
-			await ledger.agent.generate()
-			expect(selections.calls).toEqual([])
-			expect(faults.calls.flat()).toEqual([])
-			expect(
-				requireValue(provider.calls[1], 'Missing reply run')
-					.messages.slice(1)
-					.map(({ role, content }) => [role, content]),
-			).toEqual(replied.map(({ role, content }) => [role, content]))
-
-			ledger.conversation.add({ role: 'user', content: 'Does the refund need two managers?' })
+			const question = ledger.conversation.add({
+				role: 'user',
+				content: 'Does the refund need two managers?',
+			})
 			const viewed = ledger.conversation.view()
-			await ledger.agent.generate()
-			const direct = requireValue(selections.calls[0]?.[0], 'Missing direct selection')
+			const direct = requireValue(
+				await ledger.agent.context.select(
+					ledger.conversation,
+					question,
+					AbortSignal.timeout(30_000),
+				),
+				'Missing direct selection',
+			)
 			expect(isLedgerError(direct.fault)).toBe(true)
 			expect(direct.fault).toMatchObject({ code: 'REQUEST' })
-			expect(faults.calls.flat()).toEqual([direct.fault])
 			expect(extractLedgerRecords(direct.messages)).toBe('')
-			expect(
-				requireValue(provider.calls[2], 'Missing direct run')
-					.messages.slice(1)
-					.map(({ role, content }) => [role, content]),
-			).toEqual(viewed.map(({ role, content }) => [role, content]))
+			expect(direct.messages).toEqual(viewed)
+			expect(asks.calls).toEqual(asked)
+			// Over another conversation, the refusal carries that conversation's view alone.
+			const thread = createConversation()
+			const elsewhere = thread.add({ role: 'user', content: 'Is the Northgate order late?' })
+			const foreign = requireValue(
+				await ledger.agent.context.select(thread, elsewhere, AbortSignal.timeout(30_000)),
+				'Missing foreign selection',
+			)
+			expect(foreign.fault).toMatchObject({ code: 'REQUEST' })
+			expect(foreign.messages).toEqual(thread.view())
 			expect(asks.calls).toEqual(asked)
 
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
 			await entered.promise
-			ledger.conversation.add({ role: 'user', content: 'Can the desk skip the manager this once?' })
-			const abort = new AbortController()
-			ledger.agent.emitter.once('select', () => abort.abort())
-			await ledger.agent.generate({ signal: abort.signal })
+			const skip = ledger.conversation.add({
+				role: 'user',
+				content: 'Can the desk skip the manager this once?',
+			})
+			const measured = requireValue(
+				await ledger.agent.context.select(ledger.conversation, skip, AbortSignal.timeout(30_000)),
+				'Missing calibration-time selection',
+			)
 			release.resolve()
 			await measuring
-			const measured = requireValue(selections.calls[1]?.[0], 'Missing calibration-time selection')
 			expect(isLedgerError(measured.fault)).toBe(true)
 			expect(measured.fault).toMatchObject({ code: 'REQUEST' })
-			expect(faults.calls.flat()).toEqual([direct.fault, measured.fault])
 			expect(asks.calls).toEqual(asked)
+			expect(provider.calls).toHaveLength(3)
+			// The agent record starts no run of its own: `respond` is the only caller that runs the agent.
+			expect(Object.isFrozen(ledger.agent)).toBe(true)
+			expect(['generate' in ledger.agent, 'stream' in ledger.agent]).toEqual([false, false])
+			expect(Object.keys(ledger.agent).toSorted()).toEqual([
+				'abort',
+				'context',
+				'emitter',
+				'id',
+				'status',
+			])
 			expect(guideText).toContain(
-				'When the selection faults, the run rejects under the default `strict`, and under `strict: false` the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no records.',
+				"Run the ledger's agent only through the `respond` method: the ledger's agent serves only the ledger's `conversation`. The `agent` member is a `LedgerAgentInterface` value, a frozen record of the agent's `emitter`, `id`, `status`, `context`, and `abort` members with no `generate` or `stream` method, so every run on that agent is a pass of the active `respond` call, on the ledger's `conversation`.",
 			)
 			expect(guideText).toContain(
-				"Run the ledger's agent only through the `respond` method: the ledger's agent serves only the ledger's `conversation`. An active `respond` call owns a run on that conversation whose request, the newest message, is that call's request or one of the ledger's notes. A run that no active `respond` call owns, such as a direct call to the agent's `generate` method or a run on another conversation, gets a faulted selection when its newest message is a user message: the selection's `fault` is a `LedgerError` with code `'REQUEST'`, so under the default `strict` the run rejects with that error before it reaches the provider, and under `strict: false` the agent emits `fault` and builds the prompt from the whole view of the run's conversation with no records. Either way the ledger asks its judge nothing for that run. When its newest message isn't a user message, the run gets no selection and builds from the whole view. Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.",
+				"To serve another conversation, build another ledger or another agent for it. A direct call to the `context.select` method for a message no active `respond` call owns returns a selection whose `fault` is a `LedgerError` with code `'REQUEST'`, on the ledger's conversation or another one, and asks the judge nothing;",
+			)
+			expect(guideText).toContain(
+				"Host code that calls a ledger tool by hand through `agent.context.tools` while a request runs reaches that request's state: a lookup or a write meets that request's repeat stop, and a `recall` call spends that request's recall limit.",
 			)
 		})
 
-		it('faults a direct run during calibration after the answer pass rejected, as calibration admits no run', async () => {
+		it('faults a direct selection during calibration after the answer pass rejected', async () => {
 			const provider = createScriptedProvider([{ content: '' }], { repeat: false })
 			const calibration = createScriptedProvider([
 				{ content: '', usage: { prompt: 20, completion: 1, total: 21 } },
@@ -3029,23 +3389,18 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				"A rejected first pass counts as unfinished. When the answer pass rejects as well, the `respond` method rejects with that pass's error, and the ledger stays free for a later request.",
 			)
-			const selections = createRecorder<readonly [Selection]>()
-			ledger.agent.emitter.on('select', selections.handler)
+			const request = requireValue(
+				ledger.conversation.messages().find((message) => message.content === 'Review the desk.'),
+				'Missing request message',
+			)
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
 			await entered.promise
-			try {
-				const abort = new AbortController()
-				ledger.agent.emitter.once('select', () => abort.abort())
-				await ledger.agent.generate({ signal: abort.signal })
-				expect(selections.calls).toHaveLength(1)
-				expect(selections.calls[0]?.[0]?.fault).toMatchObject({ code: 'REQUEST' })
-			} finally {
-				release.resolve()
-				await measuring
-			}
-			expect(guideText).toContain(
-				'Calibration admits no run, so a run during the `calibrate` method, or during the calibration that opens a `respond` call, is one that no active `respond` call owns.',
-			)
+			const measured = await ledger.agent.context
+				.select(ledger.conversation, request, AbortSignal.timeout(30_000))
+				?.finally(() => release.resolve())
+			await measuring
+			expect(isLedgerError(measured?.fault)).toBe(true)
+			expect(measured?.fault).toMatchObject({ code: 'REQUEST' })
 		})
 
 		it('fits a short-id lookup at the tail boundary priced at its longer hidden stub, as the plan claims', async () => {
@@ -3084,51 +3439,106 @@ await new GuideCommand({
 			)
 		})
 
-		it('refuses a direct run beside a request', async () => {
-			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-			const entered = Promise.withResolvers<void>()
-			const release = Promise.withResolvers<void>()
-			const ledger = createLedger(
-				{
-					id: provider.id,
-					name: provider.name,
-					generate: (...args) => provider.generate(...args),
-					stream: async function* (...args) {
-						entered.resolve()
-						await release.promise
-						return yield* provider.stream(...args)
-					},
-				},
-				buildGuideLedgerOptions({
-					judge: createPhraseJudge(['Refunds over']),
-					capacity: 32_768,
-					gauge: { scale: 1, overhead: 0 },
-				}),
+		it('binds both passes to the scope the request entered with and leaves the context scope to the host, as the answer pass claims', async () => {
+			const provider = createScriptedProvider(
+				[{ content: '' }, { content: 'Answered.' }, { content: 'Next.' }],
+				{ recorded: true, repeat: false },
 			)
-			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
-			const responding = ledger.respond('Does a $148.50 refund need a manager?')
-			await entered.promise
-			const count = ledger.conversation.count
-			const refused = captureError(() => ledger.agent.generate())
-			const stored = ledger.conversation.count
-			release.resolve()
-			const result = await responding
+			const ledger = createLedger(provider, buildLedgerOptions())
+			const host = createScope({ name: 'host', tools: [] })
+			const wide = createScope({ name: 'wide' })
+			const scopes: Array<ScopeInterface | undefined> = []
+			// The host widens its scope at the request's first selection, inside the request.
+			ledger.agent.emitter.on('select', () => {
+				if (ledger.agent.context.scope === host) ledger.agent.context.apply(wide)
+			})
+			ledger.agent.emitter.on('request', () => scopes.push(ledger.agent.context.scope))
+			ledger.agent.context.apply(host)
+			const first = await ledger.respond('Is the Brightwater Studio refund approved?')
+			const after = ledger.agent.context.scope
+			await ledger.respond('Look up BW-20931.')
+			const advertised = provider.calls.map((call) => call.tools?.map(({ name }) => name))
 
-			// The pass binds the ledger's conversation, so a direct run on it throws synchronously and
-			// stores nothing, and the request still settles on its own reply.
-			expect(barrel.isAgentError(refused)).toBe(true)
-			expect(refused).toMatchObject({ code: 'CONCURRENCY' })
-			expect(stored).toBe(count)
-			expect(result.content).toBe('Done.')
-			expect(provider.calls).toHaveLength(1)
+			// The widening adds no tool to either pass of its request, the answer pass applies no scope,
+			// and the next request enters under the widened scope.
+			expect(first.passes).toHaveLength(2)
+			expect(advertised.slice(0, 2)).toEqual([undefined, undefined])
+			expect(scopes.slice(0, 2)).toEqual([wide, wide])
+			expect(after).toBe(wide)
+			expect(advertised[2]).toContain('lookup')
+			expect(guideText).toContain(
+				'The answer pass runs under a run scope of its own, the scope the request entered with narrowed to no tools, so it advertises nothing whatever scope a host applies during the request, and it leaves the `context.scope` value as it found it.',
+			)
+			expect(guideText).toContain(
+				'Both passes bind the scope the request entered with: a scope a host widens during a request adds no tool to either pass, and no instruction, skill, memo, or file to the answer pass, before the next request, while a scope a host narrows during it hides a tool from the next turn.',
+			)
+		})
+
+		it('ends a pass whose dispatched request advertised no tools after one generation when a later turn listener hides them, as the stray stop claims', async () => {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [{ id: 'lookup-1', name: 'lookup', arguments: { id: 'BW-20931' } }],
+					},
+					{ content: 'Answered without a lookup.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(provider, buildLedgerOptions())
+			// Registered after the ledger's own listeners, so it changes the scope after they ran.
+			ledger.agent.emitter.on('turn', () =>
+				ledger.agent.context.apply(createScope({ name: 'shut', tools: [] })),
+			)
+			const result = await ledger.respond('Look up BW-20931.')
+
+			expect(provider.calls.map((call) => call.tools)).toEqual([undefined, undefined])
+			expect(result.passes).toHaveLength(2)
+			expect(result.content).toBe('Answered without a lookup.')
+			expect(guideText).toContain(
+				"The ledger reads each request a turn dispatches through the agent's `request` event, and every run on its agent is a pass on the ledger's `conversation`, so its count of advertised tools is the provider's even when a `turn` listener or a scheduler yield changes the scope after an earlier listener ran.",
+			)
+			expect(guideText).toContain(
+				"So a pass whose dispatched request advertises no tools makes at most one model generation, whatever the agent's `limit`.",
+			)
+		})
+
+		it('faults a selection whose conversation changes during it, as the ledger section claims', async () => {
+			const { createGatedScheduler, createPacedLedger, seedLedgerPrefix } =
+				await import('./setup.js')
+			const seed = await seedLedgerPrefix(18, 'correction')
+			const rejects = Promise.withResolvers<void>()
+			const gated = createGatedScheduler(rejects)
+			const strict = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], gated)
+			const rejected = strict.ledger.respond('What is the status of OR-1000?')
+			await gated.reached
+			strict.ledger.conversation.add({ role: 'user', content: 'Order OR-1000 is on hold.' })
+			rejects.resolve()
+			await expect(rejected).rejects.toThrow('changed during selection')
+			// The rejection leaves the ledger free for a later call.
+			await expect(strict.ledger.respond('What is open on the desk?')).resolves.toMatchObject({
+				content: 'Noted.',
+			})
+
+			const lenient = Promise.withResolvers<void>()
+			const scheduler = createGatedScheduler(lenient)
+			const loose = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], scheduler, {
+				agent: { strict: false },
+			})
+			const served = loose.ledger.respond('What is the status of OR-1000?')
+			await scheduler.reached
+			const before = loose.ledger.conversation.count
+			loose.ledger.conversation.add({ role: 'user', content: 'Order OR-1000 is on hold.' })
+			lenient.resolve()
+			expect((await served).content).toBe('Noted.')
+			const [faulted] = requireValue(loose.selections.calls[0], 'Missing faulted selection')
+			expect(faulted.fault?.message).toContain('changed during selection')
+			expect(faulted.messages).toEqual(loose.ledger.conversation.view().slice(0, before + 1))
 			expect(guideText).toContain(
 				"A selection reads the conversation it was asked about, so a host append or removal while a `respond` call's selection runs faults it with a `changed during selection` error. Under the default `strict`, `respond` rejects with that error before it reaches the provider,",
 			)
 			expect(guideText).toContain(
-				"A direct run on the ledger's conversation while a `respond` call's pass runs is refused with `AgentError` `'CONCURRENCY'`.",
-			)
-			expect(guideText).toContain(
-				"a run on another conversation then adds its turns and usage to that call's gauge readings, shares its repeat stop, and can reach the lookup tools, and the `recall` tool when that call's request offers it",
+				'When the selection faults, the run rejects under the default `strict`, and under `strict: false` the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no records.',
 			)
 		})
 
@@ -3383,13 +3793,24 @@ await new GuideCommand({
 			)
 
 			const result = await ledger.respond('Review order BW-5512.')
-			ledger.conversation.add({ role: 'user', content: 'Does the refund need a manager?' })
+			const question = ledger.conversation.add({
+				role: 'user',
+				content: 'Does the refund need a manager?',
+			})
 			const view = ledger.conversation.view()
-			await ledger.agent.generate()
+			const faulted = requireValue(
+				await ledger.agent.context.select(
+					ledger.conversation,
+					question,
+					AbortSignal.timeout(30_000),
+				),
+				'Missing faulted selection',
+			)
 
 			const turn = requireValue(provider.calls[1], 'Missing second call of the pass').messages
 			const answer = requireValue(provider.calls[2], 'Missing answer pass').messages
-			const direct = requireValue(provider.calls[3], 'Missing faulted run').messages
+			const direct = faulted.messages
+			expect(faulted.fault).toMatchObject({ code: 'REQUEST' })
 			expect(result.passes).toHaveLength(2)
 			expect(turn.filter((message) => message.content === narration)).toHaveLength(1)
 			expect(estimateMessages(turn.filter((message) => message.role !== 'tool'))).toBeGreaterThan(
@@ -3416,9 +3837,7 @@ await new GuideCommand({
 					answer.filter((message) => !message.content.startsWith(LEDGER_NOTES.results)),
 				),
 			).toBeLessThanOrEqual(budget)
-			expect(direct.slice(1).map(({ role, content }) => [role, content])).toEqual(
-				view.map(({ role, content }) => [role, content]),
-			)
+			expect(direct).toEqual(view)
 			expect(estimateMessages(direct)).toBeGreaterThan(budget)
 			expect(guideText).toContain(
 				"The plan budget bounds the records, the tail, and the window of a request's first call: it prices the built head, the tail, the window, and the copy with its records and images. Runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
@@ -4133,6 +4552,72 @@ await new GuideCommand({
 			expect(results.map((result) => result.content)).toEqual(['parent', 'child'])
 			expect(guideText).toContain(
 				"const results = await runner.execute([parent]) // the parent's result, then the child's",
+			)
+		})
+
+		it('refuses a tree whose child exceeds its parent before anything spawns or runs, as the fan-out fence claims', async () => {
+			const provider = createScriptedProvider([{ content: 'Planned.' }], { recorded: true })
+			const registry = barrel.createAgentRegistry({ providers: { main: provider } })
+			const runner = barrel.createAgentRunner({ registry, concurrency: 4 })
+			const planner: AgentJobInput = {
+				provider: 'main',
+				messages: [{ role: 'user', content: 'Plan the trip.' }],
+				children: [
+					{
+						provider: 'main',
+						tools: ['book'],
+						messages: [{ role: 'user', content: 'Book flights.' }],
+					},
+				],
+			}
+			const refused = await runner.execute([planner]).catch((error: unknown) => error)
+			// A grandchild that names a larger limit refuses the root too, before the root runs. A fresh
+			// runner holds it, because a fail-fast runner settles once.
+			const deep = await barrel
+				.createAgentRunner({ registry, concurrency: 4 })
+				.execute([
+					{
+						provider: 'main',
+						messages: [{ role: 'user', content: 'Plan the trip.' }],
+						limit: 4,
+						children: [
+							{
+								provider: 'main',
+								messages: [{ role: 'user', content: 'Find flights.' }],
+								limit: 4,
+								children: [
+									{
+										provider: 'main',
+										messages: [{ role: 'user', content: 'Compare fares.' }],
+										limit: 8,
+									},
+								],
+							},
+						],
+					},
+				])
+				.catch((error: unknown) => error)
+
+			expect(deep).toMatchObject({
+				code: 'REGISTRY',
+				context: { findings: ["job.children[0].children[0].limit: 8 exceeds its parent's 4"] },
+			})
+			expect(barrel.isAgentError(refused) && refused.code).toBe('REGISTRY')
+			expect(barrel.isAgentError(refused) ? refused.context?.['findings'] : undefined).toEqual([
+				'job.children[0].tools: names "book", which its parent does not hold',
+			])
+			expect(provider.calls).toHaveLength(0)
+			expect(guideText).toContain(
+				"isAgentError(refused) && refused.code // 'REGISTRY'\n// refused.context.findings: ['job.children[0].tools: names \"book\", which its parent does not hold']",
+			)
+			expect(guideText).toContain(
+				"\t\t{ provider: 'main', tools: ['book'], messages: [{ role: 'user', content: 'Book flights.' }] },",
+			)
+			expect(guideText).toContain(
+				'The check walks the whole tree first, so a violation at any depth refuses the root before the root or any child runs.',
+			)
+			expect(guideText).toContain(
+				'The check runs on every attempt of a unit, and a retried parent spawns its children on its first attempt alone.',
 			)
 		})
 
@@ -6039,13 +6524,15 @@ await new GuideCommand({
 			])
 			await expect(strict.generate()).rejects.toMatchObject({ code: 'ROLE' })
 			// A direct build reads the selection as conversation parts: that path is host-trusted.
-			expect(agent.context.build({ messages: [forged], judgments: [] })).toEqual([forged])
+			expect(agent.context.build({ selection: { messages: [forged], judgments: [] } })).toEqual([
+				forged,
+			])
 			expect(guideText).toContain('A selection fails four ways.')
 			expect(guideText).toContain(
 				"A `system` message in a handler's selection is a fault over `view()` carrying `ConversationError` `'ROLE'`.",
 			)
 			expect(guideText).toContain(
-				'`build(selection)` adds at most one `system` message of its own and reads the selection',
+				'`build({ selection })` adds at most one `system` message of its own and reads the selection',
 			)
 		})
 
@@ -6075,7 +6562,7 @@ await new GuideCommand({
 				"The same options carry `conversation`, which binds the run, and `prompt`, which the run appends as a `user` turn after its guards; a run with no `prompt` reads its request from the conversation's tail.",
 			)
 			expect(guideText).toContain(
-				'A `prompt` that is not an exact `AgentPrompt`, a `budget` or `allowance` that does not implement `BudgetInterface`, or a `conversation` that does not implement `ConversationInterface` throws `ContractError` with code `placement` before either bound starts, and a refused run appends no `prompt`.',
+				'A `prompt` that is not an exact `AgentPrompt`, a `budget` or `allowance` that does not implement `BudgetInterface`, a `conversation` that does not implement `ConversationInterface`, or a `scope` that does not implement `ScopeInterface` throws `ContractError` with code `placement` before either bound starts, and a refused run appends no `prompt`.',
 			)
 		})
 

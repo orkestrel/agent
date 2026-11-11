@@ -1,5 +1,5 @@
 import type { ScopeFilter, ScopeInput, ScopeInterface, SelectionHandler } from '../types.js'
-import { intersectKeys } from '../helpers.js'
+import { intersectFilters } from '../helpers.js'
 
 /**
  * Represents a named, immutable filter over a richer context's items — an optional allow-list per
@@ -57,19 +57,10 @@ export class Scope implements ScopeInterface {
 	}
 
 	narrow(config: ScopeFilter): ScopeInterface {
-		const instructions = intersectKeys(this.instructions, config.instructions)
-		const skills = intersectKeys(this.skills, config.skills)
-		const memos = intersectKeys(this.memos, config.memos)
-		const tools = intersectKeys(this.tools, config.tools)
-		const files = intersectKeys(this.files, config.files)
 		return new Scope({
 			name: this.name,
 			...(this.select === undefined ? {} : { select: this.select }),
-			...(instructions === undefined ? {} : { instructions }),
-			...(skills === undefined ? {} : { skills }),
-			...(memos === undefined ? {} : { memos }),
-			...(tools === undefined ? {} : { tools }),
-			...(files === undefined ? {} : { files }),
+			...intersectFilters(this, config),
 		})
 	}
 }

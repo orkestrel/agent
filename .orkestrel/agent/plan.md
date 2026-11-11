@@ -109,7 +109,8 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | --- | --- | --- |
 | `@orkestrel/toolbox`'s agent-facing tools (`createWorkspaceTool`'s switch, `createDescribeTool`, `createAgentTool`) simplified onto Agent's built-ins | This campaign's release, at toolbox's next visit | `@orkestrel/toolbox` |
 | The method's example naming `@orkestrel/toolbox` as the owner of the model-driven loader (`orkestrel-harden` `references/methods.md`, Agent `4d897eec`) | This campaign's release | the scaffold session |
-| Phase 1's five deferrals, each with its trigger in `designs/disclosure.md` § The deferral list: `scanJobTree`'s cost on deep job trees, the scan and spawn reading `children` more than once, a malformed child bound refused only at the child's build, a supplied `gauge` refusing after a tool is added, and `ledger.agent.emitter`'s write members | each row's own | Agent |
+| Phase 1's six deferrals, each with its trigger in `designs/disclosure.md` § The deferral list: `scanJobTree`'s cost on deep job trees, the scan and spawn reading `children` more than once, a malformed child bound refused only at the child's build, a supplied `gauge` refusing after a tool is added, `ledger.agent.emitter`'s write members, and a host's own `select` during a pass filing its request again | each row's own | Agent |
+| `test:studies` takes about 20 minutes on this host, against the user's rule that a routine study run takes minutes | the dev re-pin onto `ollama` 0.0.35 and `study`'s next release, when it reruns | Agent |
 
 ## State
 
@@ -129,10 +130,12 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | Runner | Ollama v0.40.16 is the latest stable, published 2026-11-09; the runner and taverna's profiles pin 0.40.15. A new lineage comes before phase 3's reading and taverna's first sealed run. |
 | Phase 1 estimate | weight 4.75, about 16 lane hours, set by the Orchestrator; the round's repair adds 0.75 |
 | Phase 1, units | Built and closed, uncommitted. 1A (the fan-out check) closed after two repair briefs and a closure check. 1B (the run scope and the `request` event) closed after a follow-up killed its review's five surviving mutations. 1C (the ledger) failed its review on the plan's scope and closed after one repair and a re-check that passed. The integrated tree passes 2868 `test:src` tests. |
-| Phase 1, the round | Both lanes confirmed every composed claim but one. A run on another conversation of a ledger's agent still reached the ledger through every listener but `request`, as at 0.0.40. The consultant ruled that `ledger.agent` holds no member that starts a run (claims 1.18 to 1.23). Five findings below the bar entered § Deferred. The 160-scenario differential against `e6a3ae75` is byte-identical. |
-| Phase 1, documentation | 1D's guide pass is done, with `test:guides` at 220 of 220 and items 67 and 68 removed from `ROADMAP.md`. Its TSDoc pass follows the repair. |
-| ROADMAP item 66 | prepared ahead of workflow's layer-4 release as one batched run: the runtime closure of eleven packages moves to the contract 0.0.23 wave, with the release proof red on the old range and no change in `src/` |
-| Next | the repair unit (the ledger's agent), with its re-audit and closure check; then 1D's TSDoc pass, `verifier` tree-wide, and the phase 1 commit |
+| Phase 1, the round | Both lanes confirmed every composed claim but one. A run on another conversation of a ledger's agent still reached the ledger through every listener but `request`, as at 0.0.40. The consultant ruled that `ledger.agent` holds no member that starts a run (claims 1.18 to 1.23). The repair built it, and its re-audit passed with nothing above the bar. Six findings below the bar entered § Deferred. The 160-scenario differential against `e6a3ae75` is byte-identical. |
+| Phase 1, documentation | 1D's two passes are done: the guide, the TSDoc, and claim 1.15's defects. Items 66, 67, and 68 are out of `ROADMAP.md`, and item 9 lost its second trigger. Its review passed, and its findings below the bar are fixed. |
+| Phase 1 | Closed: claims 1.1 to 1.23, with the round repaired and re-audited. The chain on the 0.0.23 ranges passes `test:src` 2876, policy 179, config 545, setup 354, guides 220, and distribution 10, with format, lint, check, and build clean. Two `test:studies` cases wait on `ollama` and `study` releasing on Agent 0.0.41, because each still nests contract 0.0.22. |
+| ROADMAP item 66 | Released alone as Agent 0.0.41 on 2026-11-11, from a standalone clone while phase 1 stayed uncommitted. Main fast-forwarded onto the release and carried phase 1 across by a three-way file merge. Two memory study cases, stale since the gauge digest, were fixed with it. |
+| Phase 2 estimate | about 18 lane hours, set by the Orchestrator |
+| Next | Phase 2: units 2A, 2B, and 2C. The dev re-pin onto `ollama` 0.0.35 and `study`'s next release comes when each publishes. |
 
 ## Sequence
 

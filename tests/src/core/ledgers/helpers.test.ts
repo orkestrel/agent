@@ -2712,6 +2712,28 @@ describe('renderStub', () => {
 			expect(renderStub('lookup_order', { id: 'BW-5512' }, state).match(LEDGER_HANDLE)).toBeNull()
 		}
 	})
+
+	it('names no recall route for a hidden result when recall is not offered', () => {
+		expect(renderStub('lookup_order', args, 'hidden', false, false)).toBe(
+			'lookup_order {"id":" BW-5512 "}: result not shown',
+		)
+		expect(renderStub('lookup_order', args, 'hidden', false, true)).toBe(
+			'lookup_order {"id":" BW-5512 "}: result not shown; call recall with BW-5512',
+		)
+		expect(renderStub('update_contact', { id: 'C-12' }, 'hidden', true, false)).toBe(
+			'update_contact {"id":"C-12"}: result not shown',
+		)
+	})
+
+	it('renders every other state alike whether recall is offered', () => {
+		for (const state of ['failed', 'empty', 'shown'] as const) {
+			for (const write of [false, true]) {
+				expect(renderStub('lookup_order', args, state, write, false)).toBe(
+					renderStub('lookup_order', args, state, write, true),
+				)
+			}
+		}
+	})
 })
 
 describe('fitSlope', () => {

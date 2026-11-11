@@ -1,5 +1,14 @@
-import type { Memo, MemoOrigin, MemoSnapshot } from './types.js'
-import { arrayOf, holds, isFiniteNumber, isRecord, isString } from '@orkestrel/contract'
+import type { Memo, MemoOrigin, MemoSnapshot, ScopeInterface } from './types.js'
+import {
+	arrayOf,
+	holds,
+	isFiniteNumber,
+	isFunction,
+	isObject,
+	isRecord,
+	isString,
+	optionalOf,
+} from '@orkestrel/contract'
 
 /**
  * Checks whether a value is a memo's origin: a record with a string `conversation` and an optional
@@ -92,5 +101,45 @@ export function isMemoSnapshot(value: unknown): value is MemoSnapshot {
 		if (!isRecord(value) || Object.keys(value).length !== 2) return false
 		const { id, memos } = value
 		return isString(id) && arrayOf(isMemo)(memos)
+	})
+}
+
+/**
+ * Checks whether a value implements `ScopeInterface`; total, each member read one time, any
+ * implementation admitted.
+ *
+ * @remarks
+ * A scope is a string `id` and `name`, each of `instructions`, `skills`, `memos`, `tools`, and
+ * `files` absent or a dense array of strings, `select` absent or a function, and a `narrow`
+ * function. The guard reads each of those members one time and never calls a method. It admits
+ * unknown members, a class instance, and a transparent proxy, and returns false for a throwing
+ * getter, a revoked proxy, and any other malformed input.
+ *
+ * @param value - The value to test
+ * @returns True if `value` carries the members of a {@link ScopeInterface}; false otherwise
+ *
+ * @example
+ * ```ts
+ * import { createScope, isScope } from '@orkestrel/agent'
+ *
+ * isScope(createScope({ name: 'reader', tools: ['search'] })) // true
+ * isScope({ id: 's1', name: 'reader' }) // false
+ * ```
+ */
+export function isScope(value: unknown): value is ScopeInterface {
+	return holds(() => {
+		if (!isObject(value)) return false
+		const list = optionalOf(arrayOf(isString))
+		return (
+			isString(Reflect.get(value, 'id')) &&
+			isString(Reflect.get(value, 'name')) &&
+			list(Reflect.get(value, 'instructions')) &&
+			list(Reflect.get(value, 'skills')) &&
+			list(Reflect.get(value, 'memos')) &&
+			list(Reflect.get(value, 'tools')) &&
+			list(Reflect.get(value, 'files')) &&
+			optionalOf(isFunction)(Reflect.get(value, 'select')) &&
+			isFunction(Reflect.get(value, 'narrow'))
+		)
 	})
 }

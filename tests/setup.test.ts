@@ -70,6 +70,7 @@ import {
 	Channel,
 	createAgent,
 	createAuthority,
+	createScope,
 	estimateRequest,
 	ProviderAbortError,
 	providerRequestContract,
@@ -87,6 +88,7 @@ import {
 	AccessedAgentResult,
 	createInvalidAgentResultCases,
 	seedCompactionAgent,
+	seedLookupAgent,
 	requestConversation,
 	createConversationEchoProvider,
 	createEchoProvider,
@@ -1402,11 +1404,11 @@ describe('system boundary canary fixtures', () => {
 		])
 	})
 
-	it('serves the canary desk on its first pass, answer pass, late request, and direct run', async () => {
+	it('serves the canary desk on its first pass, answer pass, late request, and direct selection', async () => {
 		const desk = await serveCanaryDesk()
 		const fault = desk.selections.at(-1)?.fault
 
-		expect(desk.calls).toHaveLength(5)
+		expect(desk.calls).toHaveLength(4)
 		expect(isLedgerError(fault) && fault.code === 'REQUEST').toBe(true)
 		expect(desk.judgments.length).toBeGreaterThan(0)
 	})
@@ -2727,6 +2729,26 @@ describe('shared agent builders', () => {
 		expect(counted.name).toBe('add')
 		expect(await counted.execute({ id: 2 }, context)).toBe(5)
 		expect(recorder.calls).toEqual([[{ id: 1 }], [{ id: 2 }]])
+	})
+
+	it('seedLookupAgent records the scope each turn reads, each request, and each denial', async () => {
+		const seeded = seedLookupAgent(
+			[
+				{ content: '', tools: [createToolCall({ id: 'c1', name: 'lookup' })] },
+				{ content: '', tools: [createToolCall({ id: 'c2', name: 'missing' })] },
+				{ content: 'Done.' },
+			],
+			{ scope: createScope({ name: 'desk', tools: ['lookup'] }) },
+		)
+
+		const result = await seeded.agent.generate({ prompt: { content: 'Check the desk.' } })
+
+		expect(result.content).toBe('Done.')
+		expect(seeded.reads.calls).toEqual([[['lookup']], [['lookup']], [['lookup']]])
+		expect(seeded.requests.calls.map(([index]) => index)).toEqual([0, 1, 2])
+		expect(seeded.provider.calls).toHaveLength(3)
+		expect(seeded.executed.calls).toEqual([[{}]])
+		expect(seeded.denied.calls.map(([call]) => call.id)).toEqual(['c2'])
 	})
 
 	it('createForeignSignal is signal-shaped, inert, and refused by AbortSignal.any', () => {

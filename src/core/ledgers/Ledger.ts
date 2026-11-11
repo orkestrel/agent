@@ -1,7 +1,7 @@
 import type { AgentInterface, AgentResult } from '../agents/types.js'
-import type { Selection } from '../contexts/types.js'
+import type { ScopeFilter, ScopeInterface, Selection } from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
-import type { ProviderInterface } from '../providers/types.js'
+import type { ProviderInterface, ProviderRequest } from '../providers/types.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type {
 	ClassifierResult,
@@ -12,6 +12,7 @@ import type {
 	LedgerRenderResult,
 	LedgerAmendment,
 	LedgerCategory,
+	LedgerAgentInterface,
 	LedgerGauge,
 	LedgerInterface,
 	LedgerLine,
@@ -45,6 +46,7 @@ import { createAgent } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
 import { denyCall, estimateMessages, settleToolResult } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
+import { intersectFilters, intersectKeys } from '../contexts/helpers.js'
 import { createConversationManager } from '../conversations/factories.js'
 import {
 	collectExchanges,
@@ -133,12 +135,14 @@ export class Ledger implements LedgerInterface {
 	readonly #share: LedgerShare
 	readonly #conversation: ConversationInterface
 	readonly #agent: AgentInterface
+	readonly #record: LedgerAgentInterface
 	readonly #classifier: Classifier
 	readonly #requests = new Set<string>()
 	readonly #annotations = new Set<string>()
 	readonly #results = new Map<string, ToolResult>()
 	readonly #pending = new Map<number, ToolResult>()
-	readonly #live = new Set<LedgerRequest>()
+	// Each live request beside the scope it entered with, which bounds what its first pass can advertise.
+	readonly #live = new Map<LedgerRequest, ScopeInterface | undefined>()
 	readonly #scans = new Set<LedgerScan>()
 	readonly #calibrations = new Set<AbortSignal>()
 	#gauge: Gauge | undefined
@@ -352,16 +356,30 @@ export class Ledger implements LedgerInterface {
 			this.#current()?.adopt(selection, this.#conversation.messages().length)
 		})
 		this.#agent.emitter.on('fault', (error) => this.#current()?.fault(error))
-		this.#agent.emitter.on('turn', () => this.#observeTurn())
+		// The ledger prices the request each turn dispatches, so a scope a later listener changed
+		// counts as the provider receives it. Every run on the agent is a pass of the active call.
+		this.#agent.emitter.on('request', (_index, sent) => this.#observeRequest(sent))
 		this.#agent.emitter.on('usage', (usage) => this.#current()?.spend(usage))
+		// The host reads the agent through a record with no run member, so the `respond` method starts
+		// every run.
+		const agent = this.#agent
+		this.#record = Object.freeze({
+			emitter: agent.emitter,
+			id: agent.id,
+			get status() {
+				return agent.status
+			},
+			context: agent.context,
+			abort: (reason?: unknown) => agent.abort(reason),
+		})
 	}
 
 	/**
-	 * Returns the owned request engine.
-	 * @returns The engine serving this conversation
+	 * Returns the record of the owned request engine, which starts no run.
+	 * @returns The frozen record of the agent serving this conversation
 	 */
-	get agent(): AgentInterface {
-		return this.#agent
+	get agent(): LedgerAgentInterface {
+		return this.#record
 	}
 	/**
 	 * Returns the owned message history.
@@ -460,17 +478,27 @@ export class Ledger implements LedgerInterface {
 		const abort = createAbort({ ...(signal === undefined ? {} : { signal }) })
 		const caller = abort.signal
 		const request = new LedgerRequest(content, this.#options.recall?.limit)
+		// Each pass binds the scope the request entered with, so a scope widened during the request
+		// adds nothing before the next one, and a narrowing still reaches the next turn.
 		const scope = this.#agent.context.scope
-		this.#live.add(request)
+		this.#live.set(request, scope)
 		try {
-			if (this.#gauge === undefined) await this.#measureGauge(caller)
+			// A definition added or removed since the gauge was stored changes its digest, and the
+			// stored price no longer holds.
+			if (
+				this.#gauge === undefined ||
+				digestLedgerTools(this.#agent.context.tools.definitions()) !== this.#digest
+			) {
+				this.#gauge = undefined
+				await this.#measureGauge(caller)
+			}
 			const entered = request.enter(this.#conversation)
 			this.#requests.add(entered.id)
 			// The answer pass recovers a provider failure in the first pass; the agent's error event carries
 			// its cause. A selection failure that reached here rejected under `strict`, and it stands.
 			const first = this.#dropStrayCalls(
 				request,
-				await this.#generatePass(request, caller, this.#options.think).catch(
+				await this.#generatePass(request, caller, this.#options.think, scope).catch(
 					(error: unknown): AgentResult => {
 						if (request.faulted(error)) throw error
 						return {
@@ -491,13 +519,13 @@ export class Ledger implements LedgerInterface {
 				this.#annotations.add(
 					this.#conversation.add({ role: 'user', content: LEDGER_NOTES.cue }).id,
 				)
-				const previous = this.#agent.context.scope
+				// The answer pass's run scope advertises nothing and never touches the context scope.
+				const filter = intersectFilters(scope, { tools: [] })
 				const answer = createScope({
-					...previous,
+					...filter,
 					name: 'answer',
-					tools: [],
 					select: async (conversation, message, runSignal) => {
-						const selection = await this.#select(conversation, message, runSignal)
+						const selection = await this.#select(conversation, message, runSignal, filter)
 						if (selection.fault !== undefined) return selection
 						return {
 							...selection,
@@ -507,14 +535,9 @@ export class Ledger implements LedgerInterface {
 						}
 					},
 				})
-				this.#agent.context.apply(answer)
-				try {
-					passes.push(
-						this.#dropStrayCalls(request, await this.#generatePass(request, caller, false)),
-					)
-				} finally {
-					if (this.#agent.context.scope === answer) this.#agent.context.apply(previous)
-				}
+				passes.push(
+					this.#dropStrayCalls(request, await this.#generatePass(request, caller, false, answer)),
+				)
 			}
 			const last = passes.at(-1) ?? first
 			request.think(this.#conversation.messages())
@@ -555,11 +578,13 @@ export class Ledger implements LedgerInterface {
 			// read, and it leaves with them: calibration prices text.
 			const messages = stripThinking(
 				this.#agent.context.build({
-					messages: [
-						...this.#conversation.view(),
-						{ id: 'calibration', role: 'user', content: '' },
-					],
-					judgments: [],
+					selection: {
+						messages: [
+							...this.#conversation.view(),
+							{ id: 'calibration', role: 'user', content: '' },
+						],
+						judgments: [],
+					},
 				}),
 				this.#replay,
 			).slice(0, -1)
@@ -593,7 +618,8 @@ export class Ledger implements LedgerInterface {
 	async #generatePass(
 		request: LedgerRequest,
 		signal: AbortSignal,
-		think?: boolean,
+		think: boolean | undefined,
+		scope: ScopeInterface | undefined,
 	): Promise<AgentResult> {
 		request.open(this.#conversation.messages().length)
 		const stop = request.signal
@@ -601,6 +627,7 @@ export class Ledger implements LedgerInterface {
 			signal: stop === undefined ? signal : AbortSignal.any([signal, stop]),
 			conversation: this.#conversation,
 			...(think === undefined ? {} : { think }),
+			...(scope === undefined ? {} : { scope }),
 		})
 	}
 
@@ -637,7 +664,7 @@ export class Ledger implements LedgerInterface {
 	// The live `respond` call's request after it has entered its message; a run during the call's
 	// calibration reaches none. A refusal on every add caps the registry at one request.
 	#current(): LedgerRequest | undefined {
-		const [request] = this.#live
+		const [request] = this.#live.keys()
 		return request?.message === undefined ? undefined : request
 	}
 
@@ -862,13 +889,16 @@ export class Ledger implements LedgerInterface {
 			)
 	}
 
-	// A run owns a selection only on the ledger's conversation, by identity, and only for the active
-	// call's request or a ledger note; any other run is refused over its own conversation's view, so
-	// the refusal never carries the ledger's history to another thread.
+	// A selection is owned only on the ledger's conversation, by identity, and only for the active
+	// call's request or a ledger note; any other, which only a host's direct `context.select` call can
+	// ask for, is refused over its own conversation's view, so the refusal never carries the ledger's
+	// history to another thread. The `filter` parameter is the run scope of a pass the ledger built;
+	// without one, the pass runs under the scope its request entered with.
 	async #select(
 		conversation: ConversationInterface,
 		message: Message,
 		signal: AbortSignal,
+		filter?: ScopeFilter,
 	): Promise<Selection> {
 		const request = this.#current()
 		const selected = request?.message
@@ -895,7 +925,8 @@ export class Ledger implements LedgerInterface {
 		if (scanned.success) this.#hold(scanned.value)
 		try {
 			return await this.#classifier.classify(this.#requests, signal).then(
-				(classified) => this.#file(classified, request, selected, message),
+				(classified) =>
+					this.#file(classified, request, selected, message, filter ?? this.#live.get(request)),
 				(error: unknown) => this.#refuse(error, { judgments: [] }, this.#conversation),
 			)
 		} finally {
@@ -939,11 +970,12 @@ export class Ledger implements LedgerInterface {
 		request: LedgerRequest,
 		selected: Message,
 		message: Message,
+		filter: ScopeFilter | undefined,
 	): Selection {
 		const { attempts, failure, ...filed } = classified
 		const planned = attempt(() => {
 			if (filed.fault !== undefined) throw filed.fault
-			const { draft, ...plan } = this.#plan(selected, this.#rescan())
+			const { draft, ...plan } = this.#plan(selected, this.#rescan(), filter)
 			return {
 				draft,
 				selection: {
@@ -998,6 +1030,7 @@ export class Ledger implements LedgerInterface {
 	#plan(
 		request: Message,
 		scan: LedgerScan,
+		filter: ScopeFilter | undefined,
 	): Pick<Selection, 'messages'> & { readonly draft: LedgerDraft } {
 		const { input, projection } = this.#project(scan)
 		const registry = scan.registry
@@ -1011,14 +1044,21 @@ export class Ledger implements LedgerInterface {
 			return owner === undefined ? [] : [owner]
 		})
 		const records = selectRecords(projection, { owners, topics: [...near] })
+		// The plan prices every definition the pass's run scope lets a turn advertise, with `recall`
+		// offered: the context scope can move inside that bound after the plan, so it never lowers the price.
+		const bound = filter?.tools
+		const definitions = this.#agent.context.tools.definitions()
+		const advertised = definitions.filter(
+			(tool) => bound === undefined || bound.includes(tool.name),
+		)
 		const total =
 			Math.max(
 				0,
 				(this.#options.capacity - this.#predict) * this.#share.prompt -
-					(this.#gauge?.overhead ?? 0),
+					((this.#gauge?.overhead ?? 0) - this.#spared(advertised)),
 			) /
 			(1 + LEDGER_SCALE_DRIFT)
-		const built = this.#agent.context.build({ messages: [request], judgments: [] })
+		const built = this.#agent.context.build({ selection: { messages: [request], judgments: [] } })
 		const tail = this.#selectTail(request, total, input, scan)
 		const tailIds = new Set(tail.map((message) => message.id))
 		const scoped = records.some((record) => record.key !== LEDGER_RULES_KEY)
@@ -1235,8 +1275,6 @@ export class Ledger implements LedgerInterface {
 				this.#replay,
 			),
 		])
-		const names = this.#agent.context.scope?.tools
-		const definitions = this.#agent.context.tools.definitions()
 		const offered = rungs.map((rung) =>
 			hasHiddenRecall(
 				input,
@@ -1249,11 +1287,7 @@ export class Ledger implements LedgerInterface {
 		)
 		const longest = this.#findLongest()
 		const closed = probes.map((messages, at) => {
-			const tools = definitions.filter(
-				(tool) =>
-					(names === undefined || names.includes(tool.name)) &&
-					(tool.name !== 'recall' || offered[at]),
-			)
+			const tools = advertised.filter((tool) => tool.name !== 'recall' || offered[at])
 			const calls = [
 				{ estimate: estimateMessages(messages), tools: tools.length, spared: this.#spared(tools) },
 			]
@@ -1270,13 +1304,13 @@ export class Ledger implements LedgerInterface {
 				(_rung, at) =>
 					(prices[at] ?? Infinity) <= total && (closed[2] === true || closed[at] === false),
 			) ?? empty
-		if (
-			offered[rungs.indexOf(admitted)] === false &&
-			(names === undefined || names.includes('recall'))
-		) {
+		const recall = offered[rungs.indexOf(admitted)] === true
+		const ceiling = intersectKeys(this.#agent.context.scope?.tools, bound)
+		const admits = ceiling === undefined || ceiling.includes('recall')
+		if (!recall && admits) {
 			const tools = definitions.filter((tool) => tool.name !== 'recall').map((tool) => tool.name)
-			const scope = this.#agent.context.scope
-			const narrowed = scope?.narrow({ tools }) ?? createScope({ name: 'ledger', tools })
+			const host = this.#agent.context.scope
+			const narrowed = host?.narrow({ tools }) ?? createScope({ name: 'ledger', tools })
 			this.#current()?.apply(narrowed)
 			this.#agent.context.apply(narrowed)
 		}
@@ -1299,13 +1333,16 @@ export class Ledger implements LedgerInterface {
 			[...kept, ...admitted.rendered.lines],
 			[],
 		).complete
+		// The tail priced each stub naming `recall`; rendered again after admission, a hidden stub names
+		// it only when the admitted rung advertises it, which can only shorten the stub.
+		const route = recall && admits
 		return {
 			draft,
 			messages: [
 				...tail
 					.slice(0, -1)
 					.map((message) =>
-						message.role === 'tool' ? this.#renderTailStub(message, scan, shown) : message,
+						message.role === 'tool' ? this.#renderTailStub(message, scan, shown, route) : message,
 					),
 				...admitted.window.flatMap((entry) => [entry.request, entry.reply]),
 				copy,
@@ -1589,7 +1626,12 @@ export class Ledger implements LedgerInterface {
 		}
 	}
 
-	#renderTailStub(message: Message, scan: LedgerScan, shown?: ReadonlySet<string>): Message {
+	#renderTailStub(
+		message: Message,
+		scan: LedgerScan,
+		shown?: ReadonlySet<string>,
+		offered = true,
+	): Message {
 		const group = scan.group(message.id)
 		const call = group === undefined ? undefined : findLedgerCall(group, message)
 		const write = this.#options.writes?.some((one) => one.tool.name === call?.name) === true
@@ -1613,6 +1655,7 @@ export class Ledger implements LedgerInterface {
 								? 'shown'
 								: 'hidden',
 				write,
+				offered,
 			),
 		}
 	}
@@ -1655,21 +1698,14 @@ export class Ledger implements LedgerInterface {
 				request.release(finding.name, finding.arguments)
 	}
 
-	#observeTurn(): void {
+	#observeRequest(sent: ProviderRequest): void {
 		this.#flush()
 		const request = this.#current()
-		const boundary = request?.boundary
-		// An aborted pass makes no further call, so the turn its abort cancels observes none.
-		if (request === undefined || boundary === undefined || request.aborted) return
-		const additions = this.#conversation.messages().slice(boundary)
-		const messages = this.#agent.context.build(request.selection)
-		const names = this.#agent.context.scope?.tools
-		const tools = this.#agent.context.tools
-			.definitions()
-			.filter((tool) => names === undefined || names.includes(tool.name))
+		if (request?.boundary === undefined) return
+		const tools = sent.tools ?? []
 		request.observe(
 			{
-				estimate: estimateMessages(stripThinking([...messages, ...additions], this.#replay)),
+				estimate: estimateMessages(sent.messages),
 				tools: tools.length,
 				spared: this.#spared(tools),
 			},
@@ -1744,7 +1780,9 @@ export class Ledger implements LedgerInterface {
 				: estimateMessages(
 						stripThinking(
 							[
-								...this.#agent.context.build(request.selection),
+								...this.#agent.context.build(
+									request.selection === undefined ? {} : { selection: request.selection },
+								),
 								...this.#conversation.messages().slice(request.boundary),
 							],
 							this.#replay,
@@ -1767,8 +1805,8 @@ export class Ledger implements LedgerInterface {
 				? -estimateMessages([buildRecallMessage(topic)])
 				: (gauge.remainder(calls) - this.#predict - extra - drift) / rate - siblings
 		const scan = this.#scan(this.#conversation.messages())
-		// A recall while a selection holds its scan, which only another conversation's run can make,
-		// holds no scan of its own, so the classifier's handlers read the selection's.
+		// A recall while a selection holds its scan, which only a recall a host calls by hand during a
+		// selection can make, holds no scan of its own, so the classifier's handlers read the selection's.
 		const added = this.#scans.size === 0
 		if (added) this.#hold(scan)
 		try {
@@ -1958,7 +1996,9 @@ export class Ledger implements LedgerInterface {
 			this.#gauge === undefined ||
 			estimateMessages(
 				stripThinking(
-					this.#agent.context.build({ messages: [...messages, ...note], judgments: [] }),
+					this.#agent.context.build({
+						selection: { messages: [...messages, ...note], judgments: [] },
+					}),
 					this.#replay,
 				),
 			) <= allowance
@@ -1972,8 +2012,10 @@ export class Ledger implements LedgerInterface {
 		const base = estimateMessages(
 			stripThinking(
 				this.#agent.context.build({
-					messages: messages.filter((message) => !partials.has(message.id)),
-					judgments: [],
+					selection: {
+						messages: messages.filter((message) => !partials.has(message.id)),
+						judgments: [],
+					},
 				}),
 				this.#replay,
 			),

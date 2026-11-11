@@ -311,7 +311,10 @@ export type SelectionHandler = (
  */
 export interface ScopeInput extends ScopeFilter {
 	readonly name: string
-	/** Holds the selection handler that overrides the agent default while this scope is active. */
+	/**
+	 * Holds the selection handler that overrides the agent default while this scope is active, and
+	 * overrides the active scope's too while this scope is a run's.
+	 */
 	readonly select?: SelectionHandler
 }
 
@@ -330,7 +333,10 @@ export interface ScopeInput extends ScopeFilter {
 export interface ScopeInterface extends ScopeFilter {
 	readonly id: string
 	readonly name: string
-	/** Holds the selection handler that overrides the agent default while this scope is active. */
+	/**
+	 * Holds the selection handler that overrides the agent default while this scope is active, and
+	 * overrides the active scope's too while this scope is a run's.
+	 */
 	readonly select?: SelectionHandler
 	/**
 	 * Composes a tighter child scope — each category is the set intersection of this scope's
@@ -812,8 +818,8 @@ export interface SkillManagerInterface {
  * {@link ConversationManagerInterface} is created and a default conversation is added (so
  * `messages` is always defined). All default to a context with no system prompt, empty registries,
  * no scope, and a fresh conversation registry holding one default conversation. `select` is the
- * agent's default {@link SelectionHandler}, which the active scope's `select` overrides; omitted,
- * `select()` returns `undefined` while the active scope holds no handler.
+ * agent's default {@link SelectionHandler}, which the active scope's `select` and a run scope's
+ * `select` override; omitted, `select()` returns `undefined` while neither scope holds a handler.
  */
 export interface AgentContextOptions {
 	readonly system?: string
@@ -854,10 +860,31 @@ export interface AgentContextOptions {
 	 */
 	readonly conversations?: ConversationManagerInterface
 	/**
-	 * Holds the agent's default selection handler; the active scope's `select` overrides it.
-	 * Omitted ⇒ with no scope handler either, `build()` folds the active conversation's `view()`.
+	 * Holds the agent's default selection handler; the active scope's `select` overrides it, and a
+	 * run scope's `select` overrides both. Omitted ⇒ with no scope handler either, `build()` folds the
+	 * active conversation's `view()`.
 	 */
 	readonly select?: SelectionHandler
+}
+
+/**
+ * Selects what one `build` call renders.
+ *
+ * @remarks
+ * `selection` holds the conversation part in place of the active conversation's `view()`. `scope`
+ * holds a run's scope: the build filters by the context scope intersected with it, list by list,
+ * so a run scope narrows the context scope and never widens it.
+ *
+ * @example
+ * ```ts
+ * context.build({ selection: { messages: conversation.view(), judgments: [] }, scope })
+ * ```
+ */
+export interface ContextBuildOptions {
+	/** Holds the messages that replace `view()`; omitted ⇒ the active conversation's `view()`. */
+	readonly selection?: Selection
+	/** Holds a run's scope; the build filters by the context scope intersected with it. */
+	readonly scope?: ScopeInterface
 }
 
 /**
@@ -938,8 +965,8 @@ export interface AgentContextInterface {
 	 */
 	apply(scope: ScopeInterface | undefined): void
 	/**
-	 * Runs the selection handler for one request — the active scope's `select`, else the agent
-	 * default — and checks that the conversation did not change under it.
+	 * Runs the selection handler for one request — the run scope's `select`, else the active
+	 * scope's, else the agent default — and checks that the conversation did not change under it.
 	 *
 	 * @remarks
 	 * Resolves the handler once per call. With no handler in either home it returns `undefined`
@@ -957,19 +984,21 @@ export interface AgentContextInterface {
 	 * @param conversation - The conversation the handler selects over and the check compares
 	 * @param request - The user message the run serves
 	 * @param signal - The run's abort signal, passed to the handler
+	 * @param scope - The run's scope, whose `select` runs in place of the active scope's; omitted ⇒ none
 	 * @returns The pending {@link Selection}, or `undefined` when no handler is set
 	 *
 	 * @example
 	 * ```ts
 	 * const request = context.messages.add({ role: 'user', content: 'Summarize the ticket.' })
 	 * const selection = await context.select(context.messages, request, new AbortController().signal)
-	 * context.build(selection)
+	 * context.build({ selection })
 	 * ```
 	 */
 	select(
 		conversation: ConversationInterface,
 		request: Message,
 		signal: AbortSignal,
+		scope?: ScopeInterface,
 	): Promise<Selection> | undefined
 	/**
 	 * Builds the provider input for the next turn: a leading `system` message folding the
@@ -1024,10 +1053,11 @@ export interface AgentContextInterface {
 	 * handler that adds text for the model, such as a ledger's records, writes it into a message of
 	 * `selection.messages`.
 	 *
-	 * @param selection - The selection whose `messages` replace `view()`; omitted ⇒ `view()`
+	 * @param options - The selection whose `messages` replace `view()`, and a run's scope intersected
+	 *   with the active one; omitted ⇒ `view()` under the active scope
 	 * @returns The scoped conversation, prefixed by the context message when the scoped memos or the
 	 *   active workspace's scoped text files are non-empty, and before it by the assembled `system`
 	 *   message when the prompt, the scoped instructions, or the scoped skills are non-empty
 	 */
-	build(selection?: Selection): readonly Message[]
+	build(options?: ContextBuildOptions): readonly Message[]
 }

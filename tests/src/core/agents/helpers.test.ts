@@ -22,6 +22,9 @@ import {
 	MESSAGE_MEASURE_CASES,
 	REQUEST_ESTIMATE_CASES,
 	REQUEST_MEASURE_CASES,
+	FANOUT_EXCESS_CASES,
+	FANOUT_JOB,
+	FANOUT_WITHIN_CASES,
 } from '../../../setup.js'
 import {
 	agentChunkToFrame,
@@ -38,6 +41,7 @@ import {
 	createAuthority,
 	createConversation,
 	createConversationManager,
+	createScope,
 	denyCall,
 	estimateMessages,
 	estimateRequest,
@@ -52,6 +56,9 @@ import {
 	renderToolValue,
 	requireBudget,
 	requireConversation,
+	requireScope,
+	scanJobTree,
+	JOB_REFUSAL_PREFIX,
 	settleAgentJob,
 	settleToolResult,
 	requireFallback,
@@ -710,6 +717,36 @@ describe('requireConversation', () => {
 	})
 })
 
+describe('requireScope', () => {
+	it('returns an absent option and a scope unchanged', () => {
+		const scope = createScope({ name: 'reader', tools: ['search'] })
+		expect(requireScope(undefined)).toBeUndefined()
+		expect(requireScope(scope)).toBe(scope)
+		expect(requireScope(scope.narrow({ tools: [] }))).toBeDefined()
+	})
+
+	it('refuses a value that does not implement ScopeInterface with a placement error naming the option', () => {
+		const revoked = Proxy.revocable({}, {})
+		revoked.revoke()
+		const narrow: unknown = Reflect.get(createScope({ name: 'reader' }), 'narrow')
+		for (const [value, received] of [
+			[{ id: 's1', name: 'reader', tools: ['search'] }, 'object'],
+			[{ id: 's1', name: 'reader', tools: 'search', narrow }, 'object'],
+			['reader', '"reader"'],
+			[null, 'null'],
+			[revoked.proxy, 'object'],
+		] as const) {
+			const caught = captureError(() => requireScope(value))
+			if (!isContractError(caught)) throw new Error('expected a ContractError')
+			expect([caught.code, caught.message, caught.context]).toEqual([
+				'placement',
+				'Agent: scope must implement ScopeInterface',
+				{ path: ['options', 'scope'], limit: 'ScopeInterface', received },
+			])
+		}
+	})
+})
+
 describe('estimateMessages', () => {
 	it('sums estimateTokens over each message content plus the per-message overhead', () => {
 		const messages = [createMessage('hello'), createMessage('a'.repeat(40))]
@@ -980,6 +1017,131 @@ describe('settleAgentJob', () => {
 		const result = await settleAgentJob(agent, true)
 		expect(result.partial).toBe(true)
 		expect(result.content).toBe('')
+	})
+})
+
+describe('scanJobTree', () => {
+	it('clears a job with no children', () => {
+		expect(scanJobTree(FANOUT_JOB)).toEqual([])
+	})
+
+	it.each(FANOUT_WITHIN_CASES)('clears a child $name', ({ parent, child }) => {
+		expect(scanJobTree({ ...parent, children: [child] })).toEqual([])
+	})
+
+	it.each(FANOUT_EXCESS_CASES)('finds a child with $name', ({ member, parent, child }) => {
+		expect(scanJobTree({ ...parent, children: [child] })).toEqual([
+			expect.stringMatching(new RegExp(`^job\\.children\\[0\\]\\.${member}: `)),
+		])
+	})
+
+	it('names every member one child exceeds, in the order the check reads them', () => {
+		const parent = { ...FANOUT_JOB, limit: 2, timeout: 1000, budget: 1000 }
+		const child = {
+			provider: 'other',
+			tools: ['loop', 'add', 'find'],
+			authority: 'other',
+			scheduler: 'pace',
+			limit: 3,
+			timeout: 1001,
+			budget: 1001,
+		}
+		expect(scanJobTree({ ...parent, children: [child] })).toEqual([
+			'job.children[0].tools: names "add", "find", which its parent does not hold',
+			'job.children[0].authority: "other" is neither absent nor its parent\'s, which is "allow"',
+			'job.children[0].provider: "other" differs from its parent\'s, which is "main"',
+			'job.children[0].scheduler: "pace" is neither absent nor its parent\'s, which is none',
+			"job.children[0].limit: 3 exceeds its parent's 2",
+			"job.children[0].timeout: 1001 exceeds its parent's 1000",
+			"job.children[0].budget: 1001 exceeds its parent's 1000",
+		])
+	})
+
+	it('reads an absent limit as the default and an absent bound as none', () => {
+		const parent = { ...FANOUT_JOB, limit: 2, timeout: 1000, budget: 1000 }
+		expect(scanJobTree({ ...parent, children: [FANOUT_JOB] })).toEqual([
+			"job.children[0].limit: none reads 10, which exceeds its parent's 2",
+			"job.children[0].timeout: none exceeds its parent's 1000",
+			"job.children[0].budget: none exceeds its parent's 1000",
+		])
+	})
+
+	it('holds each child within its own parent at every depth', () => {
+		const grandchild = { ...FANOUT_JOB, tools: ['loop', 'add'] }
+		const root = {
+			...FANOUT_JOB,
+			tools: ['loop', 'add'],
+			children: [{ ...FANOUT_JOB, children: [grandchild] }],
+		}
+		expect(scanJobTree(root)).toEqual([
+			'job.children[0].children[0].tools: names "add", which its parent does not hold',
+		])
+	})
+
+	it('names each sibling by its index and holds siblings to their parent, not to their sum', () => {
+		const parent = { ...FANOUT_JOB, budget: 1000 }
+		const within = { ...FANOUT_JOB, budget: 1000 }
+		expect(scanJobTree({ ...parent, children: [within, within] })).toEqual([])
+		expect(scanJobTree({ ...parent, children: [within, { ...FANOUT_JOB, budget: 1001 }] })).toEqual(
+			["job.children[1].budget: 1001 exceeds its parent's 1000"],
+		)
+	})
+
+	it('refuses a malformed descendant with its faults and walks no further under it', () => {
+		const grandchild = {
+			provider: 'main',
+			tool: ['loop'],
+			children: [{ ...FANOUT_JOB, provider: 'other' }],
+		}
+		const findings = scanJobTree({
+			...FANOUT_JOB,
+			children: [{ ...FANOUT_JOB, children: [grandchild] }],
+		})
+		expect(findings).toHaveLength(1)
+		expect(findings[0]).toMatch(/^refused job\.children\[0\]\.children\[0\]: /)
+		expect(findings[0]).toContain('tool: extra')
+	})
+
+	it('refuses a root the job contract refuses', () => {
+		const root = { provider: 'main', tool: ['loop'] }
+		const findings = scanJobTree(root)
+		expect(findings).toHaveLength(1)
+		expect(findings[0]).toMatch(/^refused job: /)
+	})
+
+	it('refuses the root as unreadable, without throwing, when a child member read throws', () => {
+		// The root's audit reads its children as JSON records, so the unreadable member refuses there.
+		const child = Object.defineProperty({ provider: 'main' }, 'provider', {
+			enumerable: true,
+			get() {
+				throw new Error('unreadable')
+			},
+		})
+		expect(scanJobTree({ ...FANOUT_JOB, children: [child] })).toEqual([
+			'refused job: a member read threw, so the job cannot be read',
+		])
+	})
+
+	it('opens every refused job finding with the prefix and no exceeded member finding with it', () => {
+		const malformed = { provider: 'main', tool: ['loop'] }
+		const unreadable = Object.defineProperty({ provider: 'main' }, 'provider', {
+			enumerable: true,
+			get() {
+				throw new Error('unreadable')
+			},
+		})
+		const refused = [
+			...scanJobTree(malformed),
+			...scanJobTree({ ...FANOUT_JOB, children: [{ ...FANOUT_JOB, children: [malformed] }] }),
+			...scanJobTree({ ...FANOUT_JOB, children: [unreadable] }),
+		]
+		const exceeded = FANOUT_EXCESS_CASES.flatMap(({ parent, child }) =>
+			scanJobTree({ ...parent, children: [child] }),
+		)
+		expect(refused).toHaveLength(3)
+		expect(refused.every((finding) => finding.startsWith(JOB_REFUSAL_PREFIX))).toBe(true)
+		expect(exceeded).toHaveLength(FANOUT_EXCESS_CASES.length)
+		expect(exceeded.some((finding) => finding.startsWith(JOB_REFUSAL_PREFIX))).toBe(false)
 	})
 })
 

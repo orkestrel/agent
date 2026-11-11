@@ -76,9 +76,10 @@ export function digestLedgerWindow(
  * Digests tool definitions as the JSON a provider request carries them, in order.
  *
  * @remarks
- * A ledger stores this digest with its gauge, so a hydrate reuses the gauge only for the same
- * definitions: an added, removed, reordered, or edited definition changes the digest. The digest is
- * a {@link computeLedgerChecksum} checksum and makes no security claim.
+ * A ledger stores this digest with its gauge and compares it at a hydrate and at each `respond`
+ * call, so it reuses the gauge only for the same definitions: an added, removed, reordered, or
+ * edited definition changes the digest. The digest is a {@link computeLedgerChecksum} checksum and
+ * makes no security claim.
  *
  * @param definitions - The tool definitions, as a tool manager's `definitions` method returns them
  * @returns The 16-digit hexadecimal digest, or undefined when JSON cannot render the definitions
@@ -1345,16 +1346,26 @@ export function matchesCutLine(line: string): boolean {
 /**
  * Renders the tail stub of a lookup result from an earlier request.
  *
+ * @remarks
+ * A `hidden` stub names the `recall` call that finds its result, with the first string argument,
+ * trimmed, or `its id` when no argument is a string or that one is blank, only while `offered` is `true`. The ledger plans the
+ * tail with every stub naming `recall`, then renders the tail's stubs again after it admits a window
+ * rung, with `offered` set to whether that rung offers `recall` and the scope admits it, so the
+ * second render can only shorten a stub and raises no price. `offered` changes no other state.
+ *
  * @param name - The lookup tool name
  * @param args - The arguments the call carried; arguments JSON cannot carry leave the call as its bare tool name, per {@link renderLookupCall}
  * @param state - What became of the result: `failed`, `empty`, `shown` in the records, or `hidden` from them
  * @param write - If `true`, the call is a write's, whose `empty` state reads `changed nothing`; if `false`, a lookup's, whose `empty` state reads `no record`. Default: `false`
+ * @param offered - If `true`, a `hidden` result names the `recall` route; if `false`, because the admitted rung offers no `recall` or the scope excludes it, it reads `result not shown`. Default: `true`
  * @returns The stub text, which carries the call and its state
  *
  * @example
  * ```ts
  * renderStub('lookup_order', { id: 'BW-5512' }, 'hidden')
  * // 'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512'
+ * renderStub('lookup_order', { id: 'BW-5512' }, 'hidden', false, false)
+ * // 'lookup_order {"id":"BW-5512"}: result not shown'
  * ```
  */
 export function renderStub(
@@ -1362,11 +1373,13 @@ export function renderStub(
 	args: Readonly<Record<string, unknown>>,
 	state: LedgerLookupState,
 	write = false,
+	offered = true,
 ): string {
 	const head = renderLookupCall(name, args)
 	if (state === 'failed') return `${head}: failed`
 	if (state === 'empty') return write ? `${head}: changed nothing` : `${head}: no record`
 	if (state === 'shown') return `${head}: result shown under Records below`
+	if (!offered) return `${head}: result not shown`
 	const id = Object.values(args).find(isString)
 	return `${head}: result not shown; call recall with ${(id ?? '').trim() || 'its id'}`
 }

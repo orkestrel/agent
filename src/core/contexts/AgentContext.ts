@@ -1,6 +1,7 @@
 import type {
 	AgentContextInterface,
 	AgentContextOptions,
+	ContextBuildOptions,
 	InstructionManagerInterface,
 	MemoManagerInterface,
 	ScopeInterface,
@@ -20,7 +21,13 @@ import { SkillManager } from './skills/SkillManager.js'
 import { ConversationError, ConversationManager } from '../conversations/index.js'
 import { CONVERSATION_ROLES } from '../constants.js'
 import { filterAllowList } from '../helpers.js'
-import { attachUserImages, collectImageData, renderFencedFile, renderSection } from './helpers.js'
+import {
+	attachUserImages,
+	collectImageData,
+	intersectFilters,
+	renderFencedFile,
+	renderSection,
+} from './helpers.js'
 import { WORKSPACE_SECTION_HEADER } from './constants.js'
 
 /**
@@ -114,7 +121,7 @@ export class AgentContext implements AgentContextInterface {
 	// active conversation through `conversations.switch(id)`.
 	readonly #conversations: ConversationManagerInterface
 	readonly #tools: ToolManagerInterface
-	// The agent default; the active scope's `select` overrides it at each `select` call.
+	// The agent default; the active scope's `select` and a run scope's override it at each `select` call.
 	readonly #select: SelectionHandler | undefined
 	#scope: ScopeInterface | undefined
 
@@ -191,22 +198,24 @@ export class AgentContext implements AgentContextInterface {
 		conversation: ConversationInterface,
 		request: Message,
 		signal: AbortSignal,
+		scope?: ScopeInterface,
 	): Promise<Selection> | undefined {
 		// Returning `undefined` synchronously keeps the loop's default path free of an `await`.
-		const handler = this.#scope?.select ?? this.#select
+		const handler = scope?.select ?? this.#scope?.select ?? this.#select
 		if (handler === undefined) return undefined
 		return this.#check(handler, conversation, request, signal)
 	}
 
-	build(selection?: Selection): readonly Message[] {
-		const scope = this.#scope
+	build(options?: ContextBuildOptions): readonly Message[] {
+		// A run scope narrows the active one list by list; each list of each layer is read one time.
+		const scope = intersectFilters(this.#scope, options?.scope)
 		// Tools reach the provider structurally. Each manager resolves its format cascade.
 		const parts: string[] = []
 		// Configured by `=== undefined`, not falsiness — an explicitly supplied '' (or a
 		// whitespace-only) system is opted in and prepended verbatim; a truthiness check would drop it.
 		if (this.#system !== undefined) parts.push(this.#system)
 		const instructions = filterAllowList(
-			scope?.instructions,
+			scope.instructions,
 			this.#instructions.instructions(),
 			(one) => one.name,
 		)
@@ -217,7 +226,7 @@ export class AgentContext implements AgentContextInterface {
 			this.#instructions.close,
 		)
 		if (instructed !== undefined) parts.push(instructed)
-		const skills = filterAllowList(scope?.skills, this.#skills.skills(), (one) => one.name)
+		const skills = filterAllowList(scope.skills, this.#skills.skills(), (one) => one.name)
 		const indexed = renderSection(
 			this.#skills.open,
 			skills.length === 0 ? [] : [skills.map((one) => this.#skills.render(one)).join('\n')],
@@ -228,7 +237,7 @@ export class AgentContext implements AgentContextInterface {
 		// The active workspace is the sole document/image context. `build()` owns this render
 		// because a `Workspace` / `WorkspaceManager` stays file-focused.
 		const files = filterAllowList(
-			scope?.files,
+			scope.files,
 			this.#workspaces.active?.files() ?? [],
 			(one) => one.path,
 		)
@@ -243,7 +252,7 @@ export class AgentContext implements AgentContextInterface {
 			(file) => renderFencedFile(file.path, file.language, file.text),
 			undefined,
 		)
-		const memos = filterAllowList(scope?.memos, this.#memos.memos(), (one) => one.name)
+		const memos = filterAllowList(scope.memos, this.#memos.memos(), (one) => one.name)
 		const remembered = renderSection(
 			this.#memos.open,
 			memos.length === 0 ? [] : [memos.map((one) => this.#memos.render(one)).join('\n')],
@@ -256,7 +265,7 @@ export class AgentContext implements AgentContextInterface {
 		// skills / memos / tools / workspace files). The active conversation is always present (the
 		// constructor adds one), with `#ensureConversation()` as a total fallback if a caller emptied its
 		// supplied registry.
-		const conversation = selection?.messages ?? this.#ensureConversation().view()
+		const conversation = options?.selection?.messages ?? this.#ensureConversation().view()
 		// A vision provider reads image payloads from a user turn.
 		const tail = attachUserImages(conversation, collectImageData(files))
 		const slots = [remembered, documented].filter((slot) => slot !== undefined)

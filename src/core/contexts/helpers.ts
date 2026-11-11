@@ -1,4 +1,4 @@
-import type { Memo } from './types.js'
+import type { Memo, ScopeFilter } from './types.js'
 import type { Message } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
@@ -198,6 +198,45 @@ export function intersectKeys(
 	if (child === undefined) return [...parent]
 	const allowed = new Set(parent)
 	return child.filter((key) => allowed.has(key))
+}
+
+/**
+ * Intersects two scope filters list by list; an absent side constrains nothing.
+ *
+ * @remarks
+ * Pure, and it can only tighten. Each list of the result is {@link intersectKeys} over the two
+ * sides' lists, each read one time, in the order `instructions`, `skills`, `memos`, `tools`, and
+ * `files`. A list neither side constrains is omitted, and every returned list is a fresh copy.
+ * `Scope.narrow`, a run's build, and a ledger's answer-pass scope compose their layers through it.
+ *
+ * @param parent - The outer filter, such as the context scope (`undefined` ⇒ no constraint)
+ * @param child - The inner filter, such as a run scope (`undefined` ⇒ no constraint)
+ * @returns The intersected filter
+ *
+ * @example
+ * ```ts
+ * import { intersectFilters } from '@orkestrel/agent'
+ *
+ * intersectFilters({ tools: ['read', 'write'] }, { tools: ['write', 'admin'], files: [] })
+ * // { tools: ['write'], files: [] }
+ * ```
+ */
+export function intersectFilters(
+	parent: ScopeFilter | undefined,
+	child: ScopeFilter | undefined,
+): ScopeFilter {
+	const instructions = intersectKeys(parent?.instructions, child?.instructions)
+	const skills = intersectKeys(parent?.skills, child?.skills)
+	const memos = intersectKeys(parent?.memos, child?.memos)
+	const tools = intersectKeys(parent?.tools, child?.tools)
+	const files = intersectKeys(parent?.files, child?.files)
+	return {
+		...(instructions === undefined ? {} : { instructions }),
+		...(skills === undefined ? {} : { skills }),
+		...(memos === undefined ? {} : { memos }),
+		...(tools === undefined ? {} : { tools }),
+		...(files === undefined ? {} : { files }),
+	}
 }
 
 /**

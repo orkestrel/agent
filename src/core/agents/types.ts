@@ -303,6 +303,20 @@ export type AgentEventMap = {
 	 * fire none.
 	 */
 	readonly select: readonly [selection: Selection]
+	/**
+	 * Reports the exact request a turn dispatches, with the turn's `index` and the conversation its
+	 * run is bound to, once a turn after the loop admits the request and before the provider receives
+	 * it, so after a compaction fold it carries the rebuilt request. The request object and its
+	 * `messages` and `tools` arrays are frozen; each message, `options`, and each definition is a
+	 * shared object, so a listener is host code that reads the request and never writes to it. A
+	 * request whose turn advertises no tool carries no `tools` member, and a turn cancelled before
+	 * dispatch emits none.
+	 */
+	readonly request: readonly [
+		index: number,
+		request: ProviderRequest,
+		conversation: ConversationInterface,
+	]
 }
 
 /**
@@ -477,8 +491,9 @@ export interface ApproverInterface {
  * Configures `createAgent` — the loop's bounds and pacing, the reserved `on` hooks, the
  * construction-time context wiring (`instructions` / `skills` / `memos` / `workspaces` / `scope`), the `conversations`
  * registry holding every run's default, the context `window` budget that opts into automatic
- * compaction of the run's conversation, and the `strict` switch that aborts the run on an
- * automatic-compaction summarizer failure instead of the lenient default.
+ * compaction of the run's conversation, and the `strict` switch that settles the run `error` on
+ * an automatic-compaction summarizer failure, a selection fault, or a request still over the
+ * window, or continues past them when `false`.
  *
  * @remarks
  * - `system` — an optional system prompt prepended to the turn (seeds the context).
@@ -500,9 +515,10 @@ export interface ApproverInterface {
  *   The loop races that yield against the run signal, so a scheduler that ignores its signal still ends on a cancel.
  * - `signal` — an optional external `AbortSignal` whose abort cancels the turn (a
  *   partial result).
- * - `authority` — an optional {@link AuthorityInterface} that decides each scope-admitted call;
- *   omitted ⇒ a default `Authority` that allows an unannotated call and asks for a
- *   `consequential` one, which no approver answers, so it is denied.
+ * - `authority` — an {@link AuthorityInterface} that decides each scope-admitted call; required
+ *   when `tools` is set, and construction throws an `AgentError` with code `'AUTHORITY'` without
+ *   it. Omitted with no `tools` ⇒ the agent holds no authority, and the loop denies a call to a
+ *   tool added later through `context.tools`.
  * - `conversations` — an optional {@link ConversationManagerInterface} forwarded to the agent's
  *   context (so `context.messages` is its active conversation's live tail); a run binds that
  *   active conversation when it names no `conversation` of its own. Omitted ⇒ a fresh registry
@@ -521,11 +537,11 @@ export interface ApproverInterface {
  *   thrown handler, a returned `fault`, a conversation changed under the handler, a selected
  *   message whose role is not a `ConversationRole`) settle the same way, and a request still over
  *   the `window` after the permitted fold, or one that cannot fold, settles `error` with an
- *   `AgentError` coded `'WINDOW'` before the provider is called.
- *   Default: `false`. The run continues over-window, or on `view()` after a selection fault.
+ *   `AgentError` coded `'WINDOW'` before the provider is called. When `false`, the run continues
+ *   over-window, or on `view()` after a selection fault. Default: `true`.
  * - `select` — an optional default {@link SelectionHandler} forwarded to the agent's context; the
- *   active scope's `select` overrides it. The loop runs it at run entry and after each automatic
- *   compaction rebuild, emits each {@link Selection} it builds from on `select`, and charges the
+ *   active scope's `select` overrides it, and a run scope's `select` overrides both for its run.
+ *   The loop runs it at run entry and after each automatic compaction rebuild, emits each {@link Selection} it builds from on `select`, and charges the
  *   selection's usage to `budget` and the result's `usage`.
  * - `instructions` — an optional pre-built {@link InstructionManagerInterface} forwarded to the
  *   agent's context; an empty one is created when omitted (mirrors {@link AgentContextOptions.instructions}).
@@ -661,7 +677,8 @@ export interface AgentOptions {
 	readonly strict?: boolean
 	/**
 	 * Holds the default selection handler forwarded to the agent's context; the active scope's
-	 * `select` overrides it while that scope is active. The loop runs it at run entry and after
+	 * `select` overrides it while that scope is active, and a run scope's `select` overrides both for
+	 * its run. The loop runs it at run entry and after
 	 * each automatic compaction rebuild, for the user message that ends the run's conversation, and
 	 * charges its usage to the cost `budget`. Omitted ⇒ with no scope handler either, the loop
 	 * builds from the run's conversation's `view()` and awaits nothing.
@@ -670,7 +687,7 @@ export interface AgentOptions {
 }
 
 /**
- * Carries overrides for one call to the `generate` or `stream` method of an {@link AgentInterface}. Each member overrides the matching {@link AgentOptions} value, while `signal` composes with the construction signal, `conversation` binds the run to one conversation, and `prompt` adds the run's user turn to it.
+ * Carries overrides for one call to the `generate` or `stream` method of an {@link AgentInterface}. Each member overrides the matching {@link AgentOptions} value, while `signal` composes with the construction signal, `conversation` binds the run to one conversation, `prompt` adds the run's user turn to it, and `scope` narrows the context scope for the run.
  *
  * @remarks
  * Every member is optional and resolved independently, so an omitted member leaves the
@@ -678,9 +695,11 @@ export interface AgentOptions {
  * agent it configured. `think` / `schema` ride through to the provider as
  * {@link ProviderStreamOptions}; `limit` / `timeout` / `budget` / `allowance` replace their construction
  * defaults for this run only; `signal` composes with the constructed `signal` (both fold into
- * the run's bound abort) rather than replacing it. `conversation` and `prompt` have no construction
- * counterpart: `conversation` names the conversation the run binds in place of the one active at
- * the call, and `prompt` is the user turn the run appends to that conversation before it starts.
+ * the run's bound abort) rather than replacing it. `conversation`, `prompt`, and `scope` have no
+ * construction default: `conversation` names the conversation the run binds in place of the one
+ * active at the call, `prompt` is the user turn the run appends to that conversation before it
+ * starts, and the run `scope` narrows the construction `scope`, the context scope, at each turn of
+ * the run and never replaces it.
  * Nothing here mutates the agent — the next run reads the construction defaults again.
  */
 export interface AgentRunOptions {
@@ -750,6 +769,17 @@ export interface AgentRunOptions {
 	 * run reads its request from the conversation's tail.
 	 */
 	readonly prompt?: AgentPrompt
+	/**
+	 * Narrows this run's ceiling: each turn reads the context scope intersected with it, list by
+	 * list, one time, and each build site of the run filters instructions, skills, memos, and files
+	 * by the same intersection. Its `select` runs in place of the context scope's. A later
+	 * `context.apply` still reaches the run at its next turn, and never past this scope, so a run
+	 * that needs a wider scope than the context scope needs another agent. The `stream` or
+	 * `generate` call throws a `ContractError` coded `'placement'` synchronously when the value does
+	 * not implement {@link ScopeInterface}, before the run appends its prompt or starts. Omitted ⇒ the
+	 * context scope alone.
+	 */
+	readonly scope?: ScopeInterface
 }
 
 /**

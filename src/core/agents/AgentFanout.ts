@@ -1,6 +1,8 @@
 import type { AgentJobInput, AgentRegistryInterface, AgentResult } from './types.js'
 import type { ControllerInterface } from '@orkestrel/workflow'
-import { settleAgentJob } from './helpers.js'
+import { JOB_REFUSAL_PREFIX } from './constants.js'
+import { AgentError } from './errors.js'
+import { scanJobTree, settleAgentJob } from './helpers.js'
 
 /**
  * Executes one runner's agent jobs — spawning each unit's declared children on its first attempt
@@ -13,6 +15,14 @@ import { settleAgentJob } from './helpers.js'
  * recorded and spawns no child again. Children are fired through the controller without being
  * awaited inline, so a bounded runner frees the parent's slot for them. `createAgentRunner`
  * creates one instance per runner and binds its `execute` method as the runner's handler.
+ *
+ * A child job runs within its parent. Before a unit spawns or runs, on every attempt, the
+ * `execute` method walks the whole tree under it through the `scanJobTree` helper and refuses the
+ * unit when any job exceeds its own parent on `tools`, `authority`, `provider`, `scheduler`,
+ * `limit`, `timeout`, or `budget`, or when a job is malformed, so nothing in a refused tree runs.
+ * Each child is held within its parent alone, so the children of one parent can together spend more
+ * than it. A job that needs another provider, another authority, or more room than its parent is a
+ * root job the host enqueues.
  *
  * @example
  * ```ts
@@ -47,14 +57,44 @@ export class AgentFanout {
 	}
 
 	/**
-	 * Executes one unit: spawns its declared children unless an earlier attempt of the unit already
-	 * did, then runs the rehydrated agent and settles it under the partial policy.
+	 * Executes one unit: refuses its tree when a job in it is malformed or exceeds its parent, spawns
+	 * its declared children unless an earlier attempt of the unit already did, then runs the
+	 * rehydrated agent and settles it under the partial policy.
+	 *
+	 * @remarks
+	 * The check runs on every attempt, before the unit spawns or runs, and throws synchronously. The
+	 * error's message opens with the rule each kind of finding breaks, a refused job's rule when a
+	 * finding opens with `JOB_REFUSAL_PREFIX` and the within-parent rule when a finding names an
+	 * exceeded member, then lists every finding, one a line. Its `context.findings` holds the same
+	 * findings in walk order.
 	 *
 	 * @param controller - The runner controller for this unit's attempt
 	 * @returns The settled agent result of the unit
+	 * @throws {AgentError} Thrown with code `'REGISTRY'` when a job in the unit's tree is malformed or exceeds its parent, or when the registry cannot rehydrate the unit
 	 * @throws {AgentJobError} Thrown when the run ended partial and the partial policy is `false`
 	 */
 	execute(controller: ControllerInterface<AgentJobInput, AgentResult>): Promise<AgentResult> {
+		const findings = scanJobTree(controller.input)
+		if (findings.length > 0) {
+			const refused = findings.filter((finding) => finding.startsWith(JOB_REFUSAL_PREFIX))
+			throw new AgentError(
+				'REGISTRY',
+				[
+					...(refused.length === 0
+						? []
+						: [
+								'every job in a tree must be readable and hold only the declared members of AgentJobInput; correct each job a following finding names',
+							]),
+					...(refused.length === findings.length
+						? []
+						: [
+								'a child job must stay within its parent on tools, authority, provider, scheduler, limit, timeout, and budget; enqueue a job that needs more as a root job',
+							]),
+					...findings,
+				].join('\n'),
+				{ context: { findings } },
+			)
+		}
 		const children = controller.input.children
 		if (children !== undefined && !this.#spawned.has(controller.id)) {
 			this.#spawned = new Set([...this.#spawned, controller.id])

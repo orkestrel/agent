@@ -1,6 +1,13 @@
 import { MEMO_SNAPSHOT_FIXTURES, MEMO_SNAPSHOT_REFUSALS } from '../../../setup.js'
 import { memoSnapshotContract } from '@src/core'
-import { createMemoManager, isMemo, isMemoOrigin, isMemoSnapshot } from '@src/core'
+import {
+	createMemoManager,
+	createScope,
+	isMemo,
+	isMemoOrigin,
+	isMemoSnapshot,
+	isScope,
+} from '@src/core'
 import { createRecorder, roundTripJSON } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 
@@ -189,5 +196,101 @@ describe('the memo guards, in lockstep with their shapes', () => {
 	it.each(MEMO_SNAPSHOT_REFUSALS)('holds is ⟹ guard on the value %#', (value) => {
 		expect(isMemoSnapshot(value)).toBe(false)
 		expect(memoSnapshotContract.is(value)).toBe(false)
+	})
+})
+
+describe('isScope', () => {
+	it('admits a minted scope, a narrowed one, and a host implementation with unknown members', () => {
+		const scope = createScope({
+			name: 'reader',
+			tools: ['search'],
+			select: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+		})
+		expect(isScope(scope)).toBe(true)
+		expect(isScope(scope.narrow({ files: [] }))).toBe(true)
+		expect(
+			isScope({
+				id: 's1',
+				name: 'host',
+				instructions: ['tone'],
+				skills: [],
+				memos: undefined,
+				files: ['a.md'],
+				label: 'unknown members pass',
+				narrow: () => scope,
+			}),
+		).toBe(true)
+		expect(isScope(new Proxy(scope, {}))).toBe(true)
+	})
+
+	it('refuses a value missing a required member or holding one of another type', () => {
+		const narrow: unknown = Reflect.get(createScope({ name: 'host' }), 'narrow')
+		const base = { id: 's1', name: 'host', narrow }
+		const sparse: string[] = []
+		sparse[1] = 'a.md'
+		expect(isScope(base)).toBe(true)
+		for (const value of [
+			{ ...base, id: 1 },
+			{ name: 'host', narrow },
+			{ ...base, name: undefined },
+			{ ...base, narrow: undefined },
+			{ ...base, narrow: 'narrow' },
+			{ ...base, tools: 'read' },
+			{ ...base, tools: ['read', 1] },
+			{ ...base, files: sparse },
+			{ ...base, instructions: null },
+			{ ...base, skills: {} },
+			{ ...base, memos: [true] },
+			{ ...base, select: 'select' },
+			undefined,
+			null,
+			'scope',
+			7,
+		]) {
+			expect(isScope(value)).toBe(false)
+		}
+	})
+
+	it('returns false for a throwing getter and a revoked proxy without throwing', () => {
+		const revoked = Proxy.revocable({}, {})
+		revoked.revoke()
+		expect(
+			isScope({
+				id: 's1',
+				name: 'host',
+				get tools(): never {
+					throw new Error('unreadable')
+				},
+				narrow: () => createScope({ name: 'host' }),
+			}),
+		).toBe(false)
+		expect(isScope(revoked.proxy)).toBe(false)
+	})
+
+	it('reads each member one time', () => {
+		const reads = createRecorder<readonly [member: string | symbol]>()
+		const scope = createScope({ name: 'reader', instructions: [], tools: ['search'] })
+		const counted = new Proxy(scope, {
+			get(target, key, receiver) {
+				reads.handler(key)
+				return Reflect.get(target, key, receiver)
+			},
+		})
+		expect(isScope(counted)).toBe(true)
+		const keys = reads.calls.map(([key]) => key)
+		expect(new Set(keys).size).toBe(keys.length)
+		expect(keys).toEqual(
+			expect.arrayContaining([
+				'id',
+				'name',
+				'instructions',
+				'skills',
+				'memos',
+				'tools',
+				'files',
+				'select',
+				'narrow',
+			]),
+		)
 	})
 })
