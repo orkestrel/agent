@@ -1639,7 +1639,11 @@ describe('passive observation of actual memory requests', () => {
 		})
 		const row = readMemoryCheckpoint(uninterrupted.evidence, 'correction')
 		if (!isRecord(row) || !isRecord(row.ledger)) throw new Error('Missing checkpoint ledger')
-		expect(row.ledger.gauge).toEqual({ scale: expect.any(Number), overhead: expect.any(Number) })
+		expect(row.ledger.gauge).toEqual({
+			scale: expect.any(Number),
+			overhead: expect.any(Number),
+			digest: expect.any(String),
+		})
 		const trial: MemoryTrialFixture = {
 			arm: 'records',
 			responses: [],
@@ -1762,6 +1766,7 @@ describe('passive observation of actual memory requests', () => {
 		expect(calibrated.ledger.gauge).toEqual({
 			scale: expect.any(Number),
 			overhead: expect.any(Number),
+			digest: expect.any(String),
 		})
 	})
 
