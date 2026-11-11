@@ -93,6 +93,14 @@ A host gives a small local model progressive reach to everything its principal m
     - phase 4: the checkpoint probes into the delegation tests
 - **The user, 2026-11-11, on promotion:** "make sure they are not just copy and pasted either, you usually get plenty of leeway to do what you want when you come up with these probes but when you promote them they must strictly follow our conventions and rules and be adopted accordingly making sure they are renamed, organized, placed, and written correctly as expected of any other part of the project."
   - Each unit's review judges promoted code as it judges any other code.
+- **The user, 2026-11-11, on pace and Study:** "Why would phase 2 be so many hours? After all that we have done to optimize our approach and strategy, make sure that you are also using the study package to it's full potential to setup scenarios and seed them so we don't have to wait so long for a response or evidence, the purpose of study is to speed things up to get us and the run to where it needs to be with the least amount of setup."
+  - Evidence comes from seeded scenarios, not from long setup:
+    - Study's `--seed <result>:<trial>:<goal>` starts a run at a retained checkpoint.
+    - `--trial` and `--goals` run one segment.
+    - Keyed replay serves recorded model exchanges offline.
+    - Scripted providers stand in for a model wherever the claim is deterministic.
+  - The routine `test:studies` suite runs in minutes. Full-schedule rehearsals run only before a sealed run, never as routine tests.
+  - Units with disjoint files run in parallel against the declarations they share, rather than in series.
 - **Authorship:**
   - Host-authored text alone enters privileged context.
   - A model-authored memo, a record, and workspace data stay data.
@@ -134,8 +142,11 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | Phase 1, documentation | 1D's two passes are done: the guide, the TSDoc, and claim 1.15's defects. Items 66, 67, and 68 are out of `ROADMAP.md`, and item 9 lost its second trigger. Its review passed, and its findings below the bar are fixed. |
 | Phase 1 | Closed: claims 1.1 to 1.23, with the round repaired and re-audited. The chain on the 0.0.23 ranges passes `test:src` 2876, policy 179, config 545, setup 354, guides 220, and distribution 10, with format, lint, check, and build clean. Two `test:studies` cases wait on `ollama` and `study` releasing on Agent 0.0.41, because each still nests contract 0.0.22. |
 | ROADMAP item 66 | Released alone as Agent 0.0.41 on 2026-11-11, from a standalone clone while phase 1 stayed uncommitted. Main fast-forwarded onto the release and carried phase 1 across by a three-way file merge. Two memory study cases, stale since the gauge digest, were fixed with it. |
-| Phase 2 estimate | about 18 lane hours, set by the Orchestrator |
-| Next | Phase 2: units 2A, 2B, and 2C. The dev re-pin onto `ollama` 0.0.35 and `study`'s next release comes when each publishes. |
+| Phase 2 estimate | About 8 lane hours, revised from 18 on the user's ruling. Phase 1 took about 15 hours of wall time, and almost none of it waited on a model. The time went to the shared lane's queue, units run in series, review and repair loops, reviewers building probes from nothing, and a `test:studies` suite that runs for 20 minutes. |
+| Phase 2 plan | 2A first. Then 2B and 2C in parallel: 2C writes its tests first against 2A's declarations and takes up 2B's code when it lands. Phase 0's derivation table and checkpoint probes seed the disclosure states as shared fixtures, so the units and the round's lanes compose probes from seeded states. |
+| Study suite | A unit brings the routine `test:studies` from 20 minutes to minutes. The full-schedule rehearsals in `tests/studies/chat` and `tests/studies/memory` leave the routine suite for the step before a sealed run. Each property they prove stays proven, through seeds, segments, replay, and injected timeouts. |
+| Phase 3 reading | It is built as a recorded Study from phase 0's efficacy harness. The 4B runs live once; every later reading replays offline or starts from a seeded checkpoint. |
+| Next | 2A is running. Then come 2B and 2C in parallel, and the study suite unit beside them. The dev re-pin onto `ollama` 0.0.35 and `study`'s next release comes when each publishes. |
 
 ## Sequence
 

@@ -43,3 +43,5 @@
 | 2026-11-11 | Phase 1 unit 1D's review: pass | `reviewer` on `sonnet` | `plan.md` § State |
 | 2026-11-11 | ROADMAP item 66 released alone as Agent 0.0.41, from a standalone clone, with its full chain run | Orchestrator | `ad13d4d0` |
 | 2026-11-11 | Phase 1's tree-wide chain on the 0.0.23 ranges, and the comment fixes from 1D's review | Orchestrator | `plan.md` § State |
+| 2026-11-11 | The user's ruling: use Study to seed scenarios and replay evidence so no run waits on long setup; phase 2 re-planned to about 8 lane hours, with 2B and 2C in parallel and the routine study suite cut to minutes | user | `plan.md` § Rulings |
+| 2026-11-11 | Phase 2 unit 2A, the declarations, dispatched on `ddff6c1b` | `opus` on `opus` | `plan.md` § State |
