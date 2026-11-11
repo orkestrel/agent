@@ -1304,7 +1304,7 @@ describe('study install fixtures', () => {
 		expect(body.logprobs[0].top_logprobs).toContainEqual({ token: 'A', logprob: -8 })
 	})
 
-	it('declares recording on a built profile and on a scratch local profile, keeping its other members', () => {
+	it('declares recording on a built profile and on a profile written beside a scratch local one, keeping its other members', () => {
 		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
 		expect(profile.record).toEqual({ bytes: 4194304, calls: 256, duration: 60000 })
 		expect(profile.settings).toEqual({
@@ -1313,18 +1313,23 @@ describe('study install fixtures', () => {
 		})
 		const scratch = createScratch({ prefix: 'study-recording-setup-' })
 		try {
-			expect(() => writeStudyInstallRecord(scratch)).toThrow('Missing authored memory profile')
-			scratch.write('studies/memory/profiles/local.json', '{"name":"local","settings":{"a":1}}')
-			writeStudyInstallRecord(scratch)
-			expect(parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')).toEqual({
-				name: 'local',
+			expect(() => writeStudyInstallRecord(scratch, 'recorded')).toThrow(
+				'Missing authored memory profile',
+			)
+			const local = '{"name":"local","settings":{"a":1}}'
+			scratch.write('studies/memory/profiles/local.json', local)
+			writeStudyInstallRecord(scratch, 'recorded', ['opening'])
+			expect(parseJSON(scratch.read('studies/memory/profiles/recorded.json') ?? '')).toEqual({
+				name: 'recorded',
 				record: STUDY_MEMORY_RECORD.record,
 				settings: {
 					...STUDY_MEMORY_RECORD.settings,
 					gauge: STUDY_MEMORY_SETTINGS.gauge,
 					observe: true,
+					checkpoints: ['opening'],
 				},
 			})
+			expect(scratch.read('studies/memory/profiles/local.json')).toBe(local)
 		} finally {
 			destroyScratch(scratch)
 		}

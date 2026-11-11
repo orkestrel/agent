@@ -120,20 +120,85 @@ Study replays the ancestor's retained prefix and sends only the appended goals, 
 
 The `chat` mechanism study preserves 38 conversations, 294 requests, and 102 primary mechanical checks. Its profiles are `full` (ledger capacity 19968), `compact` (2400), and `tight` (1600). The agent context remains 20480 and its output limit 1024 in all three. Each profile composes Mica alone and pins the same runner and model identities. See [Chat source and treatment](chat/sources/README.md) for provenance, the original-to-scenario mapping, effective wire policies, allowances, and grading semantics. No model reading of this Study bundle is recorded yet.
 
-Build the package before freezing because the profiles load `dist/src/core/index.js`. The following commands freeze, check, and record the full schedule; replace `full` with the chosen capacity profile. `ABSOLUTE_CHAT_CLOSURE_PATH` names a new absolute directory under `tmp/` with an existing parent, and `STEM` names the result.
+Run a sealed reading of one capacity profile in the following order. Replace `full` with the chosen capacity profile.
 
-```sh
-npx study freeze chat --profile full --to ABSOLUTE_CHAT_CLOSURE_PATH
-npx study check chat --profile full --closure ABSOLUTE_CHAT_CLOSURE_PATH
-npx study execute chat --profile full --closure ABSOLUTE_CHAT_CLOSURE_PATH --out tmp/studies/STEM
-```
+1. **Build.** Run `npm run build`, because the profiles load `dist/src/core/index.js`.
+2. **Rehearse.** Run the [full rehearsal](#full-rehearsal) for the chosen profile and read it green.
+3. **Freeze, check, and record.** `ABSOLUTE_CHAT_CLOSURE_PATH` names a new absolute directory under `tmp/` with an existing parent, and `STEM` names the result:
 
-Grade and report through the captured entry from the closure's directory. `ABSOLUTE_RESULT_PATH` is the path printed by execution, and `ASSESSMENT_ID` is the identity printed by grading.
+   ```sh
+   npx study freeze chat --profile full --to ABSOLUTE_CHAT_CLOSURE_PATH
+   npx study check chat --profile full --closure ABSOLUTE_CHAT_CLOSURE_PATH
+   npx study execute chat --profile full --closure ABSOLUTE_CHAT_CLOSURE_PATH --out tmp/studies/STEM
+   ```
 
-```sh
-cd ABSOLUTE_CHAT_CLOSURE_PATH
-node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CHAT_CLOSURE_PATH/studies/chat/rubric.json
-node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js report ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID
-```
+4. **Grade and report.** Run both through the captured entry from the closure's directory. `ABSOLUTE_RESULT_PATH` is the path printed by execution, and `ASSESSMENT_ID` is the identity printed by grading:
+
+   ```sh
+   cd ABSOLUTE_CHAT_CLOSURE_PATH
+   node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CHAT_CLOSURE_PATH/studies/chat/rubric.json
+   node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js report ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID
+   ```
 
 Study's generic report includes the separate diagnostic and completion criteria. For the battery's 102-row primary denominator and latency reading, use the tested `buildStudyChatSummary` consumer in `chat/helpers.ts` with the verified assessment, rubric, scenarios, and evidence returned by Study's `collectStudyEvidence` helper. Its rows preserve original conversation ids and turn numbers for external pairing. Offline replay checks custody without model sends and contributes no first-text timing.
+
+## Full rehearsal
+
+The full rehearsal executes one chat profile's whole schedule from a frozen closure against a protocol fixture, with no model, and grades the result through the closure's own entry. Run it one time before each sealed run, after the last change to the bundle, the profile, the build, an installed package, or the runner, and only for the profile about to run. No routine suite runs it.
+
+Its procedure is `rehearseStudyInstall` in `tests/setupStudy.ts`, which the routine `chat` proof runs on one conversation. The procedure needs the test harness for its fixture, and a Node script can't load that harness, so the rehearsal runs through the `probe` project. Write this probe to `tmp/probes/studies/rehearsal.test.ts`, with `profile` set to the profile about to run. Its 38 attempts and 294 observations are the chat schedule's population:
+
+```ts
+import { createScratch, destroyScratch } from '@orkestrel/test/server'
+import { expect, it } from 'vitest'
+import {
+	createMemoryServer,
+	createStudyInstallFixture,
+	rehearseStudyInstall,
+	writeStudyChatFixture,
+} from '../../../tests/setupStudy.js'
+
+const profile = 'full'
+
+it(`rehearses chat under ${profile}`, async () => {
+	const scratch = createScratch({ prefix: 'study-rehearsal-' })
+	const server = await createMemoryServer()
+	try {
+		const fixture = createStudyInstallFixture(scratch, server.url)
+		writeStudyChatFixture(fixture, server.url, profile)
+		const rehearsal = await rehearseStudyInstall(fixture, {
+			study: 'chat',
+			profile,
+			duration: 900000,
+		})
+		expect(
+			[rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade].map(
+				(step) => step.code,
+			),
+		).toEqual([0, 0, 0, 0])
+		const result = rehearsal.result
+		if (result?.status !== 'sealed') throw new Error('The rehearsal did not seal')
+		const observations = result.attempts.flatMap((attempt) => attempt.observations)
+		expect([result.attempts.length, observations.length]).toEqual([38, 294])
+		expect(result.attempts.filter((attempt) => attempt.failure !== undefined)).toEqual([])
+		expect(
+			observations.filter(
+				(observation) =>
+					observation.failure !== undefined || observation.product?.partial !== false,
+			),
+		).toEqual([])
+	} finally {
+		await server.close()
+		await destroyScratch(scratch)
+	}
+}, 1200000)
+```
+
+Then run it after the build:
+
+```text
+npm run build
+npm run test:probe -- tmp/probes/studies/rehearsal.test.ts
+```
+
+Each command prints one progress line with its exit and elapsed seconds. On this host on 2026-11-11, the rehearsal of `full` took 471 s, 437 s of it in the execution.

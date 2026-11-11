@@ -26,6 +26,7 @@ import {
 	MEMORY_TRIAGE_FAILURES,
 	MEMORY_TRIAGE_GOAL,
 	MEMORY_TRIAGE_OPEN,
+	MEMORY_TRIAGE_PROFILE,
 	createMemoryRouteServer,
 	buildMemoryProfile,
 	createMemoryContext,
@@ -204,21 +205,21 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			await session.close()
 		}
 	})
-	it('records and replays a reused triage session offline', async () => {
-		const scratch = createScratch({ prefix: 'study-triage-custody-' })
+	// One recording under the owned daemon serves the offline prefix replay, which builds no daemon, and the extension.
+	it('records a reused triage session through a scripted owned daemon, replays it offline and extends it', async () => {
+		const scratch = createScratch({ prefix: 'study-triage-daemon-' })
 		const server = await createMemoryRouteServer(32)
 		try {
 			expect(Number(new URL(server.url).port)).toBeGreaterThan(40000)
 			const fixture = createStudyInstallFixture(scratch, server.url)
 			writeMemoryTriageInstall(fixture)
+			await writeMemoryTriageDaemon(fixture, server.url)
+			const execute = ['execute', 'capacity', '--profile', MEMORY_TRIAGE_PROFILE]
 			const recorded = join(scratch.path, 'tmp', 'recorded')
-			const executed = await executeStudyInstall(
-				fixture,
-				['execute', 'capacity', '--profile', 'local', '--out', recorded],
-				260000,
-			)
-			if (executed.code !== 0) throw new Error(executed.stderr)
+			const executed = await executeStudyInstall(fixture, [...execute, '--out', recorded], 260000)
+			if (executed.code !== 0) throw new Error(executed.stderr + executed.stdout)
 			expect(executed).toMatchObject({ code: 0 })
+			assertMemoryDaemonClosed(scratch)
 			const result = await readStudyResult(recorded)
 			if (result.status !== 'sealed') throw new Error('Recording did not seal')
 			expect(result.manifest.schedule).toHaveLength(1)
@@ -230,7 +231,21 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(
 				history.exchanges.filter((exchange) => exchange.attempt.path === '/api/tags'),
 			).toHaveLength(2)
-			expect(history.exchanges).toHaveLength(server.requests.length)
+			// The owned daemon's manager reads its readiness ahead of the trial, outside the recording; the recording holds every request after it, in order.
+			const paths = server.requests.map((request) => request.path)
+			const leading = paths.slice(0, paths.length - history.exchanges.length)
+			expect(paths.slice(leading.length)).toEqual(
+				history.exchanges.map((exchange) => exchange.attempt.path),
+			)
+			expect(leading.filter((path) => path !== '/api/version' && path !== '/api/tags')).toEqual([])
+			expect(
+				history.exchanges
+					.filter((exchange) => exchange.attempt.role === 'triage')
+					.map((exchange) => exchange.attempt.goal),
+			).toEqual(['triage', 'followup'])
+			expect(history.exchanges.some((exchange) => exchange.attempt.stage === 'maintenance')).toBe(
+				true,
+			)
 			const evidence = (await collectStudyEvidence(result))[trial.id] ?? []
 			const checkpoints = evidence.filter((row) => row.event === 'checkpoint')
 			expect(checkpoints.map((row) => row.goal)).toEqual(['triage', 'followup'])
@@ -246,10 +261,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			const replayedRun = await executeStudyInstall(
 				fixture,
 				[
-					'execute',
-					'capacity',
-					'--profile',
-					'local',
+					...execute,
 					'--replay',
 					recorded,
 					'--prefix',
@@ -280,47 +292,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			if (replay.status !== 'sealed') throw new Error('Replay did not seal')
 			const replayEvidence = (await collectStudyEvidence(replay))[trial.id] ?? []
 			assertMemoryReplay(evidence, replayEvidence)
-		} finally {
-			await server.close()
-			await destroyScratch(scratch)
-		}
-	}, 540000)
-	it('extends a complete triage schedule through a scripted owned daemon', async () => {
-		const scratch = createScratch({ prefix: 'study-triage-daemon-' })
-		const server = await createMemoryRouteServer(32)
-		try {
-			const fixture = createStudyInstallFixture(scratch, server.url)
-			writeMemoryTriageInstall(fixture)
-			await writeMemoryTriageDaemon(fixture, server.url)
-			const recorded = join(scratch.path, 'tmp', 'recorded')
-			const executed = await executeStudyInstall(
-				fixture,
-				['execute', 'capacity', '--profile', 'local', '--out', recorded],
-				260000,
-			)
-			if (executed.code !== 0) throw new Error(executed.stderr + executed.stdout)
-			expect(executed.code).toBe(0)
-			assertMemoryDaemonClosed(scratch)
-			const result = await readStudyResult(recorded)
-			if (result.status !== 'sealed') throw new Error('Recording did not seal')
-			expect(result.manifest.schedule).toHaveLength(1)
-			const trial = result.manifest.schedule[0]
-			if (trial === undefined) throw new Error('Missing trial')
-			const history = await readStudyExchanges(result, trial.id)
-			expect(
-				history.exchanges
-					.filter((exchange) => exchange.attempt.role === 'triage')
-					.map((exchange) => exchange.attempt.goal),
-			).toEqual(['triage', 'followup'])
-			expect(history.exchanges.some((exchange) => exchange.attempt.stage === 'maintenance')).toBe(
-				true,
-			)
-			const sent = server.requests.length
 			writeMemoryTriageHorizon(scratch, 3)
 			const extended = join(scratch.path, 'tmp', 'extended')
 			const extendedRun = await executeStudyInstall(
 				fixture,
-				['execute', 'capacity', '--profile', 'local', '--extend', recorded, '--out', extended],
+				[...execute, '--extend', recorded, '--out', extended],
 				260000,
 			)
 			if (extendedRun.code !== 0) throw new Error(extendedRun.stderr + extendedRun.stdout)
@@ -351,7 +327,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			await server.close()
 			await destroyScratch(scratch)
 		}
-	}, 540000)
+	}, 167000)
 	it('refuses an absent triage model or digest mismatch before any goal request', async () => {
 		for (const triage of MEMORY_TRIAGE_UNAVAILABLE) {
 			const server = await createMemoryServer()

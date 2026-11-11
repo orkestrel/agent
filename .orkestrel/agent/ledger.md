@@ -45,3 +45,10 @@
 | 2026-11-11 | Phase 1's tree-wide chain on the 0.0.23 ranges, and the comment fixes from 1D's review | Orchestrator | `plan.md` § State |
 | 2026-11-11 | The user's ruling: use Study to seed scenarios and replay evidence so no run waits on long setup; phase 2 re-planned to about 8 lane hours, with 2B and 2C in parallel and the routine study suite cut to minutes | user | `plan.md` § Rulings |
 | 2026-11-11 | Phase 2 unit 2A, the declarations, dispatched on `ddff6c1b` | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | The study suite measured: 1201.5 s, with ten cases taking 1177.5 s, all in process startup | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | The study strategy ruling: start few processes, prove each lever once, share one recording per file, and run the full rehearsal on demand | `planner` on `fable` | `plan.md` § State |
+| 2026-11-11 | Study probes P1 to P3: process costs, the in-process chat schedule at 5.69 s, and qualification under `--trial` | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Study units SA (chat and the rehearsal) and SB (memory) | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Study after-run SV at 397.3 s, and P4 with parallel files at 242.9 s | `verifier` on `haiku` | `plan.md` § State |
+| 2026-11-11 | Study assertion check SV.2: 131 rows marked | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | The dev re-pin onto `ollama` ^0.0.35, `study` ^0.0.18, and `probe` ^0.0.30 | Orchestrator | `plan.md` § State |

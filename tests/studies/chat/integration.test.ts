@@ -1,28 +1,35 @@
+import type { StudyResultView } from '@orkestrel/study/server'
 import { parseJSON, isRecord } from '@orkestrel/contract'
-import { parseStudyProfile } from '@orkestrel/study'
+import { filterStudyCriteria } from '@orkestrel/study'
 import {
 	readStudyDeclaration,
 	StudyOllamaTransport,
 	buildStudyOllamaModels,
 	readStudyResult,
 	collectStudyEvidence,
+	encodeStudyJSON,
 	StudyAssessmentStore,
 } from '@orkestrel/study/server'
 import { createOllamaJudge, extractTiming } from '@orkestrel/ollama'
 import { STUDY_CHAT_JUDGE, STUDY_CHAT_OPTIONS } from '../../../studies/chat/constants.js'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { resolve, join } from 'node:path'
 import { expect, it } from 'vitest'
 import { StudyChatDriver } from '../../../studies/chat/drivers/StudyChatDriver.js'
 import { buildStudyChatRoles, buildStudyChatSummary } from '../../../studies/chat/helpers.js'
 import {
+	STUDY_INSTALL_ENTRY,
+	buildStudyChatProfile,
 	createMemoryContext,
 	createMemoryServer,
 	createStudyInstallFixture,
+	executeStudyChatSeries,
+	executeStudyCommand,
 	executeStudyInstall,
 	STUDY_MEMORY_MODULES,
+	rehearseStudyInstall,
 	runStudyChatDirect,
 	writeStudyChatFixture,
 	STUDY_MEMORY_CALIBRATION,
@@ -39,20 +46,7 @@ it('preserves the battery effective agent and lone judge wires through Study', a
 		buildMemoryCall('lookup', { id: 'OR-7' }),
 	])
 	try {
-		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/chat/profiles/full.json', 'utf8')),
-		)
-		const fixture = {
-			...profile,
-			record: undefined,
-			provider: {
-				entry: '@orkestrel/ollama',
-				url: captured.url,
-				model: 'model',
-				judge: 'judge',
-				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
-			},
-		}
+		const fixture = buildStudyChatProfile('full', captured.url)
 		const { scenarios } = await readStudyDeclaration(resolve('.'), 'chat')
 		const scenario = scenarios.find((entry) => entry.id === 'script-or-7')
 		if (scenario === undefined) throw new Error('Missing conversation')
@@ -95,20 +89,7 @@ it('routes a lone Mica question through the judge custody role with its exact ef
 	const direct = await createMemoryServer()
 	const captured = await createMemoryServer()
 	try {
-		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/chat/profiles/full.json', 'utf8')),
-		)
-		const fixture = {
-			...profile,
-			record: undefined,
-			provider: {
-				entry: '@orkestrel/ollama',
-				url: captured.url,
-				model: 'model',
-				judge: 'judge',
-				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
-			},
-		}
+		const fixture = buildStudyChatProfile('full', captured.url)
 		const context = createMemoryContext(fixture)
 		const transport = new StudyOllamaTransport({
 			url: captured.url,
@@ -162,63 +143,68 @@ it('routes a lone Mica question through the judge custody role with its exact ef
 	}
 })
 
-it('checks, freezes, executes, grades, reports and replays a captured bounded conversation', async () => {
+it('rehearses one captured conversation from a frozen closure, then reports, summarizes and replays it offline', async () => {
 	const scratch = createScratch({ prefix: 'study-chat-cli-' })
 	const server = await createMemoryServer()
 	try {
 		const fixture = createStudyInstallFixture(scratch, server.url)
-		writeStudyChatFixture(fixture, server.url, 'full', true)
-		const checked = await executeStudyInstall(fixture, ['check', 'chat', '--profile', 'full'])
-		assert.equal(checked.code, 0, checked.stderr)
-		const frozen = await executeStudyInstall(fixture, [
-			'freeze',
-			'chat',
-			'--profile',
-			'full',
-			'--to',
-			join(scratch.path, 'closure'),
-		])
-		assert.equal(frozen.code, 0, frozen.stderr)
-		const result = await executeStudyInstall(
-			fixture,
-			['execute', 'chat', '--profile', 'full', '--out', join(scratch.path, 'result')],
-			240000,
-		)
-		assert.equal(result.code, 0, result.stderr)
-		const graded = await executeStudyInstall(fixture, [
-			'grade',
-			join(scratch.path, 'result'),
-			'--rubric',
-			join(scratch.path, 'studies/chat/rubric.json'),
-		])
-		assert.equal(graded.code, 0, graded.stderr)
-		const assessment = parseJSON(graded.stdout)
+		writeStudyChatFixture(fixture, server.url, 'full')
+		const declaration = await readStudyDeclaration(scratch.path, 'chat')
+		const [scenario] = declaration.scenarios
+		const first = scenario?.goals[0]
+		const last = scenario?.goals.at(-1)
+		if (scenario === undefined || first === undefined || last === undefined)
+			throw new Error('Missing conversation')
+		const selection = ['--trial', 'r1-s1-a1', '--goals', `${first.id}..${last.id}`]
+		const rehearsal = await rehearseStudyInstall(fixture, {
+			study: 'chat',
+			profile: 'full',
+			selection,
+			duration: 120000,
+		})
+		for (const step of [rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade])
+			assert.equal(step.code, 0, step.stderr)
+		const sealed = rehearsal.result
+		if (sealed?.status !== 'sealed') throw new Error('Execution did not seal')
+		expect(sealed.manifest.schedule.map((trial) => trial.scenario)).toEqual([scenario.id])
+		const copied = join(scratch.path, 'studies/chat')
+		expect(
+			readdirSync(copied, { recursive: true, encoding: 'utf8' })
+				.filter(
+					(name) =>
+						statSync(join(copied, name)).isFile() &&
+						!readFileSync(join(copied, name)).equals(readFileSync(resolve('studies/chat', name))),
+				)
+				.map((name) => name.replaceAll('\\', '/')),
+		).toEqual(['profiles/full.json'])
+		const assessment = parseJSON(rehearsal.grade.stdout)
 		if (!isRecord(assessment) || typeof assessment.assessment !== 'string')
 			throw new Error('Missing assessment')
-		const report = await executeStudyInstall(fixture, [
-			'report',
-			join(scratch.path, 'result'),
-			'--assessment',
-			assessment.assessment,
-		])
+		const report = await executeStudyCommand(
+			join(rehearsal.closure, STUDY_INSTALL_ENTRY),
+			rehearsal.closure,
+			['report', sealed.directory, '--assessment', assessment.assessment],
+		)
 		assert.equal(report.code, 0, report.stderr)
-		const sealed = await readStudyResult(join(scratch.path, 'result'))
-		if (sealed.status !== 'sealed') throw new Error('Execution did not seal')
 		const retained = await new StudyAssessmentStore({
 			result: sealed,
-			rubric: readFileSync(join(scratch.path, 'studies/chat/rubric.json')),
+			rubric: encodeStudyJSON({
+				...declaration.rubric,
+				criteria: filterStudyCriteria(declaration.rubric.criteria, sealed.manifest.scenarios),
+			}),
 		}).read(assessment.assessment)
 		if (retained === undefined) throw new Error('Missing retained assessment')
-		const declaration = await readStudyDeclaration(scratch.path, 'chat')
 		const summary = buildStudyChatSummary({
 			assessment: retained,
 			scenarios: declaration.scenarios,
 			rubric: declaration.rubric,
 			evidence: new Map(Object.entries(await collectStudyEvidence(sealed))),
 		})
-		expect(summary.rows.length).toBe(
-			declaration.rubric.criteria.filter((criterion) => criterion.id.endsWith('primary')).length,
+		const primary = declaration.rubric.criteria.filter(
+			(criterion) => criterion.scenario === scenario.id && criterion.id.endsWith('primary'),
 		)
+		expect(primary.length).toBeGreaterThan(0)
+		expect(summary.rows.length).toBe(primary.length)
 		expect(
 			summary.rows.every(
 				(row) => row.conversation.endsWith('.json') && row.turn > 6 && row.first !== undefined,
@@ -232,8 +218,9 @@ it('checks, freezes, executes, grades, reports and replays a captured bounded co
 				'chat',
 				'--profile',
 				'full',
+				...selection,
 				'--replay',
-				join(scratch.path, 'result'),
+				sealed.directory,
 				'--roles',
 				JSON.stringify(['agent', 'judge', 'metadata']),
 				'--offline',
@@ -241,7 +228,7 @@ it('checks, freezes, executes, grades, reports and replays a captured bounded co
 				'--out',
 				join(scratch.path, 'replay'),
 			],
-			240000,
+			120000,
 		)
 		assert.equal(replay.code, 0, replay.stderr)
 		expect(server.requests).toHaveLength(count)
@@ -254,7 +241,7 @@ it('checks, freezes, executes, grades, reports and replays a captured bounded co
 				.every((row) => isRecord(row.value) && row.value.first === undefined),
 		).toBe(true)
 		appendFileSync(
-			join(scratch.path, 'closure/studies/chat/helpers.ts'),
+			join(rehearsal.closure, 'studies/chat/helpers.ts'),
 			'\n// changed captured member\n',
 		)
 		const changed = await executeStudyInstall(fixture, [
@@ -263,7 +250,7 @@ it('checks, freezes, executes, grades, reports and replays a captured bounded co
 			'--profile',
 			'full',
 			'--closure',
-			join(scratch.path, 'closure'),
+			rehearsal.closure,
 		])
 		expect(changed.code).not.toBe(0)
 		expect(server.requests).toHaveLength(count)
@@ -271,23 +258,21 @@ it('checks, freezes, executes, grades, reports and replays a captured bounded co
 		await server.close()
 		await destroyScratch(scratch)
 	}
-})
+}, 233000)
 
-it('rehearses the full schedule under every capacity without a model', async () => {
-	const scratch = createScratch({ prefix: 'study-chat-rehearsal-' })
+it('seals the whole schedule in process under every capacity and fails a conversation one call short of its allowance', async () => {
+	const scratch = createScratch({ prefix: 'study-chat-schedule-' })
 	const server = await createMemoryServer()
 	try {
-		const fixture = createStudyInstallFixture(scratch, server.url)
+		const declaration = await readStudyDeclaration(resolve('.'), 'chat')
+		const results = new Map<string, StudyResultView>()
 		for (const name of ['full', 'compact', 'tight']) {
-			writeStudyChatFixture(fixture, server.url, name, false)
-			const result = await executeStudyInstall(
-				fixture,
-				['execute', 'chat', '--profile', name, '--out', join(scratch.path, name)],
-				600000,
+			const sealed = await executeStudyChatSeries(
+				buildStudyChatProfile(name, server.url),
+				declaration,
+				join(scratch.path, name),
 			)
-			assert.equal(result.code, 0, result.stderr)
-			const sealed = await readStudyResult(join(scratch.path, name))
-			if (sealed.status !== 'sealed') throw new Error('Rehearsal did not seal')
+			if (sealed.status !== 'sealed') throw new Error('Schedule did not seal')
 			expect(sealed.attempts).toHaveLength(38)
 			expect(sealed.attempts.flatMap((attempt) => attempt.observations)).toHaveLength(294)
 			expect(
@@ -300,9 +285,44 @@ it('rehearses the full schedule under every capacity without a model', async () 
 						),
 				),
 			).toBe(true)
+			results.set(name, sealed)
 		}
+		const tight = results.get('tight')
+		const [attempt] = tight?.status === 'sealed' ? tight.attempts : []
+		if (attempt === undefined) throw new Error('Missing tight conversation')
+		const calls = attempt.observations
+			.flatMap((observation) => observation.usage)
+			.filter((usage) => usage.role !== 'metadata')
+			.reduce((total, usage) => total + usage.calls, 0)
+		const profile = buildStudyChatProfile('tight', server.url)
+		const short = await executeStudyChatSeries(
+			{
+				...profile,
+				bounds: {
+					...profile.bounds,
+					goal: { ...profile.bounds.goal, calls: calls - 1 },
+					trial: { ...profile.bounds.trial, calls: calls - 1 },
+				},
+			},
+			{
+				definition: { ...declaration.definition, scenarios: [attempt.trial.scenario] },
+				scenarios: declaration.scenarios.filter(
+					(scenario) => scenario.id === attempt.trial.scenario,
+				),
+			},
+			join(scratch.path, 'short'),
+		)
+		if (short.status !== 'sealed') throw new Error('Short schedule did not seal')
+		const observations = short.attempts.flatMap((entry) => entry.observations)
+		const causes = [
+			...short.attempts.map((entry) => entry.failure),
+			...observations.map((observation) => observation.failure),
+		].flatMap((failure) => (failure === undefined ? [] : [failure.cause]))
+		expect(causes.length).toBeGreaterThan(0)
+		expect(causes.every((cause) => cause === 'capacity')).toBe(true)
+		expect(observations.some((observation) => observation.product !== undefined)).toBe(true)
 	} finally {
 		await server.close()
 		await destroyScratch(scratch)
 	}
-}, 1800000)
+}, 48000)

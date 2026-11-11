@@ -30,7 +30,9 @@ import type {
 	StudyLabelReceipt,
 	StudyLabelSegment,
 	StudyLabelSource,
+	StudyDeclaration,
 	StudyOllamaReplayInterface,
+	StudyResultView,
 	StudySealedResult,
 	StudyValidation,
 } from '@orkestrel/study/server'
@@ -56,6 +58,7 @@ import {
 import { createRecorder, waitForCondition, waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { isStudyChatInput } from '../studies/chat/validators.js'
+import { StudyChatDriver } from '../studies/chat/drivers/StudyChatDriver.js'
 import {
 	parseStudyProfile,
 	parseStudyScenario,
@@ -92,14 +95,14 @@ import {
 import { StudyToolsDriver } from '../studies/tools/index.js'
 import * as agent from '../src/core/index.js'
 import * as provider from '@orkestrel/ollama'
-import { createScratch } from '@orkestrel/test/server'
+import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { createServer } from 'node:http'
 import { deepStrictEqual, strictEqual } from 'node:assert'
 import { execFile } from 'node:child_process'
 import { cpSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createLedgerJudge } from './setup.js'
 
@@ -381,14 +384,13 @@ export async function runStudyChatDirect(
 }
 
 /** Rebinds a copied chat profile to the protocol fixture without changing treatment or allowances.
- * @param bounded - If true, retains the first conversation; if false, retains the full schedule.
- * @example writeStudyChatFixture(fixture, server.url, 'full', true)
+ * @remarks Writes the profile alone; the copied declarations keep their authored bytes, and a run selects a segment with `--trial` and `--goals`.
+ * @example writeStudyChatFixture(fixture, server.url, 'full')
  */
 export function writeStudyChatFixture(
 	fixture: StudyInstallFixture,
 	url: string,
 	name: string,
-	bounded: boolean,
 ): void {
 	const raw = parseJSON(readFileSync(resolve('studies/chat/profiles', `${name}.json`), 'utf8'))
 	if (!isRecord(raw) || !isRecord(raw.settings)) throw new Error('Missing chat profile')
@@ -409,46 +411,147 @@ export function writeStudyChatFixture(
 			settings: { ...raw.settings, version: 'fixture-1' },
 		}),
 	)
-	if (bounded) {
-		const definition = parseJSON(fixture.scratch.read('studies/chat/study.json') ?? '')
-		const rubric = parseJSON(fixture.scratch.read('studies/chat/rubric.json') ?? '')
-		if (
-			!isRecord(definition) ||
-			!isArray(definition.scenarios) ||
-			typeof definition.scenarios[0] !== 'string' ||
-			!isRecord(rubric) ||
-			!isArray(rubric.criteria)
-		)
-			throw new Error('Missing chat declarations')
-		const scenario = definition.scenarios[0]
-		fixture.scratch.write(
-			'studies/chat/study.json',
-			JSON.stringify({ ...definition, scenarios: [scenario] }),
-		)
-		fixture.scratch.write(
-			'studies/chat/rubric.json',
-			JSON.stringify({
-				...rubric,
-				criteria: rubric.criteria.filter(
-					(criterion) => isRecord(criterion) && criterion.scenario === scenario,
-				),
-			}),
-		)
+}
+
+/** Reads an authored chat profile and rebinds its provider to the protocol fixture, unrecorded, for an in-process run.
+ * @example buildStudyChatProfile('tight', server.url).settings // { capacity: 1600, ... }
+ */
+export function buildStudyChatProfile(
+	name: string,
+	url: string,
+): StudyProfile & { readonly provider: NonNullable<StudyProfile['provider']> } {
+	return {
+		...parseStudyProfile(
+			parseJSON(readFileSync(resolve('studies/chat/profiles', `${name}.json`), 'utf8')),
+		),
+		record: undefined,
+		provider: {
+			entry: '@orkestrel/ollama',
+			url,
+			model: 'model',
+			judge: 'judge',
+			digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+		},
 	}
+}
+
+/** Executes chat scenarios in process through `StudySeries` and the chat driver over the built Agent, then seals and reads the result.
+ * @param profile - The profile whose bounds the manifest declares and the driver runs.
+ * @param declaration - The definition and the scenarios to schedule.
+ * @param directory - A result directory that does not exist yet.
+ * @example (await executeStudyChatSeries(buildStudyChatProfile('full', url), declaration, join(scratch.path, 'full'))).status // 'sealed'
+ */
+export async function executeStudyChatSeries(
+	profile: StudyProfile,
+	declaration: Pick<StudyDeclaration, 'definition' | 'scenarios'>,
+	directory: string,
+): Promise<StudyResultView> {
+	const manifest = buildCustodyManifest(
+		declaration.definition,
+		declaration.scenarios,
+		profile.bounds,
+	)
+	const store = new StudyResultStore({ directory, manifest })
+	await store.create()
+	await new StudySeries({
+		manifest,
+		driver: new StudyChatDriver({ ...STUDY_MEMORY_MODULES, profile, directory: resolve('.') }),
+		store,
+		signal: new AbortController().signal,
+	}).execute()
+	await store.seal()
+	return await readStudyResult(directory)
 }
 
 /** Drives the actual installed Study executable through its public native command boundary.
  * @param fixture - Captured installed command and working directory.
  * @param arguments_ - Exact public command arguments, including emitted next hints.
  * @param duration - Outer bound; execution retains its own request, trial and series limits.
- * @returns Native exit and separate stdout/stderr bytes.
+ * @returns Native exit, separate stdout/stderr bytes, and elapsed milliseconds.
  */
 export function executeStudyInstall(
 	fixture: StudyInstallFixture,
 	arguments_: readonly string[],
 	duration = 60000,
-): Promise<StudyInstallResult> {
-	return executeStudyProcess([fixture.entry, ...arguments_], fixture.scratch.path, duration)
+): Promise<StudyInstallStep> {
+	return executeStudyCommand(fixture.entry, fixture.scratch.path, arguments_, duration)
+}
+
+/** Pins the Study executable's location under an install or a frozen closure. */
+export const STUDY_INSTALL_ENTRY = 'node_modules/@orkestrel/study/dist/bin/main.js'
+
+/** Runs one Study command through an entry from its consumer root and prints one progress line with its exit and elapsed seconds.
+ * @param entry - The Study executable: an install's, or a frozen closure's under `STUDY_INSTALL_ENTRY`.
+ * @param root - The consumer root the command reads its declarations from.
+ * @param arguments_ - Exact public command arguments.
+ * @param duration - Outer process deadline in milliseconds.
+ * @example (await executeStudyCommand(join(closure, STUDY_INSTALL_ENTRY), closure, ['report', result, '--assessment', id])).code // 0
+ */
+export async function executeStudyCommand(
+	entry: string,
+	root: string,
+	arguments_: readonly string[],
+	duration = 60000,
+): Promise<StudyInstallStep> {
+	const started = performance.now()
+	const result = await executeStudyProcess([entry, ...arguments_], root, duration)
+	const elapsed = performance.now() - started
+	console.info(
+		`[studies] ${arguments_
+			.slice(0, 2)
+			.map((value) => basename(value))
+			.join(' ')} exited ${result.code} in ${(elapsed / 1000).toFixed(1)} s`,
+	)
+	return { ...result, duration: elapsed }
+}
+
+/** Rehearses a study from a frozen closure through the installed command, with no model: freeze, closure check, closure execution, the result read, and a grade through the closure's own entry.
+ * @remarks
+ * The caller builds the install and writes the profile that names its fixture; the procedure holds no
+ * assertion and runs every step whatever an earlier one returned. It freezes the whole declaration,
+ * because a closure keeps a selection-free fingerprint, and forwards `selection` (`--trial`, `--goals`,
+ * `--seed`) unchanged to check and execute. The closure is `closure` and the result `result` under the
+ * install's scratch. `studies/README.md` § Full rehearsal holds the on-demand probe that runs it.
+ * @returns Each step's exit and elapsed time, the closure, and the result as read, absent when execution exits nonzero
+ * @example (await rehearseStudyInstall(fixture, { study: 'chat', profile: 'full' })).result?.status // 'sealed'
+ */
+export async function rehearseStudyInstall(
+	fixture: StudyInstallFixture,
+	options: StudyRehearsalOptions,
+): Promise<StudyRehearsal> {
+	const closure = join(fixture.scratch.path, 'closure')
+	const directory = join(fixture.scratch.path, 'result')
+	const selection = options.selection ?? []
+	const profile = ['--profile', options.profile]
+	const { definition } = await readStudyDeclaration(fixture.scratch.path, options.study)
+	const freeze = await executeStudyInstall(fixture, [
+		'freeze',
+		options.study,
+		...profile,
+		'--to',
+		closure,
+	])
+	const check = await executeStudyInstall(fixture, [
+		'check',
+		options.study,
+		...profile,
+		'--closure',
+		closure,
+		...selection,
+	])
+	const execute = await executeStudyInstall(
+		fixture,
+		['execute', options.study, ...profile, '--closure', closure, ...selection, '--out', directory],
+		options.duration,
+	)
+	const result = execute.code === 0 ? await readStudyResult(directory) : undefined
+	const grade = await executeStudyCommand(join(closure, STUDY_INSTALL_ENTRY), closure, [
+		'grade',
+		directory,
+		'--rubric',
+		join(closure, 'studies', options.study, definition.rubric),
+	])
+	return { closure, freeze, check, execute, grade, result }
 }
 
 /** Executes a real Node entry with bounded output and preserves failure diagnostics.
@@ -1705,6 +1808,29 @@ export interface StudyInstallResult {
 	readonly stdout: string
 	readonly stderr: string
 }
+/** Holds one Study command's output with its elapsed milliseconds. */
+export interface StudyInstallStep extends StudyInstallResult {
+	readonly duration: number
+}
+/** Selects what a rehearsal freezes and runs. */
+export interface StudyRehearsalOptions {
+	readonly study: string
+	readonly profile: string
+	/** Holds the selectors forwarded to check and execute, such as `--trial` and `--goals`; absent runs the whole schedule. */
+	readonly selection?: readonly string[]
+	/** Holds the execution's outer deadline in milliseconds; absent takes the command default. */
+	readonly duration?: number
+}
+/** Holds every reading of a rehearsal through a frozen closure. */
+export interface StudyRehearsal {
+	readonly closure: string
+	readonly freeze: StudyInstallStep
+	readonly check: StudyInstallStep
+	readonly execute: StudyInstallStep
+	readonly grade: StudyInstallStep
+	/** Holds the result as read, with its attempts and their failures; absent when execution exits nonzero. */
+	readonly result: StudyResultView | undefined
+}
 
 /** Holds one inert native HTTP fixture response. */
 export interface MemoryWireFixture {
@@ -1820,6 +1946,33 @@ export interface MemorySeedChainFixture {
 	readonly boundary: number
 	/** Counts the requests the fixture took once both segments ended. */
 	readonly sent: number
+}
+/** Holds the shared recording an install file's setup makes once, and what made it. */
+export interface MemoryRecordingFixture {
+	/** Holds the recording profile, which lists every goal in `checkpoints`. */
+	readonly profile: StudyProfile
+	/** Holds each scheduled arm's first trial id, by arm. */
+	readonly trials: ReadonlyMap<string, string>
+	/** Names the recorded `records` trial. */
+	readonly trial: string
+	/** Holds the selection's check, whose `next` arguments the execution ran. */
+	readonly selected: StudyInstallResult
+	readonly executed: StudyInstallResult
+	/** Holds the result directory. */
+	readonly path: string
+	/** Counts the requests the fixture took before the first check. */
+	readonly start: number
+	/** Counts the requests the fixture took once both checks ended. */
+	readonly boundary: number
+	/** Counts the requests the fixture took once the execution ended. */
+	readonly sent: number
+}
+/** Holds a file's one install, its loopback provider, and its shared recording. */
+export interface MemoryInstallFixture {
+	readonly scratch: ScratchInterface
+	readonly server: MemoryServerFixture
+	readonly fixture: StudyInstallFixture
+	readonly recording: MemoryRecordingFixture
 }
 /** Holds what a real trial sent, admitted, retained and returned. */
 export interface MemoryTrialResult {
@@ -2422,23 +2575,25 @@ export function buildMemoryCapture(
 }
 
 /**
- * Rewrites a scratch workspace's authored local profile to declare recording, keeping its other members.
+ * Writes a profile that declares recording beside a scratch workspace's local profile, keeping the local profile's other members and leaving it unchanged.
  * @param scratch - The workspace `createStudyInstallFixture` populated.
+ * @param name - The written profile's name, which names its file.
  * @param checkpoints - The goal ids to list. Default: none.
- * @returns Nothing after the profile is replaced.
+ * @returns Nothing after the profile is written.
  * @throws Error - Thrown when the workspace holds no authored local profile.
  */
 export function writeStudyInstallRecord(
 	scratch: ScratchInterface,
+	name: string,
 	checkpoints: readonly string[] = [],
 ): void {
-	const path = 'studies/memory/profiles/local.json'
-	const raw = parseJSON(scratch.read(path) ?? '')
+	const raw = parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')
 	if (!isRecord(raw)) throw new Error('Missing authored memory profile')
 	scratch.write(
-		path,
+		`studies/memory/profiles/${name}.json`,
 		JSON.stringify({
 			...raw,
+			name,
 			record: STUDY_MEMORY_RECORD.record,
 			settings: {
 				...STUDY_MEMORY_SETTINGS,
@@ -2955,95 +3110,185 @@ export function readMemoryProgressRows(stdout: string): ReadonlyMap<string, unkn
 }
 
 /**
- * Reads a trial id of one arm from a capacity check's schedule.
- * @param fixture - The installed command.
- * @param arm - The arm to find.
- * @returns The first trial of that arm.
- * @throws Error - Thrown when the check refuses or schedules none.
+ * Reads the first trial of each arm from a check's schedule.
+ * @param stdout - The check's standard output.
+ * @returns Each scheduled arm's first trial id, by arm, in schedule order.
+ * @throws Error - Thrown when the document holds no schedule of trials.
  */
-export async function readStudyInstallTrial(
-	fixture: StudyInstallFixture,
-	arm: MemorySeedFixture['arm'],
-): Promise<string> {
-	const checked = await executeStudyInstall(fixture, ['check', 'capacity'])
-	const plan: unknown = checked.code === 0 ? parseJSON(checked.stdout) : undefined
-	const trial =
-		isRecord(plan) && arrayOf(isRecord)(plan.schedule)
-			? plan.schedule.find((entry) => entry.arm === arm)
-			: undefined
-	if (trial === undefined || !isString(trial.id)) throw new Error(`No ${arm} trial is scheduled`)
-	return trial.id
+export function readMemoryTrials(stdout: string): ReadonlyMap<string, string> {
+	const plan = parseJSON(stdout)
+	const schedule = isRecord(plan) ? plan.schedule : undefined
+	if (!arrayOf(isRecord)(schedule) || schedule.length === 0)
+		throw new Error('The check lists no schedule')
+	const trials = new Map<string, string>()
+	for (const trial of schedule) {
+		if (!isString(trial.arm) || !isString(trial.id)) throw new Error('Invalid scheduled trial')
+		if (!trials.has(trial.arm)) trials.set(trial.arm, trial.id)
+	}
+	return trials
 }
 
 /**
- * Checks one capacity selection and executes the arguments that check returns, as an operator does.
+ * Records the shared segment of an install fixture's `capacity` target, as an operator does: the schedule's check, the selection's check, then the execution of the arguments that check returns.
+ * @remarks
+ * The segment is the first `records` trial's `opening..correction`, under the `recorded` profile, which
+ * declares recording and lists every goal in `checkpoints`. The local profile stays unchanged.
  * @param fixture - The installed command.
- * @param selectors - The `--trial`, `--goals`, and `--seed` arguments.
+ * @param server - The loopback provider; only this call sends to it while it runs.
  * @param output - The result directory.
- * @returns The refusing check, or the execution.
- * @throws Error - Thrown when a passing check returns no arguments.
+ * @returns The profile, the scheduled trials, both checks, the execution, and the request counts.
+ * @throws Error - Thrown when a check refuses, schedules no `records` trial, or returns no arguments.
  */
-export async function executeMemorySegment(
+export async function executeMemoryRecording(
 	fixture: StudyInstallFixture,
-	selectors: readonly string[],
+	server: MemoryServerFixture,
 	output: string,
-): Promise<StudyInstallResult> {
-	const checked = await executeStudyInstall(fixture, [
+): Promise<MemoryRecordingFixture> {
+	writeStudyInstallRecord(fixture.scratch, 'recorded', STUDY_MEMORY_GOALS)
+	const profile = parseStudyProfile(
+		parseJSON(fixture.scratch.read('studies/memory/profiles/recorded.json') ?? ''),
+	)
+	const start = server.requests.length
+	const scheduled = await executeStudyInstall(fixture, [
 		'check',
 		'capacity',
 		'--profile',
-		'local',
-		...selectors,
+		profile.name,
 	])
-	if (checked.code !== 0) return checked
-	const plan = parseJSON(checked.stdout)
+	if (scheduled.code !== 0) throw new Error(`The schedule check refused: ${scheduled.stderr}`)
+	const trials = readMemoryTrials(scheduled.stdout)
+	const trial = trials.get('records')
+	if (trial === undefined) throw new Error('No records trial is scheduled')
+	const selected = await executeStudyInstall(fixture, [
+		'check',
+		'capacity',
+		'--profile',
+		profile.name,
+		'--trial',
+		trial,
+		'--goals',
+		'opening..correction',
+	])
+	const plan: unknown = selected.code === 0 ? parseJSON(selected.stdout) : undefined
 	if (!isRecord(plan) || !arrayOf(isString)(plan.next))
-		throw new Error('Missing selected execution arguments')
-	return executeStudyInstall(fixture, [...plan.next, '--out', output], 260000)
+		throw new Error(`Missing selected execution arguments: ${selected.stderr}`)
+	const boundary = server.requests.length
+	const executed = await executeStudyInstall(fixture, [...plan.next, '--out', output], 260000)
+	return Object.freeze({
+		profile,
+		trials,
+		trial,
+		selected,
+		executed,
+		path: output,
+		start,
+		boundary,
+		sent: server.requests.length,
+	})
 }
 
 /**
- * Executes a two-segment chain on the install fixture's `capacity` target: `opening..correction`, then `closure..closure` seeded from the first segment's `correction` row.
- * @param fixture - The installed command; its `local.json` is rewritten to record and to list each goal.
- * @param server - The loopback provider, whose `/api/version` default answers each verification.
- * @param arm - The arm whose trial runs.
- * @param directory - The folder that holds both results; it is created when absent.
- * @returns The trial, the rewritten profile, both results, and the request counts at the boundary and at the end.
- * @throws Error - Thrown when the check schedules no trial of the arm.
+ * Executes a seeded `closure..closure` segment of one arm's trial from the `correction` row of an `opening..correction` segment.
+ * @remarks
+ * The `records` arm seeds from the shared recording itself. Another arm first executes its own
+ * `opening..correction` segment directly under the recording's profile. The seeded segment executes
+ * directly too, since every execution checks first.
+ * @param fixture - The installed command.
+ * @param server - The loopback provider; only this call sends to it while it runs.
+ * @param recording - The shared recording, whose profile and schedule the chain reads.
+ * @param arm - The arm whose first scheduled trial runs.
+ * @param directory - The folder that holds the chain's own results; it is created when absent.
+ * @returns The trial, the profile, both segments, both commands, and the request counts at the boundary and at the end.
+ * @throws Error - Thrown when the recording schedules no trial of the arm.
  */
 export async function executeMemorySeedChain(
 	fixture: StudyInstallFixture,
 	server: MemoryServerFixture,
+	recording: MemoryRecordingFixture,
 	arm: MemorySeedFixture['arm'],
 	directory: string,
 ): Promise<MemorySeedChainFixture> {
-	writeStudyInstallRecord(fixture.scratch, STUDY_MEMORY_GOALS)
+	const trial = recording.trials.get(arm)
+	if (trial === undefined) throw new Error(`No ${arm} trial is scheduled`)
 	mkdirSync(directory, { recursive: true })
-	const trial = await readStudyInstallTrial(fixture, arm)
-	const first = join(directory, 'first')
+	const execute = ['execute', 'capacity', '--profile', recording.profile.name, '--trial', trial]
+	const first = arm === 'records' ? recording.path : join(directory, 'first')
 	const second = join(directory, 'second')
-	const opened = await executeMemorySegment(
-		fixture,
-		['--trial', trial, '--goals', 'opening..correction'],
-		first,
-	)
+	const opened =
+		arm === 'records'
+			? recording.executed
+			: await executeStudyInstall(
+					fixture,
+					[...execute, '--goals', 'opening..correction', '--out', first],
+					260000,
+				)
 	const boundary = server.requests.length
-	const seeded = await executeMemorySegment(
+	const seeded = await executeStudyInstall(
 		fixture,
-		['--trial', trial, '--goals', 'closure..closure', '--seed', `${first}:${trial}:correction`],
-		second,
+		[
+			...execute,
+			'--goals',
+			'closure..closure',
+			'--seed',
+			`${first}:${trial}:correction`,
+			'--out',
+			second,
+		],
+		260000,
 	)
 	return {
 		trial,
-		profile: parseStudyProfile(
-			parseJSON(fixture.scratch.read('studies/memory/profiles/local.json') ?? ''),
-		),
+		profile: recording.profile,
 		first,
 		second,
 		opened,
 		seeded,
 		boundary,
 		sent: server.requests.length,
+	}
+}
+
+/**
+ * Builds a file's one install fixture against its own loopback provider, and makes its shared recording.
+ * @remarks
+ * Every case of the file reads this one install. The local profile stays as `createStudyInstallFixture`
+ * wrote it, and the recording writes its own `recorded` profile beside it.
+ * @param prefix - The scratch directory's prefix.
+ * @returns The scratch, the provider, the install, and the shared recording.
+ * @throws Error - Rethrows a failed setup after closing the provider and removing the scratch.
+ */
+export async function createMemoryInstall(prefix: string): Promise<MemoryInstallFixture> {
+	const scratch = createScratch({ prefix })
+	try {
+		const server = await createMemoryServer()
+		try {
+			const fixture = createStudyInstallFixture(scratch, server.url)
+			const recording = await executeMemoryRecording(
+				fixture,
+				server,
+				join(scratch.path, 'tmp', 'studies', 'recorded'),
+			)
+			return Object.freeze({ scratch, server, fixture, recording })
+		} catch (error) {
+			await server.close()
+			throw error
+		}
+	} catch (error) {
+		await destroyScratch(scratch)
+		throw error
+	}
+}
+
+/**
+ * Closes a file's install: its provider, then its scratch.
+ * @param install - The install `createMemoryInstall` built.
+ * @returns Completion once both are released.
+ */
+export async function destroyMemoryInstall(install: MemoryInstallFixture): Promise<void> {
+	try {
+		await install.server.close()
+	} finally {
+		await destroyScratch(install.scratch)
 	}
 }
 
@@ -4986,14 +5231,18 @@ export function buildMemoryReplayEvidence(
 	]
 }
 
-/** Writes a complete schedule and a provider-owned triage pin without selecting a trial or goal range. */
+/** Names the profile the triage writers declare beside the local one. */
+export const MEMORY_TRIAGE_PROFILE = 'triage'
+
+/** Writes a complete schedule and a recording profile with a provider-owned triage pin, without selecting a trial or goal range. */
 export function writeMemoryTriageInstall(fixture: StudyInstallFixture): void {
 	const { scratch } = fixture
 	writeStudyInstallRecord(
 		scratch,
+		MEMORY_TRIAGE_PROFILE,
 		MEMORY_TRIAGE_GOALS.slice(0, 2).map((goal) => goal.id),
 	)
-	const path = 'studies/memory/profiles/local.json'
+	const path = `studies/memory/profiles/${MEMORY_TRIAGE_PROFILE}.json`
 	const profile = parseStudyProfile(parseJSON(scratch.read(path) ?? ''))
 	if (profile.provider === undefined) throw new Error('Missing fixture provider')
 	scratch.write(
@@ -5045,7 +5294,7 @@ export function writeMemoryTriageHorizon(scratch: ScratchInterface, count: numbe
 	scratch.write('studies/memory/scenarios/handoff.json', JSON.stringify({ id: 'handoff', goals }))
 }
 
-/** Declares a pinned Node protocol daemon that Study owns, forwarding only to a scripted loopback server. */
+/** Declares, on the triage profile, a pinned Node protocol daemon that Study owns, forwarding only to a scripted loopback server. */
 export async function writeMemoryTriageDaemon(
 	fixture: StudyInstallFixture,
 	upstream: string,
@@ -5056,12 +5305,11 @@ export async function writeMemoryTriageDaemon(
 	if (Number(new URL(url).port) <= 40000 || Number(new URL(upstream).port) <= 40000)
 		throw new Error('Dedicated fixture ports above 40000 are required')
 	fixture.scratch.write('daemon.ts', renderMemoryTriageDaemon())
-	const profile = parseStudyProfile(
-		parseJSON(fixture.scratch.read('studies/memory/profiles/local.json') ?? ''),
-	)
+	const path = `studies/memory/profiles/${MEMORY_TRIAGE_PROFILE}.json`
+	const profile = parseStudyProfile(parseJSON(fixture.scratch.read(path) ?? ''))
 	if (profile.provider === undefined) throw new Error('Missing provider')
 	fixture.scratch.write(
-		'studies/memory/profiles/local.json',
+		path,
 		JSON.stringify({
 			...profile,
 			provider: {
