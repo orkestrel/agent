@@ -82,6 +82,9 @@ A host gives a small local model progressive reach to everything its principal m
 - **The user, 2026-11-10, on the 4B reading:** it's reported before the phase 3 release, and an efficacy miss doesn't hold the release. A design claim the live run falsifies does.
 - **The user, 2026-11-10, on durable jobs:** built in this campaign, as one unit after phase 2. A job's input carries a narrowing scope and disclosure, checked against its parent.
 - **The user, 2026-11-10, on delegation under a ledger:** ROADMAP item 9, binding the ledger's recall and lookup tools to the run, becomes phase 5. A ledger can then take delegates, behind its own design checkpoint and estimate.
+- **The user's standing ruling, 2026-11-10, for every session:** "Honestly, these continuous questions about how many hours are getting annoying, you need to reassess by yourself in terms of reasonability and if it is within what is needed for quality and performance, it's something I want you and the other sessions to do and stop with the annoying checks about how many hours work is and just do the best to get stuff done well and fast."
+  - The Orchestrator sets each phase's estimate and ceiling, keeps the work proportionate, and reports the figures in § State.
+  - Publishing codes, credentials, scope, and product decisions still go to the user.
 - **Authorship:**
   - Host-authored text alone enters privileged context.
   - A model-authored memo, a record, and workspace data stay data.
@@ -91,10 +94,6 @@ A host gives a small local model progressive reach to everything its principal m
 ## The roadmap items this campaign meets
 
 Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 57, and 69 bear on the same seams. The design reconciliation plans or rules out each one.
-
-## Open decisions
-
-- **Each phase's estimate,** from the measurements phase 0 takes, brought to the user as that phase is reached.
 
 ## Deferred
 
@@ -112,8 +111,15 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 | Final design | decided by the consultant on every input. Its four phases are scope and the ceiling; disclosure in the agent; disclosure in the ledger, with the consumer run and the 4B reading; and delegation behind a checkpoint. Two refutations read 255 claims and found 36 failures, 1 stale fact, and 14 unverifiable claims. The design repaired 65 findings and refuted 1. A re-audit closed 57 of the repairs, a closure pass corrected the other 8, and the closure check closed all 8. Its estimate is 19.5 units, about 66 lane hours at 3.4 hours a unit (wall time, `git log 19f72405~1..7718f390`), plus at most 2.4 runner hours. |
 | Decisions | the user ruled each phase estimated as reached, prototype first, the reading reported and not holding the release, durable jobs built, and ROADMAP item 9 as phase 5 |
 | Design record | `designs/disclosure.md`, with the user's later rulings folded in. The durable-job unit brings the provisional total to 20.5 units, about 70 lane hours. |
-| Phase 0 | running: the base's defects red first, the derivation table, the delegation checkpoint probes, and the density and efficacy harnesses, scripted first |
-| Next | phase 0's answers; then the two 4B runs on the held runner, then phase 1's estimate to the user |
+| Phase 0 | closed 2026-11-11: every question answered YES; no design question opens |
+| Phase 0, the base | All five defects reproduce red on `682a8298`: item 67 loops a pass to 9 provider calls against 2; item 68 reuses the gauge for an added tool; 12 widening fan-out child jobs spawn unrefused; the hidden stub names `recall` under a scope without it; and a scope hiding 79 of 80 definitions leaves the plan `total` 0 at taverna's room. |
+| Phase 0, derivation | The derivation is exact on 23 table rows, 22 mutants, and 7 loop-stored rows; 0.94 ms at 1600 messages against a 6.6 ms bar. The stored-entity option stays closed. |
+| Phase 0, delegation checkpoint | K1a to K5 all hold, 16 of 16 tests: the workflow runner composition, the run manager's throw and abort results, a child holding no `ask`, a ledger taking no delegates before phase 5, the live child ceiling failing closed, and the parent's budget bounding the child. |
+| Phase 0, density on the 4B | YES on 9 samples with noise 0, 54 calls in 125 s, on runner 0.40.15. The addition term ships as written. Margins under the bound run 4% to 8% on desk areas and 11% on areas of taverna's mean size. The runner counts cached tokens inside the prompt. |
+| Phase 0, efficacy on the 4B | It ran on a rebuilt desk catalog of 36 tools in 6 areas, because the original was swept on 2026-11-08 with no commit. Index plus `load`: 41 of 42 right, 15 of 15 loads opening the right area, median prompt 2721. All 36 tools: 42 of 42 at 6502. The oracle area: 42 of 42 at 1948. Each opened area costs one turn. The one miss called a shown tool when the needed area was hidden. Area guidance arrived as the `load` result, standing in for phase 2's head refresh. |
+| Runner | Ollama v0.40.16 is the latest stable, published 2026-11-09; the runner and taverna's profiles pin 0.40.15. A new lineage comes before phase 3's reading and taverna's first sealed run. |
+| Phase 1 estimate | weight 4.75, about 16 lane hours, set by the Orchestrator |
+| Next | phase 1: units 1A (the fan-out check) and 1B (the run scope and the `request` event) in parallel, then 1C (the ledger) |
 
 ## Sequence
 
