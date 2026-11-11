@@ -15,6 +15,7 @@ import {
 	exerciseConversationStoreTwoIds,
 	exerciseConversationStoreUpsert,
 	TOOL_SNAPSHOT,
+	NESTED_SNAPSHOT,
 	JUDGMENT_SNAPSHOT,
 } from '../../../../setup.js'
 
@@ -142,6 +143,14 @@ describe('DatabaseConversationStore', () => {
 			expect(alpha.after).toBeUndefined()
 			expect(beta.after).toEqual(beta.snapshot)
 		})
+	})
+
+	it('round trips a snapshot whose call arguments nest arbitrary keys, arrays, and nulls', async () => {
+		const { got } = await exerciseConversationStoreRoundTrip(
+			() => createDatabaseConversationStore(createMemoryDriver()),
+			async () => NESTED_SNAPSHOT,
+		)
+		expect(got).toEqual(NESTED_SNAPSHOT)
 	})
 })
 

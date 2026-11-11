@@ -92,6 +92,9 @@ import {
 	createScriptedApprover,
 	LedgerContactBook,
 	LEDGER_COUNTED_FAULTS,
+	LEDGER_RELEASED_FAULTS,
+	LEDGER_FIELD_REFUSALS,
+	buildLedgerContractRecord,
 	serveLedgerCalls,
 	serveLedgerContactWrite,
 	serveLedgerAnswer,
@@ -6921,6 +6924,69 @@ describe('Ledger — a call its tool refuses for its arguments', () => {
 		)
 		expect(aborts.calls).toEqual([['repeat']])
 	})
+
+	it.each(LEDGER_RELEASED_FAULTS)(
+		'releases a write whose handler throws an argument refusal carrying %s, so its identical retry runs',
+		async (_label, fault) => {
+			const book = new LedgerContactBook()
+			const call = {
+				name: 'write_record',
+				arguments: { kind: 'contact', input: { id: 'C-12', due: '2026-02-30' } },
+			}
+			const { ledger, tools, aborts } = await serveLedgerCalls(
+				buildLedgerContactOptions(
+					book,
+					createAuthority({ fallback: { zone: 'records', verdict: 'allow' }, ask: () => true }),
+					{ writes: [book.fail(fault)] },
+				),
+				[
+					{ id: 'write-1', ...call },
+					{ id: 'write-2', ...call },
+				],
+			)
+			const messages = ledger.conversation.messages()
+			const refusal = requireValue(messages.find((message) => message.call === 'write-1')).content
+			expect(refusal).toBe(fault.message)
+			expect(refusal).not.toBe(LEDGER_NOTES.repeat)
+			expect(messages.find((message) => message.call === 'write-2')?.content).toBe(refusal)
+			expect(tools.calls.map(([one, outcome]) => [one.id, outcome.success])).toEqual([
+				['write-1', false],
+				['write-2', false],
+			])
+			expect(aborts.calls).toEqual([])
+			expect(book.runs).toEqual([])
+		},
+	)
+
+	it.each(LEDGER_FIELD_REFUSALS)(
+		'releases a lookup whose typed door refuses %s, so its identical retry runs',
+		async (_label, field, contract, value) => {
+			const book = new LedgerContactBook()
+			const bad = { kind: 'contact', input: { id: 'C-12', [field]: value } }
+			const { ledger, tools, aborts } = await serveLedgerCalls(
+				buildLedgerContactOptions(
+					book,
+					createAuthority({ fallback: { zone: 'records', verdict: 'allow' } }),
+					{ lookups: [buildLedgerContractRecord(book, contract)], writes: [] },
+				),
+				[
+					{ id: 'bad-1', name: 'read_record', arguments: bad },
+					{ id: 'bad-2', name: 'read_record', arguments: bad },
+				],
+			)
+			const messages = ledger.conversation.messages()
+			const refusal = requireValue(messages.find((message) => message.call === 'bad-1')).content
+			expect(refusal).toContain(field)
+			expect(refusal).not.toBe(LEDGER_NOTES.repeat)
+			expect(messages.find((message) => message.call === 'bad-2')?.content).toBe(refusal)
+			expect(tools.calls.map(([one, outcome]) => [one.id, outcome.success])).toEqual([
+				['bad-1', false],
+				['bad-2', false],
+			])
+			expect(aborts.calls).toEqual([])
+			expect(book.runs).toEqual([])
+		},
+	)
 })
 
 describe('Ledger — a call the authority denied', () => {

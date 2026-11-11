@@ -6,6 +6,7 @@ import {
 	buildConversationSnapshot,
 	buildMemoSnapshot,
 	MALFORMED_MEMO_SNAPSHOTS,
+	NESTED_JSON,
 	plantSnapshotRow,
 } from '../../../../setup.js'
 
@@ -109,5 +110,22 @@ describe('DatabaseMemoStore — a present row that fails the guard throws', () =
 		)
 		expect(isContextError(error) && error.code).toBe('SNAPSHOT')
 		expect(await store.get('ada')).toBeUndefined()
+	})
+
+	it('stores a row whose snapshot nests arbitrary keys, arrays, and nulls, refuses it on read, and writes its neighbour', async () => {
+		const driver = createMemoryDriver()
+		await plantSnapshotRow(driver, 'memos', {
+			id: 'ada',
+			snapshot: { id: 'ada', memos: [], nested: NESTED_JSON },
+		})
+		const store = createDatabaseMemoStore(driver)
+		const control = buildMemoSnapshot(2, 'c')
+		await store.set(control)
+		const error = await store.get('ada').catch((caught: unknown) => caught)
+		expect(isContextError(error) && error.code).toBe('SNAPSHOT')
+		expect(isContextError(error) && error.context?.faults).toEqual([
+			{ reason: 'extra', path: ['nested'] },
+		])
+		expect(await store.get('c')).toEqual(control)
 	})
 })

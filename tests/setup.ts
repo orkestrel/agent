@@ -370,6 +370,7 @@ import type {
 	ThinkSplitterInterface,
 } from '@src/core'
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
+import type { ContractShape } from '@orkestrel/contract'
 import type { DriverInterface } from '@orkestrel/database'
 import type { RecorderInterface } from '@orkestrel/test'
 import type { ToolCall, ToolDefinition, ToolInterface, ToolManagerInterface } from '@orkestrel/tool'
@@ -378,10 +379,12 @@ import { createAgentRegistry, createConversationManager } from '@src/core'
 import { createToolManager } from '@orkestrel/tool'
 import {
 	arrayShape,
+	dateShape,
 	integerShape,
 	literalShape,
 	objectShape,
 	optionalShape,
+	shapeShape,
 	stringShape,
 } from '@orkestrel/contract'
 import {
@@ -3453,6 +3456,53 @@ export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSna
 			content: 'sunny in Oslo',
 			call: 'call-oslo',
 		},
+	],
+})
+
+/**
+ * Holds a JSON record whose nested keys no snapshot declares: spaces, a dot, an empty key, a
+ * numeric-looking key, `constructor`, and non-ASCII letters, over nested arrays, nulls, and empty
+ * containers.
+ */
+export const NESTED_JSON: Readonly<Record<string, unknown>> = Object.freeze({
+	'a key with spaces': [1, null, { '': null, 'dotted.key': [[]], ünï: { deep: [null, [null]] } }],
+	'0': 'a numeric-looking key',
+	constructor: 'a key named constructor',
+	empty: {},
+	list: [],
+	flag: false,
+})
+
+/**
+ * Holds a conversation snapshot whose sectioned and live call arguments each carry
+ * {@link NESTED_JSON}, so storage tests cover arbitrary JSON inside the snapshot column.
+ */
+export const NESTED_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSnapshot>({
+	id: 'nested',
+	sections: [
+		{
+			id: 'section-nested',
+			summary: 'The nested call ran',
+			messages: [
+				{ id: 'user-nested', role: 'user', content: 'run the nested call' },
+				{
+					id: 'assistant-nested',
+					role: 'assistant',
+					content: '',
+					calls: [{ id: 'call-nested', name: 'nested', arguments: NESTED_JSON }],
+				},
+				{ id: 'tool-nested', role: 'tool', content: 'ran', call: 'call-nested' },
+			],
+		},
+	],
+	messages: [
+		{
+			id: 'assistant-live',
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'call-live', name: 'nested', arguments: { nested: NESTED_JSON, none: null } }],
+		},
+		{ id: 'tool-live', role: 'tool', content: 'ran again', call: 'call-live' },
 	],
 })
 
@@ -6985,6 +7035,38 @@ export const LEDGER_COUNTED_FAULTS: ReadonlyArray<readonly [label: string, fault
 	])
 
 /**
+ * Lists the argument refusals a ledger tool's handler can throw whose fault names a calendar date or
+ * a shape, so the ledger releases the call from the repeat stop.
+ *
+ * @remarks
+ * Each refusal carries the fault a typed tool's own door reports for that field: a `dateShape`
+ * field refused `'2026-02-30'`, and a `shapeShape` field refused a string.
+ */
+export const LEDGER_RELEASED_FAULTS: ReadonlyArray<readonly [label: string, fault: ToolError]> =
+	Object.freeze([
+		[
+			'a date fault',
+			new ToolError('ARGUMENTS', 'due: "2026-02-30" is not a calendar date', {
+				faults: [
+					{
+						reason: 'constraint',
+						path: ['due'],
+						expected: 'date',
+						constraint: 'date',
+						received: '"2026-02-30"',
+					},
+				],
+			}),
+		],
+		[
+			'a shape fault',
+			new ToolError('ARGUMENTS', 'shape: expected a shape, received "not a shape"', {
+				faults: [{ reason: 'type', path: ['shape'], expected: 'shape', received: '"not a shape"' }],
+			}),
+		],
+	])
+
+/**
  * Holds a fictional contact book that a ledger reads and writes: each contact's phone, the lookups
  * that read it, and the write that changes it.
  *
@@ -7392,6 +7474,59 @@ export const LEDGER_WRITE_SUPERSESSIONS: ReadonlyArray<
 	['the later of two writes in one group', 'final', []],
 	['a read in a group after every write', 'after', []],
 	['a write whose result names no target', 'noop', []],
+])
+
+/**
+ * Builds the book's `read_record` lookup whose typed tool admits `input` through a contract.
+ *
+ * @remarks
+ * Any `input` object passes the door the ledger compiles from the record parameters, and the typed
+ * `lookup_contact` tool's own door throws its argument refusal for an `input` the contract refuses,
+ * synchronously.
+ *
+ * @param book - The contact book whose `lookup_contact` handler the typed tool runs
+ * @param contract - The contract the typed tool admits `input` through
+ * @returns The lookup
+ */
+export function buildLedgerContractRecord(
+	book: LedgerContactBook,
+	contract: ContractShape,
+): LedgerLookup {
+	const lookup = book.lookup
+	const record = book.record
+	const typed = createTool({
+		name: 'lookup_contact',
+		description: 'Read a contact by its id.',
+		contract,
+		execute: (args, context) => lookup.tool.execute(args, context),
+	})
+	return {
+		tool: {
+			...record.tool,
+			execute: (args, context) => typed.execute(isRecord(args.input) ? args.input : {}, context),
+		},
+		read: record.read,
+	}
+}
+
+/**
+ * Lists the typed contact fields whose own door refuses a value the ledger's `read_record` door
+ * admits: a calendar date and a shape.
+ *
+ * @remarks
+ * Each row carries the field, the contract that declares it beside the contact `id`, and the value
+ * the contract refuses, so the typed door throws an argument refusal whose fault names the field.
+ */
+export const LEDGER_FIELD_REFUSALS: ReadonlyArray<
+	readonly [label: string, field: string, contract: ContractShape, value: unknown]
+> = Object.freeze([
+	['a date fault', 'due', objectShape({ id: stringShape(), due: dateShape() }), '2026-02-30'],
+	[
+		'a shape fault',
+		'shape',
+		objectShape({ id: stringShape(), shape: shapeShape() }),
+		'not a shape',
+	],
 ])
 
 /**
