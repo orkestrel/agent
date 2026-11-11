@@ -12,6 +12,7 @@ import {
 	unionShape,
 } from '@orkestrel/contract'
 import { messageInputShape, tokenUsageShape } from '../shapers.js'
+import { BUILTIN_LIMITS } from './constants.js'
 
 /**
  * Describes a durable agent job — the record `AgentRegistry.build` checks exactly, so a misspelled key
@@ -99,4 +100,95 @@ export const agentPromptShape = objectShape({
 export const agentAnswerShape = objectShape({
 	id: stringShape(),
 	approved: booleanShape(),
+}) satisfies ContractShape
+
+/**
+ * Describes what a host shows a run — the loaded `skills` in load order and an optional selected
+ * `workspace`, the record the `disclosure` option of an agent and a run is admitted against.
+ *
+ * @remarks
+ * The guard refuses every extra member and a `workspace` given as `undefined`; the contract parser
+ * drops extra members.
+ */
+export const agentDisclosureShape = objectShape({
+	skills: arrayShape(stringShape()),
+	workspace: optionalShape(stringShape()),
+}) satisfies ContractShape
+
+/**
+ * Describes the arguments of the `load` and `unload` built-ins — one `skill` name, non-empty and
+ * at most `BUILTIN_LIMITS.name` code points.
+ *
+ * @remarks
+ * The tool's door refuses a missing, empty, over-long, or extra member before the handler runs,
+ * and repairs a value that converts to a string without loss, such as a number. A value of white
+ * space alone passes the door; the handler refuses it as it refuses any name it cannot use.
+ */
+export const loadToolShape = objectShape({
+	skill: stringShape({
+		min: 1,
+		max: BUILTIN_LIMITS.name,
+		description: 'A skill name from the skills index',
+	}),
+}) satisfies ContractShape
+
+/**
+ * Describes the arguments of the `memo` built-in — one memo `name`, non-empty and at most
+ * `BUILTIN_LIMITS.name` code points.
+ *
+ * @remarks
+ * The tool's door refuses a missing, empty, over-long, or extra member before the handler runs,
+ * and repairs a value that converts to a string without loss, such as a number. A value of white
+ * space alone passes the door; the handler refuses it as it refuses any name it cannot use.
+ */
+export const memoToolShape = objectShape({
+	name: stringShape({
+		min: 1,
+		max: BUILTIN_LIMITS.name,
+		description: 'A memo name from the memos index',
+	}),
+}) satisfies ContractShape
+
+/**
+ * Describes the arguments of the `remember` built-in — a memo `name`, the one-line `description`
+ * the memos index shows, and the `content`, each non-empty and within its `BUILTIN_LIMITS` cap.
+ *
+ * @remarks
+ * The tool's door refuses a missing, empty, over-long, or extra member before the handler runs,
+ * and repairs a value that converts to a string without loss, such as a number. A value of white
+ * space alone passes the door; the handler refuses it as it refuses any name it cannot use.
+ */
+export const rememberToolShape = objectShape({
+	name: stringShape({
+		min: 1,
+		max: BUILTIN_LIMITS.name,
+		description: 'A memo name the host lists for you to write',
+	}),
+	description: stringShape({
+		min: 1,
+		max: BUILTIN_LIMITS.description,
+		description: 'One line the memos index shows',
+	}),
+	content: stringShape({
+		min: 1,
+		max: BUILTIN_LIMITS.content,
+		description: 'The fact, why it holds, and how to apply it',
+	}),
+}) satisfies ContractShape
+
+/**
+ * Describes the arguments of the `switch` built-in — one `workspace` id, non-empty and at most
+ * `BUILTIN_LIMITS.name` code points.
+ *
+ * @remarks
+ * The tool's door refuses a missing, empty, over-long, or extra member before the handler runs,
+ * and repairs a value that converts to a string without loss, such as a number. A value of white
+ * space alone passes the door; the handler refuses it as it refuses any name it cannot use.
+ */
+export const switchToolShape = objectShape({
+	workspace: stringShape({
+		min: 1,
+		max: BUILTIN_LIMITS.name,
+		description: 'A workspace id from the workspaces index',
+	}),
 }) satisfies ContractShape

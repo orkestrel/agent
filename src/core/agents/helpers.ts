@@ -1,12 +1,20 @@
 import type { Message } from '../types.js'
 import type { ProviderRequest } from '../providers/index.js'
 import type { ConversationInterface } from '../conversations/index.js'
-import type { ScopeInterface } from '../contexts/index.js'
 import type {
+	AgentContextInterface,
+	AgentDisclosure,
+	ScopeFilter,
+	ScopeInterface,
+	Skill,
+} from '../contexts/index.js'
+import type {
+	AgentBuiltin,
 	AgentChunk,
 	AgentFrame,
 	AgentInterface,
 	AgentJobInput,
+	AgentOptions,
 	AgentRegistryInterface,
 	AgentResult,
 	AgentRunResult,
@@ -23,14 +31,16 @@ import type {
 import type { BudgetInterface, TokenUsage } from '@orkestrel/budget'
 import type { AuditFault, JSONValue } from '@orkestrel/contract'
 import type { QueueContext, QueueOptions } from '@orkestrel/queue'
-import type { ToolCall, ToolDefinition, ToolResult } from '@orkestrel/tool'
+import type { ToolCall, ToolDefinition, ToolManagerInterface, ToolResult } from '@orkestrel/tool'
 import { isBudget, isBudgetAmount, isBudgetError } from '@orkestrel/budget'
 import {
+	admitValue,
 	describeFaults,
 	attempt,
 	canonicalStringify,
 	ContractError,
 	createContract,
+	isArray,
 	isBoolean,
 	isFiniteNumber,
 	isObject,
@@ -39,21 +49,34 @@ import {
 	parseJSON,
 	parseJSONValue,
 	preview,
+	schemaToParameters,
 	schemaToShape,
 } from '@orkestrel/contract'
 import {
 	AUTHORITY_NOTES,
+	BUILTIN_LIMITS,
+	BUILTIN_NOTES,
+	BUILTIN_TOOLS,
+	ARGUMENT_BLANK_PATTERN,
+	ARGUMENT_CONTROL_PATTERN,
 	DEFAULT_AGENT_LIMIT,
 	IMAGE_TOKEN_ESTIMATE,
 	JOB_REFUSAL_PREFIX,
 	MESSAGE_TOKEN_OVERHEAD,
 } from './constants.js'
-import { agentJobContract } from './contracts.js'
+import { agentDisclosureContract, agentJobContract, builtinToolContracts } from './contracts.js'
 import { AgentError, AgentJobError } from './errors.js'
 import { isConversation } from '../conversations/index.js'
 import { isScope } from '../contexts/index.js'
-import { isAuthorityDecision, isAuthorityVerdict } from './validators.js'
-import { estimateTokens, hasCalls, renderJSON } from '../helpers.js'
+import { isAgentBuiltin, isAuthorityDecision, isAuthorityVerdict } from './validators.js'
+import {
+	collectToolGroups,
+	estimateTokens,
+	filterAllowList,
+	findToolCall,
+	hasCalls,
+	renderJSON,
+} from '../helpers.js'
 import { isPositiveSafeInteger } from '../validators.js'
 
 /**
@@ -745,7 +768,7 @@ export function denyCall(call: ToolCall, reason: string | undefined): ToolResult
 export function renderArguments(value: Readonly<Record<string, unknown>>): string | undefined {
 	const rendered = attempt(() => canonicalStringify(value))
 	if (!rendered.success || rendered.value === undefined) return undefined
-	return rendered.value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, (match) =>
+	return rendered.value.replace(new RegExp(ARGUMENT_CONTROL_PATTERN.source, 'gu'), (match) =>
 		Array.from(
 			{ length: match.length },
 			(_, index) => `\\u${match.charCodeAt(index).toString(16).padStart(4, '0')}`,
@@ -1146,4 +1169,407 @@ export function extractQueueOptions(
 		...(retries === undefined ? {} : { retries }),
 		...(timeout === undefined ? {} : { timeout }),
 	}
+}
+
+/**
+ * Collects the definitions of the tools an agent serves itself, as a run advertises them.
+ *
+ * @remarks
+ * Each definition carries the name, description, and annotations `BUILTIN_TOOLS` declares and the
+ * parameters of the built-in's compiled contract in `builtinToolContracts`, in the order `builtins` lists them, so
+ * it equals the definition of the tool `createBuiltinTool` creates. A relay server lists these
+ * among its declared definitions to forward a page's built-ins. A name that is no built-in
+ * contributes nothing.
+ *
+ * @param options - The agent options whose `builtins` to project
+ * @returns The definitions, empty when `builtins` is absent
+ *
+ * @example
+ * ```ts
+ * collectBuiltinDefinitions({ builtins: ['load', 'unload'] }).map((definition) => definition.name) // ['load', 'unload']
+ * ```
+ */
+export function collectBuiltinDefinitions(
+	options: Pick<AgentOptions, 'builtins'>,
+): readonly ToolDefinition[] {
+	return (options.builtins ?? []).filter(isAgentBuiltin).map((name) => {
+		const declared = BUILTIN_TOOLS[name]
+		const parameters = schemaToParameters(builtinToolContracts[name].contract.schema)
+		return {
+			name,
+			description: declared.description,
+			...(parameters === undefined ? {} : { parameters }),
+			...(declared.annotations === undefined ? {} : { annotations: declared.annotations }),
+		}
+	})
+}
+
+/**
+ * Returns an agent's `builtins` option as an owned, frozen list, or throws a coded error before the
+ * agent is built.
+ *
+ * @remarks
+ * `undefined` returns an empty list. The option must be an array of distinct {@link AgentBuiltin}
+ * names; `unload` needs `load`, because only a loaded skill can be unloaded; and the host's tool
+ * manager may hold no tool under an enabled name, because the run serves that name itself.
+ *
+ * @param value - The `builtins` option
+ * @param tools - The host's tool manager
+ * @returns The enabled names, in the order given
+ * @throws {AgentError} Thrown when the option is not an array, names something that is no built-in, repeats a name, lists `unload` without `load`, or names a tool the manager holds (code `'BUILTIN'`)
+ *
+ * @example
+ * ```ts
+ * requireBuiltins(['load', 'unload'], createToolManager()) // ['load', 'unload']
+ * requireBuiltins(['unload'], createToolManager()) // throws AgentError ('BUILTIN')
+ * ```
+ */
+export function requireBuiltins(
+	value: unknown,
+	tools: Pick<ToolManagerInterface, 'tool'>,
+): readonly AgentBuiltin[] {
+	if (value === undefined) return Object.freeze([])
+	if (!isArray(value)) {
+		throw new AgentError('BUILTIN', `builtins must be an array; received ${preview(value)}`)
+	}
+	const names = [...value].filter(isAgentBuiltin)
+	if (names.length !== value.length) {
+		throw new AgentError(
+			'BUILTIN',
+			"builtins lists a name that is no built-in; list only 'load', 'unload', 'memo', 'remember', and 'switch'",
+			{ context: { received: preview(value) } },
+		)
+	}
+	if (new Set(names).size !== names.length) {
+		throw new AgentError('BUILTIN', 'builtins lists a name more than once', {
+			context: { builtins: names },
+		})
+	}
+	if (names.includes('unload') && !names.includes('load')) {
+		throw new AgentError('BUILTIN', "builtins lists 'unload' without 'load'; add 'load' too", {
+			context: { builtins: names },
+		})
+	}
+	const taken = names.filter((name) => tools.tool(name) !== undefined)
+	if (taken.length > 0) {
+		throw new AgentError(
+			'BUILTIN',
+			`the tool manager holds a tool under the built-in name ${taken.map((name) => `'${name}'`).join(', ')}; rename that tool or leave the name out of builtins`,
+			{ context: { builtins: names, taken } },
+		)
+	}
+	return Object.freeze(names)
+}
+
+/**
+ * Returns an owned, frozen copy of a `disclosure` option, or throws a coded error before the agent
+ * is built or the run starts; `undefined` passes through.
+ *
+ * @remarks
+ * The check is `agentDisclosureContract.is`, which refuses a missing `skills`, a member that is not
+ * a string, an extra member, and a `workspace` given as `undefined`. The error's `context` carries
+ * the option path, the limit `'AgentDisclosure'`, and a preview of the refused value, and its text
+ * carries the faults. A name the registries do not hold, or the ceiling does not admit, passes here
+ * and shows nothing.
+ *
+ * @param value - The `disclosure` option of an agent or a run, or `undefined`
+ * @returns The owned copy, or `undefined`
+ * @throws {ContractError} Thrown when `value` is defined and the contract refuses it (code `'placement'`)
+ *
+ * @example
+ * ```ts
+ * requireDisclosure({ skills: ['refunds'] }) // { skills: ['refunds'] }
+ * requireDisclosure({ skills: 'refunds' }) // throws ContractError ('placement')
+ * ```
+ */
+export function requireDisclosure(value: unknown): AgentDisclosure | undefined {
+	if (value === undefined) return undefined
+	if (!agentDisclosureContract.is(value)) {
+		// A contract error's context declares no faults, so they travel in the text it carries.
+		const faults = attempt(() =>
+			describeFaults(agentDisclosureContract.audit(value), agentDisclosureContract.schema),
+		)
+		throw new ContractError(
+			`Agent: disclosure must be an exact AgentDisclosure${faults.success ? `\n${faults.value}` : ''}`,
+			{
+				code: 'placement',
+				context: {
+					path: ['options', 'disclosure'],
+					limit: 'AgentDisclosure',
+					received: preview(value),
+				},
+			},
+		)
+	}
+	return Object.freeze({
+		skills: Object.freeze([...value.skills]),
+		...(value.workspace === undefined ? {} : { workspace: value.workspace }),
+	})
+}
+
+/**
+ * Returns the definitions a turn advertises from the allow-list, the registered skills, and the
+ * shown skills.
+ *
+ * @remarks
+ * The allow-list admits first, as `filterAllowList` does. When no admitted definition is named
+ * `load`, the admitted list returns as it is. Otherwise a tool any registered skill names is held
+ * back unless a shown skill names it too; `load` and `unload` are never held back. Holding a tool
+ * back is presentation, never authority: a call to it is denied as outside the turn's scope.
+ *
+ * @param definitions - The candidate definitions, in advertisement order
+ * @param names - The turn's `tools` allow-list (`undefined` ⇒ all, `[]` ⇒ none)
+ * @param skills - The registered skills whose `tools` gate
+ * @param shown - The names of the skills the turn shows
+ * @returns The advertised definitions, in candidate order
+ *
+ * @example
+ * ```ts
+ * const skills = [{ id: '1', name: 'refunds', description: 'Refunds', content: '', tools: ['refund'], files: [] }]
+ * filterAdvertisedTools([{ name: 'load' }, { name: 'refund' }], undefined, skills, []) // [{ name: 'load' }]
+ * filterAdvertisedTools([{ name: 'load' }, { name: 'refund' }], undefined, skills, ['refunds']).length // 2
+ * ```
+ */
+export function filterAdvertisedTools(
+	definitions: readonly ToolDefinition[],
+	names: readonly string[] | undefined,
+	skills: readonly Skill[],
+	shown: readonly string[],
+): readonly ToolDefinition[] {
+	const admitted = filterAllowList(names, definitions, (definition) => definition.name)
+	if (!admitted.some((definition) => definition.name === 'load')) return admitted
+	const held = new Set(skills.flatMap((skill) => skill.tools))
+	const visible = new Set(shown)
+	const open = new Set(
+		skills.filter((skill) => visible.has(skill.name)).flatMap((skill) => skill.tools),
+	)
+	return admitted.filter(
+		(definition) =>
+			definition.name === 'load' ||
+			definition.name === 'unload' ||
+			!held.has(definition.name) ||
+			open.has(definition.name),
+	)
+}
+
+/**
+ * Returns the refusal that names a subject and at most `BUILTIN_LIMITS.candidates` of the names a
+ * caller can use.
+ *
+ * @remarks
+ * The subject reads after "No", so it names what the caller may use, such as `'skill you can load'`.
+ * The text echoes no argument, so an absent name and a name outside the ceiling read byte for byte
+ * the same. Each name is JSON-encoded and capped by `preview`, in the order given. Past the cap one
+ * fixed sentence sends the reader to the index in its prompt.
+ *
+ * @param subject - What the caller may name, such as `'skill you can load'`
+ * @param names - The names the caller can use, in registry order
+ * @returns The refusal text
+ *
+ * @example
+ * ```ts
+ * describeCandidates('skill you can load', ['refunds', 'billing'])
+ * // 'No skill you can load has that name. Use one of: "refunds", "billing".'
+ * ```
+ */
+export function describeCandidates(subject: string, names: readonly string[]): string {
+	if (names.length === 0) return `No ${subject} has that name, and none is available now.`
+	const listed = names
+		.slice(0, BUILTIN_LIMITS.candidates)
+		.map((name) => preview(name))
+		.join(', ')
+	const rest =
+		names.length > BUILTIN_LIMITS.candidates ? ' The index in your prompt lists the others.' : ''
+	return `No ${subject} has that name. Use one of: ${listed}.${rest}`
+}
+
+/**
+ * Checks whether a text is one nonblank line: it holds a code point other than white space and
+ * default-ignorable code points (`ARGUMENT_BLANK_PATTERN`), and no control, format, line-separator, or
+ * paragraph-separator code point (`ARGUMENT_CONTROL_PATTERN`).
+ *
+ * @remarks
+ * The class is the one `renderArguments` encodes. A memo's name and description render in the memos
+ * index one line each, so `remember` refuses a value outside this check.
+ *
+ * @param text - The text to check
+ * @returns True if the text is one nonblank line; false otherwise
+ *
+ * @example
+ * ```ts
+ * matchesPlainLine('Reply tone') // true
+ * matchesPlainLine('Reply\ntone') // false
+ * matchesPlainLine('   ') // false
+ * ```
+ */
+export function matchesPlainLine(text: string): boolean {
+	return !ARGUMENT_BLANK_PATTERN.test(text) && !ARGUMENT_CONTROL_PATTERN.test(text)
+}
+
+/**
+ * Checks whether two ceilings carry the same lists of what a head renders: `instructions`,
+ * `skills`, `memos`, `files`, and `workspaces`.
+ *
+ * @remarks
+ * Each list compares by its members in order, and an absent list equals only an absent list,
+ * because `undefined` admits everything and `[]` admits nothing. The `tools` list is not compared:
+ * it reaches the tools block, never the head.
+ *
+ * @param left - One ceiling's lists
+ * @param right - The other ceiling's lists
+ * @returns True if every compared list matches; false otherwise
+ *
+ * @example
+ * ```ts
+ * matchesHeadLists({ skills: ['refunds'] }, { skills: ['refunds'], tools: [] }) // true
+ * matchesHeadLists({ skills: [] }, {}) // false
+ * ```
+ */
+export function matchesHeadLists(left: ScopeFilter, right: ScopeFilter): boolean {
+	return [
+		[left.instructions, right.instructions],
+		[left.skills, right.skills],
+		[left.memos, right.memos],
+		[left.files, right.files],
+		[left.workspaces, right.workspaces],
+	].every(([one, other]) =>
+		one === undefined || other === undefined
+			? one === other
+			: one.length === other.length && one.every((key, index) => key === other[index]),
+	)
+}
+
+/**
+ * Resolves what a turn shows: the given value, then the conversation's record, within the ceiling
+ * and the registries.
+ *
+ * @remarks
+ * The caller reads the ceiling, so a turn reads each scope list one time. The skills are the given value's, then
+ * those {@link collectDisclosure} reads from the conversation, without repeats, keeping each that
+ * the skill registry holds and the ceiling's `skills` list admits; an empty, repeated, unregistered,
+ * or excluded name shows nothing. The workspace is the conversation's last switch, else the given
+ * value's, kept only when the workspace registry holds it and the ceiling's `workspaces` list
+ * admits it. The record counts only the built-ins in `builtins`, as {@link collectDisclosure}
+ * states.
+ *
+ * @param context - The agent's context, whose scope, skills, and workspaces it reads
+ * @param conversation - The conversation whose record to read
+ * @param given - What the host shows, or `undefined`
+ * @param ceiling - The ceiling the turn read: the context scope intersected with the run scope
+ * @param builtins - The built-ins the run enables
+ * @returns The shown skills, in order, and the shown workspace when one is
+ *
+ * @example
+ * ```ts
+ * resolveDisclosure(agent.context, agent.context.messages, { skills: ['refunds', 'unknown'] }, {}, []) // { skills: ['refunds'] } when only refunds is registered
+ * ```
+ */
+export function resolveDisclosure(
+	context: AgentContextInterface,
+	conversation: Pick<ConversationInterface, 'sections' | 'messages'>,
+	given: AgentDisclosure | undefined,
+	ceiling: ScopeFilter,
+	builtins: readonly AgentBuiltin[],
+): AgentDisclosure {
+	const recorded = collectDisclosure(conversation, builtins)
+	const admitted = new Set(
+		filterAllowList(ceiling.skills, context.skills.skills(), (skill) => skill.name).map(
+			(skill) => skill.name,
+		),
+	)
+	const skills = [...new Set([...(given?.skills ?? []), ...recorded.skills])].filter((name) =>
+		admitted.has(name),
+	)
+	const workspace = recorded.workspace ?? given?.workspace
+	const shown =
+		workspace !== undefined &&
+		context.workspaces.workspace(workspace) !== undefined &&
+		filterAllowList(ceiling.workspaces, [workspace], (id) => id).length > 0
+	return shown ? { skills, workspace } : { skills }
+}
+
+/**
+ * Collects the loaded skills and the selected workspace a conversation's stored built-in calls
+ * record, counting only the built-ins a run enables.
+ *
+ * @remarks
+ * Pure. It reads each section's retained originals, oldest first, then the live tail, and pairs
+ * each tool message with the call that owns it through {@link collectToolGroups} and
+ * {@link findToolCall}. It then folds the pairs in message order: a `load` whose message content
+ * equals `BUILTIN_NOTES.loaded` adds its `skill`, an `unload` with `BUILTIN_NOTES.unloaded` removes
+ * it, and a `switch` with `BUILTIN_NOTES.switched` selects its `workspace`. Each call's arguments
+ * are admitted through the built-in's contract in `builtinToolContracts`, lossless repairs
+ * included, as its tool's door admits them, so a `{ skill: 1 }` the door repaired to `'1'` counts
+ * as `'1'`; arguments the contract refuses change nothing. A skill loaded again while shown keeps
+ * its place, and one loaded again after its unload goes last. Any other message and a denied or
+ * refused call change nothing. The result holds `workspace` only when a switch succeeded.
+ *
+ * A record counts only while its built-in is in `builtins`, so a host tool that holds a built-in's
+ * name on a run that does not enable it shows nothing; with none of `load`, `unload`, and `switch`
+ * enabled, nothing is read. A stored record cannot tell its writer, so one a host tool wrote under a
+ * built-in's name while that built-in was off counts once a run enables it, bounded by the registry
+ * and the ceiling as every record is.
+ *
+ * @param conversation - The conversation whose stored messages record the calls
+ * @param builtins - The built-ins the run enables
+ * @returns The skills in load order and the last selected workspace
+ *
+ * @example
+ * ```ts
+ * import { collectDisclosure, createConversation } from '@orkestrel/agent'
+ *
+ * collectDisclosure(createConversation(), ['load', 'unload']) // { skills: [] }
+ * ```
+ */
+export function collectDisclosure(
+	conversation: Pick<ConversationInterface, 'sections' | 'messages'>,
+	builtins: readonly AgentBuiltin[],
+): AgentDisclosure {
+	const counted = new Set<string>(
+		builtins.filter((name) => name === 'load' || name === 'unload' || name === 'switch'),
+	)
+	if (counted.size === 0) return { skills: [] }
+	const stored = [
+		...conversation.sections.flatMap((section) => section.messages),
+		...conversation.messages(),
+	]
+	// Groups come back in owner order, so the fold walks the stored order, not the groups.
+	const owners = new Map(
+		collectToolGroups(stored).flatMap((group) =>
+			group.flatMap((message): ReadonlyArray<readonly [Message, ToolCall]> => {
+				const call = findToolCall(group, message)
+				return call === undefined ? [] : [[message, call]]
+			}),
+		),
+	)
+	return stored.reduce<AgentDisclosure>(
+		(shown, message) => {
+			const call = owners.get(message)
+			const name = call?.name
+			if (call === undefined || !isAgentBuiltin(name) || !counted.has(name)) return shown
+			const note =
+				name === 'load'
+					? BUILTIN_NOTES.loaded
+					: name === 'unload'
+						? BUILTIN_NOTES.unloaded
+						: BUILTIN_NOTES.switched
+			if (message.content !== note) return shown
+			// The door's admission, its lossless repair included, decides what the call named.
+			const admitted = admitValue(builtinToolContracts[name].contract, { ...call.arguments })
+			const skill = admitted.success ? admitted.value.value['skill'] : undefined
+			const workspace = admitted.success ? admitted.value.value['workspace'] : undefined
+			if (name === 'load') {
+				return !isString(skill) || shown.skills.includes(skill)
+					? shown
+					: { ...shown, skills: [...shown.skills, skill] }
+			}
+			if (name === 'unload') {
+				return !isString(skill)
+					? shown
+					: { ...shown, skills: shown.skills.filter((one) => one !== skill) }
+			}
+			return !isString(workspace) ? shown : { skills: shown.skills, workspace }
+		},
+		{ skills: [] },
+	)
 }

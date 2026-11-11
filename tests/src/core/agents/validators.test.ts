@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { isAuthorityDecision } from '@src/core'
+import { isAgentBuiltin, isAuthorityDecision } from '@src/core'
 import { createHostileValues } from '@orkestrel/test'
+import { BUILTIN_NAMES } from '../../../setup.js'
 
 describe('isAuthorityDecision', () => {
 	it.each(['allow', 'ask', 'deny'] as const)(
@@ -79,6 +80,23 @@ describe('isAuthorityDecision', () => {
 		for (const [index, value] of createHostileValues().entries()) {
 			expect(() => isAuthorityDecision(value), `hostile value ${index}`).not.toThrow()
 			expect(isAuthorityDecision(value), `hostile value ${index}`).toBe(false)
+		}
+	})
+})
+
+describe('isAgentBuiltin', () => {
+	it.each(BUILTIN_NAMES)('accepts the %s built-in', (name) => {
+		expect(isAgentBuiltin(name)).toBe(true)
+	})
+
+	it.each(['task', 'open', 'LOAD', 'load ', ''])('refuses the name %j', (name) => {
+		expect(isAgentBuiltin(name)).toBe(false)
+	})
+
+	it('refuses every hostile value without throwing', () => {
+		for (const [index, value] of createHostileValues().entries()) {
+			expect(() => isAgentBuiltin(value), `hostile value ${index}`).not.toThrow()
+			expect(isAgentBuiltin(value), `hostile value ${index}`).toBe(false)
 		}
 	})
 })

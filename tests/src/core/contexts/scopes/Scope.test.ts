@@ -67,6 +67,29 @@ describe('Scope — construction', () => {
 	})
 })
 
+describe('Scope — the workspaces list', () => {
+	it('copies a supplied workspaces list in, and leaves it undefined when omitted', () => {
+		const workspaces = ['north']
+		const scope = new Scope({ name: 'r', workspaces })
+		workspaces.push('south')
+
+		expect(scope.workspaces).toEqual(['north'])
+		expect(new Scope({ name: 'open' }).workspaces).toBeUndefined()
+		expect(new Scope({ name: 'none', workspaces: [] }).workspaces).toEqual([])
+	})
+
+	it('narrow intersects workspaces and keeps an unconstrained side open', () => {
+		const scope = new Scope({ name: 'r', workspaces: ['north', 'south'] })
+
+		expect(scope.narrow({ workspaces: ['south', 'east'] }).workspaces).toEqual(['south'])
+		expect(scope.narrow({}).workspaces).toEqual(['north', 'south'])
+		expect(new Scope({ name: 'open' }).narrow({ workspaces: ['east'] }).workspaces).toEqual([
+			'east',
+		])
+		expect(new Scope({ name: 'open' }).narrow({}).workspaces).toBeUndefined()
+	})
+})
+
 describe('Scope — narrow (set-intersection)', () => {
 	it('intersects list ∩ list to the keys present in BOTH', () => {
 		const parent = new Scope({ name: 'p', tools: ['a', 'b', 'c'] })

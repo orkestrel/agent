@@ -7,7 +7,7 @@ import type {
 	SkillManagerOptions,
 } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import { isArray } from '@orkestrel/contract'
+import { ContractError, isArray, isString, preview } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { createFile } from '@orkestrel/workspace'
 import { removeEntries } from '../../helpers.js'
@@ -110,14 +110,27 @@ export class SkillManager implements SkillManagerInterface {
 	}
 
 	// Mint a skill and its files, store it by name (a same-name one is replaced in place), and emit
-	// `add` after the map changed, so a swallowed listener throw can't perturb it.
+	// `add` after the map changed, so a swallowed listener throw can't perturb it. A `tools` member that
+	// is neither absent nor an array of strings refuses before anything is stored.
 	#create(input: SkillInput): Skill {
+		// A JavaScript host can pass anything; a string would mint its characters as tool names. The
+		// member is read once and copied densely, so a hole reads as undefined and refuses, and a getter
+		// cannot answer the check with one value and the copy with another.
+		const given: unknown = input.tools
+		const tools: unknown = isArray(given) ? Array.from(given) : given
+		if (tools !== undefined && !(isArray(tools) && tools.every(isString))) {
+			throw new ContractError('SkillManager: tools must be an array of tool names', {
+				code: 'placement',
+				context: { path: ['input', 'tools'], limit: 'readonly string[]', received: preview(given) },
+			})
+		}
 		const skill: Skill = {
 			id: crypto.randomUUID(),
 			name: input.name,
 			description: input.description,
 			content: input.content,
 			files: (input.files ?? []).map((file) => createFile(file)),
+			tools: tools === undefined ? [] : tools,
 		}
 		this.#skills.set(skill.name, skill)
 		this.#emitter.emit('add', skill)

@@ -302,6 +302,7 @@ import type {
 	ChannelInterface,
 } from '@src/core'
 import type {
+	AgentDisclosure,
 	ClassifierOptions,
 	ClassifierOutcome,
 	ClassifierPhase,
@@ -366,6 +367,7 @@ import type {
 	ProviderStreamOptions,
 	Selection,
 	SelectionHandler,
+	SkillInput,
 	SkillManagerInterface,
 	ThinkingReplay,
 	ThinkSplitterInterface,
@@ -402,6 +404,15 @@ import {
 	AgentJudge,
 	AgentProvider,
 	agentFrameContract,
+	AUTHORITY_NOTES,
+	BUILTIN_LIMITS,
+	BUILTIN_NOTES,
+	isConversationSnapshot,
+	SCOPE_NOTE,
+	loadToolShape,
+	memoToolShape,
+	rememberToolShape,
+	switchToolShape,
 	CONVERSATION_RECAP_PREFIX,
 	CONVERSATION_ROLES,
 	DEFAULT_AGENT_LIMIT,
@@ -1465,6 +1476,149 @@ export const AGENT_JOB_CASES = [
 	{ name: 'non-finite limit', value: { provider: 'local', limit: Number.NaN }, admitted: false },
 	{ name: 'host child', value: { provider: 'local', children: [new Date(0)] }, admitted: false },
 ]
+
+/** Lists authored disclosure admissions and refusals. */
+export const AGENT_DISCLOSURE_CASES = Object.freeze([
+	{ name: 'skills alone', value: { skills: ['refunds'] }, admitted: true },
+	{ name: 'no skill', value: { skills: [] }, admitted: true },
+	{ name: 'a workspace', value: { skills: ['refunds'], workspace: 'orders' }, admitted: true },
+	{ name: 'missing skills', value: { workspace: 'orders' }, admitted: false },
+	{ name: 'skills as text', value: { skills: 'refunds' }, admitted: false },
+	{ name: 'numeric skill', value: { skills: [1] }, admitted: false },
+	{ name: 'numeric workspace', value: { skills: [], workspace: 1 }, admitted: false },
+	{ name: 'extra member', value: { skills: [], tools: ['search'] }, admitted: false },
+	{ name: 'explicit absence', value: { skills: [], workspace: undefined }, admitted: false },
+	{ name: 'host instance', value: new Date(0), admitted: false },
+])
+
+/** Pairs a built-in's argument shape with one authored argument record and whether it admits it. */
+export interface BuiltinArgumentCase {
+	readonly name: string
+	readonly shape: ContractShape
+	readonly value: unknown
+	readonly admitted: boolean
+}
+
+/** Lists authored built-in arguments at and past each `BUILTIN_LIMITS` cap, missing, and undeclared. */
+export const BUILTIN_ARGUMENT_CASES = Object.freeze<readonly BuiltinArgumentCase[]>([
+	{ name: 'load a skill', shape: loadToolShape, value: { skill: 'refunds' }, admitted: true },
+	{
+		name: 'load a name at the cap',
+		shape: loadToolShape,
+		value: { skill: 'x'.repeat(BUILTIN_LIMITS.name) },
+		admitted: true,
+	},
+	{
+		name: 'load a name past the cap',
+		shape: loadToolShape,
+		value: { skill: 'x'.repeat(BUILTIN_LIMITS.name + 1) },
+		admitted: false,
+	},
+	{ name: 'load a blank name', shape: loadToolShape, value: { skill: '' }, admitted: false },
+	{ name: 'load no name', shape: loadToolShape, value: {}, admitted: false },
+	{ name: 'load a numeric name', shape: loadToolShape, value: { skill: 1 }, admitted: false },
+	{
+		name: 'load an undeclared member',
+		shape: loadToolShape,
+		value: { skill: 'refunds', force: true },
+		admitted: false,
+	},
+	{ name: 'read a memo', shape: memoToolShape, value: { name: 'tone' }, admitted: true },
+	{
+		name: 'read a memo name past the cap',
+		shape: memoToolShape,
+		value: { name: 'x'.repeat(BUILTIN_LIMITS.name + 1) },
+		admitted: false,
+	},
+	{ name: 'read a blank memo name', shape: memoToolShape, value: { name: '' }, admitted: false },
+	{
+		name: 'read a memo with an undeclared member',
+		shape: memoToolShape,
+		value: { name: 'tone', content: 'Be brief.' },
+		admitted: false,
+	},
+	{
+		name: 'remember a memo',
+		shape: rememberToolShape,
+		value: { name: 'tone', description: 'Reply tone', content: 'Be brief.' },
+		admitted: true,
+	},
+	{
+		name: 'remember every member at its cap',
+		shape: rememberToolShape,
+		value: {
+			name: 'x'.repeat(BUILTIN_LIMITS.name),
+			description: 'x'.repeat(BUILTIN_LIMITS.description),
+			content: 'x'.repeat(BUILTIN_LIMITS.content),
+		},
+		admitted: true,
+	},
+	{
+		name: 'remember a name past the cap',
+		shape: rememberToolShape,
+		value: { name: 'x'.repeat(BUILTIN_LIMITS.name + 1), description: 'Tone', content: 'Brief.' },
+		admitted: false,
+	},
+	{
+		name: 'remember a description past the cap',
+		shape: rememberToolShape,
+		value: {
+			name: 'tone',
+			description: 'x'.repeat(BUILTIN_LIMITS.description + 1),
+			content: 'Brief.',
+		},
+		admitted: false,
+	},
+	{
+		name: 'remember a content past the cap',
+		shape: rememberToolShape,
+		value: { name: 'tone', description: 'Tone', content: 'x'.repeat(BUILTIN_LIMITS.content + 1) },
+		admitted: false,
+	},
+	{
+		name: 'remember a blank description',
+		shape: rememberToolShape,
+		value: { name: 'tone', description: '', content: 'Be brief.' },
+		admitted: false,
+	},
+	{
+		name: 'remember a blank content',
+		shape: rememberToolShape,
+		value: { name: 'tone', description: 'Tone', content: '' },
+		admitted: false,
+	},
+	{
+		name: 'remember no content',
+		shape: rememberToolShape,
+		value: { name: 'tone', description: 'Tone' },
+		admitted: false,
+	},
+	{
+		name: 'remember an undeclared member',
+		shape: rememberToolShape,
+		value: { name: 'tone', description: 'Tone', content: 'Brief.', origin: 'c1' },
+		admitted: false,
+	},
+	{
+		name: 'switch a workspace',
+		shape: switchToolShape,
+		value: { workspace: 'orders' },
+		admitted: true,
+	},
+	{
+		name: 'switch an id past the cap',
+		shape: switchToolShape,
+		value: { workspace: 'x'.repeat(BUILTIN_LIMITS.name + 1) },
+		admitted: false,
+	},
+	{ name: 'switch a blank id', shape: switchToolShape, value: { workspace: '' }, admitted: false },
+	{
+		name: 'switch with an undeclared member',
+		shape: switchToolShape,
+		value: { workspace: 'orders', files: [] },
+		admitted: false,
+	},
+])
 
 /** Supplies a repeated tool turn that exhausts the job budget. */
 export const PARTIAL_TURNS = Object.freeze([
@@ -10963,6 +11117,7 @@ export const PARTICIPLE_KEPT = Object.freeze({
 		'listing',
 		'mapping',
 		'timing',
+		'ceiling',
 	],
 	// A name that mirrors an external field: Ollama `message.thinking`, the Node `encoding` option.
 	mirror: ['encoding', 'thinking'],
@@ -11129,4 +11284,1221 @@ export function scanParticipleNames(
 			return [{ path: source.path, line, name, word: stem }]
 		})
 	})
+}
+
+// ── Unit 2B: the disclosure derivation table and its seeded conversations ────
+//
+// Each row is a conversation built directly as stored messages, never by driving turns, with the
+// value `collectDisclosure` must derive from it, written by hand from claim 2.3. The rows double
+// as the seeded disclosure states the agent loop's tests start from.
+
+/** Holds a refusal a built-in returns, which equals no success note. */
+export const DISCLOSURE_REFUSAL = 'No skill is named that. Loadable skills: billing, claims.'
+
+/** Pairs a conversation stored as messages with the disclosure its built-in calls record. */
+export interface DisclosureCase {
+	readonly name: string
+	readonly messages: readonly MessageInput[]
+	readonly expected: AgentDisclosure
+}
+
+/** Selects how a seeded conversation folds: one cumulative section, or a cap on its sections. */
+export interface DisclosureFoldOptions {
+	readonly cumulative?: boolean
+	readonly sections?: number
+}
+
+/** Pairs exchanges folded one by one, then a live tail, with the disclosure they record. */
+export interface DisclosureFoldCase {
+	readonly name: string
+	readonly exchanges: ReadonlyArray<readonly MessageInput[]>
+	readonly tail: readonly MessageInput[]
+	readonly options: DisclosureFoldOptions
+	readonly expected: AgentDisclosure
+}
+
+/** Holds a folded seeded conversation and the `collapse` events its folds emitted. */
+export interface DisclosureFoldResult {
+	readonly conversation: ConversationInterface
+	readonly collapsed: number
+}
+
+/**
+ * Scripts a run whose host tools named `load`, `unload`, and `memo` stand in for the built-ins, so
+ * the loop itself stores the messages: `scope` lists the run's tools, `verdict` is the authority's
+ * fallback, `refuse` names the skills the `load` handler refuses, and `abort` names where the run's
+ * signal aborts.
+ */
+export interface DisclosureLoopCase {
+	readonly name: string
+	readonly turns: readonly ProviderResult[]
+	readonly expected: AgentDisclosure
+	readonly scope?: readonly string[]
+	readonly verdict?: 'allow' | 'deny'
+	readonly refuse?: readonly string[]
+	readonly abort?: 'handler' | 'evaluate'
+}
+
+/** Holds what a scripted disclosure run stored and what its handlers recorded as succeeded. */
+export interface DisclosureLoopResult {
+	readonly conversation: ConversationInterface
+	readonly recorded: AgentDisclosure
+	readonly contents: readonly string[]
+}
+
+/**
+ * Builds one model turn as stored messages: the assistant message with its calls, then one tool
+ * message per content.
+ *
+ * @param calls - The calls the assistant message carries
+ * @param contents - The tool message contents, in call order
+ * @param paired - If `true`, each tool message carries its call's id; if `false`, none does
+ * @returns The turn's messages
+ */
+export function buildToolTurn(
+	calls: readonly ToolCall[],
+	contents: readonly string[],
+	paired = true,
+): readonly MessageInput[] {
+	return [
+		{ role: 'assistant', content: '', calls },
+		...contents.map((content, at): MessageInput => {
+			const id = calls[at]?.id
+			return paired && id !== undefined
+				? { role: 'tool', content, call: id }
+				: { role: 'tool', content }
+		}),
+	]
+}
+
+/**
+ * Builds one exchange as stored messages: the request, each turn, and a closing answer.
+ *
+ * @param request - The user request
+ * @param turns - The turns {@link buildToolTurn} built
+ * @returns The exchange's messages
+ */
+export function buildToolExchange(
+	request: string,
+	turns: ReadonlyArray<readonly MessageInput[]>,
+): readonly MessageInput[] {
+	return [
+		{ role: 'user', content: request },
+		...turns.flat(),
+		{ role: 'assistant', content: 'done' },
+	]
+}
+
+/** Seeds an exchange whose `load` of `billing` succeeded. */
+export const DISCLOSURE_LOAD_BILLING = buildToolExchange('open billing', [
+	buildToolTurn(
+		[createToolCall({ id: 'a1', name: 'load', arguments: { skill: 'billing' } })],
+		[BUILTIN_NOTES.loaded],
+	),
+])
+
+/** Seeds an exchange whose `load` of `claims` succeeded. */
+export const DISCLOSURE_LOAD_CLAIMS = buildToolExchange('open claims', [
+	buildToolTurn(
+		[createToolCall({ id: 'b1', name: 'load', arguments: { skill: 'claims' } })],
+		[BUILTIN_NOTES.loaded],
+	),
+])
+
+/** Seeds an exchange whose `unload` of `billing` succeeded. */
+export const DISCLOSURE_UNLOAD_BILLING = buildToolExchange('close billing', [
+	buildToolTurn(
+		[createToolCall({ id: 'a2', name: 'unload', arguments: { skill: 'billing' } })],
+		[BUILTIN_NOTES.unloaded],
+	),
+])
+
+/** Seeds an exchange whose `unload` of `claims` succeeded. */
+export const DISCLOSURE_UNLOAD_CLAIMS = buildToolExchange('close claims', [
+	buildToolTurn(
+		[createToolCall({ id: 'b2', name: 'unload', arguments: { skill: 'claims' } })],
+		[BUILTIN_NOTES.unloaded],
+	),
+])
+
+/** Seeds an exchange whose `switch` to the `north` workspace succeeded. */
+export const DISCLOSURE_SWITCH_NORTH = buildToolExchange('use north', [
+	buildToolTurn(
+		[createToolCall({ id: 'w1', name: 'switch', arguments: { workspace: 'north' } })],
+		[BUILTIN_NOTES.switched],
+	),
+])
+
+/**
+ * Seeds a conversation that loaded `billing` and `claims`, unloaded `billing`, and loaded it again,
+ * so it shows `claims` then `billing`.
+ */
+export const DISCLOSURE_RELOADED: DisclosureCase = Object.freeze({
+	name: 'a load after its unload moves to the end',
+	messages: [
+		...DISCLOSURE_LOAD_BILLING,
+		...DISCLOSURE_LOAD_CLAIMS,
+		...DISCLOSURE_UNLOAD_BILLING,
+		...DISCLOSURE_LOAD_BILLING,
+	],
+	expected: { skills: ['claims', 'billing'] },
+})
+
+/** Seeds a conversation that switched to `north`, then to `south`, and then failed to switch to `east`. */
+export const DISCLOSURE_SWITCHED: DisclosureCase = Object.freeze({
+	name: 'the last successful switch selects the workspace',
+	messages: buildToolExchange('go', [
+		buildToolTurn(
+			[createToolCall({ id: 'w1', name: 'switch', arguments: { workspace: 'north' } })],
+			[BUILTIN_NOTES.switched],
+		),
+		buildToolTurn(
+			[createToolCall({ id: 'w2', name: 'switch', arguments: { workspace: 'south' } })],
+			[BUILTIN_NOTES.switched],
+		),
+		buildToolTurn(
+			[createToolCall({ id: 'w3', name: 'switch', arguments: { workspace: 'east' } })],
+			[DISCLOSURE_REFUSAL],
+		),
+	]),
+	expected: { skills: [], workspace: 'south' },
+})
+
+/** Seeds a conversation whose `remember` of the `tone` memo succeeded. */
+export const DISCLOSURE_REMEMBERED: DisclosureCase = Object.freeze({
+	name: 'a remembered memo shows no skill',
+	messages: buildToolExchange('keep the tone', [
+		buildToolTurn(
+			[
+				createToolCall({
+					id: 'r1',
+					name: 'remember',
+					arguments: { name: 'tone', description: 'Reply tone', content: 'Be brief.' },
+				}),
+			],
+			[BUILTIN_NOTES.remembered],
+		),
+	]),
+	expected: { skills: [] },
+})
+
+/** Lists the stored conversations of the derivation table, each with the disclosure it records. */
+export const DISCLOSURE_CASES = Object.freeze<readonly DisclosureCase[]>([
+	{
+		name: 'loads in order',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[
+					createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } }),
+					createToolCall({ id: 'c2', name: 'load', arguments: { skill: 'claims' } }),
+				],
+				[BUILTIN_NOTES.loaded, BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: ['billing', 'claims'] },
+	},
+	{
+		name: 'a later unload removes',
+		messages: [...DISCLOSURE_LOAD_BILLING, ...DISCLOSURE_LOAD_CLAIMS, ...DISCLOSURE_UNLOAD_BILLING],
+		expected: { skills: ['claims'] },
+	},
+	DISCLOSURE_RELOADED,
+	{
+		name: 'a repeated load keeps its first position',
+		messages: [...DISCLOSURE_LOAD_BILLING, ...DISCLOSURE_LOAD_CLAIMS, ...DISCLOSURE_LOAD_BILLING],
+		expected: { skills: ['billing', 'claims'] },
+	},
+	{
+		name: 'an unload of a skill never loaded changes nothing',
+		messages: [...DISCLOSURE_LOAD_BILLING, ...DISCLOSURE_UNLOAD_CLAIMS],
+		expected: { skills: ['billing'] },
+	},
+	DISCLOSURE_SWITCHED,
+	DISCLOSURE_REMEMBERED,
+	{
+		name: 'a scope-denied load shows nothing',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+				[`"load" did not run: ${SCOPE_NOTE}`],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'an authority-denied load shows nothing',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+				[`"load" did not run: ${AUTHORITY_NOTES.denied}`],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'a refused load shows nothing',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+				[DISCLOSURE_REFUSAL],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'a failed unload keeps the skill',
+		messages: [
+			...DISCLOSURE_LOAD_BILLING,
+			...buildToolExchange('close', [
+				buildToolTurn(
+					[createToolCall({ id: 'c9', name: 'unload', arguments: { skill: 'billing' } })],
+					[DISCLOSURE_REFUSAL],
+				),
+			]),
+		],
+		expected: { skills: ['billing'] },
+	},
+	{
+		name: 'a host tool returning the note under another name shows nothing',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[createToolCall({ id: 'c1', name: 'echo', arguments: { skill: 'billing' } })],
+				[BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'a memo body equal to a note shows nothing',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[createToolCall({ id: 'c1', name: 'memo', arguments: { name: 'billing' } })],
+				[BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'repeated ids pair by position: a refused load, then a memo holding the note',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[
+					createToolCall({ id: 'c', name: 'load', arguments: { skill: 'billing' } }),
+					createToolCall({ id: 'c', name: 'memo', arguments: { name: 'trap' } }),
+				],
+				[DISCLOSURE_REFUSAL, BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'repeated ids pair by position: a memo, then a load',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[
+					createToolCall({ id: 'c', name: 'memo', arguments: { name: 'notes' } }),
+					createToolCall({ id: 'c', name: 'load', arguments: { skill: 'billing' } }),
+				],
+				['memo body', BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: ['billing'] },
+	},
+	{
+		name: 'repeated ids across turns pair within each turn',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[createToolCall({ id: 'call_0', name: 'load', arguments: { skill: 'billing' } })],
+				[DISCLOSURE_REFUSAL],
+			),
+			buildToolTurn(
+				[createToolCall({ id: 'call_0', name: 'load', arguments: { skill: 'claims' } })],
+				[BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: ['claims'] },
+	},
+	{
+		name: 'results with no call member pair by position',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[
+					createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } }),
+					createToolCall({ id: 'c2', name: 'load', arguments: { skill: 'claims' } }),
+				],
+				[BUILTIN_NOTES.loaded, DISCLOSURE_REFUSAL],
+				false,
+			),
+		]),
+		expected: { skills: ['billing'] },
+	},
+	{
+		name: 'a tool message whose id no call holds shows nothing',
+		messages: [
+			{ role: 'user', content: 'go' },
+			{ role: 'tool', content: BUILTIN_NOTES.loaded, call: 'ghost' },
+		],
+		expected: { skills: [] },
+	},
+	{
+		name: 'a tool message with no call after a request has no owner',
+		messages: [
+			{ role: 'user', content: 'go' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+			},
+			{ role: 'user', content: 'again' },
+			{ role: 'tool', content: BUILTIN_NOTES.loaded },
+		],
+		expected: { skills: [] },
+	},
+	{
+		name: 'a call with no stored tool message shows nothing',
+		messages: [
+			{ role: 'user', content: 'go' },
+			{
+				role: 'assistant',
+				content: '',
+				calls: [createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+			},
+			{ role: 'user', content: 'next' },
+		],
+		expected: { skills: [] },
+	},
+	{
+		name: 'a skill argument the door refuses, or none, shows nothing',
+		messages: buildToolExchange('go', [
+			buildToolTurn(
+				[
+					createToolCall({ id: 'c1', name: 'load', arguments: { skill: { name: 'billing' } } }),
+					createToolCall({ id: 'c2', name: 'load', arguments: {} }),
+				],
+				[BUILTIN_NOTES.loaded, BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'a second tool message answering an already-answered call pairs with it',
+		messages: [
+			...buildToolExchange('go', [
+				buildToolTurn(
+					[createToolCall({ id: 'c9', name: 'load', arguments: { skill: 'billing' } })],
+					[DISCLOSURE_REFUSAL],
+				),
+			]),
+			{ role: 'user', content: 'later' },
+			{ role: 'assistant', content: 'text' },
+			{ role: 'tool', content: BUILTIN_NOTES.loaded, call: 'c9' },
+		],
+		expected: { skills: ['billing'] },
+	},
+	{
+		name: 'a late answer folds where it is stored, after a later unload',
+		messages: [
+			...buildToolExchange('go', [
+				buildToolTurn(
+					[createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+					[DISCLOSURE_REFUSAL],
+				),
+				buildToolTurn(
+					[createToolCall({ id: 'c2', name: 'unload', arguments: { skill: 'billing' } })],
+					[BUILTIN_NOTES.unloaded],
+				),
+			]),
+			{ role: 'tool', content: BUILTIN_NOTES.loaded, call: 'c1' },
+		],
+		expected: { skills: ['billing'] },
+	},
+])
+
+/** Lists the folded conversations of the derivation table, each with the disclosure it records. */
+export const DISCLOSURE_FOLD_CASES = Object.freeze<readonly DisclosureFoldCase[]>([
+	{
+		name: 'a fold keeps a load in its section',
+		exchanges: [DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS],
+		tail: DISCLOSURE_UNLOAD_BILLING,
+		options: {},
+		expected: { skills: ['claims'] },
+	},
+	{
+		name: 'a cumulative fold keeps its originals',
+		exchanges: [DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS, DISCLOSURE_UNLOAD_CLAIMS],
+		tail: [],
+		options: { cumulative: true },
+		expected: { skills: ['billing'] },
+	},
+	{
+		name: 'a capped merge keeps its originals',
+		exchanges: [
+			DISCLOSURE_LOAD_BILLING,
+			DISCLOSURE_LOAD_CLAIMS,
+			DISCLOSURE_UNLOAD_BILLING,
+			DISCLOSURE_LOAD_BILLING,
+		],
+		tail: [],
+		options: { sections: 2 },
+		expected: { skills: ['claims', 'billing'] },
+	},
+])
+
+/** Declares the `skill` argument a host stand-in for `load` and `unload` takes, so its handler runs. */
+export const DISCLOSURE_SKILL_PARAMETERS = Object.freeze({
+	type: 'object',
+	properties: { skill: { type: 'string' } },
+	required: ['skill'],
+})
+
+/** Declares the `name` argument a host stand-in for `memo` takes, so its handler runs. */
+export const DISCLOSURE_MEMO_PARAMETERS = Object.freeze({
+	type: 'object',
+	properties: { name: { type: 'string' } },
+	required: ['name'],
+})
+
+/** Lists the runs whose stored messages the derivation reads as the loop wrote them. */
+export const DISCLOSURE_LOOP_CASES = Object.freeze<readonly DisclosureLoopCase[]>([
+	{
+		name: 'loads and an unload across turns',
+		turns: [
+			{
+				content: '',
+				tools: [
+					createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } }),
+					createToolCall({ id: 'c2', name: 'load', arguments: { skill: 'claims' } }),
+				],
+			},
+			{
+				content: '',
+				tools: [createToolCall({ id: 'c3', name: 'unload', arguments: { skill: 'billing' } })],
+			},
+			{ content: 'done' },
+		],
+		expected: { skills: ['claims'] },
+	},
+	{
+		name: 'a load outside the scope',
+		turns: [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+			},
+			{ content: 'done' },
+		],
+		scope: ['memo'],
+		expected: { skills: [] },
+	},
+	{
+		name: 'a load the authority denies',
+		turns: [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+			},
+			{ content: 'done' },
+		],
+		verdict: 'deny',
+		expected: { skills: [] },
+	},
+	{
+		name: 'a load the handler refuses',
+		turns: [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+			},
+			{ content: 'done' },
+		],
+		refuse: ['billing'],
+		expected: { skills: [] },
+	},
+	{
+		name: 'repeated ids: a memo returning the note, then a refused load',
+		turns: [
+			{
+				content: '',
+				tools: [
+					createToolCall({ id: 'c', name: 'memo', arguments: { name: 'trap' } }),
+					createToolCall({ id: 'c', name: 'load', arguments: { skill: 'billing' } }),
+				],
+			},
+			{ content: 'done' },
+		],
+		refuse: ['billing'],
+		expected: { skills: [] },
+	},
+	{
+		name: 'an abort inside the first load of a batch',
+		turns: [
+			{
+				content: '',
+				tools: [
+					createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } }),
+					createToolCall({ id: 'c2', name: 'load', arguments: { skill: 'claims' } }),
+				],
+			},
+			{ content: 'done' },
+		],
+		abort: 'handler',
+		expected: { skills: ['billing'] },
+	},
+	{
+		name: 'an abort before dispatch',
+		turns: [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } })],
+			},
+			{ content: 'done' },
+		],
+		abort: 'evaluate',
+		expected: { skills: [] },
+	},
+])
+
+/**
+ * Creates a conversation that holds the given messages, stored directly.
+ *
+ * @param messages - The messages to store, in order
+ * @returns The conversation
+ */
+export function createStoredConversation(messages: readonly MessageInput[]): ConversationInterface {
+	const conversation = createConversation()
+	conversation.add(messages)
+	return conversation
+}
+
+/**
+ * Creates a conversation that stores each exchange and folds it with the stub summarizer, then
+ * stores the tail unfolded.
+ *
+ * @param exchanges - The exchanges folded one by one
+ * @param tail - The messages left in the live tail
+ * @param options - The fold's options
+ * @returns The conversation and the `collapse` events its folds emitted
+ */
+export async function createFoldedConversation(
+	exchanges: ReadonlyArray<readonly MessageInput[]>,
+	tail: readonly MessageInput[],
+	options: DisclosureFoldOptions,
+): Promise<DisclosureFoldResult> {
+	const conversation = createConversation({
+		summarize: createStubSummarizer().summarize,
+		...options,
+	})
+	const collapsed = createRecorder<[unknown]>()
+	conversation.emitter.on('collapse', collapsed.handler)
+	for (const exchange of exchanges) {
+		conversation.add([...exchange, { role: 'user', content: 'next' }])
+		await conversation.compact({ keep: 0 })
+	}
+	conversation.add(tail)
+	return { conversation, collapsed: collapsed.count }
+}
+
+/**
+ * Creates a conversation restored from another's snapshot after a JSON round trip, as a store
+ * returns it.
+ *
+ * @param conversation - The conversation to snapshot
+ * @returns The restored conversation
+ * @throws Error Thrown when the round-tripped snapshot is not a conversation snapshot
+ */
+export function restoreConversation(conversation: ConversationInterface): ConversationInterface {
+	const stored: unknown = JSON.parse(JSON.stringify(conversation.snapshot()))
+	if (!isConversationSnapshot(stored)) throw new Error('the stored snapshot is not a snapshot')
+	return createConversation({ snapshot: stored })
+}
+
+/**
+ * Creates an authority whose `evaluate` aborts a controller and allows the call, so a run aborts
+ * after its decision and before dispatch.
+ *
+ * @param controller - The controller the decision aborts
+ * @returns The authority
+ */
+export function createAbortedAuthority(controller: AbortController): AuthorityInterface {
+	return {
+		evaluate: () => {
+			controller.abort()
+			return { verdict: 'allow', zone: 'test' }
+		},
+	}
+}
+
+/**
+ * Runs one scripted disclosure case on a real agent whose host tools stand in for the built-ins,
+ * and returns what the loop stored beside what the handlers recorded as succeeded.
+ *
+ * @param row - The scripted case
+ * @returns The run's conversation, the handlers' record, and every stored tool message content
+ */
+export async function executeDisclosureLoop(
+	row: DisclosureLoopCase,
+): Promise<DisclosureLoopResult> {
+	const controller = new AbortController()
+	const succeeded = createRecorder<[name: string, skill: string]>()
+	const tools = createToolManager()
+	tools.add([
+		createTool({
+			name: 'load',
+			parameters: DISCLOSURE_SKILL_PARAMETERS,
+			execute: (input) => {
+				const skill = String(input['skill'])
+				if (row.abort === 'handler') controller.abort()
+				if (row.refuse?.includes(skill) === true) throw new Error(DISCLOSURE_REFUSAL)
+				succeeded.handler('load', skill)
+				return BUILTIN_NOTES.loaded
+			},
+		}),
+		createTool({
+			name: 'unload',
+			parameters: DISCLOSURE_SKILL_PARAMETERS,
+			execute: (input) => {
+				succeeded.handler('unload', String(input['skill']))
+				return BUILTIN_NOTES.unloaded
+			},
+		}),
+		createTool({
+			name: 'memo',
+			parameters: DISCLOSURE_MEMO_PARAMETERS,
+			execute: () => BUILTIN_NOTES.loaded,
+		}),
+	])
+	const agent = createAgent(createScriptedProvider(row.turns, AGENT_SCRIPT_OPTIONS), {
+		tools,
+		authority:
+			row.abort === 'evaluate'
+				? createAbortedAuthority(controller)
+				: createAuthority({ fallback: { zone: 'test', verdict: row.verdict ?? 'allow' } }),
+		...(row.scope === undefined ? {} : { scope: createScope({ name: 'loop', tools: row.scope }) }),
+	})
+	agent.context.messages.add({ role: 'user', content: 'go' })
+	const run = agent.stream({ signal: controller.signal })
+	await Promise.allSettled([collect(run.events), run.result])
+	const conversation = agent.context.messages
+	const skills = succeeded.calls.reduce<readonly string[]>(
+		(shown, [name, skill]) =>
+			name !== 'load'
+				? shown.filter((one) => one !== skill)
+				: shown.includes(skill)
+					? shown
+					: [...shown, skill],
+		[],
+	)
+	return {
+		conversation,
+		recorded: { skills },
+		contents: conversation
+			.messages()
+			.flatMap((message) => (message.role === 'tool' ? [message.content] : [])),
+	}
+}
+
+/**
+ * Creates a conversation of `size` stored messages for timing `collectDisclosure`: half folded
+ * into sections and half in the live tail. Each exchange of six messages carries a request, one
+ * turn of a built-in call, a `memo` call whose body equals a note, and a lookup, their results, and
+ * an answer.
+ *
+ * @param size - The stored message count, a multiple of 8 so each half folds in four equal parts
+ * @param unique - If `true`, every call id is distinct; if `false`, each turn repeats its ids
+ * @returns The conversation
+ */
+export async function createDisclosureScale(
+	size: number,
+	unique: boolean,
+): Promise<ConversationInterface> {
+	const skills = ['billing', 'claims', 'policies', 'renewals', 'contacts', 'calendar']
+	const lookup = JSON.stringify({
+		account: 'Hartley',
+		renews: '2026-12-01',
+		notes: 'x'.repeat(400),
+	})
+	const inputs = Array.from(
+		{ length: Math.ceil(size / 6) },
+		(_unused, index): readonly MessageInput[] => {
+			const skill = skills[index % skills.length] ?? 'billing'
+			const name = index % 5 === 4 ? 'unload' : index % 7 === 6 ? 'switch' : 'load'
+			const [first = '', second = '', third = ''] = [0, 1, 2].map((slot) =>
+				unique ? `call_${index}_${slot}` : `call_${slot}`,
+			)
+			const note =
+				name === 'load'
+					? BUILTIN_NOTES.loaded
+					: name === 'unload'
+						? BUILTIN_NOTES.unloaded
+						: BUILTIN_NOTES.switched
+			return [
+				{ role: 'user', content: 'Find the renewal date for the Hartley account. '.repeat(3) },
+				{
+					role: 'assistant',
+					content: '',
+					calls: [
+						createToolCall({
+							id: first,
+							name,
+							arguments: name === 'switch' ? { workspace: skill } : { skill },
+						}),
+						createToolCall({ id: second, name: 'memo', arguments: { name: 'hartley' } }),
+						createToolCall({ id: third, name: 'lookup', arguments: { account: 'Hartley' } }),
+					],
+				},
+				{ role: 'tool', content: note, call: first },
+				{ role: 'tool', content: BUILTIN_NOTES.loaded, call: second },
+				{ role: 'tool', content: lookup, call: third },
+				{ role: 'assistant', content: 'The Hartley policy renews next month. '.repeat(16) },
+			]
+		},
+	)
+		.flat()
+		.slice(0, size)
+	const conversation = createConversation({
+		summarize: createStubSummarizer().summarize,
+		sections: 8,
+	})
+	const part = size / 8
+	for (const at of [0, 1, 2, 3]) {
+		conversation.add(inputs.slice(at * part, (at + 1) * part))
+		await conversation.compact({ keep: 0 })
+	}
+	conversation.add(inputs.slice(size / 2))
+	return conversation
+}
+
+/**
+ * Seeds a context for the disclosure build: a system prompt; the skills `billing`, `claims`, and
+ * `blank`, whose content is whitespace, each naming one tool; a memo; the workspaces `north`,
+ * active, holding a text file and an image, and `south`, holding a text file; and one user turn.
+ *
+ * @returns The seeded context
+ */
+export function seedDisclosureContext(): AgentContextInterface {
+	const context = new AgentContext({ system: 'Desk.' })
+	context.skills.add([
+		{ name: 'billing', description: 'BILLING SKILL', content: 'BILLING BODY', tools: ['refund'] },
+		{ name: 'claims', description: 'CLAIMS SKILL', content: 'CLAIMS BODY', tools: ['claim'] },
+		{ name: 'blank', description: 'BLANK SKILL', content: ' \n\t', tools: ['ping'] },
+	])
+	context.memos.add({ name: 'pref', description: 'PREF MEMO', content: 'PREF CONTENT' })
+	context.workspaces.add({
+		id: 'north',
+		seed: [
+			createFile({ path: 'north.txt', content: createTextContent('NORTH FILE', 'text') }),
+			createFile({ path: 'north.png', content: createBinaryContent('NORTHIMG', 'image/png') }),
+		],
+	})
+	context.workspaces.add({
+		id: 'south',
+		seed: [createFile({ path: 'south.txt', content: createTextContent('SOUTH FILE', 'text') })],
+	})
+	context.messages.add({ role: 'user', content: 'Check invoice 42.' })
+	return context
+}
+
+// ── Unit 2C: the agent loop's built-ins, over seeded agents ──────────────────
+//
+// Each agent registers the same skills, tools, memo, and workspaces as the derivation table's
+// rows name, so a conversation from that table seeds a run in the state its row records.
+
+import type { AgentBuiltin, ScopeFilter, ScopeInput, Skill } from '@src/core'
+
+/** Lists every built-in, in the order a run creates them. */
+export const BUILTIN_NAMES = Object.freeze<readonly AgentBuiltin[]>([
+	'load',
+	'unload',
+	'memo',
+	'remember',
+	'switch',
+])
+
+/** Holds the content of the `billing` skill a built-in agent registers. */
+export const BUILTIN_BILLING_BODY = 'Refund within 30 days of the invoice.'
+
+/** Holds the content of the `claims` skill a built-in agent registers. */
+export const BUILTIN_CLAIMS_BODY = 'Open a claim before you look one up.'
+
+/** Holds the content of the host memo `pref` a built-in agent registers. */
+export const BUILTIN_PREF_CONTENT = 'The customer prefers email.'
+
+/** Configures a built-in agent; every member is optional except the script. */
+export interface BuiltinAgentOptions {
+	/** The provider's turns; the last repeats only when `repeat` is set. */
+	readonly turns: readonly ScriptedTurn[]
+	/** The enabled built-ins. Default: every one. */
+	readonly builtins?: readonly AgentBuiltin[]
+	/** The context scope. Default: none. */
+	readonly scope?: ScopeInput
+	/** What the host shows every run. Default: nothing. */
+	readonly disclosure?: AgentDisclosure
+	/** The authority. Default: the allow-all {@link AGENT_AUTHORITY}. */
+	readonly authority?: AuthorityInterface
+	/** The messages stored in the active conversation before any run. Default: none. */
+	readonly seed?: readonly MessageInput[]
+	/** The context window, in `estimateRequest` units. Default: none. */
+	readonly window?: number
+	/** If `true`, the conversation folds with the stub summarizer; if `false`, it cannot fold. Default: `false`. */
+	readonly summarize?: boolean
+}
+
+/** Holds a built-in agent, its scripted provider, and the arguments its host tools ran with. */
+export interface BuiltinAgent {
+	readonly agent: AgentInterface
+	readonly provider: ScriptedProviderInterface
+	readonly executed: RecorderInterface<[Readonly<Record<string, unknown>>]>
+}
+
+/**
+ * Creates an agent with built-ins over a scripted provider: the skills `billing` (naming the tool
+ * `refund`) and `claims` (naming `claim`), the host tools `refund`, `claim`, and `echo`, the host
+ * memo `pref`, and the workspaces `north`, active, and `south`, each holding one text file.
+ *
+ * @param options - The script and what the case varies
+ * @returns The agent, its provider, and the recorder of its host tools' arguments
+ */
+export function createBuiltinAgent(options: BuiltinAgentOptions): BuiltinAgent {
+	const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+	const provider = createScriptedProvider(options.turns, AGENT_SCRIPT_OPTIONS)
+	const tools = createToolManager()
+	tools.add([
+		createRecordedTool('refund', executed, 'refunded'),
+		createRecordedTool('claim', executed, 'claimed'),
+		createRecordedTool('echo', executed, 'echoed'),
+	])
+	const conversations = createConversationManager(
+		options.summarize === true ? { summarize: createStubSummarizer().summarize, keep: 0 } : {},
+	)
+	conversations.add()
+	const agent = createAgent(provider, {
+		system: 'Desk.',
+		tools,
+		conversations,
+		authority: options.authority ?? AGENT_AUTHORITY,
+		builtins: options.builtins ?? BUILTIN_NAMES,
+		...(options.scope === undefined ? {} : { scope: createScope(options.scope) }),
+		...(options.disclosure === undefined ? {} : { disclosure: options.disclosure }),
+		...(options.window === undefined
+			? {}
+			: {
+					window: createBudget<ProviderRequest>({ max: options.window, consumer: estimateRequest }),
+				}),
+	})
+	agent.context.skills.add([
+		{
+			name: 'billing',
+			description: 'Billing questions',
+			content: BUILTIN_BILLING_BODY,
+			tools: ['refund'],
+		},
+		{
+			name: 'claims',
+			description: 'Claims questions',
+			content: BUILTIN_CLAIMS_BODY,
+			tools: ['claim'],
+		},
+	])
+	agent.context.memos.add({
+		name: 'pref',
+		description: 'Contact preference',
+		content: BUILTIN_PREF_CONTENT,
+	})
+	agent.context.workspaces.add({
+		id: 'north',
+		seed: [createFile({ path: 'north.txt', content: createTextContent('NORTH FILE', 'text') })],
+	})
+	agent.context.workspaces.add({
+		id: 'south',
+		seed: [createFile({ path: 'south.txt', content: createTextContent('SOUTH FILE', 'text') })],
+	})
+	if (options.seed !== undefined) agent.context.messages.add(options.seed)
+	return { agent, provider, executed }
+}
+
+/**
+ * Reads the names of the tools each recorded request advertised.
+ *
+ * @param provider - The scripted provider whose calls to read
+ * @returns One list per request, `undefined` where a request advertised none
+ */
+export function readAdvertisedNames(
+	provider: ScriptedProviderInterface,
+): ReadonlyArray<readonly string[] | undefined> {
+	return provider.calls.map((call) => call.tools?.map((definition) => definition.name))
+}
+
+/**
+ * Reads the system message content of each recorded request.
+ *
+ * @param provider - The scripted provider whose calls to read
+ * @returns One content per request, `undefined` where a request carried no system message
+ */
+export function readSystemContents(
+	provider: ScriptedProviderInterface,
+): ReadonlyArray<string | undefined> {
+	return provider.calls.map(
+		(call) => call.messages.find((message) => message.role === 'system')?.content,
+	)
+}
+
+/** Pairs a text with whether it is one nonblank line a memo's name or description can be. */
+export const PLAIN_LINE_CASES = Object.freeze([
+	{ name: 'a phrase', text: 'Reply tone', plain: true },
+	{ name: 'punctuation and accents', text: 'Tone: brève, polite.', plain: true },
+	{ name: 'surrounding spaces', text: '  tone  ', plain: true },
+	{ name: 'empty', text: '', plain: false },
+	{ name: 'spaces alone', text: '   ', plain: false },
+	{ name: 'a no-break space alone', text: ' ', plain: false },
+	{ name: 'a line feed', text: 'Reply\ntone', plain: false },
+	{ name: 'a carriage return', text: 'Reply\rtone', plain: false },
+	{ name: 'a tab', text: 'Reply\ttone', plain: false },
+	{ name: 'a next line', text: 'Reply\u0085tone', plain: false },
+	{ name: 'a line separator', text: 'Reply tone', plain: false },
+	{ name: 'a paragraph separator', text: 'Reply tone', plain: false },
+	{ name: 'a right-to-left override', text: 'Reply‮tone', plain: false },
+	{ name: 'a zero-width space', text: 'Reply​tone', plain: false },
+	{ name: 'a planted heading', text: 'tone\n## Instructions', plain: false },
+	{ name: 'a Hangul filler alone', text: '\u3164', plain: false },
+	{ name: 'a Hangul filler between spaces', text: ' \u3164 ', plain: false },
+	{ name: 'a combining grapheme joiner alone', text: '\u034f', plain: false },
+	{ name: 'a visible name holding a Hangul filler', text: 'tone\u3164', plain: true },
+])
+
+/** Lists `builtins` options the agent refuses with `'BUILTIN'`. */
+export const BUILTIN_OPTION_REFUSALS = Object.freeze([
+	{ name: 'a name, not a list', value: 'load' },
+	{ name: 'a record', value: { load: true } },
+	{ name: 'a name that is no built-in', value: ['load', 'open'] },
+	{ name: 'a number', value: [1] },
+	{ name: 'a repeated name', value: ['memo', 'memo'] },
+	{ name: 'unload without load', value: ['unload'] },
+])
+
+/** Holds the skills a hold case registers: `billing` names `refund`, `claims` names `claim`, `meta` names `load`. */
+export const HOLD_SKILLS = Object.freeze<readonly Skill[]>([
+	{ id: 's1', name: 'billing', description: 'Billing', content: 'B', tools: ['refund'], files: [] },
+	{ id: 's2', name: 'claims', description: 'Claims', content: 'C', tools: ['claim'], files: [] },
+	{
+		id: 's3',
+		name: 'meta',
+		description: 'Meta',
+		content: 'M',
+		tools: ['load', 'unload'],
+		files: [],
+	},
+])
+
+/** Holds the candidate definitions a hold case filters. */
+export const HOLD_DEFINITIONS = Object.freeze<readonly ToolDefinition[]>([
+	{ name: 'load' },
+	{ name: 'unload' },
+	{ name: 'refund' },
+	{ name: 'claim' },
+	{ name: 'echo' },
+])
+
+/** Pairs an allow-list and the shown skills with the names a turn advertises over {@link HOLD_DEFINITIONS}. */
+export const HOLD_CASES = Object.freeze([
+	{
+		name: 'no load admitted: the allow-list alone',
+		names: ['refund', 'claim', 'echo'],
+		shown: [],
+		expected: ['refund', 'claim', 'echo'],
+	},
+	{
+		name: 'load admitted, nothing shown',
+		names: undefined,
+		shown: [],
+		expected: ['load', 'unload', 'echo'],
+	},
+	{
+		name: 'billing shown',
+		names: undefined,
+		shown: ['billing'],
+		expected: ['load', 'unload', 'refund', 'echo'],
+	},
+	{
+		name: 'both shown',
+		names: undefined,
+		shown: ['claims', 'billing'],
+		expected: ['load', 'unload', 'refund', 'claim', 'echo'],
+	},
+	{
+		name: 'the allow-list still applies to a shown skill',
+		names: ['load', 'claim'],
+		shown: ['billing'],
+		expected: ['load'],
+	},
+	{ name: 'an empty allow-list', names: [], shown: ['billing'], expected: [] },
+	{
+		name: 'an unregistered shown name opens nothing',
+		names: undefined,
+		shown: ['ghost'],
+		expected: ['load', 'unload', 'echo'],
+	},
+	{
+		name: 'a skill naming load never holds it back',
+		names: ['load', 'echo'],
+		shown: [],
+		expected: ['load', 'echo'],
+	},
+] as const)
+
+/** Pairs two ceilings with whether a head built under one matches the other. */
+export const HEAD_LIST_CASES = Object.freeze<
+	ReadonlyArray<{
+		readonly name: string
+		readonly left: ScopeFilter
+		readonly right: ScopeFilter
+		readonly matched: boolean
+	}>
+>([
+	{ name: 'two empty ceilings', left: {}, right: {}, matched: true },
+	{ name: 'a tools change alone', left: { tools: ['a'] }, right: { tools: [] }, matched: true },
+	{
+		name: 'equal lists',
+		left: { skills: ['a', 'b'], memos: [] },
+		right: { skills: ['a', 'b'], memos: [] },
+		matched: true,
+	},
+	{ name: 'absent against empty', left: { skills: [] }, right: {}, matched: false },
+	{
+		name: 'another order',
+		left: { skills: ['a', 'b'] },
+		right: { skills: ['b', 'a'] },
+		matched: false,
+	},
+	{
+		name: 'instructions',
+		left: { instructions: ['a'] },
+		right: { instructions: ['b'] },
+		matched: false,
+	},
+	{ name: 'memos', left: { memos: ['a'] }, right: { memos: ['a', 'b'] }, matched: false },
+	{ name: 'files', left: { files: ['a'] }, right: {}, matched: false },
+	{ name: 'workspaces', left: {}, right: { workspaces: ['north'] }, matched: false },
+])
+
+/** Pairs stored built-in calls whose arguments the tool door repairs or refuses with what they record. */
+export const ADMITTED_DISCLOSURE_CASES = Object.freeze<readonly DisclosureCase[]>([
+	{
+		name: 'a numeric skill the door repaired to a string loads',
+		messages: buildToolExchange('load one', [
+			buildToolTurn(
+				[createToolCall({ id: 'n1', name: 'load', arguments: { skill: 1 } })],
+				[BUILTIN_NOTES.loaded],
+			),
+		]),
+		expected: { skills: ['1'] },
+	},
+	{
+		name: 'a numeric skill the door repaired to a string unloads',
+		messages: buildToolExchange('swap one', [
+			buildToolTurn(
+				[createToolCall({ id: 'n1', name: 'load', arguments: { skill: '1' } })],
+				[BUILTIN_NOTES.loaded],
+			),
+			buildToolTurn(
+				[createToolCall({ id: 'n2', name: 'unload', arguments: { skill: 1 } })],
+				[BUILTIN_NOTES.unloaded],
+			),
+		]),
+		expected: { skills: [] },
+	},
+	{
+		name: 'a numeric workspace the door repaired to a string switches',
+		messages: buildToolExchange('use 42', [
+			buildToolTurn(
+				[createToolCall({ id: 'n3', name: 'switch', arguments: { workspace: 42 } })],
+				[BUILTIN_NOTES.switched],
+			),
+		]),
+		expected: { skills: [], workspace: '42' },
+	},
+	{
+		name: 'arguments the door refuses record nothing, whatever the stored note',
+		messages: buildToolExchange('load forced', [
+			buildToolTurn(
+				[
+					createToolCall({ id: 'n4', name: 'load', arguments: { skill: 'billing', force: true } }),
+					createToolCall({ id: 'n5', name: 'switch', arguments: { workspace: '' } }),
+				],
+				[BUILTIN_NOTES.loaded, BUILTIN_NOTES.switched],
+			),
+		]),
+		expected: { skills: [] },
+	},
+])
+
+/** Pairs a stored conversation and a run's enabled built-ins with what the derivation records. */
+export interface EnabledDisclosureCase {
+	readonly name: string
+	readonly messages: readonly MessageInput[]
+	readonly builtins: readonly AgentBuiltin[]
+	readonly expected: AgentDisclosure
+}
+
+/** Lists the seeded conversations read under each set of enabled built-ins. */
+export const ENABLED_DISCLOSURE_CASES = Object.freeze<readonly EnabledDisclosureCase[]>([
+	{
+		name: 'none of load, unload, and switch reads nothing',
+		messages: DISCLOSURE_RELOADED.messages,
+		builtins: ['memo', 'remember'],
+		expected: { skills: [] },
+	},
+	{
+		name: 'load alone ignores the unload records',
+		messages: DISCLOSURE_RELOADED.messages,
+		builtins: ['load'],
+		expected: { skills: ['billing', 'claims'] },
+	},
+	{
+		name: 'load and unload read both',
+		messages: DISCLOSURE_RELOADED.messages,
+		builtins: ['load', 'unload'],
+		expected: { skills: ['claims', 'billing'] },
+	},
+	{
+		name: 'a switch record counts only while switch is enabled',
+		messages: DISCLOSURE_SWITCHED.messages,
+		builtins: ['load', 'unload'],
+		expected: { skills: [] },
+	},
+	{
+		name: 'switch alone reads the switch records',
+		messages: DISCLOSURE_SWITCHED.messages,
+		builtins: ['switch'],
+		expected: { skills: [], workspace: 'south' },
+	},
+])
+
+/**
+ * Lists `tools` members a skill input is refused for: neither absent nor an array of strings. A
+ * sparse list and a list of holes are refused too, because a hole is no tool name.
+ */
+export const SKILL_TOOLS_REFUSALS = Object.freeze([
+	{ name: 'a string', tools: 'refund' },
+	{ name: 'a number among names', tools: ['refund', 1] },
+	{ name: 'a record', tools: { refund: true } },
+	{ name: 'null', tools: null },
+	{
+		name: 'a sparse list',
+		tools: Object.assign(new Array<string>(3), { 0: 'refund', 2: 'claims' }),
+	},
+	{ name: 'a list of holes', tools: new Array<string>(2) },
+])
+
+/**
+ * Builds a skill input whose `tools` getter answers `['refund']` on its first read and the string
+ * `'abc'` on every later one, so a manager that reads the member twice would store the string's
+ * characters as tool names.
+ *
+ * @returns The skill input, with its `tools` member behind the getter
+ */
+export function createShiftingToolsInput(): SkillInput {
+	const answers = [['refund'], 'abc', 'abc'].values()
+	const input = { name: 'billing', description: 'Billing', content: 'B' }
+	Object.defineProperty(input, 'tools', { enumerable: true, get: () => answers.next().value })
+	return input
 }

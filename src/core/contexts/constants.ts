@@ -15,6 +15,18 @@
 export const WORKSPACE_SECTION_HEADER = '## Workspace'
 
 /**
+ * Names the section header the loaded skills' bodies render under at the end of the system
+ * message — `'## Loaded skills'`.
+ */
+export const LOADED_SECTION_HEADER = '## Loaded skills'
+
+/**
+ * Names the section header the admitted workspace ids render under in the user context message —
+ * `'## Workspaces'`, rendered only while a run can select a workspace.
+ */
+export const WORKSPACE_INDEX_HEADER = '## Workspaces'
+
+/**
  * Names the built-in section header a {@link import('./types.js').MemoManagerInterface} renders
  * its index under — `'## Memos'`, the `open` value when no `format.open` overrides it.
  *

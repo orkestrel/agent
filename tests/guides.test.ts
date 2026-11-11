@@ -58,6 +58,7 @@ const INTERNAL: readonly string[] = Object.freeze([
 	'class LedgerPass',
 	'class LedgerScan',
 	'class ChannelCell',
+	'class AgentRun',
 ])
 
 // The server and page fences' declarations, transcribed byte for byte. They sit at module scope
@@ -525,7 +526,7 @@ await new GuideCommand({
 				'`"TOOL" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.`',
 			)
 			expect(guideText).toContain(
-				'A scope change through the `context.apply` method applies at each later site that reads the scope.',
+				"A scope change through the `context.apply` method applies at the next turn's snapshot",
 			)
 			const executed: string[] = []
 			const denials: Array<string | undefined> = []
@@ -582,7 +583,7 @@ await new GuideCommand({
 			expect(agent.context.messages.messages().at(-1)).not.toHaveProperty('calls')
 		})
 
-		it('applies a scope change to the next turn’s tools and the next run’s prompt (the scope-timing rule)', async () => {
+		it('applies a scope change to the next turn’s tools and prompt (the scope-timing rule)', async () => {
 			const tools = createToolManager()
 			tools.add(['search', 'delete'].map((name) => createTool({ name, execute: () => name })))
 			const provider = createScriptedProvider(
@@ -614,17 +615,23 @@ await new GuideCommand({
 
 			const systems = provider.calls.map((call) => call.messages[0]?.content)
 			const advertised = provider.calls.map((call) => call.tools?.map(({ name }) => name))
-			// Turn 1 keeps the system block run entry built and advertises the applied scope's tools;
-			// the next run's entry build carries the applied scope's instructions.
+			// The `tool` listener's scope reaches turn 1: its instructions list changed the view, so turn 1
+			// rebuilds the head, and the next run's entry build carries the same scope.
 			expect(systems).toEqual([
 				'## Instructions\n\nRefuse unsafe requests.',
-				'## Instructions\n\nRefuse unsafe requests.',
+				'## Instructions\n\nExplain every step.',
 				'## Instructions\n\nExplain every step.',
 			])
 			expect(advertised).toEqual([['search'], ['delete'], ['delete']])
+			expect(guideText).toContain(
+				'A `tool` or `usage` listener therefore changes the next turn, and a `turn` listener reaches the same turn, because `turn` fires before the snapshot.',
+			)
+			expect(guideText).toContain(
+				'A turn rebuilds the head, the `system` message and the context message, when its view differs from the view the head was built with.',
+			)
 		})
 
-		it('reaches the same turn’s tools from a turn listener and not its prompt (the scope-timing rule)', async () => {
+		it('reaches the same turn’s tools and prompt from a turn listener (the scope-timing rule)', async () => {
 			const tools = createToolManager()
 			tools.add(['search', 'delete'].map((name) => createTool({ name, execute: () => name })))
 			const provider = createScriptedProvider([{ content: 'Nothing is stale.' }], {
@@ -639,10 +646,12 @@ await new GuideCommand({
 			agent.context.messages.add({ role: 'user', content: 'Find the stale records.' })
 			await agent.generate()
 
+			// The `turn` listener's scope reaches turn 0 itself. It admits no instruction, so the rebuilt
+			// head carries no system message.
 			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['search'])
-			expect(provider.calls[0]?.messages[0]?.content).toBe(
-				'## Instructions\n\nRefuse unsafe requests.',
-			)
+			expect(provider.calls[0]?.messages.map(({ role, content }) => [role, content])).toEqual([
+				['user', 'Find the stale records.'],
+			])
 		})
 
 		it('carries the applied scope’s prompt from a compaction rebuild (the scope-timing rule)', async () => {
@@ -1079,7 +1088,7 @@ await new GuideCommand({
 			expect(guideText).toContain("const scope = scopes.add({ name: 'read-only' })")
 		})
 
-		it('revises, restores, and forgets memos and replaces skills as the index fence shows', () => {
+		it('revises, restores, and forgets memos and replaces skills as the index fence shows', async () => {
 			const added: string[] = []
 			const memos = barrel.createMemoManager({
 				id: 'ada',
@@ -1139,12 +1148,20 @@ await new GuideCommand({
 			expect(skills.remove('review')).toBe(true)
 			skills.clear()
 			expect(skills.count).toBe(0)
+			const { invokeUnchecked } = await import('@orkestrel/test')
+			const refused = captureError(() =>
+				invokeUnchecked(skills, skills.add, [
+					{ name: 'refunds', description: 'Refunds.', content: 'Confirm.', tools: 'refund' },
+				]),
+			)
+			expect(refused).toMatchObject({ code: 'placement' })
+			expect(skills.count).toBe(0)
+			expect(guideText).toContain(
+				"`add` refuses a `tools` member that isn't absent or an array of strings with `ContractError` code `placement`, before it stores that skill.",
+			)
 			expect(guideText).toContain('memos.add(tone) // unchanged text: the same revision, no event')
 			expect(guideText).toContain(
-				'A skills index with no tool that loads a skill is inert for the model.',
-			)
-			expect(guideText).toContain(
-				"The skills index and a loaded body render in the `system` message, so build each `SkillInput` from text the host authored, never from a user message, a tool result, a stored memo, or a page's request body, and read a loaded body from `skills.skill(name)`, never from the tool's arguments.",
+				"The skills index and a loaded body render in the `system` message, so build each `SkillInput` from text the host authored, never from a user message, a tool result, a stored memo, or a page's request body.",
 			)
 		})
 
@@ -6548,6 +6565,12 @@ await new GuideCommand({
 			const limit = captureError(() =>
 				agent.stream({ conversation: thread, prompt: { content: 'Book it.' }, limit: -1 }),
 			)
+			const { invokeUnchecked } = await import('@orkestrel/test')
+			const disclosure = captureError(() =>
+				invokeUnchecked(agent, agent.stream, [
+					{ conversation: thread, prompt: { content: 'Book it.' }, disclosure: { skills: 'all' } },
+				]),
+			)
 			const counted = thread.count
 			await agent.generate({ conversation: thread, prompt: { content: 'Book the flight.' } })
 			thread.add({ role: 'user', content: 'Book the hotel.' })
@@ -6555,6 +6578,7 @@ await new GuideCommand({
 
 			expect(placement).toMatchObject({ code: 'placement' })
 			expect(limit).toMatchObject({ code: 'LIMIT' })
+			expect(disclosure).toMatchObject({ code: 'placement' })
 			expect(counted).toBe(0)
 			expect(provider.calls[0]?.messages.at(-1)?.content).toBe('Book the flight.')
 			expect(provider.calls[1]?.messages.at(-1)?.content).toBe('Book the hotel.')
@@ -6562,7 +6586,7 @@ await new GuideCommand({
 				"The same options carry `conversation`, which binds the run, and `prompt`, which the run appends as a `user` turn after its guards; a run with no `prompt` reads its request from the conversation's tail.",
 			)
 			expect(guideText).toContain(
-				'A `prompt` that is not an exact `AgentPrompt`, a `budget` or `allowance` that does not implement `BudgetInterface`, a `conversation` that does not implement `ConversationInterface`, or a `scope` that does not implement `ScopeInterface` throws `ContractError` with code `placement` before either bound starts, and a refused run appends no `prompt`.',
+				'A `prompt` that is not an exact `AgentPrompt`, a `budget` or `allowance` that does not implement `BudgetInterface`, a `conversation` that does not implement `ConversationInterface`, a `scope` that does not implement `ScopeInterface`, or a `disclosure` that is not an exact `AgentDisclosure` throws `ContractError` with code `placement` before either bound starts, and a refused run appends no `prompt`.',
 			)
 		})
 
@@ -6615,9 +6639,9 @@ await new GuideCommand({
 			await agent.generate()
 			const sent = requireValue(provider.calls[0], 'Missing request').messages
 			await agent.context.messages.compact({ keep: 0 })
-			agent.context.instructions.add({ name: 'skill:review', content: 'List each defect.' })
-			const loaded = agent.context.build()[0]?.content
-			agent.context.apply(createScope({ name: 'plain', instructions: ['tone'] }))
+			const shown = { skills: ['review'] }
+			const loaded = agent.context.build({ disclosure: shown })[0]?.content
+			agent.context.apply(createScope({ name: 'plain', skills: [] }))
 
 			expect(sent.map(({ role }) => role)).toEqual(['system', 'user', 'user', 'assistant', 'user'])
 			expect(sent[0]?.content).toBe(
@@ -6629,14 +6653,16 @@ await new GuideCommand({
 			expect(sent[1]?.content).toContain('File: notes.txt')
 			expect(sent[2]?.content).toBe(block)
 			expect(sent[4]?.content).toBe('Is dock 4 open?')
-			// The fold took the exchange and left the instruction in the head.
+			// The fold took the exchange and left the instruction and the loaded body in the head.
 			expect(stub.calls).toHaveLength(1)
 			expect(loaded).toContain('Be terse.')
-			expect(loaded).toContain('List each defect.')
-			expect(agent.context.build()[0]?.content).not.toContain('List each defect.')
+			expect(loaded?.endsWith('## Loaded skills\n\n### review\n\nList each defect.')).toBe(true)
+			// A scope whose skills list admits none filters the body with the index.
+			const filtered = agent.context.build({ disclosure: shown })[0]?.content
+			expect(filtered).toBe('You staff the depot.\n\n## Instructions\n\nBe terse.')
 			expect(guideText).toContain('an instruction never folds')
 			expect(guideText).toContain(
-				'a host scope with an explicit `instructions` allow-list filters a loaded `skill:<name>` instruction',
+				'a host scope with an explicit `skills` allow-list filters a loaded body as it filters the index',
 			)
 		})
 
@@ -7523,112 +7549,537 @@ await new GuideCommand({
 			)
 		})
 
-		it('loads a skill at the next build site', async () => {
-			const body = 'List each defect with its line.'
-			const skills = barrel.createSkillManager()
-			skills.add({ name: 'review', description: 'Reviews a change.', content: body })
+		it('loads a skill at the next turn and holds its tool back until then (the built-in load fence)', async () => {
+			// The fence declares `provider` and `log`; the transcription scripts the provider and records
+			// what `log` receives.
 			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'refunds' } }] },
+					{ content: '', tools: [{ id: 'refund-1', name: 'refund', arguments: {} }] },
+					{ content: 'Refund queued for order 42.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const log = createRecorder<readonly [names: readonly string[] | undefined]>()
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'refund', execute: () => 'Refund queued.' }))
+			const skills = barrel.createSkillManager()
+			skills.add({
+				name: 'refunds',
+				description: 'Refunds a paid order.',
+				content: 'Confirm the order is paid before you call refund.',
+				tools: ['refund'],
+			})
+			const agent = createAgent(provider, {
+				tools,
+				skills,
+				builtins: ['load', 'unload'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+			})
+			agent.emitter.on('request', (_index, request) =>
+				log.handler(request.tools?.map(({ name }) => name)),
+			)
+			await agent.generate({ prompt: { content: 'Refund order 42.' } })
+
+			const heads = provider.calls.map((call) => call.messages[0])
+			expect(log.calls).toEqual([
+				[['load', 'unload']],
+				[['refund', 'load', 'unload']],
+				[['refund', 'load', 'unload']],
+			])
+			expect(heads[0]?.content).toBe('## Skills\n\n- refunds: Refunds a paid order.')
+			expect(heads[1]?.content).toBe(
+				'## Skills\n\n- refunds: Refunds a paid order.\n\n## Loaded skills\n\n### refunds\n\nConfirm the order is paid before you call refund.',
+			)
+			// Turn 2's view is unchanged, so it sends the head turn 1 built, its minted id included.
+			expect(heads[1]?.id).not.toBe(heads[0]?.id)
+			expect(heads[2]).toEqual(heads[1])
+			expect(provider.calls[1]?.messages.at(-1)).toMatchObject({
+				role: 'tool',
+				call: 'load-1',
+				content: barrel.BUILTIN_NOTES.loaded,
+			})
+			expect(provider.calls[2]?.messages.at(-1)).toMatchObject({
+				role: 'tool',
+				call: 'refund-1',
+				content: 'Refund queued.',
+			})
+
+			// A batch that loads and then calls the skill's tool: the tool waits for the next turn, and an
+			// unload of the load in flight is refused.
+			const batch = createScriptedProvider(
 				[
 					{
 						content: '',
-						tools: [{ id: 'load-1', name: 'load_skill', arguments: { name: 'review' } }],
+						tools: [
+							{ id: 'load-2', name: 'load', arguments: { skill: 'refunds' } },
+							{ id: 'refund-2', name: 'refund', arguments: {} },
+							{ id: 'unload-2', name: 'unload', arguments: { skill: 'refunds' } },
+						],
 					},
-					{ content: 'Loaded.' },
-					{ content: 'Reviewed.' },
-					{ content: 'Reviewed the other change.' },
-					{ content: 'Done.' },
+					{ content: '', tools: [{ id: 'refund-3', name: 'refund', arguments: {} }] },
+					{ content: 'Refund queued for order 43.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const denied = createRecorder<readonly [name: string, reason: string | undefined]>()
+			const results = createRecorder<readonly [id: string, success: boolean]>()
+			const batched = createAgent(batch, {
+				tools,
+				skills,
+				builtins: ['load', 'unload'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+			})
+			batched.emitter.on('deny', (call, reason) => denied.handler(call.name, reason))
+			batched.emitter.on('tool', (call, result) => results.handler(call.id, result.success))
+			await batched.generate({ prompt: { content: 'Refund order 43.' } })
+
+			expect(denied.calls).toEqual([['refund', 'refund is not in the active scope']])
+			expect(results.calls).toEqual([
+				['load-2', true],
+				['refund-2', false],
+				['unload-2', false],
+				['refund-3', true],
+			])
+			expect(guideText).toContain("// turn 0: ['load', 'unload'], with refund held back")
+			expect(guideText).toContain('A load reaches the next turn of the same run, never its own.')
+			expect(guideText).toContain(
+				"a run whose view doesn't change never rebuilds its head; [Scoping a turn](#scoping-a-turn) names the view a turn compares.",
+			)
+			expect(guideText).toContain(
+				"An `unload` in the same batch as the `load` it would undo is refused, because the load's tool message is stored after the batch.",
+			)
+		})
+
+		it('releases a skill’s tools without load, and keeps every call under the ceiling (the held-tool paragraph)', async () => {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'refund-1', name: 'refund', arguments: {} }] },
+					{ content: 'Refund queued for order 42.' },
+					{ content: 'Answered.' },
+					{ content: '', tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'refunds' } }] },
+					{ content: 'Answered again.' },
 				],
 				{ recorded: true, repeat: false },
 			)
 			const tools = createToolManager()
-			const conversations = createConversationManager()
-			const thread = conversations.add({ id: 'first' })
+			tools.add(createTool({ name: 'refund', execute: () => 'Refund queued.' }))
+			const skills = barrel.createSkillManager()
+			skills.add({
+				name: 'refunds',
+				description: 'Refunds a paid order.',
+				content: 'Confirm the order is paid before you call refund.',
+				tools: ['refund'],
+			})
 			const agent = createAgent(provider, {
 				tools,
-				authority: AGENT_AUTHORITY,
 				skills,
-				conversations,
+				builtins: ['load', 'unload'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
 			})
-			tools.add(
-				createTool({
-					name: 'load_skill',
-					strict: false,
-					execute: (args) => {
-						const skill = skills.skill(String(args.name))
-						if (skill === undefined) return 'no such skill'
-						agent.context.instructions.add({ name: `skill:${skill.name}`, content: skill.content })
-						return `loaded ${skill.name}`
-					},
-				}),
-			)
-			await agent.generate({ conversation: thread, prompt: { content: 'Review the diff.' } })
-			await agent.generate({ conversation: thread, prompt: { content: 'Review it again.' } })
-			const other = conversations.add({ id: 'second' })
-			await agent.generate({ conversation: other, prompt: { content: 'Review this one.' } })
-			agent.context.instructions.remove('skill:review')
-			await agent.generate({ conversation: other, prompt: { content: 'Review once more.' } })
+			// A run scope that lists the skill's tool and not `load` calls it with no load.
+			await agent.generate({
+				prompt: { content: 'Refund order 42.' },
+				scope: createScope({ name: 'refunder', tools: ['refund'] }),
+			})
+			// Removing the skill releases the tool it held.
+			skills.remove('refunds')
+			await agent.generate({ prompt: { content: 'Refund order 43.' } })
+			// A shown body renders under a tools list that excludes the skill's own tool.
+			skills.add({
+				name: 'refunds',
+				description: 'Refunds a paid order.',
+				content: 'Confirm the order is paid before you call refund.',
+				tools: ['refund'],
+			})
+			await agent.generate({
+				prompt: { content: 'Refund order 44.' },
+				scope: createScope({ name: 'loader', tools: ['load', 'unload'] }),
+			})
 
-			// No fold: the load's own run keeps the head it built, and the next run carries the body.
-			expect(provider.calls.map((call) => call.messages[0]?.content.includes(body))).toEqual([
-				false,
-				false,
-				true,
-				true,
-				false,
+			const advertised = provider.calls.map((call) => call.tools?.map(({ name }) => name))
+			expect(advertised).toEqual([
+				['refund'],
+				['refund'],
+				['refund', 'load', 'unload'],
+				['load', 'unload'],
+				['load', 'unload'],
 			])
+			expect(provider.calls[4]?.messages[0]?.content).toContain(
+				'### refunds\n\nConfirm the order is paid before you call refund.',
+			)
+			expect(guideText).toContain(
+				'Removing a skill from the registry releases the tools it held, and a turn advertises each one wherever the allow-list admits it.',
+			)
+			expect(guideText).toContain(
+				"A shown skill's body renders under any `tools` list, one that excludes the skill's own tools included, so list a skill's tools in every scope that admits the skill.",
+			)
+		})
 
-			const folded = createScriptedProvider(
+		it('shows the host’s skills from the first request (the disclosure fence)', async () => {
+			const { invokeUnchecked } = await import('@orkestrel/test')
+			const { isContractError } = await import('@orkestrel/contract')
+			const provider = createScriptedProvider(
+				[{ content: 'Refunded.' }, { content: 'Opened.' }, { content: 'Refunded.' }],
+				{ recorded: true, repeat: false },
+			)
+			const agent = createAgent(provider, { disclosure: { skills: ['refunds'] } })
+			agent.context.skills.add([
+				{
+					name: 'refunds',
+					description: 'Refunds a paid order.',
+					content: 'Confirm the order is paid.',
+				},
+				{ name: 'returns', description: 'Opens a return.', content: 'Ask for the order number.' },
+			])
+			await agent.generate({ prompt: { content: 'Refund order 42.' } })
+			const returns = { skills: ['returns'] }
+			await agent.generate({ prompt: { content: 'Return order 7.' }, disclosure: returns })
+			const plain = createScope({ name: 'plain', skills: [] })
+			await agent.generate({ prompt: { content: 'Refund order 9.' }, scope: plain })
+
+			const bodies = provider.calls.map(
+				(call) => call.messages[0]?.content.split('## Loaded skills\n\n')[1],
+			)
+			expect(bodies).toEqual([
+				'### refunds\n\nConfirm the order is paid.',
+				'### returns\n\nAsk for the order number.',
+				undefined,
+			])
+			// A value the contract refuses throws at construction and at the run, before the prompt.
+			const constructed = captureError(() =>
+				invokeUnchecked(undefined, createAgent, [provider, { disclosure: { skills: 'refunds' } }]),
+			)
+			const conversation = createConversation()
+			const streamed = captureError(() =>
+				invokeUnchecked(agent, agent.stream, [
+					{ conversation, prompt: { content: 'Hi.' }, disclosure: { skills: [1] } },
+				]),
+			)
+			expect(isContractError(constructed) && constructed.code === 'placement').toBe(true)
+			expect(isContractError(streamed) && streamed.code === 'placement').toBe(true)
+			expect(conversation.messages()).toEqual([])
+
+			// An unload of a skill the host shows refuses, after a model load of it too.
+			const loader = createScriptedProvider(
 				[
 					{
-						content: 'x'.repeat(400),
-						tools: [{ id: 'load-2', name: 'load_skill', arguments: { name: 'review' } }],
+						content: '',
+						tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'refunds' } }],
 					},
-					{ content: 'Loaded.' },
+					{
+						content: '',
+						tools: [{ id: 'unload-1', name: 'unload', arguments: { skill: 'refunds' } }],
+					},
+					{ content: 'Refunded.' },
 				],
 				{ recorded: true, repeat: false },
 			)
-			const foldTools = createToolManager()
-			const foldThreads = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-				keep: 0,
+			const unloads = createRecorder<readonly [success: boolean]>()
+			const shown = createAgent(loader, {
+				builtins: ['load', 'unload'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+				disclosure: { skills: ['refunds'] },
 			})
-			// An earlier exchange gives the between-turns fold a slice before the run's request.
-			foldThreads.add().add([
-				{ role: 'user', content: 'Earlier question.' },
-				{ role: 'assistant', content: 'Earlier answer.' },
+			shown.context.skills.add({
+				name: 'refunds',
+				description: 'Refunds a paid order.',
+				content: 'Confirm the order is paid.',
+			})
+			shown.emitter.on('tool', (call, result) => {
+				if (call.name === 'unload') unloads.handler(result.success)
+			})
+			await shown.generate({ prompt: { content: 'Refund order 42.' } })
+			expect(unloads.calls).toEqual([[false]])
+			expect(loader.calls[2]?.messages[0]?.content.endsWith('Confirm the order is paid.')).toBe(
+				true,
+			)
+			expect(guideText).toContain(
+				'An `unload` of a skill the host shows refuses with a sentence saying the host shows it, whether or not the model also loaded it.',
+			)
+			expect(guideText).toContain(
+				"On `AgentOptions` it shows them from the first request of every run, and on `AgentRunOptions` it replaces the agent's value for that run.",
+			)
+		})
+
+		it('keeps a load to its conversation and restores it from a snapshot (the derivation fence)', async () => {
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'refunds' } }] },
+					{ content: 'Refunded.' },
+					{ content: 'Refunded.' },
+					{ content: 'Refunded.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const agent = createAgent(provider, {
+				builtins: ['load', 'unload'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+			})
+			agent.context.skills.add({
+				name: 'refunds',
+				description: 'Refunds a paid order.',
+				content: 'Confirm the order is paid.',
+			})
+			const first = createConversation()
+			await agent.generate({ conversation: first, prompt: { content: 'Refund order 42.' } })
+			const second = createConversation()
+			await agent.generate({ conversation: second, prompt: { content: 'Refund order 43.' } })
+			const restored = createConversation({ snapshot: first.snapshot() })
+			await agent.generate({ conversation: restored, prompt: { content: 'Refund order 44.' } })
+
+			// The loading turn, its next turn, the second conversation, and the restored one.
+			expect(
+				provider.calls.map((call) =>
+					call.messages[0]?.content.endsWith('### refunds\n\nConfirm the order is paid.'),
+				),
+			).toEqual([false, true, false, true])
+			expect(guideText).toContain(
+				'A shown body renders last in the `system` message, under `## Loaded skills`, and a load belongs to the conversation that stored it: another conversation of the same agent shows the skill only after its own `load`.',
+			)
+			expect(guideText).toContain(
+				'a conversation restored from its `ConversationSnapshot` shows what it showed when the snapshot was taken.',
+			)
+		})
+
+		it('counts a record only for an enabled built-in, with its arguments as the contract admits them (the derivation paragraph)', async () => {
+			const body = 'Confirm the order is paid.'
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'load-1', name: 'load', arguments: { skill: 1 } }] },
+					{ content: 'Refunded.' },
+					{ content: '', tools: [{ id: 'load-2', name: 'load', arguments: { skill: 'refunds' } }] },
+					{ content: 'Refunded.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const authority = barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } })
+			const numeric = createAgent(provider, { builtins: ['load', 'unload'], authority })
+			numeric.context.skills.add({ name: '1', description: 'Refunds a paid order.', content: body })
+			await numeric.generate({ prompt: { content: 'Refund order 42.' } })
+			// A host tool under the name `load`, on a run that enables only `switch`, returns the note.
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'load', execute: () => barrel.BUILTIN_NOTES.loaded }))
+			const hosted = createAgent(provider, { tools, builtins: ['switch'], authority })
+			hosted.context.skills.add({
+				name: 'refunds',
+				description: 'Refunds a paid order.',
+				content: body,
+			})
+			await hosted.generate({ prompt: { content: 'Refund order 43.' } })
+
+			expect(provider.calls.map((call) => call.messages[0]?.content.endsWith(body))).toEqual([
+				false,
+				true,
+				false,
+				false,
 			])
-			const foldAgent = createAgent(folded, {
-				tools: foldTools,
-				authority: AGENT_AUTHORITY,
-				strict: false,
-				skills,
-				conversations: foldThreads,
-				// Message arithmetic is the claim, so the window projects the request's messages.
-				window: createBudget({
-					max: 60,
-					consumer: (request: ProviderRequest) => estimateMessages(request.messages),
-				}),
-			})
-			foldTools.add(
-				createTool({
-					name: 'load_skill',
-					strict: false,
-					execute: () => {
-						foldAgent.context.instructions.add({ name: 'skill:review', content: body })
-						return 'loaded review'
+			expect(guideText).toContain(
+				"A record counts only while the run enables its built-in, so a host tool under a built-in's name on a run that doesn't enable it shows nothing.",
+			)
+			expect(guideText).toContain(
+				"so a `{ skill: 1 }` the contract repaired to `'1'` shows the skill `'1'`.",
+			)
+		})
+
+		it('writes a listed memo and switches a workspace for its conversation (the memo and switch fence)', async () => {
+			// The fence declares `provider` and `confirm`; the transcription scripts the provider and
+			// records each approval question, answering yes.
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [
+							{
+								id: 'remember-1',
+								name: 'remember',
+								arguments: {
+									name: 'tone',
+									description: 'Reply length',
+									content: 'Keep replies short.',
+								},
+							},
+						],
+					},
+					{
+						content: '',
+						tools: [{ id: 'switch-1', name: 'switch', arguments: { workspace: 'returns' } }],
+					},
+					{ content: 'Return 7 is open.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const asked = createRecorder<readonly [question: string]>()
+			const agent = createAgent(provider, {
+				builtins: ['memo', 'remember', 'switch'],
+				authority: barrel.createAuthority({
+					fallback: { zone: 'default', verdict: 'allow' },
+					ask: (context) => {
+						asked.handler(`Run ${context.call.name}?`)
+						return Promise.resolve(true)
 					},
 				}),
-			)
-			await foldAgent.generate({ prompt: { content: 'Review the diff.' } })
+				scope: createScope({ name: 'desk', memos: ['tone'], workspaces: ['orders', 'returns'] }),
+			})
+			agent.context.workspaces.add({ id: 'orders' }).write('orders.txt', 'Order 42 is paid.')
+			agent.context.workspaces.add({ id: 'returns' }).write('returns.txt', 'Return 7 is open.')
+			await agent.generate({ prompt: { content: 'Keep replies short, then open the returns.' } })
 
-			// A fold on the turn after the load rebuilds the head, so that turn carries the body.
-			expect(foldThreads.active?.sections).toHaveLength(1)
-			expect(folded.calls.map((call) => call.messages[0]?.content.includes(body))).toEqual([
+			const contexts = provider.calls.map((call) => call.messages[0]?.content ?? '')
+			expect(asked.calls).toEqual([['Run remember?']])
+			expect(agent.context.memos.memo('tone')?.origin).toEqual({
+				conversation: agent.context.messages.id,
+			})
+			expect(agent.context.workspaces.active?.id).toBe('orders')
+			expect(
+				contexts.map((content) => content.includes('## Workspaces\n\n- orders\n- returns')),
+			).toEqual([true, true, true])
+			// A write alone rebuilds no head; the switch on turn 1 does, so turn 2 lists the memo.
+			expect(
+				contexts.map((content) => content.includes('## Memos\n\n- tone: Reply length')),
+			).toEqual([false, false, true])
+			expect(contexts.map((content) => content.includes('File: returns.txt'))).toEqual([
+				false,
 				false,
 				true,
 			])
+			expect(contexts.map((content) => content.includes('File: orders.txt'))).toEqual([
+				true,
+				true,
+				false,
+			])
 			expect(guideText).toContain(
-				"A loaded body applies as any instruction added during a run does, at the next build site named under scope changes. A run whose next turn does not fold keeps the head it built, so the model holds the tool's acknowledgement and not the body until the next run; a turn that folds rebuilds the head and carries the body. A load then serves that agent's later runs in every conversation, until the host removes the instruction.",
+				"agent.context.workspaces.active?.id // 'orders': the switch selected returns for this conversation",
+			)
+			expect(guideText).toContain(
+				"A scope's `memos` list therefore does two jobs: it filters the memos index, and it names the memos the model may write.",
+			)
+		})
+
+		it('advertises remember and switch only under their lists (the silent-omission paragraph)', async () => {
+			const provider = createScriptedProvider([{ content: 'Answered.' }], {
+				recorded: true,
+				repeat: false,
+			})
+			const agent = createAgent(provider, {
+				builtins: ['memo', 'remember', 'switch'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+			})
+			await agent.generate({ prompt: { content: 'Keep replies short.' } })
+
+			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['memo'])
+			expect(guideText).toContain(
+				'`remember` and `switch` are advertised only while the ceiling defines their lists, `memos` for `remember` and `workspaces` for `switch`, and nothing reports their absence',
+			)
+		})
+
+		it('refuses a name with the admitted names and no echo (the refusal fence)', async () => {
+			// The fence declares `provider` and `log`; the transcription scripts the provider and records
+			// each refusal. The second run asks for a registered skill its run scope excludes.
+			const provider = createScriptedProvider(
+				[
+					{ content: '', tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'billing' } }] },
+					{ content: 'There are no billing rules.' },
+					{ content: '', tools: [{ id: 'load-2', name: 'load', arguments: { skill: 'billing' } }] },
+					{ content: 'There are no billing rules.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const log = createRecorder<readonly [error: string | undefined]>()
+			const agent = createAgent(provider, {
+				builtins: ['load'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+			})
+			agent.context.skills.add({
+				name: 'refunds',
+				description: 'Refunds a paid order.',
+				content: 'Confirm.',
+			})
+			agent.emitter.on('tool', (_call, result) =>
+				log.handler(result.success ? undefined : result.error),
+			)
+			await agent.generate({ prompt: { content: 'Look up the billing rules.' } })
+			agent.context.skills.add({ name: 'billing', description: 'Billing rules.', content: 'Bill.' })
+			await agent.generate({
+				prompt: { content: 'Look up the billing rules.' },
+				scope: createScope({ name: 'refunds', skills: ['refunds'] }),
+			})
+
+			const refusal = 'No skill you can load has that name. Use one of: "refunds".'
+			expect(log.calls).toEqual([[refusal], [refusal]])
+			const names = Array.from(
+				{ length: barrel.BUILTIN_LIMITS.candidates + 1 },
+				(_, index) => `skill-${index}`,
+			)
+			const capped = barrel.describeCandidates('skill you can load', names)
+			expect(capped.endsWith('"skill-19". The index in your prompt lists the others.')).toBe(true)
+			expect(capped).not.toContain('"skill-20"')
+			expect(barrel.describeCandidates('skill you can load', [])).toBe(
+				'No skill you can load has that name, and none is available now.',
+			)
+			expect(guideText).toContain(
+				'// \'No skill you can load has that name. Use one of: "refunds".\'',
+			)
+			expect(guideText).toContain(
+				'With no name to list, it reads `No SUBJECT has that name, and none is available now.`',
+			)
+		})
+
+		it('forwards a page’s built-ins only under the relay’s acceptance (the relay built-ins fence)', async () => {
+			const fence = {
+				system: { accept: true },
+				tools: { definitions: barrel.collectBuiltinDefinitions({ builtins: ['load', 'unload'] }) },
+			}
+			const outcomes = await Promise.all(
+				[
+					fence,
+					{ ...fence, system: { accept: false } },
+					{ ...fence, tools: { definitions: [] } },
+					{ ...fence, tools: { accept: true } },
+				].map(async (policy) => {
+					const upstream = createScriptedProvider([{ content: 'Relayed.' }], {
+						recorded: true,
+						repeat: false,
+					})
+					const handler = createRelay({ provider: upstream, authorize: () => true, ...policy })
+					const page = createAgent(
+						createRelayProvider({
+							url: 'http://relay.test/',
+							fetch: (input, init) => handler(new Request(input, init)),
+						}),
+						{
+							builtins: ['load', 'unload'],
+							authority: barrel.createAuthority({
+								fallback: { zone: 'default', verdict: 'allow' },
+							}),
+							disclosure: { skills: ['refunds'] },
+						},
+					)
+					page.context.skills.add({
+						name: 'refunds',
+						description: 'Refunds a paid order.',
+						content: 'Confirm the order is paid.',
+					})
+					const status = await page.generate({ prompt: { content: 'Refund order 42.' } }).then(
+						() => 200,
+						(error: unknown) => (isProviderError(error) ? error.status : undefined),
+					)
+					return {
+						status,
+						body: upstream.calls[0]?.messages[0]?.content.endsWith('Confirm the order is paid.'),
+						tools: upstream.calls[0]?.tools?.map(({ name }) => name),
+					}
+				}),
+			)
+
+			expect(outcomes).toEqual([
+				{ status: 200, body: true, tools: ['load', 'unload'] },
+				{ status: 422, body: undefined, tools: undefined },
+				{ status: 422, body: undefined, tools: undefined },
+				{ status: 200, body: true, tools: ['load', 'unload'] },
+			])
+			expect(guideText).toContain(
+				"tools: { definitions: collectBuiltinDefinitions({ builtins: ['load', 'unload'] }) },",
 			)
 		})
 

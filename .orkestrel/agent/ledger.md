@@ -52,3 +52,14 @@
 | 2026-11-11 | Study after-run SV at 397.3 s, and P4 with parallel files at 242.9 s | `verifier` on `haiku` | `plan.md` § State |
 | 2026-11-11 | Study assertion check SV.2: 131 rows marked | `reviewer` on `sonnet` | `plan.md` § State |
 | 2026-11-11 | The dev re-pin onto `ollama` ^0.0.35, `study` ^0.0.18, and `probe` ^0.0.30 | Orchestrator | `plan.md` § State |
+| 2026-11-11 | Phase 2 unit 2A, the declarations | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 2 unit 2A's review: pass | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 2 units 2B (the context) and 2C (the agent loop), built in parallel | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 2 units 2B and 2C's reviews: both pass | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 2's falsify round: subjective confirmed; objective failed claims 4 and 5, both below the bar | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 2's repair, R1 to R10 | `opus` on `opus` | `designs/disclosure.md` § Phase 2 |
+| 2026-11-11 | Phase 2's re-audit: R10 open, the rest closed | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | R10's fix and its mutation proof, the tests for two new exports, a refusal reworded, and `ceiling` kept as a noun | Orchestrator | `plan.md` § State |
+| 2026-11-11 | Phase 2's closure check: closed | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 2 unit 2D, the guide and the TSDoc | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | Phase 2's tree-wide chain | Orchestrator | `plan.md` § State |

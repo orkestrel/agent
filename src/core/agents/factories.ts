@@ -1,5 +1,6 @@
 import type { ProviderInterface } from '../providers/index.js'
 import type {
+	AgentBuiltin,
 	AgentInterface,
 	AgentJobInput,
 	AgentOptions,
@@ -15,15 +16,19 @@ import type {
 } from './types.js'
 import type { QueueInterface } from '@orkestrel/queue'
 import type { RunnerInterface } from '@orkestrel/workflow'
+import type { ToolInterface, ToolOptions } from '@orkestrel/tool'
 import { createQueue } from '@orkestrel/queue'
 import { createRunner } from '@orkestrel/workflow'
+import { createTool } from '@orkestrel/tool'
 import { Agent } from './Agent.js'
 import { AgentFanout } from './AgentFanout.js'
 import { Channel } from './Channel.js'
 import { Authority } from './Authority.js'
 import { Approver } from './Approver.js'
 import { AgentRegistry } from './AgentRegistry.js'
+import { BUILTIN_TOOLS } from './constants.js'
 import { extractQueueOptions, handleAgentQueueJob } from './helpers.js'
+import { builtinToolContracts } from './contracts.js'
 
 /**
  * Creates an agent loop — an {@link AgentInterface} composing a
@@ -310,5 +315,41 @@ export function createAgentRunner(
 	return createRunner<AgentJobInput, AgentResult>({
 		...extractQueueOptions(options),
 		handler: fanout.execute.bind(fanout),
+	})
+}
+
+/**
+ * Creates the tool a run serves for one built-in: its description and annotations from
+ * `BUILTIN_TOOLS`, its argument shape from `builtinToolContracts`, and the given handler.
+ *
+ * @remarks
+ * The tool's door refuses a missing, empty, over-long, or extra argument before the handler runs,
+ * and repairs a value that converts to a string without loss, such as a number, so the handler
+ * reads only arguments the shape admits. Its definition equals the one `collectBuiltinDefinitions`
+ * returns for the same name.
+ *
+ * @param name - The built-in to create
+ * @param execute - The handler the door hands admitted arguments to
+ * @returns The tool
+ *
+ * @example
+ * ```ts
+ * import { createBuiltinTool } from '@orkestrel/agent'
+ *
+ * const memo = createBuiltinTool('memo', (args) => `read ${String(args.name)}`)
+ * memo.annotations // { pure: true, untrusted: true }
+ * ```
+ */
+export function createBuiltinTool(
+	name: AgentBuiltin,
+	execute: ToolOptions['execute'],
+): ToolInterface {
+	const declared = BUILTIN_TOOLS[name]
+	return createTool({
+		name,
+		description: declared.description,
+		...(declared.annotations === undefined ? {} : { annotations: declared.annotations }),
+		contract: builtinToolContracts[name].shape,
+		execute,
 	})
 }

@@ -1,4 +1,5 @@
 import type {
+	AgentBuiltin,
 	AgentChunk,
 	AgentEventMap,
 	AgentInterface,
@@ -13,20 +14,14 @@ import type {
 	AgentRunResult,
 } from './types.js'
 import type { ProviderInterface, ProviderRequest, ProviderResult } from '../providers/index.js'
-import type { AgentContextInterface, ScopeInterface, Selection } from '../contexts/index.js'
+import type { AgentContextInterface, AgentDisclosure, Selection } from '../contexts/index.js'
 import type { ConversationInterface, Section } from '../conversations/index.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, MeterInterface, TokenUsage } from '@orkestrel/budget'
 import type { Result } from '@orkestrel/contract'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import type {
-	ToolCall,
-	ToolDefinition,
-	ToolInterface,
-	ToolManagerInterface,
-	ToolResult,
-} from '@orkestrel/tool'
+import type { ToolCall, ToolDefinition, ToolInterface, ToolResult } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { TimeoutInterface } from '@orkestrel/timeout'
 import { createAbort } from '@orkestrel/abort'
@@ -43,11 +38,12 @@ import {
 } from '@orkestrel/contract'
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
-import { AgentContext, intersectKeys } from '../contexts/index.js'
+import { AgentContext } from '../contexts/index.js'
 import { raceSignal } from '../conversations/index.js'
 import { AUTHORITY_NOTES, DEFAULT_AGENT_LIMIT, SCOPE_NOTE } from './constants.js'
 import { agentPromptContract } from './contracts.js'
 import { AgentError } from './errors.js'
+import { AgentRun } from './AgentRun.js'
 import { Channel } from './Channel.js'
 import {
 	assembleResult,
@@ -56,7 +52,9 @@ import {
 	inferStop,
 	requireAnswer,
 	requireBudget,
+	requireBuiltins,
 	requireConversation,
+	requireDisclosure,
 	requireLimit,
 	requireScope,
 	resolveDecision,
@@ -160,6 +158,10 @@ export class Agent implements AgentInterface {
 	// only listener sets (no timers / handles), so it is reclaimed with the agent — there
 	// is no leak to clear, and adding lifecycle the entity does not otherwise need is avoided.
 	readonly #emitter: Emitter<AgentEventMap>
+	// The built-ins each run serves itself, checked and owned at construction; empty when none is enabled.
+	readonly #builtins: readonly AgentBuiltin[]
+	// What the host shows every run, owned at construction; a run's own option replaces it.
+	readonly #disclosure: AgentDisclosure | undefined
 	// The label the last run settled on. `status` derives the live answer from `#runs`, so an
 	// overlapping run can never report `done` while another is still in flight.
 	#settled: AgentStatus = 'idle'
@@ -200,6 +202,16 @@ export class Agent implements AgentInterface {
 			...(options?.conversations === undefined ? {} : { conversations: options.conversations }),
 			...(options?.select === undefined ? {} : { select: options.select }),
 		})
+		// A built-in runs only behind an authority, as a tool does, and the run serves its name itself,
+		// so the host's manager may hold no tool under it.
+		this.#builtins = requireBuiltins(options?.builtins, this.#context.tools)
+		if (this.#builtins.length > 0 && options?.authority === undefined) {
+			throw new AgentError(
+				'AUTHORITY',
+				"builtins are set and no authority is; pass authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) to allow every call, or rules with a deny fallback",
+			)
+		}
+		this.#disclosure = requireDisclosure(options?.disclosure)
 		this.#timeoutMs = options?.timeout
 		this.#budget = options?.budget
 		this.#allowance = options?.allowance
@@ -257,6 +269,8 @@ export class Agent implements AgentInterface {
 				},
 			)
 		}
+		// A run's `disclosure` replaces the agent's, and a refused one starts nothing.
+		const disclosure = requireDisclosure(options?.disclosure) ?? this.#disclosure
 		// Resolve effective per-run bounds — a per-run override wins, else the construction
 		// default. `limit`, `budget`, and `allowance` also thread into `#execute` (the loop bound,
 		// the reconcile, and the mid-stream meter); each budget is the same instance folded into
@@ -332,10 +346,11 @@ export class Agent implements AgentInterface {
 		// `#execute` into the channel, and the run settles from its outcome regardless of whether
 		// anyone drains `events`. The per-run `think` / `schema` preferences ride through to
 		// `provider.stream`; `limit` / `budget` / `allowance` ride through as the effective run bounds.
+		// The run's own entity: its built-in tools, and the view its turns and builds share.
+		const run = new AgentRun(this.#context, conversation, scope, disclosure, this.#builtins)
 		void this.#drive(
 			abort,
-			conversation,
-			scope,
+			run,
 			channel,
 			options?.think,
 			options?.schema,
@@ -414,8 +429,7 @@ export class Agent implements AgentInterface {
 	// return value; a genuine provider / tool error rejects. `for await` would discard the return.
 	async #drive(
 		abort: AbortInterface,
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
+		run: AgentRun,
 		channel: Channel<AgentChunk>,
 		think: boolean | undefined,
 		schema: Readonly<Record<string, unknown>> | undefined,
@@ -423,9 +437,9 @@ export class Agent implements AgentInterface {
 		budget: BudgetInterface<TokenUsage> | undefined,
 		allowance: BudgetInterface<TokenUsage> | undefined,
 	): Promise<AgentRunResult> {
-		const run = this.#execute(abort, conversation, scope, think, schema, limit, budget, allowance)
+		const steps = this.#execute(abort, run, think, schema, limit, budget, allowance)
 		for (;;) {
-			const next = await run.next()
+			const next = await steps.next()
 			if (next.done === true) return next.value
 			channel.push(next.value)
 		}
@@ -461,26 +475,25 @@ export class Agent implements AgentInterface {
 	// early `return()` cancel the provider a step sooner.
 	async *#execute(
 		abort: AbortInterface,
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
+		run: AgentRun,
 		think: boolean | undefined,
 		schema: Readonly<Record<string, unknown>> | undefined,
 		limit: number,
 		budget: BudgetInterface<TokenUsage> | undefined,
 		allowance: BudgetInterface<TokenUsage> | undefined,
 	): AsyncGenerator<AgentChunk, AgentRunResult> {
+		const conversation = run.conversation
 		// Compaction can fold the request into a section, so every select site receives the object
 		// captured at run entry.
 		const last = conversation.view().at(-1)
 		const request = last?.role === 'user' ? last : undefined
+		// The entry build renders what the run shows from its first request, so the view is resolved first.
+		run.observe()
 		// `#select` returns `undefined` when no handler is set, so the default path awaits nothing
 		// before the first provider request.
-		const selection = this.#select(conversation, scope, request, abort, budget)
+		const selection = this.#select(run, request, abort, budget)
 		const entry =
-			selection === undefined
-				? { messages: this.#build(conversation, scope), usage: undefined }
-				: await selection
-		const tools = this.#context.tools
+			selection === undefined ? { messages: this.#build(run), usage: undefined } : await selection
 		// The per-call options are fixed for the run, so every request carries this one snapshot;
 		// absent when neither preference is set.
 		const options: ProviderRequest['options'] =
@@ -502,7 +515,7 @@ export class Agent implements AgentInterface {
 		// entered in `agent.stream()`'s own call.
 		while (turns.length < limit && (turns.at(-1)?.outcome ?? 'tools') === 'tools') {
 			const index = turns.length
-			const base = turns.at(-1)?.messages ?? entry.messages
+			const prior = turns.at(-1)?.messages ?? entry.messages
 			const futile = turns.at(-1)?.futile ?? false
 			// The record of a turn a cancel stopped before its provider call.
 			const stopped: AgentTurn = {
@@ -510,7 +523,7 @@ export class Agent implements AgentInterface {
 				thinking: undefined,
 				usage: undefined,
 				spent: undefined,
-				messages: base,
+				messages: prior,
 				outcome: 'cancel',
 				partial: true,
 				futile,
@@ -538,16 +551,17 @@ export class Agent implements AgentInterface {
 				continue
 			}
 			// Snapshot the ceiling before listeners can change the active scope this turn: the context
-			// scope intersected with the run scope, each list read one time into an owned copy.
-			const names = intersectKeys(this.#context.scope?.tools, scope?.tools)
-			const advertised = filterAllowList(
-				names,
-				tools.definitions(),
-				(definition) => definition.name,
-			)
-			// The instance each advertised name holds at this point: every decision of this turn applies to it.
+			// scope intersected with the run scope, each list read one time into an owned copy; then
+			// what the turn shows within it, and what it advertises. A head built with another view is
+			// rebuilt over the selection it rendered, with every message added since kept after it.
+			const stale = run.observe()
+			const base = stale ? this.#refresh(run, prior) : prior
+			const names = run.ceiling.tools
+			const advertised = run.advertised
+			// The instance each advertised name holds at this point: every decision of this turn applies
+			// to it, and a built-in's name reads the run's own instance.
 			const held = new Map(
-				advertised.map((definition) => [definition.name, tools.tool(definition.name)]),
+				advertised.map((definition) => [definition.name, run.tool(definition.name)]),
 			)
 			const definitions = advertised.length > 0 ? advertised : undefined
 			// Admit the request: compose it once from the replay-filtered messages and this turn's tool
@@ -560,8 +574,7 @@ export class Agent implements AgentInterface {
 					? { dispatch: composed, messages: base, spent: undefined, futile }
 					: await this.#admit(
 							this.#window,
-							conversation,
-							scope,
+							run,
 							composed,
 							base,
 							request,
@@ -610,9 +623,9 @@ export class Agent implements AgentInterface {
 				const authorization = this.#authorize(result.tools, admittedCalls, advertised, held)
 				// The ask pass runs only for an asked call, so a turn with no `ask` verdict adds no `await`.
 				if (authorization.asked.length > 0 && !abort.signal.aborted) {
-					yield* this.#approve(tools, authorization, abort.signal)
+					yield* this.#approve(run, authorization, abort.signal)
 				}
-				if (!abort.signal.aborted) this.#confirm(tools, authorization, advertised)
+				if (!abort.signal.aborted) this.#confirm(run, authorization, advertised)
 				if (abort.signal.aborted) {
 					turns.push({ ...settled, outcome: 'cancel', partial: true })
 					continue
@@ -624,7 +637,7 @@ export class Agent implements AgentInterface {
 					...recorded,
 				})
 				const results = await this.#dispatch(
-					tools,
+					run,
 					result.tools,
 					abort.signal,
 					authorization,
@@ -779,8 +792,7 @@ export class Agent implements AgentInterface {
 	// WINDOW error before any dispatch, while `strict: false` sends it.
 	async #admit(
 		window: BudgetInterface<ProviderRequest>,
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
+		run: AgentRun,
 		composed: ProviderRequest,
 		messages: readonly Message[],
 		request: Message | undefined,
@@ -795,6 +807,7 @@ export class Agent implements AgentInterface {
 		// A cancelled run is about to settle, so a fold would spend summarizer time on a request no
 		// provider reads; the next run's first admission folds instead.
 		if (abort.signal.aborted) return { dispatch: undefined, messages, spent: undefined, futile }
+		const conversation = run.conversation
 		if (!conversation.summarizable || futile) {
 			return { dispatch: this.#enforce(window, composed), messages, spent: undefined, futile }
 		}
@@ -802,18 +815,7 @@ export class Agent implements AgentInterface {
 		// commits nothing, even when the summarizer ignores the signal.
 		return conversation.compact({ signal: abort.signal }).then(
 			(section) =>
-				this.#refold(
-					section,
-					window,
-					conversation,
-					scope,
-					composed,
-					messages,
-					request,
-					latch,
-					abort,
-					budget,
-				),
+				this.#refold(section, window, run, composed, messages, request, latch, abort, budget),
 			(error: unknown) => this.#unfold(error, composed, messages, abort),
 		)
 	}
@@ -824,8 +826,7 @@ export class Agent implements AgentInterface {
 	async #refold(
 		section: Section | undefined,
 		window: BudgetInterface<ProviderRequest>,
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
+		run: AgentRun,
 		composed: ProviderRequest,
 		messages: readonly Message[],
 		request: Message | undefined,
@@ -843,11 +844,9 @@ export class Agent implements AgentInterface {
 				futile: latch,
 			}
 		}
-		const selection = this.#select(conversation, scope, request, abort, budget)
+		const selection = this.#select(run, request, abort, budget)
 		const rebuilt =
-			selection === undefined
-				? { messages: this.#build(conversation, scope), usage: undefined }
-				: await selection
+			selection === undefined ? { messages: this.#build(run), usage: undefined } : await selection
 		if (abort.signal.aborted) {
 			return {
 				dispatch: undefined,
@@ -902,8 +901,7 @@ export class Agent implements AgentInterface {
 	// usage it spent, or `undefined` when there is no request or no handler, so the caller builds from
 	// `view()` without an await.
 	#select(
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
+		run: AgentRun,
 		request: Message | undefined,
 		abort: AbortInterface,
 		budget: BudgetInterface<TokenUsage> | undefined,
@@ -911,12 +909,12 @@ export class Agent implements AgentInterface {
 		const pending =
 			request === undefined
 				? undefined
-				: this.#context.select(conversation, request, abort.signal, scope)
+				: this.#context.select(run.conversation, request, abort.signal, run.scope)
 		return pending === undefined
 			? undefined
 			: pending.then(
-					(selection) => this.#adopt(conversation, scope, selection, abort, budget),
-					(error: unknown) => this.#reject(conversation, scope, error, abort),
+					(selection) => this.#adopt(run, selection, abort, budget),
+					(error: unknown) => this.#reject(run, error, abort),
 				)
 	}
 
@@ -924,52 +922,57 @@ export class Agent implements AgentInterface {
 	// either way and the charge can itself trip the run's bound; then build from it unless a cancel or
 	// a strict fault intervenes. A cancelled site builds from `view()` and emits no `select`.
 	#adopt(
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
+		run: AgentRun,
 		selection: Selection,
 		abort: AbortInterface,
 		budget: BudgetInterface<TokenUsage> | undefined,
 	) {
 		const usage = selection.usage === undefined ? undefined : sanitizeUsage(selection.usage)
 		if (usage !== undefined) chargeUsage(budget, usage, 0)
-		if (abort.signal.aborted) return { messages: this.#build(conversation, scope), usage }
+		if (abort.signal.aborted) return { messages: this.#build(run), usage }
 		if (selection.fault !== undefined) {
 			this.#emitter.emit('fault', selection.fault)
-			if (abort.signal.aborted) return { messages: this.#build(conversation, scope), usage }
+			if (abort.signal.aborted) return { messages: this.#build(run), usage }
 			if (this.#strict) throw selection.fault
 		}
-		const messages = this.#build(conversation, scope, selection)
+		const messages = this.#build(run, selection)
 		this.#emitter.emit('select', selection)
 		return { messages, usage }
 	}
 
 	// A rejected selection: a fault unless cancelled, rethrown under `strict`, then the default build.
-	#reject(
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
-		error: unknown,
-		abort: AbortInterface,
-	) {
+	#reject(run: AgentRun, error: unknown, abort: AbortInterface) {
 		if (!abort.signal.aborted) {
 			this.#emitter.emit('fault', error)
 			// A `fault` listener can cancel the run synchronously; the cancel then wins over `strict`.
 			if (this.#strict && !abort.signal.aborted) throw error
 		}
-		return { messages: this.#build(conversation, scope), usage: undefined }
+		return { messages: this.#build(run), usage: undefined }
 	}
 
 	// Every build of a run renders its bound conversation: a selection's messages when one is given,
 	// else that conversation's `view()`, never the pointer a later `switch` may have moved, under the
-	// context scope intersected with the run scope.
-	#build(
-		conversation: ConversationInterface,
-		scope: ScopeInterface | undefined,
-		selection?: Selection,
-	): readonly Message[] {
-		return this.#context.build({
-			selection: selection ?? { messages: conversation.view(), judgments: [] },
+	// context scope intersected with the run scope, with what the run's last view shows. The run
+	// records the selection, the built length, and that view, which the next turn compares.
+	#build(run: AgentRun, selection?: Selection): readonly Message[] {
+		const rendered = selection ?? { messages: run.conversation.view(), judgments: [] }
+		const scope = run.snapshot
+		const disclosure = run.disclosure
+		const messages = this.#context.build({
+			selection: rendered,
 			...(scope === undefined ? {} : { scope }),
+			...(disclosure === undefined ? {} : { disclosure }),
+			...(run.switchable ? { switchable: true } : {}),
 		})
+		run.record(rendered, messages.length)
+		return messages
+	}
+
+	// Rebuilds a working head over the selection it rendered and keeps every message added after it,
+	// so no stored message enters twice and the additions keep their ids.
+	#refresh(run: AgentRun, messages: readonly Message[]): readonly Message[] {
+		const added = messages.slice(run.length)
+		return [...this.#build(run, run.selection), ...added]
 	}
 
 	// Evaluate policy and emit each verdict before the run's final pre-dispatch abort guard, in call
@@ -1077,7 +1080,7 @@ export class Agent implements AgentInterface {
 	// later handler is entered; `raceSignal` absorbs a late settle. An approval of a tool that is no
 	// longer the turn's held instance is denied as unanswered; any other approval seats that instance.
 	async *#approve(
-		tools: ToolManagerInterface,
+		run: AgentRun,
 		authorization: {
 			readonly allowed: Map<
 				number,
@@ -1125,7 +1128,7 @@ export class Agent implements AgentInterface {
 			yield { category: 'ask', call, decision }
 			const outcome = await raceSignal(answer, signal).catch(() => undefined)
 			if (outcome === undefined || signal.aborted) return
-			if (outcome.approved && tools.tool(call.name) === tool) {
+			if (outcome.approved && run.tool(call.name) === tool) {
 				authorization.allowed.set(index, { call, tool })
 				this.#emitter.emit('allow', call, decision)
 			} else {
@@ -1140,13 +1143,13 @@ export class Agent implements AgentInterface {
 	// identity, so a host that re-adds the same instance still runs. The tool is foreign, so a read that
 	// throws counts as a change.
 	#changed(
-		tools: ToolManagerInterface,
+		run: AgentRun,
 		call: ToolCall,
 		tool: ToolInterface | undefined,
 		advertised: readonly ToolDefinition[],
 	): boolean {
 		const same = attempt(() => {
-			const current = tools.tool(call.name)
+			const current = run.tool(call.name)
 			const definition = advertised.find((entry) => entry.name === call.name)
 			return (
 				current === tool &&
@@ -1160,7 +1163,7 @@ export class Agent implements AgentInterface {
 	// Denies each allowed call whose tool changed since its decision, with no `await` and before the
 	// pre-dispatch abort guard, so a `deny` listener that cancels here stores nothing.
 	#confirm(
-		tools: ToolManagerInterface,
+		run: AgentRun,
 		authorization: {
 			readonly allowed: Map<
 				number,
@@ -1171,12 +1174,12 @@ export class Agent implements AgentInterface {
 		advertised: readonly ToolDefinition[],
 	): void {
 		for (const [index, { call, tool }] of authorization.allowed) {
-			if (!this.#changed(tools, call, tool, advertised)) continue
+			if (!this.#changed(run, call, tool, advertised)) continue
 			authorization.allowed.delete(index)
 			authorization.denials.set(index, denyCall(call, AUTHORITY_NOTES.denied))
 			this.#emitter.emit('deny', call, `${call.name} changed after its decision`, undefined)
 			// A deny listener can change a tool this walk already read, so walk them all again.
-			this.#confirm(tools, authorization, advertised)
+			this.#confirm(run, authorization, advertised)
 			return
 		}
 	}
@@ -1188,7 +1191,7 @@ export class Agent implements AgentInterface {
 	// each call is checked again right before it starts: the check and the manager's lookup read one
 	// instance, and the manager keeps its own policy for the call.
 	async #dispatch(
-		tools: ToolManagerInterface,
+		run: AgentRun,
 		calls: readonly ToolCall[],
 		signal: AbortSignal,
 		authorization: {
@@ -1203,7 +1206,7 @@ export class Agent implements AgentInterface {
 		const { allowed, denials } = authorization
 		const entries = [...allowed].sort(([left], [right]) => left - right)
 		const started = entries.map(([, { call, tool }]) => {
-			if (!this.#changed(tools, call, tool, advertised)) return tools.execute(call, { signal })
+			if (!this.#changed(run, call, tool, advertised)) return run.execute(call, { signal })
 			this.#emitter.emit('deny', call, `${call.name} changed after its decision`, undefined)
 			return denyCall(call, AUTHORITY_NOTES.denied)
 		})

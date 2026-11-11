@@ -139,6 +139,9 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * `'AUTHORITY'` reports an `Authority` built with no valid `fallback`, a rule with no valid `verdict`
  * (its `context` names the `rule` index), and an agent built with `tools` and no `authority`. Each
  * throws at construction, with the options a host passes to correct it in the message.
+ * `'BUILTIN'` reports a `builtins` entry that is not a built-in or repeats one, `unload` enabled
+ * without `load`, and a tool manager holding a tool under an enabled built-in's name, each thrown
+ * at construction.
  * `'CONCURRENCY'` reports a run started while another run on the same agent is live, when the
  * agent carries a `window` (a shared context budget) or when the run's effective `budget` or
  * `allowance` is an instance a live run holds — the second run's `start()` would replace that
@@ -158,7 +161,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * Narrow a caught value with {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver, or one its approver refuses; `'AUTHORITY'`: an authority missing its fallback or a rule's verdict, or tools set with no authority; `'CONCURRENCY'`: a run sharing accounting or a conversation with a live run; `'LIMIT'`: a `limit` that is not a positive safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
+	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver, or one its approver refuses; `'AUTHORITY'`: an authority missing its fallback or a rule's verdict, or tools set with no authority; `'BUILTIN'`: a built-in list the agent cannot serve; `'CONCURRENCY'`: a run sharing accounting or a conversation with a live run; `'LIMIT'`: a `limit` that is not a positive safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
 	readonly code: AgentErrorCode
 	/** Holds the values that locate the failure, such as the `agent` id of a refused run, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined
@@ -210,6 +213,7 @@ export function isAgentError(value: unknown): value is AgentError {
 			!(
 				code === 'APPROVER' ||
 				code === 'AUTHORITY' ||
+				code === 'BUILTIN' ||
 				code === 'CONCURRENCY' ||
 				code === 'LIMIT' ||
 				code === 'REGISTRY' ||

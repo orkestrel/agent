@@ -22,7 +22,7 @@ import type {
 	LedgerWordSet,
 	LedgerReceipt,
 } from './types.js'
-import type { ToolCall, ToolDefinition } from '@orkestrel/tool'
+import type { ToolDefinition } from '@orkestrel/tool'
 import { attempt, canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { collectToolGroups, extractLiterals, hasCalls, renderJSON } from '../helpers.js'
@@ -371,27 +371,6 @@ export function splitWords(part: string): readonly string[] {
 		.split(/\s+/)
 		.map((word) => word.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '').toLowerCase())
 		.filter((word) => word !== '')
-}
-
-/**
- * Finds the call that owns a tool message within a collected tool group.
- * @param group - The assistant leader followed by its tool results
- * @param message - The tool result to pair; distinct leader ids pair by result id when any result has one
- * @returns The call matching the result's call id, or its position when the leader repeats an id or every result lacks an id; undefined when unpaired
- * @example
- * ```ts
- * findLedgerCall(group, result)?.arguments
- * ```
- */
-export function findLedgerCall(group: readonly Message[], message: Message): ToolCall | undefined {
-	const [leader, ...results] = group
-	const at = results.findIndex((result) => result.id === message.id)
-	if (message.role !== 'tool' || at < 0) return undefined
-	const calls = leader?.calls ?? []
-	const duplicate = new Set(calls.map((call) => call.id)).size !== calls.length
-	return !duplicate && results.some((result) => result.call !== undefined)
-		? calls.find((call) => call.id === message.call)
-		: calls[at]
 }
 
 /**

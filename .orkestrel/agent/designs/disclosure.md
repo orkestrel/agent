@@ -298,6 +298,32 @@ Two alternatives were ruled out:
 
 **Hands phase 3:** `resolveDisclosure`, `filterAdvertisedTools`, `collectBuiltinDefinitions`, `BUILTIN_NOTES`, and the `build` options that carry the shown set.
 
+**As built.** Phase 2 closed on these accepted deviations from the text above. Each one keeps an earlier claim or a rule this design did not state.
+- **Placement.**
+  - `collectDisclosure` sits in `agents/helpers.ts`, as designed. It never imports `contexts/` into `agents/`.
+  - The built-in tool descriptions and annotations are `BUILTIN_TOOLS`, a record keyed by name in `agents/constants.ts`.
+  - The argument contracts are `loadToolContract`, `memoToolContract`, `rememberToolContract`, and `switchToolContract`, paired with their shapes in `builtinToolContracts` in `agents/contracts.ts`.
+  - Each built-in tool is built by `createBuiltinTool` in `agents/factories.ts`.
+  - `isAgentBuiltin` narrows names, in `agents/validators.ts`.
+  - `helpers.ts` imports no shaper (`architecture.md` § Keep the leaf pair class-free).
+- **Signatures.**
+  - `resolveDisclosure` takes the ceiling the turn already read and the run's enabled built-ins, not the run scope, so claim 1.5's one read a turn holds. The entry read serves as the entry build's read.
+  - `collectDisclosure` takes the run's enabled built-ins, and counts only their records.
+- **Derivation.**
+  - A built-in call's stored arguments are admitted by the same contract and lossless repair as the tool door, so a reply and the view agree.
+  - A reload after an unload goes last, not at its first-load place.
+  - A stored record cannot show who wrote it, so a record written under a built-in's name while that built-in was off counts once it is on, still bounded by the registry and the ceiling.
+- **Refusals.**
+  - `unload` of a host-given skill always refuses, whether or not the model also loaded it.
+  - `remember` refuses a name or description that is blank, meaning empty after removing white space and default-ignorable code points (`ARGUMENT_BLANK_PATTERN`). The one-line check is `ARGUMENT_CONTROL_PATTERN`.
+  - `SkillManager` refuses a `tools` member that isn't absent or a dense list of strings, with `ContractError('placement')`, reading it once.
+- **Caps.** `BUILTIN_LIMITS` counts code points, as `stringShape` counts them, not UTF-16 code units.
+- **The context.**
+  - An unregistered `disclosure.workspace` renders no workspace.
+  - The active workspace is hidden when the ceiling's `workspaces` list excludes it.
+  - `renderIndexLine` keeps a workspace index entry on one line.
+- **Claim 2.1.** Requests equal phase 1's over every scenario with no mid-run list change. Under claim 2.20, a changed scenario differs in the rebuilt head. Where a window folds, it may also differ in the tail, but only together with a changed fold decision.
+
 ### The durable-job unit
 
 **Ruling, the user, 2026-11-10.** A durable job's input carries a narrowing scope and disclosure, checked against its parent. The unit is built in this campaign, after phase 2, with weight 1.0 (3.4 lane hours, provisional).
@@ -1547,6 +1573,10 @@ Every other finding enters the deferral list.
 | A host-supplied `gauge` recalibrates once the definitions change (claim 1.11), so a host whose provider reports no prompt usage gets `LedgerError('GAUGE')` after adding a tool | such a host | Agent |
 | `ledger.agent.emitter` exposes `emit`, `clear`, and `destroy`, as every agent's does, so host code holding it can emit a `usage` event or clear the ledger's listeners | a host that hands a ledger's emitter to code it does not trust | Agent |
 | A host's own call to `agent.context.select` with the active request's message, during a pass, files that request again, so the result's `attempts` doubles. No message is stored twice. | a host that calls `select` itself during a pass | Agent |
+| The model learns which memo names it may write only from a refusal, because the memos index lists only memos that exist | the 4B reading shows `remember` calls refused for their name | Agent |
+| An approver is asked about a `remember` whose handler then refuses its name, because the authority runs before the handler reads the ceiling | an approver who meets asks for writes that cannot happen, or the 4B reading shows them | Agent |
+| Text a model writes with U+2800, a lone surrogate, private-use or unassigned code points, or a combining mark alone passes as visible, and reads blank in the memos index. The index sits in the context message, not `system`. | such text seen in a memos index | Agent |
+| `collectDisclosure` admits each counted record through its contract, and the growth of claim 2.11 reads 2.36× to 2.47× against the 2.5× bar | a reading over the bar, met by caching each record's admission | Agent |
 
 ROADMAP items the campaign closes: 67 and 68 in phase 1; the first clause of 37 in phase 2; 6 at the end of phase 3, after its reading; 9 in phase 5. Item 8 is ruled in phase 3. Phase 1's repair also removes item 9's second trigger, "an application runs a ledger's agent on another conversation", because the ledger holds no member that starts such a run. Item 9's other trigger and phase 5's binding stay.
 

@@ -8,6 +8,7 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { AuditFault, JSONSchema } from '@orkestrel/contract'
+import type { ToolCall } from '@orkestrel/tool'
 import {
 	describeFaults,
 	attempt,
@@ -550,6 +551,27 @@ export function collectToolGroups(messages: readonly Message[]): ReadonlyArray<r
 		return orphan.length > 0 ? [orphan] : []
 	})
 	return [...groups, ...orphans]
+}
+
+/**
+ * Finds the call that owns a tool message within a collected tool group.
+ * @param group - The assistant leader followed by its tool results, as {@link collectToolGroups} returns it
+ * @param message - The tool result to pair; distinct leader ids pair by result id when any result has one
+ * @returns The call matching the result's call id, or its position when the leader repeats an id or every result lacks an id; undefined when unpaired
+ * @example
+ * ```ts
+ * findToolCall(group, result)?.arguments
+ * ```
+ */
+export function findToolCall(group: readonly Message[], message: Message): ToolCall | undefined {
+	const [leader, ...results] = group
+	const at = results.findIndex((result) => result.id === message.id)
+	if (message.role !== 'tool' || at < 0) return undefined
+	const calls = leader?.calls ?? []
+	const duplicate = new Set(calls.map((call) => call.id)).size !== calls.length
+	return !duplicate && results.some((result) => result.call !== undefined)
+		? calls.find((call) => call.id === message.call)
+		: calls[at]
 }
 
 /**

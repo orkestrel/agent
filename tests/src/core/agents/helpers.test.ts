@@ -69,6 +69,21 @@ import {
 	resolveDecision,
 	extractQueueOptions,
 	tokenUsageToJSON,
+	BUILTIN_LIMITS,
+	BUILTIN_TOOLS,
+	createBuiltinTool,
+	collectBuiltinDefinitions,
+	createAgentContext,
+	describeCandidates,
+	filterAdvertisedTools,
+	matchesHeadLists,
+	matchesPlainLine,
+	requireBuiltins,
+	requireDisclosure,
+	resolveDisclosure,
+	collectDisclosure,
+	collectToolGroups,
+	findToolCall,
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
 import { attempt, isContractError, isRecord, parseJSONValue } from '@orkestrel/contract'
@@ -79,7 +94,7 @@ import {
 	invokeUnchecked,
 	requireValue,
 } from '@orkestrel/test'
-import { createToolManager } from '@orkestrel/tool'
+import { createToolManager, toolToDefinition } from '@orkestrel/tool'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	AGENT_SCRIPT_OPTIONS,
@@ -94,6 +109,31 @@ import {
 	createToolCall,
 	createTokenUsage,
 	RENDERED_ARGUMENTS,
+	AGENT_DISCLOSURE_CASES,
+	BUILTIN_NAMES,
+	BUILTIN_OPTION_REFUSALS,
+	createStoredConversation,
+	DISCLOSURE_RELOADED,
+	DISCLOSURE_SWITCHED,
+	HEAD_LIST_CASES,
+	HOLD_CASES,
+	HOLD_DEFINITIONS,
+	HOLD_SKILLS,
+	PLAIN_LINE_CASES,
+	ADMITTED_DISCLOSURE_CASES,
+	ENABLED_DISCLOSURE_CASES,
+	createFoldedConversation,
+	DISCLOSURE_CASES,
+	DISCLOSURE_FOLD_CASES,
+	DISCLOSURE_LOAD_BILLING,
+	DISCLOSURE_LOAD_CLAIMS,
+	DISCLOSURE_LOOP_CASES,
+	DISCLOSURE_REFUSAL,
+	DISCLOSURE_SWITCH_NORTH,
+	DISCLOSURE_UNLOAD_BILLING,
+	DISCLOSURE_UNLOAD_CLAIMS,
+	executeDisclosureLoop,
+	restoreConversation,
 } from '../../../setup.js'
 
 describe('requireEntry', () => {
@@ -1753,5 +1793,399 @@ describe('agentStreamToFrames — the page projection of one run', () => {
 				.messages.map((message) => message.content)
 				.join('\n'),
 		).toContain(CANARY_SENTINELS.copy)
+	})
+})
+
+describe('collectBuiltinDefinitions', () => {
+	it('equals what two createTool runs of each built-in project, in the order builtins lists them', () => {
+		const order = ['switch', 'memo', 'load', 'remember', 'unload'] as const
+		const projected = order.map((name) => [
+			toolToDefinition(createBuiltinTool(name, () => 'first')),
+			toolToDefinition(createBuiltinTool(name, () => 'second')),
+		])
+
+		expect(projected.map(([first]) => first)).toEqual(projected.map(([, second]) => second))
+		expect(collectBuiltinDefinitions({ builtins: order })).toEqual(
+			projected.map(([first]) => first),
+		)
+	})
+
+	it('declares each built-in once, in AgentBuiltin order, memo pure and untrusted and remember consequential', () => {
+		expect(Object.keys(BUILTIN_TOOLS)).toEqual(BUILTIN_NAMES)
+		expect(Object.values(BUILTIN_TOOLS).map((tool) => tool.annotations)).toEqual([
+			undefined,
+			undefined,
+			{ pure: true, untrusted: true },
+			{ consequential: true },
+			undefined,
+		])
+		expect(
+			Object.isFrozen(BUILTIN_TOOLS) &&
+				Object.values(BUILTIN_TOOLS).every((tool) => Object.isFrozen(tool)),
+		).toBe(true)
+	})
+
+	it('derives each argument schema from its shape, capped by BUILTIN_LIMITS and closed', () => {
+		const [load] = collectBuiltinDefinitions({ builtins: ['load'] })
+		expect(load?.parameters).toMatchObject({
+			type: 'object',
+			properties: { skill: { type: 'string', minLength: 1, maxLength: BUILTIN_LIMITS.name } },
+			required: ['skill'],
+			additionalProperties: false,
+		})
+	})
+
+	it('returns nothing with no builtins, and nothing for a name that is no built-in', () => {
+		expect(collectBuiltinDefinitions({})).toEqual([])
+		expect(collectBuiltinDefinitions({ builtins: [] })).toEqual([])
+		expect(invokeUnchecked(undefined, collectBuiltinDefinitions, [{ builtins: ['open'] }])).toEqual(
+			[],
+		)
+	})
+})
+
+describe('requireBuiltins', () => {
+	it('returns an owned, frozen copy, and an empty list for an absent option', () => {
+		const given = ['load', 'unload', 'memo'] as const
+		const owned = requireBuiltins(given, createToolManager())
+		expect(owned).toEqual(given)
+		expect(owned).not.toBe(given)
+		expect(Object.isFrozen(owned)).toBe(true)
+		expect(requireBuiltins(undefined, createToolManager())).toEqual([])
+	})
+
+	it.each(BUILTIN_OPTION_REFUSALS)('refuses $name with BUILTIN', ({ value }) => {
+		const error = captureError(() => requireBuiltins(value, createToolManager()))
+		expect(isAgentError(error) && error.code === 'BUILTIN').toBe(true)
+	})
+
+	it('refuses a name the host manager already holds a tool under, and names the tool', () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(createRecordedTool('memo', executed))
+		const error = captureError(() => requireBuiltins(['load', 'memo'], tools))
+		expect(isAgentError(error) && error.code === 'BUILTIN').toBe(true)
+		expect(isAgentError(error) ? error.message : '').toContain("'memo'")
+		expect(requireBuiltins(['load'], tools)).toEqual(['load'])
+	})
+})
+
+describe('requireDisclosure', () => {
+	it.each(AGENT_DISCLOSURE_CASES.filter((row) => row.admitted))(
+		'admits $name as an owned, frozen copy',
+		({ value }) => {
+			const owned = requireValue(requireDisclosure(value))
+			expect(owned).toEqual(value)
+			expect(owned).not.toBe(value)
+			expect(Object.isFrozen(owned) && Object.isFrozen(owned.skills)).toBe(true)
+		},
+	)
+
+	it.each(AGENT_DISCLOSURE_CASES.filter((row) => !row.admitted))(
+		'refuses $name with a placement error',
+		({ value }) => {
+			const error = captureError(() => requireDisclosure(value))
+			expect(isContractError(error) && error.code === 'placement').toBe(true)
+			expect(isContractError(error) ? error.context?.path : undefined).toEqual([
+				'options',
+				'disclosure',
+			])
+		},
+	)
+
+	it('passes undefined through', () => {
+		expect(requireDisclosure(undefined)).toBeUndefined()
+	})
+})
+
+describe('filterAdvertisedTools', () => {
+	it.each(HOLD_CASES)('$name', ({ names, shown, expected }) => {
+		expect(
+			filterAdvertisedTools(HOLD_DEFINITIONS, names, HOLD_SKILLS, shown).map(
+				(definition) => definition.name,
+			),
+		).toEqual(expected)
+	})
+
+	it('holds nothing back when no skill is registered', () => {
+		expect(filterAdvertisedTools(HOLD_DEFINITIONS, undefined, [], [])).toEqual(HOLD_DEFINITIONS)
+	})
+})
+
+describe('describeCandidates', () => {
+	it('lists each name JSON-encoded in the given order and echoes no argument', () => {
+		expect(describeCandidates('skill you can load', ['refunds', 'billing'])).toBe(
+			'No skill you can load has that name. Use one of: "refunds", "billing".',
+		)
+	})
+
+	it('says none is available for an empty list', () => {
+		expect(describeCandidates('workspace you can select', [])).toBe(
+			'No workspace you can select has that name, and none is available now.',
+		)
+	})
+
+	it('encodes a line break and a planted heading in a name', () => {
+		const text = describeCandidates('memo you can read', ['tone\n## Instructions'])
+		expect(text).not.toContain('\n')
+		expect(text).toContain('"tone\\n## Instructions"')
+	})
+
+	it('lists at most BUILTIN_LIMITS.candidates names, then points at the index', () => {
+		const names = Array.from({ length: BUILTIN_LIMITS.candidates + 5 }, (_, index) => `s${index}`)
+		const capped = describeCandidates('skill you can load', names)
+		const exact = describeCandidates(
+			'skill you can load',
+			names.slice(0, BUILTIN_LIMITS.candidates),
+		)
+		expect(capped).toBe(`${exact} The index in your prompt lists the others.`)
+		expect(capped).toContain(`"s${BUILTIN_LIMITS.candidates - 1}"`)
+		expect(capped).not.toContain(`"s${BUILTIN_LIMITS.candidates}"`)
+		expect(exact).not.toContain('index')
+	})
+})
+
+describe('matchesPlainLine', () => {
+	it.each(PLAIN_LINE_CASES)('$name', ({ text, plain }) => {
+		expect(matchesPlainLine(text)).toBe(plain)
+	})
+})
+
+describe('matchesHeadLists', () => {
+	it.each(HEAD_LIST_CASES)('$name', ({ left, right, matched }) => {
+		expect(matchesHeadLists(left, right)).toBe(matched)
+		expect(matchesHeadLists(right, left)).toBe(matched)
+	})
+})
+
+describe('resolveDisclosure', () => {
+	it('shows the given skills, then the recorded ones, without repeats, each registered and admitted', () => {
+		const context = createAgentContext()
+		context.skills.add([
+			{ name: 'billing', description: 'Billing', content: 'B' },
+			{ name: 'claims', description: 'Claims', content: 'C' },
+			{ name: 'audit', description: 'Audit', content: 'A' },
+		])
+		const conversation = createStoredConversation(DISCLOSURE_RELOADED.messages)
+
+		expect(
+			resolveDisclosure(context, conversation, { skills: ['audit', 'billing'] }, {}, BUILTIN_NAMES),
+		).toEqual({
+			skills: ['audit', 'billing', 'claims'],
+		})
+		expect(
+			resolveDisclosure(
+				context,
+				conversation,
+				{ skills: ['audit'] },
+				{ skills: ['claims', 'audit'] },
+				BUILTIN_NAMES,
+			),
+		).toEqual({ skills: ['audit', 'claims'] })
+		expect(
+			resolveDisclosure(context, conversation, undefined, { skills: [] }, BUILTIN_NAMES),
+		).toEqual({
+			skills: [],
+		})
+	})
+
+	it('shows nothing for an empty, repeated, or unregistered given name', () => {
+		const context = createAgentContext()
+		context.skills.add({ name: 'billing', description: 'Billing', content: 'B' })
+
+		expect(
+			resolveDisclosure(
+				context,
+				createStoredConversation([]),
+				{ skills: ['', 'billing', 'billing', 'ghost'] },
+				{},
+				BUILTIN_NAMES,
+			),
+		).toEqual({ skills: ['billing'] })
+		expect(
+			resolveDisclosure(
+				context,
+				createStoredConversation([]),
+				{ skills: [], workspace: '' },
+				{},
+				BUILTIN_NAMES,
+			),
+		).toEqual({
+			skills: [],
+		})
+	})
+
+	it('reads no record while none of load, unload, and switch is enabled', () => {
+		const context = createAgentContext()
+		context.skills.add([
+			{ name: 'billing', description: 'Billing', content: 'B' },
+			{ name: 'claims', description: 'Claims', content: 'C' },
+		])
+		const conversation = createStoredConversation(DISCLOSURE_RELOADED.messages)
+		expect(resolveDisclosure(context, conversation, undefined, {}, ['memo', 'remember'])).toEqual({
+			skills: [],
+		})
+		expect(resolveDisclosure(context, conversation, undefined, {}, ['load'])).toEqual({
+			skills: ['billing', 'claims'],
+		})
+	})
+
+	it('shows the last switch, else the given workspace, kept only when registered and admitted', () => {
+		const context = createAgentContext()
+		context.workspaces.add({ id: 'north' })
+		context.workspaces.add({ id: 'south' })
+		const switched = createStoredConversation(DISCLOSURE_SWITCHED.messages)
+		const silent = createStoredConversation([{ role: 'user', content: 'hi' }])
+
+		expect(
+			resolveDisclosure(context, switched, { skills: [], workspace: 'north' }, {}, BUILTIN_NAMES),
+		).toEqual({
+			skills: [],
+			workspace: 'south',
+		})
+		expect(
+			resolveDisclosure(context, silent, { skills: [], workspace: 'north' }, {}, BUILTIN_NAMES),
+		).toEqual({
+			skills: [],
+			workspace: 'north',
+		})
+		expect(
+			resolveDisclosure(context, switched, undefined, { workspaces: ['north'] }, BUILTIN_NAMES),
+		).toEqual({
+			skills: [],
+		})
+		expect(
+			resolveDisclosure(context, silent, { skills: [], workspace: 'east' }, {}, BUILTIN_NAMES),
+		).toEqual({
+			skills: [],
+		})
+	})
+})
+
+describe('collectDisclosure — the derivation table (claim 2.3)', () => {
+	it.each(DISCLOSURE_CASES)('$name', ({ messages, expected }) => {
+		expect(collectDisclosure(createStoredConversation(messages), BUILTIN_NAMES)).toStrictEqual(
+			expected,
+		)
+	})
+
+	it.each(DISCLOSURE_FOLD_CASES)('$name', async ({ exchanges, tail, options, expected }) => {
+		const { conversation } = await createFoldedConversation(exchanges, tail, options)
+		expect(conversation.sections.length).toBeGreaterThan(0)
+		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual(expected)
+	})
+
+	it('reads an empty conversation as nothing shown, with no workspace member', () => {
+		const disclosure = collectDisclosure(createStoredConversation([]), BUILTIN_NAMES)
+		expect(disclosure).toStrictEqual({ skills: [] })
+		expect(Object.keys(disclosure)).toEqual(['skills'])
+	})
+
+	it('a fold leaves no call group split across a section and the tail', async () => {
+		const { conversation } = await createFoldedConversation(
+			[DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS],
+			DISCLOSURE_UNLOAD_BILLING,
+			{},
+		)
+		expect(conversation.sections).toHaveLength(2)
+		for (const section of conversation.sections) {
+			const tools = section.messages.filter((message) => message.role === 'tool')
+			const owned = collectToolGroups(section.messages).flatMap((group) =>
+				group.filter((message) => findToolCall(group, message) !== undefined),
+			)
+			expect(owned).toHaveLength(tools.length)
+		}
+	})
+
+	it('a cumulative fold holds one section whose originals start with the first exchange', async () => {
+		const { conversation } = await createFoldedConversation(
+			[DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS, DISCLOSURE_UNLOAD_CLAIMS],
+			[],
+			{ cumulative: true },
+		)
+		expect(conversation.sections).toHaveLength(1)
+		expect(conversation.sections[0]?.messages[0]?.content).toBe('open billing')
+	})
+
+	it('a capped merge emits collapse and its merged section holds the earliest load', async () => {
+		const { conversation, collapsed } = await createFoldedConversation(
+			[
+				DISCLOSURE_LOAD_BILLING,
+				DISCLOSURE_LOAD_CLAIMS,
+				DISCLOSURE_UNLOAD_BILLING,
+				DISCLOSURE_LOAD_BILLING,
+			],
+			[],
+			{ sections: 2 },
+		)
+		expect(collapsed).toBeGreaterThan(0)
+		expect(conversation.sections.length).toBeLessThanOrEqual(2)
+		expect(conversation.sections[0]?.messages[0]?.content).toBe('open billing')
+	})
+
+	it('a conversation restored from its stored snapshot derives the same value', async () => {
+		const { conversation } = await createFoldedConversation(
+			[
+				DISCLOSURE_LOAD_BILLING,
+				DISCLOSURE_LOAD_CLAIMS,
+				DISCLOSURE_UNLOAD_BILLING,
+				DISCLOSURE_LOAD_BILLING,
+			],
+			DISCLOSURE_SWITCH_NORTH,
+			{ sections: 2 },
+		)
+		const restored = restoreConversation(conversation)
+		const expected = { skills: ['claims', 'billing'], workspace: 'north' }
+		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual(expected)
+		expect(collectDisclosure(restored, BUILTIN_NAMES)).toStrictEqual(expected)
+		expect(restored.sections).toHaveLength(conversation.sections.length)
+	})
+
+	it('rehydrating a section changes neither the messages nor the derivation', async () => {
+		const { conversation } = await createFoldedConversation(
+			[DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS],
+			DISCLOSURE_UNLOAD_BILLING,
+			{},
+		)
+		const before = collectDisclosure(conversation, BUILTIN_NAMES)
+		const count = conversation.count
+		expect(conversation.rehydrate(conversation.sections[0]?.id ?? '')?.length).toBeGreaterThan(0)
+		expect(conversation.count).toBe(count)
+		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual(before)
+	})
+
+	it('a host that removes the tool message of a load unloads it (stated limit)', () => {
+		const conversation = createStoredConversation([
+			...DISCLOSURE_LOAD_BILLING,
+			...DISCLOSURE_LOAD_CLAIMS,
+		])
+		const note = conversation.messages().find((message) => message.call === 'a1')
+		expect(conversation.remove(note?.id ?? '')).toBe(true)
+		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual({ skills: ['claims'] })
+	})
+})
+
+describe('collectDisclosure — over what the loop stores', () => {
+	it.each(DISCLOSURE_LOOP_CASES)('$name', async (row) => {
+		const { conversation, recorded, contents } = await executeDisclosureLoop(row)
+		// Two mechanisms agree: the derivation and the handlers' own record of what succeeded.
+		expect(recorded).toStrictEqual(row.expected)
+		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual(row.expected)
+		// A refusal row reaches its handler, never stopping at the tool's argument door.
+		expect(contents.includes(DISCLOSURE_REFUSAL)).toBe(row.refuse !== undefined)
+	})
+})
+
+describe('collectDisclosure — the arguments as the tool door admits them', () => {
+	it.each(ADMITTED_DISCLOSURE_CASES)('$name', ({ messages, expected }) => {
+		expect(collectDisclosure(createStoredConversation(messages), BUILTIN_NAMES)).toStrictEqual(
+			expected,
+		)
+	})
+})
+
+describe('collectDisclosure — only the built-ins a run enables count', () => {
+	it.each(ENABLED_DISCLOSURE_CASES)('$name', ({ messages, builtins, expected }) => {
+		expect(collectDisclosure(createStoredConversation(messages), builtins)).toStrictEqual(expected)
 	})
 })

@@ -3,9 +3,9 @@ import { intersectFilters } from '../helpers.js'
 
 /**
  * Represents a named, immutable filter over a richer context's items — an optional allow-list per
- * category (`instructions` / `skills` / `memos` / `tools` / `files`), each keyed by that category's
- * identity (an instruction's, a skill's, a memo's, or a tool's `name`, a workspace file's `path`)
- * and read as an allow-list:
+ * category (`instructions` / `skills` / `memos` / `tools` / `files` / `workspaces`), each keyed by
+ * that category's identity (an instruction's, a skill's, a memo's, or a tool's `name`, a workspace
+ * file's `path`, a workspace's `id`) and read as an allow-list:
  * `undefined` lets everything pass, `[]` lets nothing pass, and a non-empty list passes the listed
  * keys alone. `narrow` composes a tighter child by set intersection.
  *
@@ -42,6 +42,7 @@ export class Scope implements ScopeInterface {
 	readonly memos?: readonly string[]
 	readonly tools?: readonly string[]
 	readonly files?: readonly string[]
+	readonly workspaces?: readonly string[]
 	readonly select?: SelectionHandler
 
 	constructor(input: ScopeInput) {
@@ -54,6 +55,7 @@ export class Scope implements ScopeInterface {
 		if (input.memos !== undefined) this.memos = [...input.memos]
 		if (input.tools !== undefined) this.tools = [...input.tools]
 		if (input.files !== undefined) this.files = [...input.files]
+		if (input.workspaces !== undefined) this.workspaces = [...input.workspaces]
 	}
 
 	narrow(config: ScopeFilter): ScopeInterface {

@@ -2,7 +2,7 @@ import type { AgentJobInput, AgentResult } from '@src/core'
 import type { QueueEventMap } from '@orkestrel/queue'
 import { createRecorder, waitForCondition, waitForEvent } from '@orkestrel/test'
 import { JOB_USAGE, PARTIAL_TURNS, createObservedGatedProvider } from '../../../setup.js'
-import { numberShape, objectShape } from '@orkestrel/contract'
+import { createContract, isRecord, numberShape, objectShape } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createWorkspaceManager } from '@orkestrel/workspace'
 import {
@@ -18,6 +18,11 @@ import {
 	isAgentError,
 	isAgentJobError,
 	ProviderAbortError,
+	BUILTIN_TOOLS,
+	createBuiltinTool,
+	loadToolShape,
+	memoToolShape,
+	rememberToolShape,
 } from '@src/core'
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
 import { describe, expect, it } from 'vitest'
@@ -27,6 +32,8 @@ import {
 	createAgentJob,
 	createScriptedProvider,
 	createLoopTool,
+	BUILTIN_ARGUMENT_CASES,
+	BUILTIN_NAMES,
 } from '../../../setup.js'
 import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
 
@@ -858,5 +865,80 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		const caught = await runner.execute([createAgentJob()]).catch((error: unknown) => error)
 		expect(isQueueError(caught) ? caught.message : undefined).toBe('queue attempt timed out')
 		expect(provider.calls.map((call) => call.signal.aborted)).toEqual([true])
+	})
+})
+
+describe('createBuiltinTool', () => {
+	it.each(BUILTIN_ARGUMENT_CASES)(
+		'runs the handler only on arguments the shape admits: $name',
+		async ({ shape, value, admitted }) => {
+			const ran = createRecorder<[Readonly<Record<string, unknown>>]>()
+			const name =
+				shape === loadToolShape
+					? 'load'
+					: shape === memoToolShape
+						? 'memo'
+						: shape === rememberToolShape
+							? 'remember'
+							: 'switch'
+			const tools = createToolManager()
+			tools.add(
+				createBuiltinTool(name, (args) => {
+					ran.handler(args)
+					return 'ran'
+				}),
+			)
+			const result = await tools.execute({
+				id: 'b1',
+				name,
+				arguments: isRecord(value) ? value : {},
+			})
+
+			// The door repairs a number where a string is declared, losslessly, and refuses every other
+			// fault: a refused row runs only when that repair alone makes the shape admit it.
+			const repaired = isRecord(value)
+				? Object.fromEntries(
+						Object.entries(value).map(([key, member]) => [
+							key,
+							typeof member === 'number' ? String(member) : member,
+						]),
+					)
+				: value
+			const repairable = !admitted && createContract(shape).is(repaired)
+			expect(result.success).toBe(admitted || repairable)
+			expect(ran.count).toBe(admitted || repairable ? 1 : 0)
+			expect(ran.calls.every(([args]) => createContract(shape).is({ ...args }))).toBe(true)
+		},
+	)
+
+	it('refuses a number beside a genuine fault, and runs nothing', async () => {
+		const ran = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const tools = createToolManager()
+		tools.add(
+			createBuiltinTool('load', (args) => {
+				ran.handler(args)
+				return 'ran'
+			}),
+		)
+		const result = await tools.execute({
+			id: 'b2',
+			name: 'load',
+			arguments: { skill: 1, force: true },
+		})
+
+		expect(result.success).toBe(false)
+		expect(ran.count).toBe(0)
+	})
+
+	it('takes its name, description, and annotations from BUILTIN_TOOLS', () => {
+		for (const name of BUILTIN_NAMES) {
+			const declared = BUILTIN_TOOLS[name]
+			const tool = createBuiltinTool(name, () => 'ran')
+			expect([tool.name, tool.description, tool.annotations]).toEqual([
+				name,
+				declared.description,
+				declared.annotations,
+			])
+		}
 	})
 })

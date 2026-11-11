@@ -1,4 +1,7 @@
 import {
+	AGENT_DISCLOSURE_CASES,
+	BUILTIN_ARGUMENT_CASES,
+	BUILTIN_NAMES,
 	AGENT_WIRE_FRAMES,
 	REFUSED_WIRE_ANSWERS,
 	REFUSED_WIRE_FRAMES,
@@ -9,9 +12,11 @@ import { seededRandom } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
 import {
 	agentAnswerContract,
+	agentDisclosureContract,
 	agentFrameContract,
 	agentPromptContract,
 	agentJobContract,
+	builtinToolContracts,
 } from '@src/core'
 
 // The agent wire contracts: every frame arm accepted, every off-wire member refused, and the
@@ -20,6 +25,18 @@ import {
 describe('agent wire contracts', () => {
 	it.each(AGENT_JOB_CASES)('job: $name', ({ value, admitted }) => {
 		expect(agentJobContract.is(value)).toBe(admitted)
+	})
+
+	it.each(AGENT_DISCLOSURE_CASES)('disclosure: $name', ({ value, admitted }) => {
+		expect(agentDisclosureContract.is(value)).toBe(admitted)
+	})
+
+	it('parses seeded disclosures', () => {
+		for (const seed of Array.from({ length: 32 }, (_, index) => index + 1)) {
+			const value = agentDisclosureContract.generate(seededRandom(seed))
+			expect(agentDisclosureContract.is(value)).toBe(true)
+			expect(agentDisclosureContract.parse(value)).toEqual(value)
+		}
 	})
 
 	it('parses seeded durable jobs', () => {
@@ -90,4 +107,21 @@ describe('agent wire contracts', () => {
 			answer,
 		])
 	})
+})
+
+describe('builtinToolContracts', () => {
+	it('keys every built-in, in the order a run creates them, frozen', () => {
+		expect(Object.keys(builtinToolContracts)).toEqual(BUILTIN_NAMES)
+		expect(Object.isFrozen(builtinToolContracts)).toBe(true)
+	})
+
+	it.each(BUILTIN_ARGUMENT_CASES)(
+		'pairs each shape with the contract compiled from it: $name',
+		({ shape, value, admitted }) => {
+			const entries = Object.values(builtinToolContracts).filter((entry) => entry.shape === shape)
+
+			expect(entries.length).toBeGreaterThan(0)
+			for (const entry of entries) expect(entry.contract.is(value)).toBe(admitted)
+		},
+	)
 })

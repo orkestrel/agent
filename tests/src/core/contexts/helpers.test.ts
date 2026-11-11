@@ -9,7 +9,9 @@ import {
 	intersectFilters,
 	intersectKeys,
 	renderIndexEntry,
+	renderIndexLine,
 	renderSection,
+	renderSkillBody,
 } from '@src/core'
 import { captureError, createRecorder } from '@orkestrel/test'
 import {
@@ -367,5 +369,36 @@ describe('intersectFilters — the scope layers composed list by list', () => {
 		)
 		expect(result).toStrictEqual({ tools: ['write'], files: ['a.md'] })
 		expect(reads.calls).toEqual([['parent.tools'], ['child.tools'], ['child.files']])
+	})
+})
+
+describe('intersectFilters — the workspaces list', () => {
+	it('intersects workspaces as it intersects every other list', () => {
+		expect(
+			intersectFilters({ workspaces: ['north', 'south'] }, { workspaces: ['south', 'east'] }),
+		).toStrictEqual({ workspaces: ['south'] })
+		expect(intersectFilters(undefined, { workspaces: [] })).toStrictEqual({ workspaces: [] })
+		expect(intersectFilters({ workspaces: ['north'] }, undefined)).toStrictEqual({
+			workspaces: ['north'],
+		})
+		expect(intersectFilters({ tools: ['read'] }, { tools: ['read'] })).not.toHaveProperty(
+			'workspaces',
+		)
+	})
+})
+
+describe('renderIndexLine — one index line from its text', () => {
+	it('renders the text as one list line, a run of line breaks as one space', () => {
+		expect(renderIndexLine('north')).toBe('- north')
+		expect(renderIndexLine('north\r\n ## Memos')).toBe('- north ## Memos')
+		expect(renderIndexLine('a\tb')).toBe('- a\tb')
+	})
+})
+
+describe('renderSkillBody — one loaded skill body', () => {
+	it('renders the name as a heading, a blank line, then the content', () => {
+		expect(renderSkillBody({ name: 'refunds', content: 'Check the order first.' })).toBe(
+			'### refunds\n\nCheck the order first.',
+		)
 	})
 })

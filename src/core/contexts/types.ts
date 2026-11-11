@@ -215,25 +215,33 @@ export interface ContextSectionFormat<T> {
 
 /**
  * Lists the per-category allow-lists a {@link ScopeInterface} carries — an optional `readonly
- * string[]` for `instructions`, for `skills`, for `memos`, for `tools`, and for `files`, each keyed
- * by that category's identity (an instruction's, a skill's, a memo's, or a tool's `name`, a workspace
- * file's `path`) and read as an allow-list: `undefined` lets everything pass, `[]` lets nothing pass,
- * and a non-empty list passes the listed keys alone.
+ * string[]` for `instructions`, for `skills`, for `memos`, for `tools`, for `files`, and for
+ * `workspaces`, each keyed by that category's identity (an instruction's, a skill's, a memo's, or a
+ * tool's `name`, a workspace file's `path`, a workspace's `id`) and read as an allow-list:
+ * `undefined` lets everything pass, `[]` lets nothing pass, and a non-empty list passes the listed
+ * keys alone.
  *
  * @remarks
  * Each list is three-way (see {@link import('../helpers.js').filterAllowList}): `undefined`
  * ⇒ no constraint on that category (all pass); `[]` ⇒ none pass; a non-empty list ⇒ only
  * the listed keys pass. It is the shape both a {@link ScopeInput} and `Scope.narrow`
- * accept (a `name`-less narrowing config). `files` filters the active workspace's rendered
- * files (by `path`) in {@link AgentContextInterface.build} — both the text files folded into
- * the context message and the image files attached to the last user message.
+ * accept (a `name`-less narrowing config). `files` filters the rendered workspace's files (by
+ * `path`) in {@link AgentContextInterface.build} — both the text files folded into the context
+ * message and the image files attached to the last user message — and `workspaces` decides
+ * whether that workspace renders at all. Two lists bound a write as well as a read: the
+ * `remember` built-in writes only a name a defined `memos` list holds, and the `switch` built-in
+ * selects only an id a defined `workspaces` list holds.
  */
 export interface ScopeFilter {
 	/** Lists the allowed instruction names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
 	readonly instructions?: readonly string[]
 	/** Lists the allowed skill names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
 	readonly skills?: readonly string[]
-	/** Lists the allowed memo names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
+	/**
+	 * Lists the allowed memo names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed).
+	 * A write is the exception: the `remember` built-in writes only a name a defined list holds, so
+	 * `undefined` lets it write none.
+	 */
 	readonly memos?: readonly string[]
 	/**
 	 * Lists the allowed tool names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed).
@@ -243,11 +251,17 @@ export interface ScopeFilter {
 	readonly tools?: readonly string[]
 	/**
 	 * Lists the allowed active-workspace file paths matched against the `path` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
-	 * the filter {@link AgentContextInterface.build} applies to the active workspace's
+	 * the filter {@link AgentContextInterface.build} applies to the rendered workspace's
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} before rendering them (text → the context message, image →
 	 * the last user message).
 	 */
 	readonly files?: readonly string[]
+	/**
+	 * Lists the allowed workspace ids matched against the `id` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed).
+	 * A selection is the exception: the `switch` built-in selects only an id a defined list holds, so
+	 * `undefined` lets it select none.
+	 */
+	readonly workspaces?: readonly string[]
 }
 
 /**
@@ -677,8 +691,8 @@ export interface MemoSnapshotRow {
 }
 
 /**
- * Holds one skill: a name and a description the index shows, the instructions loading adds, and
- * bundled files.
+ * Holds one skill: a name and a description the index shows, the body a run shows, the tools it
+ * holds back, and bundled files.
  *
  * @remarks
  * A {@link SkillManagerInterface} mints it from a {@link SkillInput} and never mutates it. Its
@@ -691,8 +705,16 @@ export interface Skill {
 	readonly name: string
 	/** Holds the one-line entry the skill index shows. */
 	readonly description: string
-	/** Holds the instructions loading the skill adds. */
+	/**
+	 * Holds the body a run renders while it shows the skill: last in the `system` message, under
+	 * `## Loaded skills`, for the run's conversation alone. A blank body renders nothing.
+	 */
 	readonly content: string
+	/**
+	 * Names the tools the skill holds back: while a turn advertises `load`, each is advertised only
+	 * while a shown skill names it, within the turn's ceiling.
+	 */
+	readonly tools: readonly string[]
 	/** Lists the bundled files. */
 	readonly files: readonly FileInterface[]
 }
@@ -705,8 +727,34 @@ export interface SkillInput {
 	readonly name: string
 	readonly description: string
 	readonly content: string
+	/**
+	 * Names the tools the skill holds back until it is shown. The manager copies the list, and
+	 * refuses a value that is neither absent nor an array of strings with a `ContractError` coded
+	 * `'placement'`. Default: none.
+	 */
+	readonly tools?: readonly string[]
 	/** Lists the bundled files to mint with `createFile`. Default: none. */
 	readonly files?: readonly FileInput[]
+}
+
+/**
+ * Holds what one run shows within its ceiling: the loaded skills and the selected workspace.
+ *
+ * @remarks
+ * A host gives one as the `disclosure` option of an agent or a run, and the agent loop derives the
+ * model's part from the conversation's stored calls of the built-ins a run enables. Every read of it passes the ceiling
+ * and the registries, so a name that is not registered or not admitted shows nothing.
+ *
+ * @example
+ * ```ts
+ * const disclosure: AgentDisclosure = { skills: ['refunds'], workspace: 'orders' }
+ * ```
+ */
+export interface AgentDisclosure {
+	/** Names the loaded skills, in load order. */
+	readonly skills: readonly string[]
+	/** Names the selected workspace; omitted ⇒ the registry's active workspace. */
+	readonly workspace?: string
 }
 
 /**
@@ -758,11 +806,16 @@ export interface SkillManagerInterface {
 	/** Holds the line after the skills: the manager-options `close`, or `undefined` when none. */
 	readonly close: string | undefined
 	/**
-	 * Adds one {@link SkillInput}, or a batch: mints each `id` and file, and overwrites a
-	 * same-name skill, last write wins.
+	 * Adds one {@link SkillInput}, or a batch: mints each `id` and file, copies each `tools` list,
+	 * and overwrites a same-name skill, last write wins.
+	 *
+	 * @remarks
+	 * A `tools` member that is neither absent nor an array of strings refuses before that skill is
+	 * stored or emitted; in a batch, the skills before it stay stored.
 	 *
 	 * @param input - One {@link SkillInput}, or a batch
 	 * @returns The stored skill, or the stored batch in input order
+	 * @throws {ContractError} Thrown when a `tools` member is neither absent nor an array of strings (`code: 'placement'`)
 	 */
 	add(input: SkillInput): Skill
 	add(inputs: readonly SkillInput[]): readonly Skill[]
@@ -836,11 +889,11 @@ export interface AgentContextOptions {
 	readonly memos?: MemoManagerInterface
 	/**
 	 * Reuses a pre-built {@link WorkspaceManagerInterface}; a fresh empty one is created when
-	 * omitted (so `context.workspaces` is always present). `build()` renders the active workspace's
-	 * files by carrier — text files into the `user` context message after the system message
-	 * (fenced), image files attached to the last user message. The registry is structural; change
-	 * its active workspace through
-	 * `workspaces.switch(id)`. The active workspace is the sole document/image context.
+	 * omitted (so `context.workspaces` is always present). `build()` renders one workspace's files
+	 * by carrier — the one its `disclosure` option names, else the active one — text files into the
+	 * `user` context message after the system message (fenced), image files attached to the last user
+	 * message. That one workspace is the sole document/image context. The registry is structural;
+	 * change its active workspace through `workspaces.switch(id)`.
 	 */
 	readonly workspaces?: WorkspaceManagerInterface
 	/** Sets the initial active scope (the build-time filter); `undefined` ⇒ no filtering. */
@@ -852,9 +905,10 @@ export interface AgentContextOptions {
 	 * names no conversation — is always defined. `build()` folds the active conversation's
 	 * `view()` (the per-section summaries + the live tail), or a passed selection's `messages`.
 	 * The scope's filters never touch messages; message inclusion is the conversation's through
-	 * compaction and, when a handler is set, the selection's. A scope change reaches the prompt at
-	 * the next build or select site (run entry, the pre-first-turn compaction fold, or a compaction
-	 * rebuild) and the tools at the next turn's snapshot. The registry is structural; change its
+	 * compaction and, when a handler is set, the selection's. In an agent run, a scope change reaches
+	 * the tools and the head at the next turn's snapshot, where a changed list rebuilds the head, and
+	 * a `select` change waits for the next build or select site (run entry, the pre-first-turn
+	 * compaction fold, or a compaction rebuild). The registry is structural; change its
 	 * active conversation through the manager's `switch(id)`, which sets the next run's default and
 	 * never moves a live run.
 	 */
@@ -873,7 +927,11 @@ export interface AgentContextOptions {
  * @remarks
  * `selection` holds the conversation part in place of the active conversation's `view()`. `scope`
  * holds a run's scope: the build filters by the context scope intersected with it, list by list,
- * so a run scope narrows the context scope and never widens it.
+ * so a run scope narrows the context scope and never widens it. `disclosure` names the skills
+ * whose bodies close the `system` message and the workspace to render in place of the active one,
+ * each kept only where its registry holds it and that intersection admits it. `switchable` lists
+ * the admitted workspace ids in the context message, as an agent run does while it advertises
+ * `switch`.
  *
  * @example
  * ```ts
@@ -885,6 +943,10 @@ export interface ContextBuildOptions {
 	readonly selection?: Selection
 	/** Holds a run's scope; the build filters by the context scope intersected with it. */
 	readonly scope?: ScopeInterface
+	/** Holds the skills whose bodies close the system message and the workspace to render. Default: no body, the active workspace. */
+	readonly disclosure?: AgentDisclosure
+	/** If `true`, the context message lists the admitted workspace ids; if `false`, it lists none. Default: `false`. */
+	readonly switchable?: boolean
 }
 
 /**
@@ -896,12 +958,14 @@ export interface ContextBuildOptions {
  * (`instructions` / `skills` / `memos` / `workspaces` / `conversations`), `messages` (the active
  * conversation's live tail, satisfying {@link import('../conversations/index.js').MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
- * system prompt, the scoped instructions, and the scoped skills index into one leading `system`
- * message (under each manager's `open`, each item through its `render`), renders the scoped memos
- * index and the active workspace's scope-filtered text files (fenced reference blocks) into one
- * `user` context message after it, and appends the active conversation's `view()`, attaching the active workspace's scope-filtered image files'
- * `base64` payload to the last user message. The
- * active workspace is the sole document/image context. Tools are advertised to the provider
+ * system prompt, the scoped instructions, the scoped skills index, and the bodies of the skills
+ * its `disclosure` option shows into one leading `system` message (under each manager's `open`,
+ * each item through its `render`, the bodies last), renders the scoped memos index, the admitted
+ * workspace ids when `switchable` is `true`, and the rendered workspace's scope-filtered text files
+ * (fenced reference blocks) into one `user` context message after it, and appends the active
+ * conversation's `view()`, attaching the rendered workspace's scope-filtered image files' `base64`
+ * payload to the last user message. The rendered workspace is the one `disclosure` names, else
+ * the active one, and it is the sole document/image context. Tools are advertised to the provider
  * structurally (through `tools.definitions()`, scope-filtered by the loop), not serialized into
  * the prompt, so they never appear in the output of the `build()` method. The context managers are observable
  * (each through its own `emitter` property); the context itself is event-free.
@@ -914,13 +978,14 @@ export interface AgentContextInterface {
 	/** Holds the always-present memo set whose index `build()` renders in the `user` context message. */
 	readonly memos: MemoManagerInterface
 	/**
-	 * Holds the {@link WorkspaceManagerInterface} whose active workspace `build()` renders by carrier —
-	 * its text files folded into the `user` context message (fenced reference blocks) and its image files'
-	 * `base64` payload attached to the last user message. The active workspace is the sole
-	 * document/image context. Always present (a fresh empty manager when none was supplied).
-	 * `build()` reads its `active` (and the active workspace's `files()`) fresh each call. With no
-	 * active workspace, nothing is rendered for workspaces. Active-only — never the other registered
-	 * workspaces.
+	 * Holds the {@link WorkspaceManagerInterface} one of whose workspaces `build()` renders by
+	 * carrier — its text files folded into the `user` context message (fenced reference blocks) and
+	 * its image files' `base64` payload attached to the last user message. That workspace is the one
+	 * the `disclosure` build option names, else the active one, and it renders only while the
+	 * scope's `workspaces` list admits it; it is the sole document/image context. Always present (a
+	 * fresh empty manager when none was supplied). `build()` reads the registry and the workspace's
+	 * `files()` fresh each call, and never moves `active`. With no workspace to render, nothing is
+	 * rendered for workspaces.
 	 */
 	readonly workspaces: WorkspaceManagerInterface
 	/**
@@ -1002,23 +1067,31 @@ export interface AgentContextInterface {
 	): Promise<Selection> | undefined
 	/**
 	 * Builds the provider input for the next turn: a leading `system` message folding the
-	 * prompt, the scope-filtered instructions, and the scope-filtered skills index (each section's
-	 * header and each item's rendering resolved through the format cascade), then one `user` context
-	 * message holding the scope-filtered memos index before the active workspace's scope-filtered
-	 * (`scope.files`) text files as fenced reference blocks in a
-	 * `## Workspace` section, then the active conversation's `view()`, or the selection's
-	 * `messages` when a selection is passed, with the active workspace's image files' `base64`
-	 * payload attached to the last user message. With no override set, each section renders on its
-	 * manager's built-in framing. The `system` message is prepended only when some part of it
-	 * exists, the context message only when the memos or workspace section renders, the workspace render
-	 * covers the active workspace alone, tools are advertised structurally rather than in the
-	 * prompt, and the input is built fresh on each call.
+	 * prompt, the scope-filtered instructions, the scope-filtered skills index (each section's
+	 * header and each item's rendering resolved through the format cascade), and last the bodies of
+	 * the skills `disclosure` shows under `## Loaded skills`, then one `user` context message holding
+	 * the scope-filtered memos index, the admitted workspace ids under `## Workspaces` when
+	 * `switchable` is `true`, and the rendered workspace's scope-filtered (`scope.files`) text files
+	 * as fenced reference blocks in a `## Workspace` section, then the active conversation's
+	 * `view()`, or the selection's `messages` when a selection is passed, with the rendered
+	 * workspace's image files' `base64` payload attached to the last user message. With no override
+	 * set, each section renders on its manager's built-in framing. The `system` message is prepended
+	 * only when some part of it exists, the context message only when one of its sections renders,
+	 * one workspace renders, tools are advertised structurally rather than in the prompt, and the
+	 * input is built fresh on each call.
 	 *
 	 * @remarks
-	 * **The active workspace (rendered by carrier) — the sole document/image context.** When
-	 * `workspaces.active` is set, its
+	 * **The shown bodies.** Each name `disclosure.skills` lists renders once, in the given order,
+	 * as `### name` and the skill's `content`, when the skill registry holds it and the scope's
+	 * `skills` list admits it; a blank body renders nothing, and an unregistered or excluded name
+	 * renders nothing.
+	 *
+	 * **The rendered workspace (by carrier) — the sole document/image context.** It is the one
+	 * `disclosure.workspace` names, else `workspaces.active`, and it renders only while the scope's
+	 * `workspaces` list admits it; an unregistered `disclosure.workspace` renders none, and the build
+	 * never moves `workspaces.active`. Its
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} are filtered by
-	 * `scope.files` (a three-way allow-list; `undefined` ⇒ all active files), then split by
+	 * `scope.files` (a three-way allow-list; `undefined` ⇒ all its files), then split by
 	 * carrier: text files ({@link import('@orkestrel/workspace').isTextContent}) render into a dedicated
 	 * `## Workspace` section in the context message — a `user` message with a minted id that
 	 * follows the system message and is never stored — each a fenced
@@ -1026,8 +1099,7 @@ export interface AgentContextInterface {
 	 * the longest backtick run in the text, and never shorter than three; binary files whose MIME
 	 * starts with `image/` have their `base64` payload
 	 * attached to the last user message (a vision provider reads images off a user turn).
-	 * Active-only — never the other registered workspaces; with no active workspace nothing is
-	 * rendered for workspaces.
+	 * One workspace renders at most; with none to render, nothing is rendered for workspaces.
 	 *
 	 * **The format cascade.** Each manager section frames as `[open, ...items.map(render), close]`
 	 * (empty / absent slots dropped, the survivors `\n\n`-joined), reading the manager's `open`,
@@ -1053,11 +1125,13 @@ export interface AgentContextInterface {
 	 * handler that adds text for the model, such as a ledger's records, writes it into a message of
 	 * `selection.messages`.
 	 *
-	 * @param options - The selection whose `messages` replace `view()`, and a run's scope intersected
-	 *   with the active one; omitted ⇒ `view()` under the active scope
-	 * @returns The scoped conversation, prefixed by the context message when the scoped memos or the
-	 *   active workspace's scoped text files are non-empty, and before it by the assembled `system`
-	 *   message when the prompt, the scoped instructions, or the scoped skills are non-empty
+	 * @param options - The selection whose `messages` replace `view()`, a run's scope intersected
+	 *   with the active one, what the build shows, and whether it lists the workspace ids; omitted ⇒
+	 *   `view()` under the active scope, with no body and the active workspace
+	 * @returns The scoped conversation, prefixed by the context message when the scoped memos, the
+	 *   listed workspace ids, or the rendered workspace's scoped text files are non-empty, and before
+	 *   it by the assembled `system` message when the prompt, the scoped instructions, the scoped
+	 *   skills, or the shown bodies are non-empty
 	 */
 	build(options?: ContextBuildOptions): readonly Message[]
 }

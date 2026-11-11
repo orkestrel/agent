@@ -1,5 +1,27 @@
-import type { AuthorityDecision, AuthorityVerdict } from './types.js'
+import type { AgentBuiltin, AuthorityDecision, AuthorityVerdict } from './types.js'
 import { isString, objectOf } from '@orkestrel/contract'
+
+/**
+ * Checks whether a value names a built-in: `load`, `unload`, `memo`, `remember`, or `switch`.
+ *
+ * @param value - The unknown name candidate
+ * @returns True if the value names a built-in; false otherwise
+ *
+ * @example
+ * ```ts
+ * isAgentBuiltin('load') // true
+ * isAgentBuiltin('open') // false
+ * ```
+ */
+export function isAgentBuiltin(value: unknown): value is AgentBuiltin {
+	return (
+		value === 'load' ||
+		value === 'unload' ||
+		value === 'memo' ||
+		value === 'remember' ||
+		value === 'switch'
+	)
+}
 
 /**
  * Checks whether a value is an authority verdict: `allow`, `ask`, or `deny`.

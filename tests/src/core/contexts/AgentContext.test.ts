@@ -16,7 +16,9 @@ import {
 	createSkillManager,
 	InstructionManager,
 	isConversationError,
+	LOADED_SECTION_HEADER,
 	Scope,
+	WORKSPACE_INDEX_HEADER,
 	WORKSPACE_SECTION_HEADER,
 } from '@src/core'
 import { describe, expect, it } from 'vitest'
@@ -29,6 +31,7 @@ import {
 	resolveSectionOpen,
 	resolveSectionRender,
 	seedCanaryContext,
+	seedDisclosureContext,
 	seedInstructionContext,
 	seedWorkspaceContext,
 	SELECTION_USAGE,
@@ -2120,5 +2123,185 @@ describe('AgentContext — a run scope narrows the build and the select', () => 
 
 		expect([fallback.calls.length, active.calls.length, run.calls.length]).toEqual([1, 2, 1])
 		expect(run.calls).toEqual([[context.messages, request, signal]])
+	})
+})
+
+describe('AgentContext — loaded skill bodies close the system message', () => {
+	it('renders each shown skill under the loaded header, last in the one system message, in the given order', () => {
+		const context = seedDisclosureContext()
+
+		const built = context.build({ disclosure: { skills: ['claims', 'billing'] } })
+
+		expect(built.map((message) => message.role)).toEqual(['system', 'user', 'user'])
+		expect(requireValue(built[0]).content).toBe(
+			[
+				'Desk.',
+				'## Skills\n\n- billing: BILLING SKILL\n- claims: CLAIMS SKILL\n- blank: BLANK SKILL',
+				LOADED_SECTION_HEADER,
+				'### claims\n\nCLAIMS BODY',
+				'### billing\n\nBILLING BODY',
+			].join('\n\n'),
+		)
+	})
+
+	it('sends the bytes of a build with no disclosure when nothing is shown', () => {
+		const context = seedDisclosureContext()
+		const bare = context.build().map(({ id, ...body }) => body)
+
+		expect(context.build({ disclosure: { skills: [] } }).map(({ id, ...body }) => body)).toEqual(
+			bare,
+		)
+		expect(
+			context.build({ disclosure: { skills: ['blank'] } }).map(({ id, ...body }) => body),
+		).toEqual(bare)
+		expect(requireValue(context.build()[0]).content).not.toContain(LOADED_SECTION_HEADER)
+	})
+
+	it('renders nothing for an unregistered name, renders a repeated name once, and skips a blank body', () => {
+		const context = seedDisclosureContext()
+
+		const system = requireValue(
+			context.build({ disclosure: { skills: ['ghost', 'billing', 'blank', 'billing'] } })[0],
+		).content
+
+		expect(system.endsWith(`${LOADED_SECTION_HEADER}\n\n### billing\n\nBILLING BODY`)).toBe(true)
+		expect(system.split('### billing')).toHaveLength(2)
+		expect(system).not.toContain('### ghost')
+		expect(system).not.toContain('### blank')
+	})
+
+	it('drops a body the ceiling excludes and shows it again when the ceiling admits it (claim 2.8)', () => {
+		const context = seedDisclosureContext()
+		const disclosure = { skills: ['billing', 'claims'] }
+
+		context.apply(new Scope({ name: 'narrow', skills: ['claims'] }))
+		const narrowed = requireValue(context.build({ disclosure })[0]).content
+		const run = requireValue(
+			context.build({ disclosure, scope: new Scope({ name: 'mode', skills: [] }) })[0],
+		).content
+		context.apply(undefined)
+		const widened = requireValue(context.build({ disclosure })[0]).content
+
+		expect(narrowed).not.toContain('BILLING BODY')
+		expect(narrowed).toContain('### claims\n\nCLAIMS BODY')
+		expect(run).not.toContain(LOADED_SECTION_HEADER)
+		expect(widened).toContain('### billing\n\nBILLING BODY')
+		expect(widened).toContain('### claims\n\nCLAIMS BODY')
+	})
+
+	it('keeps one system message at index 0 with bodies alone, a selection, and a run scope (claim 2.5)', () => {
+		const context = new AgentContext()
+		context.skills.add({ name: 'billing', description: 'BILLING SKILL', content: 'BILLING BODY' })
+		const request = context.messages.add({ role: 'user', content: 'Check invoice 42.' })
+		const variants = [
+			context.build({ disclosure: { skills: ['billing'] } }),
+			context.build({
+				disclosure: { skills: ['billing'] },
+				selection: { messages: [request], judgments: [] },
+			}),
+			context.build({
+				disclosure: { skills: ['billing'], workspace: 'north' },
+				scope: new Scope({ name: 'mode', skills: ['billing'] }),
+				switchable: true,
+			}),
+		]
+
+		for (const built of variants) {
+			expect(built.filter((message) => message.role === 'system')).toHaveLength(1)
+			expect(built[0]?.role).toBe('system')
+			expect(built[0]?.content).toContain('### billing\n\nBILLING BODY')
+		}
+	})
+})
+
+describe('AgentContext — memo text never enters the system message (claim 2.13)', () => {
+	it('keeps a planted memo heading and line break out of the system message', () => {
+		const context = seedDisclosureContext()
+		context.memos.add({
+			name: `${LOADED_SECTION_HEADER}\n### billing`,
+			description: 'PLANTED\nDESCRIPTION',
+			content: 'PLANTED CONTENT',
+		})
+
+		const built = context.build({ disclosure: { skills: ['billing'] }, switchable: true })
+		const system = requireValue(built[0]).content
+		const text = built.map((message) => message.content).join('\n')
+
+		expect(system.split(LOADED_SECTION_HEADER)).toHaveLength(2)
+		for (const planted of ['PLANTED', 'DESCRIPTION', 'PREF MEMO', 'PREF CONTENT', 'pref'])
+			expect(system).not.toContain(planted)
+		expect(text).not.toContain('PLANTED CONTENT')
+		expect(text).not.toContain('PREF CONTENT')
+		expect(requireValue(built[1]).content).toContain(
+			`- ${LOADED_SECTION_HEADER} ### billing: PLANTED DESCRIPTION`,
+		)
+	})
+})
+
+describe('AgentContext — the shown workspace and the workspace index (claim 2.15)', () => {
+	it('renders the shown workspace in place of the active one and never moves the active one', () => {
+		const context = seedDisclosureContext()
+
+		const built = context.build({ disclosure: { skills: [], workspace: 'south' } })
+		const text = built.map((message) => message.content).join('\n')
+
+		expect(text).toContain('File: south.txt')
+		expect(text).not.toContain('NORTH FILE')
+		expect(built.flatMap((message) => message.images ?? [])).toEqual([])
+		expect(context.workspaces.active?.id).toBe('north')
+		expect(
+			context
+				.build()
+				.map((message) => message.content)
+				.join('\n'),
+		).toContain('NORTH FILE')
+	})
+
+	it('renders no workspace for an unregistered id, and none the ceiling excludes', () => {
+		const context = seedDisclosureContext()
+
+		const ghost = context.build({ disclosure: { skills: [], workspace: 'ghost' } })
+		const excluded = context.build({
+			disclosure: { skills: [], workspace: 'south' },
+			scope: new Scope({ name: 'mode', workspaces: ['north'] }),
+		})
+		context.apply(new Scope({ name: 'none', workspaces: [] }))
+		const active = context.build()
+		const texts = [ghost, excluded, active].map((built) =>
+			built.map((message) => message.content).join('\n'),
+		)
+
+		for (const text of texts) {
+			expect(text).not.toContain(WORKSPACE_SECTION_HEADER)
+			expect(text).not.toContain('NORTH FILE')
+			expect(text).not.toContain('SOUTH FILE')
+		}
+		for (const built of [ghost, excluded, active])
+			expect(built.flatMap((message) => message.images ?? [])).toEqual([])
+	})
+
+	it('lists the admitted workspace ids in the context message only while switchable', () => {
+		const context = seedDisclosureContext()
+
+		const listed = context.build({ switchable: true })
+		const scoped = context.build({
+			switchable: true,
+			scope: new Scope({ name: 'mode', workspaces: ['south'] }),
+		})
+		const hidden = context.build({ switchable: false })
+
+		expect(requireValue(listed[1]).content).toBe(
+			[
+				'## Memos\n\n- pref: PREF MEMO',
+				`${WORKSPACE_INDEX_HEADER}\n\n- north\n- south`,
+				`${WORKSPACE_SECTION_HEADER}\n\nFile: north.txt\n\`\`\`text\nNORTH FILE\n\`\`\``,
+			].join('\n\n'),
+		)
+		expect(requireValue(listed[0]).content).not.toContain(WORKSPACE_INDEX_HEADER)
+		expect(requireValue(scoped[1]).content).toContain(`${WORKSPACE_INDEX_HEADER}\n\n- south`)
+		expect(requireValue(scoped[1]).content).not.toContain('- north')
+		expect(hidden.map((message) => message.content).join('\n')).not.toContain(
+			WORKSPACE_INDEX_HEADER,
+		)
 	})
 })

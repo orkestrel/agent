@@ -1,4 +1,4 @@
-import type { Memo, ScopeFilter } from './types.js'
+import type { Memo, ScopeFilter, Skill } from './types.js'
 import type { Message } from '../types.js'
 import type { FileInterface } from '@orkestrel/workspace'
 import { isBinary } from '@orkestrel/workspace'
@@ -205,8 +205,9 @@ export function intersectKeys(
  *
  * @remarks
  * Pure, and it can only tighten. Each list of the result is {@link intersectKeys} over the two
- * sides' lists, each read one time, in the order `instructions`, `skills`, `memos`, `tools`, and
- * `files`. A list neither side constrains is omitted, and every returned list is a fresh copy.
+ * sides' lists, each read one time, in the order `instructions`, `skills`, `memos`, `tools`,
+ * `files`, and `workspaces`. A list neither side constrains is omitted, and every returned list is
+ * a fresh copy.
  * `Scope.narrow`, a run's build, and a ledger's answer-pass scope compose their layers through it.
  *
  * @param parent - The outer filter, such as the context scope (`undefined` ⇒ no constraint)
@@ -230,12 +231,14 @@ export function intersectFilters(
 	const memos = intersectKeys(parent?.memos, child?.memos)
 	const tools = intersectKeys(parent?.tools, child?.tools)
 	const files = intersectKeys(parent?.files, child?.files)
+	const workspaces = intersectKeys(parent?.workspaces, child?.workspaces)
 	return {
 		...(instructions === undefined ? {} : { instructions }),
 		...(skills === undefined ? {} : { skills }),
 		...(memos === undefined ? {} : { memos }),
 		...(tools === undefined ? {} : { tools }),
 		...(files === undefined ? {} : { files }),
+		...(workspaces === undefined ? {} : { workspaces }),
 	}
 }
 
@@ -259,5 +262,49 @@ export function intersectFilters(
  * ```
  */
 export function renderIndexEntry(entry: Pick<Memo, 'name' | 'description'>): string {
-	return `- ${entry.name}: ${entry.description}`.replace(/[\n\v\f\r\u0085\u2028\u2029]+/g, ' ')
+	return renderIndexLine(`${entry.name}: ${entry.description}`)
+}
+
+/**
+ * Renders one index line from its text as `- text`, with each run of line-break code points as one
+ * space.
+ *
+ * @remarks
+ * Pure and total. The memo and skill index lines and the workspace index lines render through it,
+ * so text in an index never opens another line or heading.
+ *
+ * @param text - The line's text
+ * @returns The index line
+ *
+ * @example
+ * ```ts
+ * import { renderIndexLine } from '@orkestrel/agent'
+ *
+ * renderIndexLine('orders') // '- orders'
+ * ```
+ */
+export function renderIndexLine(text: string): string {
+	return `- ${text}`.replace(/[\n\v\f\r\u0085\u2028\u2029]+/g, ' ')
+}
+
+/**
+ * Renders one loaded skill's body: `### name`, a blank line, then its content.
+ *
+ * @remarks
+ * Pure and total. The context build renders each shown skill through it under the loaded skills
+ * header, last in the system message.
+ *
+ * @param skill - The skill whose name and content the body shows
+ * @returns The body
+ *
+ * @example
+ * ```ts
+ * import { renderSkillBody } from '@orkestrel/agent'
+ *
+ * renderSkillBody({ name: 'refunds', content: 'Check the order first.' })
+ * // '### refunds\n\nCheck the order first.'
+ * ```
+ */
+export function renderSkillBody(skill: Pick<Skill, 'name' | 'content'>): string {
+	return `### ${skill.name}\n\n${skill.content}`
 }

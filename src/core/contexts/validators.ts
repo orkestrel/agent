@@ -109,8 +109,8 @@ export function isMemoSnapshot(value: unknown): value is MemoSnapshot {
  * implementation admitted.
  *
  * @remarks
- * A scope is a string `id` and `name`, each of `instructions`, `skills`, `memos`, `tools`, and
- * `files` absent or a dense array of strings, `select` absent or a function, and a `narrow`
+ * A scope is a string `id` and `name`, each of `instructions`, `skills`, `memos`, `tools`, `files`,
+ * and `workspaces` absent or a dense array of strings, `select` absent or a function, and a `narrow`
  * function. The guard reads each of those members one time and never calls a method. It admits
  * unknown members, a class instance, and a transparent proxy, and returns false for a throwing
  * getter, a revoked proxy, and any other malformed input.
@@ -138,6 +138,7 @@ export function isScope(value: unknown): value is ScopeInterface {
 			list(Reflect.get(value, 'memos')) &&
 			list(Reflect.get(value, 'tools')) &&
 			list(Reflect.get(value, 'files')) &&
+			list(Reflect.get(value, 'workspaces')) &&
 			optionalOf(isFunction)(Reflect.get(value, 'select')) &&
 			isFunction(Reflect.get(value, 'narrow'))
 		)

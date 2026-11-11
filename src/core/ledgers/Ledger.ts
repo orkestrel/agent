@@ -52,6 +52,7 @@ import {
 	collectExchanges,
 	collectToolGroups,
 	extractLiterals,
+	findToolCall,
 	estimateTokens,
 	hasCalls,
 	stripThinking,
@@ -104,7 +105,6 @@ import {
 	matchEntities,
 	rankLedgerCut,
 	resolvePredict,
-	findLedgerCall,
 	renderLedgerAnnotation,
 	renderLedgerPinned,
 	renderLedgerRecord,
@@ -735,7 +735,7 @@ export class Ledger implements LedgerInterface {
 		for (const message of messages) {
 			if (!snapshot.failures.includes(message.id)) continue
 			const group = groups.find((entries) => entries.some((one) => one.id === message.id))
-			const call = group === undefined ? undefined : findLedgerCall(group, message)
+			const call = group === undefined ? undefined : findToolCall(group, message)
 			this.#results.set(message.id, {
 				success: false,
 				id: call?.id ?? message.call ?? message.id,
@@ -771,7 +771,7 @@ export class Ledger implements LedgerInterface {
 		this.#flush()
 		return collectToolGroups(messages).flatMap((group) =>
 			group.slice(1).flatMap((message): LedgerLookupFinding[] => {
-				const call = findLedgerCall(group, message)
+				const call = findToolCall(group, message)
 				const lookup = this.#options.lookups?.find((one) => one.tool.name === call?.name)
 				const write = this.#options.writes?.find((one) => one.tool.name === call?.name)
 				if (
@@ -1525,7 +1525,7 @@ export class Ledger implements LedgerInterface {
 			const leader = group[0]
 			if (leader === undefined) return []
 			const kept = (leader.calls ?? []).flatMap((call) => {
-				const message = group.slice(1).find((result) => findLedgerCall(group, result) === call)
+				const message = group.slice(1).find((result) => findToolCall(group, result) === call)
 				const result = message === undefined ? undefined : this.#results.get(message.id)
 				return message === undefined ||
 					![...(this.#options.lookups ?? []), ...(this.#options.writes ?? [])].some(
@@ -1633,7 +1633,7 @@ export class Ledger implements LedgerInterface {
 		offered = true,
 	): Message {
 		const group = scan.group(message.id)
-		const call = group === undefined ? undefined : findLedgerCall(group, message)
+		const call = group === undefined ? undefined : findToolCall(group, message)
 		const write = this.#options.writes?.some((one) => one.tool.name === call?.name) === true
 		const finding = scan.finding(message.id)
 		const hidden = renderStub(call?.name ?? 'tool', call?.arguments ?? {}, 'hidden')

@@ -2,9 +2,10 @@ import type { SkillEventName } from '../../../../setup.js'
 import type { Skill, SkillManagerEventMap } from '@src/core'
 import { renderSection, SKILL_SECTION_HEADER, SkillManager } from '@src/core'
 import { describe, expect, it } from 'vitest'
-import { createRecorder, createRecorders } from '@orkestrel/test'
+import { captureError, createRecorder, createRecorders, invokeUnchecked } from '@orkestrel/test'
+import { isContractError } from '@orkestrel/contract'
 import { createFile, createTextContent } from '@orkestrel/workspace'
-import { SKILL_EVENTS } from '../../../../setup.js'
+import { createShiftingToolsInput, SKILL_EVENTS, SKILL_TOOLS_REFUSALS } from '../../../../setup.js'
 
 // SkillManager is the name-keyed registry of host-supplied skills: last write wins, insertion
 // order kept, files minted through `createFile`. Real behavior, no mocks.
@@ -30,8 +31,25 @@ describe('SkillManager — add & lookup', () => {
 		expect(skill.description).toBe('Reviews a change for defects.')
 		expect(skill.content).toBe('Read the diff, then list each defect.')
 		expect(skill.files).toEqual([])
+		expect(skill.tools).toEqual([])
 		expect(manager.skill('review')).toBe(skill)
 		expect(manager.count).toBe(1)
+	})
+
+	it('copies the tools a skill names, so a later mutation of the input cannot leak in', () => {
+		const manager = new SkillManager()
+		const tools = ['refund', 'lookup']
+		const skill = manager.add({
+			name: 'refunds',
+			description: 'Refunds.',
+			content: 'Check.',
+			tools,
+		})
+		tools.push('delete')
+
+		expect(skill.tools).toEqual(['refund', 'lookup'])
+		expect(skill.tools).not.toBe(tools)
+		expect(manager.skill('refunds')?.tools).toEqual(['refund', 'lookup'])
 	})
 
 	it('mints each file through createFile', () => {
@@ -247,5 +265,48 @@ describe('SkillManager — emitter', () => {
 		expect(manager.skill('a')?.content).toBe('a')
 		expect(errors.count).toBe(1)
 		expect(errors.calls[0]?.[1]).toBe('add')
+	})
+})
+
+describe('SkillManager — the tools a skill names', () => {
+	it('mints an absent tools member as none, and copies a list', () => {
+		const manager = new SkillManager()
+		const names = ['refund']
+		const named = manager.add({
+			name: 'billing',
+			description: 'Billing',
+			content: 'B',
+			tools: names,
+		})
+		const bare = manager.add({ name: 'claims', description: 'Claims', content: 'C' })
+
+		expect(named.tools).toEqual(['refund'])
+		expect(named.tools).not.toBe(names)
+		expect(bare.tools).toEqual([])
+	})
+
+	it.each(SKILL_TOOLS_REFUSALS)(
+		'refuses $name with a placement error and stores nothing',
+		({ tools }) => {
+			const added = createRecorder<SkillManagerEventMap['add']>()
+			const manager = new SkillManager({ on: { add: added.handler } })
+			const error = captureError(() =>
+				invokeUnchecked(manager, manager.add, [
+					{ name: 'billing', description: 'Billing', content: 'B', tools },
+				]),
+			)
+
+			expect(isContractError(error) && error.code === 'placement').toBe(true)
+			expect(isContractError(error) ? error.context?.path : undefined).toEqual(['input', 'tools'])
+			expect(manager.count).toBe(0)
+			expect(added.count).toBe(0)
+		},
+	)
+
+	it('reads the tools member once, so a getter cannot pass the check with one value and store another', () => {
+		const manager = new SkillManager()
+		const skill = manager.add(createShiftingToolsInput())
+
+		expect(skill.tools).toEqual(['refund'])
 	})
 })

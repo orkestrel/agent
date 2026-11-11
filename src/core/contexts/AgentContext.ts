@@ -26,9 +26,15 @@ import {
 	collectImageData,
 	intersectFilters,
 	renderFencedFile,
+	renderIndexLine,
 	renderSection,
+	renderSkillBody,
 } from './helpers.js'
-import { WORKSPACE_SECTION_HEADER } from './constants.js'
+import {
+	LOADED_SECTION_HEADER,
+	WORKSPACE_INDEX_HEADER,
+	WORKSPACE_SECTION_HEADER,
+} from './constants.js'
 
 /**
  * Assembles a provider request from the richer turn context — the optional system prompt, the
@@ -36,8 +42,9 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  * {@link ConversationManagerInterface} message source whose active conversation is `messages`, the
  * {@link ToolManagerInterface} registry, and an active {@link ScopeInterface} changed through
  * {@link AgentContextInterface.apply}. `build()` folds the system prompt, the scoped instructions,
- * and the skills index into one system message, the memos index and the active workspace's text into
- * one `user` context message after it, then the conversation, and never reads `tools`.
+ * the skills index, and the shown skills' bodies into one system message, the memos index and the
+ * rendered workspace's text into one `user` context message after it, then the conversation, and
+ * never reads `tools`.
  *
  * @remarks
  * - **Composition.** `system` is the optional system prompt; `instructions` / `skills` / `memos` /
@@ -56,40 +63,43 @@ import { WORKSPACE_SECTION_HEADER } from './constants.js'
  *   reference, no duplication), and `build()` with no selection folds that conversation's `view()`
  *   (its per-section summaries + live tail) as the authoritative message inclusion — the scope does
  *   not filter the conversation (it owns inclusion through compaction; scope filters only
- *   instructions / skills / memos / tools / workspace files). An agent run binds a conversation at
+ *   instructions / skills / memos / tools / workspace files / workspaces). An agent run binds a conversation at
  *   its call, the active one unless the run names another, and builds through a selection over that
  *   conversation, so `conversations.switch(id)` sets the next run's default at any moment and never
  *   moves a live run; `select(conversation, request, signal)` checks the conversation it is given.
  * - **`build()` — the scoped assembly + the format cascade.** It folds, in order,
  *   the system prompt, the scope-filtered instructions (a block: the section's `open` text,
  *   each item's rendering, then any `close` text), then the scope-filtered skills index (a block
- *   whose entries join with a single newline) into one leading `system` message (prepended only
- *   when at least one part exists), then the scope-filtered memos index (the same block) and the
- *   active workspace's text files into one `user` context message (present only when the memos or
- *   workspace section renders), then
+ *   whose entries join with a single newline), then the shown skills' bodies, into one leading
+ *   `system` message (prepended only when at least one part exists), then the scope-filtered memos
+ *   index (the same block), the listed workspace ids, and the rendered workspace's text files into
+ *   one `user` context message (present only when one of those sections renders), then
  *   appends the active conversation's `view()` (the conversation owns message inclusion through
  *   compaction — the scope does not filter the conversation). The instruction manager resolves
  *   each `open` / item / `close` most-specific-first: `open` = manager-options-override >
  *   built-in; per item = item-override > manager-options-override > built-in; `close` =
  *   manager-options-override (no built-in ⇒ no closing line when unset) (see
  *   {@link AgentContextInterface.build}). With no override set, each section is its built-in
- *   header + items, no closing line. The active workspace's scoped-in image files' `base64` payload is attached to
+ *   header + items, no closing line. The rendered workspace's scoped-in image files' `base64` payload is attached to
  *   the last user message (a vision provider reads images off a user turn); when no user message
  *   exists the attachment is skipped. Built fresh each call (recomputed, never cached), so it
- *   always reflects the current managers / messages / scope / active workspace; it never mutates a
+ *   always reflects the current managers / messages / scope / workspaces; it never mutates a
  *   manager or the stored messages. `build(selection)` adds at most one `system` message of its own
  *   and reads the selection's messages as conversation parts without a role check; the select path
  *   refuses a selected `system` role as a `'ROLE'` fault over `view()`; a host's direct
  *   `build(selection)` is host-trusted, and a conversation a host implements itself whose `view()`
  *   holds a `system` message is read as host-trusted too.
- * - **The active workspace, rendered by carrier — the sole document/image context.**
- *   `workspaces.active` (when set) has its {@link import('@orkestrel/workspace').FileInterface} values scope-filtered by `scope.files`,
+ * - **The rendered workspace, by carrier — the sole document/image context.**
+ *   The rendered workspace has its {@link import('@orkestrel/workspace').FileInterface} values scope-filtered by `scope.files`,
  *   then split: text files fold into a dedicated `## Workspace` section (fenced reference blocks)
  *   in the context message — a `user` message with a minted id, never stored — and image files'
  *   `base64` payload attaches to the last user message of the conversation, never to the context
  *   message. The `system` message holds host-authored text alone: the system prompt, the
- *   instructions, and the skills index. Active-only — never the other registered workspaces; with no
- *   active workspace nothing renders for workspaces. `build()` owns this render (a `Workspace` /
+ *   instructions, the skills index, and last the bodies of the skills `options.disclosure` shows.
+ *   One workspace renders: the one `options.disclosure` selects, else the active one, and only
+ *   while the scope's `workspaces` list admits it; with neither, nothing renders for workspaces.
+ *   `options.switchable` adds the admitted workspace ids to the context message, after the memos
+ *   index. `build()` never moves the active workspace, and it owns this render (a `Workspace` /
  *   `WorkspaceManager` stays file-focused).
  * - **Tools are structural, not in the prompt.** The registry is advertised to the provider
  *   through `tools.definitions()` (scope-filtered by the loop), never serialized into the
@@ -110,10 +120,10 @@ export class AgentContext implements AgentContextInterface {
 	readonly #instructions: InstructionManagerInterface
 	readonly #skills: SkillManagerInterface
 	readonly #memos: MemoManagerInterface
-	// The workspace registry whose active workspace `build()` renders by carrier (text files →
-	// the context message, image files → the last user message). Always present (a fresh empty
-	// manager when none was supplied). The registry is structural; switch its active workspace
-	// through `workspaces.switch(id)`. `build()` reads `active` / its `files()` fresh each call.
+	// The workspace registry one of whose workspaces `build()` renders by carrier (text files →
+	// the context message, image files → the last user message): the one `disclosure` names, else
+	// `active`. Always present (a fresh empty manager when none was supplied). The registry is
+	// structural; switch its active workspace through `workspaces.switch(id)`.
 	readonly #workspaces: WorkspaceManagerInterface
 	// The conversation registry whose active conversation is a run's default: the dynamic `messages`
 	// getter returns `#conversations.active`, which the constructor seeds when absent, and `build()`
@@ -131,8 +141,7 @@ export class AgentContext implements AgentContextInterface {
 		this.#skills = options?.skills ?? new SkillManager()
 		this.#memos = options?.memos ?? new MemoManager()
 		// Default to a fresh empty registry so `context.workspaces` is always present (mirroring
-		// the always-present instruction manager); a supplied one is reused. The active workspace
-		// is the sole document/image context.
+		// the always-present instruction manager); a supplied one is reused.
 		this.#workspaces = options?.workspaces ?? new WorkspaceManager()
 		// The conversation registry the default conversation flows from — a supplied one is reused,
 		// else a fresh empty one. Seed an active conversation so `context.messages` (the active conversation's
@@ -234,11 +243,29 @@ export class AgentContext implements AgentContextInterface {
 			this.#skills.close,
 		)
 		if (indexed !== undefined) parts.push(indexed)
-		// The active workspace is the sole document/image context. `build()` owns this render
-		// because a `Workspace` / `WorkspaceManager` stays file-focused.
+		// Shown bodies close the system message: each named skill the ceiling admits and the
+		// registry holds, once, in the given order, skipping a blank body.
+		const admitted = new Map(skills.map((one) => [one.name, one]))
+		const loaded = [...new Set(options?.disclosure?.skills ?? [])].flatMap((name) => {
+			const skill = admitted.get(name)
+			return skill === undefined || skill.content.trim() === '' ? [] : [skill]
+		})
+		const bodies = renderSection(LOADED_SECTION_HEADER, loaded, renderSkillBody, undefined)
+		if (bodies !== undefined) parts.push(bodies)
+		// The shown workspace, else the active one, is the sole document/image context, rendered only
+		// while the ceiling admits it. `build()` owns this render because a `Workspace` /
+		// `WorkspaceManager` stays file-focused, and it never moves the active workspace.
+		const selected = options?.disclosure?.workspace
+		const workspace =
+			selected === undefined ? this.#workspaces.active : this.#workspaces.workspace(selected)
+		const shown = filterAllowList(
+			scope.workspaces,
+			workspace === undefined ? [] : [workspace],
+			(one) => one.id,
+		)
 		const files = filterAllowList(
 			scope.files,
-			this.#workspaces.active?.files() ?? [],
+			shown.flatMap((one) => one.files()),
 			(one) => one.path,
 		)
 		const workspaceTexts = files.flatMap((file) =>
@@ -262,13 +289,24 @@ export class AgentContext implements AgentContextInterface {
 		// With no selection, the active conversation's `view()` is authoritative (the per-section
 		// summaries + the live tail) — the conversation owns message inclusion through compaction, so the
 		// scope does not filter the conversation here (scope filters only the preceding instructions /
-		// skills / memos / tools / workspace files). The active conversation is always present (the
+		// skills / memos / tools / workspace files / workspaces). The active conversation is always present (the
 		// constructor adds one), with `#ensureConversation()` as a total fallback if a caller emptied its
 		// supplied registry.
 		const conversation = options?.selection?.messages ?? this.#ensureConversation().view()
 		// A vision provider reads image payloads from a user turn.
 		const tail = attachUserImages(conversation, collectImageData(files))
-		const slots = [remembered, documented].filter((slot) => slot !== undefined)
+		// The admitted ids, only while the run can switch the workspace.
+		const switchable =
+			options?.switchable === true
+				? filterAllowList(scope.workspaces, this.#workspaces.workspaces(), (one) => one.id)
+				: []
+		const listed = renderSection(
+			WORKSPACE_INDEX_HEADER,
+			switchable.length === 0 ? [] : [switchable.map((one) => renderIndexLine(one.id)).join('\n')],
+			(block) => block,
+			undefined,
+		)
+		const slots = [remembered, listed, documented].filter((slot) => slot !== undefined)
 		const context: readonly Message[] =
 			slots.length === 0
 				? []
