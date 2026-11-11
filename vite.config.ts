@@ -217,7 +217,8 @@ export function guides(override?: UserConfig): UserConfig {
 	return mergeOverride(project, override)
 }
 
-// Run these @orkestrel/study proofs on demand with npm run test:studies; no gate or chain runs them.
+// Run these @orkestrel/study proofs on demand with npm run test:studies;
+// no gate or chain runs them.
 export function studies(override?: UserConfig): UserConfig {
 	const project: UserConfig = {
 		resolve,
