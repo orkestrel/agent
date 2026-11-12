@@ -119,6 +119,21 @@ A host gives a small local model progressive reach to everything its principal m
   - A model-authored memo, a record, and workspace data stay data.
   - No late system message is admitted (ROADMAP item 6; `methods.md` § Separate authorship from data and project outward explicitly).
 - **Authority:** every disclosure the model triggers runs as a tool call under the agent's authority, and is pinned to the instance advertised for that turn (`methods.md` § Keep learned proposals outside deterministic authority).
+- **Compositions, the user, 2026-11-12, after the 4B reading:** "Sounds good, let's go with that, and clean up the others, I don't want to leave bloat, which means get rid of P and A. Make sure that agent is properly set up for O and D as you recommended."
+  - **O is the default:** each request is scoped to the known area's tools, with no `load` and `skills: []`.
+  - **D is the fallback:** the skills index and `load`, with nothing shown.
+  - **P and A are removed:** P is a skill pre-shown by the host, plus `load`; A is every tool advertised as a composition.
+  - Agent 0.0.42, prepared at `46ae3811`, is held for the cut and re-prepared under the same number.
+- **The cut, by the consultant's O-and-D ruling (`planner` on `fable`), recorded before any dispatch:**
+  - **Removed:** the host's `disclosure` option on the agent, the run, the durable job, and the ledger, with `requireDisclosure`, `agentDisclosureShape`, and `agentDisclosureContract`, and `unload`'s "host gives that skill" refusal.
+  - **Kept, under another name:** its workspace half, as one plain `workspace?: string` option in those four homes. A non-string throws `ContractError` `'placement'`, and a stored job carrying `disclosure` refuses as an undeclared member.
+  - **Kept unchanged:** `AgentDisclosure`, `collectDisclosure`, `resolveDisclosure` (now taking the workspace string), and `ContextBuildOptions.disclosure`, as the derived state D reads.
+  - **Nothing added for O or D:** `respond` gains no scope, and `scope` in `LedgerAgentOptions` stays deferred.
+  - **The guide gains:** the O recipe (a scope built from `skill.tools`, no `load`, `skills: []`), with its one trap of `load` listed beside `skills: []`, and the D-to-O lever, both as executed fences.
+  - **The claims:** C.1 to C.8 are the cut's own claims. 2.1, 2.7, 2.9, D.1, D.2, D.4, D.8, and 3.1 are restated. 3.14 and 3.15 are restated onto arm `taverna`'s receipt and one live consumer run of arm `index` (D) on a ledger. Arm `shown` leaves the harness.
+  - **The desk study:** it keeps arms `area` and `index` on bare agents, and its ledger path and judge leave with `shown`.
+  - **The design** keeps every A and P number as the record, and gains an "As ruled, 2026-11-12" paragraph. `46ae3811` is the last tree holding the `disclosure` option and arms `all` and `shown`.
+  - **The deferral list** loses "Per-request `disclosure` on a ledger kept across requests" and gains "a shown set that ends with its request".
 
 ## The roadmap items this campaign meets
 
