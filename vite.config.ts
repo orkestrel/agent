@@ -230,7 +230,6 @@ export function studies(override?: UserConfig): UserConfig {
 			browser: { enabled: false },
 			testTimeout: 120_000,
 			hookTimeout: 120_000,
-			fileParallelism: false,
 			sequence: { groupOrder: 1 },
 		},
 	}
