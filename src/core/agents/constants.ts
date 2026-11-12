@@ -113,7 +113,7 @@ export const BUILTIN_TOOLS: Readonly<
 export const ARGUMENT_CONTROL_PATTERN = Object.freeze(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u)
 
 /**
- * Matches a text that is blank: empty once white space and default-ignorable code points, such
+ * Matches a text that is blank: empty after white space and default-ignorable code points, such
  * as U+3164, are removed, frozen.
  */
 export const ARGUMENT_BLANK_PATTERN = Object.freeze(

@@ -1568,7 +1568,7 @@ export function resolveDisclosure(
  * A record counts only while its built-in is in `builtins`, so a host tool that holds a built-in's
  * name on a run that does not enable it shows nothing; with none of `load`, `unload`, and `switch`
  * enabled, nothing is read. A stored record cannot tell its writer, so one a host tool wrote under a
- * built-in's name while that built-in was off counts once a run enables it, bounded by the registry
+ * built-in's name while that built-in was off counts after a run enables it, bounded by the registry
  * and the ceiling as every record is.
  *
  * @param conversation - The conversation whose stored messages record the calls

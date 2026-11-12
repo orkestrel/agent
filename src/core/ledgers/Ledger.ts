@@ -350,7 +350,7 @@ export class Ledger implements LedgerInterface {
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),
 		})
 		// A stored gauge holds only for the calibrated definitions its digest names, so a hydrate with
-		// others calibrates before its first pass. A supplied gauge prices the definitions held now.
+		// others calibrates before its first pass. A supplied gauge prices the definitions it holds.
 		const calibrated = this.#calibrated()
 		const digest = digestLedgerTools(calibrated)
 		const gauge =
