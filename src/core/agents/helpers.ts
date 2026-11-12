@@ -608,10 +608,13 @@ export function handleAgentQueueJob(
  * because a job's `children` cross that contract as JSON records. A refused job yields one finding
  * with its faults, or with an unreadable note when a member read throws, and the walk reads
  * nothing under it. A child is within its parent when each of
- * its `tools` is one its parent names (a parent with no `tools` names none), its `authority` and
- * `scheduler` are absent or its parent's, its `provider` is its parent's, its `limit` is at most its
- * parent's (an absent `limit` reads `DEFAULT_AGENT_LIMIT`), and, where its parent holds a `timeout`
- * or a `budget`, it holds one no larger. `system` and `messages` are free. A refused job's finding
+ * its `tools` is one its parent names (a parent with no `tools` names none), each of its `builtins`
+ * is one its parent names (a parent with no `builtins` names none), each name in each list of its
+ * `scope` is in its parent's same list (a job with no `scope` holds the three lists empty), its
+ * `authority` and `scheduler` are absent or its parent's, its `provider` is its parent's, its `limit`
+ * is at most its parent's (an absent `limit` reads `DEFAULT_AGENT_LIMIT`), and, where its parent
+ * holds a `timeout` or a `budget`, it holds one no larger. `system`, `messages`, and `disclosure` are
+ * free: a `disclosure` shows nothing its own `scope` omits. A refused job's finding
  * opens with `JOB_REFUSAL_PREFIX` and then the job's path from `job`; an exceeded member's opens
  * with that path, a dot, and the member. The walk is total: an unreadable job yields a finding,
  * never a throw. The `AgentFanout` class runs it on every attempt of a unit, before the unit spawns
@@ -647,6 +650,18 @@ export function scanJobTree(root: AgentJobInput): readonly string[] {
 		if (parent !== undefined) {
 			const held = parent.tools ?? []
 			const outside = (job.tools ?? []).filter((name) => !held.includes(name))
+			const enabled: readonly string[] = parent.builtins ?? []
+			const extra = (job.builtins ?? []).filter((name) => !enabled.includes(name))
+			// A job with no scope holds the three lists empty, so its child may list no name.
+			const unlisted = (['skills', 'memos', 'workspaces'] as const).map(
+				(list) =>
+					[
+						list,
+						(job.scope?.[list] ?? []).filter(
+							(name) => !(parent.scope?.[list] ?? []).includes(name),
+						),
+					] as const,
+			)
 			const limit = job.limit ?? DEFAULT_AGENT_LIMIT
 			const bound = parent.limit ?? DEFAULT_AGENT_LIMIT
 			findings.push(
@@ -654,6 +669,14 @@ export function scanJobTree(root: AgentJobInput): readonly string[] {
 					outside.length === 0
 						? undefined
 						: `${path}.tools: names ${outside.map((name) => preview(name)).join(', ')}, which its parent does not hold`,
+					extra.length === 0
+						? undefined
+						: `${path}.builtins: names ${extra.map((name) => preview(name)).join(', ')}, which its parent does not hold`,
+					...unlisted.map(([list, names]) =>
+						names.length === 0
+							? undefined
+							: `${path}.scope.${list}: names ${names.map((name) => preview(name)).join(', ')}, which its parent does not hold`,
+					),
 					job.authority === undefined || job.authority === parent.authority
 						? undefined
 						: `${path}.authority: ${preview(job.authority)} is neither absent nor its parent's, which is ${parent.authority === undefined ? 'none' : preview(parent.authority)}`,
@@ -1312,14 +1335,16 @@ export function requireDisclosure(value: unknown): AgentDisclosure | undefined {
  * shown skills.
  *
  * @remarks
- * The allow-list admits first, as `filterAllowList` does. When no admitted definition is named
- * `load`, the admitted list returns as it is. Otherwise a tool any registered skill names is held
- * back unless a shown skill names it too; `load` and `unload` are never held back. Holding a tool
- * back is presentation, never authority: a call to it is denied as outside the turn's scope.
+ * The allow-list admits first, as `filterAllowList` does. When no skill is passed, or the allow-list
+ * admits no `load`, the admitted list returns as it is. Otherwise a tool any registered skill names
+ * is held back unless a shown skill names it too; `load` and `unload` are never held back. A caller
+ * passes the registered skills only while `load` is enabled, so a ceiling whose empty `skills` list
+ * withholds `load` from the candidates still holds the skills' tools back. Holding a tool back is
+ * presentation, never authority: a call to it is denied as outside the turn's scope.
  *
  * @param definitions - The candidate definitions, in advertisement order
  * @param names - The turn's `tools` allow-list (`undefined` ⇒ all, `[]` ⇒ none)
- * @param skills - The registered skills whose `tools` gate
+ * @param skills - The registered skills whose `tools` gate, or none while `load` is not enabled
  * @param shown - The names of the skills the turn shows
  * @returns The advertised definitions, in candidate order
  *
@@ -1337,7 +1362,7 @@ export function filterAdvertisedTools(
 	shown: readonly string[],
 ): readonly ToolDefinition[] {
 	const admitted = filterAllowList(names, definitions, (definition) => definition.name)
-	if (!admitted.some((definition) => definition.name === 'load')) return admitted
+	if (skills.length === 0 || (names !== undefined && !names.includes('load'))) return admitted
 	const held = new Set(skills.flatMap((skill) => skill.tools))
 	const visible = new Set(shown)
 	const open = new Set(
@@ -1349,6 +1374,42 @@ export function filterAdvertisedTools(
 			definition.name === 'unload' ||
 			!held.has(definition.name) ||
 			open.has(definition.name),
+	)
+}
+
+/**
+ * Returns the definitions a run offers before the allow-list, without `remember` unless the
+ * ceiling's `memos` list names a memo, without `switch` unless its `workspaces` list names a
+ * workspace, and without `load` and `unload` while its `skills` list is empty.
+ *
+ * @remarks
+ * `remember` writes and `switch` selects only a name its list holds, so an absent list and an empty
+ * list each leave the built-in nothing to act on, and it is not advertised. An absent `skills` list
+ * admits every registered skill, so `load` and `unload` are withheld only when the list is empty.
+ * Every other definition keeps its place.
+ *
+ * @param definitions - The candidate definitions, in advertisement order
+ * @param ceiling - The turn's ceiling
+ * @returns The definitions, in candidate order
+ *
+ * @example
+ * ```ts
+ * filterBuiltinCandidates([{ name: 'memo' }, { name: 'remember' }], { memos: [] }) // [{ name: 'memo' }]
+ * filterBuiltinCandidates([{ name: 'memo' }, { name: 'remember' }], { memos: ['tone'] }).length // 2
+ * ```
+ */
+export function filterBuiltinCandidates(
+	definitions: readonly ToolDefinition[],
+	ceiling: ScopeFilter,
+): readonly ToolDefinition[] {
+	const writable = (ceiling.memos ?? []).length > 0
+	const selectable = (ceiling.workspaces ?? []).length > 0
+	const loadable = ceiling.skills === undefined || ceiling.skills.length > 0
+	return definitions.filter(
+		(definition) =>
+			(definition.name !== 'remember' || writable) &&
+			(definition.name !== 'switch' || selectable) &&
+			((definition.name !== 'load' && definition.name !== 'unload') || loadable),
 	)
 }
 

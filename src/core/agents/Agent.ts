@@ -598,6 +598,17 @@ export class Agent implements AgentInterface {
 			Object.freeze(dispatch.messages)
 			if (dispatch.tools !== undefined) Object.freeze(dispatch.tools)
 			this.#emitter.emit('request', index, Object.freeze(dispatch), conversation)
+			// A run aborted while the turn's `request` listeners ran sends nothing for the turn: it ends
+			// as a cancel stopped before its provider call.
+			if (abort.signal.aborted) {
+				turns.push({
+					...stopped,
+					messages: admitted.messages,
+					spent: admitted.spent,
+					futile: admitted.futile,
+				})
+				continue
+			}
 			// The turn's streamed content, one entry per content delta; the meter charges only when an
 			// allowance exists.
 			const streamed: string[] = []

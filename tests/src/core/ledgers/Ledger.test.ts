@@ -1,15 +1,23 @@
+import type { LedgerRoomSummary } from '../../../setup.js'
 import type {
 	AgentEventMap,
 	ConversationInterface,
 	LedgerSnapshot,
 	Message,
 	MessageInput,
+	ProviderRequest,
 	Selection,
 	ThinkingReplay,
 } from '@src/core'
 import { createFailingJudge, createSecondTurnFailureProvider } from '../../../setup.js'
 import {
 	AUTHORITY_NOTES,
+	BUILTIN_NOTES,
+	Gauge,
+	collectBuiltinDefinitions,
+	computeSkillPrice,
+	computeToolPrice,
+	renderIndexEntry,
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
 	Ledger,
@@ -34,6 +42,7 @@ import {
 import { createTokenBudget } from '@orkestrel/budget'
 import { canonicalStringify, isString, parseJSONAs } from '@orkestrel/contract'
 import { OllamaProvider } from '@orkestrel/ollama'
+import { hashStudyBytes } from '@orkestrel/study/server'
 import type { ToolCall, ToolResult } from '@orkestrel/tool'
 import { createTool } from '@orkestrel/tool'
 import {
@@ -73,7 +82,6 @@ import {
 	LEDGER_SNAPSHOT_SEED,
 	buildLedgerBenchOptions,
 	buildLedgerPrefix,
-	computeTextDigest,
 	createCorrectionJudge,
 	createLedgerJudge,
 	extractLedgerOrder,
@@ -145,6 +153,39 @@ import {
 	serveLedgerThread,
 	serveRecordsDesk,
 	summarizeAttempts,
+	AGENT_AUTHORITY,
+	BUILTIN_NAMES,
+	serveLedgerFirstEdge,
+	serveLedgerGateEdge,
+	bisectLedgerPadding,
+	admitsLedgerEdge,
+	measureLedgerRoom,
+	serveLedgerRoom,
+	serveLedgerStatedGauge,
+	serveLedgerAnswerGrowth,
+	serveLedgerLiveRates,
+	summarizeLedgerRoomArm,
+	bisectLedgerHostEdge,
+	buildLedgerOversizedLookup,
+	buildLedgerRecordShape,
+	LEDGER_RECORD_ROOM,
+	buildLedgerPageOptions,
+	serveLedgerEdge,
+	serveLedgerSwitch,
+	serveLedgerWideRecall,
+	BUILTIN_BILLING_BODY,
+	BUILTIN_CLAIMS_BODY,
+	BUILTIN_PREF_CONTENT,
+	DensityLedgerProvider,
+	LEDGER_BUILTIN_SCOPE,
+	LEDGER_SKILL_LOOKUPS,
+	LEDGER_TAVERNA_SKILLS,
+	LEDGER_TAVERNA_TOOLS,
+	buildLedgerBuiltinOptions,
+	buildSkillTurns,
+	createToolCall,
+	readLedgerToolContents,
+	seedLedgerWorkspaces,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
@@ -1921,14 +1962,19 @@ describe('Ledger', () => {
 		expect(next.filter((message) => message.content === 'Retry request.')).toHaveLength(1)
 	})
 
-	it('keeps the last good window when an oversized request finishes without a reply', async () => {
-		const provider = createScriptedProvider(
-			[{ content: 'First reply.' }, { content: '' }, { content: '' }, { content: 'Done.' }],
-			{ recorded: true },
-		)
+	it('keeps the last good window when an oversized request is refused', async () => {
+		const provider = createScriptedProvider([{ content: 'First reply.' }, { content: 'Done.' }], {
+			recorded: true,
+		})
 		const ledger = createLedger(provider, buildLedgerOptions({ topics: [] }))
 		await ledger.respond('First request.')
-		await ledger.respond('Unanswered. '.repeat(4000))
+		// No pass can carry a request over the capacity: it is refused, and the provider sees none.
+		const refused = await ledger.respond('Unanswered. '.repeat(4000)).then(
+			() => undefined,
+			(error: unknown) => error,
+		)
+		expect(isLedgerError(refused) ? refused.code : refused).toBe('OVERFLOW')
+		expect(provider.calls).toHaveLength(1)
 		await ledger.respond('Next request.')
 		expect(requireValue(provider.calls.at(-1)).messages.map((message) => message.content)).toEqual([
 			'Serve the desk.',
@@ -3888,14 +3934,14 @@ describe('Ledger', () => {
 	it('reserves the generation cap and retains within-pass thinking when fitting recall', async () => {
 		for (const predict of [0, 1024]) {
 			for (const replay of ['none', 'turn', 'all'] as const) {
-				const { provider, source } = await serveLedgerBoundary({
+				const { ledger, source } = await serveLedgerBoundary({
 					predict,
 					replay,
 					prompt: 2700,
 					thinking: 800,
 				})
 				expect(
-					provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
+					ledger.conversation.messages().findLast((message) => message.role === 'tool')?.content,
 				).toBe(
 					predict === 0 || replay === 'none'
 						? source.content
@@ -3923,7 +3969,12 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		const ledger = createLedger(provider, { ...options, predict: 1024 })
+		// The provider charges 2000 for a call of 26 estimate units: 1974 for the definitions.
+		const ledger = createLedger(provider, {
+			...options,
+			predict: 1024,
+			gauge: { scale: 1, overhead: 1974 },
+		})
 		seedLedgerRecall(ledger)
 		await ledger.respond('First.')
 		await ledger.respond('Second.')
@@ -3983,7 +4034,7 @@ describe('Ledger', () => {
 
 	it('passes replay to a calibrated gauge when fitting recall', async () => {
 		for (const replay of ['none', 'turn'] as const) {
-			const { provider, source } = await serveLedgerBoundary({
+			const { ledger, source } = await serveLedgerBoundary({
 				calibrated: true,
 				predict: 1024,
 				replay,
@@ -3991,7 +4042,7 @@ describe('Ledger', () => {
 				thinking: 800,
 			})
 			expect(
-				provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
+				ledger.conversation.messages().findLast((message) => message.role === 'tool')?.content,
 			).toBe(
 				replay === 'none'
 					? source.content
@@ -4002,20 +4053,20 @@ describe('Ledger', () => {
 
 	it('passes the generation reserve to supplied and calibrated gauges', async () => {
 		for (const calibrated of [false, true]) {
-			for (const predict of [0, 1024]) {
-				const { provider, source } = await serveLedgerBoundary({
-					calibrated,
-					predict,
-					prompt: 3500,
-				})
-				expect(
-					provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
-				).toBe(
-					predict === 0
-						? source.content
-						: "1 older item didn't fit in this request; answer from the messages you can see",
-				)
-			}
+			const { provider, source } = await serveLedgerBoundary({
+				calibrated,
+				predict: 0,
+				prompt: 3500,
+			})
+			expect(
+				provider.calls.at(-1)?.messages.findLast((message) => message.role === 'tool')?.content,
+			).toBe(source.content)
+			// Under the generation reserve the request itself prices over the limit, and no pass can carry it.
+			const refused = await serveLedgerBoundary({ calibrated, predict: 1024, prompt: 3500 }).then(
+				() => undefined,
+				(error: unknown) => error,
+			)
+			expect(isLedgerError(refused) ? refused.code : refused).toBe('OVERFLOW')
 		}
 	})
 
@@ -5018,7 +5069,8 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		const tight = createLedger(crowded, options)
+		// The provider charges 4090 for a call of 16 estimate units: 4074 for the definitions.
+		const tight = createLedger(crowded, { ...options, gauge: { scale: 1, overhead: 4074 } })
 		seedLedgerRecall(tight)
 		await tight.respond('Check the desk.')
 		expect(tight.conversation.messages().find((message) => message.role === 'tool')?.content).toBe(
@@ -5655,7 +5707,8 @@ describe('Ledger', () => {
 	it('keeps an amended record whole when it fits and drops every line when nothing fits', async () => {
 		const fixture = LEDGER_TRIM_FLIP_FIXTURE
 		const [whole, none] = await Promise.all(
-			[4096, 20].map(async (capacity) => {
+			// At capacity 20 the request estimates 19 and prices 20.14 with the drift; 21 carries it.
+			[4096, 21].map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 				const ledger = createLedger(
 					provider,
@@ -8259,10 +8312,18 @@ describe('Ledger — head pricing', () => {
 			buildLedgerOptions({ capacity, share: { prompt: 1, tail: 0.001 }, agent: { instructions } }),
 		)
 		seedLedgerTrimOrder(ledger)
+		const sent = createRecorder<[request: ProviderRequest]>()
+		ledger.agent.emitter.on('request', (_index, request) => sent.handler(request))
 
-		await ledger.respond(fixture.request)
+		// The head alone prices over the capacity: the plan cuts every record, and no pass is sent.
+		const refused = await ledger.respond(fixture.request).then(
+			() => undefined,
+			(error: unknown) => error,
+		)
 
-		const messages = requireValue(provider.calls[0]).messages
+		expect(isLedgerError(refused) ? refused.code : refused).toBe('OVERFLOW')
+		expect(provider.calls).toHaveLength(0)
+		const messages = requireValue(sent.calls[0])[0].messages
 		expect(messages.at(-1)?.content).toBe(fixture.request)
 		expect(estimateMessages(messages)).toBeGreaterThan(capacity / (1 + LEDGER_SCALE_DRIFT))
 	})
@@ -9752,7 +9813,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			supersedes: [first, second].map(
 				(result) => result.attempts.filter((attempt) => attempt.phase === 'supersedes').length,
 			),
-			digest: await computeTextDigest(
+			digest: hashStudyBytes(
 				renderLedgerPositions({ keys: [firstKeys, secondKeys], judgments }, to),
 			),
 		}).toEqual({
@@ -10522,7 +10583,8 @@ describe('Ledger — subset pricing', () => {
 					? overhead
 					: hidden.length === 0
 						? 0
-						: Math.min(overhead, 1.25 * estimateTokens(JSON.stringify(hidden)))
+						: Math.min(1.25, overhead / estimateTokens(JSON.stringify(definitions))) *
+							estimateTokens(JSON.stringify(hidden))
 			const total = Math.max(0, capacity * prompt - (overhead - spared)) / (1 + LEDGER_SCALE_DRIFT)
 			const stored = ledger.conversation.messages()
 			const request = requireValue(stored.find((message) => message.content === 'Check the desk.'))
@@ -10771,4 +10833,1567 @@ describe('Ledger — its agent', () => {
 			expect(served.gauge).toEqual(control.gauge)
 		},
 	)
+})
+
+describe('Ledger — disclosure: construction and authority', () => {
+	it('refuses agent.builtins without agent.authority', () => {
+		const { options } = buildLedgerBuiltinOptions()
+		const { authority: _authority, ...agent } = requireValue(options.agent)
+		const error = captureError(() =>
+			createLedger(createScriptedProvider([{ content: 'Done.' }]), { ...options, agent }),
+		)
+		expect(isAgentError(error) ? error.code : error).toBe('AUTHORITY')
+	})
+
+	it("routes every built-in call to the host's evaluate, and an asked one to its ask", async () => {
+		const { options, evaluated, asked } = buildLedgerBuiltinOptions()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						createToolCall({ id: 'l', name: 'load', arguments: { skill: 'billing' } }),
+						createToolCall({ id: 'm', name: 'memo', arguments: { name: 'pref' } }),
+						createToolCall({
+							id: 'r',
+							name: 'remember',
+							arguments: { name: 'notes', description: 'Desk notes', content: 'Ship on Friday.' },
+						}),
+						createToolCall({ id: 's', name: 'switch', arguments: { workspace: 'north' } }),
+					],
+				},
+				{
+					content: '',
+					tools: [createToolCall({ id: 'u', name: 'unload', arguments: { skill: 'billing' } })],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		seedLedgerWorkspaces(ledger)
+		ledger.agent.context.apply(createScope(LEDGER_BUILTIN_SCOPE))
+		await ledger.respond('Set up the desk.')
+		expect(evaluated.calls.map(([name]) => name)).toEqual([
+			'load',
+			'memo',
+			'remember',
+			'switch',
+			'unload',
+		])
+		expect(asked.calls.map(([name]) => name)).toEqual(['remember'])
+		expect(readLedgerToolContents(ledger)).toEqual([
+			BUILTIN_NOTES.loaded,
+			BUILTIN_PREF_CONTENT,
+			BUILTIN_NOTES.remembered,
+			BUILTIN_NOTES.switched,
+			BUILTIN_NOTES.unloaded,
+		])
+	})
+})
+
+describe('Ledger — disclosure: the repeat stop', () => {
+	it('denies the identical second built-in call as a repeat before the host evaluate, and ends the pass', async () => {
+		const { options, evaluated } = buildLedgerBuiltinOptions()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [createToolCall({ id: 'l1', name: 'load', arguments: { skill: 'billing' } })],
+				},
+				{
+					content: '',
+					tools: [createToolCall({ id: 'l2', name: 'load', arguments: { skill: 'billing' } })],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		const result = await ledger.respond('Open billing.')
+		expect(readLedgerToolContents(ledger)).toEqual([
+			BUILTIN_NOTES.loaded,
+			`"load" did not run: ${LEDGER_NOTES.repeat}`,
+		])
+		expect(evaluated.calls.map(([name]) => name)).toEqual(['load'])
+		expect(result.passes).toHaveLength(2)
+		expect(provider.calls).toHaveLength(3)
+		expect(provider.calls[2]?.tools).toBeUndefined()
+	})
+
+	it.each([
+		[
+			'memo n, a successful remember n, and memo n reads the revised body',
+			[
+				['remember', { name: 'notes', description: 'Desk notes', content: 'First.' }],
+				['memo', { name: 'notes' }],
+				['remember', { name: 'notes', description: 'Desk notes', content: 'Second.' }],
+				['memo', { name: 'notes' }],
+				['memo', { name: 'notes' }],
+			],
+			[BUILTIN_NOTES.remembered, 'First.', BUILTIN_NOTES.remembered, 'Second.'],
+		],
+		[
+			'load X, a successful unload X, and load X loads again, and unload X unloads again',
+			[
+				['load', { skill: 'billing' }],
+				['unload', { skill: 'billing' }],
+				['load', { skill: 'billing' }],
+				['unload', { skill: 'billing' }],
+				['unload', { skill: 'billing' }],
+			],
+			[BUILTIN_NOTES.loaded, BUILTIN_NOTES.unloaded, BUILTIN_NOTES.loaded, BUILTIN_NOTES.unloaded],
+		],
+		[
+			'switch A, switch B, and switch A switches back',
+			[
+				['switch', { workspace: 'north' }],
+				['switch', { workspace: 'south' }],
+				['switch', { workspace: 'north' }],
+				['switch', { workspace: 'north' }],
+			],
+			[BUILTIN_NOTES.switched, BUILTIN_NOTES.switched, BUILTIN_NOTES.switched],
+		],
+	] as const)(
+		'%s, and the identical call with no such call between is a repeat',
+		async (_title, calls, contents) => {
+			const { options } = buildLedgerBuiltinOptions()
+			const provider = createScriptedProvider(
+				[
+					...calls.map(([name, args], at) => ({
+						content: '',
+						tools: [createToolCall({ id: `c${at}`, name, arguments: args })],
+					})),
+					{ content: 'Done.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(provider, options)
+			seedLedgerWorkspaces(ledger)
+			ledger.agent.context.apply(createScope(LEDGER_BUILTIN_SCOPE))
+			await ledger.respond('Work the desk.')
+			const [last] = calls.slice(-1)
+			expect(readLedgerToolContents(ledger)).toEqual([
+				...contents,
+				`"${requireValue(last)[0]}" did not run: ${LEDGER_NOTES.repeat}`,
+			])
+		},
+	)
+})
+
+describe('Ledger — disclosure: filing and the answer pass', () => {
+	it('files no finding, record, or recall listing from a built-in, and its answer note carries a memo body and no acknowledgement', async () => {
+		const { options } = buildLedgerBuiltinOptions()
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						createToolCall({ id: 'k', name: 'lookup', arguments: { id: 'BW-20931' } }),
+						createToolCall({ id: 'l', name: 'load', arguments: { skill: 'billing' } }),
+						createToolCall({ id: 'm', name: 'memo', arguments: { name: 'pref' } }),
+						createToolCall({
+							id: 'r',
+							name: 'remember',
+							arguments: {
+								name: 'notes',
+								description: 'Desk notes',
+								content: 'Brightwater Studio ships on Friday.',
+							},
+						}),
+						createToolCall({ id: 's', name: 'switch', arguments: { workspace: 'north' } }),
+					],
+				},
+				{
+					content: '',
+					tools: [createToolCall({ id: 'n', name: 'memo', arguments: { name: 'notes' } })],
+				},
+				{ content: '' },
+				{ content: 'Answered.' },
+				{
+					content: '',
+					tools: [
+						createToolCall({ id: 'q', name: 'recall', arguments: { topic: 'Brightwater Studio' } }),
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		seedLedgerWorkspaces(ledger)
+		ledger.agent.context.apply(createScope(LEDGER_BUILTIN_SCOPE))
+		await ledger.respond('Check Brightwater Studio.')
+		const note = requireValue(
+			ledger.conversation
+				.messages()
+				.find((message) => message.content.startsWith(LEDGER_NOTES.results)),
+		)
+		expect(note.role).toBe('user')
+		expect(note.content).toContain(BUILTIN_PREF_CONTENT)
+		expect(note.content).toContain('Brightwater Studio ships on Friday.')
+		expect(note.content).toContain('Refund is $148.50.')
+		for (const acknowledgement of [
+			BUILTIN_NOTES.loaded,
+			BUILTIN_NOTES.remembered,
+			BUILTIN_NOTES.switched,
+		])
+			expect(note.content).not.toContain(acknowledgement)
+		await ledger.respond('When does Brightwater Studio ship?')
+		const copy = requireValue(provider.calls[4]?.messages.at(-1))
+		expect(copy.content).toContain('When does Brightwater Studio ship?')
+		expect(copy.content).not.toContain('ships on Friday')
+		const listing = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'q'),
+		)
+		expect(listing.content).not.toContain('ships on Friday')
+	})
+
+	it('advertises nothing in the answer pass and carries every shown body', async () => {
+		const { options } = buildLedgerBuiltinOptions({ disclosure: { skills: ['claims'] } })
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'billing' } })],
+				},
+				{ content: '' },
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		const result = await ledger.respond('Open billing.')
+		expect(result.passes).toHaveLength(2)
+		const answer = requireValue(provider.calls[2])
+		expect(answer.tools).toBeUndefined()
+		const system = requireValue(answer.messages.find((message) => message.role === 'system'))
+		expect(system.content).toContain(BUILTIN_BILLING_BODY)
+		expect(system.content).toContain(BUILTIN_CLAIMS_BODY)
+	})
+})
+
+describe('Ledger — disclosure: calibration and hydrate', () => {
+	it.each([
+		['calibrates the ungated set alone and plans with room at taverna’s room', true],
+		['calibrates every definition and plans with no room when no skill holds one back', false],
+	] as const)('%s', async (_title, held) => {
+		const skills = createSkillManager()
+		skills.add(LEDGER_TAVERNA_SKILLS)
+		const provider = new DensityLedgerProvider(
+			[{ content: '' }, { content: '' }, { content: 'First reply.' }, { content: 'Done.' }],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildUncalibratedOptions(
+				buildLedgerOptions({
+					capacity: 19968,
+					predict: 4096,
+					share: { prompt: 1, tail: 0.6 },
+					agent: held
+						? { skills, authority: AGENT_AUTHORITY, builtins: ['load', 'unload'] }
+						: { skills, authority: AGENT_AUTHORITY },
+				}),
+			),
+		)
+		ledger.agent.context.tools.add(LEDGER_TAVERNA_TOOLS)
+		await ledger.respond('First request.')
+		const calibration = requireValue(
+			provider.calls.find((call) => call.options?.think === false && call.tools !== undefined),
+		)
+		expect(calibration.tools?.map((tool) => tool.name)).toEqual(
+			held
+				? ['lookup', 'recall', 'load', 'unload']
+				: ['lookup', 'recall', ...LEDGER_TAVERNA_TOOLS.map((tool) => tool.name)],
+		)
+		await ledger.respond('Second request.')
+		const sent = requireValue(provider.calls[3]).messages.map((message) => message.content)
+		expect(sent.includes('First request.')).toBe(held)
+		expect(sent.includes('First reply.')).toBe(held)
+	})
+
+	it('calibrates again for a change to the calibrated set alone, never for a ceiling change, a load, or a held-back edit', async () => {
+		const { options } = buildLedgerBuiltinOptions({ builtins: ['load', 'unload'] })
+		const provider = new DensityLedgerProvider(
+			[
+				{ content: '' },
+				{ content: '' },
+				{ content: 'One.' },
+				{ content: 'Two.' },
+				{
+					content: '',
+					tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'claims' } })],
+				},
+				{ content: 'Three.' },
+				{ content: 'Four.' },
+				{ content: '' },
+				{ content: '' },
+				{ content: 'Five.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, buildUncalibratedOptions(options))
+		await ledger.respond('First.')
+		expect(provider.calls.filter((call) => call.options?.think === false)).toHaveLength(2)
+		ledger.agent.context.apply(
+			createScope({ name: 'narrow', skills: ['claims'], tools: ['lookup', 'recall', 'load'] }),
+		)
+		await ledger.respond('Narrowed.')
+		await ledger.respond('Load claims.')
+		expect(readLedgerToolContents(ledger)).toEqual([BUILTIN_NOTES.loaded])
+		ledger.agent.context.tools.remove('refund')
+		ledger.agent.context.tools.add(
+			createTool({
+				name: 'refund',
+				description: 'Runs one refund for the desk, edited.',
+				parameters: { type: 'object' },
+				execute: () => 'refund recorded',
+			}),
+		)
+		await ledger.respond('Edited.')
+		expect(provider.calls.filter((call) => call.options?.think === false)).toHaveLength(2)
+		ledger.agent.context.tools.add(
+			createTool({
+				name: 'extra',
+				description: 'A tool no skill names.',
+				parameters: { type: 'object' },
+				execute: () => 'ran',
+			}),
+		)
+		await ledger.respond('Added.')
+		expect(provider.calls.filter((call) => call.options?.think === false)).toHaveLength(4)
+	})
+
+	it('shows on a hydrated ledger what its thread showed, within a narrower ceiling, on the stored gauge', async () => {
+		const provider = new DensityLedgerProvider(
+			[
+				{ content: '' },
+				{ content: '' },
+				{
+					content: '',
+					tools: [
+						createToolCall({ id: 'l', name: 'load', arguments: { skill: 'billing' } }),
+						createToolCall({ id: 's', name: 'switch', arguments: { workspace: 'south' } }),
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildUncalibratedOptions(buildLedgerBuiltinOptions().options),
+		)
+		seedLedgerWorkspaces(ledger)
+		ledger.agent.context.apply(createScope(LEDGER_BUILTIN_SCOPE))
+		await ledger.respond('Open billing in south.')
+		const snapshot = ledger.snapshot()
+		for (const [scope, shown] of [
+			[LEDGER_BUILTIN_SCOPE, true],
+			[{ ...LEDGER_BUILTIN_SCOPE, skills: ['claims'], workspaces: ['north'] }, false],
+		] as const) {
+			const later = new DensityLedgerProvider([{ content: 'Done.' }], {
+				recorded: true,
+				repeat: false,
+			})
+			const hydrated = createLedger(later, {
+				...buildUncalibratedOptions(buildLedgerBuiltinOptions().options),
+				snapshot,
+			})
+			seedLedgerWorkspaces(hydrated)
+			hydrated.agent.context.apply(createScope(scope))
+			expect(hydrated.gauge).toEqual(ledger.gauge)
+			await hydrated.respond('What now?')
+			expect(later.calls).toHaveLength(1)
+			const text = requireValue(later.calls[0])
+				.messages.map((message) => message.content)
+				.join('\n')
+			expect(text.includes(BUILTIN_BILLING_BODY)).toBe(shown)
+			expect(text.includes('SOUTH FILE')).toBe(shown)
+		}
+	})
+})
+
+describe('Ledger — disclosure: the plan and room', () => {
+	it.each([
+		[
+			'holds back the largest loadable skill and one result while the first pass advertises load',
+			undefined,
+		],
+		[
+			'holds back nothing while the first pass does not advertise load',
+			['lookup', 'recall', 'unload', 'refund', 'claim'],
+		],
+	] as const)('%s', async (_title, tools) => {
+		const gauge = { scale: 1.25, overhead: 120 }
+		const { options } = buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{ capacity: 1600, predict: 0, share: { prompt: 1, tail: 0.25 }, gauge },
+		)
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, options)
+		ledger.agent.context.skills.add({
+			name: 'manual',
+			description: 'The desk manual',
+			content: 'Read the desk manual before you answer. '.repeat(20),
+		})
+		if (tools !== undefined) ledger.agent.context.apply(createScope({ name: 'host', tools }))
+		ledger.conversation.add(LEDGER_PLAN_SEED)
+		await ledger.respond('Check the desk.')
+		const definitions = [
+			...ledger.agent.context.tools.definitions(),
+			...collectBuiltinDefinitions({ builtins: ['load', 'unload'] }),
+		]
+		const named = ['refund', 'claim']
+		const calibrated = definitions.filter((tool) => !named.includes(tool.name))
+		const advertised = definitions.filter((tool) =>
+			tools === undefined ? !named.includes(tool.name) : tools.some((name) => name === tool.name),
+		)
+		const { spared, added } = computeToolPrice(calibrated, advertised, gauge)
+		const holdback =
+			tools === undefined
+				? Math.max(
+						...ledger.agent.context.skills.skills().map((skill) =>
+							computeSkillPrice(
+								skill,
+								definitions.filter((tool) => skill.tools.includes(tool.name)),
+								calibrated,
+								gauge,
+							),
+						),
+					) + new Gauge({ ...gauge, capacity: 1600 }).reserve([], 'Noted.')
+				: 0
+		const total =
+			Math.max(0, 1600 - (gauge.overhead - spared + added) - holdback) / (1 + LEDGER_SCALE_DRIFT)
+		const stored = ledger.conversation.messages()
+		const request = requireValue(stored.find((message) => message.content === 'Check the desk.'))
+		const seed = stored.slice(0, LEDGER_PLAN_SEED.length)
+		const prices = Array.from(
+			{ length: seed.length / 2 + 1 },
+			(_, count) => 1.25 * estimateMessages([...seed.slice(seed.length - 2 * count), request]),
+		)
+		const kept = requireValue(provider.calls[0]).messages.filter(
+			(message) => message.role === 'user' && message.content === LEDGER_PLAN_REMARK,
+		).length
+		expect(holdback > 0).toBe(tools === undefined)
+		expect(kept).toBe(
+			Math.max(
+				0,
+				prices.findLastIndex((price) => price <= total * 0.25),
+			),
+		)
+	})
+
+	it.each([
+		['denies a load the remainder cannot hold after the lookup the batch cleared first', 1],
+		['admits a load the remainder holds', 0],
+	] as const)('%s', async (_title, shift) => {
+		const gauge = { scale: 1, overhead: 0 }
+		const { options } = buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{ capacity: 8192, predict: 40, gauge },
+		)
+		const measured = createLedger(createScriptedProvider([{ content: 'Done.' }]), options)
+		const definitions = [
+			...measured.agent.context.tools.definitions(),
+			...collectBuiltinDefinitions({ builtins: ['load', 'unload'] }),
+		]
+		const calibrated = definitions.filter((tool) => tool.name !== 'refund' && tool.name !== 'claim')
+		const cost = computeSkillPrice(
+			{ name: 'billing', content: BUILTIN_BILLING_BODY },
+			definitions.filter((tool) => tool.name === 'refund'),
+			calibrated,
+			gauge,
+		)
+		const batch = [
+			createToolCall({ id: 'k', name: 'lookup', arguments: { id: 'BW-20931' } }),
+			createToolCall({ id: 'l', name: 'load', arguments: { skill: 'billing' } }),
+		]
+		const measure = await measureLedgerRoom({ builtins: ['load', 'unload'] }, batch, false)
+		// The lookup commits its result price; the load adds its own price and the next result's.
+		const lookup = requireValue(measure.results[0])
+		const load = requireValue(measure.results[1])
+		const need = Math.ceil((lookup + cost + load) * (1 + LEDGER_SCALE_DRIFT))
+		const served = await serveLedgerRoom(
+			{ builtins: ['load', 'unload'] },
+			batch,
+			measure,
+			need - shift,
+			false,
+		)
+		expect(readLedgerToolContents(served.ledger)).toEqual([
+			'No record',
+			'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+			shift === 0 ? BUILTIN_NOTES.loaded : `"load" did not run: ${LEDGER_NOTES.overflow}`,
+		])
+		const system = requireValue(served.calls[2]).messages.find((one) => one.role === 'system')
+		expect(system?.content.includes(BUILTIN_BILLING_BODY)).toBe(shift === 0)
+	})
+
+	it.each([
+		['denies a remember the remainder cannot hold, with no result term', 1],
+		['admits a remember the remainder holds', 0],
+	] as const)('%s', async (_title, shift) => {
+		const line = estimateTokens(renderIndexEntry({ name: 'notes', description: 'Desk notes' }))
+		const batch = [
+			createToolCall({ id: 'k', name: 'lookup', arguments: { id: 'BW-20931' } }),
+			createToolCall({
+				id: 'r',
+				name: 'remember',
+				arguments: { name: 'notes', description: 'Desk notes', content: 'Ship on Friday.' },
+			}),
+		]
+		const measure = await measureLedgerRoom({ builtins: ['memo', 'remember'] }, batch, true)
+		// The lookup commits its result price; the remember adds its index line and no result.
+		const lookup = requireValue(measure.results[0])
+		const need = Math.ceil((lookup + line) * (1 + LEDGER_SCALE_DRIFT))
+		const served = await serveLedgerRoom(
+			{ builtins: ['memo', 'remember'] },
+			batch,
+			measure,
+			need - shift,
+			true,
+		)
+		expect(readLedgerToolContents(served.ledger).slice(1)).toEqual([
+			'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+			shift === 0 ? BUILTIN_NOTES.remembered : `"remember" did not run: ${LEDGER_NOTES.overflow}`,
+		])
+		expect(served.ledger.agent.context.memos.memo('notes') !== undefined).toBe(shift === 0)
+	})
+
+	it.each([
+		[
+			'in one batch, the batch’s earlier load counts against the share',
+			[
+				[
+					['load', 'billing'],
+					['load', 'claims'],
+				],
+			],
+			[],
+			['loaded', 'overflow'],
+		],
+		[
+			'in one request, an unload reopens a load denied for the thread’s share',
+			[[['load', 'billing']], [['load', 'claims']], [['unload', 'billing']], [['load', 'claims']]],
+			[],
+			['loaded', 'overflow', 'unloaded', 'loaded'],
+		],
+		[
+			'in one request, the identical retry of a load denied for the share is a repeat',
+			[[['load', 'billing']], [['load', 'claims']], [['load', 'claims']]],
+			[],
+			['loaded', 'overflow', 'repeat'],
+		],
+		[
+			'across two requests, the thread’s earlier load counts against the share until it is unloaded',
+			[[['load', 'claims']], [['unload', 'billing']], [['load', 'claims']]],
+			[[['load', 'billing']]],
+			['overflow', 'unloaded', 'loaded'],
+		],
+	] as const)('%s', async (_title, turns, earlier, outcomes) => {
+		const gauge = { scale: 1, overhead: 0 }
+		const measured = createLedger(
+			createScriptedProvider([{ content: 'Done.' }]),
+			buildLedgerBuiltinOptions({ builtins: ['load', 'unload'] }, { gauge }).options,
+		)
+		const definitions = [
+			...measured.agent.context.tools.definitions(),
+			...collectBuiltinDefinitions({ builtins: ['load', 'unload'] }),
+		]
+		const calibrated = definitions.filter((tool) => tool.name !== 'refund' && tool.name !== 'claim')
+		const billing = computeSkillPrice(
+			{ name: 'billing', content: BUILTIN_BILLING_BODY },
+			definitions.filter((tool) => tool.name === 'refund'),
+			calibrated,
+			gauge,
+		)
+		const claims = computeSkillPrice(
+			{ name: 'claims', content: BUILTIN_CLAIMS_BODY },
+			definitions.filter((tool) => tool.name === 'claim'),
+			calibrated,
+			gauge,
+		)
+		const budget = 32768 * 0.7
+		const { options } = buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{ gauge, share: { skills: (billing + claims - 0.5) / budget } },
+		)
+		const provider = createScriptedProvider(
+			[
+				...(earlier.length === 0
+					? []
+					: [...buildSkillTurns(earlier, 'e'), { content: 'Earlier.' }]),
+				...buildSkillTurns(turns, 't'),
+				{ content: 'Done.' },
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		if (earlier.length > 0) await ledger.respond('Open billing.')
+		await ledger.respond('Open claims.')
+		const notes = {
+			loaded: BUILTIN_NOTES.loaded,
+			unloaded: BUILTIN_NOTES.unloaded,
+			overflow: `"load" did not run: ${LEDGER_NOTES.overflow}`,
+			repeat: `"load" did not run: ${LEDGER_NOTES.repeat}`,
+		}
+		expect(readLedgerToolContents(ledger).slice(earlier.length)).toEqual(
+			outcomes.map((outcome) => notes[outcome]),
+		)
+	})
+})
+
+describe('Ledger — disclosure: the shown set in every build', () => {
+	it('sizes a recall after a load against a head that holds the loaded body, so the next turn fits', async () => {
+		const gauge = { scale: 1, overhead: 0 }
+		const { options } = buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{ capacity: 3000, predict: 100, share: { prompt: 1, tail: 0.001 }, gauge },
+		)
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'manual' } })],
+				},
+				{
+					content: 'z'.repeat(1600),
+					tools: [createToolCall({ id: 'q', name: 'recall', arguments: { topic: 'zephyr' } })],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		ledger.agent.context.skills.add({
+			name: 'manual',
+			description: 'The drawer manual',
+			content: 'Read the drawer manual before you open one. '.repeat(40),
+		})
+		ledger.conversation.add(
+			Array.from({ length: 60 }, (_, at): MessageInput => ({
+				role: 'user',
+				content: `The zephyr drawer ${at} holds spare keys and the vault ledger. `.repeat(3),
+			})),
+		)
+		await ledger.respond('Where are the spare keys?')
+		const listing = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'q'),
+		)
+		expect(listing.content).toContain('zephyr drawer 59 ')
+		expect(listing.content).not.toContain('zephyr drawer 0 ')
+		expect(estimateMessages(requireValue(provider.calls[2]).messages)).toBeLessThanOrEqual(
+			3000 - 100,
+		)
+	})
+
+	it('plans a thread that enters with a skill shown against a head that holds its body', async () => {
+		const gauge = { scale: 1, overhead: 0 }
+		const { options } = buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{ capacity: 1700, predict: 100, share: { prompt: 1, tail: 0.001 }, gauge },
+		)
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'manual' } })],
+				},
+				{ content: 'r'.repeat(5200) },
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		ledger.agent.context.skills.add({
+			name: 'manual',
+			description: 'The drawer manual',
+			content: 'Read the drawer manual before you open one. '.repeat(40),
+		})
+		// Only the shown skill is admitted, so the plan holds nothing back for another load.
+		ledger.agent.context.apply(createScope({ name: 'host', skills: ['manual'] }))
+		await ledger.respond('Open the manual.')
+		await ledger.respond('What next?')
+		const sent = requireValue(provider.calls[2])
+		expect(
+			requireValue(sent.messages.find((message) => message.role === 'system')).content,
+		).toContain('Read the drawer manual')
+		expect(estimateMessages(sent.messages)).toBeLessThanOrEqual(1700 - 100)
+	})
+
+	it('fits the answer note against a head that holds the loaded body', async () => {
+		const gauge = { scale: 1, overhead: 0 }
+		const { options } = buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{
+				capacity: 1400,
+				predict: 100,
+				share: { prompt: 1, tail: 0.001 },
+				gauge,
+				lookups: [
+					...(buildLedgerOptions().lookups ?? []),
+					...LEDGER_SKILL_LOOKUPS,
+					{
+						tool: createTool({
+							name: 'ledger_page',
+							description: 'Reads one page of the desk ledger.',
+							parameters: { type: 'object' },
+							execute: () =>
+								Array.from({ length: 40 }, (_, at) =>
+									`Ledger line ${at}: a desk entry. `.repeat(3),
+								).join('\n'),
+						}),
+						read: () => undefined,
+					},
+				],
+			},
+		)
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'manual' } })],
+				},
+				{
+					content: '',
+					tools: [createToolCall({ id: 'p', name: 'ledger_page', arguments: { page: 1 } })],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		ledger.agent.context.skills.add({
+			name: 'manual',
+			description: 'The drawer manual',
+			content: 'Read the drawer manual before you open one. '.repeat(40),
+		})
+		const result = await ledger.respond('Read the ledger page.')
+		// The turn after the page's result does not fit, so the gate ends the pass there.
+		expect(result.passes).toHaveLength(2)
+		expect(provider.calls).toHaveLength(3)
+		const answer = requireValue(provider.calls[2])
+		expect(answer.tools).toBeUndefined()
+		expect(
+			requireValue(answer.messages.find((message) => message.role === 'system')).content,
+		).toContain('Read the drawer manual')
+		expect(estimateMessages(answer.messages)).toBeLessThanOrEqual(1400 - 100)
+	})
+
+	it('reports the turn after an admitted load within the prompt, completion, stored turn, and skill price before it', async () => {
+		const provider = new DensityLedgerProvider(
+			[
+				{ content: '' },
+				{ content: '' },
+				{
+					content: 'Opening billing.',
+					tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'billing' } })],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(
+			provider,
+			buildUncalibratedOptions(buildLedgerBuiltinOptions({ builtins: ['load', 'unload'] }).options),
+		)
+		const gauge = await ledger.calibrate(new AbortController().signal)
+		const usages = createRecorder<[prompt: number, completion: number]>()
+		ledger.agent.emitter.on('usage', (usage) => usages.handler(usage.prompt, usage.completion))
+		const boundary = ledger.conversation.messages().length
+		await ledger.respond('Open billing.')
+		const definitions = [
+			...ledger.agent.context.tools.definitions(),
+			...collectBuiltinDefinitions({ builtins: ['load', 'unload'] }),
+		]
+		const calibrated = definitions.filter((tool) => tool.name !== 'refund' && tool.name !== 'claim')
+		const turn = ledger.conversation.messages().slice(boundary + 1, boundary + 3)
+		expect(turn.map((message) => message.role)).toEqual(['assistant', 'tool'])
+		const [first, second] = usages.calls
+		const [prompt, completion] = requireValue(first)
+		const [next] = requireValue(second)
+		const bound =
+			(prompt +
+				completion +
+				gauge.scale * estimateMessages(turn) +
+				computeSkillPrice(
+					{ name: 'billing', content: BUILTIN_BILLING_BODY },
+					definitions.filter((tool) => tool.name === 'refund'),
+					calibrated,
+					gauge,
+				)) *
+			(1 + LEDGER_SCALE_DRIFT)
+		expect(next).toBeLessThanOrEqual(bound)
+		expect(next).toBeGreaterThan(prompt)
+	})
+})
+
+describe('Ledger — disclosure: the room repair', () => {
+	it.each([
+		['two loads admitted around a refused call', 'loads', 0],
+		['a remember admitted with no room for its acknowledgement', 'remember', 0],
+		['two loads around a refused call, the second one token short', 'loads', 1],
+		['a remember one token short', 'remember', 1],
+	] as const)(
+		'reads the room edge of the turn after %s, with no provider call for a turn that does not fit',
+		async (_title, ordering, shift) => {
+			const gauge = { scale: 1, overhead: 0 }
+			const { options } = buildLedgerBuiltinOptions({}, { capacity: 8192, predict: 40, gauge })
+			const measured = createLedger(createScriptedProvider([{ content: 'Done.' }]), options)
+			const definitions = [
+				...measured.agent.context.tools.definitions(),
+				...collectBuiltinDefinitions({ builtins: BUILTIN_NAMES }),
+			]
+			const calibrated = definitions.filter(
+				(tool) => tool.name !== 'refund' && tool.name !== 'claim',
+			)
+			const billing = computeSkillPrice(
+				{ name: 'billing', content: BUILTIN_BILLING_BODY },
+				definitions.filter((tool) => tool.name === 'refund'),
+				calibrated,
+				gauge,
+			)
+			const claims = computeSkillPrice(
+				{ name: 'claims', content: BUILTIN_CLAIMS_BODY },
+				definitions.filter((tool) => tool.name === 'claim'),
+				calibrated,
+				gauge,
+			)
+			const line = estimateTokens(renderIndexEntry({ name: 'notes', description: 'Desk notes' }))
+			const batch =
+				ordering === 'loads'
+					? [
+							createToolCall({ id: 'b', name: 'load', arguments: { skill: 'billing' } }),
+							createToolCall({ id: 'r', name: 'refund', arguments: {} }),
+							createToolCall({ id: 'c', name: 'load', arguments: { skill: 'claims' } }),
+						]
+					: [
+							createToolCall({
+								id: 'm',
+								name: 'remember',
+								arguments: { name: 'notes', description: 'Desk notes', content: 'Ship on Friday.' },
+							}),
+						]
+			const measure = await measureLedgerRoom({}, batch, true)
+			// The first load commits its price and the refused refund commits nothing; the second load
+			// adds its own price and the next result's. A remember adds its index line alone.
+			const need = Math.ceil(
+				(ordering === 'loads' ? billing + claims + requireValue(measure.results[2]) : line) *
+					(1 + LEDGER_SCALE_DRIFT),
+			)
+			const served = await serveLedgerRoom({}, batch, measure, need - shift, true)
+			const admitted = ordering === 'loads' ? BUILTIN_NOTES.loaded : BUILTIN_NOTES.remembered
+			const contents = readLedgerToolContents(served.ledger)
+			// At the edge the last call is admitted and the next turn does not fit; one short, it is denied.
+			expect(contents.at(-1)).toBe(
+				shift === 0
+					? admitted
+					: `"${ordering === 'loads' ? 'load' : 'remember'}" did not run: ${LEDGER_NOTES.overflow}`,
+			)
+			expect(contents.slice(0, ordering === 'loads' ? 2 : 1)).toEqual(
+				ordering === 'loads' ? ['No record', BUILTIN_NOTES.loaded] : ['No record'],
+			)
+			// At the edge the gate ends the pass at the next turn: the answer pass is the third call.
+			expect(served.result.content).toBe('Answered.')
+			expect(served.calls.slice(0, 2).every((call) => call.tools !== undefined)).toBe(true)
+			expect(shift === 0 ? served.reasons : ['overflow']).toEqual(['overflow'])
+			expect(shift === 0 ? served.calls.length : 3).toBe(3)
+			expect(shift === 0 ? served.calls.at(-1)?.tools : undefined).toBeUndefined()
+		},
+	)
+
+	it('ends the pass at the turn that does not fit after a lookup result on a turn after an earlier admission spent the room, with no provider call for it', async () => {
+		const { options } = buildLedgerBuiltinOptions(
+			{},
+			{ capacity: 8192, predict: 40, gauge: { scale: 1, overhead: 0 } },
+		)
+		const turns = [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'b', name: 'load', arguments: { skill: 'billing' } })],
+				usage: { prompt: 100, completion: 0, total: 100 },
+			},
+			{
+				content: '',
+				tools: [createToolCall({ id: 'k', name: 'lookup', arguments: { id: 'BW-20931' } })],
+				usage: { prompt: 8142, completion: 0, total: 8142 },
+			},
+		]
+		const provider = createScriptedProvider(
+			[...turns, { content: 'Answered.' }, { content: 'Unused.' }],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		ledger.agent.context.apply(createScope(LEDGER_BUILTIN_SCOPE))
+		const reasons = createRecorder<[reason: unknown]>()
+		ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+		const served = await ledger.respond('Work the desk.')
+		expect(reasons.calls).toEqual([['overflow']])
+		expect(served.passes).toHaveLength(2)
+		expect(served.content).toBe('Answered.')
+		expect(provider.calls).toHaveLength(turns.length + 1)
+		expect(provider.calls.at(-1)?.tools).toBeUndefined()
+		expect(readLedgerToolContents(ledger)).toContain(BUILTIN_NOTES.loaded)
+	})
+
+	it('ends a first pass whose host-given workspace puts its first call over the limit, and the answer pass answers', async () => {
+		const { options } = buildLedgerBuiltinOptions(
+			{ disclosure: { skills: [], workspace: 'w1' } },
+			{ capacity: 1400, predict: 0, gauge: { scale: 1, overhead: 600 } },
+		)
+		const provider = createScriptedProvider([{ content: 'Answered.' }], {
+			recorded: true,
+			repeat: false,
+		})
+		const ledger = createLedger(provider, options)
+		seedLedgerWorkspaces(ledger)
+		ledger.agent.context.workspaces.add({
+			id: 'w1',
+			seed: [
+				createFile({
+					path: 'w1.txt',
+					content: createTextContent(`WORKSPACE-W1 ${'w'.repeat(3600)}`, 'text'),
+				}),
+			],
+		})
+		ledger.agent.context.apply(
+			createScope({ ...LEDGER_BUILTIN_SCOPE, workspaces: ['north', 'south', 'w1'] }),
+		)
+		const reasons = createRecorder<[reason: unknown]>()
+		ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+		const served = await ledger.respond('What does the workspace hold?')
+		expect(reasons.calls).toEqual([['overflow']])
+		expect(provider.calls).toHaveLength(1)
+		const [answer] = provider.calls
+		expect(answer?.tools).toBeUndefined()
+		expect(answer?.messages.some((message) => message.content.includes('WORKSPACE-W1'))).toBe(true)
+		expect(served.passes).toHaveLength(2)
+		expect(served.passes[0]).toMatchObject({ content: '', partial: true })
+		expect(served).toMatchObject({ content: 'Answered.', partial: false })
+	})
+
+	it('reads 0 calls over the limit on the built-in arms of the seeded sweep, and reaches each refusal', async () => {
+		const summaries = new Map<string, LedgerRoomSummary>()
+		for (const name of ['c', 'e', 'mild', 'harsh', 'host'])
+			summaries.set(name, await summarizeLedgerRoomArm(name))
+		for (const summary of summaries.values()) {
+			expect(summary.calls).toBeGreaterThan(0)
+			expect(summary.over).toBe(0)
+			expect(summary.overCapacity).toBe(0)
+		}
+		const harsh = requireValue(summaries.get('harsh'))
+		const host = requireValue(summaries.get('host'))
+		expect(harsh.carried).toBeGreaterThan(0)
+		expect(harsh.denied).toBeGreaterThan(0)
+		// The switch stop: a first pass ends at its first call after an admitted switch on at most 1 request in 10.
+		expect(harsh.requestsAfterSwitch).toBeGreaterThan(0)
+		expect(harsh.firstAfterSwitch * 10).toBeLessThanOrEqual(harsh.requestsAfterSwitch)
+		expect(host.first).toBeGreaterThan(0)
+		expect(host.rejected).toBeGreaterThan(0)
+	}, 300_000)
+
+	it.each(['hfree', 'hswap', 'hadd', 'hedit', 'hscope', 'yield', 'listener'])(
+		'reads 0 calls over the limit on the host-act arm %s, whose acts reach later requests',
+		async (name) => {
+			const summary = await summarizeLedgerRoomArm(name)
+			expect(summary.calls).toBeGreaterThan(0)
+			expect(summary.over).toBe(0)
+			expect(summary.overCapacity).toBe(0)
+			expect(summary.acts).toBeGreaterThan(0)
+			expect(summary.acted).toBeGreaterThan(0)
+		},
+		120_000,
+	)
+
+	it('reads 0 calls over the limit on arm plain, a ledger with no built-in, and ends passes at the first call and later', async () => {
+		const plain = await summarizeLedgerRoomArm('plain')
+		expect(plain.calls).toBeGreaterThan(0)
+		expect(plain.over).toBe(0)
+		expect(plain.overCapacity).toBe(0)
+		expect(plain.first).toBeGreaterThan(0)
+		expect(plain.gated - plain.first).toBeGreaterThan(0)
+		expect(plain.rejected).toBeGreaterThan(0)
+	}, 120_000)
+
+	it('prices a stated gauge as a measured one on a provider that reports usage and on a silent one, and an understated gauge sends calls over capacity', async () => {
+		const measured = await summarizeLedgerRoomArm('host')
+		const stated = await summarizeLedgerRoomArm('stated')
+		const silent = await summarizeLedgerRoomArm('silent')
+		for (const summary of [stated, silent]) {
+			expect(summary.calls).toBeGreaterThan(0)
+			expect(summary.over).toBe(0)
+			expect(summary.overCapacity).toBe(0)
+			expect(summary.gated).toBeGreaterThan(0)
+			expect(summary.loads).toBeGreaterThan(0)
+		}
+		expect([stated.gated, stated.first, stated.rejected]).toEqual([
+			measured.gated,
+			measured.first,
+			measured.rejected,
+		])
+		// The control by fixture: half the overhead the provider charges.
+		expect((await summarizeLedgerRoomArm('low')).overCapacity).toBeGreaterThan(0)
+		expect((await summarizeLedgerRoomArm('low-silent')).overCapacity).toBeGreaterThan(0)
+	}, 300_000)
+
+	it('refuses a first request the provider charges within the limit under an overhead stated over its charge', async () => {
+		const measured = await serveLedgerStatedGauge(1, 100000, false, ['Check the stated desk.'])
+		const capacity = requireValue(measured.charges[0]) + 50
+		const served = await serveLedgerStatedGauge(3, capacity, false, ['Check the stated desk.'])
+		expect(served.reasons).toEqual(['overflow'])
+		// The answer pass alone reaches the provider.
+		expect(served.calls).toBe(1)
+		expect(served.charges).toHaveLength(1)
+	})
+
+	it('sends a first request over capacity under an overhead stated under its charge', async () => {
+		const measured = await serveLedgerStatedGauge(1, 100000, false, ['Check the stated desk.'])
+		const capacity = requireValue(measured.charges[0]) - 50
+		const served = await serveLedgerStatedGauge(0.3, capacity, false, ['Check the stated desk.'])
+		expect(served.reasons).toEqual([])
+		expect(served.calls).toBe(1)
+		expect(requireValue(served.charges[0])).toBeGreaterThan(capacity)
+	})
+
+	it('lowers the scale after a first call under an overhead stated over its charge, and sends a longer first request over the limit', async () => {
+		// The first request's estimate exceeds half the overhead, so its prompt is over the stated
+		// overhead and the rescale reads it; the second is long enough to price over the first.
+		const requests = [`Check. ${'c'.repeat(12000)}`, `Check the stated desk. ${'d'.repeat(32000)}`]
+		// At this capacity the plan already carries the second request alone, as it does at the served one.
+		const measured = await serveLedgerStatedGauge(1.5, 12000, false, requests)
+		const scale = requireValue(measured.scales[0])
+		expect(scale).toBeLessThan(measured.scale)
+		// The capacity holds the first request at the stated price and the second at the lowered one.
+		const first =
+			measured.overhead +
+			measured.scale * (1 + LEDGER_SCALE_DRIFT) * requireValue(measured.estimates[0])
+		const second =
+			measured.overhead + scale * (1 + LEDGER_SCALE_DRIFT) * requireValue(measured.estimates[1])
+		const capacity = Math.ceil(Math.max(first, second)) + 1
+		const served = await serveLedgerStatedGauge(1.5, capacity, false, requests)
+		expect(served.reasons).toEqual([])
+		expect(served.calls).toBe(2)
+		expect(requireValue(served.charges[1])).toBeGreaterThan(capacity)
+	})
+
+	it('sends no call over capacity across two requests on a silent provider under an overhead stated over its charge', async () => {
+		const requests = ['Check.', `Check the stated desk. ${'d'.repeat(12000)}`]
+		const measured = await serveLedgerStatedGauge(1, 100000, true, requests)
+		const capacity = Math.max(...measured.charges) + 400
+		const served = await serveLedgerStatedGauge(1.5, capacity, true, requests)
+		expect(served.charges.length).toBeGreaterThan(0)
+		for (const charge of served.charges) expect(charge).toBeLessThanOrEqual(capacity)
+	})
+
+	it('ends the pass after a load at the largest first-call prompt that admits it, and the answer pass carries the body within capacity', async () => {
+		const padding = await bisectLedgerPadding(admitsLedgerEdge, 0, 40000)
+		const edge = await serveLedgerEdge(padding)
+		expect(edge.loaded).toBe(true)
+		expect(await admitsLedgerEdge(padding + 1)).toBe(false)
+		expect(edge.reasons[0]).toBe('overflow')
+		expect(edge.passes).toBe(2)
+		expect(edge.answer?.tools).toBeUndefined()
+		expect(
+			edge.answer?.messages.some((message) => message.content.includes(BUILTIN_BILLING_BODY)),
+		).toBe(true)
+		expect(requireValue(edge.prompts.at(-1)) + 40).toBeLessThanOrEqual(8192)
+	}, 120_000)
+
+	it.each([
+		[0, 'prompt', [], 1],
+		[1, 'prompt', ['overflow'], 2],
+		[0, 'reply', [], 1],
+		[1, 'reply', ['overflow'], 2],
+		[0, 'none', [], 1],
+		[1, 'none', ['overflow'], 2],
+	] as const)(
+		'prices the turn after a load at the room it leaves, short by %i token, when the call before reports %s',
+		async (shift, report, reasons, passes) => {
+			const served = await serveLedgerGateEdge(shift, report)
+			expect(served.reasons).toEqual(reasons)
+			expect(served.passes).toBe(passes)
+		},
+	)
+
+	it.each([
+		[0, [], 1],
+		[1, ['overflow'], 2],
+	] as const)(
+		'prices the first call at the room it leaves, short by %i token',
+		async (shift, reasons, passes) => {
+			const served = await serveLedgerFirstEdge(shift)
+			expect(served.reasons).toEqual(reasons)
+			expect(served.passes).toBe(passes)
+			expect(served.calls[0]?.tools === undefined).toBe(shift === 1)
+		},
+	)
+
+	it('sizes a recall on the turn after a load at the rate the calls before the load measured', async () => {
+		expect(await serveLedgerWideRecall(20)).toEqual({ listed: 20, cut: false })
+	})
+
+	it.each([
+		[
+			'denies a switch whose growth the remainder cannot hold, and the thread shows what it showed',
+			[[['switch', 'w1']]],
+			1,
+			false,
+			['overflow'],
+		],
+		['admits a switch the remainder holds', [[['switch', 'w1']]], 0, false, ['switched']],
+		[
+			'admits a switch to the shown workspace at no price',
+			[[['switch', 'w0']]],
+			1,
+			false,
+			['switched'],
+		],
+		[
+			'counts a lookup the batch cleared first against a switch',
+			[
+				[
+					['lookup', 'BW-20931'],
+					['switch', 'w1'],
+				],
+			],
+			0,
+			false,
+			['lookup', 'overflow'],
+		],
+		[
+			'evaluates a switch denied for room again after a successful unload',
+			[[['switch', 'w1']], [['unload', 'billing']], [['switch', 'w1']]],
+			1,
+			true,
+			['overflow', 'unloaded', 'overflow'],
+		],
+		[
+			'denies the identical switch with no unload between as a repeat',
+			[[['switch', 'w1']], [['switch', 'w1']]],
+			1,
+			true,
+			['overflow', 'repeat'],
+		],
+	] as const)('%s', async (_title, batches, shift, seeded, outcomes) => {
+		const turns = batches.map((batch, at) => ({
+			content: '',
+			tools: batch.map(([name, value], position) =>
+				createToolCall({
+					id: `t${at}-${position}`,
+					name,
+					arguments:
+						name === 'switch'
+							? { workspace: value }
+							: name === 'lookup'
+								? { id: value }
+								: { skill: value },
+				}),
+			),
+		}))
+		const served = await serveLedgerSwitch([...turns, { content: 'Answered.' }], shift, seeded)
+		const notes = {
+			overflow: `"switch" did not run: ${LEDGER_NOTES.overflow}`,
+			repeat: `"switch" did not run: ${LEDGER_NOTES.repeat}`,
+			switched: BUILTIN_NOTES.switched,
+			unloaded: BUILTIN_NOTES.unloaded,
+			lookup: 'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+		}
+		expect(served.contents).toEqual(outcomes.map((outcome) => notes[outcome]))
+		// Only an admitted switch to w1 puts w1 in a later first call; every case dispatches more than one.
+		const shows =
+			outcomes.some((outcome) => outcome === 'switched') && batches[0]?.[0]?.[1] === 'w1'
+		expect(served.carried.some((carried) => carried)).toBe(shows)
+		expect(served.carried.length).toBeGreaterThan(1)
+	})
+
+	it('refuses an answer pass whose context does not fit with its note left out, and serves the next call after the host narrows the scope', async () => {
+		const { options } = buildLedgerBuiltinOptions(
+			{ disclosure: { skills: [], workspace: 'w1' } },
+			{ capacity: 2000, predict: 0 },
+		)
+		const provider = createScriptedProvider([{ content: 'Answered.' }], {
+			recorded: true,
+			repeat: false,
+		})
+		const ledger = createLedger(provider, options)
+		seedLedgerWorkspaces(ledger)
+		ledger.agent.context.workspaces.add({
+			id: 'w1',
+			seed: [
+				createFile({
+					path: 'w1.txt',
+					content: createTextContent(`WORKSPACE-W1 ${'w'.repeat(12000)}`, 'text'),
+				}),
+			],
+		})
+		ledger.agent.context.apply(
+			createScope({ ...LEDGER_BUILTIN_SCOPE, workspaces: ['north', 'w1'] }),
+		)
+		const error = await ledger.respond('What does the workspace hold?').then(
+			() => undefined,
+			(failure: unknown) => failure,
+		)
+		expect(isLedgerError(error) ? error.code : error).toBe('OVERFLOW')
+		expect(provider.calls).toHaveLength(0)
+		expect(ledger.conversation.messages().map((message) => message.content)).toEqual([
+			'What does the workspace hold?',
+		])
+		ledger.agent.context.apply(createScope({ ...LEDGER_BUILTIN_SCOPE, workspaces: ['north'] }))
+		const served = await ledger.respond('And without it?')
+		expect(served.content).toBe('Answered.')
+		expect(provider.calls).toHaveLength(1)
+	})
+
+	it('opens the answer pass without a note that does not fit beside its context', async () => {
+		const script = [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'p', name: 'ledger_page', arguments: { page: 1 } })],
+			},
+			{ content: '' },
+			{ content: 'Answered.' },
+		]
+		const measuring = createScriptedProvider(script, { recorded: true, repeat: false })
+		await createLedger(measuring, buildLedgerPageOptions(100000)).respond('Read the ledger page.')
+		const whole = requireValue(measuring.calls.at(-1)).messages
+		const base = estimateMessages(
+			whole.filter((message) => !message.content.startsWith(LEDGER_NOTES.results)),
+		)
+		expect(whole.some((message) => message.content.startsWith(LEDGER_NOTES.results))).toBe(true)
+		const capacity = Math.floor((base + 3) * (1 + LEDGER_SCALE_DRIFT))
+		const provider = createScriptedProvider(script, { recorded: true, repeat: false })
+		const served = await createLedger(provider, buildLedgerPageOptions(capacity)).respond(
+			'Read the ledger page.',
+		)
+		const answer = requireValue(provider.calls.at(-1))
+		expect(served.passes).toHaveLength(2)
+		expect(answer.tools).toBeUndefined()
+		expect(
+			answer.messages.some((message) => message.content.startsWith(LEDGER_NOTES.results)),
+		).toBe(false)
+		expect(estimateMessages(answer.messages)).toBeLessThanOrEqual(capacity)
+	})
+})
+
+describe('Ledger — the capacity rule: host acts inside a request, and every ledger', () => {
+	it.each([
+		['a tool a skill edit frees', 'free'],
+		['a tool the host adds', 'add'],
+		['a calibrated tool the host replaces under its name by a longer text', 'edit'],
+	] as const)(
+		'prices %s as added from the next request, at the edge, and calibrates at the next respond',
+		async (_title, act) => {
+			const { edge, at, beyond } = await bisectLedgerHostEdge([act])
+			expect(requireValue(at.prompts[1]) + edge).toBeLessThanOrEqual(20000)
+			expect(beyond.reasons[0]).toBe('overflow')
+			expect(at.calibrations).toBe(1)
+		},
+		120_000,
+	)
+
+	it('prices an answer pass a host act grows at the rate its request measured, at the edge', async () => {
+		const edge = await bisectLedgerPadding(
+			async (growth) => !(await serveLedgerAnswerGrowth(growth)).rejected,
+			0,
+			80000,
+		)
+		const at = await serveLedgerAnswerGrowth(edge)
+		const beyond = await serveLedgerAnswerGrowth(edge + 1)
+		// The first pass's call and the answer pass's; the answer reports within the capacity.
+		expect(at.prompts).toHaveLength(2)
+		expect(requireValue(at.prompts[1])).toBeLessThanOrEqual(12000)
+		expect(beyond.rejected).toBe(true)
+	}, 120_000)
+
+	it('refuses a first request of 42 of 122 definitions, on a model whose definitions cost less a unit than its messages, at a limit under its charge', async () => {
+		const measured = await serveLedgerLiveRates(100000)
+		const charge = requireValue(measured.prompts[0])
+		const refused = await serveLedgerLiveRates(charge - 1)
+		expect(refused.reasons).toEqual(['overflow'])
+		// The two calibration calls and the answer pass's: the first request is not sent.
+		expect(refused.calls).toEqual([122, undefined, undefined])
+	})
+
+	it('keeps the scale it held after a first call that advertises 10 of 122 definitions, so few that the scale times the hidden estimate is over the overhead', async () => {
+		const served = await serveLedgerLiveRates(100000, 9)
+		expect(served.reasons).toEqual([])
+		expect(served.calls).toEqual([122, undefined, 10])
+		const held = requireValue(served.scales[0])
+		expect(served.settled).toBe(held)
+	})
+
+	it('serves the same first request at a limit of its charge times 1.06', async () => {
+		const measured = await serveLedgerLiveRates(100000)
+		const charge = requireValue(measured.prompts[0])
+		const served = await serveLedgerLiveRates(Math.ceil(charge * (1 + LEDGER_SCALE_DRIFT)))
+		expect(served.reasons).toEqual([])
+		expect(served.calls).toEqual([122, undefined, 42])
+	})
+
+	it('prices a calibrated definition hidden on the last call and shown on the next at the density, at the edge', async () => {
+		const { edge, at, beyond } = await bisectLedgerHostEdge(['narrow', 'widen'])
+		expect(requireValue(at.prompts[2]) + edge).toBeLessThanOrEqual(20000)
+		expect(beyond.reasons[0]).toBe('overflow')
+	}, 120_000)
+
+	it('prices a turn at no less than the scale after a scope swaps one definition for another of the same count, at the edge', async () => {
+		const { edge, at, beyond } = await bisectLedgerHostEdge([
+			'hide_remember',
+			'hide_matched',
+			'page',
+		])
+		expect(requireValue(at.prompts[3]) + edge).toBeLessThanOrEqual(20000)
+		expect(beyond.reasons[0]).toBe('overflow')
+	}, 120_000)
+
+	it.each([
+		['with every built-in', true],
+		['with no built-in', false],
+	] as const)(
+		'refuses an answer pass a host act grows past the limit after its note, %s, and serves the next call',
+		async (_title, builtins) => {
+			const options = builtins
+				? buildLedgerBuiltinOptions({}, { capacity: 4000, predict: 0 }).options
+				: buildLedgerOptions({ capacity: 4000, predict: 0 })
+			const provider = createScriptedProvider(
+				[{ content: '' }, { content: 'Answered.' }, { content: 'Again.' }],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(provider, options)
+			ledger.agent.context.workspaces.add({
+				id: 'w0',
+				seed: [createFile({ path: 'w0.txt', content: createTextContent('W0 FILE', 'text') })],
+			})
+			ledger.agent.context.apply(
+				createScope(
+					builtins
+						? { ...LEDGER_BUILTIN_SCOPE, workspaces: ['w0'] }
+						: { name: 'host', workspaces: ['w0'] },
+				),
+			)
+			// The answer pass starts after its note and cue are stored: the host grows the shown
+			// workspace there, after the fit and before the pass builds its head.
+			ledger.agent.emitter.on('start', () => {
+				if (ledger.conversation.messages().at(-1)?.content === LEDGER_NOTES.cue)
+					ledger.agent.context.workspaces.active?.write('w0.txt', `GROWN ${'g'.repeat(40000)}`)
+			})
+			const error = await ledger.respond('Work the desk.').then(
+				() => undefined,
+				(failure: unknown) => failure,
+			)
+			expect(isLedgerError(error) ? error.code : error).toBe('OVERFLOW')
+			expect(provider.calls).toHaveLength(1)
+			expect(ledger.conversation.messages().at(-1)?.content).toBe(LEDGER_NOTES.cue)
+			ledger.agent.context.workspaces.active?.write('w0.txt', 'W0 FILE')
+			expect((await ledger.respond('Again?')).content).toBe('Answered.')
+			expect(provider.calls).toHaveLength(2)
+		},
+	)
+
+	it('refuses an answer pass whose context does not fit with its note left out in a ledger with no built-in, and serves the next call after the host narrows the scope', async () => {
+		const provider = createScriptedProvider([{ content: 'Answered.' }], {
+			recorded: true,
+			repeat: false,
+		})
+		const ledger = createLedger(provider, buildLedgerOptions({ capacity: 2000, predict: 0 }))
+		ledger.agent.context.workspaces.add({
+			id: 'w1',
+			seed: [
+				createFile({
+					path: 'w1.txt',
+					content: createTextContent(`WORKSPACE-W1 ${'w'.repeat(12000)}`, 'text'),
+				}),
+			],
+		})
+		ledger.agent.context.apply(createScope({ name: 'host', workspaces: ['w1'] }))
+		const error = await ledger.respond('What does the workspace hold?').then(
+			() => undefined,
+			(failure: unknown) => failure,
+		)
+		expect(isLedgerError(error) ? error.code : error).toBe('OVERFLOW')
+		expect(provider.calls).toHaveLength(0)
+		expect(ledger.conversation.messages().map((message) => message.content)).toEqual([
+			'What does the workspace hold?',
+		])
+		ledger.agent.context.apply(createScope({ name: 'host', workspaces: [] }))
+		expect((await ledger.respond('And without it?')).content).toBe('Answered.')
+		expect(provider.calls).toHaveLength(1)
+	})
+
+	it('opens the answer pass without a note that does not fit beside its context in a ledger with no built-in', async () => {
+		const script = [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'p', name: 'ledger_page', arguments: { page: 1 } })],
+			},
+			{ content: '' },
+			{ content: 'Answered.' },
+		]
+		const measuring = createScriptedProvider(script, { recorded: true, repeat: false })
+		await createLedger(measuring, buildLedgerPageOptions(100000, false)).respond(
+			'Read the ledger page.',
+		)
+		const whole = requireValue(measuring.calls.at(-1)).messages
+		const base = estimateMessages(
+			whole.filter((message) => !message.content.startsWith(LEDGER_NOTES.results)),
+		)
+		expect(whole.some((message) => message.content.startsWith(LEDGER_NOTES.results))).toBe(true)
+		const capacity = Math.floor((base + 3) * (1 + LEDGER_SCALE_DRIFT))
+		const provider = createScriptedProvider(script, { recorded: true, repeat: false })
+		const served = await createLedger(provider, buildLedgerPageOptions(capacity, false)).respond(
+			'Read the ledger page.',
+		)
+		const answer = requireValue(provider.calls.at(-1))
+		expect(served.passes).toHaveLength(2)
+		expect(answer.tools).toBeUndefined()
+		expect(
+			answer.messages.some((message) => message.content.startsWith(LEDGER_NOTES.results)),
+		).toBe(false)
+		expect(estimateMessages(answer.messages)).toBeLessThanOrEqual(capacity)
+	})
+
+	it('ends a pass with no built-in at the turn after a lookup whose result exceeds the remainder, and the answer pass answers from the note', async () => {
+		const { ledger, provider } = buildLedgerOversizedLookup()
+		const reasons = createRecorder<[reason: unknown]>()
+		ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+		const served = await ledger.respond('Read the big record.')
+		// Two calibration calls, the first pass's one call, and the answer pass's.
+		expect(provider.calls).toHaveLength(4)
+		expect(reasons.calls).toEqual([['overflow']])
+		expect(served).toMatchObject({ content: 'Answered.', partial: false })
+		const answer = requireValue(provider.calls.at(-1))
+		expect(answer.tools).toBeUndefined()
+		expect(
+			answer.messages.some((message) => message.content.startsWith(LEDGER_NOTES.results)),
+		).toBe(true)
+	})
+
+	it('sends no first request for a ledger with no built-in whose definitions and records exceed the limit, and the answer pass answers from every record', async () => {
+		const { ledger, provider } = buildLedgerRecordShape(24)
+		const reasons = createRecorder<[reason: unknown]>()
+		const prompts = createRecorder<[prompt: number]>()
+		ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+		ledger.agent.emitter.on('usage', (usage) => prompts.handler(usage.prompt))
+		const served = await ledger.respond('Show the records.')
+		// Two calibration calls and the answer pass's call: the first pass sends nothing.
+		expect(provider.calls).toHaveLength(3)
+		expect(reasons.calls).toEqual([['overflow']])
+		expect(served.passes[0]).toMatchObject({ content: '', partial: true })
+		expect(served).toMatchObject({ content: 'From the records.', partial: false })
+		const answer = requireValue(provider.calls.at(-1))
+		expect(answer.tools).toBeUndefined()
+		const text = answer.messages.map((message) => message.content).join('\n')
+		expect(Array.from({ length: 24 }, (_, at) => text.includes(`RECORD-${at} `))).not.toContain(
+			false,
+		)
+		const { capacity, predict } = LEDGER_RECORD_ROOM
+		expect(prompts.calls).toHaveLength(1)
+		expect(requireValue(prompts.calls[0])[0] + predict).toBeLessThanOrEqual(capacity)
+	})
+
+	it('dispatches the first request for the same ledger with its records cut to the room', async () => {
+		const { ledger, provider } = buildLedgerRecordShape(2)
+		const served = await ledger.respond('Show the records.')
+		expect(served.passes).toHaveLength(1)
+		expect(provider.calls).toHaveLength(3)
+		expect(requireValue(provider.calls.at(-1)).tools?.length).toBeGreaterThan(100)
+	})
+
+	it.each([
+		['load', { skill: 7 }],
+		['switch', { workspace: 7 }],
+	] as const)('prices a %s whose name arrives as a number the door repairs', async (name, args) => {
+		const { options } = buildLedgerBuiltinOptions({}, { capacity: 8192, predict: 0 })
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [createToolCall({ id: 'n', name, arguments: args })] },
+				{ content: 'Done.' },
+				{ content: 'Answered.' },
+			],
+			{ recorded: true, repeat: false },
+		)
+		const ledger = createLedger(provider, options)
+		ledger.agent.context.skills.add({
+			name: '7',
+			description: 'A numbered skill',
+			content: `SKILL-SEVEN ${'s'.repeat(40000)}`,
+			tools: [],
+		})
+		seedLedgerWorkspaces(ledger)
+		ledger.agent.context.workspaces.add({
+			id: '7',
+			seed: [
+				createFile({
+					path: 'seven.txt',
+					content: createTextContent(`WORKSPACE-SEVEN ${'w'.repeat(40000)}`, 'text'),
+				}),
+			],
+		})
+		ledger.agent.context.apply(createScope({ ...LEDGER_BUILTIN_SCOPE, workspaces: ['north', '7'] }))
+		await ledger.respond('Open seven.')
+		expect(readLedgerToolContents(ledger)).toEqual([
+			`"${name}" did not run: ${LEDGER_NOTES.overflow}`,
+		])
+		expect(
+			provider.calls.some((call) =>
+				call.messages.some(
+					(message) =>
+						message.content.includes('SKILL-SEVEN') || message.content.includes('WORKSPACE-SEVEN'),
+				),
+			),
+		).toBe(false)
+	})
+})
+
+describe('Ledger — disclosure: memos of one principal', () => {
+	it('keeps both memos when two ledgers of one principal each remember one during overlapping requests', async () => {
+		const memos = createMemoManager()
+		const ledgers = ['north', 'south'].map((desk) => {
+			const { options } = buildLedgerBuiltinOptions({ memos })
+			const ledger = createLedger(
+				createScriptedProvider(
+					[
+						{
+							content: '',
+							tools: [
+								createToolCall({
+									id: 'r',
+									name: 'remember',
+									arguments: {
+										name: `${desk}_notes`,
+										description: `The ${desk} desk notes`,
+										content: `The ${desk} desk ships on Friday.`,
+									},
+								}),
+							],
+						},
+						{ content: 'Saved.' },
+					],
+					{ recorded: true, repeat: false },
+				),
+				options,
+			)
+			ledger.agent.context.apply(
+				createScope({ name: 'principal', memos: ['north_notes', 'south_notes'] }),
+			)
+			return ledger
+		})
+		await Promise.all(ledgers.map((ledger) => ledger.respond('Save the shipping day.')))
+		expect(
+			memos
+				.memos()
+				.map((memo) => memo.name)
+				.toSorted(),
+		).toEqual(['north_notes', 'south_notes'])
+		expect(
+			ledgers.map(
+				(ledger, at) =>
+					memos.memo(['north_notes', 'south_notes'][at] ?? '')?.origin?.conversation ===
+					ledger.conversation.id,
+			),
+		).toEqual([true, true])
+	})
 })

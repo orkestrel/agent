@@ -3,9 +3,10 @@ import { setImmediate as waitForImmediate } from 'node:timers/promises'
 import { isLedgerSnapshot } from '@src/core'
 import { isRecord, parseJSONAs } from '@orkestrel/contract'
 import { createRecorder, requireValue, waitForCondition } from '@orkestrel/test'
+import { hashStudyBytes } from '@orkestrel/study/server'
 import { createScratch } from '@orkestrel/test/server'
 import { describe, expect, it } from 'vitest'
-import { computeTextDigest, seedLedgerPrefix } from './setup.js'
+import { seedLedgerPrefix } from './setup.js'
 import {
 	addBusyWait,
 	addLedgerHeartbeat,
@@ -400,8 +401,8 @@ describe('loadLedgerSeed', () => {
 			const read = await loadLedgerSeed(path, 'control', 18)
 			expect(written.conversation.messages).toHaveLength(18)
 			expect(parseJSONAs(text, isLedgerSnapshot)).toEqual(read)
-			expect(await computeTextDigest(JSON.stringify(written))).toBe(await computeTextDigest(text))
-			expect(await computeTextDigest(JSON.stringify(read))).toBe(await computeTextDigest(text))
+			expect(hashStudyBytes(JSON.stringify(written))).toBe(hashStudyBytes(text))
+			expect(hashStudyBytes(JSON.stringify(read))).toBe(hashStudyBytes(text))
 			expect(scratch.read('seeds/control-18.json')).toBe(text)
 			const invalid = scratch.write('invalid.json', '{}')
 			await expect(loadLedgerSeed(invalid, 'control', 18)).rejects.toThrow(
@@ -495,7 +496,7 @@ describe('runLedgerCell', () => {
 				},
 			)
 			const text = requireValue(scratch.read('seeds/control-18.json'))
-			expect(seeded.seed).toBe(await computeTextDigest(text))
+			expect(seeded.seed).toBe(hashStudyBytes(text))
 			expect([seeded.warmups, seeded.samples, seeded.mean]).toEqual([[], [], undefined])
 			const digested = await runLedgerCell(
 				() => {

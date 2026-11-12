@@ -1,0 +1,47 @@
+{
+	"id": "c1",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Has order 4471 shipped yet, or is it still being packed?",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Which items were in order 4471?",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Show me invoice INV-2290 for that order.",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Refund 12.50 on invoice INV-2290 for the missing scarf.",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "Send a replacement for order 4471, the box arrived crushed.",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "What's the status of order 4471 now?",
+				"area": "orders"
+			}
+		}
+	]
+}

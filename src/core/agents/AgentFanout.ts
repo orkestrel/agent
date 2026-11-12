@@ -18,11 +18,13 @@ import { scanJobTree, settleAgentJob } from './helpers.js'
  *
  * A child job runs within its parent. Before a unit spawns or runs, on every attempt, the
  * `execute` method walks the whole tree under it through the `scanJobTree` helper and refuses the
- * unit when any job exceeds its own parent on `tools`, `authority`, `provider`, `scheduler`,
- * `limit`, `timeout`, or `budget`, or when a job is malformed, so nothing in a refused tree runs.
- * Each child is held within its parent alone, so the children of one parent can together spend more
- * than it. A job that needs another provider, another authority, or more room than its parent is a
- * root job the host enqueues.
+ * unit when any job exceeds its own parent on `tools`, `builtins`, `scope`, `authority`,
+ * `provider`, `scheduler`, `limit`, `timeout`, or `budget`, or when a job is malformed, so nothing in
+ * a refused tree runs. A child's `disclosure` is free, because it shows nothing its own `scope`
+ * omits. Each child is held within its parent alone, so the children of one parent can together
+ * spend more than it. A job that needs another provider, another authority, a skill, memo,
+ * workspace, or built-in its parent lacks, or more room than its parent is a root job the host
+ * enqueues.
  *
  * @example
  * ```ts
@@ -88,7 +90,7 @@ export class AgentFanout {
 					...(refused.length === findings.length
 						? []
 						: [
-								'a child job must stay within its parent on tools, authority, provider, scheduler, limit, timeout, and budget; enqueue a job that needs more as a root job',
+								'a child job must stay within its parent on tools, builtins, scope, authority, provider, scheduler, limit, timeout, and budget; enqueue a job that needs more as a root job',
 							]),
 					...findings,
 				].join('\n'),

@@ -1,6 +1,7 @@
 import type { LedgerInterface } from '@orkestrel/agent'
 import type { StudyContext, StudyGoal, StudyProduct, StudySessionInterface } from '@orkestrel/study'
 import type { StudyChatInput, StudyChatSessionOptions } from '../types.js'
+import { linkSignal } from '@orkestrel/abort'
 import { canonicalStringify } from '@orkestrel/contract'
 import { createTool } from '@orkestrel/tool'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
@@ -46,7 +47,7 @@ export class StudyChatSession implements StudySessionInterface {
 			metadata: settings.metadata,
 			models: buildStudyOllamaModels(provider),
 			roles: buildStudyChatRoles(options.profile),
-			signal: AbortSignal.any([options.signal, this.#abort.signal]),
+			signal: linkSignal(options.signal, this.#abort.signal),
 			observe: true,
 			timing: options.provider.extractTiming,
 			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),

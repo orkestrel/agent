@@ -25,6 +25,9 @@ import {
 	FANOUT_EXCESS_CASES,
 	FANOUT_JOB,
 	FANOUT_WITHIN_CASES,
+	BUILTIN_CANDIDATE_CASES,
+	DURABLE_EXCESS_CASES,
+	DURABLE_WITHIN_CASES,
 } from '../../../setup.js'
 import {
 	agentChunkToFrame,
@@ -76,6 +79,7 @@ import {
 	createAgentContext,
 	describeCandidates,
 	filterAdvertisedTools,
+	filterBuiltinCandidates,
 	matchesHeadLists,
 	matchesPlainLine,
 	requireBuiltins,
@@ -1182,6 +1186,129 @@ describe('scanJobTree', () => {
 		expect(refused.every((finding) => finding.startsWith(JOB_REFUSAL_PREFIX))).toBe(true)
 		expect(exceeded).toHaveLength(FANOUT_EXCESS_CASES.length)
 		expect(exceeded.some((finding) => finding.startsWith(JOB_REFUSAL_PREFIX))).toBe(false)
+	})
+})
+
+describe('scanJobTree — the scope and builtins rows', () => {
+	it.each(DURABLE_WITHIN_CASES)('clears a child $name', ({ parent, child }) => {
+		expect(scanJobTree({ ...parent, children: [child] })).toEqual([])
+	})
+
+	it.each(DURABLE_EXCESS_CASES)('finds a child with $name', ({ member, parent, child }) => {
+		const findings = scanJobTree({ ...parent, children: [child] })
+		expect(findings).toHaveLength(1)
+		expect(findings[0]?.startsWith(`job.children[0].${member}: `)).toBe(true)
+	})
+
+	it('names the built-ins and each scope list after the tools and before the authority', () => {
+		const parent = {
+			...FANOUT_JOB,
+			builtins: ['load', 'unload'] as const,
+			scope: { skills: ['billing'], memos: [], workspaces: ['north'] },
+		}
+		const child = {
+			...FANOUT_JOB,
+			tools: ['loop', 'add'],
+			builtins: ['load', 'memo', 'remember'] as const,
+			scope: { skills: ['billing', 'claims'], memos: ['pref'], workspaces: ['north', 'south'] },
+			authority: 'other',
+		}
+		expect(scanJobTree({ ...parent, children: [child] })).toEqual([
+			'job.children[0].tools: names "add", which its parent does not hold',
+			'job.children[0].builtins: names "memo", "remember", which its parent does not hold',
+			'job.children[0].scope.skills: names "claims", which its parent does not hold',
+			'job.children[0].scope.memos: names "pref", which its parent does not hold',
+			'job.children[0].scope.workspaces: names "south", which its parent does not hold',
+			'job.children[0].authority: "other" is neither absent nor its parent\'s, which is "allow"',
+		])
+	})
+
+	it('reads a parent with no scope as holding the three lists empty, and one with no built-ins as naming none', () => {
+		const child = {
+			...FANOUT_JOB,
+			builtins: ['memo'] as const,
+			scope: { skills: ['audit'], memos: [], workspaces: ['south'] },
+		}
+		expect(scanJobTree({ ...FANOUT_JOB, children: [child] })).toEqual([
+			'job.children[0].builtins: names "memo", which its parent does not hold',
+			'job.children[0].scope.skills: names "audit", which its parent does not hold',
+			'job.children[0].scope.workspaces: names "south", which its parent does not hold',
+		])
+	})
+
+	it('holds a scoped grandchild within its own parent at depth 2', () => {
+		const grandchild = { ...FANOUT_JOB, scope: { skills: ['claims'], memos: [], workspaces: [] } }
+		const root = {
+			...FANOUT_JOB,
+			scope: { skills: ['billing', 'claims'], memos: [], workspaces: [] },
+			children: [
+				{
+					...FANOUT_JOB,
+					scope: { skills: ['billing'], memos: [], workspaces: [] },
+					children: [grandchild],
+				},
+			],
+		}
+		expect(scanJobTree(root)).toEqual([
+			'job.children[0].children[0].scope.skills: names "claims", which its parent does not hold',
+		])
+	})
+
+	it('leaves a disclosure free, a name outside the parent scope included', () => {
+		const parent = { ...FANOUT_JOB, scope: { skills: [], memos: [], workspaces: [] } }
+		const child = { ...FANOUT_JOB, disclosure: { skills: ['claims'], workspace: 'south' } }
+		expect(scanJobTree({ ...parent, children: [child] })).toEqual([])
+	})
+
+	it('refuses a malformed scope, disclosure, or builtins at depth 2 with its faults', () => {
+		const findings = [
+			{ provider: 'main', scope: { skills: [], memos: [] } },
+			{ provider: 'main', disclosure: { workspace: 'north' } },
+			{ provider: 'main', builtins: ['search'] },
+		].map((grandchild): readonly string[] =>
+			// The grandchild is malformed on purpose, so it crosses as the JSON record a restored tree holds.
+			Reflect.apply(scanJobTree, undefined, [
+				{ ...FANOUT_JOB, children: [{ ...FANOUT_JOB, children: [grandchild] }] },
+			]),
+		)
+		expect(findings.map((list) => list.length)).toEqual([1, 1, 1])
+		expect(
+			findings.map(([finding]) =>
+				finding?.startsWith(`${JOB_REFUSAL_PREFIX}job.children[0].children[0]: `),
+			),
+		).toEqual([true, true, true])
+		expect(findings.map(([finding]) => finding)).toEqual([
+			expect.stringContaining('scope.workspaces'),
+			expect.stringContaining('disclosure.skills'),
+			expect.stringContaining('builtins'),
+		])
+	})
+})
+
+describe('filterBuiltinCandidates', () => {
+	it.each(BUILTIN_CANDIDATE_CASES)(
+		'advertises each writing built-in, and load and unload, under $name only where its list leaves it a name to act on',
+		({ ceiling, expected }) => {
+			expect(
+				filterBuiltinCandidates(
+					collectBuiltinDefinitions({ builtins: BUILTIN_NAMES }),
+					ceiling,
+				).map((definition) => definition.name),
+			).toEqual(expected)
+		},
+	)
+
+	it('keeps every definition that is no writing built-in, in order', () => {
+		const definitions = [
+			{ name: 'echo' },
+			{ name: 'remember' },
+			{ name: 'load' },
+			{ name: 'switch' },
+		]
+		expect(filterBuiltinCandidates(definitions, { memos: [], workspaces: [] })).toEqual([
+			{ name: 'echo' },
+			{ name: 'load' },
+		])
 	})
 })
 

@@ -24,7 +24,7 @@ The judge factory receives the battery options unchanged: context 8192, predicti
 
 The bounded conversation proof exercises the real ledger and lookup. In that fresh-ledger conversation, submitted requests are excluded from category judging and requested-false topics, while generated replies and tool results receive mechanical categories. It produces no Mica generation. A separate real `createOllamaJudge` question proves equality of its direct and transported effective bodies and a retained `judge` wire event. Every judge created by the chat session receives that custody fetch route.
 
-Study owns runner startup, pin verification, and `keep_alive: 0` maintenance between trials when the profile declares its daemon. Those maintenance requests occur outside ledger generation and belong to their own custody role. The protocol rehearsal rebinds runner/model identities and the endpoint to the existing test daemon; it does not launch the pinned executable or measure model behavior. The tracked profiles retain the pinned 0.40.15 executable, model digests, roots, and endpoint. They differ only in name and ledger capacity: full 19968, compact 2400, tight 1600.
+The tracked profiles declare no daemon. They run on the Ollama at their provider URL, `http://127.0.0.1:11434`, which is Ollama's default, so Study starts no runner and sends no maintenance requests; it verifies the model pins against the serving inventory. The protocol rehearsal rebinds model identities and the endpoint to the existing test daemon; it measures no model behavior. The tracked profiles retain the model digests, roots, and endpoint. They differ only in name and ledger capacity: full 19968, compact 2400, tight 1600.
 
 ## Allowances
 
@@ -142,6 +142,6 @@ The generated declarations and copied source artifacts have the following digest
 | scenarios/script-or-7.json      | `015f46f5ea8bcb933f68408c91bab947ac637defa128bf7e6f7808859d871152` |
 | scenarios/script-rm-1402.json   | `1324b1ca2a39f5947b00c0f5998ef1a05ae78416b810e9294ac799cd16a9aba8` |
 | scenarios/script-zd-56.json     | `8854ff87950c88c5d74e0bbac7145b73e0fda29a9fc6f802ab9e19dd15ac512c` |
-| profiles/compact.json           | `f0a3e100e021724e43585f597b3bd09b2454b38a669da9cb7e6ca56c1d819fac` |
-| profiles/full.json              | `3a51bb887384a053765e0fd01d39541f8c496579dd6fb15348d2de3aed7de00b` |
-| profiles/tight.json             | `25070b307c4dcdb2581bb7494a433ecec512d57d86da474360c0bc84cc08a713` |
+| profiles/compact.json           | `ec0a0973e79e020895ca0ec3280339f2291d1a98a52d3beea66ad2f853bc61bc` |
+| profiles/full.json              | `41e6458031f934d1f3efeb3f1c963ef872fe8fa5d736196f59920b2b20386339` |
+| profiles/tight.json             | `b781ef2835ced87e29671d7f0bffbca90e692d32fc1887c74a881f8f58874fcf` |

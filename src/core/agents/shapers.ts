@@ -15,13 +15,28 @@ import { messageInputShape, tokenUsageShape } from '../shapers.js'
 import { BUILTIN_LIMITS } from './constants.js'
 
 /**
+ * Describes what a host shows a run — the loaded `skills` in load order and an optional selected
+ * `workspace`, the record the `disclosure` option of an agent and a run is admitted against.
+ *
+ * @remarks
+ * The guard refuses every extra member and a `workspace` given as `undefined`; the contract parser
+ * drops extra members.
+ */
+export const agentDisclosureShape = objectShape({
+	skills: arrayShape(stringShape()),
+	workspace: optionalShape(stringShape()),
+}) satisfies ContractShape
+
+/**
  * Describes a durable agent job — the record `AgentRegistry.build` checks exactly, so a misspelled key
  * refuses instead of running an agent without it.
  *
  * @remarks
  * `children` holds JSON records, because each child crosses this shape at its own `build`. `limit`
  * reads as a number here and as a positive safe integer at the agent's construction, which owns that
- * refusal.
+ * refusal. A `scope` holds the `skills`, `memos`, and `workspaces` lists, each required, and no other
+ * member; `builtins` admits only the names of `AgentBuiltin`, and the agent's construction refuses a
+ * repeated name or `unload` without `load`.
  */
 export const agentJobShape = objectShape({
 	provider: stringShape(),
@@ -33,6 +48,17 @@ export const agentJobShape = objectShape({
 	limit: optionalShape(numberShape()),
 	timeout: optionalShape(numberShape()),
 	budget: optionalShape(numberShape()),
+	scope: optionalShape(
+		objectShape({
+			skills: arrayShape(stringShape()),
+			memos: arrayShape(stringShape()),
+			workspaces: arrayShape(stringShape()),
+		}),
+	),
+	disclosure: optionalShape(agentDisclosureShape),
+	builtins: optionalShape(
+		arrayShape(literalShape(['load', 'unload', 'memo', 'remember', 'switch'])),
+	),
 	children: optionalShape(arrayShape(recordShape(jsonShape()))),
 }) satisfies ContractShape
 
@@ -100,19 +126,6 @@ export const agentPromptShape = objectShape({
 export const agentAnswerShape = objectShape({
 	id: stringShape(),
 	approved: booleanShape(),
-}) satisfies ContractShape
-
-/**
- * Describes what a host shows a run — the loaded `skills` in load order and an optional selected
- * `workspace`, the record the `disclosure` option of an agent and a run is admitted against.
- *
- * @remarks
- * The guard refuses every extra member and a `workspace` given as `undefined`; the contract parser
- * drops extra members.
- */
-export const agentDisclosureShape = objectShape({
-	skills: arrayShape(stringShape()),
-	workspace: optionalShape(stringShape()),
 }) satisfies ContractShape
 
 /**

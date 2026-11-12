@@ -1,0 +1,47 @@
+{
+	"id": "c4",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Who is on call right now?",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Who is working on 2026-11-14?",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Put Priya on the 2026-11-15 shift.",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Escalate ticket T-902, the customer has waited a week.",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "Add a note to T-902 that Priya called the customer.",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Close ticket T-902, resolved with a replacement.",
+				"area": "tickets"
+			}
+		}
+	]
+}

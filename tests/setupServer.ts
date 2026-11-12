@@ -12,11 +12,11 @@ import { createLedger, isLedgerSnapshot } from '@src/core'
 import { isRecord, isString, parseJSONAs } from '@orkestrel/contract'
 import { createDispatcher } from '@orkestrel/router'
 import { createServer } from '@orkestrel/server'
+import { hashStudyBytes } from '@orkestrel/study/server'
 import { createRecorder, requireValue } from '@orkestrel/test'
 import { createNodeScheduler } from '@orkestrel/workflow/server'
 import {
 	buildLedgerBenchOptions,
-	computeTextDigest,
 	createLedgerJudge,
 	createRecordedScheduler,
 	createScriptedProvider,
@@ -374,7 +374,7 @@ export async function takeLedgerSample(
 				([outcome, group]) => [outcome, group.length] as const,
 			),
 		),
-		digest: await computeTextDigest(
+		digest: hashStudyBytes(
 			renderLedgerPositions(
 				recalled === undefined ? selection.messages : { messages: selection.messages, recalled },
 				ledger.conversation.messages(),
@@ -594,7 +594,7 @@ export async function runLedgerCell(
 ): Promise<LedgerCellRecord> {
 	const cell = readLedgerCell(arm, size, env, shape, task)
 	const snapshot = await loadLedgerSeed(cell.seed, arm, size, cell.shape)
-	const seed = await computeTextDigest(JSON.stringify(snapshot))
+	const seed = hashStudyBytes(JSON.stringify(snapshot))
 	const warmups =
 		cell.task === 'time' || cell.task === 'recall'
 			? await warmLedgerSamples(snapshot, cell.wait, cell.warmups, cell.pace, [], cell.task)

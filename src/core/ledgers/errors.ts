@@ -73,7 +73,8 @@ export function isLedgerError(value: unknown): value is LedgerError {
 				code === 'REFERENCE' ||
 				code === 'SNAPSHOT' ||
 				code === 'QUESTION' ||
-				code === 'WRITE'
+				code === 'WRITE' ||
+				code === 'OVERFLOW'
 			)
 		)
 			return false

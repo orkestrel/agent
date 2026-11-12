@@ -185,6 +185,38 @@ describe('LedgerRequest', () => {
 		)
 	})
 
+	it('sums the prices committed after the call in flight started, and none after the next call', () => {
+		const request = new LedgerRequest('Check.')
+		request.enter(createConversation())
+		request.open(0)
+		request.commit(40)
+		expect(request.committed).toBe(40)
+		request.observe({ estimate: 1, tools: 2 }, 1)
+		expect(request.committed).toBe(0)
+		request.commit(120)
+		request.commit(35.5)
+		expect(request.committed).toBe(155.5)
+		request.observe({ estimate: 2, tools: 2 }, 3)
+		expect(request.committed).toBe(0)
+		request.open(4)
+		request.commit(7)
+		expect(request.committed).toBe(7)
+	})
+
+	it('holds the skills the loads committed after the call in flight started, in commit order', () => {
+		const request = new LedgerRequest('Check.')
+		request.enter(createConversation())
+		request.open(0)
+		request.observe({ estimate: 1, tools: 2 }, 1)
+		request.commit(40, 'billing')
+		request.commit(12)
+		request.commit(35, 'claims')
+		expect(request.loads).toEqual(['billing', 'claims'])
+		expect(request.committed).toBe(87)
+		request.observe({ estimate: 2, tools: 2 }, 3)
+		expect(request.loads).toEqual([])
+	})
+
 	it('admits a released call again, and only that call', () => {
 		const request = new LedgerRequest('Check.')
 		request.admit('lookup', { id: 'C-12' })

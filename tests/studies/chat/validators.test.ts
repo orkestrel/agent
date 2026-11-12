@@ -38,9 +38,8 @@ it('keeps every treatment field equal except the named capacity', () => {
 		expect(profile.provider?.judge).toBe(pinned.provider?.judge)
 		expect(profile.provider?.digest.model).toBe(pinned.provider?.digest.model)
 		expect(profile.provider?.digest.judge).toBe(pinned.provider?.digest.judge)
-		expect(profile.provider?.daemon?.executable).toBe(pinned.provider?.daemon?.executable)
-		expect(profile.provider?.daemon?.digest).toBe(pinned.provider?.daemon?.digest)
-		expect(profile.provider?.daemon?.version).toBe('0.40.15')
+		expect(profile.provider?.url).toBe('http://127.0.0.1:11434')
+		expect(profile.provider?.daemon).toBeUndefined()
 		expect({ ...profile, name: '', settings: { ...profile.settings, capacity: 0 } }).toEqual({
 			...profiles[0],
 			name: '',

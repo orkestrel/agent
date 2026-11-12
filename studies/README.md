@@ -11,6 +11,7 @@ The `@orkestrel/study` package fixes the shape: `studies/<name>/study.json` decl
 | `capacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory within its bounds.                                      |
 | `chat`          | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                |
 | `context`       | `tools`  | mechanism | Whether the built Agent carries a memo set and a skill registry across conversations, loads, and scopes.          |
+| `disclosure`    | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.               |
 | `endurance`     | `memory` | quality   | How records and compaction compare over the whole public endurance workload.                                      |
 | `memory`        | `memory` | quality   | How records, compaction, and the full conversation keep corrections and obligations on the `handoff` trajectory.  |
 | `qualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload. Every long run in this repository goes through it. |
@@ -22,6 +23,7 @@ The following table lists each driver bundle:
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | `studies/memory/` | The records, compaction, and full-conversation arms over a support desk, with their session and profiles. |
 | `studies/chat/`   | The sealed chat battery over fresh ledgers with one Mica judge and three ledger capacities.               |
+| `studies/desk/`   | The desk catalog's four disclosure arms over bare agents and a ledger, with its one `screen` profile.     |
 | `studies/tools/`  | One agent over real scratch tools, with its one `local` profile.                                          |
 
 The following table lists the memory profiles under `studies/memory/profiles/`:
@@ -82,7 +84,7 @@ The `chat` study is that battery, tracked. On 2026-11-08, on the 0.0.38 build an
 
 ## Running it
 
-The `recommended` profile pins its runner in `provider.daemon`: Ollama 0.40.15 by version and executable digest, on its own port 11435, with each model's digest, including `tev1`. Study starts and verifies that daemon for an execution. Its transport verifies the provider's agent, judge, and triage pins against inventory before and after the trial. The triage leg uses `/v1/systemone`; its metadata verification and daemon maintenance use the same Ollama routes as the other roles. Build the package first with `npm run build`, because the profile runs `dist/src/core/index.js`.
+The `recommended` profile runs on the Ollama at its provider URL, `http://127.0.0.1:11434`, which is Ollama's default, and pins each model by digest, including `tev1`. It declares no `provider.daemon`, so Study starts no daemon. Its transport verifies the provider's agent, judge, and triage pins against inventory before and after the trial. Study requires `settings.version` on a recording profile and refuses a serving Ollama that reports another version, so set it to the running Ollama's version before a recorded run. The triage leg uses `/v1/systemone`; its metadata verification uses the same Ollama routes as the other roles. Build the package first with `npm run build`, because the profile runs `dist/src/core/index.js`.
 
 The following commands freeze, check, record, and grade one segment of the records arm, whose trial is `r1-s1-a1`. `ABSOLUTE_CLOSURE_PATH` is a canonical absolute path to a new directory under this repository's `tmp/`, with an existing parent. A freeze admits a destination inside a profile root but refuses one under `dist`, an existing destination, or a relative path. `STEM` names the result:
 
@@ -202,3 +204,122 @@ npm run test:probe -- tmp/probes/studies/rehearsal.test.ts
 ```
 
 Each command prints one progress line with its exit and elapsed seconds. On this host on 2026-11-11, the rehearsal of `full` took 471 s, 437 s of it in the execution.
+
+## Running the disclosure reading
+
+The `disclosure` mechanism study is phase 3's 4B reading (`.orkestrel/agent/designs/disclosure.md` § The 4B reading). It runs 7 conversations of 6 requests over the `studies/desk/` bundle, one repetition, under four arms:
+
+| Arm     | What each request shows the model                                                                                          |
+| ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `all`   | Every one of the 36 desk tools.                                                                                            |
+| `area`  | The 6 tools of the request's known area, through a run scope, with no `load`.                                              |
+| `index` | The skills index and `load`, with nothing shown.                                                                           |
+| `shown` | A ledger built for the conversation, with its first request's area shown through `agent.disclosure` and `load` advertised. |
+
+Each request's input holds its prompt and the area the host knows, and the rubric alone names its tool. A request reads `right` when its first call other than `load` names that tool and wasn't denied, `late` when a later call does, `wrong` when its calls never reach it, `text` when it makes no call, and `failed` when its run fails or ends partial. The tested `buildStudyDeskSummary` consumer in `desk/helpers.ts` tallies each arm: the outcomes, the loads with the areas they opened and misopened, the turns, the median summed prompt, and first text read apart for each conversation's first request, for later requests that loaded, and for later requests that didn't, because Study unloads the models before each trial. The adapter declares `progress`, so `study progress` lists each goal's calls, loads, and turns while a run is live.
+
+The `screen` profile pins `qwen3.5:4b-q4_K_M` and Mica by digest, on the Ollama at its provider URL, `http://127.0.0.1:11434`, with recording declared. It declares no `provider.daemon`. Study requires `settings.version` on a recording profile and refuses a serving Ollama that reports another version, so set it to the running Ollama's version before a recorded run.
+
+Run the reading in the following order. Each arm runs one sealed trial a conversation, and no live run repeats before the first report.
+
+1. **Build.** Run `npm run build`, because the profile loads `dist/src/core/index.js`.
+2. **Rehearse.** Run the [disclosure rehearsal](#disclosure-rehearsal) and read it green.
+3. **Freeze and check.** `ABSOLUTE_DESK_CLOSURE_PATH` names a new absolute directory under `tmp/` with an existing parent:
+
+   ```sh
+   npx study freeze disclosure --profile screen --to ABSOLUTE_DESK_CLOSURE_PATH
+   npx study check disclosure --profile screen --closure ABSOLUTE_DESK_CLOSURE_PATH
+   ```
+
+4. **Smoke.** Run one conversation of arm `all`. The profile's trial duration holds the design's 8-minute cap. Derive the series from its per-request times, and record the schedule only when it fits 45 minutes; otherwise drop arm `area` and report before any further cut:
+
+   ```sh
+   npx study execute disclosure --profile screen --closure ABSOLUTE_DESK_CLOSURE_PATH --trial r1-s1-a1 --out tmp/studies/STEM-smoke
+   ```
+
+   Then derive the profile's byte allowances again from the smoke's own bytes, and write them before recording. Read the trial's `exchanges.jsonl` size as `X`, the bytes its observations admitted as `T`, its largest goal's admitted bytes as `G`, and its `evidence.jsonl` size as `E`. The reply side is the output cap in tokens times the bytes of one streamed frame: 1024 × 148 = 151552 B a request. A trial can send 32 agent requests and a goal 7, and the sidecar stores bodies in base64, a factor of 4/3. With `C` the request ceiling, `bounds.request.bytes`:
+   - `bounds.goal.bytes` = 3G + 7 × 151552 + C
+   - `bounds.trial.bytes` = 3T + 32 × 151552 + C
+   - `record.bytes` = 3X + (32 × 151552 + C) × 4/3
+   - `bounds.series.bytes` = 28 × (`bounds.trial.bytes` + `record.bytes`) + 28 × 3E
+
+   Round each up to a whole MiB. Study reserves each trial's whole trial and record allowance against the series before any trial starts, so the series term can't be smaller. The screening values came from the fixture rehearsal of 2026-11-11, which read `X` = 208190, `T` = 146784, `G` = 35961, and `E` = 94006.
+
+5. **Record.** Record the whole schedule live one time, and watch it with `npx study progress tmp/studies/STEM`:
+
+   ```sh
+   npx study execute disclosure --profile screen --closure ABSOLUTE_DESK_CLOSURE_PATH --out tmp/studies/STEM
+   ```
+
+6. **Replay offline.** The keyed offline replay must seal with no request. `ABSOLUTE_RESULT_PATH` is the path the recording printed:
+
+   ```sh
+   npx study execute disclosure --profile screen --replay ABSOLUTE_RESULT_PATH --roles '["agent","judge","metadata"]' --offline true --out tmp/studies/STEM-replay
+   ```
+
+7. **Grade, report, and summarize.** Grade and report through the closure's entry from its directory, as [Running the chat instrument](#running-the-chat-instrument) does, with `studies/disclosure/rubric.json`. Then pass the verified result to `buildStudyDeskSummary`.
+8. **Iterate offline.** A grading change runs `study grade` alone. A build change runs keyed replay with `--roles '["agent","judge"]' --offline false`, which serves each unchanged request from the recording and sends only the changed ones.
+
+### Disclosure rehearsal
+
+The disclosure rehearsal executes the whole schedule from a frozen closure against a protocol fixture that answers as an oracle, with no model, and grades the result through the closure's own entry. Run it on the same occasions as the [full rehearsal](#full-rehearsal). The routine `desk` proof runs the same procedure on one conversation of arm `shown`. Write this probe to `tmp/probes/studies/disclosure.test.ts`. Its 28 attempts and 168 observations are the disclosure schedule's population:
+
+```ts
+import { readStudyDeclaration } from '@orkestrel/study/server'
+import { createScratch, destroyScratch } from '@orkestrel/test/server'
+import { resolve } from 'node:path'
+import { expect, it } from 'vitest'
+import {
+	collectStudyDeskAnswers,
+	createMemoryServer,
+	createStudyDeskOracle,
+	createStudyInstallFixture,
+	rehearseStudyInstall,
+	writeStudyDeskFixture,
+} from '../../../tests/setupStudy.js'
+
+it('rehearses disclosure under screen', async () => {
+	const scratch = createScratch({ prefix: 'study-rehearsal-' })
+	const declaration = await readStudyDeclaration(resolve('.'), 'disclosure')
+	const server = await createMemoryServer(
+		[],
+		{},
+		createStudyDeskOracle(collectStudyDeskAnswers(declaration)),
+	)
+	try {
+		const fixture = createStudyInstallFixture(scratch, server.url)
+		writeStudyDeskFixture(fixture, server.url)
+		const rehearsal = await rehearseStudyInstall(fixture, {
+			study: 'disclosure',
+			profile: 'screen',
+			duration: 900000,
+		})
+		expect(
+			[rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade].map(
+				(step) => step.code,
+			),
+		).toEqual([0, 0, 0, 0])
+		const result = rehearsal.result
+		if (result?.status !== 'sealed') throw new Error('The rehearsal did not seal')
+		const observations = result.attempts.flatMap((attempt) => attempt.observations)
+		expect([result.attempts.length, observations.length]).toEqual([28, 168])
+		expect(result.attempts.filter((attempt) => attempt.failure !== undefined)).toEqual([])
+		expect(
+			observations.filter(
+				(observation) =>
+					observation.failure !== undefined || observation.product?.partial !== false,
+			),
+		).toEqual([])
+	} finally {
+		await server.close()
+		await destroyScratch(scratch)
+	}
+}, 1200000)
+```
+
+Then run it after the build:
+
+```text
+npm run build
+npm run test:probe -- tmp/probes/studies/disclosure.test.ts
+```

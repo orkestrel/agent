@@ -12,7 +12,7 @@ import type {
 } from './types.js'
 import { canonicalStringify, isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
-import { createHash } from 'node:crypto'
+import { hashStudyBytes } from '@orkestrel/study/server'
 import {
 	STUDY_CHAT_CAPACITIES,
 	STUDY_CHAT_DENIAL,
@@ -65,11 +65,7 @@ export function buildStudyChatCriteria(
  * @example buildStudyChatConversion(sealedText).scenarios.length // 38
  */
 export function buildStudyChatConversion(source: string): StudyChatConversion {
-	if (
-		![STUDY_CHAT_DIGEST, STUDY_CHAT_FORMATTED].includes(
-			createHash('sha256').update(source).digest('hex'),
-		)
-	)
+	if (![STUDY_CHAT_DIGEST, STUDY_CHAT_FORMATTED].includes(hashStudyBytes(source)))
 		throw new StudyError('CONFIG', 'Chat seal digest differs')
 	const seal = parseJSON(source)
 	if (!isStudyChatSeal(seal)) throw new StudyError('CONFIG', 'Chat seal shape differs')

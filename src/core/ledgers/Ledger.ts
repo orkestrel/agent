@@ -1,5 +1,18 @@
-import type { AgentInterface, AgentResult } from '../agents/types.js'
-import type { ScopeFilter, ScopeInterface, Selection } from '../contexts/types.js'
+import type {
+	AgentBuiltin,
+	AgentInterface,
+	AgentResult,
+	AuthorityContext,
+	AuthorityDecision,
+	AuthorityInterface,
+} from '../agents/types.js'
+import type {
+	AgentDisclosure,
+	ScopeFilter,
+	ScopeInterface,
+	Selection,
+	Skill,
+} from '../contexts/types.js'
 import type { ConversationInterface } from '../conversations/types.js'
 import type { ProviderInterface, ProviderRequest } from '../providers/types.js'
 import type { Message, ThinkingReplay } from '../types.js'
@@ -13,6 +26,8 @@ import type {
 	LedgerAmendment,
 	LedgerCategory,
 	LedgerAgentInterface,
+	GaugeCall,
+	LedgerCommit,
 	LedgerGauge,
 	LedgerInterface,
 	LedgerLine,
@@ -29,10 +44,12 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolContext, ToolDefinition, ToolResult } from '@orkestrel/tool'
-import { createAbort } from '@orkestrel/abort'
+import { createAbort, linkSignal } from '@orkestrel/abort'
 import {
 	describeFaults,
+	admitValue,
 	attempt,
+	canonicalStringify,
 	isError,
 	isFiniteNumber,
 	isPromiseLike,
@@ -42,16 +59,28 @@ import {
 } from '@orkestrel/contract'
 import { createTool, createToolManager, isToolError } from '@orkestrel/tool'
 import { Authority } from '../agents/Authority.js'
+import { builtinToolContracts } from '../agents/contracts.js'
 import { createAgent } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
-import { denyCall, estimateMessages, settleToolResult } from '../agents/helpers.js'
+import {
+	collectBuiltinDefinitions,
+	denyCall,
+	estimateMessages,
+	filterAdvertisedTools,
+	filterBuiltinCandidates,
+	requireBuiltins,
+	requireDisclosure,
+	resolveDisclosure,
+	settleToolResult,
+} from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
-import { intersectFilters, intersectKeys } from '../contexts/helpers.js'
+import { intersectFilters, intersectKeys, renderIndexEntry } from '../contexts/helpers.js'
 import { createConversationManager } from '../conversations/factories.js'
 import {
 	collectExchanges,
 	collectToolGroups,
 	extractLiterals,
+	filterAllowList,
 	findToolCall,
 	estimateTokens,
 	hasCalls,
@@ -100,6 +129,9 @@ import {
 	buildRecords,
 	collectNames,
 	collectRegistry,
+	computeSkillPrice,
+	computeToolDensity,
+	computeToolPrice,
 	cutListing,
 	linkOwners,
 	matchEntities,
@@ -136,6 +168,9 @@ export class Ledger implements LedgerInterface {
 	readonly #conversation: ConversationInterface
 	readonly #agent: AgentInterface
 	readonly #record: LedgerAgentInterface
+	// The built-ins the agent enables, and what the host shows every run, owned at construction.
+	readonly #builtins: readonly AgentBuiltin[]
+	readonly #given: AgentDisclosure | undefined
 	readonly #classifier: Classifier
 	readonly #requests = new Set<string>()
 	readonly #annotations = new Set<string>()
@@ -146,8 +181,11 @@ export class Ledger implements LedgerInterface {
 	readonly #scans = new Set<LedgerScan>()
 	readonly #calibrations = new Set<AbortSignal>()
 	#gauge: Gauge | undefined
-	// The digest of the tool definitions `#gauge` priced, set with it.
-	#digest: string | undefined
+	// The calibrated definitions `#gauge` priced, set with it. Every price reads this set, so a
+	// definition a host act frees, adds, or replaces inside a request prices as added.
+	#measured: readonly ToolDefinition[] | undefined
+	// The refusal the gate kept when it last stopped a request, cleared when a pass opens.
+	#refusal: LedgerError | undefined
 	#window: readonly LedgerExchange[] = []
 	#evidence: LedgerEvidence = collectLedgerEvidence([], new Set(), [])
 
@@ -272,9 +310,16 @@ export class Ledger implements LedgerInterface {
 				execute: (args) => this.#recall(args),
 			}),
 		)
+		this.#builtins = requireBuiltins(options.agent?.builtins, tools)
+		if (this.#builtins.length > 0 && host === undefined)
+			throw new AgentError(
+				'AUTHORITY',
+				"agent.builtins are set and no agent.authority is; pass authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) to allow every call, or rules with a deny fallback",
+			)
+		this.#given = requireDisclosure(options.agent?.disclosure)
 		// The ledger allows exactly the names it advertises, so a tool a host adds to the agent's manager
 		// later is denied instead of inheriting those names' trust. With a host authority, the ledger keeps
-		// that deny and its own allow for recall, and every lookup and write answers to the host.
+		// that deny and its own allow for recall, and every lookup, write, and built-in answers to the host.
 		const advertised = new Authority({
 			rules: [
 				{
@@ -291,15 +336,7 @@ export class Ledger implements LedgerInterface {
 			system: options.system,
 			tools,
 			authority: {
-				// In one request, the identical retry of a call the authority denied stops as a repeat, unevaluated.
-				evaluate: (context) =>
-					this.#current()?.denied(context.call.name, context.call.arguments) === true
-						? { zone: 'ledger', verdict: 'deny', reason: LEDGER_NOTES.repeat }
-						: host === undefined ||
-							  context.call.name === 'recall' ||
-							  !names.includes(context.call.name)
-							? advertised.evaluate(context)
-							: host.evaluate(context),
+				evaluate: (context) => this.#evaluate(context, host, advertised, names),
 				// A host without an approver leaves each asked call unanswered, as the ledger's own does. A
 				// batch twin of a call whose ask was declined or left unanswered is refused unasked.
 				ask: (context, decision, signal) =>
@@ -312,9 +349,10 @@ export class Ledger implements LedgerInterface {
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),
 		})
-		// A stored gauge holds only for the definitions its digest names, so a hydrate with others
-		// calibrates before its first pass. A supplied gauge prices the definitions held now.
-		const digest = digestLedgerTools(this.#agent.context.tools.definitions())
+		// A stored gauge holds only for the calibrated definitions its digest names, so a hydrate with
+		// others calibrates before its first pass. A supplied gauge prices the definitions held now.
+		const calibrated = this.#calibrated()
+		const digest = digestLedgerTools(calibrated)
 		const gauge =
 			options.gauge ?? (snapshot?.gauge?.digest === digest ? snapshot?.gauge : undefined)
 		if (gauge !== undefined) {
@@ -325,12 +363,17 @@ export class Ledger implements LedgerInterface {
 				predict: this.#predict,
 				replay: this.#replay,
 			})
-			this.#digest = digest
+			this.#measured = calibrated
 		}
-		// A lookup or write call the authority denies, or whose ask is declined or left unanswered, stays
-		// denied for the rest of the request.
+		// A lookup, write, or built-in call the authority denies, or whose ask is declined or left
+		// unanswered, stays denied for the rest of the request; a call denied for room does not.
 		this.#agent.emitter.on('deny', (call, _reason, decision) => {
-			if (decision !== undefined && call.name !== 'recall' && names.includes(call.name))
+			if (
+				decision !== undefined &&
+				decision.reason !== LEDGER_NOTES.overflow &&
+				call.name !== 'recall' &&
+				(names.includes(call.name) || this.#enables(call.name))
+			)
 				this.#current()?.deny(call.name, call.arguments)
 		})
 		this.#agent.emitter.on('tool', (call, result) => {
@@ -350,15 +393,20 @@ export class Ledger implements LedgerInterface {
 			const request = this.#current()
 			if (request?.calls.at(-1)?.tools === 0) request.abort()
 			this.#release(call, result)
+			this.#reopen(call, result)
 		})
 		this.#agent.emitter.on('select', (selection) => {
 			if (isLedgerError(selection.fault) && selection.fault.code === 'REQUEST') return
 			this.#current()?.adopt(selection, this.#conversation.messages().length)
 		})
 		this.#agent.emitter.on('fault', (error) => this.#current()?.fault(error))
-		// The ledger prices the request each turn dispatches, so a scope a later listener changed
-		// counts as the provider receives it. Every run on the agent is a pass of the active call.
-		this.#agent.emitter.on('request', (_index, sent) => this.#observeRequest(sent))
+		// The ledger prices each request as the loop composed it, before the provider receives it: one
+		// it prices over `capacity - predict` is not sent, and its pass ends. A request it sends is
+		// recorded as dispatched, so a scope a later listener changed counts as the provider receives
+		// it. Every run on the agent is a pass of the active call.
+		this.#agent.emitter.on('request', (index, sent) => {
+			if (this.#gate(index, sent)) this.#observeRequest(sent)
+		})
 		this.#agent.emitter.on('usage', (usage) => this.#current()?.spend(usage))
 		// The host reads the agent through a record with no run member, so the `respond` method starts
 		// every run.
@@ -426,7 +474,7 @@ export class Ledger implements LedgerInterface {
 		const conversation = this.#conversation.snapshot()
 		const ids = conversation.messages.map((message) => message.id)
 		const gauge = this.gauge
-		const priced = this.#digest
+		const priced = this.#digest()
 		const window = {
 			exchanges: this.#window.map((entry) => ({
 				request: entry.request.id,
@@ -471,6 +519,7 @@ export class Ledger implements LedgerInterface {
 	 * @returns The final pass, the usage of every pass, and the filing attempts of this request alone
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when the answer pass prices over `capacity - predict` with its note left out, or a host act after the note grows its request past that limit (code `'OVERFLOW'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
 	 */
 	async respond(content: string, signal?: AbortSignal): Promise<LedgerResult> {
@@ -483,12 +532,9 @@ export class Ledger implements LedgerInterface {
 		const scope = this.#agent.context.scope
 		this.#live.set(request, scope)
 		try {
-			// A definition added or removed since the gauge was stored changes its digest, and the
-			// stored price no longer holds.
-			if (
-				this.#gauge === undefined ||
-				digestLedgerTools(this.#agent.context.tools.definitions()) !== this.#digest
-			) {
+			// A calibrated definition added or removed since the gauge was stored changes its digest,
+			// and the stored price no longer holds.
+			if (this.#gauge === undefined || digestLedgerTools(this.#calibrated()) !== this.#digest()) {
 				this.#gauge = undefined
 				await this.#measureGauge(caller)
 			}
@@ -538,6 +584,9 @@ export class Ledger implements LedgerInterface {
 				passes.push(
 					this.#dropStrayCalls(request, await this.#generatePass(request, caller, false, answer)),
 				)
+				// An answer pass the gate stopped at its request rejects, unless the caller aborted.
+				const refusal = this.#refusal
+				if (refusal !== undefined && !caller.aborted) throw refusal
 			}
 			const last = passes.at(-1) ?? first
 			request.think(this.#conversation.messages())
@@ -588,7 +637,7 @@ export class Ledger implements LedgerInterface {
 				}),
 				this.#replay,
 			).slice(0, -1)
-			const definitions = this.#agent.context.tools.definitions()
+			const definitions = this.#calibrated()
 			const priced = await this.#provider.generate(messages, signal, definitions, {
 				think: false,
 			})
@@ -607,7 +656,7 @@ export class Ledger implements LedgerInterface {
 				scale: bare.usage.prompt / estimateMessages(messages),
 				overhead: Math.max(0, priced.usage.prompt - bare.usage.prompt),
 			})
-			this.#digest = digestLedgerTools(definitions)
+			this.#measured = definitions
 			return { scale: this.#gauge.scale, overhead: this.#gauge.overhead }
 		} catch (error) {
 			signal.throwIfAborted()
@@ -621,10 +670,11 @@ export class Ledger implements LedgerInterface {
 		think: boolean | undefined,
 		scope: ScopeInterface | undefined,
 	): Promise<AgentResult> {
+		this.#refusal = undefined
 		request.open(this.#conversation.messages().length)
 		const stop = request.signal
 		return await this.#agent.generate({
-			signal: stop === undefined ? signal : AbortSignal.any([signal, stop]),
+			signal: stop === undefined ? signal : linkSignal(signal, stop),
 			conversation: this.#conversation,
 			...(think === undefined ? {} : { think }),
 			...(scope === undefined ? {} : { scope }),
@@ -670,6 +720,162 @@ export class Ledger implements LedgerInterface {
 
 	#busy(): boolean {
 		return this.#live.size > 0 || this.#calibrations.size > 0
+	}
+
+	// Decides one call before the host's authority reads it. In one request, the identical retry of a
+	// denied call and the identical second call of a built-in stop as repeats, and a load, a remember,
+	// or a switch the room cannot hold is denied for room. An admitted built-in commits what its room
+	// test priced, and a lookup or a write cleared here commits one result.
+	#evaluate(
+		context: AuthorityContext,
+		host: AuthorityInterface | undefined,
+		advertised: Authority,
+		names: readonly string[],
+	): AuthorityDecision {
+		const request = this.#current()
+		const { name, arguments: args } = context.call
+		if (request?.denied(name, args) === true)
+			return { zone: 'ledger', verdict: 'deny', reason: LEDGER_NOTES.repeat }
+		if (this.#enables(name)) {
+			const admitted = attempt(() => request?.admit(name, args))
+			if (!admitted.success) {
+				if (isError(admitted.error) && admitted.error.message === LEDGER_NOTES.repeat)
+					return { zone: 'ledger', verdict: 'deny', reason: LEDGER_NOTES.repeat }
+				throw admitted.error
+			}
+			if (request !== undefined) {
+				const commitment = this.#room(request, name, args)
+				if (commitment === undefined)
+					return { zone: 'ledger', verdict: 'deny', reason: LEDGER_NOTES.overflow }
+				request.commit(commitment.price, commitment.skill)
+			}
+			// Construction refuses built-ins without a host authority.
+			return host === undefined ? advertised.evaluate(context) : host.evaluate(context)
+		}
+		const decision =
+			host === undefined || name === 'recall' || !names.includes(name)
+				? advertised.evaluate(context)
+				: host.evaluate(context)
+		if (
+			request !== undefined &&
+			decision.verdict !== 'deny' &&
+			name !== 'recall' &&
+			names.includes(name)
+		)
+			request.commit(this.#priceResult(request.calls))
+		return decision
+	}
+
+	// Returns what an admitted built-in call commits, or undefined when the room refuses it. A load is
+	// tested against the measured remainder less the generation cap, with the turn's commitments and
+	// one result, and against the thread's share, counting the loads the batch already admitted; a
+	// remember by its index line; and a switch by the tokens its workspace adds over the shown one.
+	// With no gauge, those three are refused. A skill the ceiling or the registry refuses, or one
+	// already shown, prices at 0, and its handler decides it; every other built-in prices at 0.
+	#room(
+		request: LedgerRequest,
+		name: string,
+		args: Readonly<Record<string, unknown>>,
+	): Pick<LedgerCommit, 'price' | 'skill'> | undefined {
+		if (name !== 'load' && name !== 'remember' && name !== 'switch') return { price: 0 }
+		const gauge = this.#gauge
+		if (gauge === undefined) return undefined
+		const room = gauge.remainder(request.calls) - this.#predict
+		// The door's admission, its lossless repair included, decides what the call named.
+		const admitted = admitValue(builtinToolContracts[name].contract, { ...args })
+		const values: Readonly<Record<string, unknown>> = admitted.success ? admitted.value.value : {}
+		if (name === 'remember') {
+			const line =
+				isString(values['name']) && isString(values['description'])
+					? renderIndexEntry({ name: values['name'], description: values['description'] })
+					: ''
+			const price = gauge.scale * estimateTokens(line)
+			return (request.committed + price) * (1 + LEDGER_SCALE_DRIFT) > room ? undefined : { price }
+		}
+		const ceiling = this.#ceiling(request)
+		const shown = this.#show(ceiling)
+		if (name === 'switch') {
+			const workspace = values['workspace']
+			const price = isString(workspace)
+				? gauge.scale *
+					Math.max(
+						0,
+						this.#estimateHead(request, ceiling, {
+							skills: shown.skills,
+							workspace,
+						}) - this.#estimateHead(request, ceiling, shown),
+					)
+				: 0
+			return (request.committed + price) * (1 + LEDGER_SCALE_DRIFT) > room ? undefined : { price }
+		}
+		// The thread's shown skills, then the loads this batch already admitted.
+		const thread = [...new Set([...shown.skills, ...request.loads])]
+		const skill = filterAllowList(
+			ceiling.skills,
+			this.#agent.context.skills.skills(),
+			(one) => one.name,
+		).find((one) => one.name === values['skill'])
+		if (skill === undefined || thread.includes(skill.name)) return { price: 0 }
+		const price = this.#priceSkill(skill, ceiling, this.#advertise(ceiling, thread))
+		const budget = (this.#options.capacity - this.#predict) * this.#share.prompt
+		return (request.committed + price + this.#priceResult(request.calls)) *
+			(1 + LEDGER_SCALE_DRIFT) >
+			room || this.#priceShown({ skills: thread }, ceiling) + price > this.#share.skills * budget
+			? undefined
+			: { price, skill: skill.name }
+	}
+
+	// The estimate of the head a pass's next build renders with these skills and workspace shown,
+	// over the selection the pass adopted.
+	#estimateHead(request: LedgerRequest, ceiling: ScopeFilter, shown: AgentDisclosure): number {
+		return estimateMessages(
+			stripThinking(
+				this.#agent.context.build({
+					...(request.selection === undefined ? {} : { selection: request.selection }),
+					disclosure: shown,
+					switchable: this.#advertise(ceiling, shown.skills).some((tool) => tool.name === 'switch'),
+				}),
+				this.#replay,
+			),
+		)
+	}
+
+	// A successful built-in call reopens the calls of this request whose answer it changed, read from
+	// the request's stored messages: an unload reopens the load of its skill and each call the room
+	// denied, a load the unload of its skill, a switch every other switch, and a remember the memo of
+	// its name. Only messages stored before it are read, so a later call of its batch stays shut.
+	#reopen(call: ToolCall, result: ToolResult): void {
+		const request = this.#current()
+		const entered = request?.message
+		if (
+			request === undefined ||
+			entered === undefined ||
+			!result.success ||
+			!this.#enables(call.name)
+		)
+			return
+		const messages = this.#conversation.messages()
+		const stored = messages.slice(messages.findIndex((message) => message.id === entered.id) + 1)
+		const pairs = collectToolGroups(stored).flatMap((group) =>
+			group.slice(1).flatMap((message) => {
+				const owner = findToolCall(group, message)
+				return owner === undefined ? [] : [{ call: owner, content: message.content }]
+			}),
+		)
+		const key = canonicalStringify(call.arguments)
+		const reopened = pairs.filter(({ call: earlier, content }) =>
+			call.name === 'unload'
+				? (earlier.name === 'load' && earlier.arguments.skill === call.arguments.skill) ||
+					content === settleToolResult(denyCall(earlier, LEDGER_NOTES.overflow)).content
+				: call.name === 'load'
+					? earlier.name === 'unload' && earlier.arguments.skill === call.arguments.skill
+					: call.name === 'switch'
+						? earlier.name === 'switch' && canonicalStringify(earlier.arguments) !== key
+						: call.name === 'remember' &&
+							earlier.name === 'memo' &&
+							earlier.arguments.name === call.arguments.name,
+		)
+		for (const { call: earlier } of reopened) request.release(earlier.name, earlier.arguments)
 	}
 
 	#flush(): void {
@@ -1044,21 +1250,29 @@ export class Ledger implements LedgerInterface {
 			return owner === undefined ? [] : [owner]
 		})
 		const records = selectRecords(projection, { owners, topics: [...near] })
-		// The plan prices every definition the pass's run scope lets a turn advertise, with `recall`
-		// offered: the context scope can move inside that bound after the plan, so it never lowers the price.
-		const bound = filter?.tools
-		const definitions = this.#agent.context.tools.definitions()
-		const advertised = definitions.filter(
-			(tool) => bound === undefined || bound.includes(tool.name),
-		)
+		// The plan prices what the first turn advertises under the pass's run scope, with `recall`
+		// offered, and the skills the thread shows: the context scope can move inside that bound after
+		// the plan, so it never lowers the price. While that turn advertises `load`, it holds back the
+		// largest skill a later load can show and one result.
+		const lists = intersectFilters(undefined, filter)
+		const bound = lists.tools
+		const disclosure = this.#show(lists)
+		const advertised = this.#advertise(lists, disclosure.skills)
+		const calibrated = this.#measuredSet()
+		const price = computeToolPrice(calibrated, advertised, this.#priced())
 		const total =
 			Math.max(
 				0,
 				(this.#options.capacity - this.#predict) * this.#share.prompt -
-					((this.#gauge?.overhead ?? 0) - this.#spared(advertised)),
+					(this.#priced().overhead - price.spared + price.added) -
+					this.#holdback(lists, disclosure, advertised, []),
 			) /
 			(1 + LEDGER_SCALE_DRIFT)
-		const built = this.#agent.context.build({ selection: { messages: [request], judgments: [] } })
+		const built = this.#agent.context.build({
+			selection: { messages: [request], judgments: [] },
+			disclosure,
+			switchable: advertised.some((tool) => tool.name === 'switch'),
+		})
 		const tail = this.#selectTail(request, total, input, scan)
 		const tailIds = new Set(tail.map((message) => message.id))
 		const scoped = records.some((record) => record.key !== LEDGER_RULES_KEY)
@@ -1289,7 +1503,11 @@ export class Ledger implements LedgerInterface {
 		const closed = probes.map((messages, at) => {
 			const tools = advertised.filter((tool) => tool.name !== 'recall' || offered[at])
 			const calls = [
-				{ estimate: estimateMessages(messages), tools: tools.length, spared: this.#spared(tools) },
+				{
+					estimate: estimateMessages(messages),
+					tools: tools.length,
+					...computeToolPrice(calibrated, tools, this.#priced()),
+				},
 			]
 			return (
 				offered[at] === true &&
@@ -1308,7 +1526,9 @@ export class Ledger implements LedgerInterface {
 		const ceiling = intersectKeys(this.#agent.context.scope?.tools, bound)
 		const admits = ceiling === undefined || ceiling.includes('recall')
 		if (!recall && admits) {
-			const tools = definitions.filter((tool) => tool.name !== 'recall').map((tool) => tool.name)
+			const tools = this.#definitions()
+				.filter((tool) => tool.name !== 'recall')
+				.map((tool) => tool.name)
 			const host = this.#agent.context.scope
 			const narrowed = host?.narrow({ tools }) ?? createScope({ name: 'ledger', tools })
 			this.#current()?.apply(narrowed)
@@ -1707,21 +1927,142 @@ export class Ledger implements LedgerInterface {
 			{
 				estimate: estimateMessages(sent.messages),
 				tools: tools.length,
-				spared: this.#spared(tools),
+				...computeToolPrice(this.#measuredSet(), tools, this.#priced()),
 			},
 			this.#conversation.messages().length,
 		)
 	}
 
-	#spared(tools: readonly ToolDefinition[]): number {
-		const overhead = this.#gauge?.overhead ?? 0
-		if (tools.length === 0) return overhead
-		const missing = this.#agent.context.tools
-			.definitions()
-			.filter((tool) => !tools.some((one) => one.name === tool.name))
-		return missing.length === 0
+	// The gauge's price, or a unit scale and no overhead before calibration.
+	#priced(): LedgerGauge {
+		return this.#gauge ?? { scale: 1, overhead: 0 }
+	}
+
+	// The definitions the gauge's overhead measured, or the live calibrated set before calibration.
+	#measuredSet(): readonly ToolDefinition[] {
+		return this.#measured ?? this.#calibrated()
+	}
+
+	// The digest of the measured set, derived where it is read.
+	#digest(): string | undefined {
+		return this.#measured === undefined ? undefined : digestLedgerTools(this.#measured)
+	}
+
+	// Whether the agent enables a built-in of this name.
+	#enables(name: string): boolean {
+		return this.#builtins.some((one) => one === name)
+	}
+
+	// Every definition a turn can advertise: the manager's, without an enabled built-in's name, then
+	// the built-ins', as the agent's run lists its candidates.
+	#definitions(): readonly ToolDefinition[] {
+		return [
+			...this.#agent.context.tools.definitions().filter((tool) => !this.#enables(tool.name)),
+			...collectBuiltinDefinitions({ builtins: this.#builtins }),
+		]
+	}
+
+	// The calibrated set: every definition but those a registered skill holds back, which only an
+	// enabled `load` does. It reads no scope, so a ceiling change or a load never changes it.
+	#calibrated(): readonly ToolDefinition[] {
+		const definitions = this.#definitions()
+		if (!this.#enables('load')) return definitions
+		const held = new Set(this.#agent.context.skills.skills().flatMap((skill) => skill.tools))
+		return definitions.filter((tool) => !held.has(tool.name))
+	}
+
+	// What the host and the thread show within a ceiling, as a run resolves it.
+	#show(ceiling: ScopeFilter): AgentDisclosure {
+		return resolveDisclosure(
+			this.#agent.context,
+			this.#conversation,
+			this.#given,
+			ceiling,
+			this.#builtins,
+		)
+	}
+
+	// What a turn under a ceiling advertises with these skills shown, as a run computes it: the
+	// candidates the ceiling leaves a built-in to act on, filtered by the allow-list and the skills' hold.
+	#advertise(ceiling: ScopeFilter, shown: readonly string[]): readonly ToolDefinition[] {
+		return filterAdvertisedTools(
+			filterBuiltinCandidates(this.#definitions(), ceiling),
+			ceiling.tools,
+			this.#enables('load') ? this.#agent.context.skills.skills() : [],
+			shown,
+		)
+	}
+
+	// The ceiling of a request's first pass: the context scope intersected with the scope it entered with.
+	#ceiling(request: LedgerRequest): ScopeFilter {
+		return intersectFilters(this.#agent.context.scope, this.#live.get(request))
+	}
+
+	// The tokens loading a skill adds over an advertised set: its body, and the definitions it names
+	// within the ceiling that the set leaves out.
+	#priceSkill(skill: Skill, ceiling: ScopeFilter, advertised: readonly ToolDefinition[]): number {
+		const sent = new Set(advertised.map((tool) => tool.name))
+		const named = filterAllowList(
+			ceiling.tools,
+			this.#definitions().filter((tool) => skill.tools.includes(tool.name) && !sent.has(tool.name)),
+			(tool) => tool.name,
+		)
+		return computeSkillPrice(skill, named, this.#measuredSet(), this.#priced())
+	}
+
+	// The tokens the shown skills take: each body, and the definitions they name within the ceiling.
+	#priceShown(shown: AgentDisclosure, ceiling: ScopeFilter): number {
+		const skills = shown.skills.flatMap((name) => this.#agent.context.skills.skill(name) ?? [])
+		const named = new Set(skills.flatMap((skill) => skill.tools))
+		const definitions = filterAllowList(
+			ceiling.tools,
+			this.#definitions().filter((tool) => named.has(tool.name)),
+			(tool) => tool.name,
+		)
+		const calibrated = this.#measuredSet()
+		const gauge = this.#priced()
+		return (
+			skills.reduce((sum, skill) => sum + computeSkillPrice(skill, [], calibrated, gauge), 0) +
+			computeToolPrice(calibrated, [...calibrated, ...definitions], gauge).added
+		)
+	}
+
+	// The price of one tool result: the longer of the longest tool result the thread stores and the
+	// gauge's reply reserve, which stand in for a result no fact sizes.
+	#priceResult(calls: readonly GaugeCall[]): number {
+		const longest = this.#conversation
+			.messages()
+			.filter((message) => message.role === 'tool')
+			.reduce<Message | undefined>(
+				(found, message) =>
+					found === undefined || message.content.length > found.content.length ? message : found,
+				undefined,
+			)
+		const gauge = this.#gauge
+		return Math.max(
+			this.#priced().scale * (longest === undefined ? 0 : estimateMessages([longest])),
+			gauge === undefined ? 0 : gauge.reserve(calls, this.#findLongest()),
+		)
+	}
+
+	// The room the plan keeps for a later load: the largest price of a skill the ceiling admits and
+	// the turn does not show, and one result, while the turn advertises `load`.
+	#holdback(
+		ceiling: ScopeFilter,
+		shown: AgentDisclosure,
+		advertised: readonly ToolDefinition[],
+		calls: readonly GaugeCall[],
+	): number {
+		if (!advertised.some((tool) => tool.name === 'load')) return 0
+		const loadable = filterAllowList(
+			ceiling.skills,
+			this.#agent.context.skills.skills(),
+			(skill) => skill.name,
+		).filter((skill) => !shown.skills.includes(skill.name))
+		return loadable.length === 0
 			? 0
-			: Math.min(overhead, estimateTokens(JSON.stringify(missing)) * (this.#gauge?.scale ?? 1))
+			: Math.max(...loadable.map((skill) => this.#priceSkill(skill, ceiling, advertised))) +
+					this.#priceResult(calls)
 	}
 
 	#findLongest(): string {
@@ -1772,29 +2113,7 @@ export class Ledger implements LedgerInterface {
 		request?.recall()
 		const guidance = `an owner name, an id, or one of ${renderTopicNames(this.#options.topics)}`
 		if (topic === '') throw new Error(`recall needs a topic: ${guidance}`)
-		const rate = this.#recallRate(request) * (1 + LEDGER_SCALE_DRIFT)
-		const call = calls.at(-1)
-		const carried =
-			request === undefined
-				? 0
-				: estimateMessages(
-						stripThinking(
-							[
-								...this.#agent.context.build(
-									request.selection === undefined ? {} : { selection: request.selection },
-								),
-								...this.#conversation.messages().slice(request.boundary),
-							],
-							this.#replay,
-						),
-					)
-		const completion = isFiniteNumber(call?.prompt)
-			? (call.completion ?? 0) - (this.#replay === 'none' ? (call.thinking ?? 0) : 0)
-			: 0
-		const extra = Math.max(0, (carried - (call?.estimate ?? carried)) * rate - completion)
-		const drift = isFiniteNumber(call?.prompt)
-			? 0
-			: Math.max(0, (call?.estimate ?? 0) * (rate - (gauge?.scale ?? rate)))
+		const { rate, extra, slack: drift } = this.#carry(request, calls)
 		const siblings = estimateMessages(
 			(request?.listings ?? [])
 				.filter((listing) => listing.turn === calls.length)
@@ -1957,7 +2276,13 @@ export class Ledger implements LedgerInterface {
 			...new Set(
 				this.#collectAfter(entered).flatMap((message) => {
 					const result = this.#results.get(message.id)
-					if (message.role !== 'tool' || result?.success !== true) return []
+					// A built-in's acknowledgement carries nothing the answer reads; a memo's body does.
+					if (
+						message.role !== 'tool' ||
+						result?.success !== true ||
+						(result.name !== 'memo' && this.#enables(result.name))
+					)
+						return []
 					const recalled = result.name === 'recall'
 					if (recalled && /^nothing earlier on /.test(message.content)) return []
 					const listing = recalled
@@ -1981,7 +2306,7 @@ export class Ledger implements LedgerInterface {
 		)
 		const digest = unique.length === 0 ? undefined : `${LEDGER_NOTES.results}\n${unique.join('\n')}`
 		const omitted: ReadonlySet<string> = new Set()
-		const rate = this.#recallRate(request) * (1 + LEDGER_SCALE_DRIFT)
+		const rate = this.#capacityRate(request) * (1 + LEDGER_SCALE_DRIFT)
 		const allowance = (this.#options.capacity - this.#predict) / rate
 		const after = this.#collectAfter(entered)
 		const recovery: readonly Message[] = [
@@ -1992,12 +2317,15 @@ export class Ledger implements LedgerInterface {
 		const messages = recovery.filter((message) => message.role !== 'tool' && !hasCalls(message))
 		const note: readonly Message[] =
 			digest === undefined ? [] : [{ id: 'results', role: 'user', content: digest }]
+		// The answer pass advertises nothing and carries every shown body, so the note fits beside them.
+		const shown = this.#show(this.#ceiling(request))
 		if (
 			this.#gauge === undefined ||
 			estimateMessages(
 				stripThinking(
 					this.#agent.context.build({
 						selection: { messages: [...messages, ...note], judgments: [] },
+						disclosure: shown,
 					}),
 					this.#replay,
 				),
@@ -2016,27 +2344,174 @@ export class Ledger implements LedgerInterface {
 						messages: messages.filter((message) => !partials.has(message.id)),
 						judgments: [],
 					},
+					disclosure: shown,
 				}),
 				this.#replay,
 			),
 		)
+		// No answer pass opens that does not fit with its note left out.
+		if (base > allowance)
+			throw new LedgerError(
+				'OVERFLOW',
+				`the answer pass prices ${Math.ceil(base * rate)} tokens with every cut made, over the capacity ${this.#options.capacity} less predict ${this.#predict}; shorten the request, narrow what the scope shows, or raise capacity`,
+				{
+					context: {
+						capacity: this.#options.capacity,
+						predict: this.#predict,
+						price: base * rate,
+					},
+				},
+			)
 		const fitted = cutListing(
 			unique,
 			allowance - base - estimateTokens(`${LEDGER_NOTES.results}\n`),
 			'more',
 			false,
 		)
+		const cut = fitted === '' ? undefined : `${LEDGER_NOTES.results}\n${fitted}`
+		// A note that does not fit beside the base is left out.
+		const kept =
+			cut !== undefined &&
+			base + estimateMessages([{ id: 'results', role: 'user', content: cut }]) > allowance
+				? undefined
+				: cut
+		return { digest: kept, omitted: partials }
+	}
+
+	// The tokens the next turn's prompt adds to the last measured call: the head with the shown set and
+	// every message the pass stored after its boundary, at the recall rate with drift, less that call's
+	// reply; and the slack of a call that reported no prompt. `#recall` reads these before the next turn
+	// exists.
+	#carry(
+		request: LedgerRequest | undefined,
+		calls: readonly GaugeCall[],
+	): { readonly rate: number; readonly extra: number; readonly slack: number } {
+		const rate = this.#recallRate(request) * (1 + LEDGER_SCALE_DRIFT)
+		// The next turn carries the skills the thread shows, so the carried estimate holds their bodies.
+		const ceiling = request === undefined ? {} : this.#ceiling(request)
+		const shown = this.#show(ceiling)
+		const carried =
+			request === undefined
+				? 0
+				: estimateMessages(
+						stripThinking(
+							[
+								...this.#agent.context.build({
+									...(request.selection === undefined ? {} : { selection: request.selection }),
+									disclosure: shown,
+									switchable: this.#advertise(ceiling, shown.skills).some(
+										(tool) => tool.name === 'switch',
+									),
+								}),
+								...this.#conversation.messages().slice(request.boundary),
+							],
+							this.#replay,
+						),
+					)
+		return { rate, ...this.#terms(calls.at(-1), carried, rate) }
+	}
+
+	// What a turn adds to a call: the growth of its estimate over the call's at the rate, less the
+	// call's reply, which the next prompt carries; and, where the call reported no prompt, its
+	// estimate at the rate over the scale.
+	#terms(
+		call: GaugeCall | undefined,
+		carried: number,
+		rate: number,
+	): { readonly extra: number; readonly slack: number } {
+		const reply = isFiniteNumber(call?.prompt)
+			? (call.completion ?? 0) - (this.#replay === 'none' ? (call.thinking ?? 0) : 0)
+			: 0
 		return {
-			digest: fitted === '' ? undefined : `${LEDGER_NOTES.results}\n${fitted}`,
-			omitted: partials,
+			extra: Math.max(0, (carried - (call?.estimate ?? carried)) * rate - reply),
+			slack: isFiniteNumber(call?.prompt)
+				? 0
+				: Math.max(0, (call?.estimate ?? 0) * (rate - (this.#gauge?.scale ?? rate))),
 		}
+	}
+
+	// Prices the request the loop composed before the provider receives it. A request priced over
+	// `capacity - predict`, or whose terms cannot be priced, is not sent: the ledger keeps the refusal,
+	// and the agent's abort ends the pass with the reason `overflow`. The run reads the abort after
+	// the `request` event, so the provider receives no call for it.
+	#gate(index: number, sent: ProviderRequest): boolean {
+		const request = this.#current()
+		if (request?.boundary === undefined) return true
+		const left = attempt(() =>
+			index === 0 ? this.#first(request, sent) : this.#next(request, sent),
+		)
+		if (left.success && left.value >= 0) return true
+		const limit = this.#options.capacity - this.#predict
+		this.#refusal = new LedgerError(
+			'OVERFLOW',
+			left.success
+				? `the request prices ${Math.ceil(limit - left.value)} tokens, over the capacity ${this.#options.capacity} less predict ${this.#predict}; shorten the request, narrow what the scope shows, or raise capacity`
+				: `the request could not be priced against the capacity ${this.#options.capacity} less predict ${this.#predict}`,
+			{
+				context: {
+					capacity: this.#options.capacity,
+					predict: this.#predict,
+					price: left.success ? limit - left.value : Number.POSITIVE_INFINITY,
+				},
+			},
+		)
+		this.#agent.abort('overflow')
+		return false
+	}
+
+	// The room the first request of a pass leaves under `capacity - predict`: the definitions it
+	// advertises against the measured set, and its messages at the plan's rate, or, after a call of
+	// the request, at the capacity rate.
+	#first(request: LedgerRequest, sent: ProviderRequest): number {
+		const gauge = this.#gauge
+		if (gauge === undefined) throw new LedgerError('GAUGE', 'the gate needs a gauge')
+		const tools = computeToolPrice(this.#measuredSet(), sent.tools ?? [], gauge)
+		const rate = request.calls.length === 0 ? gauge.scale : this.#capacityRate(request)
+		return (
+			this.#options.capacity -
+			this.#predict -
+			(Math.max(0, gauge.overhead - tools.spared) +
+				tools.added +
+				rate * (1 + LEDGER_SCALE_DRIFT) * estimateMessages(sent.messages))
+		)
+	}
+
+	// The room a later request of a pass leaves: the remainder the last measured call left, less
+	// `predict`, what the request adds to that call at the capacity rate, and the definitions it
+	// advertises beyond that call's: a calibrated one returned at the higher of the density and what
+	// its hiding was credited, and the added ones by the difference of their price.
+	#next(request: LedgerRequest, sent: ProviderRequest): number {
+		request.think(this.#conversation.messages())
+		const gauge = this.#gauge
+		if (gauge === undefined) throw new LedgerError('GAUGE', 'the gate needs a gauge')
+		const calls = request.calls
+		const last = calls.at(-1)
+		if (last === undefined) throw new Error('a later request has no recorded call before it')
+		const measured = this.#measuredSet()
+		const rate = this.#capacityRate(request) * (1 + LEDGER_SCALE_DRIFT)
+		const { extra, slack } = this.#terms(last, estimateMessages(sent.messages), rate)
+		const tools = computeToolPrice(measured, sent.tools ?? [], gauge)
+		const back = Math.min(
+			gauge.overhead,
+			(Math.max(0, (last.spared ?? 0) - tools.spared) * computeToolDensity(measured, gauge)) /
+				gauge.scale,
+		)
+		const more = Math.max(0, tools.added - (last.added ?? 0))
+		const grown = (back + more) * (1 + LEDGER_SCALE_DRIFT)
+		return gauge.remainder(calls) - this.#predict - extra - slack - grown
+	}
+
+	// The rate the capacity tests read: the recall rate, floored at the gauge's scale.
+	#capacityRate(request: LedgerRequest): number {
+		return Math.max(this.#recallRate(request), this.#gauge?.scale ?? 1)
 	}
 
 	#recallRate(request: LedgerRequest | undefined): number {
 		const gauge = this.#gauge
 		if (gauge === undefined) return 1
 		const calls = request?.calls ?? []
-		const last = calls.findLast((call) => isFiniteNumber(call.prompt))
+		// A call that advertised definitions beyond the calibrated set measures their tokens too.
+		const last = calls.findLast((call) => isFiniteNumber(call.prompt) && (call.added ?? 0) === 0)
 		const measured =
 			last !== undefined &&
 			isFiniteNumber(last.prompt) &&

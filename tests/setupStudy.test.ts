@@ -1805,7 +1805,8 @@ describe('memory labeling journal', () => {
 				{ agent: 'a2', label: 'node-2', result: undefined },
 			],
 		})
-		expect(() => readMemoryJournal(`${text}{"type":`)).toThrow(/journal/)
+		expect(() => readMemoryJournal(`${text}{"type":`)).toThrow(/Invalid JSON on line/)
+		expect(() => readMemoryJournal(`${text}{"agentId":"a3"}`)).toThrow(/journal/)
 	})
 
 	it('reads tool calls from assistant lines and the wall from stamped lines', () => {

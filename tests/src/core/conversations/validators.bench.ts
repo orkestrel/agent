@@ -1,6 +1,5 @@
 import {
 	buildLedgerBenchOptions,
-	computeTextDigest,
 	createLedgerJudge,
 	createScriptedProvider,
 	LEDGER_BENCH_MODEL,
@@ -9,6 +8,7 @@ import { LEDGER_WARMUP, loadLedgerSeed, measureOtherLoad } from '../../../setupS
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parseJSONAs } from '@orkestrel/contract'
+import { hashStudyBytes } from '@orkestrel/study/server'
 import { createLedger, isConversationSnapshot, isLedgerSnapshot } from '@src/core'
 import { expect, it } from 'vitest'
 import { createRecorder } from '@orkestrel/test'
@@ -33,7 +33,7 @@ it('hydrates the correction seed', { timeout: 300_000 }, async ({ bench, task })
 		'correction',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	const asked = createRecorder<readonly [key: string]>()
 	const provider = createScriptedProvider([{ content: 'Noted.' }])
 	const options = buildLedgerBenchOptions(
@@ -77,7 +77,7 @@ it('hydrates the correction seed', { timeout: 300_000 }, async ({ bench, task })
 			v8: process.versions.v8,
 			flags: process.execArgv,
 			seed: digest,
-			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
+			digests: Array.from(texts, (text) => hashStudyBytes(text)),
 			repeat: 1,
 			warmups: warmups.calls.map(([wall]) => wall),
 			walls: samples.calls.map(([wall]) => wall),
@@ -102,7 +102,7 @@ it('spins the correction hydrate to the gate', { timeout: 300_000 }, async ({ be
 		'correction',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	const asked = createRecorder<readonly [key: string]>()
 	const provider = createScriptedProvider([{ content: 'Noted.' }])
 	const options = buildLedgerBenchOptions(
@@ -155,7 +155,7 @@ it('spins the correction hydrate to the gate', { timeout: 300_000 }, async ({ be
 			v8: process.versions.v8,
 			flags: process.execArgv,
 			seed: digest,
-			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
+			digests: Array.from(texts, (text) => hashStudyBytes(text)),
 			repeat: 1,
 			factor,
 			regions: samples.calls.map(([, , region]) => region),
@@ -182,7 +182,7 @@ it('spins the correction hydrate past it', { timeout: 300_000 }, async ({ bench,
 		'correction',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	const asked = createRecorder<readonly [key: string]>()
 	const provider = createScriptedProvider([{ content: 'Noted.' }])
 	const options = buildLedgerBenchOptions(
@@ -235,7 +235,7 @@ it('spins the correction hydrate past it', { timeout: 300_000 }, async ({ bench,
 			v8: process.versions.v8,
 			flags: process.execArgv,
 			seed: digest,
-			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
+			digests: Array.from(texts, (text) => hashStudyBytes(text)),
 			repeat: 1,
 			factor,
 			regions: samples.calls.map(([, , region]) => region),
@@ -260,7 +260,7 @@ it('hydrates the control seed', { timeout: 300_000 }, async ({ bench, task }) =>
 		'control',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	const asked = createRecorder<readonly [key: string]>()
 	const provider = createScriptedProvider([{ content: 'Noted.' }])
 	const options = buildLedgerBenchOptions(
@@ -304,7 +304,7 @@ it('hydrates the control seed', { timeout: 300_000 }, async ({ bench, task }) =>
 			v8: process.versions.v8,
 			flags: process.execArgv,
 			seed: digest,
-			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
+			digests: Array.from(texts, (text) => hashStudyBytes(text)),
 			repeat: 1,
 			warmups: warmups.calls.map(([wall]) => wall),
 			walls: samples.calls.map(([wall]) => wall),
@@ -329,7 +329,7 @@ it('spins the control hydrate to 1.05', { timeout: 300_000 }, async ({ bench, ta
 		'control',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	const asked = createRecorder<readonly [key: string]>()
 	const provider = createScriptedProvider([{ content: 'Noted.' }])
 	const options = buildLedgerBenchOptions(
@@ -382,7 +382,7 @@ it('spins the control hydrate to 1.05', { timeout: 300_000 }, async ({ bench, ta
 			v8: process.versions.v8,
 			flags: process.execArgv,
 			seed: digest,
-			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
+			digests: Array.from(texts, (text) => hashStudyBytes(text)),
 			repeat: 1,
 			factor,
 			regions: samples.calls.map(([, , region]) => region),
@@ -409,7 +409,7 @@ it('spins the control hydrate past 1.05', { timeout: 300_000 }, async ({ bench, 
 		'control',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	const asked = createRecorder<readonly [key: string]>()
 	const provider = createScriptedProvider([{ content: 'Noted.' }])
 	const options = buildLedgerBenchOptions(
@@ -462,7 +462,7 @@ it('spins the control hydrate past 1.05', { timeout: 300_000 }, async ({ bench, 
 			v8: process.versions.v8,
 			flags: process.execArgv,
 			seed: digest,
-			digests: await Promise.all(Array.from(texts, (text) => computeTextDigest(text))),
+			digests: Array.from(texts, (text) => hashStudyBytes(text)),
 			repeat: 1,
 			factor,
 			regions: samples.calls.map(([, , region]) => region),
@@ -487,7 +487,7 @@ it('checks the correction ledger snapshot', { timeout: 300_000 }, async ({ bench
 		'correction',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	// One call stays over 10 ms on either build, so a reading times one call (MM-3).
 	const warmups = createRecorder<readonly [wall: number]>()
 	while (
@@ -539,7 +539,7 @@ it('checks the control ledger snapshot', { timeout: 300_000 }, async ({ bench, t
 		'control',
 		1600,
 	)
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	// K = 40: 41 ms per call on the trial, so a reading holds 100 ms on a build 16 times cheaper (MM-3).
 	const rounds = Array.from({ length: 40 }, (_unused, round) => round)
 	const warmups = createRecorder<readonly [wall: number]>()
@@ -599,7 +599,7 @@ it('checks the realistic conversation', { timeout: 300_000 }, async ({ bench, ta
 	)
 	if (seed === undefined)
 		throw new Error('the realistic conversation holds no conversation snapshot')
-	const digest = await computeTextDigest(JSON.stringify(seed))
+	const digest = hashStudyBytes(JSON.stringify(seed))
 	// One call is timed alone in the warmups; the reading then times K back-to-back calls, with K times the warmup median at least 100 ms (MM-3).
 	const warmups = createRecorder<readonly [wall: number]>()
 	while (

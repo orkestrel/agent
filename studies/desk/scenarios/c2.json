@@ -1,0 +1,47 @@
+{
+	"id": "c2",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Look up the customer with email dana.reyes@example.com.",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Her phone number changed to 555-0142, update it.",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Open a ticket for Dana Reyes: the zipper on her jacket broke.",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Assign that ticket, T-881, to Marco.",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "Add a note to T-881 that she sent photos.",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Show Dana Reyes's past orders and tickets.",
+				"area": "customers"
+			}
+		}
+	]
+}

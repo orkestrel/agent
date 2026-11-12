@@ -1,0 +1,12 @@
+{
+	"name": "disclosure",
+	"version": "1",
+	"question": "Which way of showing the desk catalog lets the model call the tool each request needs: every tool, the known area, the skills index with load, or the known area shown through disclosure?",
+	"purpose": "mechanism",
+	"driver": "desk",
+	"arms": ["all", "area", "index", "shown"],
+	"order": [["all", "area", "index", "shown"]],
+	"scenarios": ["c1", "c2", "c3", "c4", "c5", "c6", "c7"],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

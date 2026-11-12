@@ -1,7 +1,8 @@
-import { buildMemoSnapshot, computeTextDigest } from '../../../setup.js'
+import { buildMemoSnapshot } from '../../../setup.js'
 import { LEDGER_WARMUP, measureOtherLoad } from '../../../setupServer.js'
 import { isMemo, isMemoSnapshot } from '@src/core'
 import { expect, it } from 'vitest'
+import { hashStudyBytes } from '@orkestrel/study/server'
 import { createRecorder, requireValue } from '@orkestrel/test'
 
 // Each case runs one cell, chosen with `-t` by its title, over the shared builder's memo set. A cell
@@ -14,7 +15,7 @@ import { createRecorder, requireValue } from '@orkestrel/test'
 
 it('checks a memo set of 1000', { timeout: 300_000 }, async ({ bench, task }) => {
 	const snapshot = buildMemoSnapshot(1000)
-	const digest = await computeTextDigest(JSON.stringify(snapshot))
+	const digest = hashStudyBytes(JSON.stringify(snapshot))
 	// K = 40: 26 ms per call on the trial, so a reading holds 100 ms on a build 10 times cheaper (MM-3).
 	const rounds = Array.from({ length: 40 }, (_unused, round) => round)
 	const warmups = createRecorder<readonly [wall: number]>()
@@ -65,7 +66,7 @@ it('checks a memo set of 1000', { timeout: 300_000 }, async ({ bench, task }) =>
 
 it('checks one memo per call', { timeout: 300_000 }, async ({ bench, task }) => {
 	const snapshot = buildMemoSnapshot(1000)
-	const digest = await computeTextDigest(JSON.stringify(snapshot))
+	const digest = hashStudyBytes(JSON.stringify(snapshot))
 	// K = 40000: 26 µs per call on the trial, so a reading holds 100 ms on a build 10 times cheaper (MM-3).
 	const calls = Array.from({ length: 40_000 }, (_unused, call) =>
 		requireValue(snapshot.memos[call % snapshot.memos.length]),

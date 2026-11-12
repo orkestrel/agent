@@ -1,6 +1,6 @@
 import type { AgentJobInput, AgentResult } from '@src/core'
 import type { QueueEventMap } from '@orkestrel/queue'
-import { createRecorder, waitForCondition, waitForEvent } from '@orkestrel/test'
+import { createRecorder, requireValue, waitForCondition, waitForEvent } from '@orkestrel/test'
 import { JOB_USAGE, PARTIAL_TURNS, createObservedGatedProvider } from '../../../setup.js'
 import { createContract, isRecord, numberShape, objectShape } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
@@ -29,11 +29,21 @@ import { describe, expect, it } from 'vitest'
 import {
 	AGENT_JOB_SHAPE,
 	AGENT_AUTHORITY,
+	AGENT_SCRIPT_OPTIONS,
 	createAgentJob,
 	createScriptedProvider,
 	createLoopTool,
 	BUILTIN_ARGUMENT_CASES,
 	BUILTIN_NAMES,
+	DURABLE_JOB,
+	createDurableStoreShape,
+	callToRequest,
+	collectRenderedNames,
+	createDurableFixture,
+	createDurablePools,
+	createToolCall,
+	filterOutsideCeiling,
+	readDurableRendered,
 } from '../../../setup.js'
 import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
 
@@ -940,5 +950,191 @@ describe('createBuiltinTool', () => {
 				declared.annotations,
 			])
 		}
+	})
+})
+
+describe("createAgentQueue — jobs over one registry's shared pools", () => {
+	it('dispatches for a job restored from its store the requests the enqueued job dispatches', async () => {
+		const job: AgentJobInput = {
+			...DURABLE_JOB,
+			builtins: ['load', 'memo'],
+			scope: { skills: ['billing'], memos: ['pref'], workspaces: ['south'] },
+			disclosure: { skills: ['billing'], workspace: 'south' },
+		}
+		const turns = [
+			{
+				content: '',
+				tools: [createToolCall({ id: 'm1', name: 'memo', arguments: { name: 'pref' } })],
+			},
+			{ content: 'done' },
+		]
+		const enqueued = createDurableFixture(turns)
+		await createAgentQueue({ registry: enqueued.registry }).enqueue(job)
+		const restored = createDurableFixture(turns)
+		const store = createMemoryQueueStore(createDurableStoreShape())
+		await store.save({ id: 'job-1', input: job, attempts: 0 })
+		const queue = createAgentQueue({ registry: restored.registry, store })
+		const succeeded = waitForEvent<QueueEventMap<AgentResult>['success']>(
+			(listener) => queue.emitter.on('success', listener),
+			'the restored job succeeds',
+		)
+		await queue.restore()
+		await succeeded
+		expect(enqueued.provider.calls).toHaveLength(2)
+		expect(restored.provider.calls.map(callToRequest)).toEqual(
+			enqueued.provider.calls.map(callToRequest),
+		)
+	})
+
+	it('runs two overlapping jobs that each advertise and render their own scope', async () => {
+		const pools = createDurablePools()
+		const options = { ...AGENT_SCRIPT_OPTIONS, repeat: true, delay: 20 }
+		const left = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						createToolCall({ id: 'l1', name: 'load', arguments: { skill: 'billing' } }),
+						createToolCall({ id: 'l2', name: 'switch', arguments: { workspace: 'north' } }),
+					],
+				},
+				{ content: 'left' },
+			],
+			options,
+		)
+		const right = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						createToolCall({ id: 'r1', name: 'load', arguments: { skill: 'claims' } }),
+						createToolCall({ id: 'r2', name: 'switch', arguments: { workspace: 'south' } }),
+					],
+				},
+				{ content: 'right' },
+			],
+			options,
+		)
+		const registry = createAgentRegistry({
+			providers: { left, right },
+			authorities: { gate: AGENT_AUTHORITY },
+			...pools,
+		})
+		const queue = createAgentQueue({ registry, concurrency: 2 })
+		const events = createRecorder<readonly [event: string]>()
+		queue.emitter.on('start', () => events.handler('start'))
+		queue.emitter.on('success', () => events.handler('success'))
+		const leftJob: AgentJobInput = {
+			...DURABLE_JOB,
+			provider: 'left',
+			builtins: ['load', 'switch'],
+			scope: { skills: ['billing'], memos: ['pref'], workspaces: ['north'] },
+		}
+		const rightJob: AgentJobInput = {
+			...DURABLE_JOB,
+			provider: 'right',
+			builtins: ['load', 'switch'],
+			scope: { skills: ['claims'], memos: ['note'], workspaces: ['south'] },
+			disclosure: { skills: [], workspace: 'south' },
+		}
+		await Promise.all([queue.enqueue(leftJob), queue.enqueue(rightJob)])
+		expect(events.calls.map(([event]) => event).slice(0, 2)).toEqual(['start', 'start'])
+		expect(
+			left.calls.flatMap((call) =>
+				collectRenderedNames(filterOutsideCeiling(readDurableRendered(call), leftJob)),
+			),
+		).toEqual([])
+		expect(
+			right.calls.flatMap((call) =>
+				collectRenderedNames(filterOutsideCeiling(readDurableRendered(call), rightJob)),
+			),
+		).toEqual([])
+		expect(readDurableRendered(requireValue(left.calls.at(-1)))).toMatchObject({
+			bodies: ['billing'],
+			workspaces: ['north'],
+		})
+		expect(readDurableRendered(requireValue(right.calls.at(-1)))).toMatchObject({
+			bodies: ['claims'],
+			workspaces: ['south'],
+		})
+		expect(pools.workspaces.active?.id).toBe('north')
+	})
+
+	it('shows a memo one job wrote in the index of a later job whose scope lists it, and in no request of one whose scope omits it', async () => {
+		const { provider, registry } = createDurableFixture([
+			{
+				content: '',
+				tools: [
+					createToolCall({
+						id: 'r1',
+						name: 'remember',
+						arguments: { name: 'draft', description: 'DRAFT-NOTE', content: 'DRAFT-ONE' },
+					}),
+				],
+			},
+			{ content: 'written' },
+			{ content: 'listed' },
+			{ content: 'omitted' },
+		])
+		const queue = createAgentQueue({ registry })
+		await queue.enqueue({
+			...DURABLE_JOB,
+			builtins: ['remember'],
+			scope: { skills: [], memos: ['draft'], workspaces: [] },
+		})
+		await queue.enqueue({ ...DURABLE_JOB, scope: { skills: [], memos: ['draft'], workspaces: [] } })
+		await queue.enqueue({ ...DURABLE_JOB, scope: { skills: [], memos: ['pref'], workspaces: [] } })
+		// The claim reads the later jobs' requests, so the writer's own two are left out.
+		expect(
+			provider.calls
+				.slice(2)
+				.map((call) => call.messages.some((message) => message.content.includes('DRAFT-NOTE'))),
+		).toEqual([true, false])
+	})
+
+	it('refuses a retried attempt the revision of the memo an earlier attempt wrote', async () => {
+		const { provider, registry, pools } = createDurableFixture([
+			{
+				content: '',
+				tools: [
+					createToolCall({
+						id: 'a1',
+						name: 'remember',
+						arguments: { name: 'retry', description: 'Retry note', content: 'ATTEMPT-ONE' },
+					}),
+				],
+			},
+			{
+				content: '',
+				tools: [createToolCall({ id: 'a2', name: 'memo', arguments: { name: 'pref' } })],
+			},
+			{
+				content: '',
+				tools: [
+					createToolCall({
+						id: 'b1',
+						name: 'remember',
+						arguments: { name: 'retry', description: 'Retry note', content: 'ATTEMPT-TWO' },
+					}),
+				],
+			},
+			{ content: 'done' },
+		])
+		const queue = createAgentQueue({ registry, retries: 1 })
+		const retries = createRecorder<readonly [id: string, attempt: number]>()
+		queue.emitter.on('retry', retries.handler)
+		const result = await queue.enqueue({
+			...DURABLE_JOB,
+			builtins: ['memo', 'remember'],
+			scope: { skills: [], memos: ['pref', 'retry'], workspaces: [] },
+			limit: 2,
+		})
+		expect(retries.count).toBe(1)
+		expect(result.partial).toBe(false)
+		expect(provider.calls[3]?.messages.at(-1)?.content).toBe(
+			'A memo with that name exists and this conversation did not write it, so it stays as it is. Read it with memo, or write a name you created.',
+		)
+		expect(pools.memos.history('retry')).toHaveLength(1)
+		expect(pools.memos.memo('retry')?.content).toBe('ATTEMPT-ONE')
 	})
 })

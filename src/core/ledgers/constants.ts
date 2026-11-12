@@ -84,6 +84,10 @@ export const LEDGER_QUESTIONS: LedgerQuestion = Object.freeze({
 /**
  * Supplies the text of each ledger note, worded for a model that answers in its final
  * message.
+ *
+ * @remarks
+ * `overflow` names `unload` because a skill the thread shows is the room a model can give back: a
+ * successful `unload` reopens every call the room denied in that request.
  */
 export const LEDGER_NOTES: LedgerNote = Object.freeze({
 	cue: 'Give your complete answer to the request now, from what you already have.',
@@ -92,14 +96,17 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 		'You already have this result earlier in this request; give your complete answer now as your final message.',
 	closure:
 		'recall is closed for the rest of this request; give your final answer from what you have',
+	overflow:
+		'there is no room left for it in this request. Unload a skill you no longer need before you call it again, or answer with what you have.',
 })
 
 /**
- * Supplies the default prompt and tail shares.
+ * Supplies the default prompt, tail, and skills shares.
  */
 export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
 	prompt: 0.7,
 	tail: 0.35,
+	skills: 0.5,
 })
 
 /**

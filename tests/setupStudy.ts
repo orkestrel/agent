@@ -1,10 +1,11 @@
-import type { ScratchInterface } from '@orkestrel/test/server'
+import type { LoopbackInterface, ScratchInterface } from '@orkestrel/test/server'
 import type {
 	StudyAssessment,
 	StudyBounds,
 	StudyContext,
 	StudyCriterion,
 	StudyDefinition,
+	StudyDriverInterface,
 	StudyJudgment,
 	StudyLabels,
 	StudyManifest,
@@ -39,6 +40,7 @@ import type {
 import type { RecorderInterface } from '@orkestrel/test'
 import type { StudyAttempt, StudyFailure, StudyRole, StudyRubric } from '@orkestrel/study'
 import type { Guard, JSONValue } from '@orkestrel/contract'
+import type { StudyDeskAssertion } from '../studies/desk/types.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import {
 	arrayOf,
@@ -55,7 +57,7 @@ import {
 	parseJSON,
 	parseJSONAs,
 } from '@orkestrel/contract'
-import { createRecorder, waitForCondition, waitForDelay } from '@orkestrel/test'
+import { createRecorder, decodeJSONLines, waitForCondition, waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { isStudyChatInput } from '../studies/chat/validators.js'
 import { StudyChatDriver } from '../studies/chat/drivers/StudyChatDriver.js'
@@ -93,9 +95,11 @@ import {
 	isStudyMemoryArm,
 } from '../studies/memory/index.js'
 import { StudyToolsDriver } from '../studies/tools/index.js'
+import { STUDY_DESK_TOOLS } from '../studies/desk/constants.js'
+import { isStudyDeskAssertion, isStudyDeskInput } from '../studies/desk/validators.js'
 import * as agent from '../src/core/index.js'
 import * as provider from '@orkestrel/ollama'
-import { createScratch, destroyScratch } from '@orkestrel/test/server'
+import { createLoopback, createScratch, destroyScratch, isRunning } from '@orkestrel/test/server'
 import { createServer } from 'node:http'
 import { deepStrictEqual, strictEqual } from 'node:assert'
 import { execFile } from 'node:child_process'
@@ -441,7 +445,28 @@ export function buildStudyChatProfile(
  * @param directory - A result directory that does not exist yet.
  * @example (await executeStudyChatSeries(buildStudyChatProfile('full', url), declaration, join(scratch.path, 'full'))).status // 'sealed'
  */
-export async function executeStudyChatSeries(
+export function executeStudyChatSeries(
+	profile: StudyProfile,
+	declaration: Pick<StudyDeclaration, 'definition' | 'scenarios'>,
+	directory: string,
+): Promise<StudyResultView> {
+	return executeStudySeries(
+		new StudyChatDriver({ ...STUDY_MEMORY_MODULES, profile, directory: resolve('.') }),
+		profile,
+		declaration,
+		directory,
+	)
+}
+
+/** Executes a declaration's schedule in process through `StudySeries` and one driver, then seals and reads the result.
+ * @param driver - The driver every scheduled trial opens.
+ * @param profile - The profile whose bounds the manifest declares.
+ * @param declaration - The definition and the scenarios to schedule.
+ * @param directory - A result directory that does not exist yet.
+ * @example (await executeStudySeries(driver, profile, declaration, join(scratch.path, 'all'))).status // 'sealed'
+ */
+export async function executeStudySeries(
+	driver: StudyDriverInterface,
 	profile: StudyProfile,
 	declaration: Pick<StudyDeclaration, 'definition' | 'scenarios'>,
 	directory: string,
@@ -455,7 +480,7 @@ export async function executeStudyChatSeries(
 	await store.create()
 	await new StudySeries({
 		manifest,
-		driver: new StudyChatDriver({ ...STUDY_MEMORY_MODULES, profile, directory: resolve('.') }),
+		driver,
 		store,
 		signal: new AbortController().signal,
 	}).execute()
@@ -598,12 +623,11 @@ export function executeStudyTopology(
 	const entry = scratch.write(
 		'topology.ts',
 		`// Self-contained disposable entry: imported test setup would preload the measured modules.
-import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isArray, isRecord, parseJSON } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/contract/dist/src/core/index.js')).href)}
 import { parseStudyProfile } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/core/index.js')).href)}
-import { ArtifactLoader } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
+import { ArtifactLoader, hashStudyBytes } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
 
 const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')))
 const selection = parseJSON(readFileSync(${JSON.stringify(scratch.write('roots.json', JSON.stringify({ roots })))}, 'utf8'))
@@ -618,7 +642,7 @@ const installed = realpathSync('node_modules/@orkestrel/agent')
 const entries = roots.includes(installed) ? [subject, provider, dependency] : [subject, provider]
 const identities = [subject, dependency, provider].map((path) => ({
 	path,
-	digest: createHash('sha256').update(readFileSync(path)).digest('hex'),
+	digest: hashStudyBytes(readFileSync(path)),
 }))
 console.log(JSON.stringify({ event: 'selection', roots, entries, subject, provider, dependency, identities }))
 const artifacts = new ArtifactLoader({ roots, entries })
@@ -652,32 +676,35 @@ console.log(JSON.stringify({
  * Serves a native loopback Ollama protocol fixture on an ephemeral port.
  * @remarks
  * Create one per test. A scripted reply is consumed by the next request for its path while it heads
- * the script; `metadata` answers a metadata path ahead of its default; any other request is answered
- * by default, repeating the model it names as a daemon does. The script and the request log are
- * replaced and appended by this entity alone, and its getters return copies.
+ * the script; `metadata` answers a metadata path ahead of its default; `policy` answers a chat
+ * request the script does not, from the body it parsed; any other request is answered by default,
+ * repeating the model it names as a daemon does. The script and the request log are replaced and
+ * appended by this entity alone, and its getters return copies.
  */
 export class MemoryServer implements MemoryServerFixture {
 	readonly #server: Server
 	readonly #requests: Array<{ readonly path: string; readonly body: string }> = []
 	readonly #metadata: ReadonlyMap<string, string>
+	readonly #policy: MemoryPolicy | undefined
 	#pending: readonly MemoryWireFixture[]
+	#loopback: LoopbackInterface | undefined
 
-	/** Creates an unstarted fixture. @param responses - The scripted replies in the order their paths are requested. @param metadata - The body served for a metadata path ahead of its default. */
+	/** Creates an unstarted fixture. @param responses - The scripted replies in the order their paths are requested. @param metadata - The body served for a metadata path ahead of its default. @param policy - The reply policy for an unscripted chat request. Default: none. */
 	constructor(
 		responses: readonly MemoryWireFixture[] = [],
 		metadata: Readonly<Record<string, string>> = {},
+		policy: MemoryPolicy | undefined = undefined,
 	) {
 		this.#pending = responses
 		this.#metadata = new Map(Object.entries(metadata))
+		this.#policy = policy
 		this.#server = createServer((request, response) => this.#serve(request, response))
 	}
 
-	/** Holds the origin of the started fixture. @throws Error - Thrown when the fixture is not listening. */
+	/** Holds the origin of the started fixture. @throws Error - Thrown when the fixture never started. */
 	get url(): string {
-		const address = this.#server.address()
-		if (address === null || typeof address === 'string')
-			throw new Error('Missing native fixture address')
-		return `http://127.0.0.1:${address.port}`
+		if (this.#loopback === undefined) throw new Error('Missing native fixture address')
+		return this.#loopback.url
 	}
 
 	/** Holds a copy of every request received, in arrival order. */
@@ -690,20 +717,15 @@ export class MemoryServer implements MemoryServerFixture {
 		return [...this.#pending]
 	}
 
-	/** Begins listening on an ephemeral loopback port. @returns Completion once the fixture accepts connections. */
-	start(): Promise<void> {
-		return new Promise<void>((resolveListen, reject) => {
-			this.#server.once('error', reject)
-			this.#server.listen(0, '127.0.0.1', resolveListen)
-		})
+	/** Begins listening on an ephemeral loopback port. @returns Completion once the fixture accepts connections. @throws Error - Thrown when the fixture already started. */
+	async start(): Promise<void> {
+		if (this.#loopback !== undefined) throw new Error('The native fixture already started')
+		this.#loopback = await createLoopback(this.#server)
 	}
 
-	/** Drops every connection and stops listening. @returns Completion after the fixture is closed. */
+	/** Drops every connection and stops listening; a repeated call, or one before `start`, resolves at once. @returns Completion after the fixture is closed. */
 	close(): Promise<void> {
-		return new Promise<void>((resolveClose, reject) => {
-			this.#server.closeAllConnections()
-			this.#server.close((error) => (error === undefined ? resolveClose() : reject(error)))
-		})
+		return this.#loopback?.destroy() ?? Promise.resolve()
 	}
 
 	async #serve(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -746,6 +768,10 @@ export class MemoryServer implements MemoryServerFixture {
 			}
 			if (next.open === true) response.write(next.body)
 			else response.end(next.body)
+			return
+		}
+		if (request.url === '/api/chat' && this.#policy !== undefined) {
+			response.end(this.#policy(parseJSON(body)))
 			return
 		}
 		if (request.url === '/api/show') {
@@ -797,13 +823,15 @@ export class MemoryServer implements MemoryServerFixture {
  * Starts a native loopback Ollama protocol fixture on an ephemeral port.
  * @param responses - The scripted replies in the order their paths are requested. Default: none.
  * @param metadata - The body served for a metadata path ahead of its default. Default: none.
+ * @param policy - The reply policy for an unscripted chat request. Default: none.
  * @returns A listening fixture the caller closes.
  */
 export async function createMemoryServer(
 	responses: readonly MemoryWireFixture[] = [],
 	metadata: Readonly<Record<string, string>> = {},
+	policy: MemoryPolicy | undefined = undefined,
 ): Promise<MemoryServerFixture> {
-	const server = new MemoryServer(responses, metadata)
+	const server = new MemoryServer(responses, metadata, policy)
 	await server.start()
 	return server
 }
@@ -1840,6 +1868,8 @@ export interface MemoryWireFixture {
 	readonly open?: boolean
 	readonly chunks?: ReadonlyArray<{ readonly body: string; readonly delay: number }>
 }
+/** Decides a protocol fixture's chat reply body from the request body it parsed. */
+export type MemoryPolicy = (body: unknown) => string
 /** Holds an actual protocol fixture and captured request bytes. */
 export interface MemoryServerFixture {
 	readonly url: string
@@ -4460,18 +4490,14 @@ export function renderMemoryLabelScript(gate: string, nodes: readonly MemoryLabe
  * Reads a workflow journal's started nodes, each with its latest return value.
  * @param text - The journal's text
  * @returns The nodes and the count of `started` and `result` lines
- * @throws Error - Thrown when a line is not a journal line
+ * @throws Error - Thrown when a line is not JSON, or an entry is not a journal line
  */
 export function readMemoryJournal(text: string): MemoryJournal {
-	const lines = text
-		.split('\n')
-		.filter((line) => line.trim().length > 0)
-		.map((line, index) => {
-			const parsed = parseJSON(line)
-			if (!isRecord(parsed) || !isString(parsed.type))
-				throw new Error(`The journal holds an unreadable line ${String(index + 1)}`)
-			return parsed
-		})
+	const lines = decodeJSONLines(text).map((parsed, index) => {
+		if (!isRecord(parsed) || !isString(parsed.type))
+			throw new Error(`The journal holds an unreadable entry ${String(index + 1)}`)
+		return parsed
+	})
 	const named = lines.flatMap((line) =>
 		isString(line.agentId) ? [{ type: line.type, id: line.agentId, line }] : [],
 	)
@@ -4511,15 +4537,7 @@ export function extractMemoryHarness(journal: MemoryJournal): MemoryHarnessRepor
  * @throws Error - Thrown when a line is not JSON
  */
 export function readMemoryTranscript(text: string): MemoryTranscriptResult {
-	const lines = text
-		.split('\n')
-		.filter((line) => line.trim().length > 0)
-		.map((line, index) => {
-			const parsed = parseJSON(line)
-			if (parsed === undefined)
-				throw new Error(`The transcript holds an unreadable line ${String(index + 1)}`)
-			return parsed
-		})
+	const lines = decodeJSONLines(text)
 	const stamps = lines.flatMap((line) =>
 		isRecord(line) && isString(line.timestamp) ? [Date.parse(line.timestamp)] : [],
 	)
@@ -5357,18 +5375,11 @@ await new Promise(() => {})
 
 /** Checks that every process started by the scripted daemon has already been reaped by Study. */
 export function assertMemoryDaemonClosed(scratch: ScratchInterface): void {
-	const pids = (scratch.read('daemon-pids.jsonl') ?? '').trim().split(/\r?\n/).filter(Boolean)
+	const pids = decodeJSONLines(scratch.read('daemon-pids.jsonl') ?? '')
 	if (pids.length === 0) throw new Error('The owned daemon never started')
-	for (const line of pids) {
-		const pid = Number(line)
-		if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('Invalid daemon pid')
-		try {
-			process.kill(pid, 0)
-		} catch (error) {
-			if (error instanceof Error && 'code' in error && error.code === 'ESRCH') continue
-			throw error
-		}
-		throw new Error(`Owned daemon ${pid} survived execution`)
+	for (const pid of pids) {
+		if (!agent.isPositiveSafeInteger(pid)) throw new Error('Invalid daemon pid')
+		if (isRunning(pid)) throw new Error(`Owned daemon ${pid} survived execution`)
 	}
 }
 
@@ -5398,4 +5409,260 @@ export class MemoryRoutingJudge implements agent.JudgeInterface {
 		this.#signals.handler(signal)
 		return this.#inner.ask(request, signal)
 	}
+}
+
+/** Holds what a desk reply policy reads from one chat request body: each message's role, text, and called names, and each advertised tool's name and parameter types. */
+export interface StudyDeskBody {
+	readonly messages: ReadonlyArray<{
+		readonly role: string
+		readonly content: string
+		readonly calls: readonly string[]
+	}>
+	readonly tools: ReadonlyArray<{
+		readonly name: string
+		readonly fields: ReadonlyArray<{ readonly name: string; readonly type: string }>
+	}>
+}
+
+/**
+ * Reads a chat request body the desk policies answer.
+ * @param value - The parsed `/api/chat` body.
+ * @returns Its messages and its advertised tools, in wire order.
+ * @throws Error - Thrown when the body carries no message list or a message lacks its role.
+ */
+export function readStudyDeskBody(value: unknown): StudyDeskBody {
+	if (!isRecord(value) || !isArray(value.messages)) throw new Error('Desk body lacks messages')
+	return {
+		messages: value.messages.map((message) => {
+			if (!isRecord(message) || !isString(message.role)) throw new Error('Desk message lacks role')
+			return {
+				role: message.role,
+				content: isString(message.content) ? message.content : '',
+				calls: isArray(message.tool_calls)
+					? message.tool_calls.flatMap((call) =>
+							isRecord(call) && isRecord(call.function) && isString(call.function.name)
+								? [call.function.name]
+								: [],
+						)
+					: [],
+			}
+		}),
+		tools: isArray(value.tools)
+			? value.tools.flatMap((tool) =>
+					isRecord(tool) && isRecord(tool.function) && isString(tool.function.name)
+						? [
+								{
+									name: tool.function.name,
+									fields:
+										isRecord(tool.function.parameters) &&
+										isRecord(tool.function.parameters.properties)
+											? Object.entries(tool.function.parameters.properties).map(
+													([name, schema]) => ({
+														name,
+														type:
+															isRecord(schema) && isString(schema.type) ? schema.type : 'string',
+													}),
+												)
+											: [],
+								},
+							]
+						: [],
+				)
+			: [],
+	}
+}
+
+/**
+ * Collects each request's assertion by its prompt, from a desk declaration's scenarios and rubric.
+ * @param declaration - The scenarios and the rubric of a desk study.
+ * @returns Each prompt mapped to the tool and area its criterion names.
+ */
+export function collectStudyDeskAnswers(
+	declaration: Pick<StudyDeclaration, 'scenarios' | 'rubric'>,
+): ReadonlyMap<string, StudyDeskAssertion> {
+	return new Map(
+		declaration.rubric.criteria.flatMap((criterion) => {
+			const input = declaration.scenarios
+				.find((scenario) => scenario.id === criterion.scenario)
+				?.goals.find((goal) => goal.id === criterion.goal)?.input
+			return isStudyDeskInput(input) && isStudyDeskAssertion(criterion.assertion)
+				? [[input.prompt, criterion.assertion] as const]
+				: []
+		}),
+	)
+}
+
+/**
+ * Finds the request a body serves: the prompt its last user message ends with, so a ledger's request copy matches too.
+ * @param prompts - The declared prompts, each mapped to its assertion.
+ * @param body - The read body.
+ * @returns The request's assertion, or undefined for a body no request opened, such as a ledger's calibration.
+ */
+export function findStudyDeskAnswer(
+	prompts: ReadonlyMap<string, StudyDeskAssertion>,
+	body: StudyDeskBody,
+): StudyDeskAssertion | undefined {
+	const content = body.messages.findLast((message) => message.role === 'user')?.content
+	return content === undefined
+		? undefined
+		: [...prompts].find(([prompt]) => content.endsWith(prompt))?.[1]
+}
+
+/**
+ * Reads the messages after a body's last user message: the turns the current request has taken.
+ * @param body - The read body.
+ * @returns The trailing messages, in order.
+ */
+export function readStudyDeskTail(body: StudyDeskBody): StudyDeskBody['messages'] {
+	return body.messages.slice(body.messages.findLastIndex((message) => message.role === 'user') + 1)
+}
+
+/**
+ * Builds a call reply that fills each advertised parameter: its own name for a string, 1 for a number.
+ * @param body - The read body.
+ * @param name - The tool to call.
+ * @returns One chat reply holding the call.
+ */
+export function buildStudyDeskCall(body: StudyDeskBody, name: string): string {
+	const fields = body.tools.find((tool) => tool.name === name)?.fields ?? []
+	return buildMemoryReply({
+		content: '',
+		calls: [
+			{
+				function: {
+					name,
+					arguments: Object.fromEntries(
+						fields.map((field) => [field.name, field.type === 'number' ? 1 : field.name]),
+					),
+				},
+			},
+		],
+	})
+}
+
+/**
+ * Creates the oracle reply policy: it loads the request's area when the tool is held back, then calls the tool, then answers.
+ * @param prompts - The declared prompts, each mapped to its assertion.
+ * @returns A policy for `createMemoryServer`.
+ */
+export function createStudyDeskOracle(
+	prompts: ReadonlyMap<string, StudyDeskAssertion>,
+): MemoryPolicy {
+	return (value) => {
+		const body = readStudyDeskBody(value)
+		const answer = findStudyDeskAnswer(prompts, body)
+		const tail = readStudyDeskTail(body)
+		if (answer === undefined) return buildMemoryReply({ content: 'I cannot help with that.' })
+		if (tail.some((message) => message.calls.includes(answer.tool)))
+			return buildMemoryReply({ content: 'Done.' })
+		if (body.tools.some((tool) => tool.name === answer.tool))
+			return buildStudyDeskCall(body, answer.tool)
+		if (
+			body.tools.some((tool) => tool.name === 'load') &&
+			!tail.some((message) => message.calls.includes('load'))
+		)
+			return buildMemoryReply({
+				content: '',
+				calls: [{ function: { name: 'load', arguments: { skill: answer.area } } }],
+			})
+		return buildMemoryReply({ content: 'I cannot reach a tool for that.' })
+	}
+}
+
+/**
+ * Creates the control reply policy: on a declared request it never loads and calls the first advertised desk tool with no arguments, then answers.
+ * @param prompts - The declared prompts; the control reads only which bodies a request opened, never the tool.
+ * @returns A policy for `createMemoryServer`.
+ */
+export function createStudyDeskControl(
+	prompts: ReadonlyMap<string, StudyDeskAssertion>,
+): MemoryPolicy {
+	return (value) => {
+		const body = readStudyDeskBody(value)
+		const first = body.tools.find((tool) =>
+			STUDY_DESK_TOOLS.some((entry) => entry.name === tool.name),
+		)
+		if (
+			findStudyDeskAnswer(prompts, body) === undefined ||
+			first === undefined ||
+			readStudyDeskTail(body).some((message) => message.role === 'tool')
+		)
+			return buildMemoryReply({ content: 'Here is what I know.' })
+		return buildMemoryReply({
+			content: '',
+			calls: [{ function: { name: first.name, arguments: {} } }],
+		})
+	}
+}
+
+/**
+ * Reads the authored `screen` profile with its provider rebound to the protocol fixture, with no owned daemon.
+ * @param url - The fixture origin.
+ * @param entry - The Ollama entry the profile names.
+ * @param version - The runner version the profile's settings pin.
+ * @returns The raw profile record, ready to parse or write.
+ */
+export function buildStudyDeskRecord(
+	url: string,
+	entry: string,
+	version: string,
+): Readonly<Record<string, unknown>> {
+	const raw = parseJSON(readFileSync(resolve('studies/desk/profiles/screen.json'), 'utf8'))
+	if (!isRecord(raw) || !isRecord(raw.settings)) throw new Error('Missing desk profile')
+	return {
+		...raw,
+		provider: {
+			entry,
+			url,
+			model: 'model',
+			judge: 'judge',
+			digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+		},
+		settings: { ...raw.settings, version },
+	}
+}
+
+/**
+ * Reads the authored `screen` profile rebound to the protocol fixture, unrecorded, for an in-process run.
+ * @param url - The fixture origin.
+ * @returns The parsed profile.
+ */
+export function buildStudyDeskProfile(url: string): StudyProfile {
+	return {
+		...parseStudyProfile(
+			buildStudyDeskRecord(
+				url,
+				resolve('node_modules/@orkestrel/ollama/dist/src/core/index.js'),
+				'fixture-1',
+			),
+		),
+		record: undefined,
+	}
+}
+
+/**
+ * Copies the desk bundle and the disclosure declaration into an install and rebinds its `screen` profile to the protocol fixture.
+ * @remarks Writes the profile alone over the copied bundle; the declarations keep their authored bytes, and the profile keeps its recording.
+ * @param fixture - The install `createStudyInstallFixture` built.
+ * @param url - The fixture origin.
+ */
+export function writeStudyDeskFixture(fixture: StudyInstallFixture, url: string): void {
+	for (const target of ['desk', 'disclosure'])
+		cpSync(resolve('studies', target), fixture.scratch.ensure(join('studies', target)), {
+			recursive: true,
+		})
+	const entry = join(fixture.scratch.path, 'dist/src/core/index.js')
+	fixture.scratch.write(
+		'studies/desk/profiles/screen.json',
+		JSON.stringify({
+			...buildStudyDeskRecord(
+				url,
+				join(fixture.scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
+				'fixture-1',
+			),
+			agent: entry,
+			subject: entry,
+			roots: [fixture.scratch.path, ...fixture.packages.map((captured) => captured.target)],
+		}),
+	)
 }

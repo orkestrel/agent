@@ -4,6 +4,7 @@ import type { Message } from '../types.js'
 import type {
 	ClassifierAttempt,
 	GaugeCall,
+	LedgerCommit,
 	LedgerDraft,
 	LedgerListing,
 	LedgerRequestInterface,
@@ -50,6 +51,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	#admitted: ReadonlySet<string> = new Set()
 	#denials: ReadonlySet<string> = new Set()
 	#listed: readonly LedgerListing[] = []
+	#commits: readonly LedgerCommit[] = []
 	#recalls = 0
 	#closed = false
 
@@ -271,5 +273,26 @@ export class LedgerRequest implements LedgerRequestInterface {
 
 	lines(result: string): ReadonlyMap<string, string> | undefined {
 		return this.#listed.findLast((listing) => listing.result === result)?.lines
+	}
+
+	commit(price: number, skill?: string): void {
+		this.#commits = [
+			...this.#commits,
+			{ price, turn: this.calls.length, ...(skill === undefined ? {} : { skill }) },
+		]
+	}
+
+	get committed(): number {
+		return this.#inflight().reduce((sum, entry) => sum + entry.price, 0)
+	}
+
+	get loads(): readonly string[] {
+		return this.#inflight().flatMap((entry) => (entry.skill === undefined ? [] : [entry.skill]))
+	}
+
+	// The prices committed after the call in flight started.
+	#inflight(): readonly LedgerCommit[] {
+		const turn = this.calls.length
+		return this.#commits.filter((entry) => entry.turn === turn)
 	}
 }

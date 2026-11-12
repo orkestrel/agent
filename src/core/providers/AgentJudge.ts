@@ -1,5 +1,6 @@
 import type { AgentJudgeInput, AgentJudgeInterface, ProviderOptions } from './types.js'
 import type { JudgeRequest, JudgeResult } from '../types.js'
+import { linkSignal } from '@orkestrel/abort'
 import { describeFaults, isRecord, parseJSON } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
@@ -148,7 +149,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 	): Promise<JudgeResult> {
 		const timeout = new Timeout({ ms: this.#timeout })
 		timeout.start()
-		const combined = AbortSignal.any([timeout.signal, signal])
+		const combined = linkSignal(timeout.signal, signal)
 		try {
 			const headers = await buildProviderHeaders(this.#headers, combined)
 			combined.throwIfAborted()

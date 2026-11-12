@@ -87,11 +87,17 @@ export interface LedgerTopic {
  * with a delta copy, then its newest plain exchange with a full copy, then no exchange are priced
  * in that order. Admission cannot close an otherwise open recall or displace a selected record
  * line or seed message. A seed stub reads visibility across the window and the copy together.
+ * `skills` is the share of the prompt budget, `(capacity - predict) * prompt`, that a thread's shown
+ * skills can take: their bodies and the definitions they add beyond the calibrated set. A `load`
+ * that would take the shown skills, the loads its batch already admitted, and its own skill past it
+ * is denied with the {@link LedgerNote} `overflow` text.
  * Each share must be finite, greater than 0, and at most 1.
  */
 export interface LedgerShare {
 	readonly prompt: number
 	readonly tail: number
+	/** Holds the share of the prompt budget a thread's shown skills can take, bodies and tools together. */
+	readonly skills: number
 }
 
 /**
@@ -103,12 +109,17 @@ export interface LedgerShare {
  * and the reason of the denial the ledger gives the identical retry of a call the authority denied;
  * the ledger reads a failure with exactly this text, or that denial, as a repeat. `closure` is the
  * failure a `recall` call returns after the request's recalls are spent, repeated, or out of room.
+ * `overflow` is the reason of the denial the ledger gives a `load`, a `remember`, or a `switch` the
+ * request or the thread has no room for. That denial stays out of the repeat stop, and a successful
+ * `unload` in the same request reopens the call.
  */
 export interface LedgerNote {
 	readonly cue: string
 	readonly results: string
 	readonly repeat: string
 	readonly closure: string
+	/** Holds the reason the ledger denies a `load`, a `remember`, or a `switch` the request or the thread has no room for. */
+	readonly overflow: string
 }
 
 /**
@@ -345,10 +356,12 @@ export interface LedgerGauge {
  * Carries a stored gauge: its price and the digest of the tool definitions that price measured.
  *
  * @remarks
- * `digest` is what the `digestLedgerTools` helper returns for the definitions the calibration request
- * carried, or for the ledger's definitions at construction when the options supplied the gauge. A
- * hydrate reuses the price only when the hydrated ledger's definitions have the same digest, and
- * each `respond` call compares the digest again, so a definition added or removed since drops
+ * `digest` is what the `digestLedgerTools` helper returns for the calibrated definitions: those the
+ * calibration request carried, or, when the options supplied the gauge, the ledger's calibrated
+ * definitions at construction. The calibrated set is every definition a turn can advertise but the
+ * tools a registered skill holds back while `agent.builtins` enables `load`. A hydrate reuses the
+ * price only when the hydrated ledger's calibrated definitions have the same digest, and each
+ * `respond` call compares the digest again, so a calibrated definition added or removed since drops
  * the gauge.
  */
 export interface LedgerGaugeSnapshot extends LedgerGauge {
@@ -378,7 +391,12 @@ export interface LedgerGaugeSnapshot extends LedgerGauge {
  * unanswered as a repeat, before its `evaluate` method and with no ask, and its `ask` refuses the
  * identical twin in the same batch of a declined or unanswered ask without calling this authority's
  * `ask`, so a person is asked about such a call once per request. The agent still reports that
- * twin's `ask` event.
+ * twin's `ask` event. `builtins` enables the built-in tools and `disclosure` shows skills and a
+ * workspace, as `AgentOptions` describes them. A ledger with `builtins` requires `authority`:
+ * construction throws `AgentError` with code `'AUTHORITY'` without it. The ledger tests each
+ * built-in call for a repeat and for room before this authority reads it, and every call it admits
+ * reaches this authority's `evaluate` and, when asked, its `ask`. While `builtins` enables `load`,
+ * calibration measures every definition but the tools a registered skill holds back.
  */
 export type LedgerAgentOptions = Pick<
 	AgentOptions,
@@ -392,6 +410,8 @@ export type LedgerAgentOptions = Pick<
 	| 'workspaces'
 	| 'strict'
 	| 'authority'
+	| 'builtins'
+	| 'disclosure'
 >
 
 /**
@@ -404,11 +424,20 @@ export type LedgerAgentOptions = Pick<
  * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it, and the records go into a copy of each request turn. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
- * integer. Without `gauge`, or a `snapshot` gauge priced on the same tool definitions, the ledger calibrates before its first pass. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
+ * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
  * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
  * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
  * `'CAPACITY'` otherwise. The plan budgets
- * `max(0, (capacity - predict) * share.prompt - overhead) / (1 + LEDGER_SCALE_DRIFT)`.
+ * `max(0, (capacity - predict) * share.prompt - (overhead - spared + added) - holdback) / (1 + LEDGER_SCALE_DRIFT)`.
+ * `spared` and `added` are what `computeToolPrice` returns for the definitions the first pass
+ * advertises with the thread's shown skills, against the calibrated set. While that pass advertises
+ * `load`, `holdback` is the `computeSkillPrice` of the largest skill the ceiling admits and the
+ * thread does not show, plus the price of one result: the longer of the longest stored tool result
+ * and the gauge's reply reserve. Otherwise it is 0.
+ * The ledger sends no request it prices over `capacity - predict`. A first pass or a later turn that
+ * does not fit ends with the agent's `abort` reason `overflow`, and the answer pass answers; an
+ * answer pass that does not fit with its note left out rejects `respond` with `LedgerError` code
+ * `'OVERFLOW'`.
  * The plan retains its `remainder - predict < 2 * reserve` admission rule. Runtime recall fits whole
  * results to measured remaining capacity at the larger of the gauge rate and the request's measured
  * rate, allowing `LEDGER_SCALE_DRIFT` for new text. Lack of room omits results without closing recall.
@@ -510,6 +539,13 @@ export interface LedgerWindowSnapshot {
 export interface LedgerResult extends AgentResult {
 	readonly passes: readonly AgentResult[]
 	readonly attempts: readonly ClassifierAttempt[]
+}
+
+/** Carries one price a request committed: the tokens, the count of calls observed when it was committed, and the skill a `load` names. */
+export interface LedgerCommit {
+	readonly price: number
+	readonly turn: number
+	readonly skill?: string
 }
 
 /** Carries a recall result, its accepted whole groups, lookup line translations, and provider-turn position. */
@@ -698,6 +734,17 @@ export interface LedgerRequestInterface {
 	 * @returns Each listed lookup line mapped to its stored first line, or undefined when no recall returned `result`
 	 */
 	lines(result: string): ReadonlyMap<string, string> | undefined
+	/**
+	 * Records the tokens one cleared call commits to the next prompt.
+	 *
+	 * @param price - The tokens the call commits
+	 * @param skill - The skill the call loads, for a `load`
+	 */
+	commit(price: number, skill?: string): void
+	/** Holds the tokens committed after the call in flight started. */
+	readonly committed: number
+	/** Holds the skills the loads committed after the call in flight started name, in commit order. */
+	readonly loads: readonly string[]
 }
 
 /**
@@ -1116,9 +1163,11 @@ export interface ClassifierInterface {
  * `estimate` is the `estimateMessages` estimate of the call's messages. `prompt` and `completion`
  * are the tokens the provider reported, absent when it reported none. `tools` is the count of tool
  * definitions the call advertised. `spared` is the tokens of definitions it did not advertise;
- * estimated use subtracts it from overhead, floored at 0. Omission means 0. Observation rescales
- * only with exact overhead: `spared` absent or zero retains all overhead, and `spared` at or above
- * overhead retains none. A partially spared first call keeps the prior scale.
+ * estimated use subtracts it from overhead, floored at 0. `added` is the tokens of definitions it
+ * advertised beyond the calibrated set; estimated use adds it. Omission means 0 for both.
+ * Observation rescales only with exact overhead: `spared` absent or zero retains all overhead, and
+ * `spared` at or above overhead retains none. A partially spared first call, and a first call with
+ * `added` above 0, keep the prior scale.
  * `thinking` estimates the completion tokens spent on thinking from its share of the generated
  * characters, rounded to the nearest integer and capped at `completion`. With replay `'none'`,
  * the measured call uses `prompt + completion - thinking`; other policies retain the whole
@@ -1128,6 +1177,8 @@ export interface GaugeCall {
 	readonly estimate: number
 	/** Tokens spared by tool definitions this call did not advertise. Default: 0. */
 	readonly spared?: number
+	/** Tokens of definitions this call advertised beyond the calibrated set. Default: 0. */
+	readonly added?: number
 	readonly prompt?: number
 	readonly completion?: number
 	readonly thinking?: number
@@ -1143,7 +1194,7 @@ export interface GaugeCall {
  * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
  * Measured use is `prompt + completion - (thinking ?? 0)` for `'none'`, and `prompt + completion`
  * otherwise; absent completion counts as 0. Without prompt usage, use is
- * `max(0, overhead - (spared ?? 0)) + scale * estimate`.
+ * `max(0, overhead - (spared ?? 0)) + (added ?? 0) + scale * estimate`.
  * Capacity left is `max(0, capacity - used)`. The reply reserve adds recall uniform at the marginal
  * rate to the largest observed reply's `completion - (thinking ?? 0)` for every policy.
  * Without a positive reply observation, it prices the longest reply text at that rate. The room formula
@@ -1244,6 +1295,8 @@ export type LedgerErrorCode =
 	| 'QUESTION'
 	/** Reports a write without the `consequential` annotation, writes without `agent.authority`, or a write named `recall` or with a name a lookup or another write carries. */
 	| 'WRITE'
+	/** Reports a request no pass can carry, because the context the thread shows and the request price over `capacity - predict` with every cut made, or a host act after the answer pass's note grew its request past that limit. */
+	| 'OVERFLOW'
 
 /** Carries the lowercase words and non-opening capitalized names of a message. */
 export interface LedgerWordSet {

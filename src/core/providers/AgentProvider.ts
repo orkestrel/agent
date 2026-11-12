@@ -12,6 +12,7 @@ import type {
 } from './types.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
+import { linkSignal } from '@orkestrel/abort'
 import { Timeout } from '@orkestrel/timeout'
 import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
 import {
@@ -173,7 +174,7 @@ export abstract class AgentProvider<
 		if (signal.aborted) throw new ProviderAbortError({ content: '' })
 		const timeout = new Timeout({ ms: this.#timeout })
 		timeout.start()
-		const combined = AbortSignal.any([timeout.signal, signal])
+		const combined = linkSignal(timeout.signal, signal)
 		try {
 			const parser = this.#frame(combined)
 			try {

@@ -3,6 +3,7 @@ import type {
 	AgentDisclosure,
 	InstructionManagerInterface,
 	MemoManagerInterface,
+	ScopeFilter,
 	ScopeInterface,
 	Selection,
 	SelectionHandler,
@@ -321,7 +322,8 @@ export type AgentEventMap = {
 	 * `messages` and `tools` arrays are frozen; each message, `options`, and each definition is a
 	 * shared object, so a listener is host code that reads the request and never writes to it. A
 	 * request whose turn advertises no tool carries no `tools` member, and a turn cancelled before
-	 * dispatch emits none.
+	 * its request is composed emits none. A run aborted while a turn's `request` listeners run sends
+	 * nothing for that turn: the provider receives no call for it, and the turn ends as a cancel.
 	 */
 	readonly request: readonly [
 		index: number,
@@ -566,7 +568,9 @@ export interface ApproverInterface {
  * - `scope` — an optional initial active {@link ScopeInterface} forwarded to the agent's context
  *   (the context and tool-dispatch filter); `undefined` ⇒ every registered tool is admitted.
  * - `builtins` — the {@link AgentBuiltin} tools each run serves itself, each advertised only where
- *   the turn's ceiling admits its name and each call passing the authority; construction throws an
+ *   the turn's ceiling admits its name and each call passing the authority. `remember` and `switch`
+ *   are advertised only while the ceiling's `memos` or `workspaces` list names a key, and `load` and
+ *   `unload` are not advertised under an empty `skills` list; construction throws an
  *   `AgentError` with code `'BUILTIN'` for a name that is no built-in, a repeated name, `unload`
  *   without `load`, or a name the tool manager already holds. Omitted ⇒ none.
  * - `disclosure` — the skills and the workspace the host shows every run from its first request,
@@ -1055,7 +1059,11 @@ export interface BuiltinNote {
  * to run); `messages` defaults to an empty seed. `tools` lists registry keys whose
  * resolved tools are loaded into the agent's manager; `authority` / `scheduler` are
  * single registry keys (their live objects carry functions, so they can't serialize).
- * `budget` is a token ceiling rebuilt into a `createTokenBudget({ max })`.
+ * `budget` is a token ceiling rebuilt into a `createTokenBudget({ max })`. A job holds what it
+ * names: `scope` lists the skills, memos, and workspaces it holds of the registry's managers, so a
+ * job with no `scope` holds none, as a job with no `tools` holds no tool; `disclosure` shows within
+ * that scope; and `builtins` names the built-in tools it serves itself, which pass the authority
+ * `authority` names as its tools do.
  */
 export interface AgentJobInput {
 	/** Names the registry key of the {@link ProviderInterface} the job runs against. */
@@ -1066,7 +1074,7 @@ export interface AgentJobInput {
 	readonly system?: string
 	/** Names the registry keys of the values of {@link ToolInterface} loaded into the agent's tool manager; a non-empty list requires `authority`. */
 	readonly tools?: readonly string[]
-	/** Names the registry key of the {@link AuthorityInterface} policy gate; required when `tools` names any. */
+	/** Names the registry key of the {@link AuthorityInterface} policy gate; required when `tools` or `builtins` names any. */
 	readonly authority?: string
 	/** Names the registry key of an optional {@link SchedulerInterface} pacing the loop. */
 	readonly scheduler?: string
@@ -1076,6 +1084,15 @@ export interface AgentJobInput {
 	readonly timeout?: number
 	/** Sets a token ceiling rebuilt into a `createTokenBudget({ max })` cost bound. */
 	readonly budget?: number
+	/**
+	 * Holds the job's ceiling over the `skills`, `memos`, and `workspaces` managers of the registry,
+	 * each list required, `[]` for none. Omitted ⇒ the job holds no skill, memo, or workspace.
+	 */
+	readonly scope?: Required<Pick<ScopeFilter, 'skills' | 'memos' | 'workspaces'>>
+	/** Holds the skills and the workspace the job shows from its first request, within its `scope` (see {@link AgentOptions.disclosure}). */
+	readonly disclosure?: AgentDisclosure
+	/** Lists the built-in tools the job serves itself (see {@link AgentOptions.builtins}); a non-empty list requires `authority`. */
+	readonly builtins?: readonly AgentBuiltin[]
 	/**
 	 * Lists the sub-agent jobs this job fans out — each a nested {@link AgentJobInput} (so the whole
 	 * tree stays serializable). On a `createAgentRunner`, the handler calls `controller.spawn` for
@@ -1147,7 +1164,7 @@ export interface AgentRegistryInterface {
 	 * @param input - The serializable {@link AgentJobInput} to rehydrate
 	 * @param signal - An optional cancel threaded into the agent (a queue / runner abort)
 	 * @returns The ready agent, its context seeded with the job's messages
-	 * @throws {AgentError} Thrown when a referenced provider, tool, authority, or scheduler name is unregistered, or the job names `tools` and no `authority` (`code: 'REGISTRY'`), or when the job's `limit` is not a nonnegative safe integer (`code: 'LIMIT'`)
+	 * @throws {AgentError} Thrown when the job holds a member `AgentJobInput` does not declare or a member of the wrong shape, a referenced provider, tool, authority, or scheduler name is unregistered, or the job names `tools` or `builtins` and no `authority` (`code: 'REGISTRY'`), when the job's `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), or when its `builtins` repeats a name, lists `unload` without `load`, or names a tool its `tools` hold (`code: 'BUILTIN'`)
 	 * @throws {ConversationError} Thrown when a seed message's role is not a `ConversationRole` (`code: 'ROLE'`), before the agent is returned
 	 */
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface
@@ -1166,7 +1183,10 @@ export interface AgentRegistryInterface {
  * build (minted by the seeded `add`), so concurrent builds never collide, and the store
  * accumulates one snapshot per built agent that later calls `save`. Persistence
  * stays caller-triggered (`open` / `save`) — `build` never hydrates, so `build` stays
- * synchronous. Omitted ⇒ every built agent gets a registry-only manager.
+ * synchronous. Omitted ⇒ every built agent gets a registry-only manager. `skills`, `memos`, and
+ * `workspaces` are pre-built managers every job with a `scope` shares, each read through that
+ * job's lists; a job with no `scope` is passed none of them. Omitted ⇒ a scoped job's agent
+ * creates an empty one.
  */
 export interface AgentRegistryOptions {
 	readonly providers: Readonly<Record<string, ProviderInterface>>
@@ -1174,6 +1194,12 @@ export interface AgentRegistryOptions {
 	readonly authorities?: Readonly<Record<string, AuthorityInterface>>
 	readonly schedulers?: Readonly<Record<string, SchedulerInterface>>
 	readonly store?: ConversationStoreInterface
+	/** Holds the skill registry every job with a `scope` shares, read through its `skills` list. */
+	readonly skills?: SkillManagerInterface
+	/** Holds the memo set every job with a `scope` shares, read and written through its `memos` list. */
+	readonly memos?: MemoManagerInterface
+	/** Holds the workspace registry every job with a `scope` shares, read through its `workspaces` list. */
+	readonly workspaces?: WorkspaceManagerInterface
 }
 
 /**

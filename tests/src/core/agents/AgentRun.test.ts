@@ -50,7 +50,7 @@ describe('AgentRun — the run reads its own tool for a built-in name', () => {
 })
 
 describe('AgentRun — observe', () => {
-	it('advertises the host tools without a built-in name, then the run tools, remember and switch only under a defined list', () => {
+	it('advertises the host tools without a built-in name, then the run tools, remember and switch only under a list that names a key', () => {
 		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const context = createAgentContext()
 		context.tools.add([createRecordedTool('echo', executed)])
@@ -66,7 +66,18 @@ describe('AgentRun — observe', () => {
 		])
 		expect(run.switchable).toBe(false)
 
-		context.apply(createScope({ name: 'lists', memos: ['tone'], workspaces: [] }))
+		context.apply(createScope({ name: 'empty', memos: ['tone'], workspaces: [] }))
+		run.observe()
+		expect(run.advertised.map((definition) => definition.name)).toEqual([
+			'echo',
+			'load',
+			'unload',
+			'memo',
+			'remember',
+		])
+		expect(run.switchable).toBe(false)
+
+		context.apply(createScope({ name: 'lists', memos: ['tone'], workspaces: ['north'] }))
 		run.observe()
 		expect(run.advertised).toEqual([
 			...context.tools.definitions().filter((definition) => definition.name === 'echo'),

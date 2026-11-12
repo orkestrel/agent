@@ -57,6 +57,7 @@ import {
 	objectShape,
 	parseJSONAs,
 	parseJSONValue,
+	seededRandom,
 	stringShape,
 } from '@orkestrel/contract'
 import { createBudget, createTokenBudget, isBudgetError } from '@orkestrel/budget'
@@ -1656,6 +1657,33 @@ describe('Agent — abort', () => {
 		expect(result.content).toBe('')
 		expect(provider.calls).toEqual([])
 	})
+
+	it.each([
+		['its first', 0],
+		['a later', 1],
+	] as const)(
+		'a run aborted while %s turn’s request listeners run reaches no provider for that turn, and ends as a cancel',
+		async (_title, turn) => {
+			const tools = createToolManager()
+			tools.add(createTool({ name: 'read', execute: () => 'read' }))
+			const provider = createScriptedProvider(
+				[{ content: '', tools: [{ id: 'c1', name: 'read', arguments: {} }] }, { content: 'done' }],
+				AGENT_SCRIPT_OPTIONS,
+			)
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
+			const requests = createRecorder<[index: number]>()
+			agent.emitter.on('request', (index) => {
+				requests.handler(index)
+				if (index === turn) agent.abort('stop')
+			})
+			agent.context.messages.add({ role: 'user', content: 'read it' })
+			const result = await agent.generate()
+			expect(requests.calls).toEqual(Array.from({ length: turn + 1 }, (_, index) => [index]))
+			expect(provider.calls).toHaveLength(turn)
+			expect(result).toMatchObject({ content: '', partial: true })
+			expect(agent.status).toBe('done')
+		},
+	)
 
 	it('abort() mid-stream resolves partial with the accumulated content', async () => {
 		const gate = Promise.withResolvers<void>()
@@ -9919,12 +9947,13 @@ describe('Agent — the prompt option', () => {
 describe('Agent — a run scope narrows each turn ceiling', () => {
 	it('advertises and runs no tool outside the context scope intersected with the run scope, over seeded sequences', async () => {
 		const names = ['alpha', 'beta', 'gamma', 'delta']
-		// Each seed derives every list from a hash of its slot: 16 of 17 values pick a subset of
+		// Each seed draws every list from its seeded stream: 16 of 17 values pick a subset of
 		// `names` by bit, and the 17th leaves the list absent. Slot 0 is the context scope, slot 1 the
 		// run scope, and slot 2 + k the scope a `turn` listener applies at turn k.
 		for (const seed of Array.from({ length: 48 }, (_, index) => index)) {
-			const lists = Array.from({ length: 6 }, (_, slot) => {
-				const value = ((Math.imul(seed + 1, 2654435761) ^ Math.imul(slot + 1, 40503)) >>> 0) % 17
+			const random = seededRandom(seed + 1)
+			const lists = Array.from({ length: 6 }, () => {
+				const value = Math.floor(random() * 17)
 				return value === 16 ? undefined : names.filter((_name, bit) => ((value >> bit) & 1) === 1)
 			})
 			const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
@@ -10641,7 +10670,7 @@ describe('Agent — built-ins and disclosure: a skill holds its tools back while
 	it('advertises a held tool only while a shown skill names it, over seeded scopes', async () => {
 		const names = ['refund', 'claim', 'echo', 'load', 'unload']
 		for (const seed of Array.from({ length: 40 }, (_, index) => index)) {
-			const value = (Math.imul(seed + 3, 2654435761) >>> 0) % 33
+			const value = Math.floor(seededRandom(seed + 3)() * 33)
 			const allow =
 				value === 32 ? undefined : names.filter((_name, bit) => ((value >> bit) & 1) === 1)
 			const fixture = createBuiltinAgent({
@@ -11067,7 +11096,7 @@ describe('Agent — built-ins and disclosure: the ceiling decides each turn', ()
 			[
 				'No memo you can read has that name, and none is available now.',
 				'No skill you can load has that name, and none is available now.',
-				'No workspace you can select has that name, and none is available now.',
+				'No workspace can be selected here: the host lists no workspace you may select. Continue with the workspace you have.',
 			],
 		)
 	})
@@ -11102,7 +11131,7 @@ describe('Agent — built-ins and disclosure: the ceiling decides each turn', ()
 		expect(approver.calls).toHaveLength(1)
 		expect(fixture.agent.context.memos.memo('tone')).toBeUndefined()
 		expect(fixture.provider.calls[1]?.messages.at(-1)?.content).toBe(
-			'No memo you may write has that name, and none is available now.',
+			'No memo can be written here: the host lists no memo name you may write. Continue without saving it.',
 		)
 	})
 })
@@ -11262,10 +11291,8 @@ describe('Agent — built-ins and disclosure: remember', () => {
 		const pool = ['tone', 'pref', 'plan', 'ghost', 'note']
 		for (const seed of Array.from({ length: 24 }, (_, index) => index)) {
 			// Slot 0 picks the listed names by bit; slot k + 1 picks the name call k writes.
-			const picks = Array.from(
-				{ length: 5 },
-				(_, slot) => (Math.imul(seed + 11, 2654435761) ^ Math.imul(slot + 5, 40503)) >>> 0,
-			)
+			const random = seededRandom(seed + 11)
+			const picks = Array.from({ length: 5 }, () => Math.floor(random() * 2 ** 32))
 			const listed = pool.filter((_name, bit) => (((picks[0] ?? 0) >> bit) & 1) === 1)
 			const calls = picks.slice(1).map((pick, index) =>
 				createToolCall({

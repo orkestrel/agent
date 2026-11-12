@@ -4,6 +4,8 @@ import { captureError, createRecorder, requireValue } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
 import { createTool } from '@orkestrel/tool'
 import {
+	AUTHORITY_NOTES,
+	BUILTIN_NOTES,
 	createAgentRegistry,
 	createAuthority,
 	createMemoryConversationStore,
@@ -13,11 +15,24 @@ import {
 import {
 	AGENT_AUTHORITY,
 	AGENT_USAGE,
+	BUILTIN_NAMES,
+	DURABLE_EMPTY_SCOPE,
+	DURABLE_JOB,
+	DURABLE_REFUSAL_CASES,
+	DURABLE_SENTINELS,
+	callToRequest,
+	collectRenderedNames,
 	createAddTool,
+	createDurableFixture,
+	createDurablePools,
 	createRecordedScheduler,
 	createScriptedProvider,
+	createToolCall,
 	createTurnRegistry,
 	createLoopTool,
+	drawDurableHeld,
+	readDurableRendered,
+	readSystemContents,
 } from '../../../setup.js'
 
 // AgentRegistry.test.ts — the MIRROR of src/core/agents/AgentRegistry.ts. Pins the
@@ -145,7 +160,9 @@ describe('AgentRegistry — build (rehydration)', () => {
 			registry.build({ provider: 'main', messages: [], tools: ['add'] }),
 		)
 		expect(isAgentError(error) && error.code).toBe('REGISTRY')
-		expect(isAgentError(error) && error.message).toContain('names tools and no authority')
+		expect(isAgentError(error) && error.message).toContain(
+			'names tools or builtins and no authority',
+		)
 		expect(isAgentError(error) && error.context).toEqual({ tools: ['add'] })
 	})
 
@@ -725,5 +742,330 @@ describe('AgentRegistry — empty registry', () => {
 		expect(() => registry.tool('x')).toThrow('unknown tool: "x"')
 		expect(() => registry.authority('x')).toThrow('unknown authority: "x"')
 		expect(() => registry.scheduler('x')).toThrow('unknown scheduler: "x"')
+	})
+})
+
+describe('AgentRegistry — the job contract for a scope, a disclosure, and built-ins', () => {
+	it('admits a job whose scope holds its three lists, with a disclosure and built-ins', async () => {
+		const { provider, registry } = createDurableFixture([{ content: 'done' }])
+		const result = await registry
+			.build({
+				...DURABLE_JOB,
+				scope: { skills: ['billing'], memos: ['pref'], workspaces: ['north'] },
+				disclosure: { skills: ['billing'], workspace: 'north' },
+				builtins: ['load', 'unload', 'memo'],
+			})
+			.generate()
+		expect(result).toMatchObject({ content: 'done', partial: false })
+		expect(provider.calls).toHaveLength(1)
+	})
+
+	it.each(DURABLE_REFUSAL_CASES)(
+		'refuses $name at build with its faults, before the provider runs',
+		({ job, faults }) => {
+			const { provider, registry } = createDurableFixture([{ content: 'done' }])
+			// The job is malformed on purpose, so it crosses unchecked, as a restored record can.
+			const error = captureError(() => Reflect.apply(registry.build, registry, [job]))
+			expect(isAgentError(error) && error.code).toBe('REGISTRY')
+			expect(isAgentError(error) && error.context).toEqual({ faults })
+			expect(provider.started).toBe(0)
+		},
+	)
+})
+
+describe('AgentRegistry — what a job holds of the shared pools', () => {
+	it('renders no skill, memo, or workspace for a job with no scope, whatever the registry holds', async () => {
+		const held = createDurableFixture([{ content: 'done' }])
+		const none = createDurableFixture([{ content: 'done' }], { held: false })
+		await held.registry.build(DURABLE_JOB).generate()
+		await none.registry.build(DURABLE_JOB).generate()
+		expect(collectRenderedNames(readDurableRendered(requireValue(held.provider.calls[0])))).toEqual(
+			[],
+		)
+		expect(held.provider.calls.map(callToRequest)).toEqual(none.provider.calls.map(callToRequest))
+	})
+
+	it('renders exactly the listed names the pools hold, and nothing for a name they lack', async () => {
+		const { provider, registry } = createDurableFixture([{ content: 'done' }])
+		await registry
+			.build({
+				...DURABLE_JOB,
+				scope: {
+					skills: ['billing', 'ghost'],
+					memos: ['pref', 'ghost'],
+					workspaces: ['north', 'ghost'],
+				},
+			})
+			.generate()
+		const first = requireValue(provider.calls[0])
+		expect(readDurableRendered(first)).toEqual({
+			skills: ['billing'],
+			bodies: [],
+			memos: ['pref'],
+			workspaces: ['north'],
+			builtins: [],
+		})
+		expect(first.messages.map((message) => message.content).join('\n')).not.toContain('ghost')
+	})
+
+	it('renders, over generated scopes and pool contents, each listed name a pool holds and no other', async () => {
+		const readings = await Promise.all(
+			Array.from({ length: 32 }, async (_, seed) => {
+				const { held, scope } = drawDurableHeld(seed)
+				const { provider, registry } = createDurableFixture([{ content: 'done' }], {
+					pools: createDurablePools(held),
+				})
+				await registry.build({ ...DURABLE_JOB, scope }).generate()
+				return { held, scope, rendered: readDurableRendered(requireValue(provider.calls[0])) }
+			}),
+		)
+		expect(readings.map(({ rendered }) => rendered)).toEqual(
+			readings.map(({ held, scope }) => ({
+				skills: held.skills.filter((name) => scope.skills.includes(name)),
+				bodies: [],
+				memos: held.memos.filter((name) => scope.memos.includes(name)),
+				// The pool's first workspace is the active one, and it renders when the scope lists it.
+				workspaces: held.workspaces.slice(0, 1).filter((name) => scope.workspaces.includes(name)),
+				builtins: [],
+			})),
+		)
+		// The draws reach a rendered name and a held name the scope omits in every category.
+		expect(
+			(['skills', 'memos', 'workspaces'] as const).map((list) => [
+				readings.some(({ rendered }) => rendered[list].length > 0),
+				readings.some(({ held, scope }) => held[list].some((name) => !scope[list].includes(name))),
+			]),
+		).toEqual([
+			[true, true],
+			[true, true],
+			[true, true],
+		])
+	})
+})
+
+describe("AgentRegistry — a job's disclosure", () => {
+	it('puts a listed skill body last in the first system message and renders its workspace in place of the active one', async () => {
+		const { provider, registry, pools } = createDurableFixture([{ content: 'done' }])
+		await registry
+			.build({
+				...DURABLE_JOB,
+				scope: { skills: ['billing'], memos: [], workspaces: ['north', 'south'] },
+				disclosure: { skills: ['billing'], workspace: 'south' },
+			})
+			.generate()
+		expect(
+			readSystemContents(provider)[0]?.trimEnd().endsWith(`${DURABLE_SENTINELS.body}billing`),
+		).toBe(true)
+		expect(readDurableRendered(requireValue(provider.calls[0]))).toMatchObject({
+			bodies: ['billing'],
+			workspaces: ['south'],
+		})
+		expect(pools.workspaces.active?.id).toBe('north')
+	})
+
+	it('shows nothing for a name its scope omits, a name the pool lacks, or any name on a job with no scope', async () => {
+		const scoped = createDurableFixture([{ content: 'done' }])
+		await scoped.registry
+			.build({
+				...DURABLE_JOB,
+				scope: { skills: ['billing'], memos: [], workspaces: ['north'] },
+				disclosure: { skills: ['claims', 'ghost'], workspace: 'south' },
+			})
+			.generate()
+		const bare = createDurableFixture([{ content: 'done' }])
+		await bare.registry
+			.build({ ...DURABLE_JOB, disclosure: { skills: ['billing', 'claims'], workspace: 'south' } })
+			.generate()
+		expect(readDurableRendered(requireValue(scoped.provider.calls[0]))).toEqual({
+			skills: ['billing'],
+			bodies: [],
+			memos: [],
+			workspaces: ['north'],
+			builtins: [],
+		})
+		expect(collectRenderedNames(readDurableRendered(requireValue(bare.provider.calls[0])))).toEqual(
+			[],
+		)
+	})
+})
+
+describe("AgentRegistry — a job's built-ins", () => {
+	it('advertises each built-in from the first request, and each call reaches the evaluate of the authority the job names', async () => {
+		const { provider, registry, gate, pools } = createDurableFixture([
+			{
+				content: '',
+				tools: [
+					createToolCall({ id: 'c1', name: 'load', arguments: { skill: 'billing' } }),
+					createToolCall({ id: 'c2', name: 'memo', arguments: { name: 'pref' } }),
+					createToolCall({ id: 'c3', name: 'switch', arguments: { workspace: 'south' } }),
+					createToolCall({
+						id: 'c4',
+						name: 'remember',
+						arguments: { name: 'draft', description: 'Draft note', content: 'DRAFT-ONE' },
+					}),
+				],
+			},
+			{
+				content: '',
+				tools: [createToolCall({ id: 'c5', name: 'unload', arguments: { skill: 'billing' } })],
+			},
+			{ content: 'done' },
+		])
+		await registry
+			.build({
+				...DURABLE_JOB,
+				builtins: BUILTIN_NAMES,
+				scope: { skills: ['billing'], memos: ['pref', 'draft'], workspaces: ['north', 'south'] },
+			})
+			.generate()
+		expect(provider.calls.map((call) => readDurableRendered(call).builtins)).toEqual([
+			BUILTIN_NAMES,
+			BUILTIN_NAMES,
+			BUILTIN_NAMES,
+		])
+		expect(gate.evaluated.calls.map(([name]) => name).sort()).toEqual([...BUILTIN_NAMES].sort())
+		const second = requireValue(provider.calls[1])
+		expect(readDurableRendered(second)).toMatchObject({
+			bodies: ['billing'],
+			workspaces: ['south'],
+		})
+		expect(second.messages.map((message) => message.content)).toContain(
+			`${DURABLE_SENTINELS.fact}pref`,
+		)
+		expect(pools.workspaces.active?.id).toBe('north')
+	})
+
+	it('refuses a job that names built-ins and no authority at build, before an agent is constructed', () => {
+		const { provider, registry } = createDurableFixture([{ content: 'done' }])
+		const error = captureError(() =>
+			registry.build({ provider: 'main', builtins: ['memo'], scope: DURABLE_EMPTY_SCOPE }),
+		)
+		// The agent's own construction would refuse with 'AUTHORITY', so 'REGISTRY' is the registry's.
+		expect(isAgentError(error) && error.code).toBe('REGISTRY')
+		expect(isAgentError(error) && error.message).toContain(
+			'names tools or builtins and no authority',
+		)
+		expect(isAgentError(error) && error.context).toEqual({ builtins: ['memo'] })
+		expect(provider.started).toBe(0)
+	})
+
+	it('advertises for a job with built-ins and three empty lists the built-ins a job with no scope advertises, less load and unload', async () => {
+		const bare = createDurableFixture([{ content: 'done' }])
+		const empty = createDurableFixture([{ content: 'done' }])
+		await bare.registry.build({ ...DURABLE_JOB, builtins: BUILTIN_NAMES }).generate()
+		await empty.registry
+			.build({ ...DURABLE_JOB, builtins: BUILTIN_NAMES, scope: DURABLE_EMPTY_SCOPE })
+			.generate()
+		// An empty skills list leaves load and unload nothing to act on, as the empty memos and
+		// workspaces lists leave remember and switch.
+		expect(readDurableRendered(requireValue(empty.provider.calls[0])).builtins).toEqual(['memo'])
+		expect(readDurableRendered(requireValue(bare.provider.calls[0])).builtins).toEqual([
+			'load',
+			'unload',
+			'memo',
+		])
+	})
+})
+
+describe('AgentRegistry — remember on a job', () => {
+	it('denies remember as unanswered under an authority with no ask, and writes nothing', async () => {
+		const { provider, registry, pools } = createDurableFixture([
+			{
+				content: '',
+				tools: [
+					createToolCall({
+						id: 'r1',
+						name: 'remember',
+						arguments: { name: 'draft', description: 'Draft note', content: 'DRAFT-ONE' },
+					}),
+				],
+			},
+			{ content: 'done' },
+		])
+		await registry
+			.build({
+				...DURABLE_JOB,
+				authority: 'open',
+				builtins: ['remember'],
+				scope: { skills: [], memos: ['draft'], workspaces: [] },
+			})
+			.generate()
+		expect(provider.calls[1]?.messages.at(-1)?.content).toContain(AUTHORITY_NOTES.unanswered)
+		expect(pools.memos.history('draft')).toEqual([])
+	})
+
+	it("writes one revision whose origin is the job's conversation under an ask that approves, only for a listed name", async () => {
+		const { provider, registry, pools, gate } = createDurableFixture([
+			{
+				content: '',
+				tools: [
+					createToolCall({
+						id: 'r1',
+						name: 'remember',
+						arguments: { name: 'draft', description: 'Draft note', content: 'DRAFT-ONE' },
+					}),
+					createToolCall({
+						id: 'r2',
+						name: 'remember',
+						arguments: { name: 'stray', description: 'Stray note', content: 'STRAY' },
+					}),
+				],
+			},
+			{ content: 'done' },
+		])
+		const agent = registry.build({
+			...DURABLE_JOB,
+			builtins: ['remember'],
+			scope: { skills: [], memos: ['draft'], workspaces: [] },
+		})
+		await agent.generate()
+		const history = pools.memos.history('draft')
+		expect(gate.asked.calls.map(([name]) => name)).toContain('remember')
+		expect(history).toHaveLength(1)
+		expect(history[0]?.origin?.conversation).toBe(agent.context.conversations.active?.id)
+		expect(pools.memos.memo('stray')).toBeUndefined()
+		expect(provider.calls[1]?.messages.slice(-2).map((message) => message.content)).toEqual([
+			BUILTIN_NOTES.remembered,
+			'No memo you may write has that name. Use one of: "draft".',
+		])
+	})
+
+	it("refuses a second build's remember of a name an earlier build wrote, and writes nothing", async () => {
+		const { provider, registry, pools } = createDurableFixture([
+			{
+				content: '',
+				tools: [
+					createToolCall({
+						id: 'r1',
+						name: 'remember',
+						arguments: { name: 'draft', description: 'Draft note', content: 'DRAFT-ONE' },
+					}),
+				],
+			},
+			{ content: 'first' },
+			{
+				content: '',
+				tools: [
+					createToolCall({
+						id: 'r2',
+						name: 'remember',
+						arguments: { name: 'draft', description: 'Draft note', content: 'DRAFT-TWO' },
+					}),
+				],
+			},
+			{ content: 'second' },
+		])
+		const job: AgentJobInput = {
+			...DURABLE_JOB,
+			builtins: ['remember'],
+			scope: { skills: [], memos: ['draft'], workspaces: [] },
+		}
+		await registry.build(job).generate()
+		await registry.build(job).generate()
+		expect(provider.calls[3]?.messages.at(-1)?.content).toBe(
+			'A memo with that name exists and this conversation did not write it, so it stays as it is. Read it with memo, or write a name you created.',
+		)
+		expect(pools.memos.history('draft')).toHaveLength(1)
+		expect(pools.memos.memo('draft')?.content).toBe('DRAFT-ONE')
 	})
 })

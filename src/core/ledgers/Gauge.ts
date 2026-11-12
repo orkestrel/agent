@@ -84,7 +84,9 @@ export class Gauge implements GaugeInterface {
 		const call = calls.at(-1)
 		const used = isFiniteNumber(call?.prompt)
 			? call.prompt + (call.completion ?? 0) - (this.#replay === 'none' ? (call.thinking ?? 0) : 0)
-			: Math.max(0, this.#overhead - (call?.spared ?? 0)) + this.#scale * (call?.estimate ?? 0)
+			: Math.max(0, this.#overhead - (call?.spared ?? 0)) +
+				(call?.added ?? 0) +
+				this.#scale * (call?.estimate ?? 0)
 		return Math.max(0, this.#capacity - used)
 	}
 
@@ -113,6 +115,7 @@ export class Gauge implements GaugeInterface {
 			first !== undefined &&
 			isFiniteNumber(first.prompt) &&
 			first.estimate > 0 &&
+			(first.added ?? 0) === 0 &&
 			((first.spared ?? 0) === 0 || (first.spared ?? 0) >= this.#overhead)
 		) {
 			const priced = first.prompt - Math.max(0, this.#overhead - (first.spared ?? 0))

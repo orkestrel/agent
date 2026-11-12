@@ -11,7 +11,6 @@ import {
 	buildLedgerBenchOptions,
 	buildLedgerBlock,
 	buildLedgerPrefix,
-	computeTextDigest,
 	createCorrectionJudge,
 	extractLedgerOrder,
 	LEDGER_BENCH_DESK,
@@ -3546,15 +3545,6 @@ describe('ledger bench builders', () => {
 			),
 		).toBe('{"ids":["#1","#0"],"other":"x"}')
 		expect(renderLedgerPositions({ other: 'x' }, [])).toBe('{"other":"x"}')
-	})
-
-	it('computes the SHA-256 digest of a text', async () => {
-		expect(await computeTextDigest('abc')).toBe(
-			'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
-		)
-		expect(await computeTextDigest('')).toBe(
-			'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-		)
 	})
 })
 

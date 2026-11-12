@@ -24,33 +24,12 @@
 	],
 	"provider": {
 		"entry": "node_modules/@orkestrel/ollama/dist/src/core/index.js",
-		"url": "http://127.0.0.1:11435",
+		"url": "http://127.0.0.1:11434",
 		"model": "qwen3.5:2b-q4_K_M",
 		"judge": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
 		"digest": {
 			"model": "78a738cc751e89cba72bb1feabf70f30c31772eb81a89a66af94ecea90dc5d11",
 			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
-		},
-		"daemon": {
-			"executable": "C:\\Users\\mikes\\WebstormProjects\\agent\\tmp\\studies\\runner\\ollama-0.40.14\\ollama.exe",
-			"digest": "14e0fff0449ce3c3a7fe9db8b8b32089274db5f835d4c99f5af7c32dcbf08981",
-			"version": "0.40.14",
-			"models": [
-				{
-					"name": "qwen3.5:2b-q4_K_M",
-					"digest": "78a738cc751e89cba72bb1feabf70f30c31772eb81a89a66af94ecea90dc5d11"
-				},
-				{
-					"name": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
-					"digest": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
-				}
-			],
-			"environment": {
-				"OLLAMA_NUM_PARALLEL": "1",
-				"OLLAMA_MAX_LOADED_MODELS": "0",
-				"LLAMA_ARG_CONTEXT_SHIFT": "0",
-				"OLLAMA_NOPRUNE": "1"
-			}
 		}
 	},
 	"qualification": "tmp/studies/qualification",

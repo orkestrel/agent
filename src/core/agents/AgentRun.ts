@@ -24,6 +24,7 @@ import {
 	collectDisclosure,
 	describeCandidates,
 	filterAdvertisedTools,
+	filterBuiltinCandidates,
 	matchesHeadLists,
 	matchesPlainLine,
 	resolveDisclosure,
@@ -269,18 +270,11 @@ export class AgentRun {
 	}
 
 	// The turn's candidates: the host's definitions without a built-in's name, then the run's own,
-	// without `remember` while the ceiling defines no memos list and without `switch` while it
-	// defines no workspaces list.
+	// without `remember` or `switch` while the ceiling's list for it names no key.
 	#candidates(ceiling: ScopeFilter): readonly ToolDefinition[] {
 		return [
 			...this.#context.tools.definitions().filter((one) => !this.#builtins.has(one.name)),
-			...this.#tools
-				.definitions()
-				.filter(
-					(one) =>
-						(one.name !== 'remember' || ceiling.memos !== undefined) &&
-						(one.name !== 'switch' || ceiling.workspaces !== undefined),
-				),
+			...filterBuiltinCandidates(this.#tools.definitions(), ceiling),
 		]
 	}
 
@@ -353,7 +347,7 @@ export class AgentRun {
 
 	#remember(name: unknown, description: unknown, content: unknown): string {
 		const allowed = this.#live().memos
-		if (allowed === undefined) {
+		if (allowed === undefined || allowed.length === 0) {
 			throw new ToolError(
 				'ARGUMENTS',
 				'No memo can be written here: the host lists no memo name you may write. Continue without saving it.',
@@ -389,7 +383,7 @@ export class AgentRun {
 
 	#switch(workspace: unknown): string {
 		const allowed = this.#live().workspaces
-		if (allowed === undefined) {
+		if (allowed === undefined || allowed.length === 0) {
 			throw new ToolError(
 				'ARGUMENTS',
 				'No workspace can be selected here: the host lists no workspace you may select. Continue with the workspace you have.',

@@ -14,8 +14,10 @@ import type {
 	JudgeInterface,
 	JudgeRequest,
 	JudgeResult,
+	LedgerAgentOptions,
 	LedgerInterface,
 	LedgerLine,
+	LedgerLookup,
 	Message,
 	MessageInput,
 	ProviderDelta,
@@ -60,6 +62,17 @@ const INTERNAL: readonly string[] = Object.freeze([
 	'class ChannelCell',
 	'class AgentRun',
 ])
+
+/** Supplies the lookup the ledger disclosure fence declares as `refund`, which its skill holds back. */
+const REFUND_LOOKUP: LedgerLookup = Object.freeze<LedgerLookup>({
+	tool: {
+		name: 'lookup_refund',
+		description: 'Read the refund rule of an order.',
+		parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+		execute: (args) => `Order ${String(args.id)}: refunds over $100 need a manager.`,
+	},
+	read: (args) => ({ ids: [String(args.id)], owners: [] }),
+})
 
 // The server and page fences' declarations, transcribed byte for byte. They sit at module scope
 // because each fence is consumer code and a function declared inside a case body is a nested
@@ -2354,10 +2367,10 @@ await new GuideCommand({
 			expect(ledger.gauge?.overhead).toBeGreaterThan(requireValue(priced[0]))
 			expect(supplied.gauge?.overhead).toBeGreaterThan(requireValue(priced[1]))
 			expect(guideText).toContain(
-				"Each `respond` call compares the digest again at its entry, over the definitions the agent's tools hold then, so a tool a host adds or removes between requests drops the gauge and calibrates before that request's first pass.",
+				"Each `respond` call compares the digest again at its entry, over the calibrated definitions then, so a tool a host adds or removes between requests drops the gauge and calibrates before that request's first pass.",
 			)
 			expect(guideText).toContain(
-				"A `gauge` option is the application's own price for the definitions the agent's tools hold at construction: the ledger keeps it while those definitions stay the same, and a `respond` call that finds others drops it and calibrates, as it does a stored gauge.",
+				"A `gauge` option is the application's own price for the calibrated definitions at construction: the ledger keeps it while those definitions stay the same, and a `respond` call that finds others drops it and calibrates, as it does a stored gauge.",
 			)
 			expect(guideText).toContain(
 				"await ledger.respond('Is invoice 42 paid?') // calibrates before its first pass\nledger.gauge?.overhead // above `before`: the overhead prices the added definition",
@@ -2367,6 +2380,185 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain(
 				'The following ledger prices a definition added after construction, whose calls the ledger still denies:',
+			)
+		})
+
+		it("holds a skill's lookup out of calibration and the first request, and advertises it after the load (the ledger disclosure fence)", async () => {
+			// The fence declares `options`, `lookup`, `refund`, and `provider`; the transcription scripts
+			// the provider with the two calibration replies and records every call.
+			const provider = createScriptedProvider(
+				[
+					{ content: '', usage: { prompt: 160, completion: 0, total: 160 } },
+					{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+					{
+						content: '',
+						tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'refunds' } }],
+					},
+					{
+						content: '',
+						tools: [{ id: 'refund-1', name: 'lookup_refund', arguments: { id: 'BW-5512' } }],
+					},
+					{ content: 'Order BW-5512 can be refunded once a manager approves.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const options = buildUncalibratedOptions(
+				buildGuideLedgerOptions({ judge: createPhraseJudge([]) }),
+			)
+			const lookup = LEDGER_ORDER_LOOKUP
+			const refund = REFUND_LOOKUP
+
+			const skills = barrel.createSkillManager()
+			skills.add({
+				name: 'refunds',
+				description: 'Refund rules for a paid order.',
+				content: 'Read the refund rule before you answer about a refund.',
+				tools: ['lookup_refund'],
+			})
+			const ledger = createLedger(provider, {
+				...options,
+				lookups: [lookup, refund],
+				agent: {
+					skills,
+					builtins: ['load', 'unload'],
+					authority: barrel.createAuthority({ fallback: { zone: 'desk', verdict: 'allow' } }),
+				},
+			})
+			const advertised: Array<readonly string[] | undefined> = []
+			ledger.agent.emitter.on('request', (_index, request) =>
+				advertised.push(request.tools?.map(({ name }) => name)),
+			)
+			await ledger.respond('Can order BW-5512 be refunded?')
+
+			expect(advertised).toEqual([
+				['lookup_order', 'load', 'unload'],
+				['lookup_order', 'lookup_refund', 'load', 'unload'],
+				['lookup_order', 'lookup_refund', 'load', 'unload'],
+			])
+			// Calibration's first call carries the calibrated set: every definition the skill holds none of.
+			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual([
+				'lookup_order',
+				'recall',
+				'load',
+				'unload',
+			])
+			expect(provider.calls[1]?.tools).toBeUndefined()
+			expect(provider.calls).toHaveLength(5)
+			// The same ledger with built-ins and no authority refuses at construction.
+			const unauthorized = captureError(() =>
+				createLedger(provider, { ...options, agent: { skills, builtins: ['load'] } }),
+			)
+			expect(barrel.isAgentError(unauthorized) ? unauthorized.code : unauthorized).toBe('AUTHORITY')
+			expect(guideText).toContain(
+				"advertised[0] // ['lookup_order', 'load', 'unload']: the refunds skill holds lookup_refund back\nadvertised[1] // ['lookup_order', 'lookup_refund', 'load', 'unload'], after the load",
+			)
+			expect(guideText).toContain(
+				'Calibration priced `lookup_order`, `recall`, `load`, and `unload`, and never `lookup_refund`.',
+			)
+			expect(guideText).toContain(
+				"a ledger with `builtins` requires the `authority` member: construction throws `AgentError` with code `'AUTHORITY'` without it.",
+			)
+		})
+
+		it('keeps both memos two ledgers of one principal write during overlapping requests, saved from the add event (the per-principal memo fence)', async () => {
+			// The fence declares `options`, `north`, and `south`; the transcription scripts each provider
+			// with one `remember` call and its reply.
+			const options = buildGuideLedgerOptions({
+				judge: createPhraseJudge([]),
+				gauge: { scale: 1, overhead: 0 },
+			})
+			const north = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [
+							{
+								id: 'remember-1',
+								name: 'remember',
+								arguments: {
+									name: 'north_notes',
+									description: 'The north desk notes',
+									content: 'The north desk ships on Friday.',
+								},
+							},
+						],
+					},
+					{ content: 'Saved.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const south = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [
+							{
+								id: 'remember-1',
+								name: 'remember',
+								arguments: {
+									name: 'south_notes',
+									description: 'The south desk notes',
+									content: 'The south desk ships on Monday.',
+								},
+							},
+						],
+					},
+					{ content: 'Saved.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+
+			const store = barrel.createMemoryMemoStore()
+			const stored = await store.get('ada')
+			const memos = barrel.createMemoManager(
+				stored === undefined ? { id: 'ada' } : { snapshot: stored },
+			)
+			const saves: Array<Promise<void>> = []
+			memos.emitter.on('add', () => {
+				saves.push(store.set(memos.snapshot()))
+			})
+			const agent: LedgerAgentOptions = {
+				memos,
+				builtins: ['memo', 'remember'],
+				// remember is consequential, so this ask, which approves every call, approves each write.
+				authority: barrel.createAuthority({
+					fallback: { zone: 'desk', verdict: 'allow' },
+					ask: () => true,
+				}),
+			}
+			const scope = createScope({ name: 'ada', memos: ['north_notes', 'south_notes'] })
+			const desks = [
+				{ provider: north, request: 'Save the north desk shipping day.' },
+				{ provider: south, request: 'Save the south desk shipping day.' },
+			]
+			await Promise.all(
+				desks.map(({ provider, request }) => {
+					const ledger = createLedger(provider, { ...options, agent })
+					ledger.agent.context.apply(scope)
+					return ledger.respond(request)
+				}),
+			)
+			await Promise.all(saves)
+
+			expect(memos.memo('north_notes')?.content).toBe('The north desk ships on Friday.')
+			expect(memos.memo('south_notes')?.content).toBe('The south desk ships on Monday.')
+			const saved = await store.get('ada')
+			expect(saved?.memos.length).toBe(2)
+			expect(saves).toHaveLength(2)
+			// Each memo names the conversation of the ledger that wrote it.
+			const origins = ['north_notes', 'south_notes'].map(
+				(name) => memos.memo(name)?.origin?.conversation,
+			)
+			expect(origins.every((origin) => origin !== undefined)).toBe(true)
+			expect(new Set(origins).size).toBe(2)
+			expect(guideText).toContain(
+				"memos.memo('north_notes')?.content // 'The north desk ships on Friday.'\nmemos.memo('south_notes')?.content // 'The south desk ships on Monday.'\nconst saved = await store.get('ada')\nsaved?.memos.length // 2",
+			)
+			expect(guideText).toContain(
+				'save that set from its `add` event, because Agent loads and saves no memo store.',
+			)
+			expect(guideText).toContain(
+				'`remember` carries the `consequential` annotation, so an `ask` that approves every call approves each `remember` too.',
 			)
 		})
 
@@ -2983,7 +3175,7 @@ await new GuideCommand({
 			expect(tails[2]).toBeLessThan(requireValue(tails[0]))
 			expect(tails[3]).toBe(tails[0])
 			expect(guideText).toContain(
-				"The definitions the first pass can advertise are those the scope the request entered with admits, `recall` included, so a scope that hides definitions returns their price to the plan: the plan subtracts the gauge's overhead less the price of the hidden definitions, the gauge's scale times their estimate and never more than the overhead, and a scope that hides every definition costs the plan no overhead.",
+				"The definitions the first pass can advertise are those the scope the request entered with admits, `recall` included, so a scope that hides definitions returns their price to the plan: the plan subtracts the gauge's overhead less the price of the hidden definitions, the lower of the gauge's scale and the calibrated definitions' overhead per estimate unit, times their estimate, so never more than their proportional share of the overhead, and a scope that hides every definition costs the plan no overhead.",
 			)
 		})
 
@@ -3730,7 +3922,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('sends a request and a lookup result over the budget whole and refuses no over-window prompt, as the plan claims', async () => {
+		it('sends a request over the budget whole up to the window, and refuses one no pass can carry, as the plan claims', async () => {
 			const capacity = 600
 			const bulk = 'Delivery arrived Tuesday with a completed receipt. '.repeat(200).trim()
 			const request = `Review the desk. ${bulk}`
@@ -3760,19 +3952,39 @@ await new GuideCommand({
 				}),
 			)
 
-			const result = await ledger.respond(request)
+			const sent = createRecorder<[request: ProviderRequest]>()
+			ledger.agent.emitter.on('request', (_index, composed) => sent.handler(composed))
+			const refused = await ledger.respond(request).then(
+				() => undefined,
+				(error: unknown) => error,
+			)
 
-			const first = requireValue(provider.calls[0], 'Missing first call').messages
-			const second = requireValue(provider.calls[1], 'Missing lookup turn').messages
-			expect(result.content).toBe('Done.')
+			// The plan sends the request whole, and over the window no pass carries it: nothing is sent.
+			const first = requireValue(sent.calls[0], 'Missing first request')[0].messages
+			expect(isLedgerError(refused) ? refused.code : refused).toBe('OVERFLOW')
+			expect(isLedgerError(refused) ? refused.context : refused).toMatchObject({
+				capacity,
+				predict: 0,
+			})
+			expect(provider.calls).toHaveLength(0)
 			expect(first.at(-1)?.content).toBe(request)
 			expect(estimateMessages(first)).toBeGreaterThan(capacity)
-			expect(second.findLast(({ role }) => role === 'tool')?.content).toBe(reading)
+			// The fit's refusal stores the request alone: no note and no cue.
+			expect(ledger.conversation.messages().map(({ content }) => content)).toEqual([request])
 			expect(guideText).toContain(
 				"The plan budget bounds the records, the tail, and the window of a request's first call: it prices the built head, the tail, the window, and the copy with its records and images. Runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
 			)
 			expect(guideText).toContain(
-				'A request, a lookup result, or the whole view a faulted selection builds from can exceed the room the `capacity` option leaves.',
+				'so a request, a lookup result, or the whole view a faulted selection builds from can exceed the room the `capacity` option leaves, and the ledger then sends no request that carries it',
+			)
+			expect(guideText).toContain(
+				"A first request that doesn't fit after those cuts isn't sent: the agent's `abort` event carries the reason `overflow`, and the answer pass answers without tools.",
+			)
+			expect(guideText).toContain(
+				"An answer pass that doesn't fit isn't sent, and `respond` rejects with `LedgerError` code `'OVERFLOW'`, whose `context` holds `capacity`, `predict`, and `price`.",
+			)
+			expect(guideText).toContain(
+				"A rejection the answer pass's fit raises stores no note and no cue.",
 			)
 		})
 
@@ -3809,6 +4021,8 @@ await new GuideCommand({
 				}),
 			)
 
+			const sent = createRecorder<[request: ProviderRequest]>()
+			ledger.agent.emitter.on('request', (_index, composed) => sent.handler(composed))
 			const result = await ledger.respond('Review order BW-5512.')
 			const question = ledger.conversation.add({
 				role: 'user',
@@ -3824,8 +4038,10 @@ await new GuideCommand({
 				'Missing faulted selection',
 			)
 
-			const turn = requireValue(provider.calls[1], 'Missing second call of the pass').messages
-			const answer = requireValue(provider.calls[2], 'Missing answer pass').messages
+			// The turn after the lookup prices over the window and is not sent; the answer pass follows.
+			const turn = requireValue(sent.calls[1], 'Missing second request of the pass')[0].messages
+			const answer = requireValue(provider.calls[1], 'Missing answer pass').messages
+			expect(provider.calls).toHaveLength(2)
 			const direct = faulted.messages
 			expect(faulted.fault).toMatchObject({ code: 'REQUEST' })
 			expect(result.passes).toHaveLength(2)
@@ -3858,6 +4074,9 @@ await new GuideCommand({
 			expect(estimateMessages(direct)).toBeGreaterThan(budget)
 			expect(guideText).toContain(
 				"The plan budget bounds the records, the tail, and the window of a request's first call: it prices the built head, the tail, the window, and the copy with its records and images. Runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
+			)
+			expect(guideText).toContain(
+				"A later turn that doesn't fit, for example after a large lookup result, isn't sent, and the answer pass answers from the results note.",
 			)
 		})
 
@@ -4012,6 +4231,9 @@ await new GuideCommand({
 			expect(request.selection).toBe(selection)
 			expect(request.usage).toEqual({ prompt: 82, completion: 10, total: 92 })
 			expect(request.calls).toEqual([{ estimate: 40, tools: 2, prompt: 52, completion: 8 }])
+			request.commit(36, 'refunds')
+			expect(request.committed).toBe(36)
+			expect(request.loads).toEqual(['refunds'])
 
 			request.admit('lookup_order', { id: 'BW-5512' })
 			expect(() => request.admit('lookup_order', { id: 'BW-5512' })).toThrow(LEDGER_NOTES.repeat)
@@ -4338,9 +4560,10 @@ await new GuideCommand({
 				expect(
 					provider.calls.flatMap((call) => call.messages).some((message) => 'thinking' in message),
 				).toBe(false)
+				// The turn after the recall prices over the window, so the listing is read where it is stored.
 				recalled.push(
 					requireValue(
-						provider.calls[1]?.messages.findLast((message) => message.role === 'tool')?.content,
+						ledger.conversation.messages().findLast((message) => message.role === 'tool')?.content,
 					),
 				)
 			}
@@ -7957,19 +8180,30 @@ await new GuideCommand({
 		})
 
 		it('advertises remember and switch only under their lists (the silent-omission paragraph)', async () => {
-			const provider = createScriptedProvider([{ content: 'Answered.' }], {
-				recorded: true,
-				repeat: false,
-			})
+			const provider = createScriptedProvider(
+				[{ content: 'Answered.' }, { content: 'Answered.' }],
+				{
+					recorded: true,
+					repeat: false,
+				},
+			)
 			const agent = createAgent(provider, {
 				builtins: ['memo', 'remember', 'switch'],
 				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
 			})
 			await agent.generate({ prompt: { content: 'Keep replies short.' } })
+			// An empty list leaves each built-in as unadvertised as an absent one.
+			await agent.generate({
+				prompt: { content: 'Keep replies short.' },
+				scope: createScope({ name: 'none', memos: [], workspaces: [] }),
+			})
 
-			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['memo'])
+			expect(provider.calls.map((call) => call.tools?.map(({ name }) => name))).toEqual([
+				['memo'],
+				['memo'],
+			])
 			expect(guideText).toContain(
-				'`remember` and `switch` are advertised only while the ceiling defines their lists, `memos` for `remember` and `workspaces` for `switch`, and nothing reports their absence',
+				"`remember` and `switch` are advertised only while the ceiling's list names a key, `memos` for `remember` and `workspaces` for `switch`, and nothing reports their absence: an agent that enables them with no list, or with an empty one, runs as if it hadn't enabled them.",
 			)
 		})
 

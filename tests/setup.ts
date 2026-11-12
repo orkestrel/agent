@@ -10896,21 +10896,6 @@ export function renderLedgerPositions(value: unknown, messages: readonly Message
 }
 
 /**
- * Computes the SHA-256 digest of a text through Web Crypto.
- *
- * @param text - The text, encoded as UTF-8
- * @returns The digest as lowercase hexadecimal
- * @example
- * ```ts
- * await computeTextDigest('abc') // 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
- * ```
- */
-export async function computeTextDigest(text: string): Promise<string> {
-	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
-	return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
-/**
  * Builds amendment judgment records in the shape the classifier records for an `amends` pair.
  *
  * @remarks
@@ -12501,4 +12486,3616 @@ export function createShiftingToolsInput(): SkillInput {
 	const input = { name: 'billing', description: 'Billing', content: 'B' }
 	Object.defineProperty(input, 'tools', { enumerable: true, get: () => answers.next().value })
 	return input
+}
+
+// ── Durable-job unit: jobs that carry a scope, a disclosure, and built-ins ───
+//
+// The registry holds one set of skills, memos, and workspaces. Each name renders a text that opens
+// with its sentinel, so a reader finds every name a request renders, and every built-in it
+// advertises, by searching the request.
+
+import type { RandomFunction } from '@orkestrel/contract'
+import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
+import { seededRandom } from '@orkestrel/contract'
+import { createWorkspaceManager } from '@orkestrel/workspace'
+import { agentJobShape } from '@src/core'
+
+/** Names the skills, memos, and workspaces the durable pools can hold. */
+export const DURABLE_NAMES = Object.freeze({
+	skills: Object.freeze(['billing', 'claims', 'audit']),
+	memos: Object.freeze(['pref', 'note']),
+	workspaces: Object.freeze(['north', 'south']),
+})
+
+/** Holds the prefix of each text a durable pool renders: a skill's index line and body, a memo's index line and content, and a workspace's file. */
+export const DURABLE_SENTINELS = Object.freeze({
+	skill: 'SKILL-',
+	body: 'BODY-',
+	memo: 'MEMO-',
+	fact: 'FACT-',
+	file: 'FILE-',
+})
+
+/** Holds the scope a job with none reads as in the parent check: the three lists empty. */
+export const DURABLE_EMPTY_SCOPE = Object.freeze({
+	skills: Object.freeze<string[]>([]),
+	memos: Object.freeze<string[]>([]),
+	workspaces: Object.freeze<string[]>([]),
+})
+
+/** Holds the seed of the drawn parent and child pairs. */
+export const DURABLE_SEED = 20261111
+
+/** Holds how many parent and child pairs the seed draws. */
+export const DURABLE_DRAWS = 160
+
+/** Holds the managers a durable registry shares with every scoped job. */
+export interface DurablePools {
+	readonly skills: SkillManagerInterface
+	readonly memos: MemoManagerInterface
+	readonly workspaces: WorkspaceManagerInterface
+}
+
+/**
+ * Creates the durable pools over the names each list holds; the first workspace is active.
+ *
+ * @param held - The names each pool holds. Default: every name of `DURABLE_NAMES`
+ * @returns The skills, memos, and workspaces, each name rendering its sentinels
+ */
+export function createDurablePools(
+	held: NonNullable<AgentJobInput['scope']> = DURABLE_NAMES,
+): DurablePools {
+	const skills = createSkillManager()
+	skills.add(
+		held.skills.map((name) => ({
+			name,
+			description: `${DURABLE_SENTINELS.skill}${name}`,
+			content: `${DURABLE_SENTINELS.body}${name}`,
+		})),
+	)
+	const memos = createMemoManager()
+	memos.add(
+		held.memos.map((name) => ({
+			name,
+			description: `${DURABLE_SENTINELS.memo}${name}`,
+			content: `${DURABLE_SENTINELS.fact}${name}`,
+		})),
+	)
+	const workspaces = createWorkspaceManager()
+	for (const id of held.workspaces) {
+		workspaces.add({
+			id,
+			seed: [
+				createFile({
+					path: `${id}.txt`,
+					content: createTextContent(`${DURABLE_SENTINELS.file}${id}`, 'text'),
+				}),
+			],
+		})
+	}
+	return { skills, memos, workspaces }
+}
+
+/** Holds an authority over the allow-all fallback that records each call it evaluates and each it asks. */
+export interface RecordedAuthority {
+	readonly authority: AuthorityInterface
+	readonly evaluated: RecorderInterface<readonly [name: string]>
+	readonly asked: RecorderInterface<readonly [name: string]>
+}
+
+/**
+ * Creates an authority that decides as {@link AGENT_AUTHORITY} does, records the name of each call
+ * it evaluates, and answers every ask with one answer.
+ *
+ * @param answer - If `true`, every ask approves; if `false`, every ask declines
+ * @returns The authority and its two recorders
+ */
+export function createRecordedAuthority(answer: boolean): RecordedAuthority {
+	const evaluated = createRecorder<readonly [name: string]>()
+	const asked = createRecorder<readonly [name: string]>()
+	return {
+		evaluated,
+		asked,
+		authority: {
+			evaluate(context) {
+				evaluated.handler(context.call.name)
+				return AGENT_AUTHORITY.evaluate(context)
+			},
+			async ask(context) {
+				asked.handler(context.call.name)
+				return answer
+			},
+		},
+	}
+}
+
+/** Configures a durable fixture; every member is optional. */
+export interface DurableFixtureOptions {
+	/** The pools the registry holds. Default: fresh pools over every name. */
+	readonly pools?: DurablePools
+	/** If `true`, the registry holds the pools; if `false`, it holds none. Default: `true`. */
+	readonly held?: boolean
+	/** The answer of the `gate` authority's ask. Default: `true`. */
+	readonly answer?: boolean
+	/** The provider's delay per turn, in milliseconds. Default: none. */
+	readonly delay?: number
+}
+
+/** Holds a durable registry, its scripted provider, its pools, and its recorded `gate` authority. */
+export interface DurableFixture {
+	readonly registry: AgentRegistryInterface
+	readonly provider: ScriptedProviderInterface
+	readonly pools: DurablePools
+	readonly gate: RecordedAuthority
+}
+
+/**
+ * Creates a durable fixture: a registry over the scripted provider `main`, the tools `loop` and
+ * `add`, the authorities `gate` (recorded) and `open` (allow-all with no ask), and the pools.
+ *
+ * @param turns - The provider's turns; the last repeats
+ * @param options - What the case varies
+ * @returns The registry, its provider, its pools, and its `gate` authority
+ */
+export function createDurableFixture(
+	turns: readonly ScriptedTurn[],
+	options: DurableFixtureOptions = {},
+): DurableFixture {
+	const provider = createScriptedProvider(turns, {
+		...AGENT_SCRIPT_OPTIONS,
+		repeat: true,
+		...(options.delay === undefined ? {} : { delay: options.delay }),
+	})
+	const pools = options.pools ?? createDurablePools()
+	const gate = createRecordedAuthority(options.answer ?? true)
+	return {
+		provider,
+		pools,
+		gate,
+		registry: createAgentRegistry({
+			providers: { main: provider },
+			tools: { loop: createLoopTool(), add: createAddTool() },
+			authorities: { gate: gate.authority, open: AGENT_AUTHORITY },
+			...(options.held === false ? {} : pools),
+		}),
+	}
+}
+
+/** Holds the names one request renders of the durable pools, and the built-ins it advertises. */
+export interface DurableRendered {
+	readonly skills: readonly string[]
+	readonly bodies: readonly string[]
+	readonly memos: readonly string[]
+	readonly workspaces: readonly string[]
+	readonly builtins: readonly string[]
+}
+
+/**
+ * Reads the names a request renders: a skill's index line or body, a memo's index line, a
+ * workspace's file, and each built-in the request advertises.
+ *
+ * @param call - One recorded scripted provider call
+ * @returns The names by category, in `DURABLE_NAMES` and `BUILTIN_NAMES` order
+ */
+export function readDurableRendered(call: ScriptedCall): DurableRendered {
+	const text = call.messages.map((message) => message.content).join('\n')
+	const advertised = (call.tools ?? []).map((definition) => definition.name)
+	return {
+		skills: DURABLE_NAMES.skills.filter((name) =>
+			text.includes(`${DURABLE_SENTINELS.skill}${name}`),
+		),
+		bodies: DURABLE_NAMES.skills.filter((name) =>
+			text.includes(`${DURABLE_SENTINELS.body}${name}`),
+		),
+		memos: DURABLE_NAMES.memos.filter((name) => text.includes(`${DURABLE_SENTINELS.memo}${name}`)),
+		workspaces: DURABLE_NAMES.workspaces.filter((name) =>
+			text.includes(`${DURABLE_SENTINELS.file}${name}`),
+		),
+		builtins: BUILTIN_NAMES.filter((name) => advertised.includes(name)),
+	}
+}
+
+/**
+ * Filters a reading to the names outside a job's ceiling: its `scope` lists, a job with no `scope`
+ * holding the three empty, and its `builtins`.
+ *
+ * @param rendered - What a request renders
+ * @param job - The job whose ceiling bounds it
+ * @returns The names the ceiling does not hold, by category
+ */
+export function filterOutsideCeiling(
+	rendered: DurableRendered,
+	job: AgentJobInput,
+): DurableRendered {
+	const held = job.scope ?? DURABLE_EMPTY_SCOPE
+	const builtins: readonly string[] = job.builtins ?? []
+	return {
+		skills: rendered.skills.filter((name) => !held.skills.includes(name)),
+		bodies: rendered.bodies.filter((name) => !held.skills.includes(name)),
+		memos: rendered.memos.filter((name) => !held.memos.includes(name)),
+		workspaces: rendered.workspaces.filter((name) => !held.workspaces.includes(name)),
+		builtins: rendered.builtins.filter((name) => !builtins.includes(name)),
+	}
+}
+
+/**
+ * Collects every name of a reading, each opened by its category, so an empty list reads as none.
+ *
+ * @param rendered - The reading
+ * @returns The names, such as `'skill:billing'` and `'builtin:remember'`
+ */
+export function collectRenderedNames(rendered: DurableRendered): readonly string[] {
+	return [
+		...rendered.skills.map((name) => `skill:${name}`),
+		...rendered.bodies.map((name) => `body:${name}`),
+		...rendered.memos.map((name) => `memo:${name}`),
+		...rendered.workspaces.map((name) => `workspace:${name}`),
+		...rendered.builtins.map((name) => `builtin:${name}`),
+	]
+}
+
+/**
+ * Projects one recorded call to its request without the minted message ids, so the requests of two
+ * runs compare.
+ *
+ * @param call - One recorded scripted provider call
+ * @returns The messages without ids, the tools, and the options
+ */
+export function callToRequest(call: ScriptedCall): {
+	readonly messages: ReadonlyArray<Omit<Message, 'id'>>
+	readonly tools: readonly ToolDefinition[] | undefined
+	readonly options: ProviderStreamOptions | undefined
+} {
+	return {
+		messages: call.messages.map(({ id: _id, ...rest }) => rest),
+		tools: call.tools,
+		options: call.options,
+	}
+}
+
+/**
+ * Executes one job on a fresh durable fixture that answers `done`, and reads what its first request carries.
+ *
+ * @param job - The job to build and run
+ * @returns What the first request renders and advertises
+ */
+export async function executeDurableJob(job: AgentJobInput): Promise<DurableRendered> {
+	const { provider, registry } = createDurableFixture([{ content: 'done' }])
+	await registry.build(job).generate()
+	return readDurableRendered(requireValue(provider.calls[0], 'the job dispatched no request'))
+}
+
+/**
+ * Draws one list of a job's scope: within its parent's list when the draw follows the parent, with
+ * an occasional name outside it, else a free subset of the names.
+ *
+ * @param random - The seeded source
+ * @param names - Every name the list can hold
+ * @param bound - The parent's list, or `undefined` for a job drawn alone
+ * @returns The drawn names
+ */
+export function drawDurableList(
+	random: RandomFunction,
+	names: readonly string[],
+	bound: readonly string[] | undefined,
+): readonly string[] {
+	if (bound !== undefined && random() < 0.7) {
+		const held = bound.filter(() => random() < 0.6)
+		const extra = names.filter((name) => !held.includes(name))
+		const added = extra[Math.floor(random() * extra.length)]
+		return random() < 0.15 && added !== undefined ? [...held, added] : held
+	}
+	return names.filter(() => random() < 0.5)
+}
+
+/**
+ * Draws a job's scope, absent at a fixed chance, each list drawn by {@link drawDurableList}.
+ *
+ * @param random - The seeded source
+ * @param bound - The parent's scope, or `undefined`
+ * @returns The drawn scope, or `undefined`
+ */
+export function drawDurableScope(
+	random: RandomFunction,
+	bound: AgentJobInput['scope'],
+): AgentJobInput['scope'] {
+	if (random() < 0.2) return undefined
+	return {
+		skills: drawDurableList(random, DURABLE_NAMES.skills, bound?.skills),
+		memos: drawDurableList(random, DURABLE_NAMES.memos, bound?.memos),
+		workspaces: drawDurableList(random, DURABLE_NAMES.workspaces, bound?.workspaces),
+	}
+}
+
+/**
+ * Draws a job's built-ins, mostly within its parent's when the draw follows the parent; a drawn list
+ * holds `unload` only beside `load`, because the agent's construction refuses it alone.
+ *
+ * @param random - The seeded source
+ * @param bound - The parent's built-ins, or `undefined`
+ * @returns The drawn built-ins, in `BUILTIN_NAMES` order
+ */
+export function drawDurableBuiltins(
+	random: RandomFunction,
+	bound: readonly AgentBuiltin[] | undefined,
+): readonly AgentBuiltin[] {
+	const names = BUILTIN_NAMES.filter((name) =>
+		bound !== undefined && random() < 0.7 ? bound.includes(name) && random() < 0.7 : random() < 0.4,
+	)
+	return names.includes('load') ? names : names.filter((name) => name !== 'unload')
+}
+
+/**
+ * Draws a job's disclosure, absent at a fixed chance, whose skills can name `ghost`, a skill no pool
+ * holds.
+ *
+ * @param random - The seeded source
+ * @returns The drawn disclosure, or `undefined`
+ */
+export function drawDurableDisclosure(random: RandomFunction): AgentDisclosure | undefined {
+	if (random() < 0.4) return undefined
+	const skills = [...DURABLE_NAMES.skills, 'ghost'].filter(() => random() < 0.4)
+	const at = random()
+	return at < 0.33 ? { skills } : { skills, workspace: at < 0.66 ? 'north' : 'south' }
+}
+
+/**
+ * Draws one job on provider `main` with the `gate` authority: its scope, then its built-ins, then
+ * its disclosure.
+ *
+ * @param random - The seeded source
+ * @param parent - The job the draw follows, or `undefined` for a job drawn alone
+ * @returns The drawn job
+ */
+export function drawDurableJob(
+	random: RandomFunction,
+	parent: AgentJobInput | undefined,
+): AgentJobInput {
+	const scope = drawDurableScope(random, parent?.scope)
+	const builtins = drawDurableBuiltins(random, parent?.builtins)
+	const disclosure = drawDurableDisclosure(random)
+	return {
+		...DURABLE_JOB,
+		...(scope === undefined ? {} : { scope }),
+		...(builtins.length === 0 ? {} : { builtins }),
+		...(disclosure === undefined ? {} : { disclosure }),
+	}
+}
+
+/**
+ * Draws parent and child pairs from a seed: each parent alone, and each child following its parent
+ * at a fixed chance and drawn alone otherwise.
+ *
+ * @param seed - The seed of the source
+ * @param count - How many pairs to draw
+ * @returns The pairs, each named `drawn <index>`
+ */
+export function drawDurablePairs(seed: number, count: number): readonly FanoutCase[] {
+	const random = seededRandom(seed)
+	return Array.from({ length: count }, (_, index): FanoutCase => {
+		const parent = drawDurableJob(random, undefined)
+		const child = drawDurableJob(random, random() < 0.75 ? parent : undefined)
+		return { name: `drawn ${index}`, parent, child }
+	})
+}
+
+/** Holds the job every durable pair starts from: provider `main`, the `gate` authority, and a seed. */
+export const DURABLE_JOB = Object.freeze<AgentJobInput>({
+	provider: 'main',
+	system: 'Desk.',
+	messages: [{ role: 'user', content: 'Check invoice 42.' }],
+	authority: 'gate',
+})
+
+/** Lists hand pairs beside the drawn ones: a child whose disclosure reaches outside its parent's scope, and one pair that exceeds each row. */
+export const DURABLE_HAND_PAIRS = Object.freeze<readonly FanoutCase[]>([
+	{
+		name: 'hand: disclosure outside the parent scope',
+		parent: {
+			...DURABLE_JOB,
+			scope: { skills: ['billing'], memos: ['pref'], workspaces: ['north'] },
+		},
+		child: {
+			...DURABLE_JOB,
+			scope: { skills: ['billing'], memos: [], workspaces: [] },
+			disclosure: { skills: ['claims', 'billing'], workspace: 'south' },
+		},
+	},
+	{
+		name: 'hand: disclosure on a child with no scope',
+		parent: { ...DURABLE_JOB, scope: { skills: ['billing'], memos: [], workspaces: [] } },
+		child: { ...DURABLE_JOB, disclosure: { skills: ['claims', 'billing'], workspace: 'north' } },
+	},
+	{
+		name: 'hand: a built-in its parent omits',
+		parent: { ...DURABLE_JOB, builtins: ['load', 'unload'], scope: DURABLE_EMPTY_SCOPE },
+		child: { ...DURABLE_JOB, builtins: ['load', 'memo'], scope: DURABLE_EMPTY_SCOPE },
+	},
+	{
+		name: 'hand: a skill its parent scope omits',
+		parent: { ...DURABLE_JOB, scope: { skills: ['billing'], memos: [], workspaces: [] } },
+		child: {
+			...DURABLE_JOB,
+			scope: { skills: ['billing', 'claims'], memos: [], workspaces: [] },
+			disclosure: { skills: ['claims'] },
+		},
+	},
+	{
+		name: 'hand: a memo its parent scope omits',
+		parent: { ...DURABLE_JOB, scope: { skills: [], memos: ['pref'], workspaces: [] } },
+		child: { ...DURABLE_JOB, scope: { skills: [], memos: ['pref', 'note'], workspaces: [] } },
+	},
+	{
+		name: 'hand: a workspace its parent scope omits',
+		parent: { ...DURABLE_JOB, scope: { skills: [], memos: [], workspaces: ['south'] } },
+		child: { ...DURABLE_JOB, scope: { skills: [], memos: [], workspaces: ['north'] } },
+	},
+])
+
+/** Lists a parent and a child that exceeds it on the `builtins` row or one `scope` list, named by the member the finding names. */
+export const DURABLE_EXCESS_CASES = Object.freeze<readonly FanoutExcessCase[]>([
+	{
+		name: 'a built-in its parent does not name',
+		member: 'builtins',
+		parent: { ...FANOUT_JOB, builtins: ['load', 'unload'] },
+		child: { ...FANOUT_JOB, builtins: ['load', 'memo'] },
+	},
+	{
+		name: 'a built-in under a parent with none',
+		member: 'builtins',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, builtins: ['memo'] },
+	},
+	{
+		name: 'a skill its parent scope omits',
+		member: 'scope.skills',
+		parent: { ...FANOUT_JOB, scope: { skills: ['billing'], memos: [], workspaces: [] } },
+		child: { ...FANOUT_JOB, scope: { skills: ['billing', 'claims'], memos: [], workspaces: [] } },
+	},
+	{
+		name: 'a memo its parent scope omits',
+		member: 'scope.memos',
+		parent: { ...FANOUT_JOB, scope: { skills: [], memos: ['pref'], workspaces: [] } },
+		child: { ...FANOUT_JOB, scope: { skills: [], memos: ['pref', 'note'], workspaces: [] } },
+	},
+	{
+		name: 'a workspace its parent scope omits',
+		member: 'scope.workspaces',
+		parent: { ...FANOUT_JOB, scope: { skills: [], memos: [], workspaces: ['south'] } },
+		child: { ...FANOUT_JOB, scope: { skills: [], memos: [], workspaces: ['north'] } },
+	},
+	{
+		name: 'a memo that shares a name with a skill the parent lists',
+		member: 'scope.memos',
+		parent: { ...FANOUT_JOB, scope: { skills: ['billing'], memos: [], workspaces: [] } },
+		child: { ...FANOUT_JOB, scope: { skills: ['billing'], memos: ['billing'], workspaces: [] } },
+	},
+	{
+		name: 'a listed name under a parent with no scope',
+		member: 'scope.memos',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, scope: { skills: [], memos: ['pref'], workspaces: [] } },
+	},
+])
+
+/** Lists parent and child pairs within the `builtins` row and every `scope` list. */
+export const DURABLE_WITHIN_CASES = Object.freeze<readonly FanoutCase[]>([
+	{
+		name: 'equal to its parent on its scope and built-ins',
+		parent: {
+			...FANOUT_JOB,
+			builtins: ['load', 'unload', 'memo'],
+			scope: { skills: ['billing', 'claims'], memos: ['pref'], workspaces: ['north'] },
+		},
+		child: {
+			...FANOUT_JOB,
+			builtins: ['load', 'unload', 'memo'],
+			scope: { skills: ['billing', 'claims'], memos: ['pref'], workspaces: ['north'] },
+		},
+	},
+	{
+		name: 'narrower on every list and built-in',
+		parent: {
+			...FANOUT_JOB,
+			builtins: ['load', 'unload', 'memo'],
+			scope: { skills: ['billing', 'claims'], memos: ['pref'], workspaces: ['north'] },
+		},
+		child: {
+			...FANOUT_JOB,
+			builtins: ['memo'],
+			scope: { skills: ['claims'], memos: [], workspaces: [] },
+		},
+	},
+	{
+		name: 'with no scope and no built-ins under a parent with both',
+		parent: { ...FANOUT_JOB, builtins: ['memo'], scope: DURABLE_NAMES },
+		child: FANOUT_JOB,
+	},
+	{
+		name: 'with three empty lists under a parent with no scope',
+		parent: FANOUT_JOB,
+		child: { ...FANOUT_JOB, scope: DURABLE_EMPTY_SCOPE },
+	},
+	{
+		name: 'with a disclosure that names a skill outside its parent scope',
+		parent: { ...FANOUT_JOB, scope: { skills: ['billing'], memos: [], workspaces: [] } },
+		child: {
+			...FANOUT_JOB,
+			scope: { skills: ['billing'], memos: [], workspaces: [] },
+			disclosure: { skills: ['claims'], workspace: 'south' },
+		},
+	},
+])
+
+/** Pairs a malformed job member with the fault the job contract reports for it. */
+export interface DurableRefusalCase {
+	readonly name: string
+	readonly job: Readonly<Record<string, unknown>>
+	readonly faults: readonly unknown[]
+}
+
+/** Lists a job member the job contract refuses, for each way a `scope`, `disclosure`, or `builtins` can be malformed. */
+export const DURABLE_REFUSAL_CASES = Object.freeze<readonly DurableRefusalCase[]>([
+	{
+		name: 'a scope that omits skills',
+		job: { provider: 'main', scope: { memos: [], workspaces: [] } },
+		faults: [{ reason: 'missing', path: ['scope', 'skills'], expected: 'array' }],
+	},
+	{
+		name: 'a scope that omits memos',
+		job: { provider: 'main', scope: { skills: [], workspaces: [] } },
+		faults: [{ reason: 'missing', path: ['scope', 'memos'], expected: 'array' }],
+	},
+	{
+		name: 'a scope that omits workspaces',
+		job: { provider: 'main', scope: { skills: [], memos: [] } },
+		faults: [{ reason: 'missing', path: ['scope', 'workspaces'], expected: 'array' }],
+	},
+	{
+		name: 'a scope that holds tools',
+		job: { provider: 'main', scope: { ...DURABLE_EMPTY_SCOPE, tools: [] } },
+		faults: [{ reason: 'extra', path: ['scope', 'tools'] }],
+	},
+	{
+		name: 'a scope that holds files',
+		job: { provider: 'main', scope: { ...DURABLE_EMPTY_SCOPE, files: [] } },
+		faults: [{ reason: 'extra', path: ['scope', 'files'] }],
+	},
+	{
+		name: 'a scope that holds instructions',
+		job: { provider: 'main', scope: { ...DURABLE_EMPTY_SCOPE, instructions: [] } },
+		faults: [{ reason: 'extra', path: ['scope', 'instructions'] }],
+	},
+	{
+		name: 'a scope that holds another member',
+		job: { provider: 'main', scope: { ...DURABLE_EMPTY_SCOPE, name: 'job' } },
+		faults: [{ reason: 'extra', path: ['scope', 'name'] }],
+	},
+	{
+		name: 'a scope list that is no array',
+		job: { provider: 'main', scope: { ...DURABLE_EMPTY_SCOPE, skills: 'billing' } },
+		faults: [
+			{ reason: 'type', path: ['scope', 'skills'], expected: 'array', received: '"billing"' },
+		],
+	},
+	{
+		name: 'a disclosure with no skills',
+		job: { provider: 'main', disclosure: { workspace: 'north' } },
+		faults: [{ reason: 'missing', path: ['disclosure', 'skills'], expected: 'array' }],
+	},
+	{
+		name: 'a disclosure with another member',
+		job: { provider: 'main', disclosure: { skills: [], files: [] } },
+		faults: [{ reason: 'extra', path: ['disclosure', 'files'] }],
+	},
+	{
+		name: 'a builtins entry that is no built-in',
+		job: { provider: 'main', authority: 'gate', builtins: ['load', 'search'] },
+		faults: [
+			{ reason: 'type', path: ['builtins', '1'], expected: 'literal', received: '"search"' },
+		],
+	},
+])
+
+/**
+ * Creates the shape of a stored durable job: the queue store shape of `AGENT_JOB_SHAPE` plus the
+ * job's `scope`, `disclosure`, and `builtins` as `agentJobShape` declares them.
+ *
+ * @returns The store shape
+ */
+export function createDurableStoreShape() {
+	return objectShape({
+		...AGENT_JOB_SHAPE.properties,
+		scope: agentJobShape.properties.scope,
+		disclosure: agentJobShape.properties.disclosure,
+		builtins: agentJobShape.properties.builtins,
+	})
+}
+
+/**
+ * Draws one generated case of a scoped job: which names the pools hold, and the job's scope, whose
+ * lists can name `ghost`, which no pool holds.
+ *
+ * @param seed - The seed of the case
+ * @returns The names the pools hold and the job's scope
+ */
+export function drawDurableHeld(seed: number): {
+	readonly held: NonNullable<AgentJobInput['scope']>
+	readonly scope: NonNullable<AgentJobInput['scope']>
+} {
+	const random = seededRandom(seed)
+	return {
+		held: {
+			skills: DURABLE_NAMES.skills.filter(() => random() < 0.6),
+			memos: DURABLE_NAMES.memos.filter(() => random() < 0.6),
+			workspaces: DURABLE_NAMES.workspaces.filter(() => random() < 0.6),
+		},
+		scope: {
+			skills: [...DURABLE_NAMES.skills, 'ghost'].filter(() => random() < 0.5),
+			memos: [...DURABLE_NAMES.memos, 'ghost'].filter(() => random() < 0.5),
+			workspaces: [...DURABLE_NAMES.workspaces, 'ghost'].filter(() => random() < 0.5),
+		},
+	}
+}
+
+/** Pairs a ceiling with the built-ins a run enabling every one advertises under it. */
+export interface BuiltinCandidateCase {
+	readonly name: string
+	readonly ceiling: ScopeFilter
+	readonly expected: readonly AgentBuiltin[]
+}
+
+/** Lists the ceilings under which `remember` and `switch` are and are not advertised: each needs its list to name at least one key. */
+export const BUILTIN_CANDIDATE_CASES = Object.freeze<readonly BuiltinCandidateCase[]>([
+	{ name: 'no list', ceiling: {}, expected: ['load', 'unload', 'memo'] },
+	{
+		name: 'an empty memos and workspaces list',
+		ceiling: { memos: [], workspaces: [] },
+		expected: ['load', 'unload', 'memo'],
+	},
+	{
+		name: 'a memos list that names one memo',
+		ceiling: { memos: ['pref'] },
+		expected: ['load', 'unload', 'memo', 'remember'],
+	},
+	{
+		name: 'a workspaces list that names one workspace',
+		ceiling: { workspaces: ['north'] },
+		expected: ['load', 'unload', 'memo', 'switch'],
+	},
+	{
+		name: 'a named memos list beside an empty workspaces list',
+		ceiling: { memos: ['pref'], workspaces: [] },
+		expected: ['load', 'unload', 'memo', 'remember'],
+	},
+	{
+		name: 'both lists naming a key',
+		ceiling: { memos: ['pref'], workspaces: ['north'] },
+		expected: ['load', 'unload', 'memo', 'remember', 'switch'],
+	},
+	{ name: 'an empty skills list', ceiling: { skills: [] }, expected: ['memo'] },
+	{
+		name: 'a skills list that names one skill',
+		ceiling: { skills: ['billing'] },
+		expected: ['load', 'unload', 'memo'],
+	},
+])
+
+// ── Unit 3A: disclosure in the ledger, over seeded ledgers ───────────────────
+//
+// The definition-density readings on the 4B (`qwen3.5:4b-q4_K_M` on runner 0.40.15, 2026-11-11)
+// are the pricing proof's data: each sample is one whole area's definitions with the tokens they
+// added to the prompt of a calibrated core. No test contacts a model; the provider below prices its
+// calls at the rates those readings measured.
+
+import type { LedgerAgentOptions } from '@src/core'
+import {
+	collectBuiltinDefinitions,
+	computeToolPrice,
+	estimateTokens,
+	Gauge,
+	LEDGER_NOTES,
+	LEDGER_SCALE_DRIFT,
+} from '@src/core'
+
+/** Describes one definition of the density catalog: its name, its description, and each field's name, type, and description. */
+export type LedgerDensityRow = readonly [
+	name: string,
+	description: string,
+	fields: ReadonlyArray<readonly [name: string, type: string, description: string]>,
+]
+
+/** Pairs one recorded density sample's definitions with their estimate and the tokens they added on the 4B. */
+export interface LedgerDensitySample {
+	readonly name: string
+	readonly estimate: number
+	readonly added: number
+	readonly rows: readonly LedgerDensityRow[]
+}
+
+/**
+ * Holds the calibration the 4B read for the density samples: its scale, the overhead of the core
+ * set, the largest difference between two identical calls, and the core set's estimate.
+ */
+export const LEDGER_DENSITY_CALIBRATION = Object.freeze({
+	scale: 1.075,
+	overhead: 978,
+	noise: 0,
+	estimate: 724,
+})
+
+/** Holds the calibrated core the density samples were read against: an ungated surface shaped like taverna's generic one and the two loading built-ins. */
+export const LEDGER_DENSITY_CORE = Object.freeze<readonly LedgerDensityRow[]>([
+	[
+		'list',
+		'Lists the records of one resource that match a filter, newest first. Each line names the record id, its title, its owner, and the date it last changed. Use it to find a record before reading or changing it. The listing is capped: when more records match than fit, the last line says how many were left out, and you can narrow the filter or ask for the next page. A resource you are not allowed to read returns a refusal that names the resource.',
+		[
+			['resource', 'string', 'The resource to list, such as policy, claim, or contact'],
+			['filter', 'string', 'Words, an owner, or a status the records must match'],
+			['page', 'number', 'The page to return, starting at 1'],
+		],
+	],
+	[
+		'get',
+		'Reads one record of a resource by its id and returns every field the record holds, with the related records it names. Use it after list when you need the full record, or directly when the member names an id. A record that does not exist returns a refusal that names the id. A field you are not allowed to read is left out and the result says which.',
+		[
+			['resource', 'string', 'The resource the record belongs to'],
+			['id', 'string', 'The record id'],
+		],
+	],
+	[
+		'change',
+		'Changes fields of one record of a resource, or creates a record when no id is given. Name each field to change and its new value; fields you leave out keep their values. A change the member did not ask for is refused. The result lists each field that changed with its old and new value, or the refusal and why.',
+		[
+			['resource', 'string', 'The resource the record belongs to'],
+			['id', 'string', 'The record id, absent to create one'],
+			['fields', 'string', 'A JSON object of field names and their new values'],
+		],
+	],
+	[
+		'recall',
+		'Returns earlier parts of this conversation that the window left out, newest first, as quoted text. Use it when the member refers to something said earlier that you cannot see. The listing is sized to the room left in this request.',
+		[['query', 'string', 'Words the earlier part must contain']],
+	],
+	[
+		'load',
+		"Shows an area's tools and guidance from your next step on.",
+		[['area', 'string', 'The area to load, from the index']],
+	],
+	['unload', "Hides an area's tools again.", [['area', 'string', 'The area to unload']]],
+])
+
+/** Holds each density sample the 4B read: its definitions, their estimate, and the tokens they added to the core's prompt. */
+export const LEDGER_DENSITY_SAMPLES = Object.freeze<readonly LedgerDensitySample[]>([
+	{
+		name: 'desk-tickets',
+		estimate: 388,
+		added: 485,
+		rows: [
+			[
+				'open_ticket',
+				'Opens a support ticket for a customer.',
+				[
+					['customer', 'string', 'Customer name or id'],
+					['subject', 'string', 'One-line summary of the problem'],
+				],
+			],
+			[
+				'find_ticket',
+				'Finds support tickets matching a customer or a phrase.',
+				[['query', 'string', 'Customer or phrase to match']],
+			],
+			[
+				'assign_ticket',
+				'Assigns a ticket to a staff member.',
+				[
+					['ticket', 'string', 'Ticket id'],
+					['person', 'string', 'Staff member name'],
+				],
+			],
+			[
+				'note',
+				'Adds an internal note to a ticket.',
+				[
+					['ticket', 'string', 'Ticket id'],
+					['text', 'string', 'The note'],
+				],
+			],
+			[
+				'escalate_ticket',
+				'Escalates a ticket to the senior queue.',
+				[
+					['ticket', 'string', 'Ticket id'],
+					['reason', 'string', 'Why it needs a senior'],
+				],
+			],
+			[
+				'close_ticket',
+				'Closes a ticket with a resolution.',
+				[
+					['ticket', 'string', 'Ticket id'],
+					['resolution', 'string', 'How it was resolved'],
+				],
+			],
+		],
+	},
+	{
+		name: 'desk-customers',
+		estimate: 390,
+		added: 483,
+		rows: [
+			[
+				'find_customer',
+				'Finds a customer by name, email, or phone.',
+				[['query', 'string', 'Name, email, or phone']],
+			],
+			[
+				'create_customer',
+				'Creates a customer record.',
+				[
+					['name', 'string', 'Full name'],
+					['email', 'string', 'Email address'],
+				],
+			],
+			[
+				'update_contact',
+				"Changes a customer's email or phone.",
+				[
+					['customer', 'string', 'Customer name or id'],
+					['email', 'string', 'New email'],
+					['phone', 'string', 'New phone'],
+				],
+			],
+			[
+				'customer_history',
+				"Lists a customer's past orders and tickets.",
+				[['customer', 'string', 'Customer name or id']],
+			],
+			[
+				'merge_customers',
+				'Merges a duplicate customer record into another.',
+				[
+					['keep', 'string', 'Customer id to keep'],
+					['remove', 'string', 'Duplicate customer id'],
+				],
+			],
+			[
+				'flag_customer',
+				'Flags a customer account for review.',
+				[
+					['customer', 'string', 'Customer name or id'],
+					['reason', 'string', 'Why it needs review'],
+				],
+			],
+		],
+	},
+	{
+		name: 'desk-billing',
+		estimate: 357,
+		added: 438,
+		rows: [
+			[
+				'invoice_lookup',
+				"Shows an invoice's lines and total.",
+				[['invoice', 'string', 'Invoice id']],
+			],
+			[
+				'payment_status',
+				'Reports whether an invoice is paid, pending, or failed.',
+				[['invoice', 'string', 'Invoice id']],
+			],
+			[
+				'issue_refund',
+				'Refunds an amount against an invoice.',
+				[
+					['invoice', 'string', 'Invoice id'],
+					['amount', 'number', 'Amount to refund'],
+				],
+			],
+			[
+				'apply_credit',
+				"Adds store credit to a customer's account.",
+				[
+					['customer', 'string', 'Customer name or id'],
+					['amount', 'number', 'Credit amount'],
+				],
+			],
+			[
+				'update_card',
+				'Sends a customer a link to replace their card on file.',
+				[['customer', 'string', 'Customer name or id']],
+			],
+			[
+				'cancel_subscription',
+				"Cancels a customer's subscription at the period end.",
+				[['customer', 'string', 'Customer name or id']],
+			],
+		],
+	},
+	{
+		name: 'desk-orders',
+		estimate: 354,
+		added: 440,
+		rows: [
+			[
+				'status',
+				'Reports where an order stands: placed, packed, shipped, or delivered.',
+				[['order', 'string', 'Order number']],
+			],
+			['order_items', 'Lists the items in an order.', [['order', 'string', 'Order number']]],
+			[
+				'track_package',
+				"Returns the carrier and tracking events for an order's package.",
+				[['order', 'string', 'Order number']],
+			],
+			[
+				'change_address',
+				'Changes the shipping address of an order that has not shipped.',
+				[
+					['order', 'string', 'Order number'],
+					['address', 'string', 'New shipping address'],
+				],
+			],
+			[
+				'cancel_order',
+				'Cancels an order that has not shipped.',
+				[['order', 'string', 'Order number']],
+			],
+			[
+				'reship_order',
+				'Ships a replacement for a lost or damaged order.',
+				[
+					['order', 'string', 'Order number'],
+					['reason', 'string', 'Lost or damaged, and how'],
+				],
+			],
+		],
+	},
+	{
+		name: 'desk-inventory',
+		estimate: 338,
+		added: 439,
+		rows: [
+			[
+				'find_product',
+				'Finds products by name or description.',
+				[['query', 'string', 'Words to match']],
+			],
+			['stock_level', 'Reports units on hand for a product.', [['sku', 'string', 'Product SKU']]],
+			[
+				'reserve_stock',
+				'Holds units of a product for a customer.',
+				[
+					['sku', 'string', 'Product SKU'],
+					['quantity', 'number', 'Units to hold'],
+				],
+			],
+			[
+				'restock_item',
+				'Orders more units of a product from its supplier.',
+				[
+					['sku', 'string', 'Product SKU'],
+					['quantity', 'number', 'Units to order'],
+				],
+			],
+			[
+				'set_price',
+				"Changes a product's price.",
+				[
+					['sku', 'string', 'Product SKU'],
+					['price', 'number', 'New price'],
+				],
+			],
+			[
+				'discontinue_item',
+				'Marks a product as no longer sold.',
+				[['sku', 'string', 'Product SKU']],
+			],
+		],
+	},
+	{
+		name: 'desk-staff',
+		estimate: 355,
+		added: 450,
+		rows: [
+			['staff_on_call', 'Names the staff member on call right now.', []],
+			[
+				'shift_schedule',
+				'Lists who works on a given date.',
+				[['date', 'string', 'Date as YYYY-MM-DD']],
+			],
+			[
+				'assign_shift',
+				'Puts a staff member on a shift.',
+				[
+					['person', 'string', 'Staff member name'],
+					['date', 'string', 'Date as YYYY-MM-DD'],
+				],
+			],
+			[
+				'request_leave',
+				'Files a leave request for a staff member.',
+				[
+					['person', 'string', 'Staff member name'],
+					['start', 'string', 'First day as YYYY-MM-DD'],
+					['end', 'string', 'Last day as YYYY-MM-DD'],
+				],
+			],
+			[
+				'staff_contact',
+				"Returns a staff member's phone and email.",
+				[['person', 'string', 'Staff member name']],
+			],
+			[
+				'log_hours',
+				'Records hours a staff member worked.',
+				[
+					['person', 'string', 'Staff member name'],
+					['hours', 'number', 'Hours worked'],
+				],
+			],
+		],
+	},
+	{
+		name: 'taverna-policies',
+		estimate: 607,
+		added: 720,
+		rows: [
+			[
+				'list_policies',
+				'Lists the policies a household holds, with carrier and renewal date.',
+				[
+					['household', 'string', 'Household id'],
+					['status', 'string', 'Active, lapsed, or quoted'],
+				],
+			],
+			[
+				'get_policy',
+				'Reads one policy with its coverages, limits, deductibles, and premium.',
+				[
+					['policy', 'string', 'Policy number'],
+					['term', 'string', 'Policy term as YYYY'],
+				],
+			],
+			[
+				'quote_policy',
+				'Starts a quote for a line of business with the carriers we appoint.',
+				[
+					['household', 'string', 'Household id'],
+					['line', 'string', 'Auto, home, umbrella, or life'],
+				],
+			],
+			[
+				'renew_policy',
+				'Marks a policy for renewal review and records the agreed premium.',
+				[
+					['policy', 'string', 'Policy number'],
+					['premium', 'number', 'Agreed annual premium'],
+				],
+			],
+			[
+				'cancel_policy',
+				'Records a cancellation request for a policy with its effective date.',
+				[
+					['policy', 'string', 'Policy number'],
+					['date', 'string', 'Effective date YYYY-MM-DD'],
+				],
+			],
+			[
+				'add_vehicle',
+				'Adds a vehicle to an auto policy with its VIN and garaging address.',
+				[
+					['policy', 'string', 'Policy number'],
+					['vin', 'string', 'Vehicle identification number'],
+				],
+			],
+			[
+				'add_driver',
+				'Adds a driver to an auto policy with license number and birth date.',
+				[
+					['policy', 'string', 'Policy number'],
+					['license', 'string', 'Driver license number'],
+				],
+			],
+			[
+				'change_coverage',
+				'Changes one coverage limit or deductible on a policy at its next term.',
+				[
+					['policy', 'string', 'Policy number'],
+					['coverage', 'string', 'Coverage code and its new limit'],
+				],
+			],
+		],
+	},
+	{
+		name: 'taverna-claims',
+		estimate: 594,
+		added: 717,
+		rows: [
+			[
+				'list_claims',
+				'Lists the claims on a policy with loss date, status, and adjuster.',
+				[
+					['policy', 'string', 'Policy number'],
+					['status', 'string', 'Open, closed, or denied'],
+				],
+			],
+			[
+				'get_claim',
+				'Reads one claim with its loss description, reserves, and payments.',
+				[
+					['claim', 'string', 'Claim number'],
+					['detail', 'string', 'Summary or full history'],
+				],
+			],
+			[
+				'open_claim',
+				'Opens a first notice of loss for a policy and assigns an adjuster.',
+				[
+					['policy', 'string', 'Policy number'],
+					['loss', 'string', 'What happened and when'],
+				],
+			],
+			[
+				'note_claim',
+				'Adds an adjuster note to a claim file with the time it was made.',
+				[
+					['claim', 'string', 'Claim number'],
+					['text', 'string', 'The note to file on the claim'],
+				],
+			],
+			[
+				'reserve_claim',
+				'Sets the reserve on a claim for indemnity or expense with a reason.',
+				[
+					['claim', 'string', 'Claim number'],
+					['amount', 'number', 'Reserve amount in dollars'],
+				],
+			],
+			[
+				'pay_claim',
+				'Records a claim payment to a payee and reduces the open reserve.',
+				[
+					['claim', 'string', 'Claim number'],
+					['amount', 'number', 'Payment amount in dollars'],
+				],
+			],
+			[
+				'close_claim',
+				'Closes a claim with its outcome and releases any remaining reserve.',
+				[
+					['claim', 'string', 'Claim number'],
+					['outcome', 'string', 'Paid, denied, or withdrawn'],
+				],
+			],
+			[
+				'deny_claim',
+				'Records a claim denial with the policy provision the denial rests on.',
+				[
+					['claim', 'string', 'Claim number'],
+					['provision', 'string', 'Policy provision cited'],
+				],
+			],
+		],
+	},
+	{
+		name: 'taverna-contacts',
+		estimate: 594,
+		added: 712,
+		rows: [
+			[
+				'list_contacts',
+				'Lists the people in a household with role, phone, and preferred channel.',
+				[
+					['household', 'string', 'Household id'],
+					['role', 'string', 'Named insured or driver'],
+				],
+			],
+			[
+				'get_contact',
+				'Reads one contact with addresses, phones, emails, and consent flags.',
+				[
+					['contact', 'string', 'Contact id'],
+					['history', 'string', 'Include touch history'],
+				],
+			],
+			[
+				'add_contact',
+				'Adds a person to a household with their role and contact details.',
+				[
+					['household', 'string', 'Household id'],
+					['name', 'string', 'Full legal name'],
+				],
+			],
+			[
+				'update_phone',
+				'Changes the phone number on a contact and records who asked for it.',
+				[
+					['contact', 'string', 'Contact id'],
+					['phone', 'string', 'New phone number'],
+				],
+			],
+			[
+				'update_email',
+				'Changes the email address on a contact and records who asked for it.',
+				[
+					['contact', 'string', 'Contact id'],
+					['email', 'string', 'New email address'],
+				],
+			],
+			[
+				'log_touch',
+				'Logs a call, email, or meeting with a contact and its follow-up date.',
+				[
+					['contact', 'string', 'Contact id'],
+					['summary', 'string', 'What was discussed'],
+				],
+			],
+			[
+				'set_consent',
+				'Records consent to contact by text or email, with the date it was given.',
+				[
+					['contact', 'string', 'Contact id'],
+					['channel', 'string', 'Text or email'],
+				],
+			],
+			[
+				'merge_contacts',
+				'Merges a duplicate contact into another and keeps the newer details.',
+				[
+					['keep', 'string', 'Contact id to keep'],
+					['remove', 'string', 'Duplicate contact id'],
+				],
+			],
+		],
+	},
+])
+/**
+ * Builds the tool definition a density row describes, its first field required, as each definition
+ * the density samples carried was built.
+ *
+ * @param row - The row to build
+ * @returns The definition
+ */
+export function buildDensityDefinition(row: LedgerDensityRow): ToolDefinition {
+	const [name, description, fields] = row
+	return {
+		name,
+		description,
+		parameters: {
+			type: 'object',
+			properties: Object.fromEntries(
+				fields.map(([field, type, text]) => [field, { type, description: text }]),
+			),
+			required: fields.slice(0, 1).map(([field]) => field),
+		},
+	}
+}
+
+/**
+ * Prices each scripted call at the rates the 4B's density reading measured: the messages at its
+ * scale, the tool definitions at the core set's overhead per estimate unit, and the reply, calls
+ * included, at its scale.
+ */
+export class DensityLedgerProvider extends ScriptedProvider {
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const result = yield* super.stream(messages, signal, tools, options)
+		const prompt = chargeDensityPrompt(messages, tools, LEDGER_DENSITY_RATES)
+		const completion = Math.ceil(
+			LEDGER_DENSITY_CALIBRATION.scale *
+				estimateTokens(`${result.content}${JSON.stringify(result.tools ?? [])}`),
+		)
+		return { ...result, usage: { prompt, completion, total: prompt + completion } }
+	}
+}
+
+/** Names the tokens one estimate unit costs in a call: of its messages, and of its tool definitions. */
+export interface LedgerChargeRates {
+	readonly scale: number
+	readonly definitions: number
+}
+
+/** Holds the 4B density reading's rates: the messages at its scale, the definitions at the core set's overhead per estimate unit. */
+export const LEDGER_DENSITY_RATES: LedgerChargeRates = Object.freeze({
+	scale: LEDGER_DENSITY_CALIBRATION.scale,
+	definitions: LEDGER_DENSITY_CALIBRATION.overhead / LEDGER_DENSITY_CALIBRATION.estimate,
+})
+
+/**
+ * Holds the rates of the 2026-11-12 live calibration on `qwen3.5:4b-q4_K_M`, arm `taverna`: the
+ * messages at 642 over 383, and the definitions at 13257 over 13776, under the scale.
+ */
+export const LEDGER_LIVE_RATES: LedgerChargeRates = Object.freeze({
+	scale: 642 / 383,
+	definitions: 13257 / 13776,
+})
+
+/**
+ * Charges a call's prompt at a set of rates: the messages at their scale, and the tool definitions
+ * at their rate per estimate unit.
+ *
+ * @param messages - The call's messages
+ * @param tools - The call's definitions, if any
+ * @param rates - The rates the call is charged at
+ * @returns The prompt tokens the call is charged
+ */
+export function chargeDensityPrompt(
+	messages: readonly Message[],
+	tools: readonly ToolDefinition[] | undefined,
+	rates: LedgerChargeRates,
+): number {
+	const definitions =
+		tools === undefined || tools.length === 0 ? 0 : estimateTokens(JSON.stringify(tools))
+	return Math.round(rates.scale * estimateMessages(messages) + rates.definitions * definitions)
+}
+
+/** Charges each scripted call at a set of rates, and reports the charge as its prompt usage. */
+export class RatedLedgerProvider extends ScriptedProvider {
+	readonly #rates: LedgerChargeRates
+
+	/**
+	 * @param turns - The scripted turns
+	 * @param options - The scripted provider's options
+	 * @param rates - The rates each call is charged at
+	 */
+	constructor(
+		turns: readonly ScriptedTurn[],
+		options: ScriptedProviderOptions,
+		rates: LedgerChargeRates,
+	) {
+		super(turns, options)
+		this.#rates = rates
+	}
+
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const result = yield* super.stream(messages, signal, tools, options)
+		const prompt = chargeDensityPrompt(messages, tools, this.#rates)
+		return { ...result, usage: { prompt, completion: 0, total: prompt } }
+	}
+}
+
+/**
+ * Charges each scripted call as {@link DensityLedgerProvider} does, reports no usage, and hands
+ * each call's charge to a recorder.
+ */
+export class SilentDensityLedgerProvider extends ScriptedProvider {
+	readonly #charged: (charge: number) => void
+
+	/**
+	 * @param turns - The scripted turns
+	 * @param options - The scripted provider's options
+	 * @param charged - Receives each call's charge, in call order
+	 */
+	constructor(
+		turns: readonly ScriptedTurn[],
+		options: ScriptedProviderOptions,
+		charged: (charge: number) => void,
+	) {
+		super(turns, options)
+		this.#charged = charged
+	}
+
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const result = yield* super.stream(messages, signal, tools, options)
+		this.#charged(chargeDensityPrompt(messages, tools, LEDGER_DENSITY_RATES))
+		const { usage: _usage, ...silent } = result
+		return silent
+	}
+}
+
+/**
+ * Holds 238 tools of taverna's mean definition size: the taverna samples' rows in order, each
+ * renamed for the skill of seven it belongs to.
+ */
+export const LEDGER_TAVERNA_TOOLS: readonly ToolInterface[] = Object.freeze(
+	Array.from({ length: 238 }, (_, at): ToolInterface => {
+		const rows = LEDGER_DENSITY_SAMPLES.filter((sample) =>
+			sample.name.startsWith('taverna-'),
+		).flatMap((sample) => sample.rows)
+		const [name, description, fields] = requireValue(rows[at % rows.length])
+		const definition = buildDensityDefinition([
+			`${name}_${Math.floor(at / 7)}`,
+			description,
+			fields,
+		])
+		return createTool({
+			name: definition.name,
+			description: definition.description ?? '',
+			...(definition.parameters === undefined ? {} : { parameters: definition.parameters }),
+			execute: () => 'ran',
+		})
+	}),
+)
+
+/** Holds 34 skills that each name seven of the {@link LEDGER_TAVERNA_TOOLS}, in order. */
+export const LEDGER_TAVERNA_SKILLS: readonly SkillInput[] = Object.freeze(
+	Array.from({ length: 34 }, (_, at): SkillInput => ({
+		name: `area_${at}`,
+		description: `Records of area ${at}`,
+		content: `Use the area ${at} tools to read and change its records.`,
+		tools: LEDGER_TAVERNA_TOOLS.slice(at * 7, at * 7 + 7).map((tool) => tool.name),
+	})),
+)
+
+/** Holds the lookups the skills of a ledger with built-ins name: `refund` and `claim`, each filing nothing. */
+export const LEDGER_SKILL_LOOKUPS: readonly LedgerLookup[] = Object.freeze(
+	['refund', 'claim'].map((name): LedgerLookup => ({
+		tool: createTool({
+			name,
+			description: `Runs one ${name} for the desk.`,
+			parameters: { type: 'object' },
+			execute: () => `${name} recorded`,
+		}),
+		read: () => undefined,
+	})),
+)
+
+/** Holds a host scope that lists the memos `pref` and `notes` and the workspaces `north` and `south`, so `remember` and `switch` are advertised. */
+export const LEDGER_BUILTIN_SCOPE: ScopeInput = Object.freeze({
+	name: 'host',
+	memos: Object.freeze(['pref', 'notes']),
+	workspaces: Object.freeze(['north', 'south']),
+})
+
+/** Holds ledger options with built-ins and the recorders of the host authority they carry. */
+export interface LedgerBuiltinOptions {
+	readonly options: LedgerOptions
+	readonly evaluated: RecorderInterface<[name: string]>
+	readonly asked: RecorderInterface<[name: string]>
+}
+
+/**
+ * Builds ledger options with every built-in: the lookups `lookup`, `refund`, and `claim`; the skills
+ * `billing` (naming `refund`) and `claims` (naming `claim`); the host memo `pref`; and a host
+ * authority that allows every call and approves each ask, recording both.
+ *
+ * @param agent - The agent options to replace
+ * @param overrides - The ledger options to replace
+ * @returns The options and the authority's recorders
+ */
+export function buildLedgerBuiltinOptions(
+	agent: Partial<LedgerAgentOptions> = {},
+	overrides: Partial<LedgerOptions> = {},
+): LedgerBuiltinOptions {
+	const evaluated = createRecorder<[name: string]>()
+	const asked = createRecorder<[name: string]>()
+	const skills = createSkillManager()
+	skills.add([
+		{
+			name: 'billing',
+			description: 'Billing questions',
+			content: BUILTIN_BILLING_BODY,
+			tools: ['refund'],
+		},
+		{
+			name: 'claims',
+			description: 'Claims questions',
+			content: BUILTIN_CLAIMS_BODY,
+			tools: ['claim'],
+		},
+	])
+	const memos = createMemoManager()
+	memos.add({ name: 'pref', description: 'Contact preference', content: BUILTIN_PREF_CONTENT })
+	const options = buildLedgerOptions({
+		capacity: 32768,
+		lookups: [...(buildLedgerOptions().lookups ?? []), ...LEDGER_SKILL_LOOKUPS],
+		...overrides,
+		agent: {
+			builtins: BUILTIN_NAMES,
+			skills,
+			memos,
+			authority: {
+				evaluate: (context) => {
+					evaluated.handler(context.call.name)
+					return { zone: 'host', verdict: 'allow' }
+				},
+				ask: async (context) => {
+					asked.handler(context.call.name)
+					return true
+				},
+			},
+			...agent,
+		},
+	})
+	return { options, evaluated, asked }
+}
+
+/**
+ * Adds the workspaces `north` and `south` to a ledger's context, each holding one text file.
+ *
+ * @param ledger - The ledger to seed
+ */
+export function seedLedgerWorkspaces(ledger: LedgerInterface): void {
+	ledger.agent.context.workspaces.add({
+		id: 'north',
+		seed: [createFile({ path: 'north.txt', content: createTextContent('NORTH FILE', 'text') })],
+	})
+	ledger.agent.context.workspaces.add({
+		id: 'south',
+		seed: [createFile({ path: 'south.txt', content: createTextContent('SOUTH FILE', 'text') })],
+	})
+}
+
+/**
+ * Reads the content of each tool message a ledger's conversation stores, in order.
+ *
+ * @param ledger - The ledger whose conversation to read
+ * @returns The contents
+ */
+export function readLedgerToolContents(ledger: LedgerInterface): readonly string[] {
+	return ledger.conversation
+		.messages()
+		.filter((message) => message.role === 'tool')
+		.map((message) => message.content)
+}
+
+/**
+ * Holds the definitions a pricing case reads, each sized so a set's estimate is a round number: `a`
+ * and `b` together estimate 100, `b` alone 50, `extra` alone 100, and `edited`, `a` replaced under its
+ * name by a longer text, alone 100.
+ */
+export const LEDGER_PRICE_DEFINITIONS = Object.freeze({
+	a: Object.freeze({ name: 'a', description: 'x'.repeat(169) }),
+	b: Object.freeze({ name: 'b', description: 'x'.repeat(169) }),
+	extra: Object.freeze({ name: 'extra', description: 'x'.repeat(365) }),
+	edited: Object.freeze({ name: 'a', description: 'x'.repeat(369) }),
+})
+
+/**
+ * Lists `computeToolPrice` cases over the calibrated set `a` and `b`, written by hand from the
+ * design's pricing formula: the advertised set, the gauge, and the spared and added tokens.
+ */
+export const LEDGER_TOOL_PRICE_CASES = Object.freeze([
+	{
+		title: 'an empty advertised set spares the whole overhead',
+		advertised: [],
+		gauge: { scale: 1.2, overhead: 300 },
+		spared: 300,
+		added: 0,
+	},
+	{
+		title: 'the calibrated set spares and adds nothing',
+		advertised: [LEDGER_PRICE_DEFINITIONS.a, LEDGER_PRICE_DEFINITIONS.b],
+		gauge: { scale: 1.2, overhead: 300 },
+		spared: 0,
+		added: 0,
+	},
+	{
+		title: 'a subset spares the hidden definitions at scale where the density is over it',
+		advertised: [LEDGER_PRICE_DEFINITIONS.a],
+		gauge: { scale: 1.2, overhead: 300 },
+		spared: 60,
+		added: 0,
+	},
+	{
+		title:
+			'a subset spares the hidden definitions at the density where the density is under the scale',
+		advertised: [LEDGER_PRICE_DEFINITIONS.a],
+		gauge: { scale: 1.2, overhead: 40 },
+		spared: 20,
+		added: 0,
+	},
+	{
+		title: 'a superset adds at the overhead per estimate unit when it exceeds scale',
+		advertised: [
+			LEDGER_PRICE_DEFINITIONS.a,
+			LEDGER_PRICE_DEFINITIONS.b,
+			LEDGER_PRICE_DEFINITIONS.extra,
+		],
+		gauge: { scale: 1.2, overhead: 300 },
+		spared: 0,
+		added: 300,
+	},
+	{
+		title: 'a superset adds at scale when scale exceeds the overhead per estimate unit',
+		advertised: [
+			LEDGER_PRICE_DEFINITIONS.a,
+			LEDGER_PRICE_DEFINITIONS.b,
+			LEDGER_PRICE_DEFINITIONS.extra,
+		],
+		gauge: { scale: 4, overhead: 300 },
+		spared: 0,
+		added: 400,
+	},
+	{
+		title: 'a set that hides one and adds one spares and adds',
+		advertised: [LEDGER_PRICE_DEFINITIONS.a, LEDGER_PRICE_DEFINITIONS.extra],
+		gauge: { scale: 1.2, overhead: 300 },
+		spared: 60,
+		added: 300,
+	},
+	{
+		title: 'a definition replaced under its name by another text is hidden and added',
+		advertised: [LEDGER_PRICE_DEFINITIONS.edited, LEDGER_PRICE_DEFINITIONS.b],
+		gauge: { scale: 1.2, overhead: 300 },
+		spared: 60,
+		added: 300,
+	},
+])
+
+/**
+ * Builds the scripted turns of skill calls: one turn per batch, each call naming its tool and its
+ * `skill` argument, with ids that open with a prefix.
+ *
+ * @param batches - Each turn's calls as a tool name and a skill name
+ * @param prefix - The text each call id opens with
+ * @returns The turns, in order
+ */
+export function buildSkillTurns(
+	batches: ReadonlyArray<ReadonlyArray<readonly [name: string, skill: string]>>,
+	prefix: string,
+): readonly ScriptedTurn[] {
+	return batches.map((batch, at) => ({
+		content: '',
+		tools: batch.map(([name, skill], position) =>
+			createToolCall({ id: `${prefix}${at}-${position}`, name, arguments: { skill } }),
+		),
+	}))
+}
+
+/**
+ * Names the host act a room-sweep arm draws inside a request: none; in the tool phase, a skill
+ * replaced with no tools (`hfree`), a skill replaced with another area's tools (`hswap`), a tool
+ * added to the manager (`hadd`), the calibrated `lookup` replaced under its name by a longer text
+ * (`hedit`), or a scope change (`hscope`); a workspace growth, a freed skill, or a replaced body
+ * during the scheduler's yield (`yield`); or a workspace growth in a `turn` listener added after
+ * construction (`listener`).
+ */
+export type LedgerSweepAct =
+	| 'none'
+	| 'hfree'
+	| 'hswap'
+	| 'hadd'
+	| 'hedit'
+	| 'hscope'
+	| 'yield'
+	| 'listener'
+
+/**
+ * Configures one arm of the room sweep: its seeds, the `predict` values a case draws from, whether
+ * `load` and `remember` are swapped for a lookup, the size of the workspace `w1`, whether the host
+ * gives `w1` through `agent.disclosure`, the host act it draws, the gauge, the provider, whether
+ * every built-in is enabled, and the size of the skill tools' results.
+ *
+ * @remarks
+ * `workspace` reads `'none'` for a 20-token `w1`, `'mild'` for 800 to 2600 characters, and
+ * `'harsh'` for 800 to 2600 tokens. `gauge` reads `'calibrated'` for a ledger that calibrates,
+ * `'stated'` for the gauge a twin ledger's `calibrate` returned on the same draws, and `'low'` for
+ * that gauge with half its overhead. `silent` runs the provider that reports no usage. `results`
+ * reads `'capacity'` for results drawn, one tool in seven, up to 1.2 times the capacity.
+ */
+export interface LedgerRoomArm {
+	readonly name: string
+	readonly seeds: readonly number[]
+	readonly predicts: readonly number[]
+	readonly swap: boolean
+	readonly workspace: 'none' | 'mild' | 'harsh'
+	readonly host: boolean
+	readonly act: LedgerSweepAct
+	readonly gauge: 'calibrated' | 'stated' | 'low'
+	readonly silent: boolean
+	readonly builtins: boolean
+	readonly results: 'small' | 'capacity'
+}
+
+/** Names one event a room-sweep case logs, in emission order. */
+export type LedgerRoomEvent =
+	| { readonly event: 'respond' }
+	| { readonly event: 'turn'; readonly index: number }
+	| {
+			readonly event: 'tool'
+			readonly name: string
+			readonly success: boolean
+			readonly selected: boolean
+			readonly overflow: boolean
+	  }
+	| { readonly event: 'request'; readonly carried: boolean }
+	| { readonly event: 'abort'; readonly reason: unknown }
+	| { readonly event: 'usage'; readonly prompt: number }
+	| { readonly event: 'rejected'; readonly overflow: boolean }
+	| { readonly event: 'act' }
+
+/** Holds one room-sweep case: its seed, capacity, `predict`, and event log. */
+export interface LedgerRoomCase {
+	readonly seed: number
+	readonly capacity: number
+	readonly predict: number
+	readonly events: readonly LedgerRoomEvent[]
+}
+
+/** Holds what a room-sweep arm read, derived from its cases' logs. */
+export interface LedgerRoomSummary {
+	readonly calls: number
+	readonly over: number
+	readonly overCapacity: number
+	readonly loads: number
+	readonly remembers: number
+	readonly gated: number
+	readonly gatedAfterLoad: number
+	readonly first: number
+	readonly firstAfterSwitch: number
+	readonly requestsAfterSwitch: number
+	readonly selected: number
+	readonly carried: number
+	readonly denied: number
+	readonly rejected: number
+	readonly acts: number
+	readonly acted: number
+}
+
+/** Lists the call kinds a room-sweep turn draws from. */
+export const LEDGER_ROOM_KINDS = Object.freeze([
+	'load',
+	'unload',
+	'switch',
+	'remember',
+	'memo',
+	'lookup',
+	'recall',
+	'tool',
+] as const)
+
+/** Holds the settings every room-sweep arm shares unless it names its own. */
+export const LEDGER_ROOM_BASE = Object.freeze({
+	predicts: [0, 100, 300],
+	swap: false,
+	workspace: 'none',
+	host: false,
+	act: 'none',
+	gauge: 'calibrated',
+	silent: false,
+	builtins: true,
+	results: 'small',
+} as const)
+
+/**
+ * Lists the room sweep's routine arms, each at a seed count sized from a timed run: c, e, the mild
+ * and the harsh workspace arms, and the host arm; the host-act arms; arm `plain`, with no built-in;
+ * and the gauge arms `stated` and `silent` on the host arm's draws, with `low` and `low-silent` their
+ * control.
+ */
+export const LEDGER_ROOM_ARMS = Object.freeze<readonly LedgerRoomArm[]>([
+	{ ...LEDGER_ROOM_BASE, name: 'c', seeds: Array.from({ length: 150 }, (_, at) => 5000 + at) },
+	{
+		...LEDGER_ROOM_BASE,
+		name: 'e',
+		seeds: Array.from({ length: 150 }, (_, at) => 9000 + at),
+		predicts: [100, 300],
+	},
+	{
+		...LEDGER_ROOM_BASE,
+		name: 'mild',
+		seeds: Array.from({ length: 120 }, (_, at) => 7000 + at),
+		workspace: 'mild',
+	},
+	{
+		...LEDGER_ROOM_BASE,
+		name: 'harsh',
+		seeds: Array.from({ length: 120 }, (_, at) => 7000 + at),
+		workspace: 'harsh',
+	},
+	{
+		...LEDGER_ROOM_BASE,
+		name: 'host',
+		seeds: Array.from({ length: 120 }, (_, at) => 7000 + at),
+		workspace: 'harsh',
+		host: true,
+	},
+	...(['hfree', 'hswap', 'hadd', 'hedit', 'hscope', 'yield', 'listener'] as const).map(
+		(act, at): LedgerRoomArm => ({
+			...LEDGER_ROOM_BASE,
+			name: act,
+			// The scope arm reaches its defect rarely, so it draws five times the seeds.
+			seeds: Array.from(
+				{ length: act === 'hscope' ? 1500 : 300 },
+				(_, seed) => 100000 * (at + 1) + seed,
+			),
+			act,
+		}),
+	),
+	{
+		...LEDGER_ROOM_BASE,
+		name: 'plain',
+		seeds: Array.from({ length: 150 }, (_, at) => 41000 + at),
+		workspace: 'harsh',
+		host: true,
+		builtins: false,
+		results: 'capacity',
+	},
+	...(
+		[
+			['stated', 'stated', false],
+			['silent', 'stated', true],
+			['low', 'low', false],
+			['low-silent', 'low', true],
+		] as const
+	).map(([name, gauge, silent]): LedgerRoomArm => ({
+		...LEDGER_ROOM_BASE,
+		name,
+		seeds: Array.from({ length: 120 }, (_, at) => 7000 + at),
+		workspace: 'harsh',
+		host: true,
+		gauge,
+		silent,
+	})),
+])
+
+/**
+ * Draws one call of a room-sweep turn.
+ *
+ * @param random - The case's generator
+ * @param tools - The case's skill tools
+ * @param swap - If `true`, a drawn `load` or `remember` becomes a lookup; if `false`, it stands
+ * @param id - The call id's opening text
+ * @param builtins - If `false`, a drawn built-in becomes a skill tool's call; if `true`, it stands
+ * @returns The call
+ */
+export function drawLedgerRoomCall(
+	random: RandomFunction,
+	tools: readonly LedgerLookup[],
+	swap: boolean,
+	id: string,
+	builtins = true,
+): ToolCall {
+	const picked = LEDGER_ROOM_KINDS[Math.floor(random() * LEDGER_ROOM_KINDS.length)] ?? 'lookup'
+	const kind = swap && (picked === 'load' || picked === 'remember') ? 'lookup' : picked
+	const call = `${id}-${Math.floor(random() * 1000000)}`
+	const skill = `s${Math.floor(random() * 6)}`
+	const named = builtins || kind === 'lookup' || kind === 'recall' ? kind : 'tool'
+	if (named === 'load' || named === 'unload') return { id: call, name: named, arguments: { skill } }
+	if (named === 'switch')
+		return { id: call, name: 'switch', arguments: { workspace: `w${Math.floor(random() * 2)}` } }
+	if (named === 'remember')
+		return {
+			id: call,
+			name: 'remember',
+			arguments: {
+				name: Math.floor(random() * 2) === 0 ? 'notes' : 'log',
+				description: 'Desk notes',
+				content: 'n'.repeat(20 + Math.floor(random() * 380)),
+			},
+		}
+	if (named === 'memo')
+		return {
+			id: call,
+			name: 'memo',
+			arguments: { name: Math.floor(random() * 2) === 0 ? 'pref' : 'notes' },
+		}
+	if (named === 'recall') return { id: call, name: 'recall', arguments: { topic: 'zephyr' } }
+	if (named === 'tool')
+		return {
+			id: call,
+			name: tools[Math.floor(random() * tools.length)]?.tool.name ?? 'lookup',
+			arguments: { q: Math.floor(random() * 1000) },
+		}
+	return { id: call, name: 'lookup', arguments: { id: `BW-${Math.floor(random() * 100000)}` } }
+}
+
+/**
+ * Runs one host act of a room-sweep case on its ledger's context.
+ *
+ * @param act - The act
+ * @param ledger - The ledger whose context the act changes
+ * @param random - The case's generator
+ * @param areas - Each skill area's tool names, in area order
+ */
+export function applyLedgerSweepAct(
+	act: LedgerSweepAct,
+	ledger: LedgerInterface,
+	random: RandomFunction,
+	areas: ReadonlyArray<readonly string[]>,
+): void {
+	const context = ledger.agent.context
+	const area = Math.floor(random() * areas.length)
+	const skill = context.skills.skill(`s${area}`)
+	if ((act === 'hfree' || act === 'hswap') && skill !== undefined)
+		context.skills.add({
+			name: skill.name,
+			description: skill.description,
+			content: skill.content,
+			tools:
+				act === 'hfree'
+					? []
+					: [
+							...(areas[(area + 1 + Math.floor(random() * (areas.length - 1))) % areas.length] ??
+								[]),
+						],
+		})
+	if (act === 'hadd')
+		context.tools.add(
+			createTool({
+				name: `host_${Math.floor(random() * 1000000)}`,
+				description: 'A host tool added during the request. '.padEnd(
+					80 + Math.floor(random() * 400),
+					'.',
+				),
+				parameters: { type: 'object' },
+				execute: () => 'Host tool ran.',
+			}),
+		)
+	if (act === 'hedit')
+		context.tools.add(
+			createTool({
+				name: 'lookup',
+				description: 'Read an owner record. '.padEnd(60 + Math.floor(random() * 600), '.'),
+				parameters: { type: 'object' },
+				execute: () => 'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+			}),
+		)
+	if (act === 'hscope')
+		context.apply(
+			createScope({
+				name: `scope-${Math.floor(random() * 1000)}`,
+				...(random() < 0.3
+					? {}
+					: {
+							tools: ['lookup', 'recall', 'hact', ...BUILTIN_NAMES, ...areas.flat()].filter(
+								() => random() > 0.25,
+							),
+						}),
+				memos: random() < 0.5 ? ['pref', 'notes', 'log'] : ['pref'],
+				workspaces: random() < 0.5 ? ['w0', 'w1'] : ['w0'],
+			}),
+		)
+	// The yield's act is one of three; the listener's is a workspace growth.
+	const kind = act === 'yield' ? Math.floor(random() * 3) : act === 'listener' ? 0 : -1
+	const workspace = context.workspaces.active
+	if (kind === 0 && workspace !== undefined)
+		workspace.write(
+			workspace.files()[0]?.path ?? 'w0.txt',
+			`GROWN ${'g'.repeat(400 + Math.floor(random() * 8000))}`,
+		)
+	if (kind > 0 && skill !== undefined)
+		context.skills.add({
+			name: skill.name,
+			description: skill.description,
+			content:
+				kind === 1
+					? skill.content
+					: `Replaced body. ${'b'.repeat(400 + Math.floor(random() * 4000))}`,
+			tools: kind === 1 ? [] : [...skill.tools],
+		})
+}
+
+/** Holds the host authority of a room-sweep ledger with built-ins: every call allowed, every ask approved. */
+export const LEDGER_SWEEP_AUTHORITY: AuthorityInterface = Object.freeze({
+	evaluate: () => ({ zone: 'host', verdict: 'allow' as const }),
+	ask: async () => true,
+})
+
+/**
+ * Builds a room-sweep case's lookup `hact`, which runs the arm's host act on the case's ledger in the
+ * tool phase and logs it.
+ *
+ * @param act - The arm's act
+ * @param holder - Holds the case's ledger once it is built
+ * @param random - The case's generator
+ * @param areas - Each skill area's tool names, in area order
+ * @param log - The case's event log
+ * @returns The lookup
+ */
+export function buildLedgerSweepAct(
+	act: LedgerSweepAct,
+	holder: { readonly ledger?: LedgerInterface },
+	random: RandomFunction,
+	areas: ReadonlyArray<readonly string[]>,
+	log: RecorderInterface<[event: LedgerRoomEvent]>,
+): LedgerLookup {
+	return {
+		tool: createTool({
+			name: 'hact',
+			description: 'Runs one host action for the desk.',
+			parameters: { type: 'object' },
+			execute: () => {
+				if (holder.ledger !== undefined) applyLedgerSweepAct(act, holder.ledger, random, areas)
+				log.handler({ event: 'act' })
+				return 'Host action done.'
+			},
+		}),
+		read: () => undefined,
+	}
+}
+
+/**
+ * Builds a room-sweep case's scheduler, whose yield runs the `yield` act on the case's ledger half
+ * the time and logs it.
+ *
+ * @param holder - Holds the case's ledger once it is built
+ * @param random - The case's generator
+ * @param areas - Each skill area's tool names, in area order
+ * @param log - The case's event log
+ * @returns The scheduler
+ */
+export function buildLedgerSweepScheduler(
+	holder: { readonly ledger?: LedgerInterface },
+	random: RandomFunction,
+	areas: ReadonlyArray<readonly string[]>,
+	log: RecorderInterface<[event: LedgerRoomEvent]>,
+): SchedulerInterface {
+	return {
+		yield: async () => {
+			if (holder.ledger !== undefined && random() < 0.5) {
+				applyLedgerSweepAct('yield', holder.ledger, random, areas)
+				log.handler({ event: 'act' })
+			}
+		},
+		delay: async () => undefined,
+	}
+}
+
+/**
+ * Builds a room-sweep case's ledger on its provider, and adds its workspaces, host scope, and
+ * seeded messages.
+ *
+ * @param provider - The case's provider
+ * @param options - The case's options
+ * @param size - The estimate units `w1` holds
+ * @param seeded - The messages the conversation enters with
+ * @returns The ledger
+ */
+export function buildLedgerRoomLedger(
+	provider: ProviderInterface,
+	options: LedgerOptions,
+	size: number,
+	seeded: readonly MessageInput[],
+): LedgerInterface {
+	const ledger = createLedger(provider, options)
+	ledger.agent.context.workspaces.add({
+		id: 'w0',
+		seed: [createFile({ path: 'w0.txt', content: createTextContent('W0 FILE', 'text') })],
+	})
+	ledger.agent.context.workspaces.add({
+		id: 'w1',
+		seed: [
+			createFile({
+				path: 'w1.txt',
+				content: createTextContent(`WORKSPACE-W1 ${'w'.repeat(size * 4)}`, 'text'),
+			}),
+		],
+	})
+	ledger.agent.context.apply(
+		createScope({ name: 'host', memos: ['pref', 'notes', 'log'], workspaces: ['w0', 'w1'] }),
+	)
+	ledger.conversation.add(seeded)
+	return ledger
+}
+
+/**
+ * Runs one seeded room-sweep case: a ledger over six skills of 2 to 4 tools, a capacity of 2600 to
+ * 8000, and three requests whose turns draw 1 to 3 calls each, on `DensityLedgerProvider` or its
+ * silent twin, logging every turn, tool, request, abort, usage or charge, host act, and rejection.
+ * Every draw is made before a ledger is built, so a gauge arm's twin ledger sees the case's draws.
+ *
+ * @param seed - The case's seed
+ * @param arm - The arm the case belongs to
+ * @returns The case and its log
+ */
+export async function runLedgerRoomCase(seed: number, arm: LedgerRoomArm): Promise<LedgerRoomCase> {
+	const random = seededRandom(seed)
+	// A host-act arm draws the re-auditor's ranges: a capacity of 700 to 8000, and `predict` up to
+	// 0.92 of it. Each range is one draw, so every other arm keeps its stream.
+	const acting = arm.act !== 'none'
+	const capacity = acting ? 700 + Math.floor(random() * 7301) : 2600 + Math.floor(random() * 5401)
+	const predict = acting
+		? Math.floor(random() * 0.92 * capacity)
+		: (arm.predicts[Math.floor(random() * arm.predicts.length)] ?? 0)
+	const skills = createSkillManager()
+	const tools = [0, 1, 2, 3, 4, 5].flatMap((area): LedgerLookup[] => {
+		const names = Array.from({ length: 2 + Math.floor(random() * 3) }, (_, at) => `s${area}_t${at}`)
+		const lookups = names.map((name): LedgerLookup => {
+			const size =
+				arm.results === 'capacity' && random() < 1 / 7
+					? Math.floor(random() * capacity * 4 * 1.2)
+					: 40 + Math.floor(random() * 560)
+			const result = `Record ${name}: `.padEnd(size, 'x')
+			return {
+				tool: createTool({
+					name,
+					description: `Reads one record of area ${area}. `.padEnd(
+						40 + Math.floor(random() * 160),
+						'.',
+					),
+					parameters: { type: 'object' },
+					execute: () => result,
+				}),
+				read: () => undefined,
+			}
+		})
+		skills.add({
+			name: `s${area}`,
+			description: `Area ${area}`,
+			content: `Area ${area} guidance. `.padEnd(100 + Math.floor(random() * 2301), 'g'),
+			tools: names,
+		})
+		return lookups
+	})
+	const areas = [0, 1, 2, 3, 4, 5].map((area) =>
+		tools.map((lookup) => lookup.tool.name).filter((name) => name.startsWith(`s${area}_`)),
+	)
+	const memos = createMemoManager()
+	memos.add({ name: 'pref', description: 'Contact preference', content: BUILTIN_PREF_CONTENT })
+	const holder: { ledger?: LedgerInterface } = {}
+	const log = createRecorder<[event: LedgerRoomEvent]>()
+	const tooled = acting && arm.act !== 'yield' && arm.act !== 'listener'
+	const options = buildUncalibratedOptions(
+		buildLedgerOptions({
+			capacity,
+			predict,
+			lookups: [
+				...(buildLedgerOptions().lookups ?? []),
+				...tools,
+				...(tooled ? [buildLedgerSweepAct(arm.act, holder, random, areas, log)] : []),
+			],
+			agent: {
+				skills,
+				memos,
+				...(arm.builtins
+					? {
+							builtins: BUILTIN_NAMES,
+							authority: LEDGER_SWEEP_AUTHORITY,
+						}
+					: {}),
+				...(arm.host ? { disclosure: { skills: [], workspace: 'w1' } } : {}),
+				...(arm.act === 'yield'
+					? { scheduler: buildLedgerSweepScheduler(holder, random, areas, log) }
+					: {}),
+			},
+		}),
+	)
+	const script: readonly ScriptedTurn[] = [
+		...(arm.gauge === 'calibrated' ? [{ content: '' }, { content: '' }] : []),
+		...[0, 1, 2].flatMap((request): ScriptedTurn[] => [
+			...Array.from({ length: 1 + Math.floor(random() * 4) }, (_, turn) => ({
+				content: '',
+				tools: [
+					...Array.from({ length: 1 + Math.floor(random() * 3) }, (_slot, position) =>
+						drawLedgerRoomCall(
+							random,
+							tools,
+							arm.swap,
+							`c${request}-${turn}-${position}`,
+							arm.builtins,
+						),
+					),
+					...(tooled && random() < 0.3
+						? [{ id: `h${request}-${turn}`, name: 'hact', arguments: {} }]
+						: []),
+				],
+			})),
+			{ content: `Answer ${request}.` },
+		]),
+		{ content: 'Done.' },
+	]
+	const drawn = arm.workspace === 'none' ? 20 : 800 + Math.floor(random() * 1801)
+	const size = arm.workspace === 'mild' ? Math.ceil(drawn / 4) : drawn
+	const seeded = Array.from({ length: 4 + Math.floor(random() * 12) }, (_, at): MessageInput => ({
+		role: 'user',
+		content: `The zephyr drawer ${at} holds keys. `.repeat(1 + Math.floor(random() * 6)),
+	}))
+	// A gauge arm supplies the gauge a twin ledger calibrated on the same draws.
+	const twin =
+		arm.gauge === 'calibrated'
+			? undefined
+			: await buildLedgerRoomLedger(
+					new DensityLedgerProvider([{ content: '' }, { content: '' }], { recorded: true }),
+					options,
+					size,
+					seeded,
+				).calibrate(new AbortController().signal)
+	const gauge =
+		twin === undefined
+			? undefined
+			: arm.gauge === 'low'
+				? { scale: twin.scale, overhead: twin.overhead / 2 }
+				: twin
+	const ledger = buildLedgerRoomLedger(
+		arm.silent
+			? new SilentDensityLedgerProvider(script, { recorded: true }, (charge) =>
+					log.handler({ event: 'usage', prompt: charge }),
+				)
+			: new DensityLedgerProvider(script, { recorded: true }),
+		gauge === undefined ? options : { ...options, gauge },
+		size,
+		seeded,
+	)
+	holder.ledger = ledger
+	if (arm.act === 'listener')
+		ledger.agent.emitter.on('turn', (index) => {
+			if (index > 0 && random() < 0.4) {
+				applyLedgerSweepAct('listener', ledger, random, areas)
+				log.handler({ event: 'act' })
+			}
+		})
+	ledger.agent.emitter.on('turn', (index) => log.handler({ event: 'turn', index }))
+	ledger.agent.emitter.on('tool', (call, result) =>
+		log.handler({
+			event: 'tool',
+			name: call.name,
+			success: result.success,
+			selected: result.success && call.name === 'switch' && call.arguments['workspace'] === 'w1',
+			overflow: !result.success && result.error.endsWith(LEDGER_NOTES.overflow),
+		}),
+	)
+	ledger.agent.emitter.on('request', (_index, sent) =>
+		log.handler({
+			event: 'request',
+			carried: sent.messages.some((message) => message.content.includes('WORKSPACE-W1')),
+		}),
+	)
+	ledger.agent.emitter.on('abort', (reason) => log.handler({ event: 'abort', reason }))
+	ledger.agent.emitter.on('usage', (usage) => log.handler({ event: 'usage', prompt: usage.prompt }))
+	for (const request of ['Check the desk.', 'And the keys?', 'Anything else?']) {
+		log.handler({ event: 'respond' })
+		await ledger.respond(request).catch((error: unknown) =>
+			log.handler({
+				event: 'rejected',
+				overflow: isLedgerError(error) && error.code === 'OVERFLOW',
+			}),
+		)
+	}
+	return { seed, capacity, predict, events: log.calls.map(([event]) => event) }
+}
+
+/**
+ * Runs every seeded case of a room-sweep arm and derives what the arm read.
+ *
+ * @param name - The arm's name in {@link LEDGER_ROOM_ARMS}
+ * @returns The arm's summary
+ */
+export async function summarizeLedgerRoomArm(name: string): Promise<LedgerRoomSummary> {
+	const arm = requireValue(LEDGER_ROOM_ARMS.find((one) => one.name === name))
+	const cases: LedgerRoomCase[] = []
+	for (const seed of arm.seeds) cases.push(await runLedgerRoomCase(seed, arm))
+	return summarizeLedgerRoom(cases)
+}
+
+/**
+ * Derives what a room-sweep arm read from its cases' logs: the provider calls, those whose prompt
+ * plus `predict` exceeds capacity and those over capacity itself, the admitted loads and remembers,
+ * the passes the gate ended and those it ended on the turn after an admitted load, the first passes
+ * ended at their first call and those in a thread a `switch` to `w1` had selected, the requests
+ * served in such a thread, the admitted switches to `w1`, those whose next request carried it, the calls denied for room, and the
+ * rejections.
+ *
+ * @param cases - The arm's cases
+ * @returns The summary
+ */
+export function summarizeLedgerRoom(cases: readonly LedgerRoomCase[]): LedgerRoomSummary {
+	const rows = cases.flatMap((one) =>
+		one.events.map((event, at) => ({
+			event,
+			before: one.events.slice(0, at),
+			after: one.events.slice(at + 1),
+			capacity: one.capacity,
+			predict: one.predict,
+		})),
+	)
+	const prompts = rows.flatMap((row) =>
+		row.event.event === 'usage'
+			? [{ prompt: row.event.prompt, capacity: row.capacity, predict: row.predict }]
+			: [],
+	)
+	const aborts = rows.filter(
+		(row) => row.event.event === 'abort' && row.event.reason === 'overflow',
+	)
+	const firsts = aborts.filter((row) => {
+		const turn = row.before.findLast((one) => one.event === 'turn')
+		return turn?.event === 'turn' && turn.index === 0
+	})
+	const tools = rows.flatMap((row) =>
+		row.event.event === 'tool' ? [{ ...row, tool: row.event }] : [],
+	)
+	return {
+		calls: prompts.length,
+		over: prompts.filter((one) => one.prompt + one.predict > one.capacity).length,
+		overCapacity: prompts.filter((one) => one.prompt > one.capacity).length,
+		loads: tools.filter((one) => one.tool.success && one.tool.name === 'load').length,
+		remembers: tools.filter((one) => one.tool.success && one.tool.name === 'remember').length,
+		gated: aborts.length,
+		gatedAfterLoad: aborts.filter((row) => {
+			const turns = row.before.flatMap((one, at) => (one.event === 'turn' ? [at] : []))
+			const [earlier, latest] = turns.slice(-2)
+			return (
+				earlier !== undefined &&
+				latest !== undefined &&
+				row.before
+					.slice(earlier, latest)
+					.some((one) => one.event === 'tool' && one.success && one.name === 'load')
+			)
+		}).length,
+		first: firsts.length,
+		firstAfterSwitch: firsts.filter((row) =>
+			row.before.some((one) => one.event === 'tool' && one.selected),
+		).length,
+		requestsAfterSwitch: rows.filter(
+			(row) =>
+				row.event.event === 'respond' &&
+				row.before.some((one) => one.event === 'tool' && one.selected),
+		).length,
+		selected: tools.filter((one) => one.tool.selected).length,
+		carried: tools.filter((one) => {
+			if (!one.tool.selected) return false
+			const next = one.after.find((event) => event.event === 'request')
+			return next?.event === 'request' && next.carried
+		}).length,
+		denied: tools.filter((one) => one.tool.overflow).length,
+		rejected: rows.filter((row) => row.event.event === 'rejected' && row.event.overflow).length,
+		acts: rows.filter((row) => row.event.event === 'act').length,
+		acted: rows.filter(
+			(row) =>
+				row.event.event === 'request' &&
+				row.before
+					.slice(row.before.findLastIndex((one) => one.event === 'request') + 1)
+					.some((one) => one.event === 'act'),
+		).length,
+	}
+}
+
+/** Holds what one load-edge request read: whether the load was admitted, the abort reasons, the reported prompts, the passes, and the answer pass's request. */
+export interface LedgerEdge {
+	readonly loaded: boolean
+	readonly reasons: readonly unknown[]
+	readonly prompts: readonly number[]
+	readonly passes: number
+	readonly answer: ScriptedCall | undefined
+}
+
+/**
+ * Serves one request whose text is padded to a length, on a ledger at capacity 8192 with `predict`
+ * 40: the first turn loads `billing` and then reads the page `ledger_page` returns, which no room
+ * test prices, and the second makes a lookup.
+ *
+ * @param padding - The characters the request text carries beyond its sentence
+ * @returns What the request read
+ */
+export async function serveLedgerEdge(padding: number): Promise<LedgerEdge> {
+	const { options } = buildLedgerBuiltinOptions(
+		{ builtins: ['load', 'unload'] },
+		{
+			capacity: 8192,
+			predict: 40,
+			lookups: [
+				...(buildLedgerOptions().lookups ?? []),
+				...LEDGER_SKILL_LOOKUPS,
+				LEDGER_PAGE_LOOKUP,
+			],
+		},
+	)
+	const provider = new DensityLedgerProvider(
+		[
+			{ content: '' },
+			{ content: '' },
+			{
+				content: '',
+				tools: [
+					createToolCall({ id: 'l', name: 'load', arguments: { skill: 'billing' } }),
+					createToolCall({ id: 'p', name: 'ledger_page', arguments: { page: 1 } }),
+				],
+			},
+			{
+				content: '',
+				tools: [createToolCall({ id: 'k', name: 'lookup', arguments: { id: 'BW-20931' } })],
+			},
+			{ content: 'Done.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(provider, buildUncalibratedOptions(options))
+	const reasons = createRecorder<[reason: unknown]>()
+	const prompts = createRecorder<[prompt: number]>()
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	ledger.agent.emitter.on('usage', (usage) => prompts.handler(usage.prompt))
+	const result = await ledger.respond(`Open billing. ${'q'.repeat(padding)}`)
+	return {
+		loaded: ledger.conversation
+			.messages()
+			.some((message) => message.call === 'l' && message.content === BUILTIN_NOTES.loaded),
+		reasons: reasons.calls.map(([reason]) => reason),
+		prompts: prompts.calls.map(([prompt]) => prompt),
+		passes: result.passes.length,
+		answer: result.passes.length > 1 ? provider.calls.at(-1) : undefined,
+	}
+}
+
+/**
+ * Reports whether {@link serveLedgerEdge} loads `billing` at a padding. A request too long for any
+ * pass is refused with `'OVERFLOW'` and loads nothing; every other rejection rethrows.
+ *
+ * @param padding - The characters the request text carries beyond its sentence
+ * @returns Whether the load was admitted
+ */
+export async function admitsLedgerEdge(padding: number): Promise<boolean> {
+	return serveLedgerEdge(padding).then(
+		(edge) => edge.loaded,
+		(error: unknown) => {
+			if (isLedgerError(error) && error.code === 'OVERFLOW') return false
+			throw error
+		},
+	)
+}
+
+/**
+ * Finds the largest padding a test admits, by bisection between a padding it admits and one it refuses.
+ *
+ * @param admits - Reports whether a padding is admitted
+ * @param low - A padding it admits
+ * @param high - A padding it refuses
+ * @returns The largest admitted padding
+ */
+export async function bisectLedgerPadding(
+	admits: (padding: number) => Promise<boolean>,
+	low: number,
+	high: number,
+): Promise<number> {
+	if (high - low <= 1) return low
+	const middle = Math.floor((low + high) / 2)
+	return (await admits(middle))
+		? bisectLedgerPadding(admits, middle, high)
+		: bisectLedgerPadding(admits, low, middle)
+}
+
+/**
+ * Serves a `recall` on the turn after a load of the `wide` skill, whose ten tools carry long
+ * descriptions, over a number of stored sources, and reads how many sources the listing names.
+ *
+ * @param sources - The stored sources the recall can list
+ * @returns The listed count, and whether the listing was cut
+ */
+export async function serveLedgerWideRecall(
+	sources: number,
+): Promise<{ readonly listed: number; readonly cut: boolean }> {
+	const wide = Array.from({ length: 10 }, (_, at): LedgerLookup => ({
+		tool: createTool({
+			name: `wide_${at}`,
+			description: `Reads one wide record ${at} and reports every field it holds. `.repeat(4),
+			parameters: { type: 'object' },
+			execute: () => 'ran',
+		}),
+		read: () => undefined,
+	}))
+	const skills = createSkillManager()
+	skills.add({
+		name: 'wide',
+		description: 'Wide records',
+		content: 'Use the wide tools.',
+		tools: wide.map((one) => one.tool.name),
+	})
+	const provider = new DensityLedgerProvider(
+		[
+			{ content: '' },
+			{ content: '' },
+			{
+				content: '',
+				tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'wide' } })],
+			},
+			{
+				content: '',
+				tools: [createToolCall({ id: 'q', name: 'recall', arguments: { topic: 'zephyr' } })],
+			},
+			{ content: 'Done.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildUncalibratedOptions(
+			buildLedgerOptions({
+				capacity: 6000,
+				predict: 100,
+				share: { prompt: 1, tail: 0.001 },
+				lookups: [...(buildLedgerOptions().lookups ?? []), ...wide],
+				agent: { builtins: ['load', 'unload'], skills, authority: AGENT_AUTHORITY },
+			}),
+		),
+	)
+	ledger.conversation.add(
+		Array.from({ length: sources }, (_, at): MessageInput => ({
+			role: 'user',
+			content: `The zephyr drawer ${at} holds spare keys and the vault ledger. `.repeat(3),
+		})),
+	)
+	await ledger.respond('Where are the spare keys?')
+	const listing =
+		ledger.conversation.messages().find((message) => message.call === 'q')?.content ?? ''
+	return {
+		listed: Array.from({ length: sources }, (_, at) => at).filter((at) =>
+			listing.includes(`drawer ${at} `),
+		).length,
+		cut: /didn't fit|older items/.test(listing),
+	}
+}
+
+/** Holds the workspace `w1` a switch case registers, about 1000 tokens. */
+export const LEDGER_SWITCH_TEXT = `WORKSPACE-W1 ${'w'.repeat(4000)}`
+
+/** Holds what a switch case read: each tool message its requests stored, the provider calls, and whether each pass's first call carried `w1`. */
+export interface LedgerSwitch {
+	readonly contents: readonly string[]
+	readonly calls: number
+	readonly carried: readonly boolean[]
+}
+
+/**
+ * Builds a ledger with every built-in at capacity 20000 on `DensityLedgerProvider`, with the
+ * workspaces `w0`, active, and `w1`, a host scope that lists both, and, when `seeded`, a stored
+ * load of `billing`.
+ *
+ * @param predict - The generation cap
+ * @param turns - The scripted turns after calibration
+ * @param seeded - If `true`, the thread enters with `billing` loaded; if `false`, with nothing
+ * @returns The ledger and its provider
+ */
+export function buildLedgerSwitch(
+	predict: number,
+	turns: readonly ScriptedTurn[],
+	seeded: boolean,
+) {
+	const { options } = buildLedgerBuiltinOptions({}, { capacity: 20000, predict })
+	const provider = new DensityLedgerProvider(
+		[{ content: '' }, { content: '' }, ...turns, { content: 'Done.' }],
+		{ recorded: true },
+	)
+	const ledger = createLedger(provider, buildUncalibratedOptions(options))
+	ledger.agent.context.workspaces.add({
+		id: 'w0',
+		seed: [createFile({ path: 'w0.txt', content: createTextContent('W0 FILE', 'text') })],
+	})
+	ledger.agent.context.workspaces.add({
+		id: 'w1',
+		seed: [createFile({ path: 'w1.txt', content: createTextContent(LEDGER_SWITCH_TEXT, 'text') })],
+	})
+	ledger.agent.context.apply(createScope({ ...LEDGER_BUILTIN_SCOPE, workspaces: ['w0', 'w1'] }))
+	if (seeded) ledger.conversation.add(DISCLOSURE_LOAD_BILLING)
+	return { ledger, provider }
+}
+
+/**
+ * Serves a switch case at a `predict` that leaves the first turn's `switch w1` exactly the room its
+ * growth needs, moved by a shift: it reads the first call's prompt and completion and the growth on
+ * a measuring ledger, then serves two requests on a ledger with that `predict`.
+ *
+ * @param turns - The scripted turns after calibration; the first holds the `switch`
+ * @param shift - The tokens the room is short of the growth's need; 0 admits, 1 refuses
+ * @param seeded - If `true`, the thread enters with `billing` loaded
+ * @returns What the case read
+ */
+export async function serveLedgerSwitch(
+	turns: readonly ScriptedTurn[],
+	shift: number,
+	seeded: boolean,
+): Promise<LedgerSwitch> {
+	const measuring = buildLedgerSwitch(0, turns, seeded)
+	const gauge = await measuring.ledger.calibrate(new AbortController().signal)
+	const shown = seeded ? ['billing'] : []
+	const grow =
+		gauge.scale *
+		(estimateMessages(
+			measuring.ledger.agent.context.build({
+				disclosure: { skills: shown, workspace: 'w1' },
+				switchable: true,
+			}),
+		) -
+			estimateMessages(
+				measuring.ledger.agent.context.build({ disclosure: { skills: shown }, switchable: true }),
+			))
+	const usages = createRecorder<[prompt: number, completion: number]>()
+	measuring.ledger.agent.emitter.on('usage', (usage) =>
+		usages.handler(usage.prompt, usage.completion),
+	)
+	await measuring.ledger.respond('Use the north desk.')
+	const [prompt, completion] = requireValue(usages.calls[0])
+	const predict = 20000 - prompt - completion - Math.ceil(grow * (1 + LEDGER_SCALE_DRIFT)) + shift
+	const served = buildLedgerSwitch(predict, turns, seeded)
+	const requests = createRecorder<[index: number, carried: boolean]>()
+	served.ledger.agent.emitter.on('request', (index, sent) =>
+		requests.handler(
+			index,
+			sent.messages.some((message) => message.content.includes('WORKSPACE-W1')),
+		),
+	)
+	await served.ledger.respond('Use the north desk.')
+	await served.ledger.respond('And now?')
+	return {
+		// The seeded exchange's acknowledgement is the thread's, not the case's.
+		contents: readLedgerToolContents(served.ledger).slice(
+			seeded ? DISCLOSURE_LOAD_BILLING.filter((message) => message.role === 'tool').length : 0,
+		),
+		calls: served.provider.calls.length,
+		carried: requests.calls.filter(([index]) => index === 0).map(([, carried]) => carried),
+	}
+}
+
+/** Holds the lookup `ledger_page`, whose one page of 40 ledger lines estimates about 900 tokens. */
+export const LEDGER_PAGE_LOOKUP: LedgerLookup = Object.freeze({
+	tool: createTool({
+		name: 'ledger_page',
+		description: 'Reads one page of the desk ledger.',
+		parameters: { type: 'object' },
+		execute: () =>
+			Array.from({ length: 40 }, (_, at) => `Ledger line ${at}: a desk entry. `.repeat(3)).join(
+				'\n',
+			),
+	}),
+	read: () => undefined,
+})
+
+/**
+ * Builds ledger options with a unit gauge, a seed tail one token wide, and the lookup
+ * `ledger_page` beside the built-in ledger's own, at a capacity and with no `predict`: with `load`
+ * and `unload` enabled, or, under `builtins` `false`, with no built-in.
+ *
+ * @param capacity - The context capacity
+ * @param builtins - If `true`, `load` and `unload` are enabled; if `false`, no built-in is
+ * @returns The options
+ */
+export function buildLedgerPageOptions(capacity: number, builtins = true): LedgerOptions {
+	const overrides = {
+		capacity,
+		predict: 0,
+		gauge: { scale: 1, overhead: 0 },
+		share: { prompt: 1, tail: 0.001 },
+		lookups: [...(buildLedgerOptions().lookups ?? []), ...LEDGER_SKILL_LOOKUPS, LEDGER_PAGE_LOOKUP],
+	}
+	return builtins
+		? buildLedgerBuiltinOptions({ builtins: ['load', 'unload'] }, overrides).options
+		: buildLedgerOptions(overrides)
+}
+
+/**
+ * Holds the sentence a room case's first turn repeats in its lookup's note. The note rides in the
+ * call's arguments, so it grows the turn without lengthening any reply the result price reads.
+ */
+export const LEDGER_ROOM_SENTENCE = 'Reading the desk record before the batch. '
+
+/** Holds what a room case read: its ledger, the abort reasons, the result, and the provider calls. */
+export interface LedgerRoom {
+	readonly ledger: LedgerInterface
+	readonly reasons: readonly unknown[]
+	readonly result: LedgerResult
+	readonly calls: readonly ScriptedCall[]
+}
+
+/**
+ * Builds a room case's turns: a first turn that looks up the record `missing` with a note, the
+ * batch, and two answers, with each of the first two turns reporting its prompt when prompts are
+ * given.
+ *
+ * @param batch - The calls of the second turn
+ * @param note - The note the first turn's lookup carries
+ * @param prompts - The prompts the first two turns report, or `undefined` to report none
+ * @returns The turns
+ */
+export function buildLedgerRoomTurns(
+	batch: readonly ToolCall[],
+	note: string,
+	prompts?: readonly [first: number, second: number],
+): readonly ScriptedTurn[] {
+	return [
+		{
+			content: '',
+			tools: [createToolCall({ id: 'f', name: 'lookup', arguments: { id: 'missing', note } })],
+			...(prompts === undefined
+				? {}
+				: { usage: { prompt: prompts[0], completion: 0, total: prompts[0] } }),
+		},
+		{
+			content: '',
+			tools: [...batch],
+			...(prompts === undefined
+				? {}
+				: { usage: { prompt: prompts[1], completion: 0, total: prompts[1] } }),
+		},
+		{ content: 'Answered.' },
+		{ content: 'Unused.' },
+	]
+}
+
+/** Holds one measuring run of a room case: its two call estimates, and the tool messages stored when each call was evaluated. */
+export interface LedgerRoomRun {
+	readonly before: number
+	readonly after: number
+	readonly evaluated: ReadonlyMap<string, readonly Message[]>
+}
+
+/**
+ * Runs a room case once on a measuring ledger with a unit gauge, capacity 8192, and no `predict`,
+ * where every call is admitted, and reads which tool messages were stored when each call was
+ * evaluated. The host authority, which the ledger consults in the same step as its room test, logs
+ * each evaluation beside the agent's `tool` events, and each tool message is stored after its event.
+ *
+ * @param agent - The ledger's built-in options
+ * @param batch - The calls of the second turn
+ * @param note - The note the first turn's lookup carries
+ * @param scoped - If `true`, {@link LEDGER_BUILTIN_SCOPE} is applied
+ * @returns The first call's estimate and the second's, each rounded up, and each evaluated call's stored tool messages
+ */
+export async function runLedgerRoomMeasure(
+	agent: LedgerAgentOptions,
+	batch: readonly ToolCall[],
+	note: string,
+	scoped: boolean,
+): Promise<LedgerRoomRun> {
+	const order = createRecorder<[step: 'evaluate' | 'tool', id: string]>()
+	const measuring = createScriptedProvider(buildLedgerRoomTurns(batch, note), { recorded: true })
+	const measured = createLedger(
+		measuring,
+		buildLedgerBuiltinOptions(
+			{
+				...agent,
+				authority: {
+					evaluate: (context) => {
+						order.handler('evaluate', context.call.id)
+						return { zone: 'host', verdict: 'allow' }
+					},
+					ask: async () => true,
+				},
+			},
+			{ capacity: 8192, predict: 0, gauge: { scale: 1, overhead: 0 } },
+		).options,
+	)
+	measured.agent.emitter.on('tool', (call) => order.handler('tool', call.id))
+	if (scoped) measured.agent.context.apply(createScope(LEDGER_BUILTIN_SCOPE))
+	await measured.respond('Work the desk.')
+	const [first, second] = measuring.calls
+	const tools = measured.conversation.messages().filter((message) => message.role === 'tool')
+	return {
+		before: Math.ceil(estimateMessages(requireValue(first).messages)),
+		after: Math.ceil(estimateMessages(requireValue(second).messages)),
+		evaluated: new Map(
+			order.calls.flatMap(([step, id], at) => {
+				if (step !== 'evaluate') return []
+				const done = order.calls
+					.slice(0, at)
+					.flatMap(([earlier, called]) => (earlier === 'tool' ? [called] : []))
+				return [[id, tools.filter((message) => done.includes(message.call ?? ''))] as const]
+			}),
+		),
+	}
+}
+
+/** Holds what a room case's measuring runs read: the note, the two call estimates, and the result price each evaluated batch call was priced with. */
+export interface LedgerRoomMeasure {
+	readonly note: string
+	readonly before: number
+	readonly after: number
+	readonly results: ReadonlyArray<number | undefined>
+}
+
+/**
+ * Measures a room case: every term a room edge test sets its room from, read from measuring runs
+ * rather than set by hand, so a change to the head or to a note moves every edge with it.
+ *
+ * @remarks
+ * The served ledger reports each call's prompt equal to its estimate, so the measured rate is the
+ * scale. The first-call read prices the head with drift the reported prompt does not carry, so the
+ * first turn grows by that drift: one run reads the head with an empty note, and the note repeats
+ * {@link LEDGER_ROOM_SENTENCE} until the turn covers it. A second run, with that note, reads the two
+ * estimates the served ledger reports and the tool messages stored when each batch call was
+ * evaluated. The result price a call is evaluated against is the ledger's own: the longest of those
+ * messages at the scale, or the gauge's reserve, whichever is larger. A call the ledger never
+ * evaluated reads `undefined`.
+ *
+ * @param agent - The ledger's built-in options
+ * @param batch - The calls of the second turn
+ * @param scoped - If `true`, {@link LEDGER_BUILTIN_SCOPE} is applied to every ledger
+ * @returns The measure
+ */
+export async function measureLedgerRoom(
+	agent: LedgerAgentOptions,
+	batch: readonly ToolCall[],
+	scoped: boolean,
+): Promise<LedgerRoomMeasure> {
+	const bare = await runLedgerRoomMeasure(agent, batch, '', scoped)
+	const count = Math.max(
+		0,
+		Math.ceil(
+			(bare.before * LEDGER_SCALE_DRIFT - (bare.after - bare.before)) /
+				estimateTokens(LEDGER_ROOM_SENTENCE),
+		) + 1,
+	)
+	const note = LEDGER_ROOM_SENTENCE.repeat(count)
+	const run = await runLedgerRoomMeasure(agent, batch, note, scoped)
+	const reserve = new Gauge({ scale: 1, overhead: 0, capacity: 8192 }).reserve([], '')
+	const results = batch.map((call) => {
+		const stored = run.evaluated.get(call.id)
+		if (stored === undefined) return undefined
+		const longest = stored.reduce<Message | undefined>(
+			(found, message) =>
+				found === undefined || message.content.length > found.content.length ? message : found,
+			undefined,
+		)
+		return Math.max(longest === undefined ? 0 : estimateMessages([longest]), reserve)
+	})
+	return { note, before: run.before, after: run.after, results }
+}
+
+/**
+ * Serves a measured room case on a ledger with a unit gauge at capacity 8192, at a `predict` that
+ * leaves the batch a given room under the remainder its call measured, with a whole skills share.
+ *
+ * @param agent - The ledger's built-in options
+ * @param batch - The calls of the second turn
+ * @param measure - The case's measure, from {@link measureLedgerRoom}
+ * @param room - The tokens the remainder less `predict` holds when the batch is evaluated
+ * @param scoped - If `true`, {@link LEDGER_BUILTIN_SCOPE} is applied
+ * @returns What the served request read
+ */
+export async function serveLedgerRoom(
+	agent: LedgerAgentOptions,
+	batch: readonly ToolCall[],
+	measure: LedgerRoomMeasure,
+	room: number,
+	scoped: boolean,
+): Promise<LedgerRoom> {
+	const provider = createScriptedProvider(
+		buildLedgerRoomTurns(batch, measure.note, [measure.before, measure.after]),
+		{ recorded: true, repeat: false },
+	)
+	const ledger = createLedger(
+		provider,
+		buildLedgerBuiltinOptions(agent, {
+			capacity: 8192,
+			predict: 8192 - measure.after - room,
+			gauge: { scale: 1, overhead: 0 },
+			// The room is set through `predict`, which would otherwise shrink the skills share's budget
+			// with it; a whole share leaves the room clause the only one an edge reads.
+			share: { skills: 1 },
+		}).options,
+	)
+	if (scoped) ledger.agent.context.apply(createScope(LEDGER_BUILTIN_SCOPE))
+	const reasons = createRecorder<[reason: unknown]>()
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	const result = await ledger.respond('Work the desk.')
+	return {
+		ledger,
+		reasons: reasons.calls.map(([reason]) => reason),
+		result,
+		calls: provider.calls,
+	}
+}
+
+/** Holds what a gate-edge request read: the abort reasons, the passes, and the provider calls. */
+export interface LedgerGateEdge {
+	readonly reasons: readonly unknown[]
+	readonly passes: number
+	readonly calls: readonly ScriptedCall[]
+}
+
+/**
+ * Serves `load billing` on a ledger with a unit gauge at capacity 8192, at a `predict` that leaves
+ * the next turn exactly the room the turn gate prices, moved by a shift. A measuring ledger reads the
+ * two requests' estimates and the second's definitions; the served ledger reports the first call's
+ * prompt equal to its estimate, so the measured rate is the scale. Under `'reply'` that call also
+ * reports a completion of 7, which the gate credits against the turn's growth; under `'none'` it
+ * reports no usage, and the gate adds the slack of its estimate at the drift.
+ *
+ * @param shift - The tokens the room is short of the gate's price; 0 proceeds, 1 ends the pass
+ * @param report - What the first call reports: its prompt, its prompt and a completion, or nothing
+ * @returns What the served request read
+ */
+export async function serveLedgerGateEdge(
+	shift: number,
+	report: 'prompt' | 'reply' | 'none' = 'prompt',
+): Promise<LedgerGateEdge> {
+	const gauge = { scale: 1, overhead: 0 }
+	const load = createToolCall({ id: 'b', name: 'load', arguments: { skill: 'billing' } })
+	const measuring = createScriptedProvider([{ content: '', tools: [load] }, { content: 'Next.' }], {
+		recorded: true,
+	})
+	const measured = createLedger(
+		measuring,
+		buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{ capacity: 8192, predict: 0, gauge },
+		).options,
+	)
+	await measured.respond('Open billing.')
+	const [first, second] = measuring.calls
+	const before = estimateMessages(requireValue(first).messages)
+	const after = estimateMessages(requireValue(second).messages)
+	const definitions = [
+		...measured.agent.context.tools.definitions(),
+		...collectBuiltinDefinitions({ builtins: ['load', 'unload'] }),
+	]
+	const calibrated = definitions.filter((tool) => tool.name !== 'refund' && tool.name !== 'claim')
+	const grown =
+		(computeToolPrice(calibrated, requireValue(second).tools ?? [], gauge).added -
+			computeToolPrice(calibrated, requireValue(first).tools ?? [], gauge).added) *
+		(1 + LEDGER_SCALE_DRIFT)
+	const completion = report === 'reply' ? 7 : 0
+	const slack = report === 'none' ? before * LEDGER_SCALE_DRIFT : 0
+	const left = 8192 - before - (after - before) * (1 + LEDGER_SCALE_DRIFT) - slack - grown
+	const provider = createScriptedProvider(
+		[
+			report === 'none'
+				? { content: '', tools: [load] }
+				: {
+						content: '',
+						tools: [load],
+						usage: { prompt: before, completion, total: before + completion },
+					},
+			{ content: 'Next.' },
+			{ content: 'Done.' },
+		],
+		{ recorded: true, repeat: false },
+	)
+	const ledger = createLedger(
+		provider,
+		buildLedgerBuiltinOptions(
+			{ builtins: ['load', 'unload'] },
+			{ capacity: 8192, predict: Math.floor(left) + shift, gauge },
+		).options,
+	)
+	const reasons = createRecorder<[reason: unknown]>()
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	const result = await ledger.respond('Open billing.')
+	return {
+		reasons: reasons.calls.map(([reason]) => reason),
+		passes: result.passes.length,
+		calls: provider.calls,
+	}
+}
+
+/**
+ * Serves one request on a ledger whose host shows `billing` and whose scope hides `lookup`, so the
+ * first call spares a calibrated definition and adds one, at a capacity that leaves the first call
+ * exactly the room the first-call read prices, moved by a shift. A measuring ledger reads the first
+ * call's estimate and definitions.
+ *
+ * @param shift - The tokens the capacity is short of the read's price; 0 dispatches, 1 ends the pass
+ * @returns What the served request read
+ */
+export async function serveLedgerFirstEdge(shift: number): Promise<LedgerGateEdge> {
+	const gauge = { scale: 1, overhead: 300 }
+	const scope = createScope({
+		name: 'host',
+		tools: ['recall', 'load', 'unload', 'refund', 'claim'],
+	})
+	const agent = { builtins: ['load', 'unload'], disclosure: { skills: ['billing'] } } as const
+	const measuring = createScriptedProvider([{ content: 'Answered.' }], { recorded: true })
+	const measured = createLedger(
+		measuring,
+		buildLedgerBuiltinOptions(agent, { capacity: 20000, predict: 100, gauge }).options,
+	)
+	measured.agent.context.apply(scope)
+	await measured.respond('Check the refund.')
+	const [first] = measuring.calls
+	const definitions = [
+		...measured.agent.context.tools.definitions(),
+		...collectBuiltinDefinitions({ builtins: ['load', 'unload'] }),
+	]
+	const calibrated = definitions.filter((tool) => tool.name !== 'refund' && tool.name !== 'claim')
+	const { spared, added } = computeToolPrice(calibrated, requireValue(first).tools ?? [], gauge)
+	const price =
+		Math.max(0, gauge.overhead - spared) +
+		added +
+		gauge.scale * (1 + LEDGER_SCALE_DRIFT) * estimateMessages(requireValue(first).messages)
+	const provider = createScriptedProvider([{ content: 'Answered.' }], {
+		recorded: true,
+		repeat: false,
+	})
+	const ledger = createLedger(
+		provider,
+		buildLedgerBuiltinOptions(agent, {
+			capacity: Math.ceil(price) + 100 - shift,
+			predict: 100,
+			gauge,
+		}).options,
+	)
+	ledger.agent.context.apply(scope)
+	const reasons = createRecorder<[reason: unknown]>()
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	const result = await ledger.respond('Check the refund.')
+	return {
+		reasons: reasons.calls.map(([reason]) => reason),
+		passes: result.passes.length,
+		calls: provider.calls,
+	}
+}
+
+/** Holds the description of each wide host definition a host-act edge case advertises, about 150 estimate units. */
+export const LEDGER_HOST_WIDE = 'Reads one wide record and every field it holds. '.repeat(12)
+
+/**
+ * Names a host act a host-act edge case runs in the tool phase: free the tool the skill `wide`
+ * holds, add a manager tool, replace the calibrated `wide_calibrated` under its name by a longer
+ * text, narrow the scope to hide `wide_return` and widen it back, hide `remember` and then
+ * `wide_matched` in its place, or read the ledger page.
+ */
+export type LedgerHostAct =
+	| 'free'
+	| 'add'
+	| 'edit'
+	| 'narrow'
+	| 'widen'
+	| 'hide_remember'
+	| 'hide_matched'
+	| 'page'
+
+/** Lists the host acts a host-act edge ledger registers a tool for, `page` aside. */
+export const LEDGER_HOST_ACTS = Object.freeze<readonly LedgerHostAct[]>([
+	'free',
+	'add',
+	'edit',
+	'narrow',
+	'widen',
+	'hide_remember',
+	'hide_matched',
+])
+
+/** Holds what a host-act edge request read: the prompt and advertised count of each request the provider received, the abort reasons, and the calibrations. */
+export interface LedgerHostEdge {
+	readonly prompts: readonly number[]
+	readonly tools: readonly number[]
+	readonly reasons: readonly unknown[]
+	readonly calibrations: number
+}
+
+/**
+ * Runs one host act on a host-act edge ledger's context.
+ *
+ * @param ledger - The ledger whose context the act changes
+ * @param act - The act
+ * @param names - Every tool name the host scope lists
+ */
+export function applyLedgerHostAct(
+	ledger: LedgerInterface,
+	act: LedgerHostAct,
+	names: readonly string[],
+): void {
+	const context = ledger.agent.context
+	if (act === 'free')
+		context.skills.add({
+			name: 'wide',
+			description: 'Wide records',
+			content: 'Read the wide records.',
+			tools: [],
+		})
+	if (act === 'add')
+		context.tools.add(
+			createTool({
+				name: 'host_added',
+				description: LEDGER_HOST_WIDE,
+				parameters: { type: 'object' },
+				execute: () => 'host_added ran.',
+			}),
+		)
+	if (act === 'edit')
+		context.tools.add(
+			createTool({
+				name: 'wide_calibrated',
+				description: `${LEDGER_HOST_WIDE}${LEDGER_HOST_WIDE}`,
+				parameters: { type: 'object' },
+				execute: () => 'wide_calibrated ran.',
+			}),
+		)
+	const hidden =
+		act === 'narrow'
+			? 'wide_return'
+			: act === 'hide_remember'
+				? 'remember'
+				: act === 'hide_matched'
+					? 'wide_matched'
+					: undefined
+	if (hidden !== undefined || act === 'widen')
+		context.apply(
+			createScope({ name: act, tools: names.filter((name) => name !== hidden), memos: ['pref'] }),
+		)
+}
+
+/**
+ * Builds a host-act edge ledger: every built-in, the memo `pref`, a skill `wide` that holds the
+ * tool `wide_held`, the calibrated tools `wide_calibrated`, `wide_matched`, and `wide_return`, and
+ * one host tool per act, on `DensityLedgerProvider` at capacity 20000. `wide_matched` estimates 10
+ * units more than `remember`, so hiding one for the other leaves the advertised count unchanged.
+ * `wide_return`, which `narrow` hides and `widen` shows, estimates about 1500 units. The thread holds
+ * one hidden fact, so every call offers `recall` and a scope change alone moves the count.
+ *
+ * @param acts - The acts, one call a turn, in order
+ * @param predict - The generation cap
+ * @returns The ledger and its provider
+ */
+export function buildLedgerHostEdge(
+	acts: readonly LedgerHostAct[],
+	predict: number,
+): { readonly ledger: LedgerInterface; readonly provider: DensityLedgerProvider } {
+	const holder: { ledger?: LedgerInterface } = {}
+	const remember = requireValue(collectBuiltinDefinitions({ builtins: ['remember'] })[0])
+	const empty = JSON.stringify({
+		name: 'wide_matched',
+		description: '',
+		parameters: { type: 'object' },
+	})
+	const matched = 'm'.repeat(Math.max(0, JSON.stringify(remember).length + 40 - empty.length))
+	const names = [
+		'lookup',
+		'recall',
+		'ledger_page',
+		'wide_held',
+		'wide_calibrated',
+		'wide_matched',
+		'wide_return',
+		'host_added',
+		...LEDGER_HOST_ACTS,
+		...BUILTIN_NAMES,
+	]
+	const wide = [
+		['wide_held', LEDGER_HOST_WIDE],
+		['wide_calibrated', LEDGER_HOST_WIDE],
+		['wide_matched', matched],
+		['wide_return', LEDGER_HOST_WIDE.repeat(10)],
+	] as const
+	const lookups = [
+		...(buildLedgerOptions().lookups ?? []),
+		LEDGER_PAGE_LOOKUP,
+		...wide.map(([name, description]): LedgerLookup => ({
+			tool: createTool({
+				name,
+				description,
+				parameters: { type: 'object' },
+				execute: () => `${name} ran.`,
+			}),
+			read: () => undefined,
+		})),
+		...LEDGER_HOST_ACTS.map((act): LedgerLookup => ({
+			tool: createTool({
+				name: act,
+				description: `Runs the host act ${act}.`,
+				parameters: { type: 'object' },
+				execute: () => {
+					if (holder.ledger !== undefined) applyLedgerHostAct(holder.ledger, act, names)
+					return 'Done.'
+				},
+			}),
+			read: () => undefined,
+		})),
+	]
+	const { options } = buildLedgerBuiltinOptions({}, { capacity: 20000, predict, lookups })
+	const provider = new DensityLedgerProvider(
+		[
+			{ content: '' },
+			{ content: '' },
+			...acts.map((act, at) => ({
+				content: '',
+				tools: [
+					createToolCall({
+						id: `a${at}`,
+						name: act === 'page' ? 'ledger_page' : act,
+						arguments: act === 'page' ? { page: 1 } : {},
+					}),
+				],
+			})),
+			{ content: 'Answered.' },
+			{ content: 'Answered.' },
+			{ content: '' },
+			{ content: '' },
+			{ content: 'Again.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(provider, buildUncalibratedOptions(options))
+	holder.ledger = ledger
+	ledger.agent.context.skills.add({
+		name: 'wide',
+		description: 'Wide records',
+		content: 'Read the wide records.',
+		tools: ['wide_held'],
+	})
+	ledger.agent.context.apply(createScope({ name: 'host', tools: names, memos: ['pref'] }))
+	seedLedgerRecall(ledger)
+	return { ledger, provider }
+}
+
+/**
+ * Serves one host-act edge request, then a second request, and reads every request of both.
+ *
+ * @param acts - The acts, one call a turn, in order
+ * @param predict - The generation cap
+ * @returns What the requests read; `calibrations` counts the calibrations the second request ran
+ */
+export async function serveLedgerHostEdge(
+	acts: readonly LedgerHostAct[],
+	predict: number,
+): Promise<LedgerHostEdge> {
+	const { ledger, provider } = buildLedgerHostEdge(acts, predict)
+	const prompts = createRecorder<[prompt: number]>()
+	const tools = createRecorder<[count: number]>()
+	const reasons = createRecorder<[reason: unknown]>()
+	// A request the gate stops still emits its event, so a count is kept only for a request the
+	// provider received, which reports usage.
+	const composed = { count: 0 }
+	ledger.agent.emitter.on('request', (_index, sent) => {
+		composed.count = sent.tools?.length ?? 0
+	})
+	ledger.agent.emitter.on('usage', (usage) => {
+		prompts.handler(usage.prompt)
+		tools.handler(composed.count)
+	})
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	await ledger.respond('Work the desk.')
+	const first = provider.calls.length
+	const sent = prompts.calls.length
+	await ledger.respond('Again.')
+	return {
+		prompts: prompts.calls.map(([prompt]) => prompt),
+		tools: tools.calls.map(([count]) => count),
+		reasons: reasons.calls.map(([reason]) => reason),
+		// Every pass call the provider received reports usage; the rest are calibration pairs.
+		calibrations: (provider.calls.length - first - (prompts.calls.length - sent)) / 2,
+	}
+}
+
+/**
+ * Reads a host-act edge: the largest `predict` at which the turn after the last act is dispatched,
+ * and the requests at it and one token past it.
+ *
+ * @param acts - The acts, one call a turn, in order
+ * @returns The edge `predict`, and what each side read
+ */
+export async function bisectLedgerHostEdge(acts: readonly LedgerHostAct[]): Promise<{
+	readonly edge: number
+	readonly at: LedgerHostEdge
+	readonly beyond: LedgerHostEdge
+}> {
+	const edge = await bisectLedgerPadding(
+		async (predict) =>
+			(await serveLedgerHostEdge(acts, predict)).tools
+				.slice(0, acts.length + 1)
+				.filter((count) => count > 0).length > acts.length,
+		0,
+		19000,
+	)
+	return {
+		edge,
+		at: await serveLedgerHostEdge(acts, edge),
+		beyond: await serveLedgerHostEdge(acts, edge + 1),
+	}
+}
+
+/** Holds the capacity and `predict` of claim 3.32's ledger, taverna's: a limit of 15872. */
+export const LEDGER_RECORD_ROOM = Object.freeze({ capacity: 19968, predict: 4096 })
+
+/**
+ * Builds claim 3.32's ledger in taverna's shape, with no built-in: 104 lookups whose definitions
+ * price about 14000 at the density, and an active workspace of capped records, on
+ * `DensityLedgerProvider`, uncalibrated.
+ *
+ * @param records - The records the workspace holds
+ * @returns The ledger and its provider
+ */
+export function buildLedgerRecordShape(records: number): {
+	readonly ledger: LedgerInterface
+	readonly provider: DensityLedgerProvider
+} {
+	const lookups = Array.from({ length: 104 }, (_, at): LedgerLookup => ({
+		tool: createTool({
+			name: `area_tool_${at}`,
+			description: `Reads one record of area ${at}. `.padEnd(340, '.'),
+			parameters: { type: 'object' },
+			execute: () => `Record ${at}.`,
+		}),
+		read: () => undefined,
+	}))
+	const provider = new DensityLedgerProvider(
+		[{ content: '' }, { content: '' }, { content: 'From the records.' }, { content: 'Again.' }],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildUncalibratedOptions(
+			buildLedgerOptions({
+				...LEDGER_RECORD_ROOM,
+				lookups: [...(buildLedgerOptions().lookups ?? []), ...lookups],
+			}),
+		),
+	)
+	ledger.agent.context.workspaces.add({
+		id: 'records',
+		seed: Array.from({ length: records }, (_, at) =>
+			createFile({
+				path: `record-${at}.md`,
+				content: createTextContent(`RECORD-${at} ${'r'.repeat(1250)}`, 'text'),
+			}),
+		),
+	})
+	return { ledger, provider }
+}
+
+/**
+ * Builds a ledger with no built-in whose first turn calls `big_lookup`, a lookup whose result
+ * exceeds the remainder at capacity 4096 and `predict` 100, on `DensityLedgerProvider`, uncalibrated.
+ *
+ * @returns The ledger and its provider
+ */
+export function buildLedgerOversizedLookup(): {
+	readonly ledger: LedgerInterface
+	readonly provider: DensityLedgerProvider
+} {
+	const provider = new DensityLedgerProvider(
+		[
+			{ content: '' },
+			{ content: '' },
+			{ content: '', tools: [createToolCall({ id: 'b', name: 'big_lookup', arguments: {} })] },
+			{ content: 'Answered.' },
+		],
+		{ recorded: true },
+	)
+	const ledger = createLedger(
+		provider,
+		buildUncalibratedOptions(
+			buildLedgerOptions({
+				capacity: 4096,
+				predict: 100,
+				lookups: [
+					...(buildLedgerOptions().lookups ?? []),
+					{
+						tool: createTool({
+							name: 'big_lookup',
+							description: 'Reads one large record.',
+							parameters: { type: 'object' },
+							execute: () => `Large record. ${'L'.repeat(20000)}`,
+						}),
+						read: () => undefined,
+					},
+				],
+			}),
+		),
+	)
+	return { ledger, provider }
+}
+
+/** Holds what a stated-gauge run read: the stated scale and overhead, each call's charge, reported or recorded, and estimate, the abort reasons, the gauge's scale after each request, and the provider calls. */
+export interface LedgerStatedRun {
+	readonly scale: number
+	readonly overhead: number
+	readonly charges: readonly number[]
+	readonly estimates: readonly number[]
+	readonly reasons: readonly unknown[]
+	readonly scales: readonly number[]
+	readonly calls: number
+}
+
+/**
+ * Builds the options of a stated-gauge ledger: no built-in, no `predict`, and twelve lookups
+ * beside the default one, whose definitions the gauge's overhead prices.
+ *
+ * @param capacity - The context capacity
+ * @returns The options, uncalibrated
+ */
+export function buildLedgerStatedOptions(capacity: number): Omit<LedgerOptions, 'gauge'> {
+	return buildUncalibratedOptions(
+		buildLedgerOptions({
+			capacity,
+			predict: 0,
+			lookups: [
+				...(buildLedgerOptions().lookups ?? []),
+				...Array.from({ length: 12 }, (_, at): LedgerLookup => ({
+					tool: createTool({
+						name: `stated_${at}`,
+						description: `Reads one stated record ${at}. `.padEnd(300, '.'),
+						parameters: { type: 'object' },
+						execute: () => `Stated record ${at}.`,
+					}),
+					read: () => undefined,
+				})),
+			],
+		}),
+	)
+}
+
+/**
+ * Serves requests on a ledger with no built-in whose supplied gauge is the one a twin's `calibrate`
+ * returned on `DensityLedgerProvider`, with its overhead times a factor. The served provider is
+ * that provider, or its silent twin, which reports no usage. The served thread holds one hidden fact,
+ * so each first call offers `recall` and advertises every calibrated definition.
+ *
+ * @param factor - What the stated overhead is times the measured one
+ * @param capacity - The context capacity
+ * @param silent - If `true`, the provider reports no usage and records each charge
+ * @param requests - The request texts, served in order
+ * @returns What the requests read
+ */
+export async function serveLedgerStatedGauge(
+	factor: number,
+	capacity: number,
+	silent: boolean,
+	requests: readonly string[],
+): Promise<LedgerStatedRun> {
+	const twin = createLedger(
+		new DensityLedgerProvider([{ content: '' }, { content: '' }], { recorded: true }),
+		buildLedgerStatedOptions(capacity),
+	)
+	const measured = await twin.calibrate(new AbortController().signal)
+	const charges = createRecorder<[charge: number]>()
+	const script = requests.flatMap(() => [{ content: 'Answered.' }, { content: 'Answered.' }])
+	const provider = silent
+		? new SilentDensityLedgerProvider(script, { recorded: true }, (charge) =>
+				charges.handler(charge),
+			)
+		: new DensityLedgerProvider(script, { recorded: true })
+	const ledger = createLedger(provider, {
+		...buildLedgerStatedOptions(capacity),
+		gauge: { scale: measured.scale, overhead: measured.overhead * factor },
+	})
+	// A hidden fact offers `recall`, so the first call advertises every calibrated definition.
+	seedLedgerRecall(ledger)
+	const estimates = createRecorder<[estimate: number]>()
+	const reasons = createRecorder<[reason: unknown]>()
+	ledger.agent.emitter.on('usage', (usage) => charges.handler(usage.prompt))
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	ledger.agent.emitter.on('request', (_index, sent) =>
+		estimates.handler(estimateMessages(sent.messages)),
+	)
+	const scales: number[] = []
+	for (const request of requests) {
+		await ledger.respond(request)
+		scales.push(ledger.gauge?.scale ?? 0)
+	}
+	return {
+		scale: measured.scale,
+		overhead: measured.overhead * factor,
+		charges: charges.calls.map(([charge]) => charge),
+		estimates: estimates.calls.map(([estimate]) => estimate),
+		reasons: reasons.calls.map(([reason]) => reason),
+		scales,
+		calls: provider.calls.length,
+	}
+}
+
+/**
+ * Charges each scripted call as {@link DensityLedgerProvider} does, except that a call whose
+ * messages estimate under 14000 units is charged 1.3 a message unit: a model whose rate on a short
+ * request exceeds the one calibration measured over a long thread.
+ */
+export class SteppedDensityLedgerProvider extends ScriptedProvider {
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const result = yield* super.stream(messages, signal, tools, options)
+		const prompt = chargeDensityPrompt(messages, tools, {
+			...LEDGER_DENSITY_RATES,
+			...(estimateMessages(messages) < 14000 ? { scale: 1.3 } : {}),
+		})
+		return { ...result, usage: { prompt, completion: 0, total: prompt } }
+	}
+}
+
+/** Holds what an answer-growth request read: each reported prompt, the abort reasons, and whether `respond` rejected. */
+export interface LedgerAnswerGrowth {
+	readonly prompts: readonly number[]
+	readonly reasons: readonly unknown[]
+	readonly rejected: boolean
+}
+
+/**
+ * Serves one long request on a ledger with no built-in on {@link SteppedDensityLedgerProvider},
+ * uncalibrated, at capacity 12000 and no `predict`, over a thread that holds one hidden fact. The
+ * first pass answers nothing, so the answer pass opens, and when it starts the host grows the active
+ * workspace by a number of characters.
+ *
+ * @param growth - The characters the host adds to the workspace when the answer pass starts
+ * @returns What the request read
+ */
+export async function serveLedgerAnswerGrowth(growth: number): Promise<LedgerAnswerGrowth> {
+	const ledger = createLedger(
+		new SteppedDensityLedgerProvider(
+			[{ content: '' }, { content: '' }, { content: '' }, { content: 'Answered.' }],
+			{ recorded: true },
+		),
+		buildUncalibratedOptions(buildLedgerOptions({ capacity: 12000, predict: 0 })),
+	)
+	ledger.agent.context.workspaces.add({
+		id: 'w0',
+		seed: [createFile({ path: 'w0.txt', content: createTextContent('W0 FILE', 'text') })],
+	})
+	ledger.agent.context.apply(createScope({ name: 'host', workspaces: ['w0'] }))
+	seedLedgerRecall(ledger)
+	const prompts = createRecorder<[prompt: number]>()
+	const reasons = createRecorder<[reason: unknown]>()
+	ledger.agent.emitter.on('usage', (usage) => prompts.handler(usage.prompt))
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	ledger.agent.emitter.on('start', () => {
+		if (ledger.conversation.messages().at(-1)?.content === LEDGER_NOTES.cue)
+			ledger.agent.context.workspaces.active?.write('w0.txt', `GROWN ${'g'.repeat(growth)}`)
+	})
+	const rejected = await ledger.respond(`Review the desk. ${'q'.repeat(12000)}`).then(
+		() => false,
+		() => true,
+	)
+	return {
+		prompts: prompts.calls.map(([prompt]) => prompt),
+		reasons: reasons.calls.map(([reason]) => reason),
+		rejected,
+	}
+}
+
+/** Holds the definitions of claim 3.35's ledger: 120 lookups of about 113 estimate units each. */
+export const LEDGER_LIVE_LOOKUPS: readonly LedgerLookup[] = Object.freeze(
+	Array.from({ length: 120 }, (_, at): LedgerLookup => ({
+		tool: createTool({
+			name: `live_tool_${at}`,
+			description: `Reads one record of the live catalog, number ${at}. `.padEnd(400, '.'),
+			parameters: { type: 'object' },
+			execute: () => `Live record ${at}.`,
+		}),
+		read: () => undefined,
+	})),
+)
+
+/**
+ * Holds what a live-rate request read: each reported prompt, the abort reasons, each provider call's
+ * definition count, and the gauge's scale at each request the agent sent and once the request settled.
+ */
+export interface LedgerLiveRates {
+	readonly prompts: readonly number[]
+	readonly reasons: readonly unknown[]
+	readonly calls: ReadonlyArray<number | undefined>
+	readonly scales: ReadonlyArray<number | undefined>
+	readonly settled: number | undefined
+}
+
+/**
+ * Serves one request on claim 3.35's ledger: no built-in, the default lookup, `recall`, and
+ * {@link LEDGER_LIVE_LOOKUPS}, so 122 definitions are calibrated, with a host scope that advertises
+ * the lookup and the first `shown` of the others, on a {@link RatedLedgerProvider} at
+ * {@link LEDGER_LIVE_RATES}, uncalibrated, with no `predict`.
+ *
+ * @param capacity - The context capacity
+ * @param shown - How many of {@link LEDGER_LIVE_LOOKUPS} the scope advertises beside the lookup
+ * @returns What the request read
+ */
+export async function serveLedgerLiveRates(capacity: number, shown = 41): Promise<LedgerLiveRates> {
+	const provider = new RatedLedgerProvider(
+		[{ content: '' }, { content: '' }, { content: 'Answered.' }, { content: 'Answered.' }],
+		{ recorded: true },
+		LEDGER_LIVE_RATES,
+	)
+	const ledger = createLedger(
+		provider,
+		buildUncalibratedOptions(
+			buildLedgerOptions({
+				capacity,
+				predict: 0,
+				lookups: [...(buildLedgerOptions().lookups ?? []), ...LEDGER_LIVE_LOOKUPS],
+			}),
+		),
+	)
+	ledger.agent.context.apply(
+		createScope({
+			name: 'host',
+			tools: ['lookup', ...LEDGER_LIVE_LOOKUPS.slice(0, shown).map((lookup) => lookup.tool.name)],
+		}),
+	)
+	const prompts = createRecorder<[prompt: number]>()
+	const reasons = createRecorder<[reason: unknown]>()
+	ledger.agent.emitter.on('usage', (usage) => prompts.handler(usage.prompt))
+	const scales = createRecorder<[scale: number | undefined]>()
+	ledger.agent.emitter.on('abort', (reason) => reasons.handler(reason))
+	ledger.agent.emitter.on('request', () => scales.handler(ledger.gauge?.scale))
+	await ledger.respond('Show the open accounts.')
+	return {
+		prompts: prompts.calls.map(([prompt]) => prompt),
+		reasons: reasons.calls.map(([reason]) => reason),
+		calls: provider.calls.map((call) => call.tools?.length),
+		scales: scales.calls.map(([scale]) => scale),
+		settled: ledger.gauge?.scale,
+	}
 }

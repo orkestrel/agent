@@ -1,0 +1,47 @@
+{
+	"id": "c5",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Is invoice INV-3310 paid?",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "The card on file for Omar Haddad expired, send him a link to replace it.",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Give Omar Haddad 20 dollars of store credit for the trouble.",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Cancel Omar Haddad's subscription at the end of the period.",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "Flag Omar Haddad's account, he has three chargebacks.",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Create a customer record for Lena Fischer, lena.f@example.com.",
+				"area": "customers"
+			}
+		}
+	]
+}

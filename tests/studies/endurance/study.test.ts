@@ -280,8 +280,11 @@ describe('prospective public endurance declarations', () => {
 			version: '0.40.14',
 			models: [model, judge],
 		}
-		expect(isStudyProvider({ ...provider, daemon })).toBe(true)
-		expect(isStudyProvider({ ...provider, daemon: { ...daemon, models: [model] } })).toBe(false)
+		// The profile names the default Ollama, which an owned daemon can't take: Study refuses port 11434 there.
+		const owned = { ...provider, url: 'http://127.0.0.1:41435' }
+		expect(isStudyProvider({ ...provider, daemon })).toBe(false)
+		expect(isStudyProvider({ ...owned, daemon })).toBe(true)
+		expect(isStudyProvider({ ...owned, daemon: { ...daemon, models: [model] } })).toBe(false)
 	})
 
 	it('admits identical schedules and the pinned finite recommended profile while keeping semantics independently unknown', async () => {
@@ -296,6 +299,7 @@ describe('prospective public endurance declarations', () => {
 		)
 		expect(recommended.record).toEqual({ bytes: 536870912, calls: 4096, duration: 2400000 })
 		expect(isStudyMemoryOptions(recommended.settings)).toBe(true)
+		expect(recommended.provider?.daemon).toBeUndefined()
 		expect(recommended).toMatchObject({
 			name: 'recommended',
 			agent: 'dist/src/core/index.js',
@@ -303,7 +307,7 @@ describe('prospective public endurance declarations', () => {
 			qualification: 'tmp/studies/qualification',
 			provider: {
 				entry: 'node_modules/@orkestrel/ollama/dist/src/core/index.js',
-				url: 'http://127.0.0.1:11435',
+				url: 'http://127.0.0.1:11434',
 				model: 'qwen3.5:4b-q4_K_M',
 				judge: 'hf.co/sky7350/Mica-v0.1-4B:Q4_K_M',
 				triage: 'tev1:0.8b',
@@ -311,32 +315,6 @@ describe('prospective public endurance declarations', () => {
 					model: 'd8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04',
 					judge: 'ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b',
 					triage: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
-				},
-				daemon: {
-					executable:
-						'C:\\Users\\mikes\\WebstormProjects\\agent\\tmp\\studies\\runner\\ollama-0.40.15\\ollama.exe',
-					digest: '544216ca2082b8bc19b4ba94b513f0098fa06774b232f3c140090e3449e322a5',
-					version: '0.40.15',
-					models: [
-						{
-							name: 'qwen3.5:4b-q4_K_M',
-							digest: 'd8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04',
-						},
-						{
-							name: 'hf.co/sky7350/Mica-v0.1-4B:Q4_K_M',
-							digest: 'ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b',
-						},
-						{
-							name: 'tev1:0.8b',
-							digest: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
-						},
-					],
-					environment: {
-						OLLAMA_NUM_PARALLEL: '1',
-						OLLAMA_MAX_LOADED_MODELS: '0',
-						LLAMA_ARG_CONTEXT_SHIFT: '0',
-						OLLAMA_NOPRUNE: '1',
-					},
 				},
 			},
 			record: { bytes: 536870912, calls: 4096, duration: 2400000 },

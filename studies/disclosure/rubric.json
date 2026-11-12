@@ -1,0 +1,467 @@
+{
+	"version": "1",
+	"criteria": [
+		{
+			"id": "c1-turn-1",
+			"scenario": "c1",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "status",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c1-turn-2",
+			"scenario": "c1",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "order_items",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c1-turn-3",
+			"scenario": "c1",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "invoice_lookup",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "c1-turn-4",
+			"scenario": "c1",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "issue_refund",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "c1-turn-5",
+			"scenario": "c1",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "reship_order",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c1-turn-6",
+			"scenario": "c1",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "status",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c2-turn-1",
+			"scenario": "c2",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "find_customer",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "c2-turn-2",
+			"scenario": "c2",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "update_contact",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "c2-turn-3",
+			"scenario": "c2",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "open_ticket",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c2-turn-4",
+			"scenario": "c2",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "assign_ticket",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c2-turn-5",
+			"scenario": "c2",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "note",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c2-turn-6",
+			"scenario": "c2",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "customer_history",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "c3-turn-1",
+			"scenario": "c3",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "find_product",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "c3-turn-2",
+			"scenario": "c3",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "stock_level",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "c3-turn-3",
+			"scenario": "c3",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "reserve_stock",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "c3-turn-4",
+			"scenario": "c3",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "restock_item",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "c3-turn-5",
+			"scenario": "c3",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "set_price",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "c3-turn-6",
+			"scenario": "c3",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "discontinue_item",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "c4-turn-1",
+			"scenario": "c4",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "staff_on_call",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "c4-turn-2",
+			"scenario": "c4",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "shift_schedule",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "c4-turn-3",
+			"scenario": "c4",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "assign_shift",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "c4-turn-4",
+			"scenario": "c4",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "escalate_ticket",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c4-turn-5",
+			"scenario": "c4",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "note",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c4-turn-6",
+			"scenario": "c4",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "close_ticket",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c5-turn-1",
+			"scenario": "c5",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "payment_status",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "c5-turn-2",
+			"scenario": "c5",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "update_card",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "c5-turn-3",
+			"scenario": "c5",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "apply_credit",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "c5-turn-4",
+			"scenario": "c5",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "cancel_subscription",
+				"area": "billing"
+			}
+		},
+		{
+			"id": "c5-turn-5",
+			"scenario": "c5",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "flag_customer",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "c5-turn-6",
+			"scenario": "c5",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "create_customer",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "c6-turn-1",
+			"scenario": "c6",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "track_package",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c6-turn-2",
+			"scenario": "c6",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "change_address",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c6-turn-3",
+			"scenario": "c6",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "cancel_order",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c6-turn-4",
+			"scenario": "c6",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "log_hours",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "c6-turn-5",
+			"scenario": "c6",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "staff_contact",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "c6-turn-6",
+			"scenario": "c6",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "status",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c7-turn-1",
+			"scenario": "c7",
+			"goal": "turn-1",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "find_ticket",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c7-turn-2",
+			"scenario": "c7",
+			"goal": "turn-2",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "merge_customers",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "c7-turn-3",
+			"scenario": "c7",
+			"goal": "turn-3",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "request_leave",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "c7-turn-4",
+			"scenario": "c7",
+			"goal": "turn-4",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "note",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "c7-turn-5",
+			"scenario": "c7",
+			"goal": "turn-5",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "status",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "c7-turn-6",
+			"scenario": "c7",
+			"goal": "turn-6",
+			"method": "state",
+			"critical": false,
+			"assertion": {
+				"tool": "invoice_lookup",
+				"area": "billing"
+			}
+		}
+	]
+}

@@ -6,6 +6,7 @@ import type {
 	LedgerRecord,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
+import { estimateTokens, LEDGER_SCALE_DRIFT } from '@src/core'
 import {
 	collectRecallMessages,
 	collectRetiredFindings,
@@ -38,7 +39,10 @@ import {
 	collectRegistry,
 	collectAmendments,
 	collectWriteSupersessions,
+	computeSkillPrice,
 	computeThinking,
+	computeToolDensity,
+	computeToolPrice,
 	resolvePredict,
 	rankLedgerCut,
 	cutListing,
@@ -82,6 +86,14 @@ import {
 	LEDGER_OWNER_PROJECTION,
 	buildLedgerLine,
 	replaceLedgerRecord,
+	buildDensityDefinition,
+	LEDGER_DENSITY_CALIBRATION,
+	LEDGER_DENSITY_CORE,
+	LEDGER_DENSITY_SAMPLES,
+	LEDGER_LIVE_LOOKUPS,
+	LEDGER_LIVE_RATES,
+	LEDGER_PRICE_DEFINITIONS,
+	LEDGER_TOOL_PRICE_CASES,
 } from '../../../setup.js'
 
 describe('extracted ledger leaves', () => {
@@ -2752,5 +2764,110 @@ describe('fitSlope', () => {
 		groups[0] = [buildGaugeCall(100, 100, 1), buildGaugeCall(200, 200, 1)]
 		groups[2] = [buildGaugeCall(100, 150, 1), buildGaugeCall(300, 350, 1)]
 		expect(captureError(() => fitSlope(groups))).toBeInstanceOf(TypeError)
+	})
+})
+
+describe('computeToolPrice', () => {
+	it.each(LEDGER_TOOL_PRICE_CASES)('$title', ({ advertised, gauge, spared, added }) => {
+		const calibrated = [LEDGER_PRICE_DEFINITIONS.a, LEDGER_PRICE_DEFINITIONS.b]
+		expect(computeToolPrice(calibrated, advertised, gauge)).toEqual({ spared, added })
+	})
+
+	it('prices 42 of 122 definitions on a model whose definitions cost less a unit than its messages within 1.06 of the charge', () => {
+		const calibrated = LEDGER_LIVE_LOOKUPS.map(({ tool }) => ({
+			name: tool.name,
+			description: tool.description ?? '',
+			parameters: { type: 'object' },
+		}))
+		const advertised = calibrated.slice(0, 42)
+		const { scale, definitions } = LEDGER_LIVE_RATES
+		const overhead = definitions * estimateTokens(JSON.stringify(calibrated))
+		const { spared, added } = computeToolPrice(calibrated, advertised, { scale, overhead })
+		const messages = 400
+		const price = Math.max(0, overhead - spared) + added + scale * messages
+		const charge = scale * messages + definitions * estimateTokens(JSON.stringify(advertised))
+		expect(price * (1 + LEDGER_SCALE_DRIFT)).toBeGreaterThanOrEqual(charge)
+		expect(price).toBeLessThanOrEqual(charge * (1 + LEDGER_SCALE_DRIFT))
+	})
+
+	it('adds at scale over an empty calibrated set, and spares nothing', () => {
+		expect(
+			computeToolPrice([], [LEDGER_PRICE_DEFINITIONS.extra], { scale: 1.2, overhead: 0 }),
+		).toEqual({ spared: 0, added: 120 })
+	})
+
+	it('prices every density sample the 4B read at or above the tokens it added to the core', () => {
+		const { scale, overhead, noise, estimate } = LEDGER_DENSITY_CALIBRATION
+		const core = LEDGER_DENSITY_CORE.map(buildDensityDefinition)
+		expect(estimateTokens(JSON.stringify(core))).toBe(estimate)
+		const rows = LEDGER_DENSITY_SAMPLES.map((sample) => {
+			const definitions = sample.rows.map(buildDensityDefinition)
+			return {
+				name: sample.name,
+				estimate: estimateTokens(JSON.stringify(definitions)),
+				priced: computeToolPrice(core, [...core, ...definitions], { scale, overhead }).added,
+				bare: computeToolPrice(core, [...core, ...definitions], { scale, overhead: 0 }).added,
+				added: sample.added,
+				recorded: sample.estimate,
+			}
+		})
+		expect(rows.map((row) => row.name)).toEqual([
+			'desk-tickets',
+			'desk-customers',
+			'desk-billing',
+			'desk-orders',
+			'desk-inventory',
+			'desk-staff',
+			'taverna-policies',
+			'taverna-claims',
+			'taverna-contacts',
+		])
+		for (const row of rows) {
+			expect(row.estimate).toBe(row.recorded)
+			expect(row.priced + noise).toBeGreaterThanOrEqual(row.added)
+		}
+		// The control: at scale alone, the addition term underprices what the 4B read.
+		expect(rows.filter((row) => row.bare + noise < row.added).length).toBeGreaterThan(0)
+	})
+})
+
+describe('computeToolDensity', () => {
+	it.each([
+		['the overhead per estimate unit when it exceeds scale', { scale: 1.2, overhead: 300 }, 3],
+		['scale when it exceeds the overhead per estimate unit', { scale: 4, overhead: 300 }, 4],
+		['scale with no overhead', { scale: 1.2, overhead: 0 }, 1.2],
+	] as const)('returns %s', (_title, gauge, density) => {
+		const calibrated = [LEDGER_PRICE_DEFINITIONS.a, LEDGER_PRICE_DEFINITIONS.b]
+		expect(computeToolDensity(calibrated, gauge)).toBe(density)
+	})
+
+	it('returns scale for an empty calibrated set', () => {
+		expect(computeToolDensity([], { scale: 1.2, overhead: 300 })).toBe(1.2)
+	})
+})
+
+describe('computeSkillPrice', () => {
+	it('prices the body at scale and the definitions the skill adds as an addition', () => {
+		const calibrated = [LEDGER_PRICE_DEFINITIONS.a, LEDGER_PRICE_DEFINITIONS.b]
+		const gauge = { scale: 1.2, overhead: 300 }
+		const skill = { name: 'refunds', content: 'Check the order first.' }
+		expect(computeSkillPrice(skill, [], calibrated, gauge)).toBeCloseTo(10.8, 10)
+		expect(
+			computeSkillPrice(skill, [LEDGER_PRICE_DEFINITIONS.extra], calibrated, gauge),
+		).toBeCloseTo(310.8, 10)
+	})
+
+	it('prices no body for blank content and still prices the definitions it adds', () => {
+		const calibrated = [LEDGER_PRICE_DEFINITIONS.a, LEDGER_PRICE_DEFINITIONS.b]
+		const gauge = { scale: 1.2, overhead: 300 }
+		expect(computeSkillPrice({ name: 'blank', content: ' \n ' }, [], calibrated, gauge)).toBe(0)
+		expect(
+			computeSkillPrice(
+				{ name: 'blank', content: '' },
+				[LEDGER_PRICE_DEFINITIONS.extra],
+				calibrated,
+				gauge,
+			),
+		).toBe(300)
 	})
 })

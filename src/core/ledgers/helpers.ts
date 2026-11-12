@@ -1,9 +1,11 @@
+import type { Skill } from '../contexts/types.js'
 import type { Message } from '../types.js'
 import type {
 	GaugeCall,
 	LedgerAmendment,
 	LedgerEvidence,
 	LedgerExchangeSnapshot,
+	LedgerGauge,
 	LedgerCategory,
 	LedgerClassification,
 	LedgerIndex,
@@ -25,7 +27,14 @@ import type {
 import type { ToolDefinition } from '@orkestrel/tool'
 import { attempt, canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { collectToolGroups, extractLiterals, hasCalls, renderJSON } from '../helpers.js'
+import { renderSkillBody } from '../contexts/helpers.js'
+import {
+	collectToolGroups,
+	estimateTokens,
+	extractLiterals,
+	hasCalls,
+	renderJSON,
+} from '../helpers.js'
 import { isNonNegativeSafeInteger } from '../validators.js'
 import {
 	LEDGER_OWNER_PREFIX,
@@ -91,6 +100,103 @@ export function digestLedgerWindow(
 export function digestLedgerTools(definitions: readonly ToolDefinition[]): string | undefined {
 	const text = renderJSON(definitions)
 	return text === undefined ? undefined : computeLedgerChecksum(text)
+}
+
+/**
+ * Computes the tokens one estimate unit of a definition costs beyond the calibrated set.
+ *
+ * @remarks
+ * The larger of `scale` and the calibrated set's overhead per estimate unit, or `scale` for an
+ * empty set or one that estimates 0. A set's estimate is `estimateTokens` over its JSON text.
+ *
+ * @param calibrated - The definitions the gauge's overhead priced
+ * @param gauge - The gauge's scale and overhead
+ * @returns The tokens one estimate unit of a definition costs
+ * @example
+ * ```ts
+ * computeToolDensity([], { scale: 1.1, overhead: 400 }) // 1.1
+ * ```
+ */
+export function computeToolDensity(
+	calibrated: readonly ToolDefinition[],
+	gauge: LedgerGauge,
+): number {
+	const estimate = calibrated.length === 0 ? 0 : estimateTokens(JSON.stringify(calibrated))
+	return estimate > 0 ? Math.max(gauge.scale, gauge.overhead / estimate) : gauge.scale
+}
+
+/**
+ * Computes what a call's advertised set spares of the calibrated overhead and adds beyond it.
+ *
+ * @remarks
+ * Definitions compare by their JSON text, so a definition replaced under its name by another text
+ * is both left out and added. An empty advertised set spares the whole overhead. Otherwise the
+ * calibrated definitions the call leaves out spare the lower of `scale` and the calibrated set's
+ * overhead per estimate unit, times their estimate, so a credit never exceeds their proportional
+ * share of the overhead; the definitions it advertises beyond the calibrated set add
+ * {@link computeToolDensity}, the higher of the two, times theirs. A set's estimate is
+ * `estimateTokens` over its JSON text, 0 for an empty set. The call's price is
+ * `overhead - spared + added`.
+ *
+ * @param calibrated - The definitions the gauge's overhead priced
+ * @param advertised - The definitions the call advertises
+ * @param gauge - The gauge's scale and overhead
+ * @returns The tokens the call spares and adds
+ * @example
+ * ```ts
+ * computeToolPrice([], [], { scale: 1.1, overhead: 400 }) // { spared: 400, added: 0 }
+ * ```
+ */
+export function computeToolPrice(
+	calibrated: readonly ToolDefinition[],
+	advertised: readonly ToolDefinition[],
+	gauge: LedgerGauge,
+): Required<Pick<GaugeCall, 'spared' | 'added'>> {
+	if (advertised.length === 0) return { spared: gauge.overhead, added: 0 }
+	const sent = new Set(advertised.map((definition) => JSON.stringify(definition)))
+	const priced = new Set(calibrated.map((definition) => JSON.stringify(definition)))
+	const hidden = calibrated.filter((definition) => !sent.has(JSON.stringify(definition)))
+	const extra = advertised.filter((definition) => !priced.has(JSON.stringify(definition)))
+	return {
+		spared:
+			hidden.length === 0
+				? 0
+				: Math.min(gauge.scale, gauge.overhead / estimateTokens(JSON.stringify(calibrated))) *
+					estimateTokens(JSON.stringify(hidden)),
+		added:
+			extra.length === 0
+				? 0
+				: computeToolDensity(calibrated, gauge) * estimateTokens(JSON.stringify(extra)),
+	}
+}
+
+/**
+ * Computes the tokens loading a skill adds: its body, and the definitions it names beyond an advertised set.
+ *
+ * @remarks
+ * The body is the text `renderSkillBody` renders, priced at `scale`, and a blank `content` renders
+ * no body. The caller passes the definitions the skill names that the turn does not advertise,
+ * priced as {@link computeToolPrice} prices an addition.
+ *
+ * @param skill - The skill to load
+ * @param added - The definitions the skill names that the advertised set leaves out
+ * @param calibrated - The definitions the gauge's overhead priced
+ * @param gauge - The gauge's scale and overhead
+ * @returns The tokens the load adds
+ * @example
+ * ```ts
+ * computeSkillPrice({ name: 'refunds', content: 'Check the order first.' }, [], [], { scale: 1, overhead: 0 }) // 9
+ * ```
+ */
+export function computeSkillPrice(
+	skill: Pick<Skill, 'name' | 'content'>,
+	added: readonly ToolDefinition[],
+	calibrated: readonly ToolDefinition[],
+	gauge: LedgerGauge,
+): number {
+	const body =
+		skill.content.trim() === '' ? 0 : gauge.scale * estimateTokens(renderSkillBody(skill))
+	return body + computeToolPrice(calibrated, [...calibrated, ...added], gauge).added
 }
 
 /**

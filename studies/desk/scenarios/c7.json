@@ -1,0 +1,47 @@
+{
+	"id": "c7",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Find tickets about a broken zipper.",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Merge customer C-77 into C-12, they're the same person.",
+				"area": "customers"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "File leave for Marco from 2026-12-01 to 2026-12-05.",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Add a note to ticket T-881 that the replacement shipped.",
+				"area": "tickets"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "Is order 4471 delivered yet?",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Show invoice INV-3310.",
+				"area": "billing"
+			}
+		}
+	]
+}

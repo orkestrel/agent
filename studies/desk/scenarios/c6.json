@@ -1,0 +1,47 @@
+{
+	"id": "c6",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Track the package for order 5120.",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "Ship order 5120 to 14 Elm Street instead, it hasn't left yet.",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Cancel order 5133, the customer changed their mind.",
+				"area": "orders"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Log 6 hours for Marco today.",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "What's Priya's phone number?",
+				"area": "staff"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "Has order 5120 been delivered?",
+				"area": "orders"
+			}
+		}
+	]
+}

@@ -97,6 +97,21 @@ describe('Gauge.observe', () => {
 		expect(gauge.scale).toBe(2)
 	})
 
+	it('keeps the scale when the first call advertised definitions beyond the calibrated set', () => {
+		for (const added of [undefined, 0, 1, 250]) {
+			const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 8192 })
+			gauge.observe([
+				{
+					estimate: 100,
+					prompt: 200 + (added ?? 0),
+					tools: 2,
+					...(added === undefined ? {} : { added }),
+				},
+			])
+			expect(gauge.scale).toBe(added === undefined || added === 0 ? 1 : 2)
+		}
+	})
+
 	it('reproduces the seed scale from the seed prompt', () => {
 		const gauge = new Gauge({ scale: 5, overhead: 498, capacity: 32768 })
 		gauge.observe([{ estimate: 1719, prompt: 2498, tools: 3 }])
@@ -203,6 +218,12 @@ describe('Gauge.remainder', () => {
 	it('prices a call with no usage at overhead plus scale times the estimate', () => {
 		// 100 + 2 * 1000 = 2100.
 		expect(gauge.remainder([{ estimate: 1000, tools: 0 }])).toBe(7900)
+	})
+
+	it('adds the definitions a call with no usage advertised beyond the calibrated set', () => {
+		// 100 - 30 + 250 + 2 * 1000 = 2320.
+		expect(gauge.remainder([{ estimate: 1000, tools: 4, spared: 30, added: 250 }])).toBe(7680)
+		expect(gauge.remainder([{ estimate: 1000, prompt: 3000, tools: 4, added: 250 }])).toBe(7000)
 	})
 
 	it('reads only the last call', () => {

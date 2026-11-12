@@ -8,8 +8,10 @@ import type {
 } from './types.js'
 import type { ProviderInterface } from '../providers/index.js'
 import type { ConversationStoreInterface } from '../conversations/index.js'
+import type { MemoManagerInterface, SkillManagerInterface } from '../contexts/index.js'
 import type { ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
+import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
 import { describeFaults } from '@orkestrel/contract'
 import { createTokenBudget } from '@orkestrel/budget'
 import { ToolManager } from '@orkestrel/tool'
@@ -17,6 +19,7 @@ import { Agent } from './Agent.js'
 import { agentJobContract } from './contracts.js'
 import { AgentError } from './errors.js'
 import { ConversationManager } from '../conversations/index.js'
+import { createScope } from '../contexts/index.js'
 import { requireEntry } from './helpers.js'
 
 /**
@@ -37,8 +40,8 @@ import { requireEntry } from './helpers.js'
  *   rehydrated job is a programmer / config error that must fail loudly at build time, never
  *   silently resolve to `undefined` and run an agent missing a dependency.
  * - **`build` rehydrates.** Resolve the job's `provider`; assemble a fresh
- *   {@link ToolManager} from the `tools` names, which refuses with `code: 'REGISTRY'` when the job
- *   names no `authority`; rebuild the token `budget` from its
+ *   {@link ToolManager} from the `tools` names; refuse with `code: 'REGISTRY'` a job that names
+ *   `tools` or `builtins` and no `authority`; rebuild the token `budget` from its
  *   ceiling (`createTokenBudget({ max })`); resolve the optional `authority` /
  *   `scheduler` names; construct the {@link Agent} with `system` / `limit` / `timeout` /
  *   the threaded `signal`; seed its context with the job's `messages`; return it. The
@@ -46,6 +49,10 @@ import { requireEntry } from './helpers.js'
  *   into the agent (which commits a partial — the job's `partial` policy then
  *   decides success vs. retry). A job `limit` that is not a positive safe integer throws an
  *   {@link AgentError} carrying `code: 'LIMIT'` from the agent's construction.
+ * - **A job holds what it names.** A job with a `scope` gets the registry's `skills`, `memos`, and
+ *   `workspaces` managers, which every scoped job shares, and a scope named `job` built from its
+ *   three lists; a job with no `scope` gets none of them. Its `disclosure` and `builtins` pass to
+ *   the agent, whose construction refuses a malformed `builtins` list with `code: 'BUILTIN'`.
  * - **Event-free.** A pure resolver — no Emitter, no events.
  *
  * @example
@@ -62,6 +69,9 @@ export class AgentRegistry implements AgentRegistryInterface {
 	readonly #authorities: ReadonlyMap<string, AuthorityInterface>
 	readonly #schedulers: ReadonlyMap<string, SchedulerInterface>
 	readonly #store: ConversationStoreInterface | undefined
+	readonly #skills: SkillManagerInterface | undefined
+	readonly #memos: MemoManagerInterface | undefined
+	readonly #workspaces: WorkspaceManagerInterface | undefined
 
 	constructor(options: AgentRegistryOptions) {
 		this.#providers = new Map(Object.entries(options.providers))
@@ -69,6 +79,9 @@ export class AgentRegistry implements AgentRegistryInterface {
 		this.#authorities = new Map(Object.entries(options.authorities ?? {}))
 		this.#schedulers = new Map(Object.entries(options.schedulers ?? {}))
 		this.#store = options.store
+		this.#skills = options.skills
+		this.#memos = options.memos
+		this.#workspaces = options.workspaces
 	}
 
 	provider(name: string): ProviderInterface {
@@ -112,16 +125,24 @@ export class AgentRegistry implements AgentRegistryInterface {
 	// the registry carries a conversation store, thread a fresh store-backed
 	// ConversationManager for this build (a fresh conversation id per build ⇒ no
 	// collisions in the shared store) — omitted when no store is set, so the shape matches a
-	// registry with no `store`.
+	// registry with no `store`. The pools and the scope ride only a job that carries a `scope`, so
+	// a job with none takes the same options whatever pools the registry holds.
 	#buildOptions(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
 		const names = input.tools ?? []
-		if (names.length > 0 && input.authority === undefined) {
+		const builtins = input.builtins ?? []
+		if ((names.length > 0 || builtins.length > 0) && input.authority === undefined) {
 			throw new AgentError(
 				'REGISTRY',
-				"a job that names tools and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities",
-				{ context: { tools: names } },
+				"a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities",
+				{
+					context: {
+						...(names.length === 0 ? {} : { tools: names }),
+						...(builtins.length === 0 ? {} : { builtins }),
+					},
+				},
 			)
 		}
+		const scope = input.scope
 		const budget = input.budget === undefined ? undefined : createTokenBudget({ max: input.budget })
 		return {
 			...(names.length === 0 ? {} : { tools: this.#buildToolManager(names) }),
@@ -134,6 +155,14 @@ export class AgentRegistry implements AgentRegistryInterface {
 			...(this.#store === undefined
 				? {}
 				: { conversations: new ConversationManager({ store: this.#store }) }),
+			...(scope === undefined || this.#skills === undefined ? {} : { skills: this.#skills }),
+			...(scope === undefined || this.#memos === undefined ? {} : { memos: this.#memos }),
+			...(scope === undefined || this.#workspaces === undefined
+				? {}
+				: { workspaces: this.#workspaces }),
+			...(scope === undefined ? {} : { scope: createScope({ name: 'job', ...scope }) }),
+			...(input.disclosure === undefined ? {} : { disclosure: input.disclosure }),
+			...(builtins.length === 0 ? {} : { builtins }),
 			...(signal === undefined ? {} : { signal }),
 		}
 	}

@@ -1,0 +1,47 @@
+{
+	"id": "c3",
+	"goals": [
+		{
+			"id": "turn-1",
+			"input": {
+				"prompt": "Do we have any trail running shoes in the catalog?",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "turn-2",
+			"input": {
+				"prompt": "How many units of SKU TR-220 are on hand?",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "turn-3",
+			"input": {
+				"prompt": "Hold 2 units of TR-220 for a customer pickup.",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "turn-4",
+			"input": {
+				"prompt": "Order 40 more TR-220 from the supplier.",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "turn-5",
+			"input": {
+				"prompt": "Drop the price of TR-220 to 89.99.",
+				"area": "inventory"
+			}
+		},
+		{
+			"id": "turn-6",
+			"input": {
+				"prompt": "We're no longer selling SKU WB-105, mark it.",
+				"area": "inventory"
+			}
+		}
+	]
+}
