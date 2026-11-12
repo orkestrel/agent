@@ -66,3 +66,42 @@
 | 2026-11-11 | Phase 3 unit 3A, disclosure in the ledger: claims 3.1 to 3.13 and 3.17 to 3.20 | `opus` on `opus` | `plan.md` § State |
 | 2026-11-11 | The durable-job unit's shape ruled, with its probes P1 and P2 passing | `planner` on `fable`; `opus` on `opus` | `plan.md` § State |
 | 2026-11-11 | The study ruling folded into the design: the 3B rows become `studies/desk/` and `studies/disclosure/`; arm P runs on a ledger per trial; the first-text row reads later goals apart | Orchestrator | `designs/disclosure.md` § The 4B reading |
+| 2026-11-11 | The durable-job unit: claims D.1 to D.9 and the empty-list rule | `opus` on `opus` | `designs/disclosure.md` § The durable-job unit |
+| 2026-11-11 | The durable-job unit's review: pass, with a surviving union mutation and a `render*` name below the bar | `reviewer` on `sonnet` | `designs/disclosure.md` § The durable-job unit |
+| 2026-11-11 | The durable-job review's fixes: the cross-kind case that kills the union mutation, and `executeDurableJob` | Orchestrator | `designs/disclosure.md` § The durable-job unit |
+| 2026-11-11 | Phase 3 unit 3A's review: fail on the share inside a batch and on capacity after admitted `load` and `remember` calls | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-11 | Phase 3 units 3B-a and 3B-b: the desk study bundle and the `disclosure` declaration | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-11 | The room ruling: the turn gate, the batch's loads in the share, and findings D, F, G, and I taken | `planner` on `fable` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-11 | The `switch` ruling: `switch` priced at admission, no first request over capacity, and `'OVERFLOW'` for an answer pass that cannot fit | `planner` on `fable` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-11 | Reuse census: 12 copies of `@orkestrel` helpers | `reviewer` on `sonnet` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-11 | Reuse fix: Agent's copies replaced with the packages' helpers | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-11 | Phase 3 unit 3A's room repair: claims 3.6 and 3.21 to 3.27 | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | Phase 3's falsify round, objective lane: confirmed | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | Phase 3's falsify round, subjective lane: fail on claim 3.5's numeric argument | `reviewer` on `sonnet` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The room repair's re-audit: fail on host acts inside one request | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | The host-act ruling: the ledger prices the frozen request at the `request` event against the measured set, and the loop reads the abort after the emit | `planner` on `fable` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The desk grader's fixes after the round: a shared denied id, refused loads, the disclosed area read from the run, and contract guards | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The every-ledger ruling: no ledger dispatches a request priced over `capacity − predict` | `planner` on `fable` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The supplied-gauge ruling: a supplied gauge priced as stated, and the capacity line restated | `planner` on `fable` | `designs/disclosure.md` § The release bar |
+| 2026-11-12 | The runner copy into a pinned lineage, reversed the same morning on the user's correction | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The user's rulings on Ollama: no machine path and no pinned version in any script or profile, and the version tracked without refusing a run | user | `plan.md` § Rulings |
+| 2026-11-12 | The study profiles unpinned to Ollama's default URL, with their tests and READMEs | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The Study version ruling: the serving version observed as evidence and compared with nothing | `planner` on `fable` | `plan.md` § State |
+| 2026-11-12 | The consumer-run harness for claims 3.14 and 3.15 | `opus` on `opus` | `plan.md` § State |
+| 2026-11-12 | The Study version unit: ollama `710a650`, study `84e49b7`, and Agent's prepared consumer changes | `opus` on `opus` | `plan.md` § State |
+| 2026-11-12 | The user's ruling, relayed by scaffold: finishing Agent takes first claim on effort and the shared lane | user | `plan.md` § Rulings |
+| 2026-11-12 | Phase 3 unit 3A's combined round repair: five rulings and the Orchestrator's eight items | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The Study version review: pass | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | The consumer live run on the 4B: arm `shown` passed, and arm `taverna`'s first calls were priced at a sixth of their charge | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The spared-rate ruling: rule (a), with no cap | `planner` on `fable` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The round re-audit: pass, with F1 to F6 below the bar | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | Phase 3 unit 3A's spare repair: rule (a) and claim 3.35 | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The spare-differential ruling: rule (a) stands, classes `gauge` and `spare`, and three bars restated for the user | `planner` on `fable` | `designs/disclosure.md` § The release bar |
+| 2026-11-12 | The consumer rerun on the repaired build: claims 3.14 and 3.15 within the ruling's bar | Orchestrator | `plan.md` § State |
+| 2026-11-12 | Phase 3 unit 3A's spare differential: the proportional arm and claim 3.36 | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | Phase 3 unit 3C, the guide, the TSDoc, the roadmap, and the small-model composition | `opus` on `opus` | `plan.md` § State |
+| 2026-11-12 | The spare repair's closure check: pass, closing phase 3's round | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | The user's ruling, relayed by scaffold: work on main, with a worktree only where two writers truly must, known and cleaned up | user | `plan.md` § Rulings |
+| 2026-11-12 | The 4B reading: the recorded schedule, its replay, and its grading | Orchestrator | `designs/disclosure.md` § The 4B reading |
+| 2026-11-12 | The user's ruling: the spare-differential ruling's three bars accepted as baselines | user | `plan.md` § Rulings |
+| 2026-11-12 | Phase 3's records fold: the design, the plan, and the ledger brought to the round's close | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
