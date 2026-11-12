@@ -63,3 +63,6 @@
 | 2026-11-11 | Phase 2's closure check: closed | `reviewer` on `sonnet` | `plan.md` § State |
 | 2026-11-11 | Phase 2 unit 2D, the guide and the TSDoc | `opus` on `opus` | `plan.md` § State |
 | 2026-11-11 | Phase 2's tree-wide chain | Orchestrator | `plan.md` § State |
+| 2026-11-11 | Phase 3 unit 3A, disclosure in the ledger: claims 3.1 to 3.13 and 3.17 to 3.20 | `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | The durable-job unit's shape ruled, with its probes P1 and P2 passing | `planner` on `fable`; `opus` on `opus` | `plan.md` § State |
+| 2026-11-11 | The study ruling folded into the design: the 3B rows become `studies/desk/` and `studies/disclosure/`; arm P runs on a ledger per trial; the first-text row reads later goals apart | Orchestrator | `designs/disclosure.md` § The 4B reading |

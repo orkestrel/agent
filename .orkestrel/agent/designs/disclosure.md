@@ -350,7 +350,8 @@ Two alternatives were ruled out:
 | --- | --- | --- | --- | --- | --- |
 | The density probe and its ruling | throwaway probe | phase 2 | runs in phase 0, before 3A | — | 0.25 |
 | 3A ledger | `ledgers/types.ts`, `ledgers/constants.ts`, `ledgers/Ledger.ts`, `Gauge.ts`, `LedgerRequest.ts`, `ledgers/helpers.ts` (`computeToolPrice`, `computeSkillPrice`), their tests | the probe | serial | medium | 1.75 |
-| 3B study bundle | `studies/tools/**`: the arms of § The 4B reading | 3A | after 3A | medium | 0.75 |
+| 3B-a desk declarations and grading | `studies/desk/` (`types.ts`, `constants.ts`, `validators.ts`, `helpers.ts`, `scenarios/`), the declaration `studies/disclosure/` with its rubric, and their tests under `tests/studies/desk/` and `tests/studies/disclosure/` | — | beside 3A | medium | 0.35 |
+| 3B-b desk session and installed path | `studies/desk/` (`adapters/`, `drivers/`, `sessions/`, `factories.ts`, `index.ts`, `profiles/screen.json`), the policies in `tests/setupStudy.ts`, `tests/studies/desk/integration.test.ts`, and the rows of `studies/README.md` | 3A, 3B-a | after 3A | medium | 0.4 |
 | Consumer run | taverna's repository, against a local build of Agent | 3A | before the round | — | 1.0 |
 | Falsify round and its repairs | — | 3A, the consumer run | — | — | 1.0 |
 | The reading | — | 3B, the round and its repairs | after the round, before 3C; `verifier` runs it in the shared execution lane | — | at most 2.4 runner hours |
@@ -1616,6 +1617,13 @@ The reading is phase 3's last run: it follows the falsify round and its repairs,
 | A against its 2026-11-07 reading | reported as the one spread reading across builds |
 
 [inference] The margin of 2 requests assumes the battery repeats at a fixed seed, as the `chat` study did row for row on 2026-11-08 (`agent/studies/README.md`, § What it measured). The A row reads that assumption; a spread wider than the margin voids the bar, and the report says so instead of ruling.
+
+**As recorded, per the consultant's study ruling of 2026-11-11.** The reading runs as a recorded Study.
+- The declaration is `disclosure`, over the driver bundle `studies/desk/` (units 3B-a and 3B-b). Phase 0 found no desk catalog under `studies/tools/`.
+- Its purpose is `mechanism`, with mechanical grading, one scenario per conversation, and one repetition, under a `screen` profile pinned to the 0.40.16 runner lineage, with `record` declared.
+- Arm P runs on a ledger built for each trial, with `agent.disclosure` set at construction. A trial is one conversation, so no kept ledger needs per-request `disclosure`.
+- The first-text row reads each trial's goals after its first apart from the first, because Study unloads the models before each trial.
+- Live model use is one smoke trial and one recorded schedule. Every later iteration grades offline, or replays the recording by key and sends only changed requests.
 
 ## Refused
 
