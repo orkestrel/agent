@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { parseStudyProfile } from '@orkestrel/study'
 import { parseJSON } from '@orkestrel/contract'
 import { expect, it } from 'vitest'
-import { isStudyChatInput } from '../../../studies/chat/validators.js'
+import { isStudyChatInput, isStudyChatSettings } from '../../../studies/chat/validators.js'
 import { validateStudyChatProfile } from '../../../studies/chat/helpers.js'
 
 it('rejects grading metadata at the public boundary and preserves stated facts', () => {
@@ -18,6 +18,12 @@ it('rejects grading metadata at the public boundary and preserves stated facts',
 	const revoked = Proxy.revocable({}, {})
 	revoked.revoke()
 	expect(isStudyChatInput(revoked.proxy)).toBe(false)
+})
+
+it('admits settings without a serving version and refuses a stale version key', () => {
+	const metadata = { calls: 64, bytes: 67108864, duration: 600000 }
+	expect(isStudyChatSettings({ capacity: 19968, metadata })).toBe(true)
+	expect(isStudyChatSettings({ capacity: 19968, version: '0.40.15', metadata })).toBe(false)
 })
 
 it('keeps every treatment field equal except the named capacity', () => {

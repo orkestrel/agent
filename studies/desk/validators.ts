@@ -88,7 +88,7 @@ export function isStudyDeskProvider(value: unknown): value is StudyDeskProvider 
  * @example isStudyDeskSettings({ version: '0.40.16' }) // false
  */
 export function isStudyDeskSettings(value: unknown): value is StudyDeskSettings {
-	return recordOf({ version: isString, metadata: isStudyOllamaMetadata })(value)
+	return recordOf({ metadata: isStudyOllamaMetadata })(value)
 }
 
 /** Checks a retained `tool` row's value: an id, a name, the arguments, and the success flag with its value or error.

@@ -84,7 +84,7 @@ The `chat` study is that battery, tracked. On 2026-11-08, on the 0.0.38 build an
 
 ## Running it
 
-The `recommended` profile runs on the Ollama at its provider URL, `http://127.0.0.1:11434`, which is Ollama's default, and pins each model by digest, including `tev1`. It declares no `provider.daemon`, so Study starts no daemon. Its transport verifies the provider's agent, judge, and triage pins against inventory before and after the trial. Study requires `settings.version` on a recording profile and refuses a serving Ollama that reports another version, so set it to the running Ollama's version before a recorded run. The triage leg uses `/v1/systemone`; its metadata verification uses the same Ollama routes as the other roles. Build the package first with `npm run build`, because the profile runs `dist/src/core/index.js`.
+The `recommended` profile runs on the Ollama at its provider URL, `http://127.0.0.1:11434`, which is Ollama's default, and pins each model by digest, including `tev1`. It declares no `provider.daemon`, so Study starts no daemon. Its transport verifies the provider's agent, judge, and triage pins against inventory before and after the trial. A recorded run fetches the serving Ollama's version at preflight and postflight and keeps it as a `version` evidence row for debugging; Study compares it with nothing, so a version never refuses a run. The triage leg uses `/v1/systemone`; its metadata verification uses the same Ollama routes as the other roles. Build the package first with `npm run build`, because the profile runs `dist/src/core/index.js`.
 
 The following commands freeze, check, record, and grade one segment of the records arm, whose trial is `r1-s1-a1`. `ABSOLUTE_CLOSURE_PATH` is a canonical absolute path to a new directory under this repository's `tmp/`, with an existing parent. A freeze admits a destination inside a profile root but refuses one under `dist`, an existing destination, or a relative path. `STEM` names the result:
 
@@ -101,7 +101,7 @@ cd ABSOLUTE_CLOSURE_PATH
 node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CLOSURE_PATH/studies/qualification/rubric.json
 ```
 
-The profile declares `record` allowances of 512 MiB, 4096 calls, and 2400000 ms per trial. Both judge legs, inventory verification, and daemon maintenance enter custody. Offline replay checks the retained request bytes and makes no sends; message ids are local to each Agent run.
+The profile declares `record` allowances of 512 MiB, 4096 calls, and 2400000 ms per trial. Both judge legs and inventory verification enter custody. Offline replay checks the retained request bytes and makes no sends; message ids are local to each Agent run.
 
 A continuation needs an ancestor that completed its entire schedule. Record that ancestor separately, without `--trial`, `--goals`, or `--seed`:
 
@@ -116,7 +116,7 @@ npx study freeze qualification --profile recommended --to ABSOLUTE_GROWN_CLOSURE
 npx study execute qualification --profile recommended --closure ABSOLUTE_GROWN_CLOSURE_PATH --extend ABSOLUTE_ANCESTOR_PATH --out tmp/studies/continued
 ```
 
-Study replays the ancestor's retained prefix and sends only the appended goals, with the owned daemon's maintenance retained as well. Segmented selectors cannot accompany `--extend`; an unchanged horizon is not an extension.
+Study replays the ancestor's retained prefix and sends only the appended goals to the Ollama at the provider URL. The profile declares no `provider.daemon`, so the continuation records no maintenance, and the serving Ollama's version can differ from the ancestor's. Segmented selectors cannot accompany `--extend`; an unchanged horizon is not an extension.
 
 ## Running the chat instrument
 
@@ -218,7 +218,7 @@ Each request's input holds its prompt and the area the host knows, and the rubri
 
 One run on 2026-11-12 read arm `area` right on 42 of 42 requests at a median summed prompt of 1947.5 tokens, and arm `index` right on 40 of 42 at a median of 2791 tokens, with 15 loads, each right. Treat both readings as baselines that tell drift from an outlier on a later run, not as verdicts.
 
-The `screen` profile pins `qwen3.5:4b-q4_K_M` by digest and declares no judge, on the Ollama at its provider URL, `http://127.0.0.1:11434`, with recording declared. It declares no `provider.daemon`. Study requires `settings.version` on a recording profile and refuses a serving Ollama that reports another version, so set it to the running Ollama's version before a recorded run.
+The `screen` profile pins `qwen3.5:4b-q4_K_M` by digest and declares no judge, on the Ollama at its provider URL, `http://127.0.0.1:11434`, with recording declared. It declares no `provider.daemon`. A recorded run keeps the serving Ollama's version as a `version` evidence row and compares it with nothing.
 
 Run the reading in the following order. Each arm runs one sealed trial a conversation, and no live run repeats before the first report.
 

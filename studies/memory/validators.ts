@@ -17,7 +17,6 @@ import {
 	isArray,
 	isBoolean,
 	isFiniteNumber,
-	isNonEmptyString,
 	isObject,
 	isRecord,
 	isString,
@@ -80,19 +79,11 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		if (
 			Object.keys(value).some(
 				(key) =>
-					![
-						'gauge',
-						'observe',
-						'checkpoints',
-						'version',
-						'metadata',
-						'correction',
-						'judge',
-					].includes(key),
+					!['gauge', 'observe', 'checkpoints', 'metadata', 'correction', 'judge'].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, version, metadata, correction, judge } = value
+		const { gauge, observe, checkpoints, metadata, correction, judge } = value
 		if (
 			judge !== undefined &&
 			(!recordOf({ gpu: isFiniteNumber })(judge) ||
@@ -100,7 +91,6 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 				judge.gpu < 0)
 		)
 			return false
-		if (version !== undefined && !isNonEmptyString(version)) return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
 		if (correction !== undefined && !recordOf({ narrow: isBoolean }, true)(correction)) return false
 		if (gauge !== undefined) {

@@ -166,7 +166,7 @@ export function readStudyDeskProgress(rows: readonly StudyEvidence[]): JSONValue
  */
 export function validateStudyDeskProfile(profile: StudyProfile): void {
 	if (!isStudyDeskSettings(profile.settings))
-		throw new StudyError('CONFIG', 'Desk settings differ from version and metadata')
+		throw new StudyError('CONFIG', 'Desk settings differ from metadata')
 	if (
 		profile.provider === undefined ||
 		profile.provider.judge !== undefined ||

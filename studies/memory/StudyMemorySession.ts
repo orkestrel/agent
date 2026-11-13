@@ -98,12 +98,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		if (!recorded && (options.exchanges !== undefined || options.replay !== undefined))
 			throw new StudyError('CONFIG', 'Memory exchanges and replay require declared recording')
 		const declaration = options.exchanges?.declaration
-		if (
-			recorded &&
-			(declaration === undefined ||
-				settings?.version === undefined ||
-				settings.metadata === undefined)
-		)
+		if (recorded && (declaration === undefined || settings?.metadata === undefined))
 			throw new StudyError('CONFIG', 'Memory recording requires declarations and an exchange sink')
 		this.#goals = declaration === undefined ? undefined : [...declaration.goals]
 		// One declaration of every role's wire policy feeds both the transport and the provider constructors.

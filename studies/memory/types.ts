@@ -32,8 +32,6 @@ export interface StudyMemoryOptions {
 	readonly observe?: boolean | undefined
 	/** Names observation checkpoints and requires `observe: true`. */
 	readonly checkpoints?: readonly string[] | undefined
-	/** Declares the bare serving version a recording requires, equal to the profile's daemon version. */
-	readonly version?: string | undefined
 	/** Bounds the metadata passes a recording declares; absent, the unrecorded default bounds them. */
 	readonly metadata?: StudyOllamaMetadata | undefined
 	/** Mirrors `LedgerOptions.correction`; forwarded only in the records arm. */

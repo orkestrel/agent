@@ -412,7 +412,6 @@ export function writeStudyChatFixture(
 				judge: 'judge',
 				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
 			},
-			settings: { ...raw.settings, version: 'fixture-1' },
 		}),
 	)
 }
@@ -934,7 +933,7 @@ export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
 		settings: Object.freeze({ checkpoints: Object.freeze(['opening']) }),
 	}),
 	Object.freeze({ name: 'unknown key', settings: Object.freeze({ observe: true, extra: 1 }) }),
-	Object.freeze({ name: 'empty version', settings: Object.freeze({ version: '' }) }),
+	Object.freeze({ name: 'stale version', settings: Object.freeze({ version: '0.40.15' }) }),
 	Object.freeze({
 		name: 'malformed metadata',
 		settings: Object.freeze({ metadata: Object.freeze({ calls: 0, bytes: 1, duration: 1 }) }),
@@ -2464,11 +2463,10 @@ export const STUDY_MEMORY_OPTION_KEYS = Object.freeze([
 	'top_p',
 ])
 
-/** Pins a fixture recording: the sidecar bounds, and the version `MemoryServer` answers with the metadata bounds. */
+/** Pins a fixture recording: the sidecar bounds and the metadata bounds. */
 export const STUDY_MEMORY_RECORD = Object.freeze({
 	record: Object.freeze({ bytes: 4194304, calls: 256, duration: 60000 }),
 	settings: Object.freeze({
-		version: 'fixture-1',
 		metadata: Object.freeze({ calls: 64, bytes: 1048576, duration: 30000 }),
 	}),
 })
@@ -2556,7 +2554,7 @@ export function buildMemoryVerdict(label: string): MemoryWireFixture {
 /**
  * Builds a finite CPU-only profile that declares recording.
  * @param url - The protocol fixture origin.
- * @returns The fixture profile with the recording bounds, version, and metadata.
+ * @returns The fixture profile with the recording bounds and metadata.
  */
 export function buildMemoryRecordProfile(url: string): StudyProfile {
 	return {
@@ -5335,8 +5333,6 @@ export async function writeMemoryTriageDaemon(
 				url,
 				daemon: {
 					executable: realpathSync(process.execPath),
-					digest: hashStudyBytes(readFileSync(process.execPath)),
-					version: 'fixture-1',
 					environment: {
 						NODE_OPTIONS: `--experimental-strip-types --import=${pathToFileURL(join(fixture.scratch.path, 'daemon.ts')).href}`,
 						STUDY_FIXTURE_UPSTREAM: upstream,
@@ -5599,13 +5595,11 @@ export function createStudyDeskControl(
  * Reads the authored `screen` profile with its provider rebound to the protocol fixture, with no owned daemon.
  * @param url - The fixture origin.
  * @param entry - The Ollama entry the profile names.
- * @param version - The runner version the profile's settings pin.
  * @returns The raw profile record, ready to parse or write.
  */
 export function buildStudyDeskRecord(
 	url: string,
 	entry: string,
-	version: string,
 ): Readonly<Record<string, unknown>> {
 	const raw = parseJSON(readFileSync(resolve('studies/desk/profiles/screen.json'), 'utf8'))
 	if (!isRecord(raw) || !isRecord(raw.settings)) throw new Error('Missing desk profile')
@@ -5617,7 +5611,6 @@ export function buildStudyDeskRecord(
 			model: 'model',
 			digest: { model: 'a'.repeat(64) },
 		},
-		settings: { ...raw.settings, version },
 	}
 }
 
@@ -5629,11 +5622,7 @@ export function buildStudyDeskRecord(
 export function buildStudyDeskProfile(url: string): StudyProfile {
 	return {
 		...parseStudyProfile(
-			buildStudyDeskRecord(
-				url,
-				resolve('node_modules/@orkestrel/ollama/dist/src/core/index.js'),
-				'fixture-1',
-			),
+			buildStudyDeskRecord(url, resolve('node_modules/@orkestrel/ollama/dist/src/core/index.js')),
 		),
 		record: undefined,
 	}
@@ -5657,7 +5646,6 @@ export function writeStudyDeskFixture(fixture: StudyInstallFixture, url: string)
 			...buildStudyDeskRecord(
 				url,
 				join(fixture.scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
-				'fixture-1',
 			),
 			agent: entry,
 			subject: entry,

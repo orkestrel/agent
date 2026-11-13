@@ -1308,7 +1308,6 @@ describe('study install fixtures', () => {
 		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
 		expect(profile.record).toEqual({ bytes: 4194304, calls: 256, duration: 60000 })
 		expect(profile.settings).toEqual({
-			version: 'fixture-1',
 			metadata: { calls: 64, bytes: 1048576, duration: 30000 },
 		})
 		const scratch = createScratch({ prefix: 'study-recording-setup-' })
@@ -1363,9 +1362,9 @@ describe('study install fixtures', () => {
 		expect(capture.exchanges.declaration).toMatchObject({
 			phase: 'declaration',
 			trial: 'captured',
-			version: 'fixture-1',
 			goals: ['first'],
 		})
+		expect(capture.exchanges.declaration).not.toHaveProperty('version')
 		await capture.exchanges.append({ phase: 'complete', count: 0 })
 		expect(capture.rows.calls).toEqual([[{ phase: 'complete', count: 0 }]])
 		await expect(

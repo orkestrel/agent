@@ -367,16 +367,17 @@ describe('memory declaration and mechanical evidence', () => {
 			})
 	})
 
-	it('refuses a recording profile with no version or metadata', () => {
+	it('refuses a recording profile with no metadata', () => {
 		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
-		const { version, metadata } = STUDY_MEMORY_RECORD.settings
 		const refusal = expect.objectContaining({
 			code: 'CONFIG',
-			message: 'Memory recording requires a declared version and metadata',
+			message: 'Memory recording requires declared metadata',
 		})
-		for (const settings of [undefined, { version }, { metadata }])
+		for (const settings of [undefined, {}])
 			expect(() => validateStudyMemoryProfile({ ...profile, settings }, [])).toThrow(refusal)
-		expect(() => validateStudyMemoryProfile(profile, [])).not.toThrow()
+		expect(() =>
+			validateStudyMemoryProfile({ ...profile, settings: STUDY_MEMORY_RECORD.settings }, []),
+		).not.toThrow()
 	})
 
 	it('joins message origins from session state only, in priority order, leaving the rest unknown', () => {

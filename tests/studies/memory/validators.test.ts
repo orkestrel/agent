@@ -91,15 +91,15 @@ describe('memory declaration and mechanical evidence', () => {
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, false])
 	})
 
-	it('admits version, metadata, and a correction', () => {
+	it('admits metadata and a correction, and refuses a stale version key', () => {
 		const metadata = { calls: 8192, bytes: 67108864, duration: 600000 }
 		for (const settings of [
-			{ version: '0.40.13' },
 			{ metadata },
 			{ correction: {} },
-			{ version: '0.40.13', metadata, correction: { narrow: true } },
+			{ metadata, correction: { narrow: true } },
 		])
 			expect([settings, isStudyMemoryOptions(settings)]).toEqual([settings, true])
+		expect(isStudyMemoryOptions({ version: '0.40.13', metadata })).toBe(false)
 	})
 
 	it('admits a non-negative safe integer judge placement and refuses malformed placements', () => {

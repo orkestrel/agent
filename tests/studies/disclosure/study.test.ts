@@ -98,10 +98,11 @@ describe('the disclosure declaration', () => {
 					model: 'd8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04',
 				},
 			},
-			settings: { version: '0.40.16' },
+			settings: { metadata: { calls: 64, bytes: 67108864, duration: 600000 } },
 			record: { duration: 480000, calls: 256 },
 		})
 		expect(raw).not.toHaveProperty('provider.daemon')
+		expect(raw).not.toHaveProperty('settings.version')
 		expect(raw).not.toHaveProperty('provider.judge')
 		expect(raw).not.toHaveProperty('provider.digest.judge')
 	})

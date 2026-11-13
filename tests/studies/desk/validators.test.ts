@@ -69,9 +69,10 @@ describe('the treatment', () => {
 		expect(isStudyDeskRuntime(agent)).toBe(true)
 		expect(isStudyDeskRuntime({ ...agent, createSkillManager: undefined })).toBe(false)
 		expect(isStudyDeskRuntime({})).toBe(false)
-		const settings = { version: '0.40.16', metadata: { calls: 64, bytes: 1024, duration: 1000 } }
+		const settings = { metadata: { calls: 64, bytes: 1024, duration: 1000 } }
 		expect(isStudyDeskSettings(settings)).toBe(true)
 		expect(isStudyDeskSettings({ ...settings, capacity: 19968 })).toBe(false)
+		expect(isStudyDeskSettings({ ...settings, version: '0.40.16' })).toBe(false)
 		expect(isStudyDeskSettings({ version: '0.40.16' })).toBe(false)
 	})
 
@@ -109,7 +110,10 @@ describe('the treatment', () => {
 		).toThrow(/treatment/)
 		expect(() => validateStudyDeskProfile({ ...profile, provider: undefined })).toThrow(/treatment/)
 		expect(() =>
-			validateStudyDeskProfile({ ...profile, settings: { version: '0.40.16' } }),
+			validateStudyDeskProfile({
+				...profile,
+				settings: { ...profile.settings, version: '0.40.16' },
+			}),
 		).toThrow(/settings/)
 	})
 })

@@ -47,7 +47,6 @@
 		"judge": {
 			"gpu": 0
 		},
-		"version": "0.40.15",
 		"metadata": {
 			"calls": 8192,
 			"bytes": 67108864,

@@ -145,11 +145,10 @@ export interface StudyDeskProvider {
 	readonly extractTiming: typeof extractTiming
 }
 
-/** Declares the runner identity and the independent metadata allowance.
- * @example const settings: StudyDeskSettings = { version: '0.40.16', metadata: { calls: 64, bytes: 67108864, duration: 600000 } }
+/** Declares the independent metadata allowance.
+ * @example const settings: StudyDeskSettings = { metadata: { calls: 64, bytes: 67108864, duration: 600000 } }
  */
 export interface StudyDeskSettings {
-	readonly version: string
 	readonly metadata: { readonly calls: number; readonly bytes: number; readonly duration: number }
 }
 

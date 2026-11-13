@@ -37,7 +37,6 @@
 		"think": false
 	},
 	"settings": {
-		"version": "0.40.16",
 		"metadata": {
 			"calls": 64,
 			"bytes": 67108864,

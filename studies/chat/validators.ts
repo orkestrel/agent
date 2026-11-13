@@ -152,8 +152,7 @@ export function isStudyChatSettings(value: unknown): value is StudyChatSettings 
 		() =>
 			isRecord(value) &&
 			typeof value.capacity === 'number' &&
-			typeof value.version === 'string' &&
 			isStudyOllamaMetadata(value.metadata) &&
-			Object.keys(value).every((key) => ['capacity', 'version', 'metadata'].includes(key)),
+			Object.keys(value).every((key) => ['capacity', 'metadata'].includes(key)),
 	)
 }

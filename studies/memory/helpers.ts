@@ -188,7 +188,7 @@ export function buildStudyMemoryOrigins(
 	})
 }
 
-/** Checks well-formed driver settings, then the generic provider and room declarations through Study's guards, then what only the selected arms require. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest and the compaction arm a recap allowance. @returns Nothing when admitted. @throws StudyError - CONFIG when the settings, the provider declaration (exact digests and uncredentialed origin) or the room (positive finite integers leaving prompt capacity) is invalid, a declared recording names no version or metadata, or an arm's requirement is not met. */
+/** Checks well-formed driver settings, then the generic provider and room declarations through Study's guards, then what only the selected arms require. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest and the compaction arm a recap allowance. @returns Nothing when admitted. @throws StudyError - CONFIG when the settings, the provider declaration (exact digests and uncredentialed origin) or the room (positive finite integers leaving prompt capacity) is invalid, a declared recording names no metadata, or an arm's requirement is not met. */
 export function validateStudyMemoryProfile(
 	profile: StudyProfile,
 	arms: readonly StudyMemoryArm[],
@@ -198,11 +198,9 @@ export function validateStudyMemoryProfile(
 		throw new StudyError('CONFIG', 'Memory settings are malformed')
 	if (
 		profile.record !== undefined &&
-		(!isStudyMemoryOptions(profile.settings) ||
-			profile.settings.version === undefined ||
-			profile.settings.metadata === undefined)
+		(!isStudyMemoryOptions(profile.settings) || profile.settings.metadata === undefined)
 	)
-		throw new StudyError('CONFIG', 'Memory recording requires a declared version and metadata')
+		throw new StudyError('CONFIG', 'Memory recording requires declared metadata')
 	if (provider === undefined || !isStudyProvider(provider))
 		throw new StudyError('CONFIG', 'Memory provider declaration is invalid')
 	if (arms.includes('records') && provider.judge === undefined)

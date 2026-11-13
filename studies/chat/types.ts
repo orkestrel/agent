@@ -114,12 +114,11 @@ export interface StudyChatSessionOptions extends StudyDriverOptions {
 	readonly provider: StudyChatProvider
 	readonly signal: AbortSignal
 }
-/** Declares the ledger capacity, runner identity, and independent metadata allowance.
- * @example const settings: StudyChatSettings = { capacity: 19968, version: '0.40.15', metadata: { calls: 64, bytes: 67108864, duration: 600000 } }
+/** Declares the ledger capacity and the independent metadata allowance.
+ * @example const settings: StudyChatSettings = { capacity: 19968, metadata: { calls: 64, bytes: 67108864, duration: 600000 } }
  */
 export interface StudyChatSettings {
 	readonly capacity: number
-	readonly version: string
 	readonly metadata: { readonly calls: number; readonly bytes: number; readonly duration: number }
 }
 /** Joins a verified assessment to its scenarios, rubric, and sealed trial evidence.

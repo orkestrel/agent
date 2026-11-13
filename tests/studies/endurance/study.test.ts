@@ -276,8 +276,6 @@ describe('prospective public endurance declarations', () => {
 		const judge = { name: provider.judge, digest: provider.digest.judge }
 		const daemon = {
 			executable: process.execPath,
-			digest: 'a'.repeat(64),
-			version: '0.40.14',
 			models: [model, judge],
 		}
 		// The profile names the default Ollama, which an owned daemon can't take: Study refuses port 11434 there.
@@ -322,7 +320,6 @@ describe('prospective public endurance declarations', () => {
 			settings: {
 				observe: true,
 				judge: { gpu: 0 },
-				version: '0.40.15',
 				metadata: { calls: 8192, bytes: 67108864, duration: 600000 },
 				gauge: { scale: 1, overhead: 352 },
 			},

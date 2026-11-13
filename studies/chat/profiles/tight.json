@@ -40,7 +40,6 @@
 	},
 	"settings": {
 		"capacity": 1600,
-		"version": "0.40.15",
 		"metadata": {
 			"calls": 64,
 			"bytes": 67108864,
