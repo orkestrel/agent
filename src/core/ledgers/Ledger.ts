@@ -683,10 +683,10 @@ export class Ledger implements LedgerInterface {
 		signal: AbortSignal,
 	): Promise<number> {
 		const rate = bare / estimateMessages(head)
-		const ceiling = intersectFilters(this.#agent.context.scope, undefined)
-		const workspace = this.#show(ceiling).workspace
+		const workspace = this.#show(intersectFilters(this.#agent.context.scope, undefined)).workspace
+		// The listing passes no `workspaces` list: the build that follows applies the context scope's.
 		const files = (
-			resolveWorkspace(this.#agent.context.workspaces, workspace, ceiling.workspaces)?.files() ?? []
+			resolveWorkspace(this.#agent.context.workspaces, workspace, undefined)?.files() ?? []
 		).flatMap((file) => (isTextContent(file.content) ? [file.path] : []))
 		// The sample carries the workspace's text alone: an image needs a user turn, which it holds none of.
 		const shown = this.#agent.context.build({

@@ -15,7 +15,7 @@ import type {
 	ToolManagerInterface,
 	ToolResult,
 } from '@orkestrel/tool'
-import type { FileInterface } from '@orkestrel/workspace'
+import type { FileInterface, WorkspaceInterface } from '@orkestrel/workspace'
 import { isString } from '@orkestrel/contract'
 import { createToolManager, ToolError } from '@orkestrel/tool'
 import {
@@ -77,6 +77,7 @@ export class AgentRun {
 				readonly workspace: string | undefined
 				readonly switchable: boolean
 				readonly files: readonly FileInterface[]
+				readonly rendered: WorkspaceInterface | undefined
 		  }
 		| undefined
 
@@ -176,24 +177,30 @@ export class AgentRun {
 	}
 
 	/**
-	 * Returns what a tool call receives as `ToolContext.caller`: the workspace the last `observe`
-	 * showed, kept only while the ceiling at this moment admits it, and that ceiling's `files` list.
+	 * Returns what a tool call receives as `ToolContext.caller`: the workspace instance the working
+	 * head rendered, kept only while the ceiling at this moment admits its id, and that ceiling's
+	 * `files` list.
 	 *
 	 * @remarks
-	 * Each read of this getter reads the `workspaces` and `files` lists of the context scope and the
-	 * run scope one time each, and no other list, so a call reads them as it starts, a narrowing made
-	 * after the turn's decision reaches that call, and a turn still reads its `tools` list once.
+	 * The instance is the one the head's build resolved, never the registry's `active` pointer at the
+	 * call, so a host's `switch` made while the provider answers reaches the next turn's head and not
+	 * this call. Each read of this getter reads the `workspaces` and `files` lists of the context
+	 * scope and the run scope one time each, and no other list, so a call reads them as it starts, a
+	 * narrowing made after the turn's decision reaches that call, and a turn still reads its `tools`
+	 * list once.
 	 *
 	 * @returns A fresh caller
 	 */
 	get caller(): AgentCaller {
 		const outer = this.#context.scope
 		const inner = this.#scope
-		const workspaces = intersectKeys(outer?.workspaces, inner?.workspaces)
-		return {
-			workspace: resolveWorkspace(this.#context.workspaces, this.#shown.workspace, workspaces),
-			files: intersectKeys(outer?.files, inner?.files),
-		}
+		const rendered = this.#head?.rendered
+		const [workspace] = filterAllowList(
+			intersectKeys(outer?.workspaces, inner?.workspaces),
+			rendered === undefined ? [] : [rendered],
+			(one) => one.id,
+		)
+		return { workspace, files: intersectKeys(outer?.files, inner?.files) }
 	}
 
 	/**
@@ -270,8 +277,13 @@ export class AgentRun {
 	}
 
 	/**
-	 * Records what the working head was built with: the selection, the built array's length, and
-	 * the view the last `observe` resolved.
+	 * Records what the working head was built with: the selection, the built array's length, the
+	 * view the last `observe` resolved, and the workspace instance the build rendered.
+	 *
+	 * @remarks
+	 * Call it right after the build: it resolves the rendered workspace from the inputs the build
+	 * read, the shown workspace and the context scope's `workspaces` list intersected with the
+	 * snapshot's.
 	 *
 	 * @param selection - The selection the build rendered
 	 * @param length - The length of the built array
@@ -285,6 +297,11 @@ export class AgentRun {
 			workspace: this.#shown.workspace,
 			switchable: this.switchable,
 			files: this.#files,
+			rendered: resolveWorkspace(
+				this.#context.workspaces,
+				this.#shown.workspace,
+				intersectKeys(this.#context.scope?.workspaces, this.#snapshot?.workspaces),
+			),
 		}
 	}
 

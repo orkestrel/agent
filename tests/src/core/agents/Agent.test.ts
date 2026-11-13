@@ -12112,6 +12112,34 @@ describe('Agent — the tool caller: each host call receives the run workspace a
 		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true])
 		expect(collectCallers(contexts)[0]?.files).toEqual(['notes.md'])
 	})
+
+	it('hands a call the workspace its request rendered when the host moves the active pointer while the provider answers (claim O1)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', workspaces: ['north', 'south'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		fixture.agent.emitter.on('request', (index) => {
+			if (index === 0) fixture.agent.context.workspaces.switch('south')
+		})
+		await fixture.agent.generate({ prompt: { content: 'Inspect.' } })
+		const workspaces = fixture.agent.context.workspaces
+		const rendered = fixture.provider.calls.map((call) =>
+			['NORTH FILE', 'SOUTH FILE'].filter((text) =>
+				call.messages.some((message) => message.content.includes(text)),
+			),
+		)
+
+		expect(rendered).toEqual([['NORTH FILE'], ['SOUTH FILE']])
+		expect(workspaces.active?.id).toBe('south')
+		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true])
+		expect(collectCallers(contexts)[0]?.workspace).toBe(workspaces.workspace('north'))
+	})
 })
 
 describe('Agent — an edit to a rendered file reaches the next request (claim A.8)', () => {
