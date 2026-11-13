@@ -1,11 +1,33 @@
 import type { SkillEventName } from '../../../../setup.js'
-import type { Skill, SkillManagerEventMap } from '@src/core'
+import type {
+	Skill,
+	SkillManagerEventMap,
+	SkillManagerOptions,
+	SkillInput,
+	SKILL_MANAGER_KEYS,
+	skillInputShape,
+} from '@src/core'
 import { renderSection, SKILL_SECTION_HEADER, SkillManager } from '@src/core'
-import { describe, expect, it } from 'vitest'
-import { captureError, createRecorder, createRecorders, invokeUnchecked } from '@orkestrel/test'
-import { isContractError } from '@orkestrel/contract'
+import { describe, expect, it, expectTypeOf } from 'vitest'
+import {
+	captureError,
+	createRecorder,
+	createRecorders,
+	invokeUnchecked,
+	roundTripJSON,
+} from '@orkestrel/test'
+import { attempt, isContractError, seededRandom } from '@orkestrel/contract'
 import { createFile, createTextContent } from '@orkestrel/workspace'
-import { createShiftingToolsInput, SKILL_EVENTS, SKILL_TOOLS_REFUSALS } from '../../../../setup.js'
+import {
+	createShiftingToolsInput,
+	SKILL_EVENTS,
+	SKILL_TOOLS_REFUSALS,
+	buildOptionDoors,
+	buildRecordInputRefusals,
+	drawRecordInput,
+	readDoorRefusal,
+	RECORD_INPUT_FIXTURES,
+} from '../../../../setup.js'
 
 // SkillManager is the name-keyed registry of host-supplied skills: last write wins, insertion
 // order kept, files minted through `createFile`. Real behavior, no mocks.
@@ -303,10 +325,96 @@ describe('SkillManager — the tools a skill names', () => {
 		},
 	)
 
-	it('reads the tools member once, so a getter cannot pass the check with one value and store another', () => {
+	it('refuses a tools getter whose later read is no list, so a getter cannot pass the check with one value and store another', () => {
 		const manager = new SkillManager()
-		const skill = manager.add(createShiftingToolsInput())
+		const error = captureError(() => manager.add(createShiftingToolsInput()))
 
-		expect(skill.tools).toEqual(['refund'])
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['tools'], shape: 'SkillInput' },
+		])
+		expect(manager.count).toBe(0)
+	})
+
+	it('refuses a batch whose second input names no tool list, and stores nothing', () => {
+		const added = createRecorder<SkillManagerEventMap['add']>()
+		const manager = new SkillManager({ on: { add: added.handler } })
+		const error = captureError(() =>
+			invokeUnchecked(manager, manager.add, [
+				[
+					{ name: 'claims', description: 'Claims', content: 'C' },
+					{ name: 'billing', description: 'Billing', content: 'B', tools: 'refund' },
+				],
+			]),
+		)
+
+		expect(isContractError(error) && error.code).toBe('placement')
+		expect(manager.count).toBe(0)
+		expect(added.count).toBe(0)
+	})
+})
+
+describe('SkillManager — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'SkillManager' && ['SkillManagerOptions', 'SkillInput'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof SkillManagerOptions, (typeof SKILL_MANAGER_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<keyof typeof skillInputShape.properties>().toEqualTypeOf<keyof SkillInput>()
+	})
+})
+
+describe('SkillManager — each input is an exact record (claims F-R1 and F-R5)', () => {
+	it.each(buildRecordInputRefusals(RECORD_INPUT_FIXTURES.skill))(
+		'refuses a batch whose second input has $name, and stores nothing',
+		({ input, path }) => {
+			const added = createRecorder<SkillManagerEventMap['add']>()
+			const manager = new SkillManager({ on: { add: added.handler } })
+			const error = captureError(() =>
+				invokeUnchecked(manager, manager.add, [
+					[{ name: 'claims', description: 'Claims', content: 'C' }, input],
+				]),
+			)
+
+			expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+				'structure',
+				{ path, shape: 'SkillInput' },
+			])
+			expect(manager.count).toBe(0)
+			expect(added.count).toBe(0)
+		},
+	)
+
+	it('stores only skills whose own members a JSON copy keeps, over seeded inputs (claim F-R5)', () => {
+		const random = seededRandom(20261112)
+		const manager = new SkillManager()
+		const outcomes = Array.from({ length: 240 }, () =>
+			attempt(() =>
+				invokeUnchecked<Skill>(manager, manager.add, [
+					drawRecordInput(RECORD_INPUT_FIXTURES.skill, random),
+				]),
+			),
+		)
+		const stored = outcomes.flatMap((outcome) => (outcome.success ? [outcome.value] : []))
+		const refused = outcomes.flatMap((outcome) =>
+			outcome.success ? [] : [isContractError(outcome.error) ? outcome.error.code : outcome.error],
+		)
+
+		expect(stored.length).toBeGreaterThan(0)
+		expect([...new Set(refused)].sort()).toEqual(['placement', 'structure'])
+		expect(roundTripJSON(stored)).toStrictEqual(stored)
 	})
 })

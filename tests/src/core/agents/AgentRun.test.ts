@@ -16,6 +16,7 @@ import {
 	createRecordedTool,
 	createStoredConversation,
 	createToolCall,
+	DISCLOSURE_LOAD_BILLING,
 	DISCLOSURE_RELOADED,
 } from '../../../setup.js'
 
@@ -89,10 +90,14 @@ describe('AgentRun — observe', () => {
 	it('reports a head built with another view as stale, and the same view as current', () => {
 		const context = createAgentContext()
 		context.skills.add({ name: 'billing', description: 'Billing', content: 'B', tools: ['refund'] })
-		const run = new AgentRun(context, createConversation(), undefined, { skills: ['billing'] }, [
-			'load',
-			'unload',
-		])
+		// The conversation records a load of billing, so the head shows it.
+		const run = new AgentRun(
+			context,
+			createStoredConversation(DISCLOSURE_LOAD_BILLING),
+			undefined,
+			undefined,
+			['load', 'unload'],
+		)
 		const selection = { messages: [], judgments: [] }
 
 		expect(run.observe()).toBe(true)
@@ -169,7 +174,7 @@ describe('AgentRun — the built-in handlers', () => {
 		})
 	})
 
-	it('unloads only a skill the conversation records as loaded, a host-given one refused', async () => {
+	it('unloads only a skill the conversation records as loaded, listing the loaded ones otherwise', async () => {
 		const context = createAgentContext()
 		context.skills.add([
 			{ name: 'billing', description: 'Billing', content: 'B' },
@@ -180,7 +185,7 @@ describe('AgentRun — the built-in handlers', () => {
 			context,
 			createStoredConversation(DISCLOSURE_RELOADED.messages),
 			undefined,
-			{ skills: ['audit'] },
+			undefined,
 			['load', 'unload'],
 		)
 		const [audit, claims] = await Promise.all(
@@ -190,7 +195,7 @@ describe('AgentRun — the built-in handlers', () => {
 		)
 		expect(audit).toMatchObject({
 			success: false,
-			error: 'The host gives that skill, so it cannot be unloaded. Continue without unloading it.',
+			error: 'No skill you loaded has that name. Use one of: "claims", "billing".',
 		})
 		expect(claims).toMatchObject({ success: true, value: BUILTIN_NOTES.unloaded })
 	})
@@ -341,31 +346,31 @@ describe('AgentRun — the built-in handlers', () => {
 	})
 })
 
-describe('AgentRun — unload of a host-given skill', () => {
-	it('refuses it even when the conversation records the model loading it', async () => {
+describe('AgentRun — unload of a loaded skill (claim C.5)', () => {
+	it('admits the unload of every skill the conversation records as loaded, on a run given a workspace', async () => {
 		const context = createAgentContext()
 		context.skills.add([
 			{ name: 'billing', description: 'Billing', content: 'B' },
 			{ name: 'claims', description: 'Claims', content: 'C' },
 		])
+		context.workspaces.add({ id: 'north' })
 		const run = new AgentRun(
 			context,
 			createStoredConversation(DISCLOSURE_RELOADED.messages),
 			undefined,
-			{ skills: ['billing'] },
+			'north',
 			['load', 'unload'],
 		)
 		const signal = new AbortController().signal
-		const [given, loaded] = await Promise.all(
+		const results = await Promise.all(
 			['billing', 'claims'].map((skill) =>
 				run.execute(createToolCall({ name: 'unload', arguments: { skill } }), { signal }),
 			),
 		)
 
-		expect(given).toMatchObject({
-			success: false,
-			error: 'The host gives that skill, so it cannot be unloaded. Continue without unloading it.',
-		})
-		expect(loaded).toMatchObject({ success: true, value: BUILTIN_NOTES.unloaded })
+		expect(results).toMatchObject([
+			{ success: true, value: BUILTIN_NOTES.unloaded },
+			{ success: true, value: BUILTIN_NOTES.unloaded },
+		])
 	})
 })

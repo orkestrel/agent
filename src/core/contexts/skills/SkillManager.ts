@@ -7,12 +7,20 @@ import type {
 	SkillManagerOptions,
 } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import { ContractError, isArray, isString, preview } from '@orkestrel/contract'
+import {
+	ContractError,
+	isArray,
+	isRecord,
+	isString,
+	preview,
+	refuseOptionKeys,
+} from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { createFile } from '@orkestrel/workspace'
 import { removeEntries } from '../../helpers.js'
-import { SKILL_SECTION_HEADER } from '../constants.js'
-import { renderIndexEntry } from '../helpers.js'
+import { SKILL_MANAGER_KEYS, SKILL_SECTION_HEADER } from '../constants.js'
+import { skillInputContract } from '../contracts.js'
+import { renderIndexEntry, requireRecordInput } from '../helpers.js'
 
 /**
  * Registers the skills a host supplies — instruction bundles keyed by `name`, listed in insertion
@@ -55,6 +63,7 @@ export class SkillManager implements SkillManagerInterface {
 	readonly #format: ContextSectionFormat<Skill> | undefined
 
 	constructor(options?: SkillManagerOptions) {
+		refuseOptionKeys(options, SKILL_MANAGER_KEYS, 'SkillManager', 'SkillManagerOptions')
 		this.#emitter = new Emitter<SkillManagerEventMap>(options)
 		this.#format = options?.format
 	}
@@ -78,8 +87,13 @@ export class SkillManager implements SkillManagerInterface {
 	add(input: SkillInput): Skill
 	add(inputs: readonly SkillInput[]): readonly Skill[]
 	add(input: SkillInput | readonly SkillInput[]): Skill | readonly Skill[] {
-		if (isArray(input)) return input.map((one) => this.#create(one))
-		return this.#create(input)
+		// Every input is checked and minted before any is stored, so a refused batch stores nothing.
+		if (isArray(input)) {
+			const skills = input.map((one) => this.#mint(one))
+			skills.forEach((skill) => this.#store(skill))
+			return skills
+		}
+		return this.#store(this.#mint(input))
 	}
 
 	skill(name: string): Skill | undefined {
@@ -109,14 +123,14 @@ export class SkillManager implements SkillManagerInterface {
 		this.#emitter.emit('clear')
 	}
 
-	// Mint a skill and its files, store it by name (a same-name one is replaced in place), and emit
-	// `add` after the map changed, so a swallowed listener throw can't perturb it. A `tools` member that
-	// is neither absent nor an array of strings refuses before anything is stored.
-	#create(input: SkillInput): Skill {
+	// Check one input and mint its skill and files, storing nothing. The `tools` member is read first and
+	// refuses with `'placement'`, as a message's role refuses before its other members; the input then
+	// meets its exact contract.
+	#mint(input: SkillInput): Skill {
 		// A JavaScript host can pass anything; a string would mint its characters as tool names. The
-		// member is read once and copied densely, so a hole reads as undefined and refuses, and a getter
-		// cannot answer the check with one value and the copy with another.
-		const given: unknown = input.tools
+		// member is read once and copied densely, so a hole reads as undefined and refuses, and the skill
+		// stores the copy that passed, never a later read.
+		const given: unknown = isRecord(input) ? input.tools : undefined
 		const tools: unknown = isArray(given) ? Array.from(given) : given
 		if (tools !== undefined && !(isArray(tools) && tools.every(isString))) {
 			throw new ContractError('SkillManager: tools must be an array of tool names', {
@@ -124,7 +138,8 @@ export class SkillManager implements SkillManagerInterface {
 				context: { path: ['input', 'tools'], limit: 'readonly string[]', received: preview(given) },
 			})
 		}
-		const skill: Skill = {
+		requireRecordInput(input, skillInputContract, 'SkillManager', 'SkillInput')
+		return {
 			id: crypto.randomUUID(),
 			name: input.name,
 			description: input.description,
@@ -132,6 +147,11 @@ export class SkillManager implements SkillManagerInterface {
 			files: (input.files ?? []).map((file) => createFile(file)),
 			tools: tools === undefined ? [] : tools,
 		}
+	}
+
+	// Store one minted skill by name (a same-name one is replaced in place), and emit `add` after the map
+	// changed, so a swallowed listener throw can't perturb it.
+	#store(skill: Skill): Skill {
 		this.#skills.set(skill.name, skill)
 		this.#emitter.emit('add', skill)
 		return skill

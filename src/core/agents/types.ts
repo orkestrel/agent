@@ -1,6 +1,5 @@
 import type {
 	AgentContextInterface,
-	AgentDisclosure,
 	InstructionManagerInterface,
 	MemoManagerInterface,
 	ScopeFilter,
@@ -504,12 +503,14 @@ export interface ApproverInterface {
  * Configures `createAgent` — the loop's bounds and pacing, the reserved `on` hooks, the
  * construction-time context wiring (`instructions` / `skills` / `memos` / `workspaces` / `scope`), the `conversations`
  * registry holding every run's default, the context `window` budget that opts into automatic
- * compaction of the run's conversation, the `builtins` each run serves and the `disclosure` it
- * shows, and the `strict` switch that settles the run `error` on
+ * compaction of the run's conversation, the `builtins` each run serves and the `workspace` it
+ * renders, and the `strict` switch that settles the run `error` on
  * an automatic-compaction summarizer failure, a selection fault, or a request still over the
  * window, or continues past them when `false`.
  *
  * @remarks
+ * An own enumerable member this type does not declare refuses at construction with a
+ * `ContractError` coded `'structure'`, and a declared member holding `undefined` reads as omitted.
  * - `system` — an optional system prompt prepended to the turn (seeds the context).
  * - `tools` — an optional pre-built {@link ToolManagerInterface} the loop dispatches
  *   the model's calls through; an empty one is created when omitted.
@@ -573,9 +574,12 @@ export interface ApproverInterface {
  *   `unload` are not advertised under an empty `skills` list; construction throws an
  *   `AgentError` with code `'BUILTIN'` for a name that is no built-in, a repeated name, `unload`
  *   without `load`, or a name the tool manager already holds. Omitted ⇒ none.
- * - `disclosure` — the skills and the workspace the host shows every run from its first request,
- *   within the ceiling; a run's own `disclosure` replaces it. Construction throws a `ContractError`
- *   with code `'placement'` for a value that is no exact {@link AgentDisclosure}. Omitted ⇒ none.
+ * - `workspace` — the id of the workspace every run renders in place of the active one, from its
+ *   first request, until the thread's own `switch`, and only where the registry holds it and the
+ *   ceiling admits it; a run's own `workspace` replaces it. It selects for the run and never moves
+ *   the `workspaces` manager's active pointer, which every conversation of the agent reads.
+ *   Construction throws a `ContractError` with code `'placement'` for a value that is not a string.
+ *   Omitted ⇒ the active workspace.
  * - `on` — the reserved {@link EmitterHooks} key: initial listeners for the agent's
  *   {@link AgentEventMap}, wired at construction (for example `{ finish: (r) => log(r) }`).
  */
@@ -711,14 +715,17 @@ export interface AgentOptions {
 	readonly select?: SelectionHandler
 	/** Lists the built-in tools each run serves itself, each subject to the ceiling and the authority. Default: none. */
 	readonly builtins?: readonly AgentBuiltin[]
-	/** Holds the skills and the workspace the host shows every run from its first request, within the ceiling. Default: nothing. */
-	readonly disclosure?: AgentDisclosure
+	/** Names the workspace every run renders in place of the active one, until the thread's own `switch`. Default: the active workspace. */
+	readonly workspace?: string
 }
 
 /**
  * Carries overrides for one call to the `generate` or `stream` method of an {@link AgentInterface}. Each member overrides the matching {@link AgentOptions} value, while `signal` composes with the construction signal, `conversation` binds the run to one conversation, `prompt` adds the run's user turn to it, and `scope` narrows the context scope for the run.
  *
  * @remarks
+ * An own enumerable member this type does not declare refuses the call synchronously with a
+ * `ContractError` coded `'structure'`, before the run changes anything, and a declared member
+ * holding `undefined` reads as omitted.
  * Every member is optional and resolved independently, so an omitted member leaves the
  * agent's constructed value in force and a caller that passes no options runs exactly the
  * agent it configured. `think` / `schema` ride through to the provider as
@@ -810,12 +817,13 @@ export interface AgentRunOptions {
 	 */
 	readonly scope?: ScopeInterface
 	/**
-	 * Replaces {@link AgentOptions.disclosure} for this run: the skills and the workspace the host
-	 * shows from the run's first request, within the ceiling. The `stream` or `generate` call throws a
-	 * `ContractError` coded `'placement'` synchronously when the value is no exact
-	 * {@link AgentDisclosure}, before the run appends its prompt or starts. Omitted ⇒ the agent's value.
+	 * Replaces {@link AgentOptions.workspace} for this run: the id of the workspace the run renders in
+	 * place of the active one, from its first request, until the thread's own `switch`, within the
+	 * ceiling. The `stream` or `generate` call throws a `ContractError` coded `'placement'`
+	 * synchronously when the value is not a string, before the run appends its prompt or starts.
+	 * Omitted ⇒ the agent's value.
 	 */
-	readonly disclosure?: AgentDisclosure
+	readonly workspace?: string
 }
 
 /**
@@ -873,7 +881,7 @@ export interface AgentInterface {
 	 * integer throws one with `code: 'LIMIT'`. A `prompt` that `agentPromptContract` refuses, a
 	 * `budget` or `allowance` that does not implement `BudgetInterface`, a `conversation` that does
 	 * not implement `ConversationInterface`, a `scope` that does not implement `ScopeInterface`, or a
-	 * `disclosure` that `agentDisclosureContract` refuses throws a `ContractError` with code
+	 * `workspace` that is not a string throws a `ContractError` with code
 	 * `'placement'` before either bound starts. Each throws synchronously, before any `Promise` is returned, and
 	 * leaves the run's conversation unchanged. A fire-and-forget `agent.generate().catch(...)`
 	 * therefore will not catch them (the throw happens on the call itself, ahead of the `.catch` ever
@@ -883,7 +891,7 @@ export interface AgentInterface {
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
 	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
-	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, the `conversation` does not implement `ConversationInterface`, the `scope` does not implement `ScopeInterface`, or the `disclosure` is not an exact `AgentDisclosure` (`code: 'placement'`), synchronously before a handle returns.
+	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, the `conversation` does not implement `ConversationInterface`, the `scope` does not implement `ScopeInterface`, or the `workspace` is not a string (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
 	/**
@@ -897,8 +905,8 @@ export interface AgentInterface {
 	 * `code: 'CONCURRENCY'`, a `limit` that is not a positive safe integer throws one with `code: 'LIMIT'`, and a `prompt` that
 	 * `agentPromptContract` refuses, a `budget` or `allowance` that does not implement
 	 * `BudgetInterface`, a `conversation` that does not implement `ConversationInterface`, a `scope`
-	 * that does not implement `ScopeInterface`, or a `disclosure` that `agentDisclosureContract`
-	 * refuses throws a `ContractError` with code `'placement'`, synchronously — before the
+	 * that does not implement `ScopeInterface`, or a `workspace` that is not a string throws a
+	 * `ContractError` with code `'placement'`, synchronously — before the
 	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
 	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`. Each of those leaves
 	 * the run's conversation unchanged. The guard compares conversation instances: two `Conversation`
@@ -911,7 +919,7 @@ export interface AgentInterface {
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
 	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
-	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, the `conversation` does not implement `ConversationInterface`, the `scope` does not implement `ScopeInterface`, or the `disclosure` is not an exact `AgentDisclosure` (`code: 'placement'`), synchronously before a handle returns.
+	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, the `conversation` does not implement `ConversationInterface`, the `scope` does not implement `ScopeInterface`, or the `workspace` is not a string (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
 	/**
@@ -1061,7 +1069,7 @@ export interface BuiltinNote {
  * single registry keys (their live objects carry functions, so they can't serialize).
  * `budget` is a token ceiling rebuilt into a `createTokenBudget({ max })`. A job holds what it
  * names: `scope` lists the skills, memos, and workspaces it holds of the registry's managers, so a
- * job with no `scope` holds none, as a job with no `tools` holds no tool; `disclosure` shows within
+ * job with no `scope` holds none, as a job with no `tools` holds no tool; `workspace` renders within
  * that scope; and `builtins` names the built-in tools it serves itself, which pass the authority
  * `authority` names as its tools do.
  */
@@ -1089,8 +1097,8 @@ export interface AgentJobInput {
 	 * each list required, `[]` for none. Omitted ⇒ the job holds no skill, memo, or workspace.
 	 */
 	readonly scope?: Required<Pick<ScopeFilter, 'skills' | 'memos' | 'workspaces'>>
-	/** Holds the skills and the workspace the job shows from its first request, within its `scope` (see {@link AgentOptions.disclosure}). */
-	readonly disclosure?: AgentDisclosure
+	/** Names the workspace the job renders in place of the active one, within its `scope` (see {@link AgentOptions.workspace}). */
+	readonly workspace?: string
 	/** Lists the built-in tools the job serves itself (see {@link AgentOptions.builtins}); a non-empty list requires `authority`. */
 	readonly builtins?: readonly AgentBuiltin[]
 	/**
@@ -1164,8 +1172,7 @@ export interface AgentRegistryInterface {
 	 * @param input - The serializable {@link AgentJobInput} to rehydrate
 	 * @param signal - An optional cancel threaded into the agent (a queue / runner abort)
 	 * @returns The ready agent, its context seeded with the job's messages
-	 * @throws {AgentError} Thrown when the job holds a member `AgentJobInput` does not declare or a member of the wrong shape, a referenced provider, tool, authority, or scheduler name is unregistered, or the job names `tools` or `builtins` and no `authority` (`code: 'REGISTRY'`), when the job's `limit` is not a nonnegative safe integer (`code: 'LIMIT'`), or when its `builtins` repeats a name, lists `unload` without `load`, or names a tool its `tools` hold (`code: 'BUILTIN'`)
-	 * @throws {ConversationError} Thrown when a seed message's role is not a `ConversationRole` (`code: 'ROLE'`), before the agent is returned
+	 * @throws {AgentError} Thrown when the job holds a member `AgentJobInput` does not declare or a member of the wrong shape, a bound out of range or a seed role that is not a `ConversationRole` included, when the job names `tools` or `builtins` and no `authority`, when its `builtins` repeats a name, lists `unload` without `load`, or names a tool its `tools` hold, or when a referenced provider, tool, authority, or scheduler name is unregistered (`code: 'REGISTRY'`)
 	 */
 	build(input: AgentJobInput, signal?: AbortSignal): AgentInterface
 }

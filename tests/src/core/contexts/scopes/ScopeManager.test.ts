@@ -1,9 +1,15 @@
 import type { ScopeEventName } from '../../../../setup.js'
-import type { ScopeInterface, ScopeManagerEventMap } from '@src/core'
+import type {
+	ScopeInterface,
+	ScopeManagerEventMap,
+	ScopeManagerOptions,
+	SCOPE_MANAGER_KEYS,
+} from '@src/core'
+import { isContractError } from '@orkestrel/contract'
 import { ScopeManager } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import { createRecorder, createRecorders } from '@orkestrel/test'
-import { SCOPE_EVENTS } from '../../../../setup.js'
+import { SCOPE_EVENTS, buildOptionDoors, readDoorRefusal } from '../../../../setup.js'
 
 // ScopeManager is the id-keyed registry of reusable named scopes — real
 // behavior, no mocks. Covers add (minting an id, never overwriting),
@@ -190,5 +196,26 @@ describe('ScopeManager — emitter (the push observation surface)', () => {
 		// Fired exactly once (its own throw was swallowed, not re-entered — no recursion).
 		expect(errors.count).toBe(1)
 		expect(errors.calls[0]?.[1]).toBe('add')
+	})
+})
+
+describe('ScopeManager — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'ScopeManager' && ['ScopeManagerOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof ScopeManagerOptions, (typeof SCOPE_MANAGER_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

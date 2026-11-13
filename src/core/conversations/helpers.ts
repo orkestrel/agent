@@ -230,14 +230,17 @@ export function requireRole(role: unknown): ConversationRole {
  * Returns a message input after checking its role and its members, or throws a coded error.
  *
  * @remarks
- * The role goes first, through {@link requireRole}, so its refusal names what it received. The members
- * cross {@link isMessageInput}, and `audit` runs only after it refused, so a stored message costs one
- * guard read. Tool-call arguments must also be JSON values before a message is stored.
+ * A value that is not a plain record, such as a class instance or an object that inherits its
+ * `role`, refuses first, through `isRecord` of `@orkestrel/contract`, with a text saying so. The role
+ * goes next, through {@link requireRole}, so its refusal names what it received. The members
+ * cross {@link isMessageInput}, an exact record guard, so a member `MessageInput` does not declare or a
+ * declared member holding `undefined` refuses, and `audit` runs only after a refusal. Tool-call
+ * arguments must also be JSON values before a message is stored.
  *
  * @param input - The message input to check
  * @param contract - The message input contract, whose `audit` is read only on a refusal
  * @returns The input, narrowed
- * @throws ConversationError Thrown when the role is not a `ConversationRole` (code `'ROLE'`) or a member fails `isMessageInput` (code `'MESSAGE'`), with the faults under `context.faults`
+ * @throws ConversationError Thrown when the input is not a plain record (code `'MESSAGE'`), when the role is not a `ConversationRole` (code `'ROLE'`), or when a member fails `isMessageInput`, an undeclared member included (code `'MESSAGE'`), with the faults under `context.faults`
  *
  * @example
  * ```ts
@@ -249,7 +252,15 @@ export function requireMessageInput(
 	input: unknown,
 	contract: Pick<ContractInterface<unknown>, 'audit' | 'schema'>,
 ): MessageInput {
-	requireRole(isRecord(input) ? input.role : undefined)
+	if (!isRecord(input)) {
+		const faults = contract.audit(input)
+		throw new ConversationError(
+			'MESSAGE',
+			'a message input must be a plain record, an object literal or parsed JSON holding its role and content as its own members, not a class instance or an object that inherits them',
+			{ context: { faults } },
+		)
+	}
+	requireRole(input.role)
 	if (
 		isMessageInput(input) &&
 		(input.calls === undefined || input.calls.every((call) => isJSONValue(call.arguments)))
@@ -258,7 +269,7 @@ export function requireMessageInput(
 	const faults = contract.audit(input)
 	throw new ConversationError(
 		'MESSAGE',
-		`a message input must carry string content, and calls, call, images, and thinking of their declared types\n${describeFaults(faults, contract.schema)}`,
+		`a message input must carry string content, calls, call, images, and thinking of their declared types, and no other member\n${describeFaults(faults, contract.schema)}`,
 		{ context: { faults } },
 	)
 }

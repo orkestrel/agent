@@ -1,6 +1,13 @@
-import { createScriptedApprover, createAuthorityContext } from '../../../setup.js'
+import type { AuthorityOptions, AUTHORITY_OPTION_KEYS } from '@src/core'
+import { isContractError } from '@orkestrel/contract'
+import {
+	createScriptedApprover,
+	createAuthorityContext,
+	buildOptionDoors,
+	readDoorRefusal,
+} from '../../../setup.js'
 import { captureError } from '@orkestrel/test'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import { Authority, createAuthority, isAgentError } from '@src/core'
 
 // Deterministic, Ollama-free unit tests for the Authority policy gate (the mirror of
@@ -237,5 +244,26 @@ describe('Authority — ask answers through the approver', () => {
 		expect(isAgentError(error)).toBe(true)
 		expect(isAgentError(error) && error.code).toBe('APPROVER')
 		expect(isAgentError(error) && error.context).toEqual({ tool: 'write' })
+	})
+})
+
+describe('Authority — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'Authority' && ['AuthorityOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof AuthorityOptions, (typeof AUTHORITY_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

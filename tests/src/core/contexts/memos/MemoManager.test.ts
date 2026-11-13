@@ -1,15 +1,39 @@
 import type { MemoEventName } from '../../../../setup.js'
-import type { Memo, MemoManagerEventMap } from '@src/core'
+import type {
+	Memo,
+	MemoManagerEventMap,
+	MemoManagerOptions,
+	MemoInput,
+	MEMO_MANAGER_KEYS,
+	memoInputShape,
+} from '@src/core'
+import { attempt, isContractError, seededRandom } from '@orkestrel/contract'
 import {
+	createMemoManager,
 	isContextError,
 	isMemoSnapshot,
 	MEMO_SECTION_HEADER,
 	MemoManager,
 	renderSection,
 } from '@src/core'
-import { describe, expect, it } from 'vitest'
-import { captureError, createRecorder, createRecorders, roundTripJSON } from '@orkestrel/test'
-import { MALFORMED_MEMO_SNAPSHOTS, MEMO_EVENTS, MEMO_REVISION } from '../../../../setup.js'
+import { describe, expect, it, expectTypeOf } from 'vitest'
+import {
+	captureError,
+	createRecorder,
+	createRecorders,
+	invokeUnchecked,
+	roundTripJSON,
+} from '@orkestrel/test'
+import {
+	MALFORMED_MEMO_SNAPSHOTS,
+	MEMO_EVENTS,
+	MEMO_REVISION,
+	buildOptionDoors,
+	buildRecordInputRefusals,
+	drawRecordInput,
+	readDoorRefusal,
+	RECORD_INPUT_FIXTURES,
+} from '../../../../setup.js'
 
 // MemoManager is the name-keyed memo set: one append-ordered list of revisions from which the
 // current memos, each history, and the snapshot derive. Real behavior, no mocks.
@@ -502,5 +526,100 @@ describe('MemoManager — foreign snapshot', () => {
 		expect(manager.memo('tone')?.origin).toEqual({ conversation: 'c1' })
 		expect(manager.count).toBe(1)
 		expect(manager.snapshot().memos).toEqual([{ ...MEMO_REVISION, origin: { conversation: 'c1' } }])
+	})
+})
+
+describe('MemoManager — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'MemoManager' && ['MemoManagerOptions', 'MemoInput'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof MemoManagerOptions, (typeof MEMO_MANAGER_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<keyof typeof memoInputShape.properties>().toEqualTypeOf<keyof MemoInput>()
+	})
+})
+
+describe('MemoManager — each input is an exact record (claims F-R1, F-R2, and F-R5)', () => {
+	it.each([
+		...buildRecordInputRefusals(RECORD_INPUT_FIXTURES.memo),
+		{
+			name: 'an origin message spelled undefined',
+			input: {
+				...RECORD_INPUT_FIXTURES.memo.full,
+				origin: { conversation: 'c1', message: undefined },
+			},
+			path: ['origin', 'message'],
+		},
+	])('refuses a batch whose second input has $name, and stores nothing', ({ input, path }) => {
+		const added = createRecorder<MemoManagerEventMap['add']>()
+		const manager = new MemoManager({ on: { add: added.handler } })
+		const error = captureError(() =>
+			invokeUnchecked(manager, manager.add, [
+				[
+					{ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' },
+					input,
+				],
+			]),
+		)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path, shape: 'MemoInput' },
+		])
+		expect(manager.snapshot().memos).toEqual([])
+		expect(added.count).toBe(0)
+	})
+
+	it('stores an origin with no message member when the input gives none, so its snapshot and a JSON copy agree (claim F-R2)', () => {
+		const manager = new MemoManager()
+		manager.add({
+			name: 'tone',
+			description: 'Prefers short replies.',
+			content: 'Answer briefly.',
+			origin: { conversation: 'c1' },
+		})
+		const snapshot = manager.snapshot()
+
+		expect(snapshot.memos.map((memo) => Object.keys(memo.origin ?? {}))).toEqual([['conversation']])
+		expect(roundTripJSON(snapshot)).toStrictEqual(snapshot)
+	})
+
+	it('stores only revisions its own hydrate admits, in memory and through JSON, over seeded inputs (claim F-R5)', () => {
+		const random = seededRandom(20261112)
+		const manager = new MemoManager()
+		const outcomes = Array.from({ length: 240 }, () =>
+			attempt(() =>
+				invokeUnchecked<Memo>(manager, manager.add, [
+					drawRecordInput(RECORD_INPUT_FIXTURES.memo, random),
+				]),
+			),
+		)
+		const refused = outcomes.flatMap((outcome) =>
+			outcome.success ? [] : [isContractError(outcome.error) ? outcome.error.code : outcome.error],
+		)
+		const snapshot = manager.snapshot()
+		const hydrated = [snapshot, roundTripJSON(snapshot)].map((seed) =>
+			attempt(() => createMemoManager({ snapshot: seed }).snapshot()),
+		)
+
+		expect(outcomes.filter((outcome) => outcome.success).length).toBeGreaterThan(0)
+		expect([...new Set(refused)]).toEqual(['structure'])
+		expect(hydrated).toEqual([
+			{ success: true, value: snapshot },
+			{ success: true, value: snapshot },
+		])
 	})
 })

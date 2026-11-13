@@ -1,6 +1,8 @@
 import type { Memo, ScopeFilter, Skill } from './types.js'
 import type { Message } from '../types.js'
+import type { ContractInterface } from '@orkestrel/contract'
 import type { FileInterface } from '@orkestrel/workspace'
+import { ContractError, describeFaults } from '@orkestrel/contract'
 import { isBinary } from '@orkestrel/workspace'
 import { ContextError } from './errors.js'
 
@@ -307,4 +309,44 @@ export function renderIndexLine(text: string): string {
  */
 export function renderSkillBody(skill: Pick<Skill, 'name' | 'content'>): string {
 	return `### ${skill.name}\n\n${skill.content}`
+}
+
+/**
+ * Checks a stored record's input against its exact contract, and throws a `ContractError` coded
+ * `'structure'` when it fails.
+ *
+ * @remarks
+ * The input must pass the contract's `is` guard: a missing required member, a member the input type
+ * does not declare, a declared member holding `undefined`, and a member of another type each refuse,
+ * so nothing a refused input carries is stored. A class instance refuses, and the contract reads own
+ * enumerable string keys alone, as every option door does. The contract's `audit` runs only after a refusal, and
+ * the message names the owner, the input type, and every fault with the members to send. The
+ * `context` holds the first fault's `path` and the input type as its `shape`.
+ *
+ * @param input - The input to check
+ * @param contract - The input's compiled contract
+ * @param owner - The entity named at the head of the refusal
+ * @param shape - The input type named in the refusal and its `context`
+ * @throws ContractError Thrown when the input fails the contract (code `'structure'`)
+ *
+ * @example
+ * ```ts
+ * import { memoInputContract, requireRecordInput } from '@orkestrel/agent'
+ *
+ * requireRecordInput({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' }, memoInputContract, 'MemoManager', 'MemoInput') // returns
+ * requireRecordInput({ name: 'tone', description: undefined, content: 'Answer briefly.' }, memoInputContract, 'MemoManager', 'MemoInput') // throws ContractError ('structure')
+ * ```
+ */
+export function requireRecordInput(
+	input: unknown,
+	contract: Pick<ContractInterface<unknown>, 'is' | 'audit' | 'schema'>,
+	owner: string,
+	shape: string,
+): void {
+	if (contract.is(input)) return
+	const faults = contract.audit(input)
+	throw new ContractError(
+		`${owner}: a ${shape} must hold each required member and no other, every member of its declared type\n${describeFaults(faults, contract.schema)}`,
+		{ code: 'structure', context: { path: faults[0]?.path ?? [], shape } },
+	)
 }

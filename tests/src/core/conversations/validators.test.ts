@@ -20,6 +20,7 @@ import {
 import {
 	CONVERSATION_SNAPSHOT_FIXTURES,
 	MALFORMED_CONVERSATION_SNAPSHOTS,
+	buildNonPlainMessages,
 	MESSAGE_FIXTURES,
 	MESSAGE_REFUSALS,
 } from '../../../setup.js'
@@ -577,9 +578,8 @@ describe('the owned conversation guards are exact', () => {
 })
 
 describe('isMessageInput', () => {
-	it('admits each member of its declared type and leaves the role to requireRole', () => {
+	it('admits each member of its declared type and a ConversationRole', () => {
 		expect(isMessageInput({ role: 'user', content: 'hi' })).toBe(true)
-		expect(isMessageInput({ role: 'other', content: 'hi' })).toBe(true)
 		expect(
 			isMessageInput({
 				role: 'assistant',
@@ -598,6 +598,13 @@ describe('isMessageInput', () => {
 		[{ role: 'user', content: '', call: 1 }],
 		[{ role: 'user', content: '', images: [1] }],
 		[{ role: 'user', content: '', thinking: 1 }],
+		// An exact record: a role outside ConversationRole, an undeclared member, and a declared
+		// optional member holding undefined each refuse.
+		[{ role: 'other', content: 'hi' }],
+		[{ role: 'system', content: 'hi' }],
+		[{ id: 'm', role: 'user', content: 'hi' }],
+		[{ role: 'user', content: 'hi', disclosure: { skills: ['billing'] } }],
+		[{ role: 'user', content: 'hi', thinking: undefined }],
 		[null],
 		[
 			new Proxy(
@@ -611,6 +618,10 @@ describe('isMessageInput', () => {
 		],
 	])('refuses row %#', (value) => {
 		expect(isMessageInput(value)).toBe(false)
+	})
+
+	it.each(buildNonPlainMessages())('refuses $name as no plain record (claim F-R6)', ({ input }) => {
+		expect(isMessageInput(input)).toBe(false)
 	})
 
 	it('holds is ⟹ guard against the input shape', () => {

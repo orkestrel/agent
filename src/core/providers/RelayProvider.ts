@@ -4,9 +4,10 @@ import type {
 	ProviderRequest,
 	RelayProviderOptions,
 } from './types.js'
-import { attempt, cloneJSONValue } from '@orkestrel/contract'
+import { attempt, cloneJSONValue, refuseOptionKeys } from '@orkestrel/contract'
 import { createNDJSONParser } from '@orkestrel/ndjson'
 import { AgentProvider } from './AgentProvider.js'
+import { RELAY_PROVIDER_KEYS } from './constants.js'
 import { ProviderAbortError, ProviderError } from './errors.js'
 import { requestToRelay } from './helpers.js'
 import { providerRequestContract, relayFrameContract } from './contracts.js'
@@ -50,6 +51,7 @@ export class RelayProvider extends AgentProvider {
 	readonly #parser: (() => ProviderParserInterface) | undefined
 
 	constructor(options: RelayProviderOptions) {
+		refuseOptionKeys(options, RELAY_PROVIDER_KEYS, 'RelayProvider', 'RelayProviderOptions')
 		const { url, timeout, fetch, headers, replay } = options
 		super({
 			url,

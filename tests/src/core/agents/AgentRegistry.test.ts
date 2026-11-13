@@ -1,6 +1,7 @@
-import type { AgentJobInput } from '@src/core'
-import { describe, expect, it } from 'vitest'
-import { captureError, createRecorder, requireValue } from '@orkestrel/test'
+import type { AgentJobInput, AgentRegistryOptions, REGISTRY_OPTION_KEYS } from '@src/core'
+import { isContractError } from '@orkestrel/contract'
+import { describe, expect, it, expectTypeOf } from 'vitest'
+import { captureError, createRecorder, invokeUnchecked, requireValue } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
 import { createTool } from '@orkestrel/tool'
 import {
@@ -20,6 +21,13 @@ import {
 	DURABLE_JOB,
 	DURABLE_REFUSAL_CASES,
 	DURABLE_SENTINELS,
+	JOB_REFUSAL_CASES,
+	buildRefusalTree,
+	createFanoutFixture,
+	UNDISCLOSED_DRAWS,
+	UNDISCLOSED_SEED,
+	drawUndisclosedCases,
+	executeUndisclosedCase,
 	callToRequest,
 	collectRenderedNames,
 	createAddTool,
@@ -32,7 +40,8 @@ import {
 	createLoopTool,
 	drawDurableHeld,
 	readDurableRendered,
-	readSystemContents,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 // AgentRegistry.test.ts — the MIRROR of src/core/agents/AgentRegistry.ts. Pins the
@@ -105,7 +114,7 @@ describe('AgentRegistry — build (rehydration)', () => {
 		expect(result.usage).toEqual(AGENT_USAGE)
 	})
 
-	it('refuses a job seed holding a system role', () => {
+	it('refuses a job seed holding a system role as a record, naming the role under a fault', () => {
 		const registry = createAgentRegistry({
 			providers: { main: createScriptedProvider([{ content: 'done' }]) },
 		})
@@ -123,7 +132,11 @@ describe('AgentRegistry — build (rehydration)', () => {
 			]),
 		)
 
-		expect(isConversationError(error) && error.code).toBe('ROLE')
+		expect(isConversationError(error)).toBe(false)
+		expect(isAgentError(error) && error.code).toBe('REGISTRY')
+		expect(isAgentError(error) ? error.context?.faults : undefined).toEqual([
+			expect.objectContaining({ path: ['messages', '1', 'role'] }),
+		])
 	})
 
 	it('refuses a job with a misspelled key, naming it under an extra fault', () => {
@@ -163,7 +176,11 @@ describe('AgentRegistry — build (rehydration)', () => {
 		expect(isAgentError(error) && error.message).toContain(
 			'names tools or builtins and no authority',
 		)
-		expect(isAgentError(error) && error.context).toEqual({ tools: ['add'] })
+		expect(isAgentError(error) && error.context).toEqual({
+			refusals: [
+				"authority: a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities",
+			],
+		})
 	})
 
 	it('builds a job with an empty tools list and no authority', () => {
@@ -283,11 +300,11 @@ describe('AgentRegistry — build (rehydration)', () => {
 		expect(result.partial).toBe(true)
 	})
 
-	it('refuses a rehydrated `limit` that is not a positive safe integer', () => {
+	it('refuses a rehydrated `limit` that is not a positive safe integer as a record', () => {
 		const registry = createTurnRegistry({ content: 'ok' })
 		for (const limit of [0, -1, 1.5]) {
 			const caught = captureError(() => registry.build({ provider: 'main', messages: [], limit }))
-			expect(isAgentError(caught) ? caught.code : undefined).toBe('LIMIT')
+			expect(isAgentError(caught) ? caught.code : undefined).toBe('REGISTRY')
 		}
 		expect(registry.build({ provider: 'main', messages: [], limit: 1 }).status).toBe('idle')
 	})
@@ -745,14 +762,14 @@ describe('AgentRegistry — empty registry', () => {
 	})
 })
 
-describe('AgentRegistry — the job contract for a scope, a disclosure, and built-ins', () => {
-	it('admits a job whose scope holds its three lists, with a disclosure and built-ins', async () => {
+describe('AgentRegistry — the job contract for a scope, a workspace, and built-ins', () => {
+	it('admits a job whose scope holds its three lists, with a workspace and built-ins', async () => {
 		const { provider, registry } = createDurableFixture([{ content: 'done' }])
 		const result = await registry
 			.build({
 				...DURABLE_JOB,
 				scope: { skills: ['billing'], memos: ['pref'], workspaces: ['north'] },
-				disclosure: { skills: ['billing'], workspace: 'north' },
+				workspace: 'north',
 				builtins: ['load', 'unload', 'memo'],
 			})
 			.generate()
@@ -843,49 +860,73 @@ describe('AgentRegistry — what a job holds of the shared pools', () => {
 	})
 })
 
-describe("AgentRegistry — a job's disclosure", () => {
-	it('puts a listed skill body last in the first system message and renders its workspace in place of the active one', async () => {
+describe("AgentRegistry — a job's workspace (claim D.4)", () => {
+	it('renders its workspace in place of the active one and shows no skill body, without moving the active one', async () => {
 		const { provider, registry, pools } = createDurableFixture([{ content: 'done' }])
 		await registry
 			.build({
 				...DURABLE_JOB,
 				scope: { skills: ['billing'], memos: [], workspaces: ['north', 'south'] },
-				disclosure: { skills: ['billing'], workspace: 'south' },
+				workspace: 'south',
 			})
 			.generate()
-		expect(
-			readSystemContents(provider)[0]?.trimEnd().endsWith(`${DURABLE_SENTINELS.body}billing`),
-		).toBe(true)
-		expect(readDurableRendered(requireValue(provider.calls[0]))).toMatchObject({
-			bodies: ['billing'],
+		expect(readDurableRendered(requireValue(provider.calls[0]))).toEqual({
+			skills: ['billing'],
+			bodies: [],
+			memos: [],
 			workspaces: ['south'],
+			builtins: [],
 		})
 		expect(pools.workspaces.active?.id).toBe('north')
 	})
 
-	it('shows nothing for a name its scope omits, a name the pool lacks, or any name on a job with no scope', async () => {
-		const scoped = createDurableFixture([{ content: 'done' }])
-		await scoped.registry
+	it('renders none for an id its scope omits, an id the pool lacks, or any id on a job with no scope', async () => {
+		const omitted = createDurableFixture([{ content: 'done' }])
+		await omitted.registry
 			.build({
 				...DURABLE_JOB,
 				scope: { skills: ['billing'], memos: [], workspaces: ['north'] },
-				disclosure: { skills: ['claims', 'ghost'], workspace: 'south' },
+				workspace: 'south',
+			})
+			.generate()
+		const lacked = createDurableFixture([{ content: 'done' }])
+		await lacked.registry
+			.build({
+				...DURABLE_JOB,
+				scope: { skills: ['billing'], memos: [], workspaces: ['north', 'ghost'] },
+				workspace: 'ghost',
 			})
 			.generate()
 		const bare = createDurableFixture([{ content: 'done' }])
-		await bare.registry
-			.build({ ...DURABLE_JOB, disclosure: { skills: ['billing', 'claims'], workspace: 'south' } })
-			.generate()
-		expect(readDurableRendered(requireValue(scoped.provider.calls[0]))).toEqual({
-			skills: ['billing'],
-			bodies: [],
-			memos: [],
-			workspaces: ['north'],
-			builtins: [],
-		})
+		await bare.registry.build({ ...DURABLE_JOB, workspace: 'south' }).generate()
+		for (const fixture of [omitted, lacked]) {
+			expect(readDurableRendered(requireValue(fixture.provider.calls[0]))).toEqual({
+				skills: ['billing'],
+				bodies: [],
+				memos: [],
+				workspaces: ['north'],
+				builtins: [],
+			})
+		}
 		expect(collectRenderedNames(readDurableRendered(requireValue(bare.provider.calls[0])))).toEqual(
 			[],
 		)
+	})
+})
+
+describe('AgentRegistry — no job shows a skill (claim C.3)', () => {
+	it('shows no skill on the first request of a drawn job, and refuses each that carries a disclosure with REGISTRY', async () => {
+		const rows = drawUndisclosedCases('job', UNDISCLOSED_SEED, UNDISCLOSED_DRAWS)
+		const readings = await Promise.all(rows.map(executeUndisclosedCase))
+
+		expect(readings.filter((reading) => reading.loaded || reading.held.length > 0)).toEqual([])
+		expect(readings.map((reading) => reading.refused)).toEqual(rows.map((row) => row.undeclared))
+		// The admitted draws reach a scope that admits a skill while load is advertised.
+		expect(
+			rows.some(
+				(row, at) => !row.undeclared && readings[at]?.load === true && row.skills?.length !== 0,
+			),
+		).toBe(true)
 	})
 })
 
@@ -945,7 +986,11 @@ describe("AgentRegistry — a job's built-ins", () => {
 		expect(isAgentError(error) && error.message).toContain(
 			'names tools or builtins and no authority',
 		)
-		expect(isAgentError(error) && error.context).toEqual({ builtins: ['memo'] })
+		expect(isAgentError(error) && error.context).toEqual({
+			refusals: [
+				"authority: a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities",
+			],
+		})
 		expect(provider.started).toBe(0)
 	})
 
@@ -1067,5 +1112,40 @@ describe('AgentRegistry — remember on a job', () => {
 		)
 		expect(pools.memos.history('draft')).toHaveLength(1)
 		expect(pools.memos.memo('draft')?.content).toBe('DRAFT-ONE')
+	})
+})
+
+describe('AgentRegistry — a job its build refuses (claim J.5)', () => {
+	it.each(JOB_REFUSAL_CASES)(
+		'refuses a root job with $name with REGISTRY, naming $member',
+		({ job, member }) => {
+			const { registry } = createFanoutFixture()
+			const caught = captureError(() =>
+				invokeUnchecked(registry, registry.build, [buildRefusalTree(job, 0)]),
+			)
+			expect(isAgentError(caught) ? caught.code : caught).toBe('REGISTRY')
+			expect(isAgentError(caught) ? caught.message : '').toContain(member)
+		},
+	)
+})
+
+describe('AgentRegistry — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'AgentRegistry' && ['AgentRegistryOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof AgentRegistryOptions, (typeof REGISTRY_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

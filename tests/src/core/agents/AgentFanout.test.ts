@@ -6,7 +6,7 @@ import {
 	isAgentJobError,
 	scanJobTree,
 } from '@src/core'
-import { createRecorder } from '@orkestrel/test'
+import { createRecorder, invokeUnchecked } from '@orkestrel/test'
 import { createRunner } from '@orkestrel/workflow'
 import { describe, expect, it } from 'vitest'
 import {
@@ -18,6 +18,10 @@ import {
 	FANOUT_EXCESS_CASES,
 	FANOUT_JOB,
 	FANOUT_WITHIN_CASES,
+	JOB_REFUSAL_CASES,
+	JOB_REFUSAL_PARENT,
+	buildRefusalTree,
+	createRecordedRegistry,
 	createAgentJob,
 	createEchoProvider,
 	createFanoutFixture,
@@ -178,7 +182,7 @@ describe('AgentFanout', () => {
 		const message = isAgentError(caught) ? caught.message : ''
 		expect(isAgentError(caught) ? caught.code : caught).toBe('REGISTRY')
 		expect(message.split('\n')[0]).toBe(
-			'every job in a tree must be readable and hold only the declared members of AgentJobInput; correct each job a following finding names',
+			'every job in a tree must be readable, hold only the declared members of AgentJobInput, and build under its parent; correct each job a following finding names',
 		)
 		expect(message).not.toContain('a child job must stay within its parent')
 		expect(message).toContain('job.children[0].children[0]: ')
@@ -201,7 +205,7 @@ describe('AgentFanout', () => {
 		const lines = isAgentError(caught) ? caught.message.split('\n') : []
 		expect(isAgentError(caught) ? caught.code : caught).toBe('REGISTRY')
 		expect(lines[0]).toBe(
-			'every job in a tree must be readable and hold only the declared members of AgentJobInput; correct each job a following finding names',
+			'every job in a tree must be readable, hold only the declared members of AgentJobInput, and build under its parent; correct each job a following finding names',
 		)
 		expect(lines[1]).toMatch(/^refused job: /)
 		expect(lines).not.toContain(
@@ -229,7 +233,7 @@ describe('AgentFanout', () => {
 			])
 			.catch((error: unknown) => error)
 		expect(isAgentError(caught) ? caught.message.split('\n').slice(0, 2) : []).toEqual([
-			'every job in a tree must be readable and hold only the declared members of AgentJobInput; correct each job a following finding names',
+			'every job in a tree must be readable, hold only the declared members of AgentJobInput, and build under its parent; correct each job a following finding names',
 			'a child job must stay within its parent on tools, builtins, scope, authority, provider, scheduler, limit, timeout, and budget; enqueue a job that needs more as a root job',
 		])
 	})
@@ -397,7 +401,7 @@ describe('AgentFanout — a child within its parent on scope and builtins', () =
 		expect(main.started + other.started).toBe(0)
 	})
 
-	it('renders no admitted child outside its parent ceiling over seeded pairs, a disclosure outside the parent scope included', async () => {
+	it('renders no admitted child outside its parent ceiling over seeded pairs, a workspace outside the parent scope included', async () => {
 		const pairs = [...drawDurablePairs(DURABLE_SEED, DURABLE_DRAWS), ...DURABLE_HAND_PAIRS]
 		const readings = await Promise.all(
 			pairs.map(async (pair) => ({
@@ -421,15 +425,58 @@ describe('AgentFanout — a child within its parent on scope and builtins', () =
 				)
 				.map(({ pair }) => pair.name),
 		).toEqual([])
-		// The scan admits pairs, refuses others, and admits a child whose disclosure names a skill its parent's scope omits.
+		// The scan admits pairs, refuses others, and admits a child whose workspace names one its parent's scope omits.
 		expect(admitted.length).toBeGreaterThan(0)
 		expect(admitted.length).toBeLessThan(readings.length)
 		expect(
-			admitted.some(({ pair }) =>
-				(pair.child.disclosure?.skills ?? []).some(
-					(name) => !(pair.parent.scope?.skills ?? []).includes(name),
-				),
+			admitted.some(
+				({ pair }) =>
+					pair.child.workspace !== undefined &&
+					!(pair.parent.scope?.workspaces ?? []).includes(pair.child.workspace),
 			),
 		).toBe(true)
+	})
+})
+
+describe('AgentFanout — a job its build would refuse (claim J.3)', () => {
+	it.each(JOB_REFUSAL_CASES)(
+		'refuses a child with $name under a sound parent before anything spawns, builds, or runs',
+		async ({ job }) => {
+			const { main, other, registry } = createFanoutFixture()
+			const recorded = createRecordedRegistry(registry)
+			const fanout = new AgentFanout(recorded.registry, false)
+			const spawns = createRecorder<readonly [id: string, parent: string | undefined]>()
+			const runner = createRunner<AgentJobInput, AgentResult>({
+				handler: fanout.execute.bind(fanout),
+				on: { spawn: spawns.handler },
+			})
+			const caught = await invokeUnchecked<Promise<unknown>>(runner, runner.execute, [
+				[buildRefusalTree(job, 1)],
+			]).catch((error: unknown) => error)
+			expect(isAgentError(caught) ? caught.code : caught).toBe('REGISTRY')
+			expect([spawns.count, recorded.builds.count, main.started + other.started]).toEqual([0, 0, 0])
+		},
+	)
+
+	it('refuses a root whose own tools name one of its built-ins before its child spawns', async () => {
+		const { main, other, registry } = createFanoutFixture()
+		const recorded = createRecordedRegistry(registry)
+		const fanout = new AgentFanout(recorded.registry, false)
+		const spawns = createRecorder<readonly [id: string, parent: string | undefined]>()
+		const caught = await createRunner<AgentJobInput, AgentResult>({
+			handler: fanout.execute.bind(fanout),
+			on: { spawn: spawns.handler },
+		})
+			.execute([
+				{
+					...JOB_REFUSAL_PARENT,
+					tools: ['loop', 'memo'],
+					children: [createAgentJob({ messages: [{ role: 'user', content: 'child' }] })],
+				},
+			])
+			.catch((error: unknown) => error)
+		expect(isAgentError(caught) ? caught.code : caught).toBe('REGISTRY')
+		expect(isAgentError(caught) ? caught.message : '').toContain('job.builtins: names "memo"')
+		expect([spawns.count, recorded.builds.count, main.started + other.started]).toEqual([0, 0, 0])
 	})
 })

@@ -11,12 +11,17 @@ import type {
 } from './types.js'
 import type { Message, MessageInput } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import { isArray } from '@orkestrel/contract'
+import { isArray, refuseOptionKeys } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { messageInputContract } from '../contracts.js'
 import { collectExchanges, removeEntries, stripThinking } from '../helpers.js'
 import { conversationSnapshotContract } from './contracts.js'
-import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
+import {
+	COMPACT_OPTION_KEYS,
+	CONVERSATION_OPTION_KEYS,
+	DEFAULT_CONVERSATION_KEEP,
+	REFERENCE_OPTION_KEYS,
+} from './constants.js'
 import { ConversationError } from './errors.js'
 import {
 	buildRecapMessage,
@@ -126,6 +131,7 @@ export class Conversation implements ConversationInterface {
 	readonly #pending = new Set<Promise<Section | undefined>>()
 
 	constructor(options?: ConversationOptions) {
+		refuseOptionKeys(options, CONVERSATION_OPTION_KEYS, 'Conversation', 'ConversationOptions')
 		// A summarizer is a function and is never serialized, so it comes from options beside the
 		// snapshot. Restoring is silent: nothing was edited, so no event fires. The snapshot is checked
 		// before any member is seated, and every member is seated from the checked read alone.
@@ -216,6 +222,7 @@ export class Conversation implements ConversationInterface {
 	}
 
 	async compact(options?: CompactOptions): Promise<Section | undefined> {
+		refuseOptionKeys(options, COMPACT_OPTION_KEYS, 'Conversation', 'CompactOptions')
 		const summarize = this.#summarize
 		if (summarize === undefined) {
 			throw new ConversationError(
@@ -259,6 +266,7 @@ export class Conversation implements ConversationInterface {
 	}
 
 	reference(options?: ConversationReferenceOptions): string {
+		refuseOptionKeys(options, REFERENCE_OPTION_KEYS, 'Conversation', 'ConversationReferenceOptions')
 		// The leading marker states the block is not part of the live conversation, so a small
 		// model reads the cherry-picked excerpts as foreign material it attributes to that source,
 		// never as its own latest turns.

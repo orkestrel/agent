@@ -6,6 +6,8 @@ import type {
 	AuthorityOptions,
 	AuthorityRule,
 } from './types.js'
+import { refuseOptionKeys } from '@orkestrel/contract'
+import { AUTHORITY_OPTION_KEYS } from './constants.js'
 import { AgentError } from './errors.js'
 import { requireFallback, requireRules } from './helpers.js'
 
@@ -54,6 +56,7 @@ export class Authority implements AuthorityInterface {
 
 	constructor(options: AuthorityOptions) {
 		this.#fallback = requireFallback(options)
+		refuseOptionKeys(options, AUTHORITY_OPTION_KEYS, 'Authority', 'AuthorityOptions')
 		this.#rules = requireRules(options.rules)
 		this.#handler = options.ask
 	}

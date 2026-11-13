@@ -1,6 +1,13 @@
-import type { ConversationEventMap } from '@src/core'
+import type {
+	ConversationEventMap,
+	ConversationManagerOptions,
+	ConversationInput,
+	CONVERSATION_MANAGER_KEYS,
+} from '@src/core'
+import { isContractError } from '@orkestrel/contract'
 import { captureError } from '@orkestrel/test'
 import {
+	CONVERSATION_INPUT_KEYS,
 	Conversation,
 	ConversationManager,
 	createDatabaseConversationStore,
@@ -10,7 +17,7 @@ import {
 } from '@src/core'
 import { createMemoryDriver } from '@orkestrel/database'
 import { createRecorder, requireValue } from '@orkestrel/test'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import {
 	compactSeedTurns,
 	createObservedConversationStore,
@@ -23,6 +30,8 @@ import {
 	seedConversation,
 	REWRITTEN_CONVERSATION_SNAPSHOT,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 // ConversationManager is the id-keyed registry over the conversation layer WITH an active pointer — an
@@ -757,5 +766,45 @@ describe('ConversationManager — open reads a 0.0.29 snapshot without its conve
 			renderRecap('recap of 2'),
 			'Which order is late?',
 		])
+	})
+})
+
+describe('ConversationManager — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'ConversationManager' &&
+				['ConversationManagerOptions', 'ConversationInput'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('reads every declared member of ConversationInput spelled undefined as omitted, as options read (claim F-R1)', () => {
+		const door = requireValue(
+			buildOptionDoors().find(
+				(entry) => entry.owner === 'ConversationManager' && entry.shape === 'ConversationInput',
+			),
+		)
+		const spelled = Object.fromEntries(CONVERSATION_INPUT_KEYS.map((key) => [key, undefined]))
+
+		expect([Object.keys(spelled), door.open(spelled)]).toEqual([
+			[...CONVERSATION_INPUT_KEYS],
+			expect.any(Conversation),
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof ConversationManagerOptions, (typeof CONVERSATION_MANAGER_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<
+			Exclude<keyof ConversationInput, (typeof CONVERSATION_INPUT_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

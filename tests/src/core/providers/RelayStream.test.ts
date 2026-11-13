@@ -1,5 +1,5 @@
-import type { ThinkingReplay } from '@src/core'
-import { parseJSONAs } from '@orkestrel/contract'
+import type { ThinkingReplay, RelayStreamOptions, RELAY_STREAM_KEYS } from '@src/core'
+import { parseJSONAs, isContractError } from '@orkestrel/contract'
 import { requireValue, waitForDelay } from '@orkestrel/test'
 import { getEventListeners } from 'node:events'
 import {
@@ -9,7 +9,7 @@ import {
 	relayFrameContract,
 	RelayStream,
 } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import {
 	createScriptedProvider,
 	createToolCall,
@@ -18,6 +18,8 @@ import {
 	RecordedTransport,
 	ScriptedReads,
 	ScriptedWire,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 describe('RelayStream', () => {
@@ -313,5 +315,26 @@ describe('RelayStream', () => {
 		})
 		expect(requireValue(provider.calls[0]).signal.aborted).toBe(true)
 		expect(getEventListeners(abort.signal, 'abort')).toEqual([])
+	})
+})
+
+describe('RelayStream — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'RelayStream' && ['RelayStreamOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof RelayStreamOptions, (typeof RELAY_STREAM_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

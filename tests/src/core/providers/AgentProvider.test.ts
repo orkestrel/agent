@@ -1,5 +1,13 @@
-import type { Message, ProviderIncrement } from '@src/core'
+import type {
+	Message,
+	ProviderIncrement,
+	AgentProviderInput,
+	ProviderStreamOptions,
+	PROVIDER_INPUT_KEYS,
+	STREAM_OPTION_KEYS,
+} from '@src/core'
 import type { ToolCall } from '@orkestrel/tool'
+import { isContractError } from '@orkestrel/contract'
 import { getEventListeners } from 'node:events'
 import {
 	DEFAULT_PROVIDER_TIMEOUT,
@@ -12,7 +20,7 @@ import {
 } from '@src/core'
 import { createNDJSONParser, isNDJSONError } from '@orkestrel/ndjson'
 import { captureProduction, requireValue, waitForDelay } from '@orkestrel/test'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, expectTypeOf } from 'vitest'
 import {
 	createRefusingTransport,
 	createStreamingTransport,
@@ -23,6 +31,8 @@ import {
 	rejectTransportOnAbort,
 	recordGlobalTransport,
 	ScriptedWire,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 describe('AgentProvider — identity, transport, and request composition', () => {
@@ -1400,5 +1410,31 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const refusal: unknown = settled.reason
 		if (!isProviderAbortError(refusal)) throw new Error('the raced finish did not abort')
 		expect(refusal.cause).toBe(failure)
+	})
+})
+
+describe('AgentProvider — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'AgentProvider' &&
+				['AgentProviderInput', 'ProviderStreamOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof AgentProviderInput, (typeof PROVIDER_INPUT_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<
+			Exclude<keyof ProviderStreamOptions, (typeof STREAM_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

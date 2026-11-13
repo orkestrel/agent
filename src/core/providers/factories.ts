@@ -9,13 +9,20 @@ import type {
 	ThinkSplitterInterface,
 } from './types.js'
 import type { JudgeInterface } from '../types.js'
-import { attempt, cloneJSONValue, parseJSONAs, preview } from '@orkestrel/contract'
+import {
+	attempt,
+	cloneJSONValue,
+	parseJSONAs,
+	preview,
+	refuseOptionKeys,
+} from '@orkestrel/contract'
 import {
 	DEFAULT_RELAY_LIMIT,
 	INVALID_RELAY_STATUS,
 	OVERSIZED_RELAY_STATUS,
 	REFUSED_RELAY_CONTENT_TYPE,
 	REFUSED_RELAY_STATUS,
+	RELAY_OPTION_KEYS,
 	UNAUTHORIZED_RELAY_STATUS,
 	UPSTREAM_RELAY_STATUS,
 } from './constants.js'
@@ -76,6 +83,7 @@ import { SystemOneJudge } from './SystemOneJudge.js'
  * ```
  */
 export function createRelay(options: RelayOptions): RelayHandler {
+	refuseOptionKeys(options, RELAY_OPTION_KEYS, 'createRelay', 'RelayOptions')
 	const { provider, authorize, limit } = options
 	const system: RelaySystemOptions = { ...options.system }
 	const { definitions, accept } = options.tools ?? {}

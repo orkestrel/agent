@@ -14,7 +14,7 @@ import type {
 	AgentRunResult,
 } from './types.js'
 import type { ProviderInterface, ProviderRequest, ProviderResult } from '../providers/index.js'
-import type { AgentContextInterface, AgentDisclosure, Selection } from '../contexts/index.js'
+import type { AgentContextInterface, Selection } from '../contexts/index.js'
 import type { ConversationInterface, Section } from '../conversations/index.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
@@ -29,6 +29,7 @@ import { createTokenMeter } from '@orkestrel/budget'
 import {
 	describeFaults,
 	attempt,
+	refuseOptionKeys,
 	ContractError,
 	errorToMessage,
 	failure,
@@ -40,7 +41,13 @@ import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
 import { AgentContext } from '../contexts/index.js'
 import { raceSignal } from '../conversations/index.js'
-import { AUTHORITY_NOTES, DEFAULT_AGENT_LIMIT, SCOPE_NOTE } from './constants.js'
+import {
+	AGENT_OPTION_KEYS,
+	AGENT_RUN_KEYS,
+	AUTHORITY_NOTES,
+	DEFAULT_AGENT_LIMIT,
+	SCOPE_NOTE,
+} from './constants.js'
 import { agentPromptContract } from './contracts.js'
 import { AgentError } from './errors.js'
 import { AgentRun } from './AgentRun.js'
@@ -54,9 +61,9 @@ import {
 	requireBudget,
 	requireBuiltins,
 	requireConversation,
-	requireDisclosure,
 	requireLimit,
 	requireScope,
+	requireWorkspace,
 	resolveDecision,
 	settleToolResult,
 } from './helpers.js'
@@ -160,8 +167,9 @@ export class Agent implements AgentInterface {
 	readonly #emitter: Emitter<AgentEventMap>
 	// The built-ins each run serves itself, checked and owned at construction; empty when none is enabled.
 	readonly #builtins: readonly AgentBuiltin[]
-	// What the host shows every run, owned at construction; a run's own option replaces it.
-	readonly #disclosure: AgentDisclosure | undefined
+	// The workspace every run renders in place of the active one, checked at construction; a run's
+	// own option replaces it.
+	readonly #workspace: string | undefined
 	// The label the last run settled on. `status` derives the live answer from `#runs`, so an
 	// overlapping run can never report `done` while another is still in flight.
 	#settled: AgentStatus = 'idle'
@@ -181,6 +189,7 @@ export class Agent implements AgentInterface {
 	>()
 
 	constructor(provider: ProviderInterface, options?: AgentOptions) {
+		refuseOptionKeys(options, AGENT_OPTION_KEYS, 'Agent', 'AgentOptions')
 		if (options?.tools !== undefined && options.authority === undefined) {
 			throw new AgentError(
 				'AUTHORITY',
@@ -211,7 +220,7 @@ export class Agent implements AgentInterface {
 				"builtins are set and no authority is; pass authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) to allow every call, or rules with a deny fallback",
 			)
 		}
-		this.#disclosure = requireDisclosure(options?.disclosure)
+		this.#workspace = requireWorkspace(options?.workspace)
 		this.#timeoutMs = options?.timeout
 		this.#budget = options?.budget
 		this.#allowance = options?.allowance
@@ -250,6 +259,7 @@ export class Agent implements AgentInterface {
 	}
 
 	stream(options?: AgentRunOptions): AgentStreamInterface {
+		refuseOptionKeys(options, AGENT_RUN_KEYS, 'Agent', 'AgentRunOptions')
 		// The prompt is checked exactly before every other guard, so a refused prompt starts nothing.
 		const prompt = options?.prompt
 		if (prompt !== undefined && !agentPromptContract.is(prompt)) {
@@ -269,8 +279,8 @@ export class Agent implements AgentInterface {
 				},
 			)
 		}
-		// A run's `disclosure` replaces the agent's, and a refused one starts nothing.
-		const disclosure = requireDisclosure(options?.disclosure) ?? this.#disclosure
+		// A run's `workspace` replaces the agent's, and a refused one starts nothing.
+		const workspace = requireWorkspace(options?.workspace) ?? this.#workspace
 		// Resolve effective per-run bounds — a per-run override wins, else the construction
 		// default. `limit`, `budget`, and `allowance` also thread into `#execute` (the loop bound,
 		// the reconcile, and the mid-stream meter); each budget is the same instance folded into
@@ -347,7 +357,7 @@ export class Agent implements AgentInterface {
 		// anyone drains `events`. The per-run `think` / `schema` preferences ride through to
 		// `provider.stream`; `limit` / `budget` / `allowance` ride through as the effective run bounds.
 		// The run's own entity: its built-in tools, and the view its turns and builds share.
-		const run = new AgentRun(this.#context, conversation, scope, disclosure, this.#builtins)
+		const run = new AgentRun(this.#context, conversation, scope, workspace, this.#builtins)
 		void this.#drive(
 			abort,
 			run,

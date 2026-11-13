@@ -1,4 +1,14 @@
-import type { AgentBuiltin, AuthorityNote, BuiltinNote } from './types.js'
+import type {
+	AgentBuiltin,
+	AgentOptions,
+	AgentQueueOptions,
+	AgentRegistryOptions,
+	AgentRunnerOptions,
+	AgentRunOptions,
+	AuthorityNote,
+	AuthorityOptions,
+	BuiltinNote,
+} from './types.js'
 import type { ToolAnnotations } from '@orkestrel/tool'
 
 /**
@@ -145,3 +155,95 @@ export const MESSAGE_TOKEN_OVERHEAD = 4
  * exact count.
  */
 export const IMAGE_TOKEN_ESTIMATE = 512
+
+/**
+ * Lists the members `AgentOptions` declares, frozen — the keys the `Agent` constructor admits.
+ *
+ * @remarks
+ * The constructor passes the list to `refuseOptionKeys` of `@orkestrel/contract`, so an own
+ * enumerable member outside it refuses with a `ContractError` coded `'structure'`.
+ */
+export const AGENT_OPTION_KEYS = Object.freeze([
+	'on',
+	'error',
+	'system',
+	'tools',
+	'instructions',
+	'skills',
+	'memos',
+	'workspaces',
+	'scope',
+	'limit',
+	'timeout',
+	'budget',
+	'allowance',
+	'scheduler',
+	'signal',
+	'authority',
+	'conversations',
+	'window',
+	'strict',
+	'select',
+	'builtins',
+	'workspace',
+] as const) satisfies ReadonlyArray<keyof AgentOptions>
+
+/**
+ * Lists the members `AgentRunOptions` declares, frozen — the keys the `stream` and `generate`
+ * methods admit.
+ *
+ * @remarks
+ * The `stream` method passes the list to `refuseOptionKeys` of `@orkestrel/contract`, so an own
+ * enumerable member outside it refuses with a `ContractError` coded `'structure'`.
+ */
+export const AGENT_RUN_KEYS = Object.freeze([
+	'think',
+	'schema',
+	'limit',
+	'timeout',
+	'budget',
+	'allowance',
+	'signal',
+	'conversation',
+	'prompt',
+	'scope',
+	'workspace',
+] as const) satisfies ReadonlyArray<keyof AgentRunOptions>
+
+/** Lists the members `AuthorityOptions` declares, frozen — the keys the `Authority` constructor admits. */
+export const AUTHORITY_OPTION_KEYS = Object.freeze([
+	'rules',
+	'fallback',
+	'ask',
+] as const) satisfies ReadonlyArray<keyof AuthorityOptions>
+
+/** Lists the members `AgentRegistryOptions` declares, frozen — the keys the `AgentRegistry` constructor admits. */
+export const REGISTRY_OPTION_KEYS = Object.freeze([
+	'providers',
+	'tools',
+	'authorities',
+	'schedulers',
+	'store',
+	'skills',
+	'memos',
+	'workspaces',
+] as const) satisfies ReadonlyArray<keyof AgentRegistryOptions>
+
+/** Lists the members `AgentQueueOptions` declares, frozen — the keys `createAgentQueue` admits. */
+export const QUEUE_OPTION_KEYS = Object.freeze([
+	'registry',
+	'partial',
+	'concurrency',
+	'retries',
+	'timeout',
+	'store',
+] as const) satisfies ReadonlyArray<keyof AgentQueueOptions>
+
+/** Lists the members `AgentRunnerOptions` declares, frozen — the keys `createAgentRunner` admits. */
+export const RUNNER_OPTION_KEYS = Object.freeze([
+	'registry',
+	'partial',
+	'concurrency',
+	'retries',
+	'timeout',
+] as const) satisfies ReadonlyArray<keyof AgentRunnerOptions>

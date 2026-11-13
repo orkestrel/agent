@@ -8,14 +8,14 @@ import type {
 	MemoSnapshot,
 } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import { describeFaults, isArray } from '@orkestrel/contract'
+import { describeFaults, isArray, refuseOptionKeys } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { copyJSON } from '../../cloners.js'
 import { removeEntries } from '../../helpers.js'
-import { MEMO_SECTION_HEADER } from '../constants.js'
+import { MEMO_MANAGER_KEYS, MEMO_SECTION_HEADER } from '../constants.js'
 import { ContextError } from '../errors.js'
-import { renderIndexEntry } from '../helpers.js'
-import { memoSnapshotContract } from '../contracts.js'
+import { renderIndexEntry, requireRecordInput } from '../helpers.js'
+import { memoInputContract, memoSnapshotContract } from '../contracts.js'
 import { isMemoSnapshot } from '../validators.js'
 
 /**
@@ -68,6 +68,7 @@ export class MemoManager implements MemoManagerInterface {
 	 * @throws {ContextError} Thrown when the `snapshot` option cannot be copied through JSON or its copy is not a memo snapshot (code `'SNAPSHOT'`); nothing is seated and nothing is emitted
 	 */
 	constructor(options?: MemoManagerOptions) {
+		refuseOptionKeys(options, MEMO_MANAGER_KEYS, 'MemoManager', 'MemoManagerOptions')
 		// A snapshot is a foreign value: own a JSON copy first so the caller's objects never alias the
 		// state, then refuse a malformed one, or one JSON cannot copy, before anything is seated.
 		const supplied = options?.snapshot
@@ -111,6 +112,9 @@ export class MemoManager implements MemoManagerInterface {
 	add(input: MemoInput): Memo
 	add(inputs: readonly MemoInput[]): readonly Memo[]
 	add(input: MemoInput | readonly MemoInput[]): Memo | readonly Memo[] {
+		// Every input is checked before any is stored, so a refused batch stores nothing.
+		const inputs = isArray(input) ? input : [input]
+		inputs.forEach((one) => requireRecordInput(one, memoInputContract, 'MemoManager', 'MemoInput'))
 		if (isArray(input)) return input.map((one) => this.#append(one))
 		return this.#append(input)
 	}

@@ -12,15 +12,16 @@ import type { MemoManagerInterface, SkillManagerInterface } from '../contexts/in
 import type { ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
 import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
-import { describeFaults } from '@orkestrel/contract'
+import { describeFaults, refuseOptionKeys } from '@orkestrel/contract'
 import { createTokenBudget } from '@orkestrel/budget'
 import { ToolManager } from '@orkestrel/tool'
 import { Agent } from './Agent.js'
+import { REGISTRY_OPTION_KEYS } from './constants.js'
 import { agentJobContract } from './contracts.js'
 import { AgentError } from './errors.js'
 import { ConversationManager } from '../conversations/index.js'
 import { createScope } from '../contexts/index.js'
-import { requireEntry } from './helpers.js'
+import { collectJobRefusals, requireEntry } from './helpers.js'
 
 /**
  * Makes a durable, JSON-serializable {@link AgentJobInput} runnable — holds the named pools of
@@ -39,20 +40,22 @@ import { requireEntry } from './helpers.js'
  *   the message `unknown <category>: <name>` when it is absent — an unknown name in a
  *   rehydrated job is a programmer / config error that must fail loudly at build time, never
  *   silently resolve to `undefined` and run an agent missing a dependency.
- * - **`build` rehydrates.** Resolve the job's `provider`; assemble a fresh
- *   {@link ToolManager} from the `tools` names; refuse with `code: 'REGISTRY'` a job that names
- *   `tools` or `builtins` and no `authority`; rebuild the token `budget` from its
- *   ceiling (`createTokenBudget({ max })`); resolve the optional `authority` /
+ * - **`build` rehydrates.** Refuse with `code: 'REGISTRY'` a job `agentJobContract` refuses,
+ *   its faults under `context.faults`, and a job `collectJobRefusals` refuses, its lines under
+ *   `context.refusals`: tools or built-ins with no `authority`, a `builtins` list an agent
+ *   refuses, and a built-in the job's `tools` also name. Then resolve the job's `provider`;
+ *   assemble a fresh {@link ToolManager} from the `tools` names; rebuild the token `budget` from
+ *   its ceiling (`createTokenBudget({ max })`); resolve the optional `authority` /
  *   `scheduler` names; construct the {@link Agent} with `system` / `limit` / `timeout` /
  *   the threaded `signal`; seed its context with the job's `messages`; return it. The
  *   `signal` is the queue attempt's / runner unit's cancel, so a bounded abort propagates
  *   into the agent (which commits a partial — the job's `partial` policy then
- *   decides success vs. retry). A job `limit` that is not a positive safe integer throws an
- *   {@link AgentError} carrying `code: 'LIMIT'` from the agent's construction.
+ *   decides success vs. retry). A job is a record, so a malformed `limit`, `timeout`, `budget`,
+ *   seed role, or `builtins` list refuses as one, with `code: 'REGISTRY'`.
  * - **A job holds what it names.** A job with a `scope` gets the registry's `skills`, `memos`, and
  *   `workspaces` managers, which every scoped job shares, and a scope named `job` built from its
- *   three lists; a job with no `scope` gets none of them. Its `disclosure` and `builtins` pass to
- *   the agent, whose construction refuses a malformed `builtins` list with `code: 'BUILTIN'`.
+ *   three lists; a job with no `scope` gets none of them. Its `workspace` and `builtins` pass to
+ *   the agent.
  * - **Event-free.** A pure resolver — no Emitter, no events.
  *
  * @example
@@ -74,6 +77,7 @@ export class AgentRegistry implements AgentRegistryInterface {
 	readonly #workspaces: WorkspaceManagerInterface | undefined
 
 	constructor(options: AgentRegistryOptions) {
+		refuseOptionKeys(options, REGISTRY_OPTION_KEYS, 'AgentRegistry', 'AgentRegistryOptions')
 		this.#providers = new Map(Object.entries(options.providers))
 		this.#tools = new Map(Object.entries(options.tools ?? {}))
 		this.#authorities = new Map(Object.entries(options.authorities ?? {}))
@@ -110,6 +114,17 @@ export class AgentRegistry implements AgentRegistryInterface {
 				{ context: { faults } },
 			)
 		}
+		const refusals = collectJobRefusals(input)
+		if (refusals.length > 0) {
+			throw new AgentError(
+				'REGISTRY',
+				[
+					'a job must build as it is written; correct each member a following line names',
+					...refusals,
+				].join('\n'),
+				{ context: { refusals } },
+			)
+		}
 		const provider = this.provider(input.provider)
 		const agent = new Agent(provider, this.#buildOptions(input, signal))
 		// Seed the conversation onto the rehydrated agent's context — the serializable
@@ -130,18 +145,6 @@ export class AgentRegistry implements AgentRegistryInterface {
 	#buildOptions(input: AgentJobInput, signal: AbortSignal | undefined): AgentOptions {
 		const names = input.tools ?? []
 		const builtins = input.builtins ?? []
-		if ((names.length > 0 || builtins.length > 0) && input.authority === undefined) {
-			throw new AgentError(
-				'REGISTRY',
-				"a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities",
-				{
-					context: {
-						...(names.length === 0 ? {} : { tools: names }),
-						...(builtins.length === 0 ? {} : { builtins }),
-					},
-				},
-			)
-		}
 		const scope = input.scope
 		const budget = input.budget === undefined ? undefined : createTokenBudget({ max: input.budget })
 		return {
@@ -161,7 +164,7 @@ export class AgentRegistry implements AgentRegistryInterface {
 				? {}
 				: { workspaces: this.#workspaces }),
 			...(scope === undefined ? {} : { scope: createScope({ name: 'job', ...scope }) }),
-			...(input.disclosure === undefined ? {} : { disclosure: input.disclosure }),
+			...(input.workspace === undefined ? {} : { workspace: input.workspace }),
 			...(builtins.length === 0 ? {} : { builtins }),
 			...(signal === undefined ? {} : { signal }),
 		}

@@ -1,8 +1,8 @@
 import type { SystemOneJudgeOptions, SystemOneRequest } from './types.js'
 import type { JudgeRequest, JudgeResult } from '../types.js'
-import { preview } from '@orkestrel/contract'
+import { preview, refuseOptionKeys } from '@orkestrel/contract'
 import { AgentJudge } from './AgentJudge.js'
-import { SYSTEM_ONE_PATH } from './constants.js'
+import { SYSTEM_ONE_OPTION_KEYS, SYSTEM_ONE_PATH } from './constants.js'
 import { extractSystemOneAnswer, extractSystemOneUsage, questionToSystemOne } from './helpers.js'
 import { isSystemOneAnswer, isSystemOneResponse } from './validators.js'
 import { JudgeError } from './errors.js'
@@ -60,6 +60,7 @@ import { JudgeError } from './errors.js'
  */
 export class SystemOneJudge extends AgentJudge {
 	constructor(options: SystemOneJudgeOptions) {
+		refuseOptionKeys(options, SYSTEM_ONE_OPTION_KEYS, 'SystemOneJudge', 'SystemOneJudgeOptions')
 		super({ ...options, path: SYSTEM_ONE_PATH, batch: true })
 	}
 

@@ -1,9 +1,28 @@
 import type { InstructionEventName } from '../../../../setup.js'
-import type { InstructionInterface, InstructionManagerEventMap } from '@src/core'
+import type {
+	InstructionInterface,
+	InstructionManagerEventMap,
+	InstructionManagerOptions,
+	INSTRUCTION_MANAGER_KEYS,
+} from '@src/core'
+import { attempt, isContractError, seededRandom } from '@orkestrel/contract'
 import { InstructionManager, renderSection } from '@src/core'
-import { describe, expect, it } from 'vitest'
-import { createRecorder, createRecorders } from '@orkestrel/test'
-import { INSTRUCTION_EVENTS } from '../../../../setup.js'
+import { describe, expect, it, expectTypeOf } from 'vitest'
+import {
+	captureError,
+	createRecorder,
+	createRecorders,
+	invokeUnchecked,
+	roundTripJSON,
+} from '@orkestrel/test'
+import {
+	INSTRUCTION_EVENTS,
+	buildOptionDoors,
+	buildRecordInputRefusals,
+	drawRecordInput,
+	readDoorRefusal,
+	RECORD_INPUT_FIXTURES,
+} from '../../../../setup.js'
 
 // InstructionManager is the name-keyed instruction registry a richer context renders a
 // directives block from — real behavior, no mocks. Covers add (single +
@@ -341,5 +360,68 @@ describe('InstructionManager — emitter (the push observation surface)', () => 
 		// Fired exactly once (its own throw was swallowed, not re-entered — no recursion).
 		expect(errors.count).toBe(1)
 		expect(errors.calls[0]?.[1]).toBe('add')
+	})
+})
+
+describe('InstructionManager — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'InstructionManager' &&
+				['InstructionManagerOptions', 'InstructionInput'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof InstructionManagerOptions, (typeof INSTRUCTION_MANAGER_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+	})
+})
+
+describe('InstructionManager — each input is an exact record (claims F-R1 and F-R5)', () => {
+	it.each(buildRecordInputRefusals(RECORD_INPUT_FIXTURES.instruction))(
+		'refuses a batch whose second input has $name, and stores nothing',
+		({ input, path }) => {
+			const added = createRecorder<InstructionManagerEventMap['add']>()
+			const manager = new InstructionManager({ on: { add: added.handler } })
+			const error = captureError(() =>
+				invokeUnchecked(manager, manager.add, [[{ name: 'reply', content: 'Reply.' }, input]]),
+			)
+
+			expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+				'structure',
+				{ path, shape: 'InstructionInput' },
+			])
+			expect(manager.count).toBe(0)
+			expect(added.count).toBe(0)
+		},
+	)
+
+	it('stores only instructions whose own members a JSON copy keeps, over seeded inputs (claim F-R5)', () => {
+		const random = seededRandom(20261112)
+		const manager = new InstructionManager()
+		const outcomes = Array.from({ length: 240 }, () =>
+			attempt(() =>
+				invokeUnchecked<InstructionInterface>(manager, manager.add, [
+					drawRecordInput(RECORD_INPUT_FIXTURES.instruction, random),
+				]),
+			),
+		)
+		const stored = outcomes.flatMap((outcome) => (outcome.success ? [{ ...outcome.value }] : []))
+		const refused = outcomes.flatMap((outcome) =>
+			outcome.success ? [] : [isContractError(outcome.error) ? outcome.error.code : outcome.error],
+		)
+
+		expect(stored.length).toBeGreaterThan(0)
+		expect([...new Set(refused)]).toEqual(['structure'])
+		expect(roundTripJSON(stored)).toStrictEqual(stored)
 	})
 })

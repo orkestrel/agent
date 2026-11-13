@@ -46,7 +46,7 @@ export class AgentRun {
 	readonly #context: AgentContextInterface
 	readonly #conversation: ConversationInterface
 	readonly #scope: ScopeInterface | undefined
-	readonly #given: AgentDisclosure | undefined
+	readonly #workspace: string | undefined
 	readonly #enabled: readonly AgentBuiltin[]
 	readonly #builtins: ReadonlySet<string>
 	readonly #tools: ToolManagerInterface
@@ -76,20 +76,20 @@ export class AgentRun {
 	 * @param context - The agent's context
 	 * @param conversation - The conversation the run is bound to
 	 * @param scope - The run scope, or `undefined`
-	 * @param given - What the host shows the run, already admitted, or `undefined`
+	 * @param workspace - The workspace the run renders in place of the active one, already checked, or `undefined`
 	 * @param builtins - The enabled built-ins, already checked
 	 */
 	constructor(
 		context: AgentContextInterface,
 		conversation: ConversationInterface,
 		scope: ScopeInterface | undefined,
-		given: AgentDisclosure | undefined,
+		workspace: string | undefined,
 		builtins: readonly AgentBuiltin[],
 	) {
 		this.#context = context
 		this.#conversation = conversation
 		this.#scope = scope
-		this.#given = given
+		this.#workspace = workspace
 		this.#enabled = builtins
 		this.#builtins = new Set(builtins)
 		this.#tools = createToolManager()
@@ -204,7 +204,7 @@ export class AgentRun {
 		const shown = resolveDisclosure(
 			this.#context,
 			this.#conversation,
-			this.#given,
+			this.#workspace,
 			ceiling,
 			this.#enabled,
 		)
@@ -312,13 +312,6 @@ export class AgentRun {
 	}
 
 	#unload(skill: unknown): string {
-		// The host shows a skill it gives, so the model's unload of it would change nothing.
-		if (isString(skill) && this.#given?.skills.includes(skill) === true) {
-			throw new ToolError(
-				'ARGUMENTS',
-				'The host gives that skill, so it cannot be unloaded. Continue without unloading it.',
-			)
-		}
 		const loaded = collectDisclosure(this.#conversation, this.#enabled).skills
 		if (!isString(skill) || !loaded.includes(skill)) {
 			throw new ToolError('ARGUMENTS', describeCandidates('skill you loaded', loaded))

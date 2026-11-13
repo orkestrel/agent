@@ -176,6 +176,18 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+	buildRefusalPath,
+	buildRefusalTree,
+	collectTreeJobs,
+	drawJobBounds,
+	drawJobTrees,
+	JOB_REFUSAL_CASES,
+	JOB_REFUSAL_PARENT,
+	omitMember,
+	readStructureRefusal,
+	UNDECLARED_FORMS,
+} from './setup.js'
+import {
 	blankSourceText,
 	extractDeclaredNames,
 	extractNameWord,
@@ -289,9 +301,20 @@ import {
 	RecordedScheduler,
 	ScriptedReads,
 } from './setup.js'
+import {
+	buildLedgerWorkspaceShape,
+	buildNonPlainMessages,
+	buildRecordInputRefusals,
+	chargeDensityPrompt,
+	LEDGER_DENSE_RATES,
+	LEDGER_DENSITY_RATES,
+	drawRecordInput,
+	MessageInstance,
+	RECORD_INPUT_FIXTURES,
+} from './setup.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
-import { rawShape, stringShape } from '@orkestrel/contract'
+import { isRecord, rawShape, seededRandom, stringShape } from '@orkestrel/contract'
 
 // setup.test.ts — the proof of `tests/setup.ts`, the host-independent shared test-infrastructure
 // module. Its subject is the exported HELPERS' behaviour, the behaviour every suite in
@@ -3888,5 +3911,132 @@ describe('scanParticipleNames', () => {
 		expect(sources.length).toBeGreaterThan(0)
 		expect(scanParticipleNames(sources, new Set()).length).toBeGreaterThan(0)
 		expect(scanParticipleNames(sources, PARTICIPLE_ALLOWED)).toEqual([])
+	})
+})
+
+describe('refusal fixtures (claims J and O)', () => {
+	it('places a case at the depth it names, under the refusal parent, and reads its path', () => {
+		const tree = buildRefusalTree({ limit: 0 }, 2)
+		const jobs = collectTreeJobs(tree)
+
+		expect(jobs).toHaveLength(3)
+		expect(jobs.at(-1)).toEqual({
+			provider: 'main',
+			messages: JOB_REFUSAL_PARENT.messages,
+			limit: 0,
+		})
+		expect(buildRefusalPath(2)).toBe('job.children[0].children[0]')
+		expect(buildRefusalTree({ limit: 0 }, 0)).toEqual(jobs.at(-1))
+	})
+
+	it('draws the same trees and bounds from the same seed, reaching every case', () => {
+		expect(drawJobTrees(7, 40)).toEqual(drawJobTrees(7, 40))
+		expect(drawJobBounds(7, 40)).toEqual(drawJobBounds(7, 40))
+		const cases = new Set(drawJobTrees(2411, 300).map((draw) => draw.case))
+		expect(JOB_REFUSAL_CASES.filter((row) => !cases.has(row.name))).toEqual([])
+	})
+
+	it('builds each undeclared form, own and enumerable exactly where it refuses', () => {
+		const readings = UNDECLARED_FORMS.map((form) => {
+			const record = form.build({ system: 'Desk.' }, 'shown', 1)
+			return [form.name, Object.keys(record).includes('shown'), form.refused]
+		})
+
+		expect(readings.filter(([, own, refused]) => own !== refused)).toEqual([])
+		expect(readings.some(([, own]) => own)).toBe(true)
+	})
+
+	it('omits one member and keeps the rest', () => {
+		expect(omitMember({ system: 'Desk.', limit: 4 }, 'limit')).toEqual({ system: 'Desk.' })
+	})
+
+	it('reads a structure refusal as refused and any other error as not', () => {
+		expect(readStructureRefusal(new Error('boom')).refused).toBe(false)
+	})
+})
+
+describe('record input fixtures (claims F-R1, F-R5, and F-R6)', () => {
+	it('refuses each declared member spelled undefined, each required member omitted, and one stray, naming each path', () => {
+		const rows = buildRecordInputRefusals(RECORD_INPUT_FIXTURES.instruction)
+
+		expect(rows.map((row) => [row.name, row.path])).toEqual([
+			['name spelled undefined', ['name']],
+			['content spelled undefined', ['content']],
+			['priority spelled undefined', ['priority']],
+			['override spelled undefined', ['override']],
+			['name omitted', ['name']],
+			['content omitted', ['content']],
+			['an undeclared member', ['stray']],
+		])
+		expect(Object.hasOwn(rows[2]?.input ?? {}, 'priority')).toBe(true)
+		expect(Object.hasOwn(rows[4]?.input ?? {}, 'name')).toBe(false)
+	})
+
+	it('draws the same inputs from the same seed, reaching each member form and a stray', () => {
+		const first = seededRandom(20261112)
+		const second = seededRandom(20261112)
+		const drawn = Array.from({ length: 240 }, () =>
+			drawRecordInput(RECORD_INPUT_FIXTURES.memo, first),
+		)
+		const again = Array.from({ length: 240 }, () =>
+			drawRecordInput(RECORD_INPUT_FIXTURES.memo, second),
+		)
+		const forms = drawn.map((input) =>
+			!Object.hasOwn(input, 'name')
+				? 'absent'
+				: input.name === undefined
+					? 'undefined'
+					: input.name === 7
+						? 'other'
+						: 'declared',
+		)
+
+		expect(again).toStrictEqual(drawn)
+		expect(new Set(forms)).toEqual(new Set(['declared', 'absent', 'undefined', 'other']))
+		expect(drawn.some((input) => Object.hasOwn(input, 'stray'))).toBe(true)
+	})
+
+	it('builds message inputs that hold a role and content but are no plain record', () => {
+		const inputs = buildNonPlainMessages()
+
+		expect(
+			inputs.map(({ name, input }) => [name, isRecord(input), Reflect.get(input, 'role')]),
+		).toEqual([
+			['a class instance', false, 'user'],
+			['an object that inherits its role', false, 'user'],
+		])
+		expect(inputs[0]?.input).toBeInstanceOf(MessageInstance)
+	})
+})
+
+describe('workspace sample fixtures (claims W.1 to W.4)', () => {
+	it('charges workspace text at its own rate and every other message at the scale', () => {
+		const head = { id: 's', role: 'system', content: 'Serve the desk.' } as const
+		const shown = {
+			id: 'c',
+			role: 'user',
+			content: `## Workspace
+
+${'r'.repeat(400)}`,
+		} as const
+
+		expect(chargeDensityPrompt([head], undefined, LEDGER_DENSE_RATES)).toBe(
+			chargeDensityPrompt([head], undefined, LEDGER_DENSITY_RATES),
+		)
+		expect(chargeDensityPrompt([head, shown], undefined, LEDGER_DENSE_RATES)).toBeGreaterThan(
+			2 * chargeDensityPrompt([head, shown], undefined, LEDGER_DENSITY_RATES),
+		)
+	})
+
+	it('builds a fresh ledger whose active workspace holds the records it is given', () => {
+		const none = buildLedgerWorkspaceShape(0, LEDGER_DENSE_RATES)
+		const two = buildLedgerWorkspaceShape(2, LEDGER_DENSE_RATES)
+
+		expect(none.ledger.agent.context.workspaces.active).toBeUndefined()
+		expect(two.ledger.agent.context.workspaces.active?.files().map((file) => file.path)).toEqual([
+			'record-0.md',
+			'record-1.md',
+		])
+		expect(two.ledger.gauge).toBeUndefined()
 	})
 })

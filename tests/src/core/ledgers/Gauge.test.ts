@@ -1,7 +1,15 @@
+import type { GAUGE_OPTION_KEYS } from '@src/core'
+import type { GaugeOptions } from '@src/core'
 import type { GaugeCall } from '../../../../src/core/ledgers/types.js'
-import { describe, expect, it } from 'vitest'
+import { isContractError } from '@orkestrel/contract'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import { Gauge } from '../../../../src/core/ledgers/Gauge.js'
-import { computeLedgerErrorCode, LEDGER_GAUGE_SEED } from '../../../setup.js'
+import {
+	computeLedgerErrorCode,
+	LEDGER_GAUGE_SEED,
+	buildOptionDoors,
+	readDoorRefusal,
+} from '../../../setup.js'
 
 // Gauge arithmetic on hand-computed values. A recall call with a short result estimates 25 units: the
 // assistant message is 4 overhead plus ceil(65 / 4) = 17 for its serialized call, the tool message 4.
@@ -328,5 +336,26 @@ describe('Gauge.room', () => {
 		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
 		expect(gauge.room([{ estimate: 1, prompt: 9990, tools: 0 }], 'a'.repeat(40))).toBe(0)
 		expect(gauge.room([{ estimate: 1, prompt: 9999, completion: 500, tools: 0 }], '')).toBe(0)
+	})
+})
+
+describe('Gauge — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'Gauge' && ['GaugeOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof GaugeOptions, (typeof GAUGE_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

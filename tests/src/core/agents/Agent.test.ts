@@ -97,6 +97,9 @@ import {
 	createRelay,
 	createRelayProvider,
 	LOADED_SECTION_HEADER,
+	AGENT_OPTION_KEYS,
+	AGENT_RUN_KEYS,
+	SKILL_SECTION_HEADER,
 	WORKSPACE_INDEX_HEADER,
 } from '@src/core'
 import {
@@ -143,12 +146,25 @@ import {
 	createBuiltinAgent,
 	createStoredConversation,
 	DISCLOSURE_LOAD_BILLING,
+	DISCLOSURE_LOAD_CLAIMS,
 	DISCLOSURE_RELOADED,
 	DISCLOSURE_SWITCHED,
+	drawUndisclosedCases,
+	executeUndisclosedCase,
 	readAdvertisedNames,
 	readSystemContents,
 	restoreConversation,
 	selectGuideView,
+	UNDISCLOSED_DRAWS,
+	UNDISCLOSED_RECORD,
+	UNDISCLOSED_SEED,
+	UNDECLARED_FORMS,
+	UNDECLARED_NAMES,
+	buildRequiredAgentOptions,
+	buildRequiredRunOptions,
+	omitMember,
+	readUndisclosed,
+	serveAgentArm,
 } from '../../../setup.js'
 import {
 	captureError,
@@ -8845,7 +8861,12 @@ describe('Agent — the system boundary canary, stored ingress', () => {
 	it.each(CANARY_INGRESS_SOURCES)('refuses a system %s and sends none', async (source) => {
 		const canary = await serveIngressCanary(source)
 
-		expect(isConversationError(canary.error) && canary.error.code).toBe('ROLE')
+		// A job is a record, so its contract refuses a system seed before a conversation reads it.
+		expect(
+			source === 'seed'
+				? isAgentError(canary.error) && canary.error.code
+				: isConversationError(canary.error) && canary.error.code,
+		).toBe(source === 'seed' ? 'REGISTRY' : 'ROLE')
 		expect(canary.sent.length > 0).toBe(source !== 'select')
 		for (const messages of canary.sent) {
 			expect(messages.filter((message) => message.role === 'system')).toHaveLength(1)
@@ -10620,17 +10641,17 @@ describe('Agent — built-ins and disclosure: construction', () => {
 		expect(isAgentError(error) && error.code === 'BUILTIN').toBe(true)
 	})
 
-	it('refuses a disclosure the contract refuses, at construction and at stream, before anything starts', () => {
+	it('refuses a workspace that is not a string, at construction and at stream, before anything starts', () => {
 		const started = createRecorder<AgentEventMap['start']>()
 		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const constructed = captureError(() =>
-			invokeUnchecked(undefined, createAgent, [provider, { disclosure: { skills: 'billing' } }]),
+			invokeUnchecked(undefined, createAgent, [provider, { workspace: 7 }]),
 		)
 		const agent = createAgent(provider, { on: { start: started.handler } })
 		const conversation = createConversation()
 		const streamed = captureError(() =>
 			invokeUnchecked<AgentStreamInterface>(agent, agent.stream, [
-				{ conversation, prompt: { content: 'hi' }, disclosure: { skills: [], tools: [] } },
+				{ conversation, prompt: { content: 'hi' }, workspace: { skills: [], workspace: 'north' } },
 			]),
 		)
 
@@ -10643,7 +10664,7 @@ describe('Agent — built-ins and disclosure: construction', () => {
 	})
 })
 
-describe('Agent — built-ins and disclosure: with neither enabled, the request is unchanged', () => {
+describe('Agent — built-ins and disclosure: with built-ins and a workspace absent, the request is unchanged (claim 2.1)', () => {
 	it('advertises every tool a skill names and renders no loaded body', async () => {
 		const plain = createBuiltinAgent({ turns: [{ content: 'done' }], builtins: [] })
 		await plain.agent.generate({ prompt: { content: 'Check invoice 42.' } })
@@ -10793,7 +10814,7 @@ describe('Agent — built-ins and disclosure: a load reaches the next turn', () 
 })
 
 describe('Agent — built-ins and disclosure: one system message at index 0', () => {
-	it('holds across load, unload, switch, a selection, and a host-given skill', async () => {
+	it('holds across load, unload, switch, a selection, and a skill the thread loaded before the run', async () => {
 		const fixture = createBuiltinAgent({
 			turns: [
 				{
@@ -10811,7 +10832,7 @@ describe('Agent — built-ins and disclosure: one system message at index 0', ()
 				{ content: 'done' },
 			],
 			scope: { name: 'host', workspaces: ['north', 'south'], select: selectGuideView },
-			disclosure: { skills: ['claims'] },
+			seed: DISCLOSURE_LOAD_CLAIMS,
 		})
 		await fixture.agent.generate({ prompt: { content: 'Work the desk.' } })
 
@@ -10992,33 +11013,59 @@ describe('Agent — built-ins and disclosure: the head refresh', () => {
 	})
 })
 
-describe('Agent — built-ins and disclosure: what the host shows', () => {
-	it('renders a given skill from the first request, a run value over the agent value, and nothing for an unregistered or excluded name', async () => {
-		const given = createBuiltinAgent({
-			turns: [{ content: 'one' }, { content: 'two' }, { content: 'three' }],
-			disclosure: { skills: ['billing'] },
-			scope: { name: 'host', skills: ['billing', 'claims'] },
+describe('Agent — built-ins and disclosure: the workspace option (claims 2.7 and C.4)', () => {
+	it('renders the given workspace from the first request, a run value over the agent value, and the active one in place of an unregistered or excluded id', async () => {
+		const fixture = createBuiltinAgent({
+			turns: [{ content: 'one' }, { content: 'two' }, { content: 'three' }, { content: 'four' }],
+			builtins: [],
+			workspace: 'south',
+			scope: { name: 'host', workspaces: ['north', 'south'] },
 		})
-		await given.agent.generate({ prompt: { content: 'First.' } })
-		await given.agent.generate({
-			prompt: { content: 'Second.' },
-			disclosure: { skills: ['claims'] },
+		await fixture.agent.generate({ prompt: { content: 'First.' } })
+		await fixture.agent.generate({ prompt: { content: 'Second.' }, workspace: 'north' })
+		await fixture.agent.generate({ prompt: { content: 'Third.' }, workspace: 'ghost' })
+		await fixture.agent.generate({
+			prompt: { content: 'Fourth.' },
+			scope: createScope({ name: 'run', workspaces: ['north'] }),
 		})
-		await given.agent.generate({
-			prompt: { content: 'Third.' },
-			disclosure: { skills: ['ghost', 'audit'] },
-		})
-		const systems = readSystemContents(given.provider)
+		const files = fixture.provider.calls.map((call) =>
+			['NORTH FILE', 'SOUTH FILE'].filter((file) =>
+				call.messages.some((message) => message.content.includes(file)),
+			),
+		)
 
-		expect(systems[0]?.endsWith(BUILTIN_BILLING_BODY)).toBe(true)
-		expect(systems[1]?.endsWith(BUILTIN_CLAIMS_BODY)).toBe(true)
-		expect(systems[1]).not.toContain(BUILTIN_BILLING_BODY)
-		expect(systems[2]).not.toContain(LOADED_SECTION_HEADER)
-		expect(readAdvertisedNames(given.provider)[0]).toContain('refund')
-		expect(readAdvertisedNames(given.provider)[1]).not.toContain('refund')
+		expect(files).toEqual([['SOUTH FILE'], ['NORTH FILE'], ['NORTH FILE'], ['NORTH FILE']])
+		expect(fixture.agent.context.workspaces.active?.id).toBe('north')
 	})
 
-	it('refuses unload of a host-given skill', async () => {
+	it('renders the thread’s last switch over the run value and the agent value', async () => {
+		const fixture = createBuiltinAgent({
+			turns: [
+				{
+					content: '',
+					tools: [createToolCall({ id: 'w1', name: 'switch', arguments: { workspace: 'north' } })],
+				},
+				{ content: 'done' },
+				{ content: 'again' },
+			],
+			builtins: ['switch'],
+			workspace: 'south',
+			scope: { name: 'host', workspaces: ['north', 'south'] },
+		})
+		await fixture.agent.generate({ prompt: { content: 'Use north.' }, workspace: 'south' })
+		await fixture.agent.generate({ prompt: { content: 'Again.' }, workspace: 'south' })
+		const files = fixture.provider.calls.map((call) =>
+			['NORTH FILE', 'SOUTH FILE'].filter((file) =>
+				call.messages.some((message) => message.content.includes(file)),
+			),
+		)
+
+		expect(files).toEqual([['SOUTH FILE'], ['NORTH FILE'], ['NORTH FILE']])
+	})
+})
+
+describe('Agent — built-ins and disclosure: unload of a loaded skill (claim C.5)', () => {
+	it('admits unload of a skill the thread loaded, on an agent given a workspace', async () => {
 		const fixture = createBuiltinAgent({
 			turns: [
 				{
@@ -11027,17 +11074,38 @@ describe('Agent — built-ins and disclosure: what the host shows', () => {
 				},
 				{ content: 'done' },
 			],
-			disclosure: { skills: ['billing'] },
+			builtins: ['load', 'unload'],
+			workspace: 'north',
+			seed: DISCLOSURE_LOAD_BILLING,
 		})
 		await fixture.agent.generate({ prompt: { content: 'Drop billing.' } })
 
 		expect(fixture.provider.calls[1]?.messages.at(-1)).toMatchObject({
 			role: 'tool',
-			content:
-				'The host gives that skill, so it cannot be unloaded. Continue without unloading it.',
+			content: BUILTIN_NOTES.unloaded,
 		})
-		expect(readSystemContents(fixture.provider)[1]?.endsWith(BUILTIN_BILLING_BODY)).toBe(true)
+		expect(readSystemContents(fixture.provider)[0]?.endsWith(BUILTIN_BILLING_BODY)).toBe(true)
+		expect(readSystemContents(fixture.provider)[1]).not.toContain(BUILTIN_BILLING_BODY)
 	})
+})
+
+describe('Agent — built-ins and disclosure: no option shows a skill (claim C.3)', () => {
+	it.each(['agent', 'run'] as const)(
+		'shows no skill and holds back every skill tool on the first request of a drawn %s option set, and refuses each that carries a disclosure (claim O.4)',
+		async (surface) => {
+			const rows = drawUndisclosedCases(surface, UNDISCLOSED_SEED, UNDISCLOSED_DRAWS)
+			const readings = await Promise.all(rows.map(executeUndisclosedCase))
+
+			expect(readings.filter((reading) => reading.loaded || reading.held.length > 0)).toEqual([])
+			expect(readings.map((reading) => reading.refused)).toEqual(rows.map((row) => row.undeclared))
+			// The admitted draws reach a skill admitted while load is advertised.
+			expect(
+				rows.some(
+					(row, at) => !row.undeclared && readings[at]?.load === true && row.skills?.length !== 0,
+				),
+			).toBe(true)
+		},
+	)
 })
 
 describe('Agent — built-ins and disclosure: the ceiling decides each turn', () => {
@@ -11137,25 +11205,30 @@ describe('Agent — built-ins and disclosure: the ceiling decides each turn', ()
 })
 
 describe('Agent — built-ins and disclosure: per run and per conversation', () => {
-	it('advertises and renders each overlapping run its own scope and disclosure', async () => {
+	it('advertises and renders each overlapping run its own scope and workspace', async () => {
 		const fixture = createBuiltinAgent({
 			turns: [{ content: 'first' }, { content: 'second' }],
 			builtins: ['load', 'unload'],
 		})
-		const left = createConversation()
-		const right = createConversation()
+		// Each thread records its own load, so each run shows the skill its thread loaded.
+		const left = createStoredConversation(DISCLOSURE_LOAD_BILLING)
+		const right = createStoredConversation(DISCLOSURE_LOAD_CLAIMS)
 		const runs = [
 			fixture.agent.stream({
 				conversation: left,
 				prompt: { content: 'LEFT' },
-				scope: createScope({ name: 'left', tools: ['refund', 'claim', 'load'] }),
-				disclosure: { skills: ['billing'] },
+				scope: createScope({
+					name: 'left',
+					tools: ['refund', 'claim', 'load'],
+					workspaces: ['north', 'south'],
+				}),
+				workspace: 'south',
 			}),
 			fixture.agent.stream({
 				conversation: right,
 				prompt: { content: 'RIGHT' },
-				scope: createScope({ name: 'right', tools: ['claim', 'echo'] }),
-				disclosure: { skills: ['claims'] },
+				scope: createScope({ name: 'right', tools: ['claim', 'echo'], workspaces: ['north'] }),
+				workspace: 'north',
 			}),
 		]
 		expect(fixture.agent.status).toBe('running')
@@ -11168,8 +11241,10 @@ describe('Agent — built-ins and disclosure: per run and per conversation', () 
 
 		expect(leftCall?.tools?.map((definition) => definition.name)).toEqual(['refund', 'load'])
 		expect(leftCall?.messages[0]?.content.endsWith(BUILTIN_BILLING_BODY)).toBe(true)
+		expect(leftCall?.messages[1]?.content).toContain('SOUTH FILE')
 		expect(rightCall?.tools?.map((definition) => definition.name)).toEqual(['claim', 'echo'])
 		expect(rightCall?.messages[0]?.content.endsWith(BUILTIN_CLAIMS_BODY)).toBe(true)
+		expect(rightCall?.messages[1]?.content).toContain('NORTH FILE')
 	})
 
 	it('shows the same skills and workspace from a conversation restored from its snapshot', async () => {
@@ -11516,13 +11591,14 @@ describe('Agent — built-ins and disclosure: a relay', () => {
 						url: 'http://relay.test/',
 						fetch: (input, init) => handler(new Request(input, init)),
 					}),
-					{ authority: AGENT_AUTHORITY, builtins, disclosure: { skills: ['billing'] } },
+					{ authority: AGENT_AUTHORITY, builtins },
 				)
 				page.context.skills.add({
 					name: 'billing',
 					description: 'Billing',
 					content: BUILTIN_BILLING_BODY,
 				})
+				page.context.messages.add(DISCLOSURE_LOAD_BILLING)
 				const status = await page.generate({ prompt: { content: 'hi' } }).then(
 					() => 200,
 					(error: unknown) => (isProviderError(error) ? error.status : undefined),
@@ -11598,27 +11674,6 @@ describe('Agent — built-ins and disclosure: what a reply says is what shows', 
 		).not.toContain('SOUTH FILE')
 	})
 
-	it('refuses unload of a skill the host gives, even after the model loaded it, and keeps it shown', async () => {
-		const fixture = createBuiltinAgent({
-			turns: [
-				{
-					content: '',
-					tools: [createToolCall({ id: 'u1', name: 'unload', arguments: { skill: 'billing' } })],
-				},
-				{ content: 'done' },
-			],
-			builtins: ['load', 'unload'],
-			disclosure: { skills: ['billing'] },
-			seed: DISCLOSURE_LOAD_BILLING,
-		})
-		await fixture.agent.generate({ prompt: { content: 'Drop billing.' } })
-
-		expect(fixture.provider.calls[1]?.messages.at(-1)?.content).toBe(
-			'The host gives that skill, so it cannot be unloaded. Continue without unloading it.',
-		)
-		expect(readSystemContents(fixture.provider)[1]?.endsWith(BUILTIN_BILLING_BODY)).toBe(true)
-	})
-
 	it('rebuilds the head when switch leaves the advertised set with no list change', async () => {
 		const fixture = createBuiltinAgent({
 			turns: [
@@ -11649,4 +11704,184 @@ describe('Agent — built-ins and disclosure: what a reply says is what shows', 
 			false,
 		])
 	})
+})
+
+describe('Agent — built-ins and disclosure: an allow-list that admits no load decides alone (claim T.2)', () => {
+	it('dispatches under a scope that lists load beside skills: [] the request the same scope without load dispatches', async () => {
+		const requests = await Promise.all(
+			[
+				{ name: 'o', tools: ['refund', 'echo', 'load'], skills: [] },
+				{ name: 'o', tools: ['refund', 'echo'], skills: [] },
+			].map(async (scope) => {
+				const fixture = createBuiltinAgent({
+					turns: [{ content: 'done' }],
+					builtins: ['load'],
+					scope,
+				})
+				await fixture.agent.generate({ prompt: { content: 'Refund invoice 42.' } })
+				const call = requireValue(fixture.provider.calls[0])
+				return {
+					messages: call.messages.map(({ id: _id, ...rest }) => rest),
+					tools: call.tools,
+				}
+			}),
+		)
+		const system = requests[0]?.messages.find((message) => message.role === 'system')?.content
+
+		expect(requests[0]).toEqual(requests[1])
+		expect(requests[0]?.tools?.map((definition) => definition.name)).toEqual(['refund', 'echo'])
+		expect(system).not.toContain(SKILL_SECTION_HEADER)
+		expect(system).not.toContain(BUILTIN_BILLING_BODY)
+	})
+})
+
+describe('Agent — the option doors refuse a member their type does not declare (claims O.1 to O.4)', () => {
+	it('refuses an undeclared option at construction, naming it and listing the declared ones (claim O.1)', () => {
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const error = captureError(() =>
+			invokeUnchecked(undefined, createAgent, [provider, { system: 'Desk.', sytem: 'Desk.' }]),
+		)
+
+		expect(isContractError(error) && error.code).toBe('structure')
+		expect(isContractError(error) ? error.message : '').toBe(
+			'Agent: unknown option "sytem"; the options are on, error, system, tools, instructions, skills, memos, workspaces, scope, limit, timeout, budget, allowance, scheduler, signal, authority, conversations, window, strict, select, builtins, workspace',
+		)
+		expect(isContractError(error) ? error.context : undefined).toEqual({
+			path: ['sytem'],
+			shape: 'AgentOptions',
+		})
+		expect(provider.started).toBe(0)
+	})
+
+	it('refuses an undeclared run option synchronously, before the run changes anything (claim O.1)', () => {
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider)
+		agent.context.messages.add({ role: 'user', content: 'Check invoice 42.' })
+		const before = agent.context.messages.messages()
+		const streamed = captureError(() =>
+			invokeUnchecked(agent, agent.stream, [{ prompt: { content: 'Refund.' }, temperature: 0 }]),
+		)
+		const generated = captureError(() =>
+			invokeUnchecked(agent, agent.generate, [{ temprature: 0 }]),
+		)
+
+		expect(isContractError(streamed) && streamed.code).toBe('structure')
+		expect(isContractError(streamed) ? streamed.message : '').toBe(
+			'Agent: unknown option "temperature"; the options are think, schema, limit, timeout, budget, allowance, signal, conversation, prompt, scope, workspace',
+		)
+		expect(isContractError(streamed) ? streamed.context : undefined).toEqual({
+			path: ['temperature'],
+			shape: 'AgentRunOptions',
+		})
+		expect(isContractError(generated) && generated.code).toBe('structure')
+		expect(agent.status).toBe('idle')
+		expect(agent.context.messages.messages()).toEqual(before)
+		expect(provider.started).toBe(0)
+	})
+
+	it('admits options and run options that hold every declared member (claim O.2)', async () => {
+		const provider = createScriptedProvider([{ content: '{"ok":true}' }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, buildRequiredAgentOptions())
+		const result = await agent.generate(buildRequiredRunOptions())
+
+		expect(result.content).toBe('{"ok":true}')
+		expect(provider.started).toBe(1)
+	})
+
+	it('reads each declared option spelled undefined as omitted, from the first request (claim O.3)', async () => {
+		const readings = await Promise.all(
+			AGENT_OPTION_KEYS.map(async (key) => {
+				const omitted = omitMember(buildRequiredAgentOptions(), key)
+				const spelled = { ...omitMember(buildRequiredAgentOptions(), key), [key]: undefined }
+				return [
+					key,
+					await serveAgentArm(omitted, { prompt: { content: 'Refund.' } }),
+					await serveAgentArm(spelled, { prompt: { content: 'Refund.' } }),
+				] as const
+			}),
+		)
+
+		expect(readings.map(([key, , spelled]) => [key, spelled])).toEqual(
+			readings.map(([key, omitted]) => [key, omitted]),
+		)
+		// The fixture holds tools and a built-in, so each arm that drops the authority refuses alike.
+		expect(
+			readings.filter(([, omitted]) => omitted.request === undefined).map(([key]) => key),
+		).toEqual(['authority'])
+	})
+
+	it('reads each declared run option spelled undefined as omitted, from the first request (claim O.3)', async () => {
+		const readings = await Promise.all(
+			AGENT_RUN_KEYS.map(async (key) => {
+				const omitted = omitMember(buildRequiredRunOptions(), key)
+				const spelled = { ...omitMember(buildRequiredRunOptions(), key), [key]: undefined }
+				return [key, await serveAgentArm({}, omitted), await serveAgentArm({}, spelled)] as const
+			}),
+		)
+
+		expect(readings.map(([key, , spelled]) => [key, spelled])).toEqual(
+			readings.map(([key, omitted]) => [key, omitted]),
+		)
+		expect(readings.filter(([, omitted]) => omitted.request === undefined)).toEqual([])
+	})
+
+	it.each(
+		UNDECLARED_FORMS.filter((form) => form.refused).flatMap((form) =>
+			UNDECLARED_NAMES.map((name) => ({ form, name })),
+		),
+	)(
+		'refuses a $form.name disclosure under $name at the agent and at a run (claim O.4)',
+		({ form, name }) => {
+			const built = captureError(() =>
+				createBuiltinAgent({
+					turns: [{ content: 'done' }],
+					builtins: ['load'],
+					wrap: (declared) => form.build(declared, name, UNDISCLOSED_RECORD.disclosure),
+				}),
+			)
+			const plain = createBuiltinAgent({ turns: [{ content: 'done' }], builtins: ['load'] })
+			const run = captureError(() =>
+				invokeUnchecked(plain.agent, plain.agent.stream, [
+					form.build({ prompt: { content: 'Refund.' } }, name, UNDISCLOSED_RECORD.disclosure),
+				]),
+			)
+
+			expect([isContractError(built) && built.code, isContractError(run) && run.code]).toEqual([
+				'structure',
+				'structure',
+			])
+			expect(plain.provider.started).toBe(0)
+		},
+	)
+
+	it.each(
+		UNDECLARED_FORMS.filter((form) => !form.refused).flatMap((form) =>
+			UNDECLARED_NAMES.map((name) => ({ form, name })),
+		),
+	)(
+		'admits a $form.name disclosure under $name at the agent and at a run, which shows nothing (claim O.4)',
+		async ({ form, name }) => {
+			const built = createBuiltinAgent({
+				turns: [{ content: 'done' }],
+				builtins: ['load'],
+				wrap: (declared) => form.build(declared, name, UNDISCLOSED_RECORD.disclosure),
+			})
+			const plain = createBuiltinAgent({ turns: [{ content: 'done' }], builtins: ['load'] })
+			await built.agent.generate({ prompt: { content: 'Refund.' } })
+			await invokeUnchecked<AgentStreamInterface>(plain.agent, plain.agent.stream, [
+				form.build({ prompt: { content: 'Refund.' } }, name, UNDISCLOSED_RECORD.disclosure),
+			]).result
+			const shown = [built, plain].map((fixture) =>
+				readUndisclosed(
+					requireValue(fixture.provider.calls[0]),
+					fixture.agent.context.skills.skills(),
+				),
+			)
+
+			expect(shown.map((reading) => [reading.loaded, reading.held, reading.load])).toEqual([
+				[false, [], true],
+				[false, [], true],
+			])
+		},
+	)
 })

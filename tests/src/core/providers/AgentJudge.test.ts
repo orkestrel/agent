@@ -1,6 +1,6 @@
-import type { JudgeEntry, JudgeRequest } from '@src/core'
+import type { JudgeEntry, JudgeRequest, AgentJudgeInput, JUDGE_INPUT_KEYS } from '@src/core'
 import type { JSONValue } from '@orkestrel/contract'
-import { isArray } from '@orkestrel/contract'
+import { isArray, isContractError } from '@orkestrel/contract'
 import { estimateTokens } from '@src/core'
 import {
 	DEFAULT_PROVIDER_TIMEOUT,
@@ -12,7 +12,7 @@ import {
 	SystemOneJudge,
 } from '@src/core'
 import { requireValue } from '@orkestrel/test'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import {
 	createRefusingTransport,
 	JUDGE_ENVELOPE,
@@ -30,6 +30,8 @@ import {
 	TEV1_CHOICE,
 	TEV1_NOUL,
 	TEV1_REQUEST,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 describe('AgentJudge — identity and request composition', () => {
@@ -610,5 +612,26 @@ describe('AgentJudge — the result door', () => {
 		)
 		const estimate = estimateTokens(body)
 		expect(result.usage).toEqual({ prompt: 0, completion: estimate, total: estimate })
+	})
+})
+
+describe('AgentJudge — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'AgentJudge' && ['AgentJudgeInput'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof AgentJudgeInput, (typeof JUDGE_INPUT_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

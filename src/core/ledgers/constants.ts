@@ -1,4 +1,13 @@
-import type { LedgerCategory, LedgerNote, LedgerQuestion, LedgerShare } from './types.js'
+import type {
+	ClassifierOptions,
+	GaugeOptions,
+	LedgerAgentOptions,
+	LedgerCategory,
+	LedgerNote,
+	LedgerOptions,
+	LedgerQuestion,
+	LedgerShare,
+} from './types.js'
 
 /**
  * Lists the categories the ledger files a message under, in the order the category question
@@ -149,3 +158,87 @@ export const LEDGER_WORD = /[\p{L}\p{N}]+/gu
 
 /** Matches the logprob decoding failure `invalid or duplicate top logprob token`, which the ledger holds for the ledger's life. */
 export const DETERMINISTIC_JUDGE_ERROR = /invalid or duplicate top logprob token/
+
+/**
+ * Lists the members `LedgerOptions` declares, frozen — the keys the `Ledger` constructor admits.
+ *
+ * @remarks
+ * The constructor passes the list to `refuseOptionKeys` of `@orkestrel/contract`, so an own
+ * enumerable member outside it refuses with a `ContractError` coded `'structure'`.
+ */
+export const LEDGER_OPTION_KEYS = Object.freeze([
+	'judge',
+	'system',
+	'topics',
+	'questions',
+	'thresholds',
+	'capacity',
+	'predict',
+	'think',
+	'gauge',
+	'lookups',
+	'writes',
+	'share',
+	'recall',
+	'correction',
+	'agent',
+	'snapshot',
+] as const) satisfies ReadonlyArray<keyof LedgerOptions>
+
+/**
+ * Lists the members the `LedgerAgentOptions` pick declares, frozen — the keys a ledger's `agent`
+ * option admits.
+ *
+ * @remarks
+ * The `Ledger` constructor passes the list to `refuseOptionKeys` of `@orkestrel/contract`, so an
+ * own enumerable member outside it, an `AgentOptions` member the pick leaves out included, refuses
+ * with a `ContractError` coded `'structure'`.
+ */
+export const LEDGER_AGENT_KEYS = Object.freeze([
+	'limit',
+	'timeout',
+	'on',
+	'scheduler',
+	'instructions',
+	'skills',
+	'memos',
+	'workspaces',
+	'strict',
+	'authority',
+	'builtins',
+	'workspace',
+] as const) satisfies ReadonlyArray<keyof LedgerAgentOptions>
+
+/** Lists the members `ClassifierOptions` declares, frozen — the keys the `Classifier` constructor admits. */
+export const CLASSIFIER_OPTION_KEYS = Object.freeze([
+	'strict',
+	'conversation',
+	'judge',
+	'questions',
+	'topics',
+	'thresholds',
+	'assign',
+	'entities',
+	'correction',
+	'scheduler',
+] as const) satisfies ReadonlyArray<keyof ClassifierOptions>
+
+/** Lists the members `GaugeOptions` declares, frozen — the keys the `Gauge` constructor admits. */
+export const GAUGE_OPTION_KEYS = Object.freeze([
+	'scale',
+	'overhead',
+	'capacity',
+	'predict',
+	'replay',
+] as const) satisfies ReadonlyArray<keyof GaugeOptions>
+
+/**
+ * Sets the 3 UTF-8 bytes one UTF-16 code unit encodes to at most, the divisor that sizes the
+ * workspace text a calibration's third call carries.
+ *
+ * @remarks
+ * A tokenizer that falls back to bytes charges at most one token a byte, so workspace text cut to the
+ * capacity the call without definitions left, divided by this figure, in characters, reports at most
+ * `capacity` apart from a template's few tokens for an added message.
+ */
+export const LEDGER_SAMPLE_BYTES = 3

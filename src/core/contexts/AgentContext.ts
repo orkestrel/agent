@@ -13,6 +13,7 @@ import type { ConversationInterface, ConversationManagerInterface } from '../con
 import type { Message } from '../types.js'
 import type { ToolManagerInterface } from '@orkestrel/tool'
 import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
+import { refuseOptionKeys } from '@orkestrel/contract'
 import { ToolManager } from '@orkestrel/tool'
 import { isTextContent, WorkspaceManager } from '@orkestrel/workspace'
 import { InstructionManager } from './instructions/InstructionManager.js'
@@ -20,6 +21,7 @@ import { MemoManager } from './memos/MemoManager.js'
 import { SkillManager } from './skills/SkillManager.js'
 import { ConversationError, ConversationManager } from '../conversations/index.js'
 import { CONVERSATION_ROLES } from '../constants.js'
+import { BUILD_OPTION_KEYS, CONTEXT_OPTION_KEYS } from './constants.js'
 import { filterAllowList } from '../helpers.js'
 import {
 	attachUserImages,
@@ -136,6 +138,7 @@ export class AgentContext implements AgentContextInterface {
 	#scope: ScopeInterface | undefined
 
 	constructor(options?: AgentContextOptions) {
+		refuseOptionKeys(options, CONTEXT_OPTION_KEYS, 'AgentContext', 'AgentContextOptions')
 		this.#system = options?.system
 		this.#instructions = options?.instructions ?? new InstructionManager()
 		this.#skills = options?.skills ?? new SkillManager()
@@ -216,6 +219,7 @@ export class AgentContext implements AgentContextInterface {
 	}
 
 	build(options?: ContextBuildOptions): readonly Message[] {
+		refuseOptionKeys(options, BUILD_OPTION_KEYS, 'AgentContext', 'ContextBuildOptions')
 		// A run scope narrows the active one list by list; each list of each layer is read one time.
 		const scope = intersectFilters(this.#scope, options?.scope)
 		// Tools reach the provider structurally. Each manager resolves its format cascade.

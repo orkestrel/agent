@@ -26,7 +26,8 @@ import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
  * `'SUMMARY'`. A stored message plays a `ConversationRole`: `add` refuses any other role with
  * `'ROLE'` before it stores any message of the batch, a hydrating snapshot that holds one throws
  * `'ROLE'`, and an agent's selection that holds one becomes a `'ROLE'` fault. `add` refuses an input
- * whose other members fail `isMessageInput` with `'MESSAGE'`, its `context` holding the `faults`,
+ * that is not a plain record, before its role is read, or whose other members fail `isMessageInput`
+ * with `'MESSAGE'`, its `context` holding the `faults`,
  * before it stores any message of the batch. A hydrating snapshot that fails
  * `isConversationSnapshot` or repeats an id, and a store row or written snapshot that does, throw
  * `'SNAPSHOT'`; a judgment the guard admits but JSON cannot carry still throws `'JUDGMENT'`. A
@@ -34,7 +35,7 @@ import { INTRINSICS, holds, isObject, isFunction } from '@orkestrel/contract'
  * {@link isConversationError} and branch on `error.code`.
  */
 export class ConversationError extends Error {
-	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a `sections` cap that is not a positive safe integer, or a cap combined with `cumulative`; `'JUDGMENT'`: a judgment or judge request that is not JSON; `'KEEP'`: a `keep` that is not a nonnegative safe integer; `'SUMMARY'`: a summarizer digest whose trimmed text is empty; `'ROLE'`: a stored or selected message whose role is not a `ConversationRole`; `'MESSAGE'`: a message input whose other members fail `isMessageInput`; `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot` or repeats an id; `'ID'`: a manager's `add` of an id it already holds. */
+	/** Names the machine-readable condition — `'SUMMARIZER'`: a `compact()` with no summarizer; `'SECTIONS'`: a `sections` cap that is not a positive safe integer, or a cap combined with `cumulative`; `'JUDGMENT'`: a judgment or judge request that is not JSON; `'KEEP'`: a `keep` that is not a nonnegative safe integer; `'SUMMARY'`: a summarizer digest whose trimmed text is empty; `'ROLE'`: a stored or selected message whose role is not a `ConversationRole`; `'MESSAGE'`: a message input that is not a plain record or whose other members fail `isMessageInput`; `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot` or repeats an id; `'ID'`: a manager's `add` of an id it already holds. */
 	readonly code: ConversationErrorCode
 	/** Holds the values that locate the failure, such as the `question` id of a malformed question, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined

@@ -1,4 +1,6 @@
 import type { ScopeFilter, ScopeInput, ScopeInterface, SelectionHandler } from '../types.js'
+import { refuseOptionKeys } from '@orkestrel/contract'
+import { SCOPE_FILTER_KEYS, SCOPE_KEYS } from '../constants.js'
 import { intersectFilters } from '../helpers.js'
 
 /**
@@ -23,6 +25,10 @@ import { intersectFilters } from '../helpers.js'
  *   `undefined` with a list yields the list, and `undefined` with `undefined` stays
  *   `undefined`. Narrowing can only tighten, never widen — a key excluded by a parent
  *   can never be re-admitted by a child. The child keeps this scope's `name` and `select` handler.
+ * - **Exact.** The constructor refuses an own enumerable member of its input outside
+ *   `SCOPE_KEYS`, and `narrow` one of its filter outside `SCOPE_FILTER_KEYS`, with a
+ *   `ContractError` coded `'structure'`, so a misspelled list never builds an open scope. A
+ *   declared member holding `undefined` reads as omitted.
  *
  * @example
  * ```ts
@@ -46,6 +52,7 @@ export class Scope implements ScopeInterface {
 	readonly select?: SelectionHandler
 
 	constructor(input: ScopeInput) {
+		refuseOptionKeys(input, SCOPE_KEYS, 'Scope', 'ScopeInput')
 		this.name = input.name
 		if (input.select !== undefined) this.select = input.select
 		// Copy each supplied list in (a later mutation of the caller's array can't leak in);
@@ -59,6 +66,7 @@ export class Scope implements ScopeInterface {
 	}
 
 	narrow(config: ScopeFilter): ScopeInterface {
+		refuseOptionKeys(config, SCOPE_FILTER_KEYS, 'Scope', 'ScopeFilter')
 		return new Scope({
 			name: this.name,
 			...(this.select === undefined ? {} : { select: this.select }),

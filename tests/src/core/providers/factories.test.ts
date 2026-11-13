@@ -1,5 +1,6 @@
-import type { Message } from '@src/core'
+import type { Message, RelayOptions, RELAY_OPTION_KEYS } from '@src/core'
 import type { ToolDefinition } from '@orkestrel/tool'
+import { isContractError } from '@orkestrel/contract'
 import {
 	createRelay,
 	createThinkSplitter,
@@ -8,7 +9,7 @@ import {
 	REFUSED_RELAY_CONTENT_TYPE,
 	REFUSED_RELAY_STATUS,
 } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import { getEventListeners } from 'node:events'
 import { captureError, requireValue } from '@orkestrel/test'
 import {
@@ -18,6 +19,8 @@ import {
 	RELAY_SYSTEM_CASES,
 	RELAY_TOOL_CASES,
 	createScriptedProvider,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 describe('createRelay', () => {
@@ -448,5 +451,26 @@ describe('createThinkSplitter', () => {
 		// The sibling shares no state — its scan starts outside any span.
 		expect(second.split('clean')).toBe('clean')
 		expect(second.thinking).toBe('')
+	})
+})
+
+describe('factories — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'factories' && ['RelayOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof RelayOptions, (typeof RELAY_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

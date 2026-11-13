@@ -6,9 +6,10 @@ import type {
 	ScopeManagerOptions,
 } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import { isArray } from '@orkestrel/contract'
+import { isArray, refuseOptionKeys } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { removeEntries } from '../../helpers.js'
+import { SCOPE_MANAGER_KEYS } from '../constants.js'
 import { Scope } from './Scope.js'
 
 /**
@@ -46,6 +47,7 @@ export class ScopeManager implements ScopeManagerInterface {
 	readonly #emitter: Emitter<ScopeManagerEventMap>
 
 	constructor(options?: ScopeManagerOptions) {
+		refuseOptionKeys(options, SCOPE_MANAGER_KEYS, 'ScopeManager', 'ScopeManagerOptions')
 		this.#emitter = new Emitter<ScopeManagerEventMap>(options)
 	}
 

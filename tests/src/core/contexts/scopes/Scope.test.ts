@@ -1,7 +1,15 @@
 import type { ScopeInterface } from '@src/core'
-import { createScope, Scope } from '@src/core'
+import { isContractError } from '@orkestrel/contract'
+import { captureError, invokeUnchecked } from '@orkestrel/test'
+import { createScope, Scope, SCOPE_FILTER_KEYS, SCOPE_KEYS } from '@src/core'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { createRecordedSelection, rejectSelection } from '../../../../setup.js'
+import {
+	buildRequiredScopeInput,
+	createRecordedSelection,
+	omitMember,
+	rejectSelection,
+	serveScopeArm,
+} from '../../../../setup.js'
 
 // Scope is the named, immutable allow-list filter over a context's items — real
 // behavior, no mocks. Covers construction (a minted id + the per-category
@@ -197,12 +205,15 @@ describe('Scope — narrow (set-intersection)', () => {
 })
 
 describe('Scope — the selection handler travels with the scope', () => {
-	it('ignores a description outside the scope contract', () => {
+	it('refuses a description outside the scope contract (claim O.6)', () => {
 		const input = { name: 'triage', description: 'Ticket review' }
-		const scope = new Scope(input)
+		const error = captureError(() => new Scope(input))
 
-		expect(scope).not.toHaveProperty('description')
-		expect(scope.narrow({ tools: [] })).not.toHaveProperty('description')
+		expect(isContractError(error) && error.code).toBe('structure')
+		expect(isContractError(error) ? error.context : undefined).toEqual({
+			path: ['description'],
+			shape: 'ScopeInput',
+		})
 	})
 
 	it('carries `select` when supplied and leaves it undefined when omitted', () => {
@@ -238,15 +249,87 @@ describe('Scope — the selection handler travels with the scope', () => {
 		expect(child.select).toBeUndefined()
 	})
 
-	it('refuses `select` in the `narrow` argument, which keeps the parent handler', () => {
+	it('refuses `select` in the `narrow` argument, so only the parent handler travels', () => {
 		expectTypeOf<Parameters<ScopeInterface['narrow']>[0]>().not.toHaveProperty('select')
 		expectTypeOf<Parameters<ScopeInterface['narrow']>[0]>().not.toHaveProperty('description')
 		const parent = new Scope({ name: 'triage', select: rejectSelection })
-		// A widened value skips the excess-property check, so the runtime ignores the extra member.
+		// A widened value skips the excess-property check, so the runtime door refuses the extra member.
 		const config = { tools: ['reply'], select: createRecordedSelection().handler }
 
-		const child = parent.narrow(config)
+		const error = captureError(() => parent.narrow(config))
 
-		expect(child.select).toBe(rejectSelection)
+		expect(isContractError(error) && error.code).toBe('structure')
+		expect(parent.narrow({ tools: ['reply'] }).select).toBe(rejectSelection)
+	})
+})
+
+describe('Scope — the input and filter doors refuse a member their type does not declare (claims O.1 to O.3, O.6)', () => {
+	it('refuses a misspelled list key at createScope and builds no scope (claim O.6)', () => {
+		const error = captureError(() =>
+			invokeUnchecked(undefined, createScope, [{ name: 'reader', tool: ['search'] }]),
+		)
+
+		expect(isContractError(error) && error.code).toBe('structure')
+		expect(isContractError(error) ? error.message : '').toBe(
+			'Scope: unknown option "tool"; the options are name, select, instructions, skills, memos, tools, files, workspaces',
+		)
+	})
+
+	it('refuses a misspelled list key at narrow (claim O.6)', () => {
+		const scope = createScope({ name: 'reader', tools: ['search', 'read'] })
+		const error = captureError(() => invokeUnchecked(scope, scope.narrow, [{ tool: ['read'] }]))
+
+		expect(isContractError(error) && error.code).toBe('structure')
+		expect(isContractError(error) ? error.message : '').toBe(
+			'Scope: unknown option "tool"; the options are instructions, skills, memos, tools, files, workspaces',
+		)
+		expect(isContractError(error) ? error.context : undefined).toEqual({
+			path: ['tool'],
+			shape: 'ScopeFilter',
+		})
+	})
+
+	it('admits an input and a filter that hold every declared member (claim O.2)', () => {
+		const scope = createScope(buildRequiredScopeInput())
+		const { name: _name, select: _select, ...filter } = buildRequiredScopeInput()
+
+		expect(scope.narrow(filter).tools).toEqual(['refund'])
+	})
+
+	it('reads each declared input member spelled undefined as omitted, from the first request (claim O.3)', async () => {
+		const readings = await Promise.all(
+			SCOPE_KEYS.filter((key) => key !== 'name').map(async (key) => {
+				const omitted = omitMember(buildRequiredScopeInput(), key)
+				const spelled = { ...omitMember(buildRequiredScopeInput(), key), [key]: undefined }
+				return [key, await serveScopeArm(omitted), await serveScopeArm(spelled)] as const
+			}),
+		)
+
+		expect(readings.map(([key, , spelled]) => [key, spelled])).toEqual(
+			readings.map(([key, omitted]) => [key, omitted]),
+		)
+		expect(readings.filter(([, omitted]) => omitted.request === undefined)).toEqual([])
+	})
+
+	it('reads each declared filter member spelled undefined as omitted (claim O.3)', () => {
+		const scope = createScope({ name: 'reader', tools: ['search', 'read'] })
+		const { name: _name, select: _select, ...filter } = buildRequiredScopeInput()
+		const readings = SCOPE_FILTER_KEYS.map((key) => [
+			key,
+			omitMember(
+				invokeUnchecked<ScopeInterface>(scope, scope.narrow, [omitMember(filter, key)]),
+				'id',
+			),
+			omitMember(
+				invokeUnchecked<ScopeInterface>(scope, scope.narrow, [
+					{ ...omitMember(filter, key), [key]: undefined },
+				]),
+				'id',
+			),
+		])
+
+		expect(readings.map(([key, , spelled]) => [key, spelled])).toEqual(
+			readings.map(([key, omitted]) => [key, omitted]),
+		)
 	})
 })

@@ -1,7 +1,6 @@
 import type { Infer } from '@orkestrel/contract'
 import type {
 	AgentAnswer,
-	AgentDisclosure,
 	AgentFrame,
 	AgentPrompt,
 	MemoInput,
@@ -10,12 +9,7 @@ import type {
 	rememberToolShape,
 	switchToolShape,
 } from '@src/core'
-import {
-	agentAnswerShape,
-	agentDisclosureShape,
-	agentFrameShape,
-	agentPromptShape,
-} from '@src/core'
+import { agentAnswerShape, agentFrameShape, agentPromptShape } from '@src/core'
 import { createContract } from '@orkestrel/contract'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { BUILTIN_ARGUMENT_CASES } from '../../../setup.js'
@@ -35,11 +29,6 @@ describe('agent wire shapes', () => {
 		expectTypeOf<Infer<typeof agentAnswerShape>>().toExtend<AgentAnswer>()
 		expectTypeOf<AgentAnswer>().toExtend<Infer<typeof agentAnswerShape>>()
 		expect(createContract(agentAnswerShape).is({ id: 'a1', approved: true })).toBe(true)
-	})
-	it('infers a disclosure projection equal to its domain', () => {
-		expectTypeOf<Infer<typeof agentDisclosureShape>>().toExtend<AgentDisclosure>()
-		expectTypeOf<AgentDisclosure>().toExtend<Infer<typeof agentDisclosureShape>>()
-		expect(createContract(agentDisclosureShape).is({ skills: [] })).toBe(true)
 	})
 })
 

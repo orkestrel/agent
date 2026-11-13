@@ -74,6 +74,17 @@ const REFUND_LOOKUP: LedgerLookup = Object.freeze<LedgerLookup>({
 	read: (args) => ({ ids: [String(args.id)], owners: [] }),
 })
 
+/** Supplies the lookup the area-scope fence declares as `lookup_invoice`, which the billing skill holds back. */
+const INVOICE_LOOKUP: LedgerLookup = Object.freeze<LedgerLookup>({
+	tool: {
+		name: 'lookup_invoice',
+		description: 'Read an invoice by its id.',
+		parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+		execute: (args) => `Invoice ${String(args.id)} is paid.`,
+	},
+	read: (args) => ({ ids: [String(args.id)], owners: [] }),
+})
+
 // The server and page fences' declarations, transcribed byte for byte. They sit at module scope
 // because each fence is consumer code and a function declared inside a case body is a nested
 // function; the cases under `flagship fences` build each server fence's session table and call them.
@@ -260,6 +271,9 @@ await new GuideCommand({
 		buildLedgerOptions,
 		buildUncalibratedOptions,
 		serveLedgerGauge,
+		buildLedgerWorkspaceShape,
+		chargeDensityPrompt,
+		LEDGER_DENSE_RATES,
 	} = await import('./setup.js')
 	const { createFixtureServer, stopTimed } = await import('./setupServer.js')
 	const { describe, expect, expectTypeOf, it } = await import('vitest')
@@ -2383,6 +2397,77 @@ await new GuideCommand({
 			)
 		})
 
+		it('refuses a calibration whose call with the definitions reports a prompt over capacity, naming the whole call, as the calibration paragraph and the refusal fence claim (claim F-K1)', async () => {
+			// The fence's provider reports 9000 for the call with the definitions; a second call would take
+			// the second reply.
+			const provider = createScriptedProvider(
+				[
+					{ content: '', usage: { prompt: 9000, completion: 0, total: 9000 } },
+					{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const ledger = createLedger(
+				provider,
+				buildUncalibratedOptions(buildLedgerOptions({ capacity: 8192 })),
+			)
+			const refused = await ledger
+				.calibrate(AbortSignal.timeout(30_000))
+				.catch((error: unknown) => error)
+
+			expect(isLedgerError(refused) ? refused.code : refused).toBe('GAUGE')
+			expect(isLedgerError(refused) ? refused.context : refused).toEqual({
+				capacity: 8192,
+				prompt: 9000,
+			})
+			expect(isLedgerError(refused) ? refused.message : refused).toBe(
+				'the calibration call with the tool definitions prices 9000 tokens, the head included, over the capacity 8192; hold tools behind a skill with the `load` built-in, register fewer tools, or raise capacity',
+			)
+			expect(ledger.gauge).toBeUndefined()
+			// The call with the definitions alone, carrying the head with no conversation message.
+			expect(provider.calls.map((call) => call.tools !== undefined)).toEqual([true])
+			expect(provider.calls[0]?.messages.map((message) => message.role)).toEqual(['system'])
+			expect(guideText).toContain(
+				"isLedgerError(refused) ? refused.code : refused // 'GAUGE'\nisLedgerError(refused) ? refused.context : refused // { capacity: 8192, prompt: 9000 }\nisLedgerError(refused) ? refused.message : refused // 'the calibration call with the tool definitions prices 9000 tokens, the head included, over the capacity 8192; hold tools behind a skill with the `load` built-in, register fewer tools, or raise capacity'\nledger.gauge // undefined — and the provider received the call with the definitions alone",
+			)
+			expect(guideText).toContain(
+				"When the call with the definitions reports a prompt over `capacity`, the head included, the ledger sends no second call, stores no gauge, and rejects `calibrate` and `respond` with `LedgerError` code `'GAUGE'`, whose `context` holds `capacity` and `prompt`; the call without them and the call with the workspace text refuse the same way, and a refused `respond` stores no request.",
+			)
+			expect(guideText).toContain(
+				"The error's text names the call and its prompt, such as `the calibration call with the tool definitions prices 9000 tokens, the head included, over the capacity 8192`.",
+			)
+			expect(guideText).toContain(
+				'A head over `capacity` on its own clears only through a shorter system prompt or a larger `capacity`, and a workspace call over it through a scope that shows less of the workspace or a larger `capacity`, which its error names.',
+			)
+			expect(guideText).toContain(
+				'hold tools behind a skill with the `load` built-in, which takes them out of the calibrated set and still lets a scope that lists them advertise them, register fewer tools, or raise `capacity`.',
+			)
+		})
+
+		it('calibrates a ledger whose workspace renders text with a third call, as the calibration paragraph claims (claim W.6)', async () => {
+			const bare = buildLedgerWorkspaceShape(0, LEDGER_DENSE_RATES)
+			const shown = buildLedgerWorkspaceShape(1, LEDGER_DENSE_RATES)
+			await bare.ledger.calibrate(AbortSignal.timeout(30_000))
+			const gauge = await shown.ledger.calibrate(AbortSignal.timeout(30_000))
+			const head = requireValue(shown.provider.calls[1]).messages
+			const rate = chargeDensityPrompt(head, undefined, LEDGER_DENSE_RATES) / estimateMessages(head)
+
+			// The first two calls carry the head alone; the third carries the head and the workspace text.
+			expect(bare.provider.calls.map((call) => call.tools !== undefined)).toEqual([true, false])
+			expect(shown.provider.calls.map((call) => call.tools !== undefined)).toEqual([
+				true,
+				false,
+				false,
+			])
+			expect(requireValue(shown.provider.calls[0]).messages).toEqual(head)
+			expect(requireValue(shown.provider.calls[2]).messages.at(-1)?.content).toContain('RECORD-0')
+			// The dense record raises the scale over the head's own rate.
+			expect(gauge.scale).toBeGreaterThan(rate)
+			expect(guideText).toContain(
+				"Calibration sends the head the agent's context builds for an empty turn, within the scope at entry, with no conversation message. The first call carries the calibrated definitions and no workspace text, and the second carries neither; their difference is the overhead. When the workspace renders text, a third call carries the head and that text with no definitions, cut to a third of the capacity the second call left, in characters, as the `LEDGER_SAMPLE_BYTES` constant sets. The scale is the reported prompt of the head with the workspace over its estimate, with a cut text's tokens scaled to the whole text's estimate, and never under the head's own rate. A long thread moves no call, and no workspace moves one past `capacity`.",
+			)
+		})
+
 		it("holds a skill's lookup out of calibration and the first request, and advertises it after the load (the ledger disclosure fence)", async () => {
 			// The fence declares `options`, `lookup`, `refund`, and `provider`; the transcription scripts
 			// the provider with the two calibration replies and records every call.
@@ -2456,7 +2541,223 @@ await new GuideCommand({
 				'Calibration priced `lookup_order`, `recall`, `load`, and `unload`, and never `lookup_refund`.',
 			)
 			expect(guideText).toContain(
+				"A fresh thread's first request carries `load` and the ungated definitions other than `recall`, which the ledger offers only on a request with something earlier to find, and no tool a skill holds.",
+			)
+			expect(guideText).toContain(
 				"a ledger with `builtins` requires the `authority` member: construction throws `AgentError` with code `'AUTHORITY'` without it.",
+			)
+		})
+
+		it('serves each request under its area scope and moves one thread between that scope and the skills index (the area-scope and lever fences)', async () => {
+			// The fences declare `options`, `lookups`, and `provider`; the transcription scripts the
+			// provider with the two calibration replies, one answer for each area request, then the
+			// lever's load, lookup, and answers, and records every call.
+			const provider = createScriptedProvider(
+				[
+					{ content: '', usage: { prompt: 160, completion: 0, total: 160 } },
+					{ content: '', usage: { prompt: 40, completion: 0, total: 40 } },
+					{ content: 'Order BW-5512 can be refunded.' },
+					{ content: 'Invoice 42 is paid.' },
+					{
+						content: '',
+						tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'refunds' } }],
+					},
+					{
+						content: '',
+						tools: [{ id: 'refund-1', name: 'lookup_refund', arguments: { id: 'BW-5513' } }],
+					},
+					{ content: 'Order BW-5513 can be refunded once a manager approves.' },
+					{ content: 'Invoice 43 is paid.' },
+					{ content: 'Yes. Refunds over $100 need a manager.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const options = buildUncalibratedOptions(
+				buildGuideLedgerOptions({ judge: createPhraseJudge([]) }),
+			)
+			const lookups = [LEDGER_ORDER_LOOKUP, REFUND_LOOKUP, INVOICE_LOOKUP]
+
+			// One skill registry serves the area scope and the skills index.
+			const skills = barrel.createSkillManager()
+			skills.add([
+				{
+					name: 'refunds',
+					description: 'Refund rules for a paid order.',
+					content: 'Read the refund rule before you answer about a refund.',
+					tools: ['lookup_refund'],
+				},
+				{
+					name: 'billing',
+					description: 'Invoices and their payments.',
+					content: 'Read the invoice before you answer about a payment.',
+					tools: ['lookup_invoice'],
+				},
+			])
+			const ledger = createLedger(provider, {
+				...options,
+				lookups,
+				agent: {
+					skills,
+					builtins: ['load'],
+					authority: barrel.createAuthority({ fallback: { zone: 'desk', verdict: 'allow' } }),
+				},
+			})
+			const advertised: Array<readonly string[] | undefined> = []
+			ledger.agent.emitter.on('request', (_index, request) =>
+				advertised.push(request.tools?.map(({ name }) => name)),
+			)
+			const requests = [
+				{ area: 'refunds', text: 'Can order BW-5512 be refunded?' },
+				{ area: 'billing', text: 'Is invoice 42 paid?' },
+			]
+			for (const { area, text } of requests) {
+				// The area's tools, the ungated lookup, and `recall`; no `load`, and no skill.
+				const tools = skills.skill(area)?.tools ?? []
+				ledger.agent.context.apply(
+					createScope({ name: area, tools: ['lookup_order', ...tools, 'recall'], skills: [] }),
+				)
+				await ledger.respond(text)
+			}
+
+			expect(advertised).toEqual([
+				['lookup_order', 'lookup_refund'],
+				['lookup_order', 'lookup_invoice'],
+			])
+			// Two calibration calls, then one call a request: no calibration call came between them.
+			expect(provider.calls).toHaveLength(4)
+			for (const call of provider.calls.slice(2)) {
+				expect(call.messages[0]?.content).not.toContain('## Skills')
+				expect(call.messages[0]?.content).not.toContain('## Loaded skills')
+			}
+
+			// The lever fence, after the area-scope fence on the same ledger.
+			ledger.agent.context.apply(undefined) // the skills index and `load`, for a request the host can't place
+			await ledger.respond('Can order BW-5513 be refunded?')
+			const billing = skills.skill('billing')?.tools ?? []
+			ledger.agent.context.apply(
+				createScope({ name: 'billing', tools: ['lookup_order', ...billing, 'recall'], skills: [] }),
+			)
+			await ledger.respond('Is invoice 43 paid?')
+			ledger.agent.context.apply(undefined)
+			await ledger.respond('Does order BW-5513 need a manager?')
+
+			expect(advertised.at(-3)).toEqual(['lookup_order', 'lookup_refund', 'load'])
+			expect(advertised.at(-2)).toEqual(['lookup_order', 'lookup_invoice', 'recall'])
+			expect(advertised.at(-1)).toEqual(['lookup_order', 'lookup_refund', 'load'])
+			expect(advertised).toHaveLength(7)
+			// The billing request's head held no index and no body; the last one showed refunds again.
+			const lever = provider.calls.map((call) => call.messages[0]?.content ?? '')
+			expect(lever.at(-2)).not.toContain('## Skills')
+			expect(lever.at(-2)).not.toContain('## Loaded skills')
+			expect(lever.at(-1)).toContain(
+				'## Loaded skills\n\n### refunds\n\nRead the refund rule before you answer about a refund.',
+			)
+			// The thread holds one `load` call, the lever's first request's.
+			const loads = ledger.conversation
+				.messages()
+				.filter((message) => message.calls?.some((call) => call.name === 'load') === true)
+			expect(loads).toHaveLength(1)
+			expect(guideText).toContain(
+				'With no `load` in the allow-list, the allow-list alone decides what a turn advertises, and the empty `skills` list drops the skills index and every loaded body from the head.',
+			)
+			expect(guideText).toContain(
+				'the empty `skills` list drops the loaded bodies from the head, the conversation keeps the `load` record, and a later request on the index shows the loaded skill again with no further `load`.',
+			)
+		})
+
+		it('refuses at build a job outside its bounds and a job its construction would refuse (the durable-jobs clause)', () => {
+			const registry = barrel.createAgentRegistry({
+				providers: { main: createScriptedProvider([{ content: 'Done.' }]) },
+			})
+			const bounded = captureError(() => registry.build({ provider: 'main', limit: 0 }))
+			expect(barrel.isAgentError(bounded) ? bounded.code : bounded).toBe('REGISTRY')
+			const refused = captureError(() => registry.build({ provider: 'main', builtins: ['load'] }))
+			expect(barrel.isAgentError(refused) ? refused.code : refused).toBe('REGISTRY')
+			expect(barrel.isAgentError(refused) ? refused.context?.refusals : refused).toEqual(
+				barrel.collectJobRefusals({ builtins: ['load'] }),
+			)
+			expect(barrel.collectJobRefusals({ builtins: ['load'] })).toHaveLength(1)
+			expect(guideText).toContain(
+				"a job the agent's construction would refuse throws the same code at `build` with the lines `collectJobRefusals` returns under `context.refusals`.",
+			)
+		})
+
+		it("lets code that holds a ledger's agent emitter clear the listener that runs the capacity gate (the emitter limit)", async () => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], {
+				recorded: true,
+				repeat: false,
+			})
+			const ledger = createLedger(
+				provider,
+				buildGuideLedgerOptions({ judge: createPhraseJudge([]) }),
+			)
+			expect(ledger.agent.emitter.count('request')).toBe(1)
+			ledger.agent.emitter.clear()
+			expect(ledger.agent.emitter.count('request')).toBe(0)
+			expect(guideText).toContain(
+				'clear the listeners the ledger registered there, the `request` listener that runs the capacity gate included.',
+			)
+		})
+
+		it("files the request again for a host's own selection during a pass and stores no message twice (the host selection limit)", async () => {
+			const runs = await Promise.all(
+				[false, true].map(async (host) => {
+					const provider = createScriptedProvider(
+						[
+							{
+								content: '',
+								tools: [{ id: 'note-1', name: 'lookup_note', arguments: { id: 'N-1' } }],
+							},
+							{ content: 'Note N-1 is open.' },
+						],
+						{ recorded: true, repeat: false },
+					)
+					const selections: Array<() => Promise<unknown>> = []
+					const ledger = createLedger(
+						provider,
+						buildGuideLedgerOptions({
+							judge: createPhraseJudge([]),
+							lookups: [
+								{
+									tool: {
+										name: 'lookup_note',
+										description: 'Read a note by its id.',
+										parameters: {
+											type: 'object',
+											properties: { id: { type: 'string' } },
+											required: ['id'],
+										},
+										execute: async () => {
+											if (host) await selections[0]?.()
+											return 'Note N-1 is open.'
+										},
+									},
+									read: (args) => ({ ids: [String(args.id)], owners: [] }),
+								},
+							],
+						}),
+					)
+					selections.push(async () => {
+						const request = requireValue(
+							ledger.conversation
+								.messages()
+								.filter((message) => message.role === 'user')
+								.at(-1),
+						)
+						return ledger.agent.context.select(
+							ledger.conversation,
+							request,
+							new AbortController().signal,
+						)
+					})
+					const result = await ledger.respond('Is note N-1 open?')
+					return { attempts: result.attempts.length, stored: ledger.conversation.messages().length }
+				}),
+			)
+			expect(runs[1]?.attempts).toBe(2 * (runs[0]?.attempts ?? 0))
+			expect(runs[1]?.stored).toBe(runs[0]?.stored)
+			expect(guideText).toContain(
+				"files that request a second time, so that `respond` call's `attempts` member holds the second filing's attempts too. No message is stored twice.",
 			)
 		})
 
@@ -3629,9 +3930,11 @@ await new GuideCommand({
 						lookups: [LEDGER_ORDER_LOOKUP],
 					}),
 				)
+				// A stored message carries its minted id, which a message input does not declare.
+				const { id: _id, ...input } = hidden
 				ledger.conversation.add([
-					...seed,
-					{ ...hidden, content: 'Order BW-5512 belongs to Brightwater Studio.' },
+					...seed.map(({ id: _seed, ...message }) => message),
+					{ ...input, content: 'Order BW-5512 belongs to Brightwater Studio.' },
 				])
 				await ledger.respond(request.content)
 				const sent = requireValue(provider.calls[0]).messages
@@ -4801,11 +5104,13 @@ await new GuideCommand({
 			const runner = barrel.createAgentRunner({ registry, concurrency: 4 })
 			const planner: AgentJobInput = {
 				provider: 'main',
+				authority: 'desk',
 				messages: [{ role: 'user', content: 'Plan the trip.' }],
 				children: [
 					{
 						provider: 'main',
 						tools: ['book'],
+						authority: 'desk',
 						messages: [{ role: 'user', content: 'Book flights.' }],
 					},
 				],
@@ -4850,9 +5155,7 @@ await new GuideCommand({
 			expect(guideText).toContain(
 				"isAgentError(refused) && refused.code // 'REGISTRY'\n// refused.context.findings: ['job.children[0].tools: names \"book\", which its parent does not hold']",
 			)
-			expect(guideText).toContain(
-				"\t\t{ provider: 'main', tools: ['book'], messages: [{ role: 'user', content: 'Book flights.' }] },",
-			)
+			expect(guideText).toContain("\t\t\ttools: ['book'],\n\t\t\tauthority: 'desk',")
 			expect(guideText).toContain(
 				'The check walks the whole tree first, so a violation at any depth refuses the root before the root or any child runs.',
 			)
@@ -6789,9 +7092,9 @@ await new GuideCommand({
 				agent.stream({ conversation: thread, prompt: { content: 'Book it.' }, limit: -1 }),
 			)
 			const { invokeUnchecked } = await import('@orkestrel/test')
-			const disclosure = captureError(() =>
+			const workspace = captureError(() =>
 				invokeUnchecked(agent, agent.stream, [
-					{ conversation: thread, prompt: { content: 'Book it.' }, disclosure: { skills: 'all' } },
+					{ conversation: thread, prompt: { content: 'Book it.' }, workspace: ['all'] },
 				]),
 			)
 			const counted = thread.count
@@ -6801,7 +7104,7 @@ await new GuideCommand({
 
 			expect(placement).toMatchObject({ code: 'placement' })
 			expect(limit).toMatchObject({ code: 'LIMIT' })
-			expect(disclosure).toMatchObject({ code: 'placement' })
+			expect(workspace).toMatchObject({ code: 'placement' })
 			expect(counted).toBe(0)
 			expect(provider.calls[0]?.messages.at(-1)?.content).toBe('Book the flight.')
 			expect(provider.calls[1]?.messages.at(-1)?.content).toBe('Book the hotel.')
@@ -6809,7 +7112,7 @@ await new GuideCommand({
 				"The same options carry `conversation`, which binds the run, and `prompt`, which the run appends as a `user` turn after its guards; a run with no `prompt` reads its request from the conversation's tail.",
 			)
 			expect(guideText).toContain(
-				'A `prompt` that is not an exact `AgentPrompt`, a `budget` or `allowance` that does not implement `BudgetInterface`, a `conversation` that does not implement `ConversationInterface`, a `scope` that does not implement `ScopeInterface`, or a `disclosure` that is not an exact `AgentDisclosure` throws `ContractError` with code `placement` before either bound starts, and a refused run appends no `prompt`.',
+				'A `prompt` that is not an exact `AgentPrompt`, a `budget` or `allowance` that does not implement `BudgetInterface`, a `conversation` that does not implement `ConversationInterface`, a `scope` that does not implement `ScopeInterface`, or a `workspace` that is not a string throws `ContractError` with code `placement` before either bound starts, and a refused run appends no `prompt`.',
 			)
 		})
 
@@ -7719,17 +8022,16 @@ await new GuideCommand({
 			})
 
 			expect(refused).toMatchObject({
-				code: 'ROLE',
-				message:
-					'a stored message role must be one of "user", "assistant", "tool"; received "system"; host text goes in the system option or an instruction',
+				code: 'REGISTRY',
+				context: { faults: [expect.objectContaining({ path: ['messages', '0', 'role'] })] },
 			})
+			expect(guideText).toContain(
+				"fails at `AgentRegistry.build` with `AgentError` `'REGISTRY'`, whose `context.faults` names the message's `role`",
+			)
 			expect(moved.context.build()[0]).toMatchObject({
 				role: 'system',
 				content: 'Obey the depot rules.',
 			})
-			expect(guideText).toContain(
-				'`a stored message role must be one of "user", "assistant", "tool"; received "system"; host text goes in the system option or an instruction`',
-			)
 		})
 
 		it('reads a stored row in any key order', async () => {
@@ -7939,89 +8241,47 @@ await new GuideCommand({
 			)
 		})
 
-		it('shows the host’s skills from the first request (the disclosure fence)', async () => {
+		it('renders the chosen workspace from the first request (the workspace fence)', async () => {
 			const { invokeUnchecked } = await import('@orkestrel/test')
 			const { isContractError } = await import('@orkestrel/contract')
 			const provider = createScriptedProvider(
-				[{ content: 'Refunded.' }, { content: 'Opened.' }, { content: 'Refunded.' }],
+				[{ content: 'Open.' }, { content: 'Paid.' }, { content: 'Paid.' }],
 				{ recorded: true, repeat: false },
 			)
-			const agent = createAgent(provider, { disclosure: { skills: ['refunds'] } })
-			agent.context.skills.add([
-				{
-					name: 'refunds',
-					description: 'Refunds a paid order.',
-					content: 'Confirm the order is paid.',
-				},
-				{ name: 'returns', description: 'Opens a return.', content: 'Ask for the order number.' },
-			])
-			await agent.generate({ prompt: { content: 'Refund order 42.' } })
-			const returns = { skills: ['returns'] }
-			await agent.generate({ prompt: { content: 'Return order 7.' }, disclosure: returns })
-			const plain = createScope({ name: 'plain', skills: [] })
-			await agent.generate({ prompt: { content: 'Refund order 9.' }, scope: plain })
+			const agent = createAgent(provider, { workspace: 'returns' })
+			agent.context.workspaces.add({ id: 'orders' }).write('orders.txt', 'Order 42 is paid.')
+			agent.context.workspaces.add({ id: 'returns' }).write('returns.txt', 'Return 7 is open.')
+			await agent.generate({ prompt: { content: 'Check return 7.' } })
+			await agent.generate({ prompt: { content: 'Check order 42.' }, workspace: 'orders' })
+			const plain = createScope({ name: 'plain', workspaces: ['orders'] })
+			await agent.generate({ prompt: { content: 'Check order 9.' }, scope: plain })
 
-			const bodies = provider.calls.map(
-				(call) => call.messages[0]?.content.split('## Loaded skills\n\n')[1],
+			const rendered = provider.calls.map((call) =>
+				['Order 42 is paid.', 'Return 7 is open.'].filter((text) =>
+					call.messages.some((message) => message.content.includes(text)),
+				),
 			)
-			expect(bodies).toEqual([
-				'### refunds\n\nConfirm the order is paid.',
-				'### returns\n\nAsk for the order number.',
-				undefined,
+			expect(rendered).toEqual([
+				['Return 7 is open.'],
+				['Order 42 is paid.'],
+				['Order 42 is paid.'],
 			])
-			// A value the contract refuses throws at construction and at the run, before the prompt.
+			expect(agent.context.workspaces.active?.id).toBe('orders')
+			// A value that is not a string throws at construction and at the run, before the prompt.
 			const constructed = captureError(() =>
-				invokeUnchecked(undefined, createAgent, [provider, { disclosure: { skills: 'refunds' } }]),
+				invokeUnchecked(undefined, createAgent, [provider, { workspace: 7 }]),
 			)
 			const conversation = createConversation()
 			const streamed = captureError(() =>
 				invokeUnchecked(agent, agent.stream, [
-					{ conversation, prompt: { content: 'Hi.' }, disclosure: { skills: [1] } },
+					{ conversation, prompt: { content: 'Hi.' }, workspace: ['orders'] },
 				]),
 			)
 			expect(isContractError(constructed) && constructed.code === 'placement').toBe(true)
 			expect(isContractError(streamed) && streamed.code === 'placement').toBe(true)
 			expect(conversation.messages()).toEqual([])
-
-			// An unload of a skill the host shows refuses, after a model load of it too.
-			const loader = createScriptedProvider(
-				[
-					{
-						content: '',
-						tools: [{ id: 'load-1', name: 'load', arguments: { skill: 'refunds' } }],
-					},
-					{
-						content: '',
-						tools: [{ id: 'unload-1', name: 'unload', arguments: { skill: 'refunds' } }],
-					},
-					{ content: 'Refunded.' },
-				],
-				{ recorded: true, repeat: false },
-			)
-			const unloads = createRecorder<readonly [success: boolean]>()
-			const shown = createAgent(loader, {
-				builtins: ['load', 'unload'],
-				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
-				disclosure: { skills: ['refunds'] },
-			})
-			shown.context.skills.add({
-				name: 'refunds',
-				description: 'Refunds a paid order.',
-				content: 'Confirm the order is paid.',
-			})
-			shown.emitter.on('tool', (call, result) => {
-				if (call.name === 'unload') unloads.handler(result.success)
-			})
-			await shown.generate({ prompt: { content: 'Refund order 42.' } })
-			expect(unloads.calls).toEqual([[false]])
-			expect(loader.calls[2]?.messages[0]?.content.endsWith('Confirm the order is paid.')).toBe(
-				true,
-			)
 			expect(guideText).toContain(
-				'An `unload` of a skill the host shows refuses with a sentence saying the host shows it, whether or not the model also loaded it.',
-			)
-			expect(guideText).toContain(
-				"On `AgentOptions` it shows them from the first request of every run, and on `AgentRunOptions` it replaces the agent's value for that run.",
+				"On `AgentOptions` it names the workspace every run renders in place of the active one, and on `AgentRunOptions` it replaces the agent's value for that run; the thread's last `switch` outranks both.",
 			)
 		})
 
@@ -8286,7 +8546,6 @@ await new GuideCommand({
 							authority: barrel.createAuthority({
 								fallback: { zone: 'default', verdict: 'allow' },
 							}),
-							disclosure: { skills: ['refunds'] },
 						},
 					)
 					page.context.skills.add({
@@ -8294,6 +8553,17 @@ await new GuideCommand({
 						description: 'Refunds a paid order.',
 						content: 'Confirm the order is paid.',
 					})
+					// The page's thread loaded refunds earlier, so the first request carries its body.
+					page.context.messages.add([
+						{ role: 'user', content: 'Open refunds.' },
+						{
+							role: 'assistant',
+							content: '',
+							calls: [{ id: 'load-0', name: 'load', arguments: { skill: 'refunds' } }],
+						},
+						{ role: 'tool', content: barrel.BUILTIN_NOTES.loaded, call: 'load-0' },
+						{ role: 'assistant', content: 'Opened.' },
+					])
 					const status = await page.generate({ prompt: { content: 'Refund order 42.' } }).then(
 						() => 200,
 						(error: unknown) => (isProviderError(error) ? error.status : undefined),

@@ -150,11 +150,11 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * `agent` id, and the `conversation` id for a shared conversation. For concurrent runs, use
  * separate agents, or one agent with no `window`, distinct budget and allowance instances per
  * run, and a distinct conversation per run.
- * `'LIMIT'` reports a construction or per-run `limit` that is not a positive safe integer,
- * including one a rehydrated job carries into `build`. `'REGISTRY'` reports a rehydration name
- * absent from its registry pool, on `provider` / `tool` / `authority` / `scheduler` / `build`,
- * whose `context` names the `category` and the `name`, and a job that names `tools` and no
- * `authority` at `build`, whose `context` names the `tools`. `'WINDOW'` reports a `strict` run whose
+ * `'LIMIT'` reports a construction or per-run `limit` that is not a positive safe integer.
+ * `'REGISTRY'` reports a rehydration name absent from its registry pool, on `provider` / `tool` /
+ * `authority` / `scheduler` / `build`, whose `context` names the `category` and the `name`, and a
+ * job `build` refuses as a record, whose `context` holds the contract's `faults` or the
+ * `refusals` lines `collectJobRefusals` returns. `'WINDOW'` reports a `strict` run whose
  * complete provider request is still over the `window` budget, equal to its `max` included, after
  * the one permitted fold or with no fold possible; it settles the run `error` before the provider
  * is called, and its `context` holds the `agent` id, the measured `consumed`, and the window `max`.

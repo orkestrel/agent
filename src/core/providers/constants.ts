@@ -1,3 +1,13 @@
+import type {
+	AgentJudgeInput,
+	AgentProviderInput,
+	ProviderStreamOptions,
+	RelayOptions,
+	RelayProviderOptions,
+	RelayStreamOptions,
+	SystemOneJudgeOptions,
+} from './types.js'
+
 /**
  * Names the opening tag a {@link import('./ThinkSplitter.js').ThinkSplitter} recognizes as the start of
  * an in-content reasoning span — `'<think>'`, the de-facto wire convention thinking models
@@ -87,3 +97,67 @@ export const REFUSED_RELAY_CONTENT_TYPE = 'text/plain; charset=utf-8'
 
 /** Names the System One decision endpoint shared by compatible servers. */
 export const SYSTEM_ONE_PATH = '/v1/systemone'
+
+/** Lists the members `RelayOptions` declares, frozen — the keys `createRelay` admits. */
+export const RELAY_OPTION_KEYS = Object.freeze([
+	'provider',
+	'authorize',
+	'limit',
+	'system',
+	'tools',
+] as const) satisfies ReadonlyArray<keyof RelayOptions>
+
+/** Lists the members `RelayProviderOptions` declares, frozen — the keys the `RelayProvider` constructor admits. */
+export const RELAY_PROVIDER_KEYS = Object.freeze([
+	'url',
+	'parser',
+	'timeout',
+	'replay',
+	'fetch',
+	'headers',
+] as const) satisfies ReadonlyArray<keyof RelayProviderOptions>
+
+/** Lists the members `RelayStreamOptions` declares, frozen — the keys the `RelayStream` constructor admits. */
+export const RELAY_STREAM_KEYS = Object.freeze([
+	'provider',
+	'request',
+	'signal',
+] as const) satisfies ReadonlyArray<keyof RelayStreamOptions>
+
+/** Lists the members `AgentProviderInput` declares, frozen — the keys the `AgentProvider` constructor admits. */
+export const PROVIDER_INPUT_KEYS = Object.freeze([
+	'url',
+	'path',
+	'split',
+	'strict',
+	'timeout',
+	'replay',
+	'fetch',
+	'headers',
+] as const) satisfies ReadonlyArray<keyof AgentProviderInput>
+
+/** Lists the members `AgentJudgeInput` declares, frozen — the keys the `AgentJudge` constructor admits. */
+export const JUDGE_INPUT_KEYS = Object.freeze([
+	'url',
+	'path',
+	'model',
+	'batch',
+	'timeout',
+	'fetch',
+	'headers',
+] as const) satisfies ReadonlyArray<keyof AgentJudgeInput>
+
+/** Lists the members `SystemOneJudgeOptions` declares, frozen — the keys the `SystemOneJudge` constructor admits. */
+export const SYSTEM_ONE_OPTION_KEYS = Object.freeze([
+	'url',
+	'model',
+	'timeout',
+	'fetch',
+	'headers',
+] as const) satisfies ReadonlyArray<keyof SystemOneJudgeOptions>
+
+/** Lists the members `ProviderStreamOptions` declares, frozen — the keys the `generate` and `stream` methods of an `AgentProvider` admits. */
+export const STREAM_OPTION_KEYS = Object.freeze([
+	'think',
+	'schema',
+] as const) satisfies ReadonlyArray<keyof ProviderStreamOptions>

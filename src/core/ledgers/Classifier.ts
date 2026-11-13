@@ -10,12 +10,20 @@ import type {
 	LedgerTopic,
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
-import { errorToMessage, isArray, isError, isString, parseJSONAs } from '@orkestrel/contract'
+import {
+	errorToMessage,
+	isArray,
+	isError,
+	isString,
+	parseJSONAs,
+	refuseOptionKeys,
+} from '@orkestrel/contract'
 import { raceSignal } from '../conversations/index.js'
 import { isJudgeAbortError } from '../errors.js'
 import { extractLiterals, matchesJudgment, renderJSON, sumUsage } from '../helpers.js'
 import { isJudgeError } from '../providers/errors.js'
 import {
+	CLASSIFIER_OPTION_KEYS,
 	DECISIVE_CATEGORIES,
 	DETERMINISTIC_JUDGE_ERROR,
 	LEDGER_CATEGORIES,
@@ -44,6 +52,7 @@ export class Classifier implements ClassifierInterface {
 	 * @param options - The conversation, judge, questions, cutoffs, and handlers
 	 */
 	constructor(options: ClassifierOptions) {
+		refuseOptionKeys(options, CLASSIFIER_OPTION_KEYS, 'Classifier', 'ClassifierOptions')
 		this.#options = options
 	}
 

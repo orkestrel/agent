@@ -3,7 +3,6 @@ import type { ContractInterface, ContractShape } from '@orkestrel/contract'
 import { createContract } from '@orkestrel/contract'
 import {
 	agentAnswerShape,
-	agentDisclosureShape,
 	agentFrameShape,
 	agentJobShape,
 	agentPromptShape,
@@ -24,9 +23,6 @@ export const agentJobContract = createContract(agentJobShape)
 
 /** Validates and projects a page's answers to `ask` frames at a JSON wire boundary. */
 export const agentAnswerContract = createContract(agentAnswerShape)
-
-/** Checks the `disclosure` option of an agent and a run exactly, before construction or the run starts. */
-export const agentDisclosureContract = createContract(agentDisclosureShape)
 
 /** Checks the arguments of the `load` and `unload` built-ins; its schema is the parameters they advertise. */
 export const loadToolContract = createContract(loadToolShape)

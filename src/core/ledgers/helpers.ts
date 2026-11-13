@@ -2002,3 +2002,61 @@ export function collectLedgerEvidence(
 		),
 	}
 }
+
+/**
+ * Cuts the workspace text a calibration sample adds over its head to a number of characters, or
+ * returns `undefined` when the sample adds anything else.
+ *
+ * @remarks
+ * The head and the shown sample are what a context's `build` returns for an empty turn without and
+ * with the workspace: the shown sample holds the head's messages with the workspace section appended
+ * to the context message, or one context message added where the head holds none. The cut keeps the
+ * first `limit` characters of that added text and every other message as the sample holds it. A
+ * sample whose messages differ from the head's in any other way, or that adds no text, returns
+ * `undefined`.
+ *
+ * @param head - The head built with no workspace
+ * @param shown - The head built with the workspace a request renders
+ * @param limit - The characters of added text to keep
+ * @returns The cut sample, or `undefined` when the sample adds no trailing text to one message
+ *
+ * @example
+ * ```ts
+ * import { cutWorkspaceSample } from '@orkestrel/agent'
+ *
+ * const head = [{ id: 's', role: 'system', content: 'Serve the desk.' }] as const
+ * const shown = [...head, { id: 'c', role: 'user', content: '## Workspace\n\nFile: a.md' }] as const
+ * cutWorkspaceSample(head, shown, 12)?.[1]?.content // '## Workspace'
+ * ```
+ */
+export function cutWorkspaceSample(
+	head: readonly Message[],
+	shown: readonly Message[],
+	limit: number,
+): readonly Message[] | undefined {
+	const at = shown.findIndex(
+		(message, index) =>
+			message.role !== head[index]?.role || message.content !== head[index]?.content,
+	)
+	const added = shown[at]
+	const extended = shown.length === head.length ? head[at] : undefined
+	const prefix = extended?.content ?? ''
+	const rest = shown.slice(at + 1)
+	const held = head.slice(extended === undefined ? at : at + 1)
+	if (added === undefined || shown.length - head.length > 1 || shown.length < head.length)
+		return undefined
+	if (!added.content.startsWith(prefix) || added.content.length === prefix.length) return undefined
+	if (
+		rest.length !== held.length ||
+		rest.some(
+			(message, index) =>
+				message.role !== held[index]?.role || message.content !== held[index]?.content,
+		)
+	)
+		return undefined
+	return [
+		...shown.slice(0, at),
+		{ ...added, content: prefix + added.content.slice(prefix.length, prefix.length + limit) },
+		...rest,
+	]
+}

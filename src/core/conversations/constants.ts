@@ -1,3 +1,11 @@
+import type {
+	CompactOptions,
+	ConversationInput,
+	ConversationManagerOptions,
+	ConversationOptions,
+	ConversationReferenceOptions,
+} from './types.js'
+
 /**
  * Sets the default number of recent live messages the `compact()` method of a
  * {@link ConversationInterface} retains verbatim — `0`, so a manual `compact()` keeps no recent tail and folds every
@@ -25,3 +33,48 @@ export const DEFAULT_CONVERSATION_KEEP = 0
  * because it interpolates the per-call provenance `label`).
  */
 export const CONVERSATION_RECAP_PREFIX = '[Summary of earlier messages] '
+
+/** Lists the members `ConversationOptions` declares, frozen — the keys the `Conversation` constructor admits. */
+export const CONVERSATION_OPTION_KEYS = Object.freeze([
+	'id',
+	'on',
+	'error',
+	'summarize',
+	'keep',
+	'sections',
+	'cumulative',
+	'snapshot',
+] as const) satisfies ReadonlyArray<keyof ConversationOptions>
+
+/** Lists the members `ConversationManagerOptions` declares, frozen — the keys the `ConversationManager` constructor admits. */
+export const CONVERSATION_MANAGER_KEYS = Object.freeze([
+	'summarize',
+	'keep',
+	'sections',
+	'store',
+] as const) satisfies ReadonlyArray<keyof ConversationManagerOptions>
+
+/** Lists the members `ConversationInput` declares, frozen — the keys the `add` method of a `ConversationManager` admits. */
+export const CONVERSATION_INPUT_KEYS = Object.freeze([
+	'id',
+	'summarize',
+	'keep',
+	'sections',
+	'cumulative',
+	'on',
+	'error',
+	'snapshot',
+] as const) satisfies ReadonlyArray<keyof ConversationInput>
+
+/** Lists the members `CompactOptions` declares, frozen — the keys the `compact` method of a `Conversation` admits. */
+export const COMPACT_OPTION_KEYS = Object.freeze([
+	'keep',
+	'sections',
+	'signal',
+] as const) satisfies ReadonlyArray<keyof CompactOptions>
+
+/** Lists the members `ConversationReferenceOptions` declares, frozen — the keys the `reference` method of a `Conversation` admits. */
+export const REFERENCE_OPTION_KEYS = Object.freeze([
+	'label',
+	'messages',
+] as const) satisfies ReadonlyArray<keyof ConversationReferenceOptions>

@@ -135,6 +135,7 @@ export interface InstructionManagerInterface {
 	 *
 	 * @param input - One {@link InstructionInput}, or a batch
 	 * @returns The stored instruction, or the stored batch in input order
+	 * @throws {ContractError} Thrown when an input fails `instructionInputContract`: a missing required member, an undeclared member, or a declared member holding `undefined` (`code: 'structure'`); a refused batch stores nothing
 	 */
 	add(input: InstructionInput): InstructionInterface
 	add(inputs: readonly InstructionInput[]): readonly InstructionInterface[]
@@ -585,6 +586,7 @@ export interface MemoManagerInterface {
 	 *
 	 * @param input - One {@link MemoInput}, or a batch
 	 * @returns The appended or unchanged current revision, or the batch's results in input order
+	 * @throws {ContractError} Thrown when an input fails `memoInputContract`: a missing required member, an undeclared member, or a declared member holding `undefined` (`code: 'structure'`); a refused batch stores nothing
 	 */
 	add(input: MemoInput): Memo
 	add(inputs: readonly MemoInput[]): readonly Memo[]
@@ -741,9 +743,10 @@ export interface SkillInput {
  * Holds what one run shows within its ceiling: the loaded skills and the selected workspace.
  *
  * @remarks
- * A host gives one as the `disclosure` option of an agent or a run, and the agent loop derives the
- * model's part from the conversation's stored calls of the built-ins a run enables. Every read of it passes the ceiling
- * and the registries, so a name that is not registered or not admitted shows nothing.
+ * The agent loop derives one for each turn and passes it to `build`: the skills from the
+ * conversation's stored calls of the built-ins a run enables, and the workspace from the thread's
+ * last `switch`, else the `workspace` option of the run or the agent. Every read of it passes the
+ * ceiling and the registries, so a name that is not registered or not admitted shows nothing.
  *
  * @example
  * ```ts
@@ -810,12 +813,13 @@ export interface SkillManagerInterface {
 	 * and overwrites a same-name skill, last write wins.
 	 *
 	 * @remarks
-	 * A `tools` member that is neither absent nor an array of strings refuses before that skill is
-	 * stored or emitted; in a batch, the skills before it stay stored.
+	 * Each input is checked and minted before any skill is stored or emitted, so a refused batch
+	 * stores nothing. A `tools` member is read first, then the input meets `skillInputContract`.
 	 *
 	 * @param input - One {@link SkillInput}, or a batch
 	 * @returns The stored skill, or the stored batch in input order
 	 * @throws {ContractError} Thrown when a `tools` member is neither absent nor an array of strings (`code: 'placement'`)
+	 * @throws {ContractError} Thrown when an input fails `skillInputContract`: a missing required member, an undeclared member, or a declared member holding `undefined` (`code: 'structure'`)
 	 */
 	add(input: SkillInput): Skill
 	add(inputs: readonly SkillInput[]): readonly Skill[]

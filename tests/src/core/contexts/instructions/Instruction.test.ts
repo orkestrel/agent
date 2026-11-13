@@ -1,5 +1,14 @@
-import { Instruction, InstructionManager } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import type { InstructionInput, instructionInputShape } from '@src/core'
+import {
+	buildOptionDoors,
+	buildRecordInputRefusals,
+	readDoorRefusal,
+	RECORD_INPUT_FIXTURES,
+} from '../../../../setup.js'
+import { isContractError } from '@orkestrel/contract'
+import { createInstruction, Instruction, InstructionManager } from '@src/core'
+import { captureError, invokeUnchecked, roundTripJSON } from '@orkestrel/test'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 
 // Instruction is the immutable named directive an InstructionManager renders by
 // descending priority — real behavior, no mocks. Covers id minting,
@@ -72,5 +81,49 @@ describe('Instruction', () => {
 
 		expect(instruction.content).toBe('original')
 		expect(instruction.priority).toBe(1)
+	})
+})
+
+describe('Instruction — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'Instruction' && ['InstructionInput'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('declares in its shape every member the input type declares, and no other', () => {
+		expectTypeOf<keyof typeof instructionInputShape.properties>().toEqualTypeOf<
+			keyof InstructionInput
+		>()
+	})
+})
+
+describe('Instruction — the input is an exact record (claims F-R1, F-R2, and F-R5)', () => {
+	it.each(buildRecordInputRefusals(RECORD_INPUT_FIXTURES.instruction))(
+		'refuses an input with $name, naming its path',
+		({ input, path }) => {
+			const error = captureError(() => invokeUnchecked(undefined, createInstruction, [input]))
+
+			expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+				'structure',
+				{ path, shape: 'InstructionInput' },
+			])
+		},
+	)
+
+	it('owns no override member when none is given, so its own keys and a JSON copy agree (claim F-R2)', () => {
+		const bare = new Instruction({ name: 'tone', content: 'Be brief.' })
+		const given = new Instruction({ name: 'tone', content: 'Be brief.', override: 'One line.' })
+
+		expect(Object.keys(bare)).toEqual(['id', 'name', 'content', 'priority'])
+		expect(Object.keys(given)).toEqual(['id', 'name', 'content', 'priority', 'override'])
+		expect(roundTripJSON({ ...bare })).toStrictEqual({ ...bare })
 	})
 })

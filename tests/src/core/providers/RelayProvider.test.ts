@@ -1,5 +1,11 @@
-import type { ProviderInterface, ProviderRequest, RelayFrame } from '@src/core'
-import { ContractError, parseJSONAs } from '@orkestrel/contract'
+import type {
+	ProviderInterface,
+	ProviderRequest,
+	RelayFrame,
+	RelayProviderOptions,
+	RELAY_PROVIDER_KEYS,
+} from '@src/core'
+import { ContractError, parseJSONAs, isContractError } from '@orkestrel/contract'
 import { createNDJSONParser, isNDJSONError } from '@orkestrel/ndjson'
 import {
 	captureError,
@@ -26,6 +32,8 @@ import {
 	drainProvider,
 	RecordedTransport,
 	RELAY_RESULT_FRAME,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 describe('RelayProvider', () => {
@@ -430,5 +438,26 @@ describe('RelayProvider', () => {
 		expect(refusal.message).toBe('provider error: malformed wire record')
 		if (!isNDJSONError(refusal.cause)) throw new Error('the cause is not the parser refusal')
 		expect(refusal.cause.code).toBe('SYNTAX')
+	})
+})
+
+describe('RelayProvider — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'RelayProvider' && ['RelayProviderOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof RelayProviderOptions, (typeof RELAY_PROVIDER_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

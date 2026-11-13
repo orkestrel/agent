@@ -40,6 +40,7 @@ import {
 	canonicalStringify,
 	ContractError,
 	createContract,
+	errorToMessage,
 	isArray,
 	isBoolean,
 	isFiniteNumber,
@@ -64,7 +65,7 @@ import {
 	JOB_REFUSAL_PREFIX,
 	MESSAGE_TOKEN_OVERHEAD,
 } from './constants.js'
-import { agentDisclosureContract, agentJobContract, builtinToolContracts } from './contracts.js'
+import { agentJobContract, builtinToolContracts } from './contracts.js'
 import { AgentError, AgentJobError } from './errors.js'
 import { isConversation } from '../conversations/index.js'
 import { isScope } from '../contexts/index.js'
@@ -601,20 +602,60 @@ export function handleAgentQueueJob(
 }
 
 /**
+ * Collects the refusals a job the contract admitted would meet at its build: tools or built-ins with
+ * no authority, a `builtins` list `requireBuiltins` refuses, and a built-in its own `tools` name.
+ *
+ * @remarks
+ * Each line names the member first, then the refusal and its remedy. The `builtins` line of a list
+ * `requireBuiltins` refuses carries that error's message; a job's tool manager holds exactly its
+ * `tools`, so a built-in its `tools` list also names is the name a manager would already hold.
+ * `AgentRegistry.build` refuses a job with any line, and `scanJobTree` refuses each such job of a
+ * tree before anything spawns.
+ *
+ * @param job - The `tools`, `builtins`, and `authority` of a job `agentJobContract` admitted
+ * @returns One line a refusal, in member order; empty when the job builds
+ *
+ * @example
+ * ```ts
+ * collectJobRefusals({ provider: 'main', tools: ['search'] })
+ * // ["authority: a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities"]
+ * ```
+ */
+export function collectJobRefusals(
+	job: Pick<AgentJobInput, 'tools' | 'builtins' | 'authority'>,
+): readonly string[] {
+	const tools = job.tools ?? []
+	const builtins = job.builtins ?? []
+	const checked = attempt(() => requireBuiltins(job.builtins, { tool: () => undefined }))
+	const shared = builtins.filter((name) => tools.includes(name))
+	return [
+		(tools.length > 0 || builtins.length > 0) && job.authority === undefined
+			? "authority: a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities"
+			: undefined,
+		checked.success ? undefined : `builtins: ${errorToMessage(checked.error)}`,
+		shared.length === 0
+			? undefined
+			: `builtins: names ${shared.map((name) => preview(name)).join(', ')}, which its tools also name; rename that tool or leave the name out of builtins`,
+	].filter((line) => line !== undefined)
+}
+
+/**
  * Scans every job under a root for a member that exceeds its own parent's; an empty result clears the tree.
  *
  * @remarks
  * The walk audits each job, the root included, through `agentJobContract` before it reads a member,
- * because a job's `children` cross that contract as JSON records. A refused job yields one finding
- * with its faults, or with an unreadable note when a member read throws, and the walk reads
- * nothing under it. A child is within its parent when each of
+ * because a job's `children` cross that contract as JSON records, and then reads each job the
+ * contract admits through `collectJobRefusals`. A job the contract refuses yields one finding with its
+ * faults, or with an unreadable note when a member read throws; a job its build would refuse yields
+ * one finding a refusal, its path, a dot, and the line; and the walk reads nothing under either. A
+ * child is within its parent when each of
  * its `tools` is one its parent names (a parent with no `tools` names none), each of its `builtins`
  * is one its parent names (a parent with no `builtins` names none), each name in each list of its
  * `scope` is in its parent's same list (a job with no `scope` holds the three lists empty), its
  * `authority` and `scheduler` are absent or its parent's, its `provider` is its parent's, its `limit`
  * is at most its parent's (an absent `limit` reads `DEFAULT_AGENT_LIMIT`), and, where its parent
- * holds a `timeout` or a `budget`, it holds one no larger. `system`, `messages`, and `disclosure` are
- * free: a `disclosure` shows nothing its own `scope` omits. A refused job's finding
+ * holds a `timeout` or a `budget`, it holds one no larger. `system`, `messages`, and `workspace` are
+ * free: a `workspace` renders nothing its own `scope` omits. A refused job's finding
  * opens with `JOB_REFUSAL_PREFIX` and then the job's path from `job`; an exceeded member's opens
  * with that path, a dot, and the member. The walk is total: an unreadable job yields a finding,
  * never a throw. The `AgentFanout` class runs it on every attempt of a unit, before the unit spawns
@@ -645,6 +686,11 @@ export function scanJobTree(root: AgentJobInput): readonly string[] {
 			findings.push(
 				`${JOB_REFUSAL_PREFIX}${path}: ${faults.success ? describeFaults(faults.value, agentJobContract.schema) : 'a member read threw, so the job cannot be read'}`,
 			)
+			continue
+		}
+		const refusals = collectJobRefusals(job)
+		if (refusals.length > 0) {
+			findings.push(...refusals.map((line) => `${JOB_REFUSAL_PREFIX}${path}.${line}`))
 			continue
 		}
 		if (parent !== undefined) {
@@ -1285,48 +1331,29 @@ export function requireBuiltins(
 }
 
 /**
- * Returns an owned, frozen copy of a `disclosure` option, or throws a coded error before the agent
- * is built or the run starts; `undefined` passes through.
+ * Returns a `workspace` option unchanged, or throws a `ContractError` coded `'placement'`;
+ * `undefined` passes through.
  *
  * @remarks
- * The check is `agentDisclosureContract.is`, which refuses a missing `skills`, a member that is not
- * a string, an extra member, and a `workspace` given as `undefined`. The error's `context` carries
- * the option path, the limit `'AgentDisclosure'`, and a preview of the refused value, and its text
- * carries the faults. A name the registries do not hold, or the ceiling does not admit, passes here
- * and shows nothing.
+ * The check is `isString`. An id the workspace registry does not hold, or the ceiling does not
+ * admit, passes here and renders nothing. The error's `context` carries the option path, the limit
+ * `'string'`, and a preview of the refused value.
  *
- * @param value - The `disclosure` option of an agent or a run, or `undefined`
- * @returns The owned copy, or `undefined`
- * @throws {ContractError} Thrown when `value` is defined and the contract refuses it (code `'placement'`)
+ * @param value - The `workspace` option of an agent, a run, or a ledger's agent, or `undefined`
+ * @returns The value unchanged
+ * @throws {ContractError} Thrown when `value` is defined and is not a string (code `'placement'`)
  *
  * @example
  * ```ts
- * requireDisclosure({ skills: ['refunds'] }) // { skills: ['refunds'] }
- * requireDisclosure({ skills: 'refunds' }) // throws ContractError ('placement')
+ * requireWorkspace('orders') // 'orders'
+ * requireWorkspace(7) // throws ContractError ('placement')
  * ```
  */
-export function requireDisclosure(value: unknown): AgentDisclosure | undefined {
-	if (value === undefined) return undefined
-	if (!agentDisclosureContract.is(value)) {
-		// A contract error's context declares no faults, so they travel in the text it carries.
-		const faults = attempt(() =>
-			describeFaults(agentDisclosureContract.audit(value), agentDisclosureContract.schema),
-		)
-		throw new ContractError(
-			`Agent: disclosure must be an exact AgentDisclosure${faults.success ? `\n${faults.value}` : ''}`,
-			{
-				code: 'placement',
-				context: {
-					path: ['options', 'disclosure'],
-					limit: 'AgentDisclosure',
-					received: preview(value),
-				},
-			},
-		)
-	}
-	return Object.freeze({
-		skills: Object.freeze([...value.skills]),
-		...(value.workspace === undefined ? {} : { workspace: value.workspace }),
+export function requireWorkspace(value: unknown): string | undefined {
+	if (value === undefined || isString(value)) return value
+	throw new ContractError('Agent: workspace must be a string', {
+		code: 'placement',
+		context: { path: ['options', 'workspace'], limit: 'string', received: preview(value) },
 	})
 }
 
@@ -1335,12 +1362,13 @@ export function requireDisclosure(value: unknown): AgentDisclosure | undefined {
  * shown skills.
  *
  * @remarks
- * The allow-list admits first, as `filterAllowList` does. When no skill is passed, or the allow-list
- * admits no `load`, the admitted list returns as it is. Otherwise a tool any registered skill names
- * is held back unless a shown skill names it too; `load` and `unload` are never held back. A caller
- * passes the registered skills only while `load` is enabled, so a ceiling whose empty `skills` list
- * withholds `load` from the candidates still holds the skills' tools back. Holding a tool back is
- * presentation, never authority: a call to it is denied as outside the turn's scope.
+ * The allow-list admits first, as `filterAllowList` does. When no skill is passed, or an allow-list
+ * admits no `load` definition, the admitted list returns as it is. Otherwise a tool any registered
+ * skill names is held back unless a shown skill names it too; `load` and `unload` are never held
+ * back. A caller passes the registered skills only while `load` is enabled, so with no allow-list a
+ * ceiling whose empty `skills` list withholds `load` from the candidates still holds the skills'
+ * tools back. Holding a tool back is presentation, never authority: a call to it is denied as
+ * outside the turn's scope.
  *
  * @param definitions - The candidate definitions, in advertisement order
  * @param names - The turn's `tools` allow-list (`undefined` ⇒ all, `[]` ⇒ none)
@@ -1362,7 +1390,9 @@ export function filterAdvertisedTools(
 	shown: readonly string[],
 ): readonly ToolDefinition[] {
 	const admitted = filterAllowList(names, definitions, (definition) => definition.name)
-	if (skills.length === 0 || (names !== undefined && !names.includes('load'))) return admitted
+	if (skills.length === 0) return admitted
+	if (names !== undefined && !admitted.some((definition) => definition.name === 'load'))
+		return admitted
 	const held = new Set(skills.flatMap((skill) => skill.tools))
 	const visible = new Set(shown)
 	const open = new Set(
@@ -1501,34 +1531,33 @@ export function matchesHeadLists(left: ScopeFilter, right: ScopeFilter): boolean
 }
 
 /**
- * Resolves what a turn shows: the given value, then the conversation's record, within the ceiling
- * and the registries.
+ * Resolves what a turn shows: the conversation's record, and the given workspace, within the
+ * ceiling and the registries.
  *
  * @remarks
- * The caller reads the ceiling, so a turn reads each scope list one time. The skills are the given value's, then
- * those {@link collectDisclosure} reads from the conversation, without repeats, keeping each that
- * the skill registry holds and the ceiling's `skills` list admits; an empty, repeated, unregistered,
- * or excluded name shows nothing. The workspace is the conversation's last switch, else the given
- * value's, kept only when the workspace registry holds it and the ceiling's `workspaces` list
- * admits it. The record counts only the built-ins in `builtins`, as {@link collectDisclosure}
- * states.
+ * The caller reads the ceiling, so a turn reads each scope list one time. The skills are those
+ * {@link collectDisclosure} reads from the conversation, in load order, keeping each that the skill
+ * registry holds and the ceiling's `skills` list admits; an unregistered or excluded name shows
+ * nothing. The workspace is the conversation's last switch, else the given one, kept only when the
+ * workspace registry holds it and the ceiling's `workspaces` list admits it. The record counts only
+ * the built-ins in `builtins`, as {@link collectDisclosure} states.
  *
  * @param context - The agent's context, whose scope, skills, and workspaces it reads
  * @param conversation - The conversation whose record to read
- * @param given - What the host shows, or `undefined`
+ * @param workspace - The `workspace` option of the run or the agent, or `undefined`
  * @param ceiling - The ceiling the turn read: the context scope intersected with the run scope
  * @param builtins - The built-ins the run enables
  * @returns The shown skills, in order, and the shown workspace when one is
  *
  * @example
  * ```ts
- * resolveDisclosure(agent.context, agent.context.messages, { skills: ['refunds', 'unknown'] }, {}, []) // { skills: ['refunds'] } when only refunds is registered
+ * resolveDisclosure(agent.context, agent.context.messages, 'orders', {}, []) // { skills: [], workspace: 'orders' } when orders is registered
  * ```
  */
 export function resolveDisclosure(
 	context: AgentContextInterface,
 	conversation: Pick<ConversationInterface, 'sections' | 'messages'>,
-	given: AgentDisclosure | undefined,
+	workspace: string | undefined,
 	ceiling: ScopeFilter,
 	builtins: readonly AgentBuiltin[],
 ): AgentDisclosure {
@@ -1538,15 +1567,13 @@ export function resolveDisclosure(
 			(skill) => skill.name,
 		),
 	)
-	const skills = [...new Set([...(given?.skills ?? []), ...recorded.skills])].filter((name) =>
-		admitted.has(name),
-	)
-	const workspace = recorded.workspace ?? given?.workspace
+	const skills = recorded.skills.filter((name) => admitted.has(name))
+	const selected = recorded.workspace ?? workspace
 	const shown =
-		workspace !== undefined &&
-		context.workspaces.workspace(workspace) !== undefined &&
-		filterAllowList(ceiling.workspaces, [workspace], (id) => id).length > 0
-	return shown ? { skills, workspace } : { skills }
+		selected !== undefined &&
+		context.workspaces.workspace(selected) !== undefined &&
+		filterAllowList(ceiling.workspaces, [selected], (id) => id).length > 0
+	return shown ? { skills, workspace: selected } : { skills }
 }
 
 /**

@@ -1,5 +1,15 @@
-import type { ConversationEventMap, Message, Section } from '@src/core'
-import { isArray } from '@orkestrel/contract'
+import type {
+	ConversationEventMap,
+	Message,
+	Section,
+	ConversationOptions,
+	CompactOptions,
+	ConversationReferenceOptions,
+	CONVERSATION_OPTION_KEYS,
+	COMPACT_OPTION_KEYS,
+	REFERENCE_OPTION_KEYS,
+} from '@src/core'
+import { isArray, isContractError } from '@orkestrel/contract'
 import {
 	CONVERSATION_RECAP_PREFIX,
 	Conversation,
@@ -11,7 +21,7 @@ import {
 	isConversationError,
 	isConversationSnapshot,
 } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import {
 	BLANK_DIGESTS,
 	createRecapSummarizer,
@@ -24,6 +34,9 @@ import {
 	ScriptedReads,
 	REWRITTEN_CONVERSATION_SNAPSHOT,
 	SUMMARIZED_CONVERSATION_SNAPSHOT,
+	buildNonPlainMessages,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 import {
 	captureError,
@@ -2362,4 +2375,85 @@ describe('Conversation — stored roles and snapshot checks', () => {
 		expect(isConversationSnapshot(snapshot)).toBe(false)
 		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
 	})
+})
+
+describe('Conversation — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'Conversation' &&
+				['ConversationOptions', 'CompactOptions', 'ConversationReferenceOptions'].includes(
+					door.shape,
+				),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof ConversationOptions, (typeof CONVERSATION_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<
+			Exclude<keyof CompactOptions, (typeof COMPACT_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<
+			Exclude<keyof ConversationReferenceOptions, (typeof REFERENCE_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+	})
+})
+
+describe('Conversation — add admits a message input as an exact record (door census)', () => {
+	it('refuses a member MessageInput does not declare, and stores nothing of the batch', () => {
+		const conversation = createConversation()
+		const error = captureError(() =>
+			invokeUnchecked(conversation, conversation.add, [
+				[
+					{ role: 'user', content: 'Check invoice 42.' },
+					{ role: 'user', content: 'Refund it.', disclosure: { skills: ['billing'] } },
+				],
+			]),
+		)
+
+		expect(isConversationError(error) && error.code).toBe('MESSAGE')
+		expect(isConversationError(error) ? error.context?.faults : undefined).toEqual([
+			expect.objectContaining({ reason: 'extra', path: ['disclosure'] }),
+		])
+		expect(conversation.count).toBe(0)
+	})
+
+	it('refuses a declared optional member holding undefined, because a stored message is a record', () => {
+		const conversation = createConversation()
+		const error = captureError(() =>
+			invokeUnchecked(conversation, conversation.add, [
+				{ role: 'assistant', content: 'Done.', thinking: undefined },
+			]),
+		)
+
+		expect(isConversationError(error) && error.code).toBe('MESSAGE')
+		expect(conversation.count).toBe(0)
+	})
+
+	it.each(buildNonPlainMessages())(
+		'refuses $name as no plain record before it reads the role, and stores nothing of the batch (claim F-R6)',
+		({ input }) => {
+			const conversation = createConversation()
+			const error = captureError(() =>
+				invokeUnchecked(conversation, conversation.add, [
+					[{ role: 'user', content: 'Check invoice 42.' }, input],
+				]),
+			)
+
+			expect(isConversationError(error) ? [error.code, error.message] : error).toEqual([
+				'MESSAGE',
+				'a message input must be a plain record, an object literal or parsed JSON holding its role and content as its own members, not a class instance or an object that inherits them',
+			])
+			expect(conversation.count).toBe(0)
+		},
+	)
 })

@@ -6,8 +6,12 @@ import type {
 	ConversationStoreInterface,
 	ConversationSummaryHandler,
 } from './types.js'
-import { isArray, preview } from '@orkestrel/contract'
-import { DEFAULT_CONVERSATION_KEEP } from './constants.js'
+import { isArray, preview, refuseOptionKeys } from '@orkestrel/contract'
+import {
+	CONVERSATION_INPUT_KEYS,
+	CONVERSATION_MANAGER_KEYS,
+	DEFAULT_CONVERSATION_KEEP,
+} from './constants.js'
 import { Conversation } from './Conversation.js'
 import { ConversationError } from './errors.js'
 import { requireKeep } from './helpers.js'
@@ -66,6 +70,12 @@ export class ConversationManager implements ConversationManagerInterface {
 	readonly #store: ConversationStoreInterface | undefined
 
 	constructor(options?: ConversationManagerOptions) {
+		refuseOptionKeys(
+			options,
+			CONVERSATION_MANAGER_KEYS,
+			'ConversationManager',
+			'ConversationManagerOptions',
+		)
 		this.#summarize = options?.summarize
 		this.#keep = requireKeep(options?.keep ?? DEFAULT_CONVERSATION_KEEP)
 		this.#sections = options?.sections
@@ -89,6 +99,7 @@ export class ConversationManager implements ConversationManagerInterface {
 	}
 
 	add(input?: ConversationInput): ConversationInterface {
+		refuseOptionKeys(input, CONVERSATION_INPUT_KEYS, 'ConversationManager', 'ConversationInput')
 		const held = input?.id ?? input?.snapshot?.id
 		if (held !== undefined && this.#conversations.has(held)) {
 			throw new ConversationError(

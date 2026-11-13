@@ -1,4 +1,10 @@
-import type { JudgeInterface, JudgeRequest } from '@src/core'
+import type {
+	JudgeInterface,
+	JudgeRequest,
+	SystemOneJudgeOptions,
+	SYSTEM_ONE_OPTION_KEYS,
+} from '@src/core'
+import { isContractError } from '@orkestrel/contract'
 import {
 	measureAnswer,
 	createSystemOneJudge,
@@ -26,6 +32,8 @@ import {
 	SYSTEM_ONE_TEV1,
 	SYSTEM_ONE_TEV1_REQUEST,
 	TEV1_ANSWERS,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 describe('SystemOneJudge — what it refuses', () => {
@@ -325,4 +333,25 @@ describe('SystemOneJudge', () => {
 			expect(transport.requests).toHaveLength(1)
 		},
 	)
+})
+
+describe('SystemOneJudge — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'SystemOneJudge' && ['SystemOneJudgeOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof SystemOneJudgeOptions, (typeof SYSTEM_ONE_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+	})
 })

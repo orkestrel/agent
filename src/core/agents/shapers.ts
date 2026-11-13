@@ -2,6 +2,7 @@ import type { ContractShape } from '@orkestrel/contract'
 import {
 	arrayShape,
 	booleanShape,
+	integerShape,
 	jsonShape,
 	literalShape,
 	numberShape,
@@ -11,43 +12,37 @@ import {
 	stringShape,
 	unionShape,
 } from '@orkestrel/contract'
+import { MAX_TIMEOUT_MS } from '@orkestrel/timeout'
+import { CONVERSATION_ROLES } from '../constants.js'
 import { messageInputShape, tokenUsageShape } from '../shapers.js'
 import { BUILTIN_LIMITS } from './constants.js'
-
-/**
- * Describes what a host shows a run — the loaded `skills` in load order and an optional selected
- * `workspace`, the record the `disclosure` option of an agent and a run is admitted against.
- *
- * @remarks
- * The guard refuses every extra member and a `workspace` given as `undefined`; the contract parser
- * drops extra members.
- */
-export const agentDisclosureShape = objectShape({
-	skills: arrayShape(stringShape()),
-	workspace: optionalShape(stringShape()),
-}) satisfies ContractShape
 
 /**
  * Describes a durable agent job — the record `AgentRegistry.build` checks exactly, so a misspelled key
  * refuses instead of running an agent without it.
  *
  * @remarks
- * `children` holds JSON records, because each child crosses this shape at its own `build`. `limit`
- * reads as a number here and as a positive safe integer at the agent's construction, which owns that
- * refusal. A `scope` holds the `skills`, `memos`, and `workspaces` lists, each required, and no other
- * member; `builtins` admits only the names of `AgentBuiltin`, and the agent's construction refuses a
- * repeated name or `unload` without `load`.
+ * `children` holds JSON records, because each child crosses this shape at its own `build`. Each
+ * bound states what the build reads: `limit` an integer from 1 through `Number.MAX_SAFE_INTEGER`,
+ * `timeout` an integer from 0 through `MAX_TIMEOUT_MS`, and `budget` a number of at least 0. A seed
+ * message plays a `ConversationRole`, so a `system` message refuses here. A `scope` holds the
+ * `skills`, `memos`, and `workspaces` lists, each required, and no other member; `builtins` admits
+ * only the names of `AgentBuiltin`, and `collectJobRefusals` reads what a list of them cannot state.
  */
 export const agentJobShape = objectShape({
 	provider: stringShape(),
-	messages: optionalShape(arrayShape(messageInputShape)),
+	messages: optionalShape(
+		arrayShape(
+			objectShape({ ...messageInputShape.properties, role: literalShape(CONVERSATION_ROLES) }),
+		),
+	),
 	system: optionalShape(stringShape()),
 	tools: optionalShape(arrayShape(stringShape())),
 	authority: optionalShape(stringShape()),
 	scheduler: optionalShape(stringShape()),
-	limit: optionalShape(numberShape()),
-	timeout: optionalShape(numberShape()),
-	budget: optionalShape(numberShape()),
+	limit: optionalShape(integerShape({ min: 1, max: Number.MAX_SAFE_INTEGER })),
+	timeout: optionalShape(integerShape({ min: 0, max: MAX_TIMEOUT_MS })),
+	budget: optionalShape(numberShape({ min: 0 })),
 	scope: optionalShape(
 		objectShape({
 			skills: arrayShape(stringShape()),
@@ -55,7 +50,7 @@ export const agentJobShape = objectShape({
 			workspaces: arrayShape(stringShape()),
 		}),
 	),
-	disclosure: optionalShape(agentDisclosureShape),
+	workspace: optionalShape(stringShape()),
 	builtins: optionalShape(
 		arrayShape(literalShape(['load', 'unload', 'memo', 'remember', 'switch'])),
 	),

@@ -1,8 +1,27 @@
-import type { AgentJobInput, AgentResult } from '@src/core'
+import type {
+	AgentJobInput,
+	AgentResult,
+	AgentQueueOptions,
+	AgentRunnerOptions,
+	QUEUE_OPTION_KEYS,
+	RUNNER_OPTION_KEYS,
+} from '@src/core'
 import type { QueueEventMap } from '@orkestrel/queue'
 import { createRecorder, requireValue, waitForCondition, waitForEvent } from '@orkestrel/test'
-import { JOB_USAGE, PARTIAL_TURNS, createObservedGatedProvider } from '../../../setup.js'
-import { createContract, isRecord, numberShape, objectShape } from '@orkestrel/contract'
+import {
+	JOB_USAGE,
+	PARTIAL_TURNS,
+	createObservedGatedProvider,
+	buildOptionDoors,
+	readDoorRefusal,
+} from '../../../setup.js'
+import {
+	createContract,
+	isRecord,
+	numberShape,
+	objectShape,
+	isContractError,
+} from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { createWorkspaceManager } from '@orkestrel/workspace'
 import {
@@ -25,7 +44,7 @@ import {
 	rememberToolShape,
 } from '@src/core'
 import { createMemoryQueueStore, isQueueError } from '@orkestrel/queue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import {
 	AGENT_JOB_SHAPE,
 	AGENT_AUTHORITY,
@@ -848,12 +867,13 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 		expect(results.map((result) => result.content)).toEqual(['parent', 'child'])
 	})
 
-	it('fails the run with the error of a child that cannot be rehydrated', async () => {
+	it('refuses a child that cannot be rehydrated before the parent runs (claim J.3)', async () => {
 		// The child stays within its parent, which holds `loop` under `allow`, yet names a tool and no
-		// authority, which only its own rehydration refuses.
+		// authority, which the scan reads before anything spawns.
+		const provider = createScriptedProvider([{ content: 'parent' }])
 		const registry = createAgentRegistry({
 			authorities: { allow: AGENT_AUTHORITY },
-			providers: { main: createScriptedProvider([{ content: 'parent' }]) },
+			providers: { main: provider },
 			tools: { loop: createLoopTool() },
 		})
 		const caught = await createAgentRunner({ registry })
@@ -865,7 +885,12 @@ describe('createAgentRunner — partial policy + fan-out, extended', () => {
 				}),
 			])
 			.catch((error: unknown) => error)
-		expect(isAgentError(caught) ? caught.context : undefined).toEqual({ tools: ['loop'] })
+		expect(isAgentError(caught) ? caught.context : undefined).toEqual({
+			findings: [
+				"refused job.children[0].authority: a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities",
+			],
+		})
+		expect(provider.started).toBe(0)
 	})
 
 	it("bounds each unit with the runner's per-attempt timeout and cancels its agent", async () => {
@@ -959,12 +984,16 @@ describe("createAgentQueue — jobs over one registry's shared pools", () => {
 			...DURABLE_JOB,
 			builtins: ['load', 'memo'],
 			scope: { skills: ['billing'], memos: ['pref'], workspaces: ['south'] },
-			disclosure: { skills: ['billing'], workspace: 'south' },
+			workspace: 'south',
 		}
+		// The first turn loads billing, so the second request shows it in both runs.
 		const turns = [
 			{
 				content: '',
-				tools: [createToolCall({ id: 'm1', name: 'memo', arguments: { name: 'pref' } })],
+				tools: [
+					createToolCall({ id: 'm1', name: 'memo', arguments: { name: 'pref' } }),
+					createToolCall({ id: 'l1', name: 'load', arguments: { skill: 'billing' } }),
+				],
 			},
 			{ content: 'done' },
 		]
@@ -981,6 +1010,10 @@ describe("createAgentQueue — jobs over one registry's shared pools", () => {
 		await queue.restore()
 		await succeeded
 		expect(enqueued.provider.calls).toHaveLength(2)
+		expect(readDurableRendered(requireValue(enqueued.provider.calls[1]))).toMatchObject({
+			bodies: ['billing'],
+			workspaces: ['south'],
+		})
 		expect(restored.provider.calls.map(callToRequest)).toEqual(
 			enqueued.provider.calls.map(callToRequest),
 		)
@@ -1035,7 +1068,7 @@ describe("createAgentQueue — jobs over one registry's shared pools", () => {
 			provider: 'right',
 			builtins: ['load', 'switch'],
 			scope: { skills: ['claims'], memos: ['note'], workspaces: ['south'] },
-			disclosure: { skills: [], workspace: 'south' },
+			workspace: 'south',
 		}
 		await Promise.all([queue.enqueue(leftJob), queue.enqueue(rightJob)])
 		expect(events.calls.map(([event]) => event).slice(0, 2)).toEqual(['start', 'start'])
@@ -1136,5 +1169,31 @@ describe("createAgentQueue — jobs over one registry's shared pools", () => {
 		)
 		expect(pools.memos.history('retry')).toHaveLength(1)
 		expect(pools.memos.memo('retry')?.content).toBe('ATTEMPT-ONE')
+	})
+})
+
+describe('factories — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'factories' &&
+				['AgentQueueOptions', 'AgentRunnerOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof AgentQueueOptions, (typeof QUEUE_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<
+			Exclude<keyof AgentRunnerOptions, (typeof RUNNER_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

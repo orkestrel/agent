@@ -1,7 +1,8 @@
 import type { ThinkingReplay } from '../types.js'
 import type { GaugeCall, GaugeInterface, GaugeOptions } from './types.js'
-import { isFiniteNumber } from '@orkestrel/contract'
+import { isFiniteNumber, refuseOptionKeys } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
+import { GAUGE_OPTION_KEYS } from './constants.js'
 import { LedgerError } from './errors.js'
 import { isPositiveSafeInteger } from '../validators.js'
 import { buildRecallMessage, fitSlope, resolvePredict } from './helpers.js'
@@ -42,6 +43,7 @@ export class Gauge implements GaugeInterface {
 	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
 	 */
 	constructor(options: GaugeOptions) {
+		refuseOptionKeys(options, GAUGE_OPTION_KEYS, 'Gauge', 'GaugeOptions')
 		if (!isFiniteNumber(options.scale) || options.scale <= 0) {
 			throw new LedgerError('GAUGE', 'gauge scale must be finite and greater than 0')
 		}

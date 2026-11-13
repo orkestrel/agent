@@ -1446,6 +1446,13 @@ export const JOB_USAGE = Object.freeze(createTokenUsage({ prompt: 3, total: 10 }
 /** Lists authored durable job admissions and refusals. */
 export const AGENT_JOB_CASES = [
 	{ name: 'minimal', value: { provider: 'local' }, admitted: true },
+	{ name: 'a workspace', value: { provider: 'local', workspace: 'orders' }, admitted: true },
+	{ name: 'a numeric workspace', value: { provider: 'local', workspace: 1 }, admitted: false },
+	{
+		name: 'a disclosure, no member of the job',
+		value: { provider: 'local', disclosure: { skills: ['refunds'] } },
+		admitted: false,
+	},
 	{
 		name: 'options',
 		value: {
@@ -1477,18 +1484,20 @@ export const AGENT_JOB_CASES = [
 	{ name: 'host child', value: { provider: 'local', children: [new Date(0)] }, admitted: false },
 ]
 
-/** Lists authored disclosure admissions and refusals. */
-export const AGENT_DISCLOSURE_CASES = Object.freeze([
-	{ name: 'skills alone', value: { skills: ['refunds'] }, admitted: true },
-	{ name: 'no skill', value: { skills: [] }, admitted: true },
-	{ name: 'a workspace', value: { skills: ['refunds'], workspace: 'orders' }, admitted: true },
-	{ name: 'missing skills', value: { workspace: 'orders' }, admitted: false },
-	{ name: 'skills as text', value: { skills: 'refunds' }, admitted: false },
-	{ name: 'numeric skill', value: { skills: [1] }, admitted: false },
-	{ name: 'numeric workspace', value: { skills: [], workspace: 1 }, admitted: false },
-	{ name: 'extra member', value: { skills: [], tools: ['search'] }, admitted: false },
-	{ name: 'explicit absence', value: { skills: [], workspace: undefined }, admitted: false },
-	{ name: 'host instance', value: new Date(0), admitted: false },
+/** Lists authored `workspace` option admissions and refusals. */
+export const AGENT_WORKSPACE_CASES = Object.freeze([
+	{ name: 'an id', value: 'orders', admitted: true },
+	{ name: 'an empty id', value: '', admitted: true },
+	{ name: 'an id no registry holds', value: 'ghost', admitted: true },
+	{ name: 'a number', value: 1, admitted: false },
+	{ name: 'null', value: null, admitted: false },
+	{ name: 'a list of ids', value: ['orders'], admitted: false },
+	{
+		name: 'the former disclosure record',
+		value: { skills: [], workspace: 'orders' },
+		admitted: false,
+	},
+	{ name: 'a boxed string', value: Object('orders'), admitted: false },
 ])
 
 /** Pairs a built-in's argument shape with one authored argument record and whether it admits it. */
@@ -1789,7 +1798,12 @@ export function createFanoutFixture(
 		other,
 		registry: createAgentRegistry({
 			providers: { main, other },
-			tools: { loop: createLoopTool(), add: createAddTool() },
+			// `memo` shares a built-in's name, so a job naming it as a tool and a built-in reaches the build.
+			tools: {
+				loop: createLoopTool(),
+				add: createAddTool(),
+				memo: createTool({ name: 'memo', execute: () => 'noted' }),
+			},
 			authorities: { allow: AGENT_AUTHORITY, other: AGENT_AUTHORITY },
 			schedulers: { pace: createRecordedScheduler() },
 		}),
@@ -5104,7 +5118,8 @@ export class ScriptedWire extends AgentProvider<string> {
 	readonly #decoded: string[] = []
 	readonly name = 'scripted'
 	constructor(options: ScriptedWireOptions) {
-		super(options)
+		const { records: _records, buffered: _buffered, abort: _abort, ...input } = options
+		super(input)
 		this.#records = options.records ?? new Map()
 		this.#buffered = options.buffered ?? false
 		this.#abort = options.abort
@@ -5699,7 +5714,14 @@ export class ScriptedJudge extends AgentJudge {
 	readonly #values: unknown[] = []
 	readonly name = 'scripted'
 	constructor(options: ScriptedJudgeOptions) {
-		super(options)
+		const {
+			answers: _answers,
+			refusals: _refusals,
+			refuse: _refuse,
+			abort: _abort,
+			...input
+		} = options
+		super(input)
 		this.#answers = options.answers ?? {}
 		this.#refusals = options.refusals ?? {}
 		this.#refuse = options.refuse
@@ -12116,8 +12138,8 @@ export interface BuiltinAgentOptions {
 	readonly builtins?: readonly AgentBuiltin[]
 	/** The context scope. Default: none. */
 	readonly scope?: ScopeInput
-	/** What the host shows every run. Default: nothing. */
-	readonly disclosure?: AgentDisclosure
+	/** The workspace every run renders in place of the active one. Default: the active workspace. */
+	readonly workspace?: string
 	/** The authority. Default: the allow-all {@link AGENT_AUTHORITY}. */
 	readonly authority?: AuthorityInterface
 	/** The messages stored in the active conversation before any run. Default: none. */
@@ -12126,6 +12148,8 @@ export interface BuiltinAgentOptions {
 	readonly window?: number
 	/** If `true`, the conversation folds with the stub summarizer; if `false`, it cannot fold. Default: `false`. */
 	readonly summarize?: boolean
+	/** Rewraps the declared options before `createAgent` reads them, past its types, as a restored record can carry members it does not declare. Default: none. */
+	readonly wrap?: (declared: AgentOptions) => object
 }
 
 /** Holds a built-in agent, its scripted provider, and the arguments its host tools ran with. */
@@ -12156,20 +12180,24 @@ export function createBuiltinAgent(options: BuiltinAgentOptions): BuiltinAgent {
 		options.summarize === true ? { summarize: createStubSummarizer().summarize, keep: 0 } : {},
 	)
 	conversations.add()
-	const agent = createAgent(provider, {
+	const declared: AgentOptions = {
 		system: 'Desk.',
 		tools,
 		conversations,
 		authority: options.authority ?? AGENT_AUTHORITY,
 		builtins: options.builtins ?? BUILTIN_NAMES,
 		...(options.scope === undefined ? {} : { scope: createScope(options.scope) }),
-		...(options.disclosure === undefined ? {} : { disclosure: options.disclosure }),
+		...(options.workspace === undefined ? {} : { workspace: options.workspace }),
 		...(options.window === undefined
 			? {}
 			: {
 					window: createBudget<ProviderRequest>({ max: options.window, consumer: estimateRequest }),
 				}),
-	})
+	}
+	const agent =
+		options.wrap === undefined
+			? createAgent(provider, declared)
+			: invokeUnchecked<AgentInterface>(undefined, createAgent, [provider, options.wrap(declared)])
 	agent.context.skills.add([
 		{
 			name: 'billing',
@@ -12476,8 +12504,8 @@ export const SKILL_TOOLS_REFUSALS = Object.freeze([
 
 /**
  * Builds a skill input whose `tools` getter answers `['refund']` on its first read and the string
- * `'abc'` on every later one, so a manager that reads the member twice would store the string's
- * characters as tool names.
+ * `'abc'` on every later one: a manager that stored a later read would store the string's characters
+ * as tool names, and a record check that reads the member again refuses it.
  *
  * @returns The skill input, with its `tools` member behind the getter
  */
@@ -12488,7 +12516,7 @@ export function createShiftingToolsInput(): SkillInput {
 	return input
 }
 
-// ── Durable-job unit: jobs that carry a scope, a disclosure, and built-ins ───
+// ── Durable-job unit: jobs that carry a scope, a workspace, and built-ins ────
 //
 // The registry holds one set of skills, memos, and workspaces. Each name renders a text that opens
 // with its sentinel, so a reader finds every name a request renders, and every built-in it
@@ -12826,22 +12854,21 @@ export function drawDurableBuiltins(
 }
 
 /**
- * Draws a job's disclosure, absent at a fixed chance, whose skills can name `ghost`, a skill no pool
+ * Draws a job's workspace, absent at a fixed chance, which can name `ghost`, a workspace no pool
  * holds.
  *
  * @param random - The seeded source
- * @returns The drawn disclosure, or `undefined`
+ * @returns The drawn workspace id, or `undefined`
  */
-export function drawDurableDisclosure(random: RandomFunction): AgentDisclosure | undefined {
+export function drawDurableWorkspace(random: RandomFunction): string | undefined {
 	if (random() < 0.4) return undefined
-	const skills = [...DURABLE_NAMES.skills, 'ghost'].filter(() => random() < 0.4)
-	const at = random()
-	return at < 0.33 ? { skills } : { skills, workspace: at < 0.66 ? 'north' : 'south' }
+	const names = [...DURABLE_NAMES.workspaces, 'ghost']
+	return names[Math.floor(random() * names.length)]
 }
 
 /**
  * Draws one job on provider `main` with the `gate` authority: its scope, then its built-ins, then
- * its disclosure.
+ * its workspace.
  *
  * @param random - The seeded source
  * @param parent - The job the draw follows, or `undefined` for a job drawn alone
@@ -12853,12 +12880,12 @@ export function drawDurableJob(
 ): AgentJobInput {
 	const scope = drawDurableScope(random, parent?.scope)
 	const builtins = drawDurableBuiltins(random, parent?.builtins)
-	const disclosure = drawDurableDisclosure(random)
+	const workspace = drawDurableWorkspace(random)
 	return {
 		...DURABLE_JOB,
 		...(scope === undefined ? {} : { scope }),
 		...(builtins.length === 0 ? {} : { builtins }),
-		...(disclosure === undefined ? {} : { disclosure }),
+		...(workspace === undefined ? {} : { workspace }),
 	}
 }
 
@@ -12887,10 +12914,10 @@ export const DURABLE_JOB = Object.freeze<AgentJobInput>({
 	authority: 'gate',
 })
 
-/** Lists hand pairs beside the drawn ones: a child whose disclosure reaches outside its parent's scope, and one pair that exceeds each row. */
+/** Lists hand pairs beside the drawn ones: a child whose workspace reaches outside its parent's scope, and one pair that exceeds each row. */
 export const DURABLE_HAND_PAIRS = Object.freeze<readonly FanoutCase[]>([
 	{
-		name: 'hand: disclosure outside the parent scope',
+		name: 'hand: a workspace outside the parent scope',
 		parent: {
 			...DURABLE_JOB,
 			scope: { skills: ['billing'], memos: ['pref'], workspaces: ['north'] },
@@ -12898,13 +12925,13 @@ export const DURABLE_HAND_PAIRS = Object.freeze<readonly FanoutCase[]>([
 		child: {
 			...DURABLE_JOB,
 			scope: { skills: ['billing'], memos: [], workspaces: [] },
-			disclosure: { skills: ['claims', 'billing'], workspace: 'south' },
+			workspace: 'south',
 		},
 	},
 	{
-		name: 'hand: disclosure on a child with no scope',
+		name: 'hand: a workspace on a child with no scope',
 		parent: { ...DURABLE_JOB, scope: { skills: ['billing'], memos: [], workspaces: [] } },
-		child: { ...DURABLE_JOB, disclosure: { skills: ['claims', 'billing'], workspace: 'north' } },
+		child: { ...DURABLE_JOB, workspace: 'north' },
 	},
 	{
 		name: 'hand: a built-in its parent omits',
@@ -12917,7 +12944,6 @@ export const DURABLE_HAND_PAIRS = Object.freeze<readonly FanoutCase[]>([
 		child: {
 			...DURABLE_JOB,
 			scope: { skills: ['billing', 'claims'], memos: [], workspaces: [] },
-			disclosure: { skills: ['claims'] },
 		},
 	},
 	{
@@ -13017,12 +13043,12 @@ export const DURABLE_WITHIN_CASES = Object.freeze<readonly FanoutCase[]>([
 		child: { ...FANOUT_JOB, scope: DURABLE_EMPTY_SCOPE },
 	},
 	{
-		name: 'with a disclosure that names a skill outside its parent scope',
+		name: 'with a workspace outside its parent scope',
 		parent: { ...FANOUT_JOB, scope: { skills: ['billing'], memos: [], workspaces: [] } },
 		child: {
 			...FANOUT_JOB,
 			scope: { skills: ['billing'], memos: [], workspaces: [] },
-			disclosure: { skills: ['claims'], workspace: 'south' },
+			workspace: 'south',
 		},
 	},
 ])
@@ -13034,7 +13060,7 @@ export interface DurableRefusalCase {
 	readonly faults: readonly unknown[]
 }
 
-/** Lists a job member the job contract refuses, for each way a `scope`, `disclosure`, or `builtins` can be malformed. */
+/** Lists a job member the job contract refuses, for each way a `scope`, `workspace`, or `builtins` can be malformed, and the former `disclosure` member. */
 export const DURABLE_REFUSAL_CASES = Object.freeze<readonly DurableRefusalCase[]>([
 	{
 		name: 'a scope that omits skills',
@@ -13079,14 +13105,14 @@ export const DURABLE_REFUSAL_CASES = Object.freeze<readonly DurableRefusalCase[]
 		],
 	},
 	{
-		name: 'a disclosure with no skills',
-		job: { provider: 'main', disclosure: { workspace: 'north' } },
-		faults: [{ reason: 'missing', path: ['disclosure', 'skills'], expected: 'array' }],
+		name: 'a workspace that is no string',
+		job: { provider: 'main', workspace: 7 },
+		faults: [{ reason: 'type', path: ['workspace'], expected: 'string', received: '7' }],
 	},
 	{
-		name: 'a disclosure with another member',
-		job: { provider: 'main', disclosure: { skills: [], files: [] } },
-		faults: [{ reason: 'extra', path: ['disclosure', 'files'] }],
+		name: 'a disclosure, which the contract does not declare',
+		job: { provider: 'main', disclosure: { skills: ['billing'], workspace: 'north' } },
+		faults: [{ reason: 'extra', path: ['disclosure'] }],
 	},
 	{
 		name: 'a builtins entry that is no built-in',
@@ -13099,7 +13125,7 @@ export const DURABLE_REFUSAL_CASES = Object.freeze<readonly DurableRefusalCase[]
 
 /**
  * Creates the shape of a stored durable job: the queue store shape of `AGENT_JOB_SHAPE` plus the
- * job's `scope`, `disclosure`, and `builtins` as `agentJobShape` declares them.
+ * job's `scope`, `workspace`, and `builtins` as `agentJobShape` declares them.
  *
  * @returns The store shape
  */
@@ -13107,7 +13133,7 @@ export function createDurableStoreShape() {
 	return objectShape({
 		...AGENT_JOB_SHAPE.properties,
 		scope: agentJobShape.properties.scope,
-		disclosure: agentJobShape.properties.disclosure,
+		workspace: agentJobShape.properties.workspace,
 		builtins: agentJobShape.properties.builtins,
 	})
 }
@@ -13181,6 +13207,378 @@ export const BUILTIN_CANDIDATE_CASES = Object.freeze<readonly BuiltinCandidateCa
 	},
 ])
 
+// ── The cut: no option shows a skill (claim C.3) ─────────────────────────────
+//
+// Each case draws an option set for an agent, a run, a durable job, or a ledger's agent, with an
+// undeclared `disclosure` member passed past the types at a fixed chance, and reads the first
+// request of a conversation that stores no `load` record.
+
+import type { AgentStreamInterface } from '@src/core'
+import { isContractError } from '@orkestrel/contract'
+import { invokeUnchecked } from '@orkestrel/test'
+import { isAgentError, LOADED_SECTION_HEADER } from '@src/core'
+
+/** Names the surface a claim C.3 case composes its options on. */
+export type UndisclosedSurface = 'agent' | 'run' | 'job' | 'ledger'
+
+/** Holds one generated option set of claim C.3. */
+export interface UndisclosedCase {
+	readonly surface: UndisclosedSurface
+	readonly builtins: readonly AgentBuiltin[]
+	readonly workspace: string | undefined
+	readonly skills: readonly string[] | undefined
+	readonly undeclared: boolean
+}
+
+/** Holds what the first request of a claim C.3 case carried, or that its job refused. */
+export interface UndisclosedReading {
+	readonly loaded: boolean
+	readonly load: boolean
+	readonly held: readonly string[]
+	readonly refused: boolean
+}
+
+/** Holds the seed of claim C.3's draws. */
+export const UNDISCLOSED_SEED = 2026
+
+/** Holds how many option sets claim C.3 draws on each surface. */
+export const UNDISCLOSED_DRAWS = 40
+
+/** Holds the record an undeclared `disclosure` member carries: every skill a surface registers, and a workspace. */
+export const UNDISCLOSED_RECORD = Object.freeze({
+	disclosure: Object.freeze({
+		skills: Object.freeze(['billing', 'claims', 'audit']),
+		workspace: 'south',
+	}),
+})
+
+/** Holds the rewrap that carries {@link UNDISCLOSED_RECORD} beside an agent's declared options as a plain own member. */
+export const UNDISCLOSED_WRAP = Object.freeze({
+	wrap: (declared: AgentOptions): object => ({ ...declared, ...UNDISCLOSED_RECORD }),
+})
+
+/**
+ * Draws claim C.3's option sets on one surface: the built-ins, `load` most often among them; the
+ * workspace, absent or an id the pools hold or lack; the scope's `skills` list, absent or a subset;
+ * and whether an undeclared `disclosure` member rides along.
+ *
+ * @param surface - The surface every case composes on
+ * @param seed - The seed of the source
+ * @param count - How many cases to draw
+ * @returns The cases
+ */
+export function drawUndisclosedCases(
+	surface: UndisclosedSurface,
+	seed: number,
+	count: number,
+): readonly UndisclosedCase[] {
+	const random = seededRandom(seed)
+	return Array.from({ length: count }, (): UndisclosedCase => {
+		const drawn = BUILTIN_NAMES.filter((name) => random() < (name === 'load' ? 0.75 : 0.4))
+		const builtins = drawn.includes('load') ? drawn : drawn.filter((name) => name !== 'unload')
+		const workspace = [undefined, 'north', 'south', 'ghost'][Math.floor(random() * 4)]
+		const skills =
+			random() < 0.3 ? undefined : UNDISCLOSED_RECORD.disclosure.skills.filter(() => random() < 0.6)
+		return { surface, builtins, workspace, skills, undeclared: random() < 0.5 }
+	})
+}
+
+/**
+ * Reads claim C.3's facts from a first request: whether its system message carries the loaded
+ * skills section, and each advertised tool a registered skill holds while `load` is advertised.
+ *
+ * @param call - The first recorded call
+ * @param skills - The skills the agent registers
+ * @returns The reading
+ */
+export function readUndisclosed(call: ScriptedCall, skills: readonly Skill[]): UndisclosedReading {
+	const advertised = (call.tools ?? []).map((definition) => definition.name)
+	const named = new Set(skills.flatMap((skill) => skill.tools))
+	return {
+		loaded: call.messages.some(
+			(message) => message.role === 'system' && message.content.includes(LOADED_SECTION_HEADER),
+		),
+		load: advertised.includes('load'),
+		held: advertised.includes('load') ? advertised.filter((name) => named.has(name)) : [],
+		refused: false,
+	}
+}
+
+/**
+ * Reads a claim C.3 case whose door threw: refused when the error is a `ContractError` coded
+ * `'structure'`, the refusal an undeclared own member meets.
+ *
+ * @param error - What the door threw
+ * @returns The reading, with nothing shown
+ */
+export function readStructureRefusal(error: unknown): UndisclosedReading {
+	return {
+		loaded: false,
+		load: false,
+		held: [],
+		refused: isContractError(error) && error.code === 'structure',
+	}
+}
+
+/**
+ * Executes one claim C.3 case on its surface over a conversation that stores no `load` record and
+ * reads its first request; a case that carries the undeclared member reads as refused when a job's
+ * build refuses it with `'REGISTRY'`, or when the agent's, the run's, or the ledger's door refuses it
+ * with a `ContractError` coded `'structure'` (claim O.4).
+ *
+ * @param row - The case
+ * @returns The reading
+ */
+export async function executeUndisclosedCase(row: UndisclosedCase): Promise<UndisclosedReading> {
+	const undeclared = row.undeclared ? UNDISCLOSED_RECORD : {}
+	const workspace = row.workspace === undefined ? {} : { workspace: row.workspace }
+	const prompt = { content: 'Check invoice 42.' }
+	if (row.surface === 'job') {
+		const { provider, registry } = createDurableFixture([{ content: 'done' }])
+		const job = {
+			...DURABLE_JOB,
+			...(row.builtins.length === 0 ? {} : { builtins: row.builtins }),
+			...(row.skills === undefined
+				? {}
+				: { scope: { skills: row.skills, memos: [], workspaces: ['north', 'south'] } }),
+			...workspace,
+			...undeclared,
+		}
+		const built = attempt(() => invokeUnchecked<AgentInterface>(registry, registry.build, [job]))
+		if (!built.success) {
+			return {
+				loaded: false,
+				load: false,
+				held: [],
+				refused: isAgentError(built.error) && built.error.code === 'REGISTRY',
+			}
+		}
+		await built.value.generate()
+		return readUndisclosed(requireValue(provider.calls[0]), built.value.context.skills.skills())
+	}
+	if (row.surface === 'ledger') {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const { options } = buildLedgerBuiltinOptions({ builtins: row.builtins, ...workspace })
+		const built = attempt(() =>
+			invokeUnchecked<LedgerInterface>(undefined, createLedger, [
+				provider,
+				{ ...options, agent: { ...options.agent, ...undeclared } },
+			]),
+		)
+		if (!built.success) return readStructureRefusal(built.error)
+		const ledger = built.value
+		seedLedgerWorkspaces(ledger)
+		if (row.skills !== undefined)
+			ledger.agent.context.apply(
+				createScope({ name: 'host', skills: row.skills, workspaces: ['north', 'south'] }),
+			)
+		await ledger.respond(prompt.content)
+		return readUndisclosed(requireValue(provider.calls[0]), ledger.agent.context.skills.skills())
+	}
+	const scope =
+		row.skills === undefined
+			? {}
+			: { scope: { name: 'host', skills: row.skills, workspaces: ['north', 'south'] } }
+	const built = attempt(() =>
+		createBuiltinAgent({
+			turns: [{ content: 'done' }],
+			builtins: row.builtins,
+			...scope,
+			...(row.surface === 'agent'
+				? { ...workspace, ...(row.undeclared ? UNDISCLOSED_WRAP : {}) }
+				: {}),
+		}),
+	)
+	if (!built.success) return readStructureRefusal(built.error)
+	const fixture = built.value
+	const run = attempt(() =>
+		row.surface === 'agent'
+			? fixture.agent.stream({ prompt })
+			: invokeUnchecked<AgentStreamInterface>(fixture.agent, fixture.agent.stream, [
+					{ prompt, ...workspace, ...undeclared },
+				]),
+	)
+	if (!run.success) return readStructureRefusal(run.error)
+	await run.value.result
+	return readUndisclosed(
+		requireValue(fixture.provider.calls[0]),
+		fixture.agent.context.skills.skills(),
+	)
+}
+
+// ── O and D on one kept ledger (claim C.6) ───────────────────────────────────
+//
+// O serves each request under a scope that lists the area's tools and `recall`, omits `load`, and
+// sets `skills: []`; D serves it with `load` and the skills admitted. One skill registry serves both.
+
+import { computeSkillPrice, SKILL_SECTION_HEADER } from '@src/core'
+
+/** Holds claim C.6's scopes: O for each area, D with every list open, and O that lists `load` beside `skills: []`. */
+export const LEDGER_AREA_SCOPES = Object.freeze({
+	billing: Object.freeze<ScopeInput>({
+		name: 'o-billing',
+		tools: Object.freeze(['refund', 'recall']),
+		skills: Object.freeze([]),
+	}),
+	claims: Object.freeze<ScopeInput>({
+		name: 'o-claims',
+		tools: Object.freeze(['claim', 'recall']),
+		skills: Object.freeze([]),
+	}),
+	open: Object.freeze<ScopeInput>({ name: 'd' }),
+	wrong: Object.freeze<ScopeInput>({
+		name: 'o-wrong',
+		tools: Object.freeze(['refund', 'recall', 'load']),
+		skills: Object.freeze([]),
+	}),
+})
+
+/** Holds the turns of claim C.6's kept ledger: calibration, a D request that loads `billing`, three plain replies, and a second calibration. */
+export const LEDGER_AREA_TURNS: readonly ScriptedTurn[] = Object.freeze([
+	{ content: '' },
+	{ content: '' },
+	{
+		content: '',
+		tools: [createToolCall({ id: 'l1', name: 'load', arguments: { skill: 'billing' } })],
+	},
+	{ content: 'Billing is open.' },
+	{ content: 'Billing answer.' },
+	{ content: 'Claims answer.' },
+	{ content: 'Both shown.' },
+	{ content: '' },
+	{ content: '' },
+	{ content: 'Recalibrated.' },
+])
+
+/** Holds what one served call of a claim C.6 request carried: the advertised names and what its head shows. */
+export interface LedgerAreaCall {
+	readonly tools: readonly string[] | undefined
+	readonly index: boolean
+	readonly loaded: boolean
+	readonly billing: boolean
+	readonly claims: boolean
+}
+
+/** Holds what one claim C.6 request dispatched: its calibration calls and each call it served. */
+export interface LedgerAreaReading {
+	readonly calibrations: number
+	readonly served: readonly LedgerAreaCall[]
+}
+
+/**
+ * Serves one request on a kept ledger under a scope applied before `respond`, as a host serves each
+ * request's area, and reads the calls it dispatched.
+ *
+ * @param ledger - The kept ledger
+ * @param provider - Its scripted provider
+ * @param scope - The scope the host applies for this request
+ * @param request - The request text
+ * @returns The calibration count and each served call
+ */
+export async function serveLedgerArea(
+	ledger: LedgerInterface,
+	provider: ScriptedProviderInterface,
+	scope: ScopeInput,
+	request: string,
+): Promise<LedgerAreaReading> {
+	ledger.agent.context.apply(createScope(scope))
+	const before = provider.calls.length
+	await ledger.respond(request)
+	const calls = provider.calls.slice(before)
+	return {
+		calibrations: calls.filter((call) => call.options?.think === false).length,
+		served: calls
+			.filter((call) => call.options?.think !== false)
+			.map((call): LedgerAreaCall => {
+				const system = call.messages.find((message) => message.role === 'system')?.content ?? ''
+				const text = call.messages.map((message) => message.content).join('\n')
+				return {
+					tools: call.tools?.map((definition) => definition.name),
+					index: system.includes(SKILL_SECTION_HEADER),
+					loaded: system.includes(LOADED_SECTION_HEADER),
+					billing: text.includes(BUILTIN_BILLING_BODY),
+					claims: text.includes(BUILTIN_CLAIMS_BODY),
+				}
+			}),
+	}
+}
+
+/** Holds how many plan seed remarks a first call kept, and how many the plan formula keeps with no holdback and with the largest loadable skill held back. */
+export interface LedgerRoomKept {
+	readonly kept: number
+	readonly free: number
+	readonly held: number
+}
+
+/**
+ * Serves one request under a scope on a ledger with `builtins: ['load']` at a capacity where the
+ * holdback moves the seed tail, and reads the seed remarks its first call kept beside the counts
+ * claim 3.4's formula gives with no holdback and with one.
+ *
+ * @param scope - The scope the host applies
+ * @returns The kept count and the two formula counts
+ */
+export async function serveLedgerRoomKept(scope: ScopeInput): Promise<LedgerRoomKept> {
+	const gauge = { scale: 1.25, overhead: 120 }
+	const { options } = buildLedgerBuiltinOptions(
+		{ builtins: ['load'] },
+		{ capacity: 1600, predict: 0, share: { prompt: 1, tail: 0.25 }, gauge },
+	)
+	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+	const ledger = createLedger(provider, options)
+	ledger.agent.context.skills.add({
+		name: 'manual',
+		description: 'The desk manual',
+		content: 'Read the desk manual before you answer. '.repeat(20),
+	})
+	ledger.agent.context.apply(createScope(scope))
+	ledger.conversation.add(LEDGER_PLAN_SEED)
+	await ledger.respond('Check the desk.')
+	const definitions = [
+		...ledger.agent.context.tools.definitions(),
+		...collectBuiltinDefinitions({ builtins: ['load'] }),
+	]
+	const calibrated = definitions.filter((tool) => tool.name !== 'refund' && tool.name !== 'claim')
+	const first = requireValue(provider.calls[0])
+	const { spared, added } = computeToolPrice(calibrated, first.tools ?? [], gauge)
+	const holdback =
+		Math.max(
+			...ledger.agent.context.skills.skills().map((skill) =>
+				computeSkillPrice(
+					skill,
+					definitions.filter((tool) => skill.tools.includes(tool.name)),
+					calibrated,
+					gauge,
+				),
+			),
+		) + new Gauge({ ...gauge, capacity: 1600 }).reserve([], 'Noted.')
+	const stored = ledger.conversation.messages()
+	const request = requireValue(stored.find((message) => message.content === 'Check the desk.'))
+	const seed = stored.slice(0, LEDGER_PLAN_SEED.length)
+	const prices = Array.from(
+		{ length: seed.length / 2 + 1 },
+		(_, count) => gauge.scale * estimateMessages([...seed.slice(seed.length - 2 * count), request]),
+	)
+	const [free, held] = [0, holdback].map((hold) =>
+		Math.max(
+			0,
+			prices.findLastIndex(
+				(price) =>
+					price <=
+					(0.25 * Math.max(0, 1600 - (gauge.overhead - spared + added) - hold)) /
+						(1 + LEDGER_SCALE_DRIFT),
+			),
+		),
+	)
+	return {
+		kept: first.messages.filter(
+			(message) => message.role === 'user' && message.content === LEDGER_PLAN_REMARK,
+		).length,
+		free: requireValue(free),
+		held: requireValue(held),
+	}
+}
+
 // ── Unit 3A: disclosure in the ledger, over seeded ledgers ───────────────────
 //
 // The definition-density readings on the 4B (`qwen3.5:4b-q4_K_M` on runner 0.40.15, 2026-11-11)
@@ -13196,6 +13594,7 @@ import {
 	Gauge,
 	LEDGER_NOTES,
 	LEDGER_SCALE_DRIFT,
+	WORKSPACE_SECTION_HEADER,
 } from '@src/core'
 
 /** Describes one definition of the density catalog: its name, its description, and each field's name, type, and description. */
@@ -13794,10 +14193,11 @@ export class DensityLedgerProvider extends ScriptedProvider {
 	}
 }
 
-/** Names the tokens one estimate unit costs in a call: of its messages, and of its tool definitions. */
+/** Names the tokens one estimate unit costs in a call: of its messages, of its tool definitions, and, when given, of its workspace text. */
 export interface LedgerChargeRates {
 	readonly scale: number
 	readonly definitions: number
+	readonly workspace?: number
 }
 
 /** Holds the 4B density reading's rates: the messages at its scale, the definitions at the core set's overhead per estimate unit. */
@@ -13816,8 +14216,9 @@ export const LEDGER_LIVE_RATES: LedgerChargeRates = Object.freeze({
 })
 
 /**
- * Charges a call's prompt at a set of rates: the messages at their scale, and the tool definitions
- * at their rate per estimate unit.
+ * Charges a call's prompt at a set of rates: the messages at their scale, the tool definitions at
+ * their rate per estimate unit, and, when the rates name one, the workspace text at its own rate: the
+ * text of each message from its `## Workspace` header on.
  *
  * @param messages - The call's messages
  * @param tools - The call's definitions, if any
@@ -13831,7 +14232,21 @@ export function chargeDensityPrompt(
 ): number {
 	const definitions =
 		tools === undefined || tools.length === 0 ? 0 : estimateTokens(JSON.stringify(tools))
-	return Math.round(rates.scale * estimateMessages(messages) + rates.definitions * definitions)
+	const dense =
+		rates.workspace === undefined
+			? 0
+			: messages
+					.map((message) => message.content.indexOf(WORKSPACE_SECTION_HEADER))
+					.reduce(
+						(sum, at, index) =>
+							at === -1 ? sum : sum + estimateTokens(messages[index]?.content.slice(at) ?? ''),
+						0,
+					)
+	return Math.round(
+		rates.scale * (estimateMessages(messages) - dense) +
+			(rates.workspace ?? 0) * dense +
+			rates.definitions * definitions,
+	)
 }
 
 /** Charges each scripted call at a set of rates, and reports the charge as its prompt usage. */
@@ -13861,6 +14276,40 @@ export class RatedLedgerProvider extends ScriptedProvider {
 		const result = yield* super.stream(messages, signal, tools, options)
 		const prompt = chargeDensityPrompt(messages, tools, this.#rates)
 		return { ...result, usage: { prompt, completion: 0, total: prompt } }
+	}
+}
+
+/**
+ * Charges and reports each scripted call as {@link DensityLedgerProvider} does, and hands each call's
+ * reported prompt and the count of definitions it carried to a recorder, so a caller reads the calls a
+ * ledger makes outside its agent.
+ */
+export class ReportedDensityLedgerProvider extends DensityLedgerProvider {
+	readonly #reported: (prompt: number, definitions: number) => void
+
+	/**
+	 * @param turns - The scripted turns
+	 * @param options - The scripted provider's options
+	 * @param reported - Receives each call's reported prompt and definition count, in call order
+	 */
+	constructor(
+		turns: readonly ScriptedTurn[],
+		options: ScriptedProviderOptions,
+		reported: (prompt: number, definitions: number) => void,
+	) {
+		super(turns, options)
+		this.#reported = reported
+	}
+
+	override async *stream(
+		messages: readonly Message[],
+		signal: AbortSignal,
+		tools?: readonly ToolDefinition[],
+		options?: ProviderStreamOptions,
+	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		const result = yield* super.stream(messages, signal, tools, options)
+		this.#reported(result.usage?.prompt ?? Number.NaN, tools?.length ?? 0)
+		return result
 	}
 }
 
@@ -14169,7 +14618,7 @@ export type LedgerSweepAct =
 /**
  * Configures one arm of the room sweep: its seeds, the `predict` values a case draws from, whether
  * `load` and `remember` are swapped for a lookup, the size of the workspace `w1`, whether the host
- * gives `w1` through `agent.disclosure`, the host act it draws, the gauge, the provider, whether
+ * gives `w1` through `agent.workspace`, the host act it draws, the gauge, the provider, whether
  * every built-in is enabled, and the size of the skill tools' results.
  *
  * @remarks
@@ -14207,8 +14656,9 @@ export type LedgerRoomEvent =
 	| { readonly event: 'request'; readonly carried: boolean }
 	| { readonly event: 'abort'; readonly reason: unknown }
 	| { readonly event: 'usage'; readonly prompt: number }
-	| { readonly event: 'rejected'; readonly overflow: boolean }
+	| { readonly event: 'rejected'; readonly code: string | undefined; readonly held: boolean }
 	| { readonly event: 'act' }
+	| { readonly event: 'calibration'; readonly prompt: number; readonly definitions: number }
 
 /** Holds one room-sweep case: its seed, capacity, `predict`, and event log. */
 export interface LedgerRoomCase {
@@ -14236,6 +14686,11 @@ export interface LedgerRoomSummary {
 	readonly rejected: number
 	readonly acts: number
 	readonly acted: number
+	readonly calibrations: number
+	readonly bareOver: number
+	readonly pricedOver: number
+	readonly refusals: number
+	readonly refused: number
 }
 
 /** Lists the call kinds a room-sweep turn draws from. */
@@ -14512,30 +14967,62 @@ export function buildLedgerSweepAct(
 }
 
 /**
- * Builds a room-sweep case's scheduler, whose yield runs the `yield` act on the case's ledger half
- * the time and logs it.
+ * Paces a room-sweep case: at each turn boundary the agent loop yields at, the `yield` method runs
+ * the `yield` act on the case's ledger half the time and logs it.
  *
- * @param holder - Holds the case's ledger once it is built
- * @param random - The case's generator
- * @param areas - Each skill area's tool names, in area order
- * @param log - The case's event log
- * @returns The scheduler
+ * @remarks
+ * The case's `turn` listener calls the `arm` method, and the agent loop's yield follows that event in
+ * the same synchronous step, so the yield takes the armed turn. The classifier also yields after each
+ * slice of `LEDGER_SLICE` milliseconds, a count the host's clock decides; such a yield finds no armed
+ * turn and draws nothing, so the case's draws, and every act, repeat run to run.
  */
-export function buildLedgerSweepScheduler(
-	holder: { readonly ledger?: LedgerInterface },
-	random: RandomFunction,
-	areas: ReadonlyArray<readonly string[]>,
-	log: RecorderInterface<[event: LedgerRoomEvent]>,
-): SchedulerInterface {
-	return {
-		yield: async () => {
-			if (holder.ledger !== undefined && random() < 0.5) {
-				applyLedgerSweepAct('yield', holder.ledger, random, areas)
-				log.handler({ event: 'act' })
-			}
-		},
-		delay: async () => undefined,
+export class LedgerSweepScheduler implements SchedulerInterface {
+	readonly #holder: { readonly ledger?: LedgerInterface }
+	readonly #random: RandomFunction
+	readonly #areas: ReadonlyArray<readonly string[]>
+	readonly #log: RecorderInterface<[event: LedgerRoomEvent]>
+	#turn: number | undefined
+
+	/**
+	 * @param holder - Holds the case's ledger once it is built
+	 * @param random - The case's generator
+	 * @param areas - Each skill area's tool names, in area order
+	 * @param log - The case's event log
+	 */
+	constructor(
+		holder: { readonly ledger?: LedgerInterface },
+		random: RandomFunction,
+		areas: ReadonlyArray<readonly string[]>,
+		log: RecorderInterface<[event: LedgerRoomEvent]>,
+	) {
+		this.#holder = holder
+		this.#random = random
+		this.#areas = areas
+		this.#log = log
 	}
+
+	/**
+	 * Arms the yield the agent loop makes after the turn begins; the first turn makes none.
+	 *
+	 * @param index - The turn's index
+	 */
+	arm(index: number): void {
+		if (index === 0) return
+		if (this.#turn !== undefined) throw new Error(`turn ${this.#turn} was armed and never paced`)
+		this.#turn = index
+	}
+
+	async yield(): Promise<void> {
+		if (this.#turn === undefined) return
+		this.#turn = undefined
+		const ledger = this.#holder.ledger
+		if (ledger !== undefined && this.#random() < 0.5) {
+			applyLedgerSweepAct('yield', ledger, this.#random, this.#areas)
+			this.#log.handler({ event: 'act' })
+		}
+	}
+
+	async delay(): Promise<void> {}
 }
 
 /**
@@ -14578,7 +15065,8 @@ export function buildLedgerRoomLedger(
 /**
  * Runs one seeded room-sweep case: a ledger over six skills of 2 to 4 tools, a capacity of 2600 to
  * 8000, and three requests whose turns draw 1 to 3 calls each, on `DensityLedgerProvider` or its
- * silent twin, logging every turn, tool, request, abort, usage or charge, host act, and rejection.
+ * silent twin, logging every turn, tool, request, abort, usage or charge, host act, rejection, and
+ * calibration call with its recorded prompt.
  * Every draw is made before a ledger is built, so a gauge arm's twin ledger sees the case's draws.
  *
  * @param seed - The case's seed
@@ -14632,6 +15120,8 @@ export async function runLedgerRoomCase(seed: number, arm: LedgerRoomArm): Promi
 	const holder: { ledger?: LedgerInterface } = {}
 	const log = createRecorder<[event: LedgerRoomEvent]>()
 	const tooled = acting && arm.act !== 'yield' && arm.act !== 'listener'
+	const scheduler =
+		arm.act === 'yield' ? new LedgerSweepScheduler(holder, random, areas, log) : undefined
 	const options = buildUncalibratedOptions(
 		buildLedgerOptions({
 			capacity,
@@ -14650,15 +15140,14 @@ export async function runLedgerRoomCase(seed: number, arm: LedgerRoomArm): Promi
 							authority: LEDGER_SWEEP_AUTHORITY,
 						}
 					: {}),
-				...(arm.host ? { disclosure: { skills: [], workspace: 'w1' } } : {}),
-				...(arm.act === 'yield'
-					? { scheduler: buildLedgerSweepScheduler(holder, random, areas, log) }
-					: {}),
+				...(arm.host ? { workspace: 'w1' } : {}),
+				...(scheduler === undefined ? {} : { scheduler }),
 			},
 		}),
 	)
 	const script: readonly ScriptedTurn[] = [
-		...(arm.gauge === 'calibrated' ? [{ content: '' }, { content: '' }] : []),
+		// Three calibration replies: the active workspace renders text, so calibration sends a third call.
+		...(arm.gauge === 'calibrated' ? [{ content: '' }, { content: '' }, { content: '' }] : []),
 		...[0, 1, 2].flatMap((request): ScriptedTurn[] => [
 			...Array.from({ length: 1 + Math.floor(random() * 4) }, (_, turn) => ({
 				content: '',
@@ -14687,12 +15176,17 @@ export async function runLedgerRoomCase(seed: number, arm: LedgerRoomArm): Promi
 		role: 'user',
 		content: `The zephyr drawer ${at} holds keys. `.repeat(1 + Math.floor(random() * 6)),
 	}))
-	// A gauge arm supplies the gauge a twin ledger calibrated on the same draws.
+	// A gauge arm supplies the gauge a twin ledger calibrated on the same draws; every call the twin
+	// makes is a calibration call.
 	const twin =
 		arm.gauge === 'calibrated'
 			? undefined
 			: await buildLedgerRoomLedger(
-					new DensityLedgerProvider([{ content: '' }, { content: '' }], { recorded: true }),
+					new ReportedDensityLedgerProvider(
+						[{ content: '' }, { content: '' }, { content: '' }],
+						{ recorded: true },
+						(prompt, definitions) => log.handler({ event: 'calibration', prompt, definitions }),
+					),
 					options,
 					size,
 					seeded,
@@ -14708,12 +15202,17 @@ export async function runLedgerRoomCase(seed: number, arm: LedgerRoomArm): Promi
 			? new SilentDensityLedgerProvider(script, { recorded: true }, (charge) =>
 					log.handler({ event: 'usage', prompt: charge }),
 				)
-			: new DensityLedgerProvider(script, { recorded: true }),
+			: // A call the ledger makes while it holds no gauge is a calibration call.
+				new ReportedDensityLedgerProvider(script, { recorded: true }, (prompt, definitions) => {
+					if (holder.ledger?.gauge === undefined)
+						log.handler({ event: 'calibration', prompt, definitions })
+				}),
 		gauge === undefined ? options : { ...options, gauge },
 		size,
 		seeded,
 	)
 	holder.ledger = ledger
+	if (scheduler !== undefined) ledger.agent.emitter.on('turn', (index) => scheduler.arm(index))
 	if (arm.act === 'listener')
 		ledger.agent.emitter.on('turn', (index) => {
 			if (index > 0 && random() < 0.4) {
@@ -14741,10 +15240,12 @@ export async function runLedgerRoomCase(seed: number, arm: LedgerRoomArm): Promi
 	ledger.agent.emitter.on('usage', (usage) => log.handler({ event: 'usage', prompt: usage.prompt }))
 	for (const request of ['Check the desk.', 'And the keys?', 'Anything else?']) {
 		log.handler({ event: 'respond' })
+		// A rejected request is an outcome; the case continues with its next request.
 		await ledger.respond(request).catch((error: unknown) =>
 			log.handler({
 				event: 'rejected',
-				overflow: isLedgerError(error) && error.code === 'OVERFLOW',
+				code: isLedgerError(error) ? error.code : undefined,
+				held: ledger.gauge !== undefined,
 			}),
 		)
 	}
@@ -14769,8 +15270,11 @@ export async function summarizeLedgerRoomArm(name: string): Promise<LedgerRoomSu
  * plus `predict` exceeds capacity and those over capacity itself, the admitted loads and remembers,
  * the passes the gate ended and those it ended on the turn after an admitted load, the first passes
  * ended at their first call and those in a thread a `switch` to `w1` had selected, the requests
- * served in such a thread, the admitted switches to `w1`, those whose next request carried it, the calls denied for room, and the
- * rejections.
+ * served in such a thread, the admitted switches to `w1`, those whose next request carried it, the calls denied for room, the
+ * rejections, the host acts and the requests after one, and the calibration calls: every one, those
+ * without definitions whose recorded prompt exceeds capacity, those with definitions whose recorded
+ * prompt exceeds capacity and how many of them their request's `'GAUGE'` rejection follows with no
+ * gauge held, and the `'GAUGE'` rejections.
  *
  * @param cases - The arm's cases
  * @returns The summary
@@ -14800,6 +15304,12 @@ export function summarizeLedgerRoom(cases: readonly LedgerRoomCase[]): LedgerRoo
 	const tools = rows.flatMap((row) =>
 		row.event.event === 'tool' ? [{ ...row, tool: row.event }] : [],
 	)
+	const calibrations = rows.flatMap((row) =>
+		row.event.event === 'calibration'
+			? [{ ...row, prompt: row.event.prompt, definitions: row.event.definitions }]
+			: [],
+	)
+	const priced = calibrations.filter((row) => row.definitions > 0 && row.prompt > row.capacity)
 	return {
 		calls: prompts.length,
 		over: prompts.filter((one) => one.prompt + one.predict > one.capacity).length,
@@ -14834,7 +15344,8 @@ export function summarizeLedgerRoom(cases: readonly LedgerRoomCase[]): LedgerRoo
 			return next?.event === 'request' && next.carried
 		}).length,
 		denied: tools.filter((one) => one.tool.overflow).length,
-		rejected: rows.filter((row) => row.event.event === 'rejected' && row.event.overflow).length,
+		rejected: rows.filter((row) => row.event.event === 'rejected' && row.event.code === 'OVERFLOW')
+			.length,
 		acts: rows.filter((row) => row.event.event === 'act').length,
 		acted: rows.filter(
 			(row) =>
@@ -14843,6 +15354,18 @@ export function summarizeLedgerRoom(cases: readonly LedgerRoomCase[]): LedgerRoo
 					.slice(row.before.findLastIndex((one) => one.event === 'request') + 1)
 					.some((one) => one.event === 'act'),
 		).length,
+		calibrations: calibrations.length,
+		bareOver: calibrations.filter((row) => row.definitions === 0 && row.prompt > row.capacity)
+			.length,
+		pricedOver: priced.length,
+		refusals: rows.filter((row) => row.event.event === 'rejected' && row.event.code === 'GAUGE')
+			.length,
+		// A refused call is followed by its request's `'GAUGE'` rejection, with no call without
+		// definitions between them and no gauge held after it.
+		refused: priced.filter((row) => {
+			const next = row.after.at(0)
+			return next?.event === 'rejected' && next.code === 'GAUGE' && !next.held
+		}).length,
 	}
 }
 
@@ -15047,7 +15570,7 @@ export function buildLedgerSwitch(
 ) {
 	const { options } = buildLedgerBuiltinOptions({}, { capacity: 20000, predict })
 	const provider = new DensityLedgerProvider(
-		[{ content: '' }, { content: '' }, ...turns, { content: 'Done.' }],
+		[{ content: '' }, { content: '' }, { content: '' }, ...turns, { content: 'Done.' }],
 		{ recorded: true },
 	)
 	const ledger = createLedger(provider, buildUncalibratedOptions(options))
@@ -15452,21 +15975,20 @@ export async function serveLedgerGateEdge(
 }
 
 /**
- * Serves one request on a ledger whose host shows `billing` and whose scope hides `lookup`, so the
- * first call spares a calibrated definition and adds one, at a capacity that leaves the first call
- * exactly the room the first-call read prices, moved by a shift. A measuring ledger reads the first
- * call's estimate and definitions.
+ * Serves one request on a ledger with `load` enabled whose O scope lists `refund` and omits `load`
+ * and `lookup`, so the allow-list alone advertises `refund`, which a skill holds out of
+ * calibration, and the first call spares calibrated definitions and adds one, at a capacity that
+ * leaves the first call exactly the room the first-call read prices, moved by a shift. A measuring
+ * ledger reads the first call's estimate and definitions.
  *
  * @param shift - The tokens the capacity is short of the read's price; 0 dispatches, 1 ends the pass
  * @returns What the served request read
  */
 export async function serveLedgerFirstEdge(shift: number): Promise<LedgerGateEdge> {
-	const gauge = { scale: 1, overhead: 300 }
-	const scope = createScope({
-		name: 'host',
-		tools: ['recall', 'load', 'unload', 'refund', 'claim'],
-	})
-	const agent = { builtins: ['load', 'unload'], disclosure: { skills: ['billing'] } } as const
+	// The overhead outweighs what the hidden definitions spare, so the first call keeps room for the answer pass.
+	const gauge = { scale: 1, overhead: 1000 }
+	const scope = createScope({ name: 'host', tools: ['recall', 'refund'], skills: [] })
+	const agent = { builtins: ['load', 'unload'] } as const
 	const measuring = createScriptedProvider([{ content: 'Answered.' }], { recorded: true })
 	const measured = createLedger(
 		measuring,
@@ -15792,7 +16314,13 @@ export function buildLedgerRecordShape(records: number): {
 		read: () => undefined,
 	}))
 	const provider = new DensityLedgerProvider(
-		[{ content: '' }, { content: '' }, { content: 'From the records.' }, { content: 'Again.' }],
+		[
+			{ content: '' },
+			{ content: '' },
+			{ content: '' },
+			{ content: 'From the records.' },
+			{ content: 'Again.' },
+		],
 		{ recorded: true },
 	)
 	const ledger = createLedger(
@@ -15813,6 +16341,119 @@ export function buildLedgerRecordShape(records: number): {
 			}),
 		),
 	})
+	return { ledger, provider }
+}
+
+/** Holds the capacity of the calibration sample's ledgers, which a long thread and a large workspace each estimate over. */
+export const LEDGER_SAMPLE_CAPACITY = 4096
+
+/**
+ * Builds a ledger that calibrates at its first `respond` call, on `DensityLedgerProvider` at
+ * {@link LEDGER_SAMPLE_CAPACITY}, with an `invoice` lookup beside the fixture's. With a thread, the
+ * ledger hydrates a snapshot of that many messages, about 250 estimate units each, whose gauge priced
+ * the definitions without `invoice`; its active workspace holds the records it is given, about 1250
+ * characters each, and its provider scripts a reply for each calibration call.
+ *
+ * @param thread - The messages the hydrated thread holds; 0 builds a fresh ledger
+ * @param records - The files of the active workspace; 0 adds no workspace
+ * @returns The ledger and its provider
+ */
+export function buildLedgerSampleShape(
+	thread: number,
+	records: number,
+): { readonly ledger: LedgerInterface; readonly provider: DensityLedgerProvider } {
+	const options = buildLedgerOptions({ capacity: LEDGER_SAMPLE_CAPACITY })
+	const stored = createLedger(new DensityLedgerProvider([], { recorded: false }), options)
+	stored.conversation.add(
+		Array.from({ length: thread }, (_, at): MessageInput => ({
+			role: at % 2 === 0 ? 'user' : 'assistant',
+			content: `Order ${at} for Brightwater Studio shipped on the north route. `.repeat(16),
+		})),
+	)
+	// A workspace that renders text adds the third calibration call.
+	const provider = new DensityLedgerProvider(
+		Array.from({ length: records > 0 ? 3 : 2 }, () => ({ content: '' })),
+		{ recorded: true },
+	)
+	const ledger = createLedger(provider, {
+		...buildUncalibratedOptions(
+			buildLedgerOptions({
+				capacity: LEDGER_SAMPLE_CAPACITY,
+				lookups: [
+					...(options.lookups ?? []),
+					{
+						tool: createTool({
+							name: 'invoice',
+							description: 'Reads one invoice.',
+							parameters: { type: 'object' },
+							execute: () => 'Invoice 4410 is paid.',
+						}),
+						read: () => undefined,
+					},
+				],
+			}),
+		),
+		...(thread === 0 ? {} : { snapshot: stored.snapshot() }),
+	})
+	if (records > 0)
+		ledger.agent.context.workspaces.add({
+			id: 'records',
+			seed: Array.from({ length: records }, (_, at) =>
+				createFile({
+					path: `record-${at}.md`,
+					content: createTextContent(`RECORD-${at} ${'r'.repeat(1250)}`, 'text'),
+				}),
+			),
+		})
+	return { ledger, provider }
+}
+
+/** Holds the density rates with workspace text charged at 2.9 times the messages' scale, as a record of identifiers and amounts costs a small model. */
+export const LEDGER_DENSE_RATES: LedgerChargeRates = Object.freeze({
+	...LEDGER_DENSITY_RATES,
+	workspace: LEDGER_DENSITY_RATES.scale * 2.9,
+})
+
+/** Holds the density rates with workspace text charged at half the messages' scale, a workspace sparser than the head. */
+export const LEDGER_SPARSE_RATES: LedgerChargeRates = Object.freeze({
+	...LEDGER_DENSITY_RATES,
+	workspace: LEDGER_DENSITY_RATES.scale / 2,
+})
+
+/**
+ * Builds a fresh ledger at {@link LEDGER_SAMPLE_CAPACITY} on `RatedLedgerProvider`, uncalibrated,
+ * whose active workspace holds the records it is given, about 1260 characters each. The provider
+ * scripts three calibration replies, then the given turns.
+ *
+ * @param records - The files of the active workspace; 0 adds no workspace
+ * @param rates - The rates each call is charged at
+ * @param turns - The scripted turns after calibration
+ * @returns The ledger and its provider
+ */
+export function buildLedgerWorkspaceShape(
+	records: number,
+	rates: LedgerChargeRates,
+	turns: readonly ScriptedTurn[] = [],
+): { readonly ledger: LedgerInterface; readonly provider: RatedLedgerProvider } {
+	const provider = new RatedLedgerProvider(
+		[{ content: '' }, { content: '' }, { content: '' }, ...turns],
+		{ recorded: true, repeat: false },
+		rates,
+	)
+	const ledger = createLedger(
+		provider,
+		buildUncalibratedOptions(buildLedgerOptions({ capacity: LEDGER_SAMPLE_CAPACITY })),
+	)
+	if (records > 0)
+		ledger.agent.context.workspaces.add({
+			id: 'records',
+			seed: Array.from({ length: records }, (_, at) =>
+				createFile({
+					path: `record-${at}.md`,
+					content: createTextContent(`RECORD-${at} ${'r'.repeat(1250)}`, 'text'),
+				}),
+			),
+		})
 	return { ledger, provider }
 }
 
@@ -15916,9 +16557,10 @@ export async function serveLedgerStatedGauge(
 	silent: boolean,
 	requests: readonly string[],
 ): Promise<LedgerStatedRun> {
+	// The twin measures at a capacity its calibrated set fits; the gauge it returns reads no capacity.
 	const twin = createLedger(
 		new DensityLedgerProvider([{ content: '' }, { content: '' }], { recorded: true }),
-		buildLedgerStatedOptions(capacity),
+		buildLedgerStatedOptions(100000),
 	)
 	const measured = await twin.calibrate(new AbortController().signal)
 	const charges = createRecorder<[charge: number]>()
@@ -15997,7 +16639,13 @@ export interface LedgerAnswerGrowth {
 export async function serveLedgerAnswerGrowth(growth: number): Promise<LedgerAnswerGrowth> {
 	const ledger = createLedger(
 		new SteppedDensityLedgerProvider(
-			[{ content: '' }, { content: '' }, { content: '' }, { content: 'Answered.' }],
+			[
+				{ content: '' },
+				{ content: '' },
+				{ content: '' },
+				{ content: '' },
+				{ content: 'Answered.' },
+			],
 			{ recorded: true },
 		),
 		buildUncalibratedOptions(buildLedgerOptions({ capacity: 12000, predict: 0 })),
@@ -16056,13 +16704,15 @@ export interface LedgerLiveRates {
  * Serves one request on claim 3.35's ledger: no built-in, the default lookup, `recall`, and
  * {@link LEDGER_LIVE_LOOKUPS}, so 122 definitions are calibrated, with a host scope that advertises
  * the lookup and the first `shown` of the others, on a {@link RatedLedgerProvider} at
- * {@link LEDGER_LIVE_RATES}, uncalibrated, with no `predict`.
+ * {@link LEDGER_LIVE_RATES}, uncalibrated. The capacity is taverna's, or the limit where it is larger,
+ * so the call that calibrates the 122 definitions fits it, and `predict` holds the difference.
  *
- * @param capacity - The context capacity
+ * @param limit - The capacity less `predict` that the gate reads
  * @param shown - How many of {@link LEDGER_LIVE_LOOKUPS} the scope advertises beside the lookup
  * @returns What the request read
  */
-export async function serveLedgerLiveRates(capacity: number, shown = 41): Promise<LedgerLiveRates> {
+export async function serveLedgerLiveRates(limit: number, shown = 41): Promise<LedgerLiveRates> {
+	const capacity = Math.max(limit, LEDGER_RECORD_ROOM.capacity)
 	const provider = new RatedLedgerProvider(
 		[{ content: '' }, { content: '' }, { content: 'Answered.' }, { content: 'Answered.' }],
 		{ recorded: true },
@@ -16073,7 +16723,7 @@ export async function serveLedgerLiveRates(capacity: number, shown = 41): Promis
 		buildUncalibratedOptions(
 			buildLedgerOptions({
 				capacity,
-				predict: 0,
+				predict: capacity - limit,
 				lookups: [...(buildLedgerOptions().lookups ?? []), ...LEDGER_LIVE_LOOKUPS],
 			}),
 		),
@@ -16098,4 +16748,1024 @@ export async function serveLedgerLiveRates(capacity: number, shown = 41): Promis
 		scales: scales.calls.map(([scale]) => scale),
 		settled: ledger.gauge?.scale,
 	}
+}
+
+// ── Refusals: a job its build would refuse (claims J.2 to J.5) ───────────────
+//
+// Each case carries one job's members that a build refuses and the member its refusal names. A tree
+// places that job under a chain of sound parents, which the fan-out registry builds.
+
+import { createTokenBudget } from '@orkestrel/budget'
+import { createTimeout, MAX_TIMEOUT_MS } from '@orkestrel/timeout'
+import { requireLimit } from '@src/core'
+
+/** Holds the parent every claim J case sits under: the `loop` tool and the `load`, `unload`, and `memo` built-ins behind the `allow` authority. */
+export const JOB_REFUSAL_PARENT = Object.freeze<AgentJobInput>({
+	provider: 'main',
+	messages: FANOUT_SEED,
+	tools: ['loop'],
+	builtins: ['load', 'unload', 'memo'],
+	authority: 'allow',
+})
+
+/** Names one claim J case: the members of a job a build refuses, past the job type where the type refuses them too, and the member the refusal names. */
+export interface JobRefusalCase {
+	readonly name: string
+	readonly member: string
+	readonly job: Readonly<Record<string, unknown>>
+}
+
+/** Lists every claim J case: each bound a build reads, each `builtins` list it refuses, a built-in the job's tools name, tools or built-ins with no authority, and a `system` message. */
+export const JOB_REFUSAL_CASES = Object.freeze<readonly JobRefusalCase[]>([
+	{ name: 'a zero limit', member: 'limit', job: { limit: 0 } },
+	{ name: 'a fractional limit', member: 'limit', job: { limit: 1.5 } },
+	{
+		name: 'a limit past the safe integers',
+		member: 'limit',
+		job: { limit: Number.MAX_SAFE_INTEGER + 1 },
+	},
+	{ name: 'a fractional timeout', member: 'timeout', job: { timeout: 1.5 } },
+	{ name: 'a negative timeout', member: 'timeout', job: { timeout: -1 } },
+	{
+		name: 'a timeout past MAX_TIMEOUT_MS',
+		member: 'timeout',
+		job: { timeout: MAX_TIMEOUT_MS + 1 },
+	},
+	{ name: 'a negative budget', member: 'budget', job: { budget: -1 } },
+	{
+		name: 'a repeated built-in',
+		member: 'builtins',
+		job: { builtins: ['load', 'load'], authority: 'allow' },
+	},
+	{
+		name: 'unload without load',
+		member: 'builtins',
+		job: { builtins: ['unload'], authority: 'allow' },
+	},
+	{
+		name: 'a built-in its tools name',
+		member: 'builtins',
+		job: { tools: ['memo'], builtins: ['memo'], authority: 'allow' },
+	},
+	{ name: 'tools and no authority', member: 'authority', job: { tools: ['loop'] } },
+	{ name: 'built-ins and no authority', member: 'authority', job: { builtins: ['memo'] } },
+	{
+		name: 'a system message',
+		member: 'messages',
+		job: { messages: [{ role: 'system', content: 'Child rules.' }] },
+	},
+])
+
+/**
+ * Builds a tree whose job at `depth` carries a claim J case's members under a chain of
+ * {@link JOB_REFUSAL_PARENT} jobs; depth 0 is the job alone.
+ *
+ * @param job - The case's members
+ * @param depth - How many parents hold the job
+ * @returns The root job, read past the job type
+ */
+export function buildRefusalTree(job: Readonly<Record<string, unknown>>, depth: number): unknown {
+	return Array.from({ length: depth }).reduce<unknown>(
+		(child) => ({ ...JOB_REFUSAL_PARENT, children: [child] }),
+		{ provider: 'main', messages: FANOUT_SEED, ...job },
+	)
+}
+
+/**
+ * Returns the path a scan names for the job a {@link buildRefusalTree} tree holds at `depth`.
+ *
+ * @param depth - How many parents hold the job
+ * @returns The path, `job` for the root
+ */
+export function buildRefusalPath(depth: number): string {
+	return ['job', ...Array.from({ length: depth }, () => '.children[0]')].join('')
+}
+
+/** Holds a registry whose `build` calls are recorded before they reach the real registry. */
+export interface RecordedRegistry {
+	readonly registry: AgentRegistryInterface
+	readonly builds: RecorderInterface<[input: AgentJobInput]>
+}
+
+/**
+ * Creates a registry that records each `build` call and forwards every call to a real registry.
+ *
+ * @param registry - The real registry
+ * @returns The recording registry and its recorder
+ */
+export function createRecordedRegistry(registry: AgentRegistryInterface): RecordedRegistry {
+	const builds = createRecorder<[input: AgentJobInput]>()
+	return {
+		builds,
+		registry: {
+			provider: (name) => registry.provider(name),
+			tool: (name) => registry.tool(name),
+			authority: (name) => registry.authority(name),
+			scheduler: (name) => registry.scheduler(name),
+			build: (input, signal) => {
+				builds.handler(input)
+				return registry.build(input, signal)
+			},
+		},
+	}
+}
+
+/** Holds the seed of claim J.4's trees. */
+export const JOB_TREE_SEED = 2411
+
+/** Holds how many trees claim J.4 draws. */
+export const JOB_TREE_DRAWS = 300
+
+/** Holds one seeded claim J.4 tree and the claim J case it carries, when it carries one. */
+export interface JobTreeDraw {
+	readonly tree: unknown
+	readonly case: string | undefined
+}
+
+/**
+ * Draws claim J.4's trees: a chain of up to three sound parents over a job that carries either
+ * sound members within its parent (a smaller `limit`, a `timeout`, a `budget`, the `loop` tool, a
+ * subset of the built-ins) or one claim J case, at a fixed chance.
+ *
+ * @param seed - The seed of the source
+ * @param count - How many trees to draw
+ * @returns The trees, each with the case it carries
+ */
+export function drawJobTrees(seed: number, count: number): readonly JobTreeDraw[] {
+	const random = seededRandom(seed)
+	return Array.from({ length: count }, (): JobTreeDraw => {
+		const depth = Math.floor(random() * 4)
+		const row =
+			random() < 0.6
+				? JOB_REFUSAL_CASES[Math.floor(random() * JOB_REFUSAL_CASES.length)]
+				: undefined
+		const builtins = (['load', 'unload', 'memo'] as const).filter(() => random() < 0.4)
+		const sound = {
+			limit: 1 + Math.floor(random() * 10),
+			...(random() < 0.5 ? { timeout: Math.floor(random() * 60_000) } : {}),
+			...(random() < 0.5 ? { budget: random() * 1000 } : {}),
+			...(random() < 0.5 ? { tools: ['loop'], authority: 'allow' } : {}),
+			...(builtins.length === 0 || (builtins.includes('unload') && !builtins.includes('load'))
+				? {}
+				: { builtins, authority: 'allow' }),
+		}
+		return { tree: buildRefusalTree(row?.job ?? sound, depth), case: row?.name }
+	})
+}
+
+/**
+ * Collects every job of a tree, the root first, read past the job type.
+ *
+ * @param tree - The root job
+ * @returns The jobs in walk order
+ */
+export function collectTreeJobs(tree: unknown): readonly unknown[] {
+	const children = isRecord(tree) && isArray(tree.children) ? tree.children : []
+	return [tree, ...children.flatMap((child: unknown) => collectTreeJobs(child))]
+}
+
+/** Pairs each job bound claim J.1 checks with the construction that owns its refusal, called past its types. */
+export const JOB_BOUND_OWNERS = Object.freeze([
+	{ member: 'limit', build: (value: unknown) => invokeUnchecked(undefined, requireLimit, [value]) },
+	{
+		member: 'timeout',
+		build: (value: unknown) => invokeUnchecked(undefined, createTimeout, [{ ms: value }]),
+	},
+	{
+		member: 'budget',
+		build: (value: unknown) => invokeUnchecked(undefined, createTokenBudget, [{ max: value }]),
+	},
+] as const)
+
+/** Lists claim J.1's boundary values: 0, 1, -1, a fraction, each upper bound and the integer after it, the non-finite numbers, negative zero, and a non-number. */
+export const JOB_BOUND_VALUES = Object.freeze<readonly unknown[]>([
+	0,
+	1,
+	-1,
+	1.5,
+	Number.MAX_SAFE_INTEGER,
+	Number.MAX_SAFE_INTEGER + 1,
+	MAX_TIMEOUT_MS,
+	MAX_TIMEOUT_MS + 1,
+	Number.NaN,
+	Number.POSITIVE_INFINITY,
+	Number.NEGATIVE_INFINITY,
+	-0,
+	'10',
+])
+
+/**
+ * Draws claim J.1's seeded numbers: small integers of either sign, fractions, and integers around
+ * `MAX_TIMEOUT_MS` and `Number.MAX_SAFE_INTEGER`.
+ *
+ * @param seed - The seed of the source
+ * @param count - How many numbers to draw
+ * @returns The numbers
+ */
+export function drawJobBounds(seed: number, count: number): readonly number[] {
+	const random = seededRandom(seed)
+	return Array.from({ length: count }, () => {
+		const offset = Math.floor(random() * 7) - 3
+		return (
+			[
+				offset,
+				offset + random(),
+				(random() - 0.5) * 1000,
+				MAX_TIMEOUT_MS + offset,
+				Number.MAX_SAFE_INTEGER + offset,
+			][Math.floor(random() * 5)] ?? 0
+		)
+	})
+}
+
+// ── Refusals: the option doors (claims O.1 to O.6) ───────────────────────────
+//
+// Each door refuses an own enumerable member its options type does not declare and reads a
+// declared member spelled `undefined` as omitted. The forms below carry one member past the types,
+// and the builders fill every declared member of each door's type.
+
+import type { AgentRunOptions } from '@src/core'
+import { errorToMessage } from '@orkestrel/contract'
+import { createInstructionManager } from '@src/core'
+import { createScheduler } from '@orkestrel/workflow'
+
+/** Names one form a member past an options type can take, and whether a door reads it as an own enumerable member. */
+export interface UndeclaredForm {
+	readonly name: string
+	readonly refused: boolean
+	readonly build: (base: object, key: string, value: unknown) => object
+}
+
+/** Lists the forms claim O.4 draws: plain, getter, and frozen own members refuse; non-enumerable, inherited, symbol-keyed, and `Proxy` members do not. */
+export const UNDECLARED_FORMS = Object.freeze<readonly UndeclaredForm[]>([
+	{ name: 'plain', refused: true, build: (base, key, value) => ({ ...base, [key]: value }) },
+	{
+		name: 'getter',
+		refused: true,
+		build: (base, key, value) =>
+			Object.defineProperty({ ...base }, key, { get: () => value, enumerable: true }),
+	},
+	{
+		name: 'frozen',
+		refused: true,
+		build: (base, key, value) => Object.freeze({ ...base, [key]: value }),
+	},
+	{
+		name: 'non-enumerable',
+		refused: false,
+		build: (base, key, value) =>
+			Object.defineProperty({ ...base }, key, { value, enumerable: false }),
+	},
+	{
+		name: 'inherited',
+		refused: false,
+		build: (base, key, value) => {
+			const record = { ...base }
+			Reflect.setPrototypeOf(record, { [key]: value })
+			return record
+		},
+	},
+	{
+		name: 'symbol-keyed',
+		refused: false,
+		build: (base, key, value) => ({ ...base, [Symbol(key)]: value }),
+	},
+	{
+		name: 'proxy',
+		refused: false,
+		build: (base, key, value) =>
+			new Proxy(
+				{ ...base },
+				{
+					get: (target, property) => (property === key ? value : Reflect.get(target, property)),
+				},
+			),
+	},
+])
+
+/** Lists the names claim O.4 carries a disclosure record under: the removed member and its aliases. */
+export const UNDECLARED_NAMES = Object.freeze(['disclosure', 'disclosed', 'shown', 'loaded'])
+
+/**
+ * Returns a record without one member, every other own enumerable member kept.
+ *
+ * @param record - The record
+ * @param key - The member to leave out
+ * @returns A fresh record
+ */
+export function omitMember(record: object, key: string): Readonly<Record<string, unknown>> {
+	return Object.fromEntries(Object.entries(record).filter(([name]) => name !== key))
+}
+
+/**
+ * Builds agent options that hold every declared member, each admitted: an empty tool manager, the
+ * `memo` built-in behind the allow-all authority, fresh managers and budgets, and the `north`
+ * workspace.
+ *
+ * @returns The options
+ */
+export function buildRequiredAgentOptions(): Required<AgentOptions> {
+	return {
+		on: {},
+		error: () => undefined,
+		system: 'Desk.',
+		tools: createToolManager(),
+		instructions: createInstructionManager(),
+		skills: createSkillManager(),
+		memos: createMemoManager(),
+		workspaces: createWorkspaceManager(),
+		scope: createScope({ name: 'all' }),
+		limit: 4,
+		timeout: 60_000,
+		budget: createTokenBudget({ max: 1_000_000 }),
+		allowance: createTokenBudget({ max: 1_000_000 }),
+		scheduler: createScheduler(),
+		signal: new AbortController().signal,
+		authority: AGENT_AUTHORITY,
+		conversations: createConversationManager(),
+		window: createBudget<ProviderRequest>({ max: 1_000_000, consumer: estimateRequest }),
+		strict: true,
+		select: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+		builtins: ['memo'],
+		workspace: 'north',
+	}
+}
+
+/**
+ * Builds run options that hold every declared member, each admitted: an object schema, fresh
+ * budgets, an unregistered conversation, a prompt, a run scope, and the `north` workspace.
+ *
+ * @returns The options
+ */
+export function buildRequiredRunOptions(): Required<AgentRunOptions> {
+	return {
+		think: false,
+		schema: { type: 'object' },
+		limit: 2,
+		timeout: 60_000,
+		budget: createTokenBudget({ max: 1_000_000 }),
+		allowance: createTokenBudget({ max: 1_000_000 }),
+		signal: new AbortController().signal,
+		conversation: createConversation(),
+		prompt: { content: 'Check invoice 42.' },
+		scope: createScope({ name: 'run' }),
+		workspace: 'north',
+	}
+}
+
+/**
+ * Builds a ledger's agent options that hold every member of the pick, each admitted.
+ *
+ * @returns The options
+ */
+export function buildRequiredLedgerAgentOptions(): Required<LedgerAgentOptions> {
+	return {
+		limit: 4,
+		timeout: 60_000,
+		on: {},
+		scheduler: createScheduler(),
+		instructions: createInstructionManager(),
+		skills: createSkillManager(),
+		memos: createMemoManager(),
+		workspaces: createWorkspaceManager(),
+		strict: true,
+		authority: AGENT_AUTHORITY,
+		builtins: ['memo'],
+		workspace: 'north',
+	}
+}
+
+/**
+ * Builds ledger options that hold every declared member, each admitted: the desk options with a
+ * write, a share, a recall limit, a correction, the full agent pick, and a fresh ledger's snapshot.
+ *
+ * @returns The options
+ */
+export function buildRequiredLedgerOptions(): Required<LedgerOptions> {
+	const base = buildLedgerOptions()
+	return {
+		judge: base.judge,
+		system: base.system,
+		topics: base.topics,
+		questions: base.questions,
+		thresholds: base.thresholds,
+		capacity: base.capacity,
+		predict: 0,
+		think: false,
+		gauge: { scale: 1, overhead: 0 },
+		lookups: base.lookups ?? [],
+		writes: [createGuideContactWrite()],
+		share: { prompt: 1 },
+		recall: { limit: 2 },
+		correction: { narrow: false },
+		agent: buildRequiredLedgerAgentOptions(),
+		snapshot: createLedger(createScriptedProvider([]), buildLedgerOptions()).snapshot(),
+	}
+}
+
+/**
+ * Builds a scope input that holds every declared member.
+ *
+ * @returns The input
+ */
+export function buildRequiredScopeInput(): Required<ScopeInput> {
+	return {
+		name: 'all',
+		select: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+		instructions: [],
+		skills: ['billing'],
+		memos: ['pref'],
+		tools: ['refund'],
+		files: ['north.txt'],
+		workspaces: ['north'],
+	}
+}
+
+/** Holds what one arm of claim O.3 dispatched first, with message ids removed, or the text of what refused it. */
+export interface DoorReading {
+	readonly request: unknown
+	readonly error: string | undefined
+}
+
+/**
+ * Reads the first request a scripted provider recorded, with each message's minted id removed.
+ *
+ * @param provider - The provider
+ * @returns The messages, tools, and options of the first call, or `undefined` when none was made
+ */
+export function readDoorRequest(provider: ScriptedProviderInterface): unknown {
+	const call = provider.calls[0]
+	return call === undefined
+		? undefined
+		: {
+				messages: call.messages.map(({ id: _id, ...rest }) => rest),
+				tools: call.tools,
+				options: call.options,
+			}
+}
+
+/**
+ * Serves one claim O.3 arm on an agent: builds it from `options` past its types over a seeded
+ * conversation and runs it with `run` past its types.
+ *
+ * @param options - The agent's options
+ * @param run - The run's options
+ * @returns The first request, or the refusal's text
+ */
+export async function serveAgentArm(options: unknown, run: unknown): Promise<DoorReading> {
+	const provider = createScriptedProvider([{ content: '{"ok":true}' }], AGENT_SCRIPT_OPTIONS)
+	const error = await Promise.resolve()
+		.then(() => {
+			const agent = invokeUnchecked<AgentInterface>(undefined, createAgent, [provider, options])
+			agent.context.messages.add({ role: 'user', content: 'Check invoice 42.' })
+			return invokeUnchecked<AgentStreamInterface>(agent, agent.stream, [run]).result
+		})
+		.then(
+			() => undefined,
+			(reason: unknown) => errorToMessage(reason),
+		)
+	return { request: readDoorRequest(provider), error }
+}
+
+/**
+ * Serves one claim O.3 arm on a ledger: builds it from `options` past its types and serves one
+ * request.
+ *
+ * @param options - The ledger's options
+ * @returns The first request, or the refusal's text
+ */
+export async function serveLedgerArm(options: unknown): Promise<DoorReading> {
+	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true, repeat: true })
+	const error = await Promise.resolve()
+		.then(() =>
+			invokeUnchecked<LedgerInterface>(undefined, createLedger, [provider, options]).respond(
+				'Refund invoice 42.',
+			),
+		)
+		.then(
+			() => undefined,
+			(reason: unknown) => errorToMessage(reason),
+		)
+	return { request: readDoorRequest(provider), error }
+}
+
+/**
+ * Serves one claim O.3 arm on a scope: builds a built-in agent under a scope created from `input`
+ * past its types and runs one request.
+ *
+ * @param input - The scope's input
+ * @returns The first request, or the refusal's text
+ */
+export async function serveScopeArm(input: unknown): Promise<DoorReading> {
+	const fixture = invokeUnchecked<BuiltinAgent>(undefined, createBuiltinAgent, [
+		{ turns: [{ content: 'done' }], scope: input },
+	])
+	const error = await fixture.agent.generate({ prompt: { content: 'Refund invoice 42.' } }).then(
+		() => undefined,
+		(reason: unknown) => errorToMessage(reason),
+	)
+	return { request: readDoorRequest(fixture.provider), error }
+}
+
+/** Lists claim O.5's riders: each `AgentOptions` member the ledger's `agent` pick leaves out, with an admitted value. */
+export function buildLedgerAgentRiders(): ReadonlyArray<readonly [string, unknown]> {
+	return [
+		['scope', createScope({ name: 'rider' })],
+		['budget', createTokenBudget({ max: 1000 })],
+		['allowance', createTokenBudget({ max: 1000 })],
+		['signal', new AbortController().signal],
+		['error', () => undefined],
+		['window', createBudget<ProviderRequest>({ max: 1000, consumer: estimateRequest })],
+		['tools', createToolManager()],
+	]
+}
+
+// ── Refusals: the census doors (the door ruling's groups) ────────────────────
+//
+// Each door hands a constructor, a factory, or a per-call method one member its type does not
+// declare, past the types, and reads what refused it. The `owner` names the mirrored test file.
+
+import {
+	AgentRegistry,
+	Authority,
+	Conversation,
+	ConversationManager,
+	createAgentContext,
+	createAgentQueue,
+	createAgentRunner,
+	createInstruction,
+	createRelayProvider,
+	createScopeManager,
+	Instruction,
+	MemoManager,
+	RelayStream,
+	SkillManager,
+} from '@src/core'
+
+/** Names one census door: the entity whose mirrored test owns it, the type it admits, and a call that hands it a member past that type. */
+export interface OptionDoor {
+	readonly owner: string
+	readonly shape: string
+	readonly open: (stray: Readonly<Record<string, unknown>>) => unknown
+}
+
+/** Holds the member every census door is handed past its type. */
+export const OPTION_DOOR_STRAY = Object.freeze({ stray: true })
+
+/**
+ * Builds the census doors, one a constructor, factory, or per-call method the door ruling names,
+ * each called with its minimal declared members and a stray member past its type.
+ *
+ * @returns The doors
+ */
+export function buildOptionDoors(): readonly OptionDoor[] {
+	const registry = createAgentRegistry({ providers: {} })
+	const provider = createScriptedProvider([{ content: 'done' }], { recorded: true })
+	const fallback = { zone: 'desk', verdict: 'allow' } as const
+	const wire = { url: 'http://127.0.0.1:1', timeout: 1000 }
+	return [
+		{
+			owner: 'Authority',
+			shape: 'AuthorityOptions',
+			open: (stray) => invokeUnchecked(undefined, createAuthority, [{ fallback, ...stray }]),
+		},
+		{
+			owner: 'Authority',
+			shape: 'AuthorityOptions',
+			open: (stray) =>
+				new Authority(invokeUnchecked(undefined, Object.assign, [{}, { fallback }, stray])),
+		},
+		{
+			owner: 'AgentRegistry',
+			shape: 'AgentRegistryOptions',
+			open: (stray) =>
+				invokeUnchecked(undefined, createAgentRegistry, [{ providers: {}, ...stray }]),
+		},
+		{
+			owner: 'AgentRegistry',
+			shape: 'AgentRegistryOptions',
+			open: (stray) =>
+				new AgentRegistry(
+					invokeUnchecked(undefined, Object.assign, [{}, { providers: {} }, stray]),
+				),
+		},
+		{
+			owner: 'factories',
+			shape: 'AgentQueueOptions',
+			open: (stray) => invokeUnchecked(undefined, createAgentQueue, [{ registry, ...stray }]),
+		},
+		{
+			owner: 'factories',
+			shape: 'AgentRunnerOptions',
+			open: (stray) => invokeUnchecked(undefined, createAgentRunner, [{ registry, ...stray }]),
+		},
+		{
+			owner: 'AgentContext',
+			shape: 'AgentContextOptions',
+			open: (stray) => invokeUnchecked(undefined, createAgentContext, [{ ...stray }]),
+		},
+		{
+			owner: 'AgentContext',
+			shape: 'AgentContextOptions',
+			open: (stray) => new AgentContext(invokeUnchecked(undefined, Object.assign, [{}, stray])),
+		},
+		{
+			owner: 'AgentContext',
+			shape: 'ContextBuildOptions',
+			open: (stray) => {
+				const context = createAgentContext()
+				return invokeUnchecked(context, context.build, [{ ...stray }])
+			},
+		},
+		{
+			owner: 'Conversation',
+			shape: 'ConversationOptions',
+			open: (stray) => invokeUnchecked(undefined, createConversation, [{ ...stray }]),
+		},
+		{
+			owner: 'Conversation',
+			shape: 'ConversationOptions',
+			open: (stray) => new Conversation(invokeUnchecked(undefined, Object.assign, [{}, stray])),
+		},
+		{
+			owner: 'Conversation',
+			shape: 'CompactOptions',
+			open: (stray) => {
+				const conversation = createConversation({ summarize: createStubSummarizer().summarize })
+				return invokeUnchecked(conversation, conversation.compact, [{ ...stray }])
+			},
+		},
+		{
+			owner: 'Conversation',
+			shape: 'ConversationReferenceOptions',
+			open: (stray) => {
+				const conversation = createConversation()
+				return invokeUnchecked(conversation, conversation.reference, [{ ...stray }])
+			},
+		},
+		{
+			owner: 'ConversationManager',
+			shape: 'ConversationManagerOptions',
+			open: (stray) => invokeUnchecked(undefined, createConversationManager, [{ ...stray }]),
+		},
+		{
+			owner: 'ConversationManager',
+			shape: 'ConversationManagerOptions',
+			open: (stray) =>
+				new ConversationManager(invokeUnchecked(undefined, Object.assign, [{}, stray])),
+		},
+		{
+			owner: 'ConversationManager',
+			shape: 'ConversationInput',
+			open: (stray) => {
+				const manager = createConversationManager()
+				return invokeUnchecked(manager, manager.add, [{ ...stray }])
+			},
+		},
+		{
+			owner: 'Instruction',
+			shape: 'InstructionInput',
+			open: (stray) =>
+				invokeUnchecked(undefined, createInstruction, [
+					{ name: 'tone', content: 'Be brief.', ...stray },
+				]),
+		},
+		{
+			owner: 'Instruction',
+			shape: 'InstructionInput',
+			open: (stray) =>
+				new Instruction(
+					invokeUnchecked(undefined, Object.assign, [
+						{},
+						{ name: 'tone', content: 'Be brief.' },
+						stray,
+					]),
+				),
+		},
+		{
+			owner: 'InstructionManager',
+			shape: 'InstructionManagerOptions',
+			open: (stray) => invokeUnchecked(undefined, createInstructionManager, [{ ...stray }]),
+		},
+		{
+			owner: 'InstructionManager',
+			shape: 'InstructionInput',
+			open: (stray) => {
+				const manager = createInstructionManager()
+				return invokeUnchecked(manager, manager.add, [
+					[
+						{ name: 'tone', content: 'Be brief.' },
+						{ name: 'reply', content: 'Reply.', ...stray },
+					],
+				])
+			},
+		},
+		{
+			owner: 'MemoManager',
+			shape: 'MemoManagerOptions',
+			open: (stray) => invokeUnchecked(undefined, createMemoManager, [{ ...stray }]),
+		},
+		{
+			owner: 'MemoManager',
+			shape: 'MemoManagerOptions',
+			open: (stray) => new MemoManager(invokeUnchecked(undefined, Object.assign, [{}, stray])),
+		},
+		{
+			owner: 'MemoManager',
+			shape: 'MemoInput',
+			open: (stray) => {
+				const manager = createMemoManager()
+				return invokeUnchecked(manager, manager.add, [
+					{ name: 'pref', description: 'Contact preference', content: 'Email.', ...stray },
+				])
+			},
+		},
+		{
+			owner: 'ScopeManager',
+			shape: 'ScopeManagerOptions',
+			open: (stray) => invokeUnchecked(undefined, createScopeManager, [{ ...stray }]),
+		},
+		{
+			owner: 'SkillManager',
+			shape: 'SkillManagerOptions',
+			open: (stray) => invokeUnchecked(undefined, createSkillManager, [{ ...stray }]),
+		},
+		{
+			owner: 'SkillManager',
+			shape: 'SkillManagerOptions',
+			open: (stray) => new SkillManager(invokeUnchecked(undefined, Object.assign, [{}, stray])),
+		},
+		{
+			owner: 'SkillManager',
+			shape: 'SkillInput',
+			open: (stray) => {
+				const manager = createSkillManager()
+				return invokeUnchecked(manager, manager.add, [
+					{ name: 'billing', description: 'Billing', content: 'Refund.', ...stray },
+				])
+			},
+		},
+		{
+			owner: 'Classifier',
+			shape: 'ClassifierOptions',
+			open: (stray) =>
+				new Classifier(
+					invokeUnchecked(undefined, Object.assign, [{}, buildClassifierOptions(), stray]),
+				),
+		},
+		{
+			owner: 'Gauge',
+			shape: 'GaugeOptions',
+			open: (stray) =>
+				new Gauge(
+					invokeUnchecked(undefined, Object.assign, [
+						{},
+						{ scale: 1, overhead: 0, capacity: 4096 },
+						stray,
+					]),
+				),
+		},
+		{
+			owner: 'factories',
+			shape: 'RelayOptions',
+			open: (stray) =>
+				invokeUnchecked(undefined, createRelay, [{ provider, authorize: () => true, ...stray }]),
+		},
+		{
+			owner: 'RelayProvider',
+			shape: 'RelayProviderOptions',
+			open: (stray) =>
+				invokeUnchecked(undefined, createRelayProvider, [{ url: wire.url, ...stray }]),
+		},
+		{
+			owner: 'RelayProvider',
+			shape: 'RelayProviderOptions',
+			open: (stray) =>
+				new RelayProvider(
+					invokeUnchecked(undefined, Object.assign, [{}, { url: wire.url }, stray]),
+				),
+		},
+		{
+			owner: 'RelayStream',
+			shape: 'RelayStreamOptions',
+			open: (stray) =>
+				new RelayStream(
+					invokeUnchecked(undefined, Object.assign, [
+						{},
+						{ provider, request: { messages: [] }, signal: new AbortController().signal },
+						stray,
+					]),
+				),
+		},
+		{
+			owner: 'AgentProvider',
+			shape: 'AgentProviderInput',
+			open: (stray) =>
+				new ScriptedWire(invokeUnchecked(undefined, Object.assign, [{}, wire, stray])),
+		},
+		{
+			owner: 'AgentProvider',
+			shape: 'ProviderStreamOptions',
+			open: (stray) => {
+				const scripted = new ScriptedWire(wire)
+				return invokeUnchecked<AsyncGenerator<unknown>>(scripted, scripted.stream, [
+					[],
+					new AbortController().signal,
+					undefined,
+					{ ...stray },
+				]).next()
+			},
+		},
+		{
+			owner: 'AgentProvider',
+			shape: 'ProviderStreamOptions',
+			open: (stray) => {
+				const scripted = new ScriptedWire(wire)
+				return invokeUnchecked(scripted, scripted.generate, [
+					[],
+					new AbortController().signal,
+					undefined,
+					{ ...stray },
+				])
+			},
+		},
+		{
+			owner: 'AgentJudge',
+			shape: 'AgentJudgeInput',
+			open: (stray) =>
+				new ScriptedJudge(
+					invokeUnchecked(undefined, Object.assign, [{}, { ...wire, model: 'judge' }, stray]),
+				),
+		},
+		{
+			owner: 'SystemOneJudge',
+			shape: 'SystemOneJudgeOptions',
+			open: (stray) =>
+				invokeUnchecked(undefined, createSystemOneJudge, [{ ...wire, model: 'judge', ...stray }]),
+		},
+	]
+}
+
+/**
+ * Reads what refused a census door, a synchronous throw and a rejection alike.
+ *
+ * @param door - The door
+ * @returns The refusal, or `undefined` when the door admitted the stray
+ */
+export async function readDoorRefusal(door: OptionDoor): Promise<unknown> {
+	return Promise.resolve()
+		.then(() => door.open(OPTION_DOOR_STRAY))
+		.then(
+			() => undefined,
+			(reason: unknown) => reason,
+		)
+}
+
+// ── Refusals: the stored record inputs (claims F-R1, F-R2, F-R5, and F-R6) ────
+//
+// An instruction, a memo, and a skill input is a record: it refuses a missing required member, an
+// undeclared member, and a declared member spelled `undefined`. A seeded draw mixes each member's
+// forms, so a test reads what `add` admits against what the record's own reader admits.
+
+/** Holds one stored record input type: an input holding each declared member, and the members it requires. */
+export interface RecordInputFixture {
+	readonly shape: string
+	readonly full: Readonly<Record<string, unknown>>
+	readonly required: readonly string[]
+}
+
+/** Holds the record input fixtures of an instruction, a memo, and a skill, each member admitted. */
+export const RECORD_INPUT_FIXTURES: Readonly<
+	Record<'instruction' | 'memo' | 'skill', RecordInputFixture>
+> = Object.freeze({
+	instruction: Object.freeze({
+		shape: 'InstructionInput',
+		full: Object.freeze({
+			name: 'tone',
+			content: 'Be brief.',
+			priority: 5,
+			override: 'Answer in one line.',
+		}),
+		required: Object.freeze(['name', 'content']),
+	}),
+	memo: Object.freeze({
+		shape: 'MemoInput',
+		full: Object.freeze({
+			name: 'pref',
+			description: 'Contact preference',
+			content: 'Email.',
+			origin: Object.freeze({ conversation: 'c1', message: 'm1' }),
+		}),
+		required: Object.freeze(['name', 'description', 'content']),
+	}),
+	skill: Object.freeze({
+		shape: 'SkillInput',
+		full: Object.freeze({
+			name: 'billing',
+			description: 'Billing',
+			content: 'Refund.',
+			tools: Object.freeze(['refund']),
+			files: Object.freeze([
+				Object.freeze({
+					path: 'checklist.md',
+					content: Object.freeze({ text: '- Tests pass', language: 'markdown' }),
+				}),
+			]),
+		}),
+		required: Object.freeze(['name', 'description', 'content']),
+	}),
+})
+
+/** Names one record input a door refuses: what it holds and the path its refusal names first. */
+export interface RecordInputRefusal {
+	readonly name: string
+	readonly input: Readonly<Record<string, unknown>>
+	readonly path: readonly string[]
+}
+
+/**
+ * Builds the inputs a record door refuses: each declared member spelled `undefined`, each required
+ * member omitted, and one undeclared member.
+ *
+ * @param fixture - The record input fixture
+ * @returns The refused inputs, each with the path its refusal names
+ */
+export function buildRecordInputRefusals(
+	fixture: RecordInputFixture,
+): readonly RecordInputRefusal[] {
+	return [
+		...Object.keys(fixture.full).map((key) => ({
+			name: `${key} spelled undefined`,
+			input: { ...fixture.full, [key]: undefined },
+			path: [key],
+		})),
+		...fixture.required.map((key) => ({
+			name: `${key} omitted`,
+			input: omitMember(fixture.full, key),
+			path: [key],
+		})),
+		{ name: 'an undeclared member', input: { ...fixture.full, stray: true }, path: ['stray'] },
+	]
+}
+
+/** Lists the forms a seeded record input draws for one member, its declared value weighted most. */
+export const RECORD_MEMBER_FORMS = Object.freeze([
+	'declared',
+	'declared',
+	'declared',
+	'declared',
+	'declared',
+	'absent',
+	'undefined',
+	'other',
+] as const)
+
+/**
+ * Draws a record input from a fixture: each member its declared value, absent, spelled `undefined`,
+ * or a value of another type, and at times one undeclared member.
+ *
+ * @param fixture - The record input fixture
+ * @param random - The seeded random source
+ * @returns The drawn input, which the record's door can admit or refuse
+ */
+export function drawRecordInput(
+	fixture: RecordInputFixture,
+	random: RandomFunction,
+): Readonly<Record<string, unknown>> {
+	const members = Object.entries(fixture.full).flatMap(([key, value]) => {
+		const form = RECORD_MEMBER_FORMS[Math.floor(random() * RECORD_MEMBER_FORMS.length)]
+		if (form === 'absent') return []
+		if (form === 'undefined') return [[key, undefined] as const]
+		if (form === 'other') return [[key, typeof value === 'number' ? 'high' : 7] as const]
+		return [[key, value] as const]
+	})
+	return Object.fromEntries(random() < 0.1 ? [...members, ['stray', true] as const] : members)
+}
+
+/** Holds a message input as a class instance: its members are its own, but it is no plain record. */
+export class MessageInstance {
+	readonly role = 'user'
+	readonly content = 'Where is my order?'
+}
+
+/** Names a message input that is no plain record. */
+export interface NonPlainMessage {
+	readonly name: string
+	readonly input: object
+}
+
+/**
+ * Builds message inputs that are no plain record: a class instance, and an object that inherits its
+ * role.
+ *
+ * @returns The named inputs
+ */
+export function buildNonPlainMessages(): readonly NonPlainMessage[] {
+	return [
+		{ name: 'a class instance', input: new MessageInstance() },
+		...UNDECLARED_FORMS.filter((form) => form.name === 'inherited').map((form) => ({
+			name: 'an object that inherits its role',
+			input: form.build({ content: 'Where is my order?' }, 'role', 'user'),
+		})),
+	]
 }

@@ -12,12 +12,13 @@ import {
 	isObject,
 	isRecord,
 	isString,
+	literalOf,
 	optionalOf,
 	recordOf,
 	unionOf,
 } from '@orkestrel/contract'
 import { isToolCall } from '@orkestrel/tool'
-import { MESSAGE_ROLES } from '../constants.js'
+import { CONVERSATION_ROLES, MESSAGE_ROLES } from '../constants.js'
 import { isJudgeAnswer, isJudgeQuestion } from '../validators.js'
 
 /**
@@ -64,13 +65,17 @@ export function isMessage(value: unknown): value is Message {
 }
 
 /**
- * Checks whether a value is a message input a conversation can store: a string `content`, and `calls`,
- * `call`, `images`, and `thinking` absent or of their declared types.
+ * Checks whether a value is a message input a conversation can store: a `ConversationRole`, a string
+ * `content`, and `calls`, `call`, `images`, and `thinking` absent or of their declared types.
  *
  * @remarks
- * A hand guard, because `add` checks every message: it reads the members once and composes no record
- * guard. The role is `requireRole`'s to refuse, so its text can name the role received. Unknown members
- * are left behind by the store. An unreadable member returns false.
+ * An exact record, because a stored message is one: a value that is not a plain record, such as a
+ * class instance or an object that inherits its `role`, returns false through `recordOf`'s own plain
+ * record check, as does a member `MessageInput` does not declare or a declared optional member holding
+ * `undefined`. Each tool call crosses `isToolCall` of
+ * `@orkestrel/tool`, whose interface admits more members, so the store keeps `id`, `name`, and
+ * `arguments` and leaves the rest. `add` reads the role through `requireRole` first, so its text can
+ * name the role received. An unreadable member returns false.
  *
  * @param value - The unknown input candidate
  * @returns True if the input's members are valid; false otherwise
@@ -80,20 +85,17 @@ export function isMessage(value: unknown): value is Message {
  * isMessageInput({ role: 'user' }) // false
  * ```
  */
-export function isMessageInput(value: unknown): value is MessageInput {
-	const checked = attempt(() => {
-		if (!isRecord(value)) return false
-		const { content, calls, call, images, thinking } = value
-		return (
-			isString(content) &&
-			(calls === undefined || arrayOf(isToolCall)(calls)) &&
-			(call === undefined || isString(call)) &&
-			(images === undefined || arrayOf(isString)(images)) &&
-			(thinking === undefined || isString(thinking))
-		)
-	})
-	return checked.success && checked.value
-}
+export const isMessageInput: Guard<MessageInput> = recordOf(
+	{
+		role: literalOf(CONVERSATION_ROLES),
+		content: isString,
+		calls: arrayOf(isToolCall),
+		call: isString,
+		images: arrayOf(isString),
+		thinking: isString,
+	},
+	['calls', 'call', 'images', 'thinking'],
+)
 
 /**
  * Checks whether a stored judgment carries a valid question and exactly one answer or refusal.

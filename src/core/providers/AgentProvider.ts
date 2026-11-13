@@ -13,8 +13,9 @@ import type {
 import type { Message, ThinkingReplay } from '../types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
 import { linkSignal } from '@orkestrel/abort'
+import { refuseOptionKeys } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
-import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
+import { DEFAULT_PROVIDER_TIMEOUT, PROVIDER_INPUT_KEYS, STREAM_OPTION_KEYS } from './constants.js'
 import {
 	isProviderAbortError,
 	isProviderError,
@@ -98,6 +99,7 @@ export abstract class AgentProvider<
 	readonly #strict: boolean
 
 	constructor(input: AgentProviderInput) {
+		refuseOptionKeys(input, PROVIDER_INPUT_KEYS, 'AgentProvider', 'AgentProviderInput')
 		this.#id = crypto.randomUUID()
 		this.#replay = input.replay ?? 'none'
 		this.#url = input.url
@@ -171,6 +173,7 @@ export abstract class AgentProvider<
 		tools?: readonly ToolDefinition[],
 		options?: ProviderStreamOptions,
 	): AsyncGenerator<ProviderDelta, ProviderResult> {
+		refuseOptionKeys(options, STREAM_OPTION_KEYS, 'AgentProvider', 'ProviderStreamOptions')
 		if (signal.aborted) throw new ProviderAbortError({ content: '' })
 		const timeout = new Timeout({ ms: this.#timeout })
 		timeout.start()

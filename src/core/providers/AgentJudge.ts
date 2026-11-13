@@ -1,9 +1,9 @@
 import type { AgentJudgeInput, AgentJudgeInterface, ProviderOptions } from './types.js'
 import type { JudgeRequest, JudgeResult } from '../types.js'
 import { linkSignal } from '@orkestrel/abort'
-import { describeFaults, isRecord, parseJSON } from '@orkestrel/contract'
+import { describeFaults, isRecord, parseJSON, refuseOptionKeys } from '@orkestrel/contract'
 import { Timeout } from '@orkestrel/timeout'
-import { DEFAULT_PROVIDER_TIMEOUT } from './constants.js'
+import { DEFAULT_PROVIDER_TIMEOUT, JUDGE_INPUT_KEYS } from './constants.js'
 import { JudgeError } from './errors.js'
 import { copyJSON } from '../cloners.js'
 import { judgeAnswerContract, judgeQuestionContract } from '../contracts.js'
@@ -66,6 +66,7 @@ export abstract class AgentJudge implements AgentJudgeInterface {
 	readonly #batch: boolean
 
 	constructor(input: AgentJudgeInput) {
+		refuseOptionKeys(input, JUDGE_INPUT_KEYS, 'AgentJudge', 'AgentJudgeInput')
 		this.#id = crypto.randomUUID()
 		this.#url = input.url
 		this.#path = input.path ?? ''

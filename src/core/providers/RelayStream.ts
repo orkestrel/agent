@@ -1,6 +1,7 @@
 import type { ProviderDelta, ProviderResult, RelayFrame, RelayStreamOptions } from './types.js'
 import type { ThinkingReplay } from '../types.js'
-import { RELAY_CONTENT_TYPE, RELAY_PROVIDER_MESSAGE } from './constants.js'
+import { refuseOptionKeys } from '@orkestrel/contract'
+import { RELAY_CONTENT_TYPE, RELAY_PROVIDER_MESSAGE, RELAY_STREAM_KEYS } from './constants.js'
 import { ProviderError, isProviderAbortError } from './errors.js'
 import { relayFrameContract } from './contracts.js'
 import { stripThinking } from '../helpers.js'
@@ -36,6 +37,7 @@ export class RelayStream {
 	#settled = false
 
 	constructor(options: RelayStreamOptions) {
+		refuseOptionKeys(options, RELAY_STREAM_KEYS, 'RelayStream', 'RelayStreamOptions')
 		this.#replay = options.provider.replay ?? 'none'
 		this.#signal = options.signal
 		this.#listener = this.#abort.bind(this)

@@ -1,4 +1,14 @@
-import type { AgentContextInterface, MessageInput, Message, Selection } from '@src/core'
+import type {
+	AgentContextInterface,
+	MessageInput,
+	Message,
+	Selection,
+	AgentContextOptions,
+	ContextBuildOptions,
+	CONTEXT_OPTION_KEYS,
+	BUILD_OPTION_KEYS,
+} from '@src/core'
+import { isContractError } from '@orkestrel/contract'
 import { isContextError } from '@src/core'
 import { captureError } from '@orkestrel/test'
 import { Tool, ToolManager } from '@orkestrel/tool'
@@ -21,7 +31,7 @@ import {
 	WORKSPACE_INDEX_HEADER,
 	WORKSPACE_SECTION_HEADER,
 } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, expectTypeOf } from 'vitest'
 import {
 	CANARY_BUILD_SOURCES,
 	CANARY_SENTINELS,
@@ -35,6 +45,8 @@ import {
 	seedInstructionContext,
 	seedWorkspaceContext,
 	SELECTION_USAGE,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 import { requireValue } from '@orkestrel/test'
 
@@ -2303,5 +2315,31 @@ describe('AgentContext — the shown workspace and the workspace index (claim 2.
 		expect(hidden.map((message) => message.content).join('\n')).not.toContain(
 			WORKSPACE_INDEX_HEADER,
 		)
+	})
+})
+
+describe('AgentContext — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) =>
+				door.owner === 'AgentContext' &&
+				['AgentContextOptions', 'ContextBuildOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof AgentContextOptions, (typeof CONTEXT_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
+		expectTypeOf<
+			Exclude<keyof ContextBuildOptions, (typeof BUILD_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

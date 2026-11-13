@@ -17,6 +17,7 @@ import type {
 import type { QueueInterface } from '@orkestrel/queue'
 import type { RunnerInterface } from '@orkestrel/workflow'
 import type { ToolInterface, ToolOptions } from '@orkestrel/tool'
+import { refuseOptionKeys } from '@orkestrel/contract'
 import { createQueue } from '@orkestrel/queue'
 import { createRunner } from '@orkestrel/workflow'
 import { createTool } from '@orkestrel/tool'
@@ -26,7 +27,7 @@ import { Channel } from './Channel.js'
 import { Authority } from './Authority.js'
 import { Approver } from './Approver.js'
 import { AgentRegistry } from './AgentRegistry.js'
-import { BUILTIN_TOOLS } from './constants.js'
+import { BUILTIN_TOOLS, QUEUE_OPTION_KEYS, RUNNER_OPTION_KEYS } from './constants.js'
 import { extractQueueOptions, handleAgentQueueJob } from './helpers.js'
 import { builtinToolContracts } from './contracts.js'
 
@@ -261,6 +262,7 @@ export function createAgentRegistry(options: AgentRegistryOptions): AgentRegistr
 export function createAgentQueue(
 	options: AgentQueueOptions,
 ): QueueInterface<AgentJobInput, AgentResult> {
+	refuseOptionKeys(options, QUEUE_OPTION_KEYS, 'createAgentQueue', 'AgentQueueOptions')
 	const { registry, partial = false, store } = options
 	return createQueue<AgentJobInput, AgentResult>({
 		...extractQueueOptions(options),
@@ -310,6 +312,7 @@ export function createAgentQueue(
 export function createAgentRunner(
 	options: AgentRunnerOptions,
 ): RunnerInterface<AgentJobInput, AgentResult> {
+	refuseOptionKeys(options, RUNNER_OPTION_KEYS, 'createAgentRunner', 'AgentRunnerOptions')
 	const { registry, partial = false } = options
 	const fanout = new AgentFanout(registry, partial)
 	return createRunner<AgentJobInput, AgentResult>({

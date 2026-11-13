@@ -391,8 +391,8 @@ export interface LedgerGaugeSnapshot extends LedgerGauge {
  * unanswered as a repeat, before its `evaluate` method and with no ask, and its `ask` refuses the
  * identical twin in the same batch of a declined or unanswered ask without calling this authority's
  * `ask`, so a person is asked about such a call once per request. The agent still reports that
- * twin's `ask` event. `builtins` enables the built-in tools and `disclosure` shows skills and a
- * workspace, as `AgentOptions` describes them. A ledger with `builtins` requires `authority`:
+ * twin's `ask` event. `builtins` enables the built-in tools and `workspace` names the workspace
+ * every request renders, as `AgentOptions` describes them. A ledger with `builtins` requires `authority`:
  * construction throws `AgentError` with code `'AUTHORITY'` without it. The ledger tests each
  * built-in call for a repeat and for room before this authority reads it, and every call it admits
  * reaches this authority's `evaluate` and, when asked, its `ask`. While `builtins` enables `load`,
@@ -411,7 +411,7 @@ export type LedgerAgentOptions = Pick<
 	| 'strict'
 	| 'authority'
 	| 'builtins'
-	| 'disclosure'
+	| 'workspace'
 >
 
 /**
@@ -446,6 +446,9 @@ export type LedgerAgentOptions = Pick<
  * the marked ids a ledger's `snapshot()` returned; construction throws `LedgerError` with code
  * `'SNAPSHOT'` when `isLedgerSnapshot` refuses it, and `ConversationError` with code `'ROLE'` or
  * `'SNAPSHOT'` when its conversation holds a `system` message or repeats an id.
+ * An own enumerable member this type or the `agent` pick does not declare refuses at construction
+ * with a `ContractError` coded `'structure'`, an `AgentOptions` member the pick leaves out included,
+ * and a declared member holding `undefined` reads as omitted.
  */
 export interface LedgerOptions {
 	readonly judge: JudgeInterface
@@ -809,7 +812,9 @@ export interface LedgerInterface {
 	 * reply's text and `partial: false`, or partial with empty content when the reply carries no text. A rejected first pass counts as unfinished; when the
 	 * answer pass rejects as well, `respond` rejects with that pass's error. A `respond` or `calibrate` call while either is in flight
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
-	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
+	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error. A calibration call, with the
+	 * tool definitions, without them, or with the workspace text, that reports a prompt over `capacity`, the head included,
+	 * rejects with the same code and stores no request.
 	 * Every run on the ledger's agent is a pass of this method, because `agent` holds no `generate` or
 	 * `stream` member. A direct call to `agent.context.select` for a message no active `respond` call
 	 * owns returns a selection whose `fault` is a `LedgerError` with code `'REQUEST'`, on
@@ -825,6 +830,7 @@ export interface LedgerInterface {
 	 * @param signal - An optional caller signal; an abort during calibration rejects with its reason; afterward it ends the request partial and skips the answer pass
 	 * @returns The reply, the passes the request took, and the filing attempts of this request alone
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
 	 */
@@ -833,16 +839,25 @@ export interface LedgerInterface {
 	 * Measures the gauge, holds it as `gauge`, and returns it.
 	 *
 	 * @remarks
-	 * The ledger sends the head its agent's context builds and its conversation's view to the provider twice, with
-	 * and without the tool definitions. The call without tools prices the messages and the
-	 * difference between the calls is the overhead cost. The ledger records the digest of the
+	 * The ledger sends the head its agent's context builds for an empty turn, with no workspace text and
+	 * no conversation message, to the provider with the calibrated tool definitions and then without
+	 * them, and the difference between the calls is the overhead cost. When the workspace the next
+	 * request renders adds text, a third call carries the head and that text with no definitions, cut
+	 * to the capacity the second call left over `LEDGER_SAMPLE_BYTES`, in characters. The scale is the
+	 * reported prompt of the head with the workspace over its estimate, a cut text's tokens scaled to the
+	 * whole text's estimate, and never under the head's own rate; with no workspace text it is the
+	 * second call's prompt over the head's estimate. When the call with the definitions reports a
+	 * prompt over `capacity`, the head included, the ledger sends no second call, stores no gauge, and
+	 * rejects with `LedgerError` code `'GAUGE'`, whose `context` holds `capacity` and `prompt`; the
+	 * call without them and the call with the workspace text refuse the same way. The ledger records the digest of the
 	 * definitions the call with tools carried, and its snapshot stores that digest with the gauge.
 	 * An abort during calibration rejects with the abort reason. A call during `respond` or `calibrate` rejects
 	 * with `AgentError` code `'CONCURRENCY'`.
 	 *
-	 * @param signal - The signal that aborts both calls
+	 * @param signal - The signal that aborts every calibration call
 	 * @returns The measured gauge
 	 * @throws {LedgerError} Thrown when a call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	calibrate(signal: AbortSignal): Promise<LedgerGauge>
@@ -1285,7 +1300,7 @@ export type LedgerErrorCode =
 	| 'TOPIC'
 	/** Reports a lookup tool named `recall` or a name another lookup tool carries. */
 	| 'LOOKUP'
-	/** Reports a supplied gauge outside its bounds, or a calibration call that reports no prompt usage, or a prompt usage of 0 or less. */
+	/** Reports a supplied gauge outside its bounds, a calibration call that reports no prompt usage or a prompt usage of 0 or less, or a calibration call, with the tool definitions, without them, or with the workspace text, that prices a prompt over `capacity`, the head included. */
 	| 'GAUGE'
 	/** Reports a render context that holds no reference for a source it annotates. */
 	| 'REFERENCE'

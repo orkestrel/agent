@@ -48,6 +48,7 @@ import { createAbort, linkSignal } from '@orkestrel/abort'
 import {
 	describeFaults,
 	admitValue,
+	refuseOptionKeys,
 	attempt,
 	canonicalStringify,
 	isError,
@@ -58,6 +59,7 @@ import {
 	stringShape,
 } from '@orkestrel/contract'
 import { createTool, createToolManager, isToolError } from '@orkestrel/tool'
+import { isTextContent } from '@orkestrel/workspace'
 import { Authority } from '../agents/Authority.js'
 import { builtinToolContracts } from '../agents/contracts.js'
 import { createAgent } from '../agents/factories.js'
@@ -69,7 +71,7 @@ import {
 	filterAdvertisedTools,
 	filterBuiltinCandidates,
 	requireBuiltins,
-	requireDisclosure,
+	requireWorkspace,
 	resolveDisclosure,
 	settleToolResult,
 } from '../agents/helpers.js'
@@ -95,10 +97,13 @@ import { LedgerScan } from './LedgerScan.js'
 import {
 	DEFAULT_LEDGER_LIMIT,
 	DEFAULT_LEDGER_SHARE,
+	LEDGER_AGENT_KEYS,
 	LEDGER_NOTES,
+	LEDGER_OPTION_KEYS,
 	LEDGER_OWNER_PREFIX,
 	LEDGER_RECALL_LABELS,
 	LEDGER_RULES_KEY,
+	LEDGER_SAMPLE_BYTES,
 	LEDGER_SCALE_DRIFT,
 } from './constants.js'
 import { isLedgerError, LedgerError } from './errors.js'
@@ -133,6 +138,7 @@ import {
 	computeToolDensity,
 	computeToolPrice,
 	cutListing,
+	cutWorkspaceSample,
 	linkOwners,
 	matchEntities,
 	rankLedgerCut,
@@ -168,9 +174,9 @@ export class Ledger implements LedgerInterface {
 	readonly #conversation: ConversationInterface
 	readonly #agent: AgentInterface
 	readonly #record: LedgerAgentInterface
-	// The built-ins the agent enables, and what the host shows every run, owned at construction.
+	// The built-ins the agent enables, and the workspace every run renders, checked at construction.
 	readonly #builtins: readonly AgentBuiltin[]
-	readonly #given: AgentDisclosure | undefined
+	readonly #given: string | undefined
 	readonly #classifier: Classifier
 	readonly #requests = new Set<string>()
 	readonly #annotations = new Set<string>()
@@ -201,6 +207,8 @@ export class Ledger implements LedgerInterface {
 	 * @throws {ConversationError} Thrown when `isLedgerSnapshot` admits `snapshot` but its conversation holds a `system` message (code `'ROLE'`) or repeats an id (code `'SNAPSHOT'`)
 	 */
 	constructor(provider: ProviderInterface, options: LedgerOptions) {
+		refuseOptionKeys(options, LEDGER_OPTION_KEYS, 'Ledger', 'LedgerOptions')
+		refuseOptionKeys(options.agent, LEDGER_AGENT_KEYS, 'Ledger agent', 'LedgerAgentOptions')
 		for (const key of ['category', 'topic', 'correction', 'amends', 'supersedes'] as const) {
 			const value = options.thresholds[key]
 			if (!isFraction(value))
@@ -316,7 +324,7 @@ export class Ledger implements LedgerInterface {
 				'AUTHORITY',
 				"agent.builtins are set and no agent.authority is; pass authority: createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }) to allow every call, or rules with a deny fallback",
 			)
-		this.#given = requireDisclosure(options.agent?.disclosure)
+		this.#given = requireWorkspace(options.agent?.workspace)
 		// The ledger allows exactly the names it advertises, so a tool a host adds to the agent's manager
 		// later is denied instead of inheriting those names' trust. With a host authority, the ledger keeps
 		// that deny and its own allow for recall, and every lookup, write, and built-in answers to the host.
@@ -448,9 +456,10 @@ export class Ledger implements LedgerInterface {
 
 	/**
 	 * Measures message scale and tool overhead from provider prompt usage.
-	 * @param signal - The signal bounding both calibration calls; an abort rejects with its reason
+	 * @param signal - The signal bounding every calibration call; an abort rejects with its reason
 	 * @returns The stored scale and overhead cost
-	 * @throws {LedgerError} Thrown when either call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 */
 	async calibrate(signal: AbortSignal): Promise<LedgerGauge> {
@@ -512,13 +521,14 @@ export class Ledger implements LedgerInterface {
 	/**
 	 * Appends a request and serves it, recovering an unfinished or rejected first pass with one answer pass.
 	 * In either pass, a call the model makes in a turn that advertises no tools runs nothing and ends the pass after that generation, whatever the agent's `limit`, and when every call of that turn failed, the ledger stores the reply without its calls: a reply with text ends the pass complete, and one without text ends it partial with empty content.
-	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error.
+	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error. A calibration call, with the tool definitions, without them, or with the workspace text, that reports a prompt over `capacity`, the head included, rejects with the same code and stores no request.
 	 * When the answer pass rejects, `respond` rejects with that error, and under the default `strict` a judge failure or another selection failure rejects it too. A rejection belongs to its own call: the ledger stays free, and the next call asks the judge again about whatever is still unanswered.
 	 * @param content - The request text
 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
 	 * @returns The final pass, the usage of every pass, and the filing attempts of this request alone
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
+	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when the answer pass prices over `capacity - predict` with its note left out, or a host act after the note grows its request past that limit (code `'OVERFLOW'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
 	 */
@@ -623,37 +633,32 @@ export class Ledger implements LedgerInterface {
 
 	async #measureGauge(signal: AbortSignal): Promise<LedgerGauge> {
 		try {
-			// The empty turn stands where the request will, so a workspace's images have a user turn to
-			// read, and it leaves with them: calibration prices text.
-			const messages = stripThinking(
-				this.#agent.context.build({
-					selection: {
-						messages: [
-							...this.#conversation.view(),
-							{ id: 'calibration', role: 'user', content: '' },
-						],
-						judgments: [],
-					},
-				}),
-				this.#replay,
-			).slice(0, -1)
+			// The sample is the head alone under the ceiling with no workspace: no conversation message
+			// and no workspace text, so a thread's length or a workspace's size moves neither of these two calls.
+			const messages = this.#agent.context.build({
+				selection: { messages: [], judgments: [] },
+				scope: createScope({ name: 'calibration', workspaces: [] }),
+			})
 			const definitions = this.#calibrated()
 			const priced = await this.#provider.generate(messages, signal, definitions, {
 				think: false,
 			})
+			this.#refuseOverCapacity('with', priced.usage?.prompt)
 			const bare = await this.#provider.generate(messages, signal, undefined, { think: false })
+			this.#refuseOverCapacity('without', bare.usage?.prompt)
 			if (
 				!isFiniteNumber(priced.usage?.prompt) ||
 				priced.usage.prompt <= 0 ||
 				!isFiniteNumber(bare.usage?.prompt) ||
 				bare.usage.prompt <= 0
 			)
-				throw new LedgerError('GAUGE', 'calibration requires prompt usage from both calls')
+				throw new LedgerError('GAUGE', 'calibration requires prompt usage from each call')
+			const scale = await this.#measureScale(messages, bare.usage.prompt, signal)
 			this.#gauge = new Gauge({
 				capacity: this.#options.capacity,
 				predict: this.#predict,
 				replay: this.#replay,
-				scale: bare.usage.prompt / estimateMessages(messages),
+				scale,
 				overhead: Math.max(0, priced.usage.prompt - bare.usage.prompt),
 			})
 			this.#measured = definitions
@@ -662,6 +667,61 @@ export class Ledger implements LedgerInterface {
 			signal.throwIfAborted()
 			throw error
 		}
+	}
+
+	// The head's rate, or, when the workspace the next request renders adds text, the higher of that rate
+	// and the rate a third call reads on the head with that text cut to what the window left, its tokens
+	// scaled from the cut text's estimate to the whole text's.
+	async #measureScale(
+		head: readonly Message[],
+		bare: number,
+		signal: AbortSignal,
+	): Promise<number> {
+		const rate = bare / estimateMessages(head)
+		const workspace = this.#show(intersectFilters(this.#agent.context.scope, undefined)).workspace
+		const workspaces = this.#agent.context.workspaces
+		const files = (
+			(workspace === undefined ? workspaces.active : workspaces.workspace(workspace))?.files() ?? []
+		).flatMap((file) => (isTextContent(file.content) ? [file.path] : []))
+		// The sample carries the workspace's text alone: an image needs a user turn, which it holds none of.
+		const shown = this.#agent.context.build({
+			selection: { messages: [], judgments: [] },
+			scope: createScope({ name: 'calibration', files }),
+			disclosure: { skills: [], ...(workspace === undefined ? {} : { workspace }) },
+		})
+		const whole = estimateMessages(shown) - estimateMessages(head)
+		const cut = cutWorkspaceSample(
+			head,
+			shown,
+			Math.floor((this.#options.capacity - bare) / LEDGER_SAMPLE_BYTES),
+		)
+		const part = cut === undefined ? 0 : estimateMessages(cut) - estimateMessages(head)
+		// No workspace text, or none the window left room for, keeps the head's rate.
+		if (cut === undefined || whole <= 0 || part <= 0) return rate
+		const third = await this.#provider.generate(cut, signal, undefined, { think: false })
+		this.#refuseOverCapacity('workspace', third.usage?.prompt)
+		if (!isFiniteNumber(third.usage?.prompt) || third.usage.prompt <= 0)
+			throw new LedgerError('GAUGE', 'calibration requires prompt usage from each call')
+		const tokens = bare + ((third.usage.prompt - bare) * whole) / part
+		return Math.max(rate, tokens / estimateMessages(shown))
+	}
+
+	// A calibration call the window cannot carry whole measures nothing the gauge can hold, so a finite
+	// reported prompt over the capacity refuses before a gauge is stored, naming the call and its remedy.
+	#refuseOverCapacity(call: 'with' | 'without' | 'workspace', prompt: number | undefined): void {
+		const capacity = this.#options.capacity
+		const subject =
+			call === 'workspace' ? 'with the workspace text' : `${call} the tool definitions`
+		const remedy =
+			call === 'workspace'
+				? 'narrow what the scope shows of the workspace, or raise capacity'
+				: 'hold tools behind a skill with the `load` built-in, register fewer tools, or raise capacity'
+		if (isFiniteNumber(prompt) && prompt > capacity)
+			throw new LedgerError(
+				'GAUGE',
+				`the calibration call ${subject} prices ${prompt} tokens, the head included, over the capacity ${capacity}; ${remedy}`,
+				{ context: { capacity, prompt } },
+			)
 	}
 
 	async #generatePass(
@@ -1971,7 +2031,7 @@ export class Ledger implements LedgerInterface {
 		return definitions.filter((tool) => !held.has(tool.name))
 	}
 
-	// What the host and the thread show within a ceiling, as a run resolves it.
+	// What the thread shows within a ceiling, with the given workspace, as a run resolves it.
 	#show(ceiling: ScopeFilter): AgentDisclosure {
 		return resolveDisclosure(
 			this.#agent.context,

@@ -1,9 +1,15 @@
-import type { JudgeAnswer, LedgerTopic, Message } from '@src/core'
+import type {
+	JudgeAnswer,
+	LedgerTopic,
+	Message,
+	ClassifierOptions,
+	CLASSIFIER_OPTION_KEYS,
+} from '@src/core'
 import { createConversation, createLedger, JudgeAbortError } from '@src/core'
-import { isRecord } from '@orkestrel/contract'
+import { isRecord, isContractError } from '@orkestrel/contract'
 import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it, onTestFinished, expectTypeOf } from 'vitest'
 import { Classifier } from '../../../../src/core/ledgers/Classifier.js'
 import {
 	DETERMINISTIC_JUDGE_ERROR,
@@ -51,6 +57,8 @@ import {
 	SequentialSystemOneJudge,
 	summarizeAttempts,
 	SwitchableJudge,
+	buildOptionDoors,
+	readDoorRefusal,
 } from '../../../setup.js'
 
 describe('Classifier', () => {
@@ -1769,5 +1777,26 @@ describe('Classifier', () => {
 		expect(result.fault?.message).toBe('scheduler fault')
 		expect(result.attempts).toEqual([])
 		expect(judge.requests).toEqual([])
+	})
+})
+
+describe('Classifier — the census door refuses a member its type does not declare', () => {
+	it.each(
+		buildOptionDoors().filter(
+			(door) => door.owner === 'Classifier' && ['ClassifierOptions'].includes(door.shape),
+		),
+	)('refuses a stray member of $shape with a structure refusal', async (door) => {
+		const error = await readDoorRefusal(door)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['stray'], shape: door.shape },
+		])
+	})
+
+	it('lists every member each door type declares', () => {
+		expectTypeOf<
+			Exclude<keyof ClassifierOptions, (typeof CLASSIFIER_OPTION_KEYS)[number]>
+		>().toEqualTypeOf<never>()
 	})
 })

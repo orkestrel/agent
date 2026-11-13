@@ -7,9 +7,12 @@ import type {
 	InstructionManagerOptions,
 } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import { isArray } from '@orkestrel/contract'
+import { isArray, refuseOptionKeys } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import { removeEntries } from '../../helpers.js'
+import { INSTRUCTION_MANAGER_KEYS } from '../constants.js'
+import { instructionInputContract } from '../contracts.js'
+import { requireRecordInput } from '../helpers.js'
 import { Instruction } from './Instruction.js'
 
 /**
@@ -57,6 +60,12 @@ export class InstructionManager implements InstructionManagerInterface {
 	readonly #format: ContextSectionFormat<InstructionInterface> | undefined
 
 	constructor(options?: InstructionManagerOptions) {
+		refuseOptionKeys(
+			options,
+			INSTRUCTION_MANAGER_KEYS,
+			'InstructionManager',
+			'InstructionManagerOptions',
+		)
 		this.#emitter = new Emitter<InstructionManagerEventMap>(options)
 		this.#format = options?.format
 	}
@@ -82,7 +91,13 @@ export class InstructionManager implements InstructionManagerInterface {
 	add(
 		input: InstructionInput | readonly InstructionInput[],
 	): InstructionInterface | readonly InstructionInterface[] {
-		if (isArray(input)) return input.map((one) => this.#create(one))
+		if (isArray(input)) {
+			// Every input is checked before any is stored, so a refused batch stores nothing.
+			input.forEach((one) =>
+				requireRecordInput(one, instructionInputContract, 'Instruction', 'InstructionInput'),
+			)
+			return input.map((one) => this.#create(one))
+		}
 		return this.#create(input)
 	}
 

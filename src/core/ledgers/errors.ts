@@ -9,7 +9,9 @@ import { INTRINSICS, holds, isFunction, isObject } from '@orkestrel/contract'
  * @remarks
  * A threshold, share, capacity, limit, topic, lookup, write, question, or gauge outside its bounds is a
  * programmer error and throws this with the matching {@link LedgerErrorCode}. A calibration call that reports
- * no prompt usage throws this with `'GAUGE'`. A snapshot option that `isLedgerSnapshot` refuses
+ * no prompt usage, or a calibration call, with the tool definitions, without them, or with the workspace text, that reports a prompt
+ * over `capacity`, the head included, throws this with `'GAUGE'`; the second holds `capacity` and
+ * `prompt` in its `context`. A snapshot option that `isLedgerSnapshot` refuses
  * throws this with `'SNAPSHOT'`, its `context` holding the `faults`. Narrow a caught value with {@link isLedgerError} and
  * branch on `error.code`. A selection without an active `respond` call, for a conversation other
  * than the ledger's, or for a request other than that call's request or a ledger note, reports

@@ -60,7 +60,9 @@ import {
 	requireBudget,
 	requireConversation,
 	requireScope,
+	requireWorkspace,
 	scanJobTree,
+	collectJobRefusals,
 	JOB_REFUSAL_PREFIX,
 	settleAgentJob,
 	settleToolResult,
@@ -83,7 +85,6 @@ import {
 	matchesHeadLists,
 	matchesPlainLine,
 	requireBuiltins,
-	requireDisclosure,
 	resolveDisclosure,
 	collectDisclosure,
 	collectToolGroups,
@@ -113,7 +114,7 @@ import {
 	createToolCall,
 	createTokenUsage,
 	RENDERED_ARGUMENTS,
-	AGENT_DISCLOSURE_CASES,
+	AGENT_WORKSPACE_CASES,
 	BUILTIN_NAMES,
 	BUILTIN_OPTION_REFUSALS,
 	createStoredConversation,
@@ -138,6 +139,15 @@ import {
 	DISCLOSURE_UNLOAD_CLAIMS,
 	executeDisclosureLoop,
 	restoreConversation,
+	JOB_REFUSAL_CASES,
+	JOB_REFUSAL_PARENT,
+	JOB_TREE_DRAWS,
+	JOB_TREE_SEED,
+	buildRefusalPath,
+	buildRefusalTree,
+	collectTreeJobs,
+	createFanoutFixture,
+	drawJobTrees,
 } from '../../../setup.js'
 
 describe('requireEntry', () => {
@@ -1254,16 +1264,16 @@ describe('scanJobTree — the scope and builtins rows', () => {
 		])
 	})
 
-	it('leaves a disclosure free, a name outside the parent scope included', () => {
+	it('leaves a workspace free, an id outside the parent scope included', () => {
 		const parent = { ...FANOUT_JOB, scope: { skills: [], memos: [], workspaces: [] } }
-		const child = { ...FANOUT_JOB, disclosure: { skills: ['claims'], workspace: 'south' } }
+		const child = { ...FANOUT_JOB, workspace: 'south' }
 		expect(scanJobTree({ ...parent, children: [child] })).toEqual([])
 	})
 
-	it('refuses a malformed scope, disclosure, or builtins at depth 2 with its faults', () => {
+	it('refuses a malformed scope, workspace, or builtins at depth 2 with its faults', () => {
 		const findings = [
 			{ provider: 'main', scope: { skills: [], memos: [] } },
-			{ provider: 'main', disclosure: { workspace: 'north' } },
+			{ provider: 'main', workspace: 7 },
 			{ provider: 'main', builtins: ['search'] },
 		].map((grandchild): readonly string[] =>
 			// The grandchild is malformed on purpose, so it crosses as the JSON record a restored tree holds.
@@ -1279,9 +1289,98 @@ describe('scanJobTree — the scope and builtins rows', () => {
 		).toEqual([true, true, true])
 		expect(findings.map(([finding]) => finding)).toEqual([
 			expect.stringContaining('scope.workspaces'),
-			expect.stringContaining('disclosure.skills'),
+			expect.stringMatching(/\bworkspace\b/),
 			expect.stringContaining('builtins'),
 		])
+	})
+})
+
+describe('collectJobRefusals', () => {
+	it('returns nothing for a job its build accepts', () => {
+		expect(collectJobRefusals(JOB_REFUSAL_PARENT)).toEqual([])
+		expect(collectJobRefusals({})).toEqual([])
+	})
+
+	it('names authority for tools or built-ins with no authority, with the remedy', () => {
+		const line =
+			"authority: a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities"
+		expect(collectJobRefusals({ tools: ['loop'] })).toEqual([line])
+		expect(collectJobRefusals({ builtins: ['memo'] })).toEqual([line])
+	})
+
+	it('carries the refusal requireBuiltins gives the list under builtins', () => {
+		expect(collectJobRefusals({ builtins: ['load', 'load'], authority: 'allow' })).toEqual([
+			'builtins: builtins lists a name more than once',
+		])
+		expect(collectJobRefusals({ builtins: ['unload'], authority: 'allow' })).toEqual([
+			"builtins: builtins lists 'unload' without 'load'; add 'load' too",
+		])
+	})
+
+	it('names a built-in the job also lists as a tool', () => {
+		expect(
+			collectJobRefusals({
+				tools: ['loop', 'memo'],
+				builtins: ['load', 'memo'],
+				authority: 'allow',
+			}),
+		).toEqual([
+			'builtins: names "memo", which its tools also name; rename that tool or leave the name out of builtins',
+		])
+	})
+
+	it('names every refusal of one job, the member first', () => {
+		expect(
+			collectJobRefusals({ tools: ['memo'], builtins: ['memo', 'memo'] }).map((line) =>
+				line.slice(0, line.indexOf(':')),
+			),
+		).toEqual(['authority', 'builtins', 'builtins'])
+	})
+})
+
+describe('scanJobTree — a job its build would refuse (claim J.2)', () => {
+	it.each(JOB_REFUSAL_CASES.flatMap((row) => [1, 3].map((depth) => ({ ...row, depth }))))(
+		'refuses a job at depth $depth with $name, naming its path and the member $member',
+		({ job, member, depth }) => {
+			const findings = invokeUnchecked<readonly string[]>(undefined, scanJobTree, [
+				buildRefusalTree(job, depth),
+			])
+			expect(findings).toHaveLength(1)
+			expect(findings[0]?.startsWith(`${JOB_REFUSAL_PREFIX}${buildRefusalPath(depth)}`)).toBe(true)
+			expect(findings[0]).toContain(member)
+		},
+	)
+
+	it('reads the refusals of the root too, and nothing under a refused job', () => {
+		const findings = invokeUnchecked<readonly string[]>(undefined, scanJobTree, [
+			buildRefusalTree({ tools: ['loop'], children: [{ provider: 'other' }] }, 0),
+		])
+		expect(findings).toEqual([
+			`${JOB_REFUSAL_PREFIX}job.authority: a job that names tools or builtins and no authority cannot run them; add authority: 'NAME' to the job and register that NAME under authorities`,
+		])
+	})
+})
+
+describe('scanJobTree — a tree it clears builds (claim J.4)', () => {
+	it('builds every job of each seeded tree the scan clears', () => {
+		const { registry } = createFanoutFixture()
+		const draws = drawJobTrees(JOB_TREE_SEED, JOB_TREE_DRAWS)
+		const cleared = draws.filter(
+			(draw) =>
+				invokeUnchecked<readonly string[]>(undefined, scanJobTree, [draw.tree]).length === 0,
+		)
+		const thrown = cleared.flatMap((draw) =>
+			collectTreeJobs(draw.tree).filter(
+				(job) => !attempt(() => invokeUnchecked(registry, registry.build, [job])).success,
+			),
+		)
+
+		expect(thrown).toEqual([])
+		// The draws reach every claim J case and a tree the scan clears.
+		expect(
+			JOB_REFUSAL_CASES.filter((row) => !draws.some((draw) => draw.case === row.name)),
+		).toEqual([])
+		expect(cleared.length).toBeGreaterThan(0)
 	})
 })
 
@@ -1997,31 +2096,28 @@ describe('requireBuiltins', () => {
 	})
 })
 
-describe('requireDisclosure', () => {
-	it.each(AGENT_DISCLOSURE_CASES.filter((row) => row.admitted))(
-		'admits $name as an owned, frozen copy',
+describe('requireWorkspace', () => {
+	it.each(AGENT_WORKSPACE_CASES.filter((row) => row.admitted))(
+		'admits $name unchanged',
 		({ value }) => {
-			const owned = requireValue(requireDisclosure(value))
-			expect(owned).toEqual(value)
-			expect(owned).not.toBe(value)
-			expect(Object.isFrozen(owned) && Object.isFrozen(owned.skills)).toBe(true)
+			expect(requireWorkspace(value)).toBe(value)
 		},
 	)
 
-	it.each(AGENT_DISCLOSURE_CASES.filter((row) => !row.admitted))(
+	it.each(AGENT_WORKSPACE_CASES.filter((row) => !row.admitted))(
 		'refuses $name with a placement error',
 		({ value }) => {
-			const error = captureError(() => requireDisclosure(value))
+			const error = captureError(() => requireWorkspace(value))
 			expect(isContractError(error) && error.code === 'placement').toBe(true)
 			expect(isContractError(error) ? error.context?.path : undefined).toEqual([
 				'options',
-				'disclosure',
+				'workspace',
 			])
 		},
 	)
 
 	it('passes undefined through', () => {
-		expect(requireDisclosure(undefined)).toBeUndefined()
+		expect(requireWorkspace(undefined)).toBeUndefined()
 	})
 })
 
@@ -2036,6 +2132,24 @@ describe('filterAdvertisedTools', () => {
 
 	it('holds nothing back when no skill is registered', () => {
 		expect(filterAdvertisedTools(HOLD_DEFINITIONS, undefined, [], [])).toEqual(HOLD_DEFINITIONS)
+	})
+
+	it('lets an allow-list that admits no load definition decide alone (claim T.1)', () => {
+		// An empty skills list has withheld load and unload from the candidates.
+		const candidates = HOLD_DEFINITIONS.filter(
+			(definition) => definition.name !== 'load' && definition.name !== 'unload',
+		)
+		expect(
+			filterAdvertisedTools(candidates, ['refund', 'load'], HOLD_SKILLS, []).map(
+				(definition) => definition.name,
+			),
+		).toEqual(['refund'])
+		// With no allow-list the hold stays, so a ceiling that names no tool advertises no skill's tool.
+		expect(
+			filterAdvertisedTools(candidates, undefined, HOLD_SKILLS, []).map(
+				(definition) => definition.name,
+			),
+		).toEqual(['echo'])
 	})
 })
 
@@ -2086,7 +2200,7 @@ describe('matchesHeadLists', () => {
 })
 
 describe('resolveDisclosure', () => {
-	it('shows the given skills, then the recorded ones, without repeats, each registered and admitted', () => {
+	it('shows the recorded skills in load order, each registered and admitted', () => {
 		const context = createAgentContext()
 		context.skills.add([
 			{ name: 'billing', description: 'Billing', content: 'B' },
@@ -2095,20 +2209,18 @@ describe('resolveDisclosure', () => {
 		])
 		const conversation = createStoredConversation(DISCLOSURE_RELOADED.messages)
 
-		expect(
-			resolveDisclosure(context, conversation, { skills: ['audit', 'billing'] }, {}, BUILTIN_NAMES),
-		).toEqual({
-			skills: ['audit', 'billing', 'claims'],
+		expect(resolveDisclosure(context, conversation, undefined, {}, BUILTIN_NAMES)).toEqual({
+			skills: ['claims', 'billing'],
 		})
 		expect(
 			resolveDisclosure(
 				context,
 				conversation,
-				{ skills: ['audit'] },
+				'north',
 				{ skills: ['claims', 'audit'] },
 				BUILTIN_NAMES,
 			),
-		).toEqual({ skills: ['audit', 'claims'] })
+		).toEqual({ skills: ['claims'] })
 		expect(
 			resolveDisclosure(context, conversation, undefined, { skills: [] }, BUILTIN_NAMES),
 		).toEqual({
@@ -2116,30 +2228,19 @@ describe('resolveDisclosure', () => {
 		})
 	})
 
-	it('shows nothing for an empty, repeated, or unregistered given name', () => {
+	it('shows no skill on a conversation that records no load, whatever the workspace (claim C.3)', () => {
 		const context = createAgentContext()
 		context.skills.add({ name: 'billing', description: 'Billing', content: 'B' })
+		context.workspaces.add({ id: 'north' })
 
 		expect(
-			resolveDisclosure(
-				context,
-				createStoredConversation([]),
-				{ skills: ['', 'billing', 'billing', 'ghost'] },
-				{},
-				BUILTIN_NAMES,
-			),
-		).toEqual({ skills: ['billing'] })
-		expect(
-			resolveDisclosure(
-				context,
-				createStoredConversation([]),
-				{ skills: [], workspace: '' },
-				{},
-				BUILTIN_NAMES,
-			),
-		).toEqual({
-			skills: [],
-		})
+			resolveDisclosure(context, createStoredConversation([]), 'north', {}, BUILTIN_NAMES),
+		).toEqual({ skills: [], workspace: 'north' })
+		expect(resolveDisclosure(context, createStoredConversation([]), '', {}, BUILTIN_NAMES)).toEqual(
+			{
+				skills: [],
+			},
+		)
 	})
 
 	it('reads no record while none of load, unload, and switch is enabled', () => {
@@ -2164,15 +2265,11 @@ describe('resolveDisclosure', () => {
 		const switched = createStoredConversation(DISCLOSURE_SWITCHED.messages)
 		const silent = createStoredConversation([{ role: 'user', content: 'hi' }])
 
-		expect(
-			resolveDisclosure(context, switched, { skills: [], workspace: 'north' }, {}, BUILTIN_NAMES),
-		).toEqual({
+		expect(resolveDisclosure(context, switched, 'north', {}, BUILTIN_NAMES)).toEqual({
 			skills: [],
 			workspace: 'south',
 		})
-		expect(
-			resolveDisclosure(context, silent, { skills: [], workspace: 'north' }, {}, BUILTIN_NAMES),
-		).toEqual({
+		expect(resolveDisclosure(context, silent, 'north', {}, BUILTIN_NAMES)).toEqual({
 			skills: [],
 			workspace: 'north',
 		})
@@ -2181,9 +2278,7 @@ describe('resolveDisclosure', () => {
 		).toEqual({
 			skills: [],
 		})
-		expect(
-			resolveDisclosure(context, silent, { skills: [], workspace: 'east' }, {}, BUILTIN_NAMES),
-		).toEqual({
+		expect(resolveDisclosure(context, silent, 'east', {}, BUILTIN_NAMES)).toEqual({
 			skills: [],
 		})
 	})

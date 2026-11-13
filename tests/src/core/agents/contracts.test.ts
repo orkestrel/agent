@@ -1,5 +1,4 @@
 import {
-	AGENT_DISCLOSURE_CASES,
 	BUILTIN_ARGUMENT_CASES,
 	BUILTIN_NAMES,
 	AGENT_WIRE_FRAMES,
@@ -7,12 +6,14 @@ import {
 	REFUSED_WIRE_FRAMES,
 	REFUSED_WIRE_PROMPTS,
 	AGENT_JOB_CASES,
+	JOB_BOUND_OWNERS,
+	JOB_BOUND_VALUES,
+	drawJobBounds,
 } from '../../../setup.js'
-import { seededRandom } from '@orkestrel/contract'
+import { attempt, seededRandom } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
 import {
 	agentAnswerContract,
-	agentDisclosureContract,
 	agentFrameContract,
 	agentPromptContract,
 	agentJobContract,
@@ -25,18 +26,6 @@ import {
 describe('agent wire contracts', () => {
 	it.each(AGENT_JOB_CASES)('job: $name', ({ value, admitted }) => {
 		expect(agentJobContract.is(value)).toBe(admitted)
-	})
-
-	it.each(AGENT_DISCLOSURE_CASES)('disclosure: $name', ({ value, admitted }) => {
-		expect(agentDisclosureContract.is(value)).toBe(admitted)
-	})
-
-	it('parses seeded disclosures', () => {
-		for (const seed of Array.from({ length: 32 }, (_, index) => index + 1)) {
-			const value = agentDisclosureContract.generate(seededRandom(seed))
-			expect(agentDisclosureContract.is(value)).toBe(true)
-			expect(agentDisclosureContract.parse(value)).toEqual(value)
-		}
 	})
 
 	it('parses seeded durable jobs', () => {
@@ -106,6 +95,41 @@ describe('agent wire contracts', () => {
 			prompt,
 			answer,
 		])
+	})
+})
+
+describe('agentJobContract — the bounds a build reads (claim J.1)', () => {
+	it.each(
+		JOB_BOUND_OWNERS.flatMap(({ member, build }) =>
+			JOB_BOUND_VALUES.map((value) => ({ member, build, value })),
+		),
+	)(
+		'admits $member $value exactly where its construction accepts it',
+		({ member, build, value }) => {
+			expect(agentJobContract.is({ provider: 'main', [member]: value })).toBe(
+				attempt(() => build(value)).success,
+			)
+		},
+	)
+
+	it('admits each bound exactly where its construction accepts it, over seeded numbers', () => {
+		const values = drawJobBounds(4207, 400)
+		const differ = JOB_BOUND_OWNERS.flatMap(({ member, build }) =>
+			values
+				.filter(
+					(value) =>
+						agentJobContract.is({ provider: 'main', [member]: value }) !==
+						attempt(() => build(value)).success,
+				)
+				.map((value) => [member, value]),
+		)
+		expect(differ).toEqual([])
+		// The draws reach both answers for every bound.
+		expect(
+			JOB_BOUND_OWNERS.map(
+				({ build }) => new Set(values.map((value) => attempt(() => build(value)).success)).size,
+			),
+		).toEqual([2, 2, 2])
 	})
 })
 
