@@ -105,3 +105,49 @@
 | 2026-11-12 | The 4B reading: the recorded schedule, its replay, and its grading | Orchestrator | `designs/disclosure.md` § The 4B reading |
 | 2026-11-12 | The user's ruling: the spare-differential ruling's three bars accepted as baselines | user | `plan.md` § Rulings |
 | 2026-11-12 | Phase 3's records fold: the design, the plan, and the ledger brought to the round's close | `opus` on `opus` | `designs/disclosure.md` § Phase 3 |
+| 2026-11-12 | The user's ruling: O as the default and D as the fallback, P and A removed, and Agent 0.0.42 held for the cut | user | `plan.md` § Rulings |
+| 2026-11-12 | The O-and-D ruling: the cut, O and D with no added mechanism, the cut's claims and the restated ones, and the desk study's two arms | `planner` on `fable` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The census of `disclosure` lines: 323 lines in six classes | `scout` on `haiku` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Unit U2, the desk study: arms `area` and `index`, with the ledger path and the judge removed | `builder` on `sonnet` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The consumer harness: arm `shown` removed and arm `index`, D on a ledger, added | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Unit U1, the cut in `src/`: claims C.1 to C.6 and C.8, and the restated claims | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Arm `index` live on the 4B: claims 3.14 and 3.15 pass as restated | Orchestrator | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The D-after-a-load ruling: 0.0.42 keeps the thread-long shown set, behind probes E0, S1, and L1 to L3 | `planner` on `fable` | `designs/disclosure.md` § The 4B reading |
+| 2026-11-12 | Probe E0: 8 of 9 entries after another area's load loaded their own area | Orchestrator | `designs/disclosure.md` § The 4B reading |
+| 2026-11-12 | The user's ruling: settle every deferred row on 2026-11-12 and defer nothing | user | `plan.md` § Rulings |
+| 2026-11-12 | The falsify round on the cut, subjective lane: confirmed, with F1 to F5 below the bar | `reviewer` on `sonnet` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The deferral triage over 41 rows | `planner` on `fable` | `designs/disclosure.md` § The deferral list |
+| 2026-11-12 | The Orchestrator's rulings on the triage's flags: D32 and D16 closed, and D24 reversed to a build | Orchestrator | `designs/disclosure.md` § The deferral list |
+| 2026-11-12 | The hand-offs sent: D20, D21, P4, and P7 to scaffold, and D19 with taverna's notes to taverna's thread | Orchestrator | `plan.md` § Deferred |
+| 2026-11-12 | The falsify round on the cut, objective lane: confirmed | `reviewer` on `sonnet` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The refusals ruling: the trap's rule changed, D24 built, and undeclared option members refused | `planner` on `fable` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The Orchestrator's decisions under the refusals ruling: an option spelled `undefined` reads as absent, and the other option doors are censused | Orchestrator | `plan.md` § Rulings |
+| 2026-11-12 | The door census: 75 rows | `scout` on `haiku` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The door ruling: five groups | Orchestrator | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The D probes' vehicles: S1 on both builds, and L1 to L3 proved offline | `opus` on `opus` | `designs/disclosure.md` § The 4B reading |
+| 2026-11-12 | Unit K's probes PK1 and PK2, with F1 and F3 of the round on the cut; K stopped at PK2's return | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | K's follow-up ruling: rule (b), the comparison between the two calls | `planner` on `fable` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Probe L1, D on a ledger, live: 37 of 42 | Orchestrator | `designs/disclosure.md` § The 4B reading |
+| 2026-11-12 | Probe L2, the request-bounded set on a ledger, live: 27 of 42; L3 skipped by the rule | Orchestrator | `designs/disclosure.md` § The 4B reading |
+| 2026-11-12 | The D-window ruling: L1 is drift, and the request-bounded set is refused | `planner` on `fable` | `designs/disclosure.md` § The 4B reading |
+| 2026-11-12 | Probe PK3: K.4's classes hold, and claim 3.1 returns 15 `before` rows | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The Orchestrator's ruling: claim K.3 gains the class `refused` | Orchestrator | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Unit K, calibration on a bounded sample with the refusal: claims K.1 to K.6 | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Unit R: claims T.1 to T.4, J.1 to J.5, and O.1 to O.6, and the door groups | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Unit R accepted for review, with its deviation 4 held for the review | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The falsify round on K and R, subjective lane: confirmed, with five findings below the bar | `reviewer` on `sonnet` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The falsify round on K and R, objective lane | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | The documentation unit: the guide, its test, and `ROADMAP.md` | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The user's direction: run in parallel what can run in parallel | user | `plan.md` § Rulings |
+| 2026-11-12 | The fix ruling on the findings of the round on K and R | Orchestrator | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | Deviation: `dist` rebuilt by `npm run build` run directly, against the lane form's heavy rule | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The fix round on K and R | `opus` on `opus` | `plan.md` § State |
+| 2026-11-12 | Arm `taverna`'s live rerun on the 18:05 `dist`, and the daemon's window reading | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The records fold: the design, the plan, and the ledger brought to the re-prepared 0.0.42 | `opus` on `opus` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The third K ruling: K's sample under-priced a dense workspace on the live rerun; a cut workspace call joins calibration | `planner` on `fable` | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | F-K2 ruled `>` on the daemon's window reading | Orchestrator | `designs/disclosure.md` § The re-prepared 0.0.42 |
+| 2026-11-12 | The fix round accepted; the memo `origin` spread restored after mutation `r2-memo` survived | Orchestrator | `plan.md` § State |
+| 2026-11-12 | Arm `taverna` live, the final, on the 19:52 `dist`: adopted | Orchestrator | `plan.md` § State |
+| 2026-11-12 | C.7's rehearsal on the 19:52 `dist`: 14 trials and 84 requests | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The closure check of the fix round: OPEN on one F-R1 row, added and proved by the Orchestrator, closing the round | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | The tree-wide chain: green | Orchestrator | `plan.md` § State |
