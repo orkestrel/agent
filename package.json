@@ -81,14 +81,14 @@
 		"@orkestrel/abort": "^0.0.17",
 		"@orkestrel/budget": "^0.0.18",
 		"@orkestrel/contract": "^0.0.23",
-		"@orkestrel/database": "^0.0.23",
+		"@orkestrel/database": "^0.0.24",
 		"@orkestrel/emitter": "^0.0.16",
 		"@orkestrel/ndjson": "^0.0.17",
-		"@orkestrel/queue": "^0.0.22",
+		"@orkestrel/queue": "^0.0.23",
 		"@orkestrel/timeout": "^0.0.17",
 		"@orkestrel/tool": "^0.0.23",
-		"@orkestrel/workflow": "^0.0.28",
-		"@orkestrel/workspace": "^0.0.18"
+		"@orkestrel/workflow": "^0.0.29",
+		"@orkestrel/workspace": "^0.0.19"
 	},
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.60.1",
