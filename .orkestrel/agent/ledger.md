@@ -152,3 +152,4 @@
 | 2026-11-12 | The closure check of the fix round: OPEN on one F-R1 row, added and proved by the Orchestrator, closing the round | `reviewer` on `sonnet` | `plan.md` § State |
 | 2026-11-12 | The tree-wide chain: green | Orchestrator | `plan.md` § State |
 | 2026-11-12 | Release 0.0.42, re-prepared: the release chain green, its notes replacing those of `46ae3811`; held for the user's code | Orchestrator | `plan.md` § State |
+| 2026-11-12 | Agent 0.0.42 published on the user's code, registry-confirmed, and main pushed at `d5002f61` | user, Orchestrator | `plan.md` § State |
