@@ -2,16 +2,15 @@ import type {
 	AgentInterface,
 	AgentOptions,
 	AgentResult,
-	LedgerInterface,
 	ProviderInterface,
 	SkillManagerInterface,
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { StudyContext, StudyGoal, StudyProduct, StudySessionInterface } from '@orkestrel/study'
-import type { StudyDeskArea, StudyDeskInput, StudyDeskSessionOptions } from '../types.js'
+import type { StudyDeskInput, StudyDeskSessionOptions } from '../types.js'
 import { linkSignal } from '@orkestrel/abort'
 import { createTool, createToolManager } from '@orkestrel/tool'
-import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
+import { StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
 	StudyAgentTrace,
 	StudyOllamaTransport,
@@ -21,25 +20,20 @@ import {
 	buildStudyOllamaOptions,
 } from '@orkestrel/study/server'
 import {
-	STUDY_DESK_JUDGE,
-	STUDY_DESK_JUDGE_OPTIONS,
 	STUDY_DESK_LIMIT,
 	STUDY_DESK_RESULT,
 	STUDY_DESK_SKILLS,
 	STUDY_DESK_SYSTEM,
-	STUDY_DESK_THRESHOLDS,
 	STUDY_DESK_TOOLS,
-	STUDY_DESK_TOPIC,
 } from '../constants.js'
 import { buildStudyDeskDefinition, buildStudyDeskRoles, collectStudyDeskTools } from '../helpers.js'
 import { isStudyDeskInput, isStudyDeskSettings } from '../validators.js'
 import { StudyDeskRequest } from './StudyDeskRequest.js'
 
-/** Owns one conversation of one arm: its agent or ledger, its transported requests, its tool and turn rows, and its cleanup.
+/** Owns one conversation of one arm: its agent, its transported requests, its tool and turn rows, and its cleanup.
  * @remarks
- * Arms `all`, `area`, and `index` run one bare agent across the conversation; arm `shown` runs one
- * ledger built at the first goal with that goal's area shown through `agent.disclosure`, and retains that
- * value as the goal's `disclosure` row. Every
+ * Arms `area` and `index` run one bare agent across the conversation: arm `area` passes each request a
+ * run scope of its area's tools, and arm `index` advertises the skills index and `load`. Every
  * request passes Study's transport, so it is admitted, metered, and recorded.
  * @example await new StudyDeskSession(options).execute(goal, context)
  */
@@ -51,7 +45,6 @@ export class StudyDeskSession implements StudySessionInterface {
 	readonly #active = new Set<StudyDeskRequest>()
 	readonly #flights = new Set<Promise<StudyProduct>>()
 	#agent: AgentInterface | undefined
-	#ledger: LedgerInterface | undefined
 	#closed: Promise<void> | undefined
 
 	/**
@@ -161,12 +154,8 @@ export class StudyDeskSession implements StudySessionInterface {
 		}
 	}
 
-	// Runs one request on the arm's agent, or on the ledger built at the first goal for arm `shown`.
+	// Runs one request on the arm's agent.
 	async #run(input: StudyDeskInput, signal: AbortSignal): Promise<AgentResult> {
-		if (this.#options.arm === 'shown') {
-			this.#ledger ??= this.#createLedger(input.area)
-			return await this.#ledger.respond(input.prompt, signal)
-		}
 		this.#agent ??= this.#createAgent()
 		return await this.#agent.generate({
 			prompt: { content: input.prompt },
@@ -199,48 +188,6 @@ export class StudyDeskSession implements StudySessionInterface {
 			...(this.#options.arm === 'index'
 				? { skills: this.#createSkills(), builtins: ['load'] as const }
 				: {}),
-		})
-	}
-
-	#createLedger(area: StudyDeskArea): LedgerInterface {
-		const options = this.#options
-		const provider = options.profile.provider
-		if (provider?.judge === undefined) throw new StudyError('CONFIG', 'Desk requires a judge')
-		// One value reaches the ledger and the trial's evidence, so the summary splits by what the run disclosed.
-		const disclosure = { skills: [area] }
-		this.#trace.append('disclosure', disclosure)
-		const judge = new StudyAgentJudge(
-			options.provider.createOllamaJudge({
-				model: provider.judge,
-				system: STUDY_DESK_JUDGE,
-				url: provider.url,
-				timeout: 180000,
-				options: STUDY_DESK_JUDGE_OPTIONS,
-				fetch: (url, init) => this.#transport.fetch('judge', url, init),
-			}),
-			this.#transport,
-		)
-		return options.agent.createLedger(this.#createProvider(), {
-			judge,
-			system: STUDY_DESK_SYSTEM,
-			topics: [STUDY_DESK_TOPIC],
-			questions: options.agent.LEDGER_QUESTIONS,
-			thresholds: STUDY_DESK_THRESHOLDS,
-			capacity: options.profile.room.context - options.profile.room.safety,
-			predict: options.profile.room.output,
-			think: false,
-			lookups: STUDY_DESK_TOOLS.map((tool) => ({
-				tool: createTool({ ...buildStudyDeskDefinition(tool), execute: () => STUDY_DESK_RESULT }),
-				read: () => undefined,
-			})),
-			agent: {
-				limit: STUDY_DESK_LIMIT,
-				on: this.#hooks(),
-				skills: this.#createSkills(),
-				builtins: ['load'],
-				disclosure,
-				authority: options.agent.createAuthority({ fallback: { zone: 'desk', verdict: 'allow' } }),
-			},
 		})
 	}
 
@@ -310,11 +257,8 @@ export class StudyDeskSession implements StudySessionInterface {
 	async #dispose(): Promise<void> {
 		this.#abort.abort(new StudyError('FAULT', 'Desk session closed'))
 		this.#agent?.abort()
-		this.#ledger?.agent.abort()
 		await this.#transport.close()
 		await Promise.allSettled([...this.#flights])
 		this.#agent?.emitter.destroy()
-		this.#ledger?.agent.emitter.destroy()
-		this.#ledger?.conversation.emitter.destroy()
 	}
 }

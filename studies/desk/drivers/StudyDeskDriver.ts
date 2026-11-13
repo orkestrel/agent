@@ -23,7 +23,7 @@ export class StudyDeskDriver implements StudyDriverInterface {
 	constructor(options: StudyDriverOptions) {
 		validateStudyDeskProfile(options.profile)
 		if (!isStudyDeskRuntime(options.agent) || !isStudyDeskProvider(options.provider))
-			throw new StudyError('CONFIG', 'Desk requires admitted Agent, Ledger, and Ollama factories')
+			throw new StudyError('CONFIG', 'Desk requires admitted Agent and Ollama factories')
 		this.#options = options
 		this.#agent = options.agent
 		this.#provider = options.provider

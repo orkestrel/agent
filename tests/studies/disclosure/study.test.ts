@@ -10,12 +10,12 @@ import { buildStudyDeskProfile, collectStudyDeskAnswers } from '../../setupStudy
 const declaration = await readStudyDeclaration(resolve('.'), 'disclosure')
 
 describe('the disclosure declaration', () => {
-	it('declares the four arms over seven conversations of six requests, one repetition, with no qualification', () => {
+	it('declares the two arms over seven conversations of six requests, one repetition, with no qualification', () => {
 		expect(declaration.definition).toMatchObject({
 			purpose: 'mechanism',
 			driver: 'desk',
-			arms: ['all', 'area', 'index', 'shown'],
-			order: [['all', 'area', 'index', 'shown']],
+			arms: ['area', 'index'],
+			order: [['area', 'index']],
 			retries: 0,
 		})
 		expect(declaration.scenarios.map((scenario) => scenario.id)).toEqual([
@@ -29,12 +29,12 @@ describe('the disclosure declaration', () => {
 		])
 		expect(declaration.scenarios.every((scenario) => scenario.goals.length === 6)).toBe(true)
 		const schedule = buildStudySchedule(declaration.definition, declaration.scenarios)
-		expect(schedule).toHaveLength(28)
-		expect(schedule.filter((trial) => trial.scenario === 'c1').map((trial) => trial.id)).toEqual([
-			'r1-s1-a1',
-			'r1-s1-a2',
-			'r1-s1-a3',
-			'r1-s1-a4',
+		expect(schedule).toHaveLength(14)
+		expect(
+			schedule.filter((trial) => trial.scenario === 'c1').map((trial) => [trial.id, trial.arm]),
+		).toEqual([
+			['r1-s1-a1', 'area'],
+			['r1-s1-a2', 'index'],
 		])
 	})
 
@@ -70,7 +70,7 @@ describe('the disclosure declaration', () => {
 		expect(() =>
 			adapter.validate({
 				...input,
-				definition: { ...declaration.definition, arms: ['all', 'records'] },
+				definition: { ...declaration.definition, arms: ['area', 'records'] },
 			}),
 		).toThrow(/arms/)
 		const [first, ...rest] = declaration.rubric.criteria
@@ -86,7 +86,7 @@ describe('the disclosure declaration', () => {
 		).toThrow(/assertion/)
 	})
 
-	it('pins the screen profile to the 4B and Mica on the available Ollama, with recording declared', () => {
+	it('pins the screen profile to the 4B alone on the available Ollama, with recording declared', () => {
 		const raw = parseJSON(readFileSync('studies/desk/profiles/screen.json', 'utf8'))
 		expect(raw).toMatchObject({
 			name: 'screen',
@@ -94,15 +94,15 @@ describe('the disclosure declaration', () => {
 			provider: {
 				url: 'http://127.0.0.1:11434',
 				model: 'qwen3.5:4b-q4_K_M',
-				judge: 'hf.co/sky7350/Mica-v0.1-4B:Q4_K_M',
 				digest: {
 					model: 'd8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04',
-					judge: 'ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b',
 				},
 			},
 			settings: { version: '0.40.16' },
 			record: { duration: 480000, calls: 256 },
 		})
 		expect(raw).not.toHaveProperty('provider.daemon')
+		expect(raw).not.toHaveProperty('provider.judge')
+		expect(raw).not.toHaveProperty('provider.digest.judge')
 	})
 })

@@ -26,10 +26,8 @@
 		"entry": "node_modules/@orkestrel/ollama/dist/src/core/index.js",
 		"url": "http://127.0.0.1:11434",
 		"model": "qwen3.5:4b-q4_K_M",
-		"judge": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
 		"digest": {
-			"model": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
-			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
+			"model": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04"
 		}
 	},
 	"room": {

@@ -2,15 +2,8 @@ import { describe, expect, it } from 'vitest'
 import * as provider from '@orkestrel/ollama'
 import * as agent from '../../../src/core/index.js'
 import {
-	STUDY_CHAT_JUDGE,
-	STUDY_CHAT_OPTIONS,
-	STUDY_CHAT_THRESHOLDS,
-} from '../../../studies/chat/constants.js'
-import {
-	STUDY_DESK_JUDGE,
-	STUDY_DESK_JUDGE_OPTIONS,
+	STUDY_DESK_ARMS,
 	STUDY_DESK_SKILLS,
-	STUDY_DESK_THRESHOLDS,
 	STUDY_DESK_TOOLS,
 	isStudyDeskArea,
 	isStudyDeskArm,
@@ -44,8 +37,9 @@ describe('the public boundary', () => {
 		expect(isStudyDeskAssertion({ tool: 'status', area: 'orders', extra: 1 })).toBe(false)
 		expect(isStudyDeskArea('staff')).toBe(true)
 		expect(isStudyDeskArea('Staff')).toBe(false)
-		expect(['all', 'area', 'index', 'shown'].every(isStudyDeskArm)).toBe(true)
-		expect(isStudyDeskArm('records')).toBe(false)
+		expect(STUDY_DESK_ARMS).toEqual(['area', 'index'])
+		expect(['area', 'index'].every(isStudyDeskArm)).toBe(true)
+		for (const arm of ['all', 'shown', 'records']) expect(isStudyDeskArm(arm)).toBe(false)
 	})
 })
 
@@ -66,10 +60,7 @@ describe('the catalog', () => {
 })
 
 describe('the treatment', () => {
-	it('files with the chat study judge wiring, which Study bars the bundle from importing', () => {
-		expect(STUDY_DESK_JUDGE).toBe(STUDY_CHAT_JUDGE)
-		expect(STUDY_DESK_JUDGE_OPTIONS).toEqual(STUDY_CHAT_OPTIONS)
-		expect(STUDY_DESK_THRESHOLDS).toEqual(STUDY_CHAT_THRESHOLDS)
+	it('admits the source provider namespace and refuses one without the timing reader', () => {
 		expect(isStudyDeskProvider(provider)).toBe(true)
 		expect(isStudyDeskProvider({ ...provider, extractTiming: undefined })).toBe(false)
 	})
@@ -84,7 +75,7 @@ describe('the treatment', () => {
 		expect(isStudyDeskSettings({ version: '0.40.16' })).toBe(false)
 	})
 
-	it('admits the screen profile and refuses another room, a missing judge, or a triage role', () => {
+	it('admits the screen profile, which declares no judge, and refuses another room, a judge, or a triage role', () => {
 		const profile = buildStudyDeskProfile('http://127.0.0.1:9')
 		validateStudyDeskProfile(profile)
 		const pinned = profile.provider
@@ -95,16 +86,28 @@ describe('the treatment', () => {
 		expect(() =>
 			validateStudyDeskProfile({ ...profile, room: { ...profile.room, think: true } }),
 		).toThrow(/treatment/)
+		expect(pinned.judge).toBeUndefined()
 		expect(() =>
 			validateStudyDeskProfile({
 				...profile,
 				provider: {
 					...pinned,
-					judge: undefined,
-					digest: { model: pinned.digest.model, judge: undefined },
+					judge: 'judge',
+					digest: { ...pinned.digest, judge: 'b'.repeat(64) },
 				},
 			}),
 		).toThrow(/treatment/)
+		expect(() =>
+			validateStudyDeskProfile({
+				...profile,
+				provider: {
+					...pinned,
+					triage: 'triage',
+					digest: { ...pinned.digest, triage: 'c'.repeat(64) },
+				},
+			}),
+		).toThrow(/treatment/)
+		expect(() => validateStudyDeskProfile({ ...profile, provider: undefined })).toThrow(/treatment/)
 		expect(() =>
 			validateStudyDeskProfile({ ...profile, settings: { version: '0.40.16' } }),
 		).toThrow(/settings/)

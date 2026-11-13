@@ -19,11 +19,10 @@ import type {
 } from './types.js'
 import { isString } from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
-import { STUDY_DESK_JUDGE_OPTIONS, STUDY_DESK_OPTIONS, STUDY_DESK_TOOLS } from './constants.js'
+import { STUDY_DESK_OPTIONS, STUDY_DESK_TOOLS } from './constants.js'
 import {
 	isStudyDeskAssertion,
 	isStudyDeskDenialRow,
-	isStudyDeskDisclosure,
 	isStudyDeskResultRow,
 	isStudyDeskSettings,
 	isStudyDeskToolRow,
@@ -97,15 +96,6 @@ export function readStudyDeskEvidence(rows: readonly StudyEvidence[]): StudyDesk
 	}
 }
 
-/** Reads the skills a trial's run disclosed, from its `disclosure` row: the value arm `shown` passed to `agent.disclosure`.
- * @example readStudyDeskDisclosure([{ event: 'disclosure', goal: 'turn-1', value: { skills: ['orders'] } }]) // ['orders']
- */
-export function readStudyDeskDisclosure(rows: readonly StudyEvidence[]): readonly StudyDeskArea[] {
-	return rows.flatMap((row) =>
-		row.event === 'disclosure' && isStudyDeskDisclosure(row.value) ? row.value.skills : [],
-	)
-}
-
 /** Infers how a request ended: the first call other than `load` names the tool, a later call does, a call never does, no call at all, or the run failed.
  * @param tool - The tool the rubric names.
  * @param calls - The calls in dispatch order.
@@ -171,15 +161,15 @@ export function readStudyDeskProgress(rows: readonly StudyEvidence[]): JSONValue
 	}
 }
 
-/** Refuses a profile without the judge arm `shown` files with, with a triage role, or with another room than the chat study's.
+/** Refuses a profile without a provider, with a judge or a triage role, or with another room than the chat study's.
  * @example validateStudyDeskProfile(profile)
  */
 export function validateStudyDeskProfile(profile: StudyProfile): void {
 	if (!isStudyDeskSettings(profile.settings))
 		throw new StudyError('CONFIG', 'Desk settings differ from version and metadata')
 	if (
-		profile.provider?.judge === undefined ||
-		profile.provider.digest.judge === undefined ||
+		profile.provider === undefined ||
+		profile.provider.judge !== undefined ||
 		profile.provider.triage !== undefined ||
 		profile.room.context !== STUDY_DESK_OPTIONS.num_ctx ||
 		profile.room.output !== STUDY_DESK_OPTIONS.num_predict ||
@@ -189,24 +179,17 @@ export function validateStudyDeskProfile(profile: StudyProfile): void {
 		throw new StudyError('CONFIG', 'Desk treatment differs from the chat study wire')
 }
 
-/** Declares the agent wire every arm sends and the judge wire arm `shown` files with.
+/** Declares the agent wire every arm sends.
  * @example buildStudyDeskRoles(profile).agent?.options.num_ctx // 20480
  */
 export function buildStudyDeskRoles(profile: StudyProfile): StudyOllamaTransportOptions['roles'] {
 	validateStudyDeskProfile(profile)
 	const provider = profile.provider
-	if (provider?.judge === undefined) throw new StudyError('CONFIG', 'Desk requires a judge')
+	if (provider === undefined) throw new StudyError('CONFIG', 'Desk requires a provider')
 	return {
 		agent: {
 			model: provider.model,
 			options: { ...STUDY_DESK_OPTIONS },
-			think: false,
-			strict: false,
-			length: true,
-		},
-		judge: {
-			model: provider.judge,
-			options: { ...STUDY_DESK_JUDGE_OPTIONS, temperature: 1 },
 			think: false,
 			strict: false,
 			length: true,
@@ -259,17 +242,16 @@ export function computeStudyDeskTally(rows: readonly StudyDeskRow[]): StudyDeskT
 	}
 }
 
-/** Joins a sealed result's trials to the rubric into one row per request, one tally per arm, and arm `shown`'s split by the disclosed area.
- * @remarks Pass the attempts and evidence of a result Study verified, through its `readStudyResult` and `collectStudyEvidence` helpers. A trial's first goal is read apart, because Study unloads the models before each trial. A row is `disclosed` when its area is among the skills its trial's run passed to `agent.disclosure`, read from the trial's `disclosure` row, so a run that opens at a later goal under `--goals` splits by the area it disclosed. Arm `shown`'s disclosed requests read against the bar, and its requests in another area, which need a `load`, read apart.
+/** Joins a sealed result's trials to the rubric into one row per request and one tally per arm.
+ * @remarks Pass the attempts and evidence of a result Study verified, through its `readStudyResult` and `collectStudyEvidence` helpers. A trial's first goal is read apart, because Study unloads the models before each trial.
  * @throws StudyError - Thrown when a criterion names a scenario or goal the declaration lacks.
- * @example buildStudyDeskSummary(input).tallies.all?.right
+ * @example buildStudyDeskSummary(input).tallies.index?.right
  */
 export function buildStudyDeskSummary(input: StudyDeskSummaryInput): StudyDeskSummary {
 	const rows: readonly StudyDeskRow[] = input.schedule.flatMap((trial) => {
 		const attempt = input.attempts.find((entry) => entry.trial.id === trial.id)
 		const evidence = input.evidence.get(trial.id) ?? []
 		const scenario = input.scenarios.find((entry) => entry.id === trial.scenario)
-		const disclosure = readStudyDeskDisclosure(evidence)
 		return input.rubric.criteria.flatMap((criterion) => {
 			if (criterion.scenario !== trial.scenario || !isStudyDeskAssertion(criterion.assertion))
 				return []
@@ -284,7 +266,6 @@ export function buildStudyDeskSummary(input: StudyDeskSummaryInput): StudyDeskSu
 					scenario: trial.scenario,
 					goal: criterion.goal,
 					initial: scenario.goals[0]?.id === criterion.goal,
-					disclosed: disclosure.includes(criterion.assertion.area),
 					tool: criterion.assertion.tool,
 					area: criterion.assertion.area,
 					outcome: inferStudyDeskOutcome(
@@ -311,9 +292,5 @@ export function buildStudyDeskSummary(input: StudyDeskSummaryInput): StudyDeskSu
 				computeStudyDeskTally(rows.filter((row) => row.arm === arm)),
 			]),
 		),
-		shown: {
-			disclosed: computeStudyDeskTally(rows.filter((row) => row.arm === 'shown' && row.disclosed)),
-			other: computeStudyDeskTally(rows.filter((row) => row.arm === 'shown' && !row.disclosed)),
-		},
 	}
 }

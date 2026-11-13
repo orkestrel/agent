@@ -5493,10 +5493,10 @@ export function collectStudyDeskAnswers(
 }
 
 /**
- * Finds the request a body serves: the prompt its last user message ends with, so a ledger's request copy matches too.
+ * Finds the request a body serves: the prompt its last user message ends with.
  * @param prompts - The declared prompts, each mapped to its assertion.
  * @param body - The read body.
- * @returns The request's assertion, or undefined for a body no request opened, such as a ledger's calibration.
+ * @returns The request's assertion, or undefined for a body no declared request opened.
  */
 export function findStudyDeskAnswer(
 	prompts: ReadonlyMap<string, StudyDeskAssertion>,
@@ -5615,8 +5615,7 @@ export function buildStudyDeskRecord(
 			entry,
 			url,
 			model: 'model',
-			judge: 'judge',
-			digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+			digest: { model: 'a'.repeat(64) },
 		},
 		settings: { ...raw.settings, version },
 	}

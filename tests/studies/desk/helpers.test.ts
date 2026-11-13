@@ -13,7 +13,7 @@ import {
 	readStudyDeskProgress,
 } from '../../../studies/desk/index.js'
 
-const trial: StudyTrial = { id: 'r1-s1-a3', scenario: 'c1', arm: 'index', repetition: 0 }
+const trial: StudyTrial = { id: 'r1-s1-a2', scenario: 'c1', arm: 'index', repetition: 0 }
 const criterion: StudyCriterion = {
 	id: 'c1-turn-3',
 	scenario: 'c1',
@@ -271,12 +271,11 @@ describe('grading through Study', () => {
 describe('the bar table', () => {
 	it('tallies outcomes, opened and misopened loads, turns, and first text apart for opening goals', () => {
 		const row = {
-			trial: 'r1-s1-a3',
+			trial: 'r1-s1-a2',
 			arm: 'index',
 			scenario: 'c1',
 			goal: 'turn-1',
 			initial: true,
-			disclosed: true,
 			tool: 'status',
 			area: 'orders' as const,
 			outcome: 'right' as const,
@@ -326,12 +325,11 @@ describe('the bar table', () => {
 		})
 		expect(summary.rows).toEqual([
 			{
-				trial: 'r1-s1-a3',
+				trial: 'r1-s1-a2',
 				arm: 'index',
 				scenario: 'c1',
 				goal: 'turn-3',
 				initial: false,
-				disclosed: false,
 				tool: 'invoice_lookup',
 				area: 'billing',
 				outcome: 'right',
@@ -342,7 +340,6 @@ describe('the bar table', () => {
 			},
 		])
 		expect(summary.tallies.index).toMatchObject({ requests: 1, right: 1, opened: 1 })
-		expect([summary.shown.disclosed.requests, summary.shown.other.requests]).toEqual([0, 0])
 		expect(() =>
 			buildStudyDeskSummary({
 				schedule: [trial],
@@ -352,48 +349,6 @@ describe('the bar table', () => {
 				evidence: new Map(),
 			}),
 		).toThrow(/join/)
-	})
-
-	it("splits arm shown's requests by the area its run disclosed, not by the declaration's first goal", () => {
-		const shown: StudyTrial = { ...trial, id: 'r1-s1-a4', arm: 'shown' }
-		const summary = buildStudyDeskSummary({
-			schedule: [shown],
-			attempts: [{ ...attempt, trial: shown }],
-			scenarios: [
-				{
-					id: 'c1',
-					goals: [
-						{ id: 'turn-1', input: { prompt: 'Has order 4471 shipped?', area: 'orders' } },
-						{ id: 'turn-3', input: { prompt: 'Show me invoice INV-2290.', area: 'billing' } },
-					],
-				},
-			],
-			rubric: {
-				version: '1',
-				criteria: [
-					{
-						...criterion,
-						id: 'c1-turn-1',
-						goal: 'turn-1',
-						assertion: { tool: 'status', area: 'orders' },
-					},
-					criterion,
-				],
-			},
-			evidence: new Map([
-				[
-					shown.id,
-					[{ event: 'disclosure', goal: 'turn-3', value: { skills: ['billing'] } }, ...rows],
-				],
-			]),
-		})
-		expect(summary.rows.map((row) => [row.goal, row.disclosed, row.outcome])).toEqual([
-			['turn-1', false, 'failed'],
-			['turn-3', true, 'right'],
-		])
-		expect(summary.shown.disclosed).toMatchObject({ requests: 1, right: 1, loads: 1, opened: 1 })
-		expect(summary.shown.other).toMatchObject({ requests: 1, right: 0, failed: 1, loads: 0 })
-		expect(summary.tallies.shown).toMatchObject({ requests: 2, right: 1, failed: 1 })
 	})
 })
 

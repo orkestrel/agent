@@ -3,7 +3,6 @@ import type {
 	StudyDeskArm,
 	StudyDeskAssertion,
 	StudyDeskDenialRow,
-	StudyDeskDisclosure,
 	StudyDeskInput,
 	StudyDeskProvider,
 	StudyDeskResultRow,
@@ -12,7 +11,6 @@ import type {
 	StudyDeskToolRow,
 } from './types.js'
 import {
-	arrayOf,
 	isBoolean,
 	isFunction,
 	isJSONValue,
@@ -35,7 +33,7 @@ export function isStudyDeskArea(value: unknown): value is StudyDeskArea {
 	return literalOf(STUDY_DESK_SKILLS.map((skill) => skill.name))(value)
 }
 
-/** Checks that a value names one of the four arms.
+/** Checks that a value names one of the two arms.
  * @example isStudyDeskArm('index') // true
  */
 export function isStudyDeskArm(value: unknown): value is StudyDeskArm {
@@ -72,19 +70,16 @@ export function isStudyDeskRuntime(value: unknown): value is StudyDeskRuntime {
 			createAuthority: isFunction,
 			createScope: isFunction,
 			createSkillManager: isFunction,
-			createLedger: isFunction,
-			LEDGER_QUESTIONS: isRecord,
 		})(value)
 	)
 }
 
-/** Checks the admitted provider factories and the timing reader.
+/** Checks the admitted provider factory and the timing reader.
  * @example isStudyDeskProvider({}) // false
  */
 export function isStudyDeskProvider(value: unknown): value is StudyDeskProvider {
 	return objectOf({
 		createOllama: isFunction,
-		createOllamaJudge: isFunction,
 		extractTiming: isFunction,
 	})(value)
 }
@@ -128,11 +123,4 @@ export function isStudyDeskResultRow(value: unknown): value is StudyDeskResultRo
 		'prompt',
 		'first',
 	])(value)
-}
-
-/** Checks a retained `disclosure` row's value: the skills arm `shown` passed to `agent.disclosure`.
- * @example isStudyDeskDisclosure({ skills: ['orders'] }) // true
- */
-export function isStudyDeskDisclosure(value: unknown): value is StudyDeskDisclosure {
-	return recordOf({ skills: arrayOf(isStudyDeskArea) })(value)
 }

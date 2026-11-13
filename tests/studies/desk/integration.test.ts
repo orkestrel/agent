@@ -9,7 +9,6 @@ import assert from 'node:assert/strict'
 import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import {
-	STUDY_DESK_TOOLS,
 	StudyDeskDriver,
 	buildStudyDeskSummary,
 	collectStudyDeskTools,
@@ -33,9 +32,8 @@ import {
 
 const declaration = await readStudyDeclaration(resolve('.'), 'disclosure')
 const answers = collectStudyDeskAnswers(declaration)
-const desk = new Set(STUDY_DESK_TOOLS.map((tool) => tool.name))
 
-it('reads every request right on every arm under the oracle, each load opening its own area', async () => {
+it('reads every request right on both arms under the oracle, each load opening its own area', async () => {
 	const scratch = createScratch({ prefix: 'study-desk-oracle-' })
 	const server = await createMemoryServer([], {}, createStudyDeskOracle(answers))
 	try {
@@ -57,15 +55,10 @@ it('reads every request right on every arm under the oracle, each load opening i
 		})
 		const exact = { requests: 42, right: 42, late: 0, wrong: 0, text: 0, failed: 0 }
 		expect(summary.tallies).toMatchObject({
-			all: { ...exact, loads: 0, turns: 84 },
 			area: { ...exact, loads: 0, turns: 84 },
 			index: { ...exact, loads: 16, opened: 16, misopened: 0, turns: 100 },
-			shown: { ...exact, loads: 9, opened: 9, misopened: 0, turns: 93 },
 		})
-		expect(summary.shown).toMatchObject({
-			disclosed: { requests: 26, right: 26, loads: 0, turns: 52 },
-			other: { requests: 16, right: 16, loads: 9, opened: 9, misopened: 0, turns: 41 },
-		})
+		expect(Object.keys(summary.tallies)).toEqual(['area', 'index'])
 		expect(summary.rows.filter((row) => row.first === undefined)).toEqual([])
 		const turns = sealed.manifest.schedule.map((trial) => ({
 			trial,
@@ -75,15 +68,6 @@ it('reads every request right on every arm under the oracle, each load opening i
 					: [],
 			),
 		}))
-		expect(
-			turns
-				.filter((entry) => entry.trial.arm === 'all')
-				.every((entry) =>
-					entry.rows.every(
-						(row) => row.tools.length === 36 && row.tools.every((name) => desk.has(name)),
-					),
-				),
-		).toBe(true)
 		for (const entry of turns.filter((candidate) => candidate.trial.arm === 'area'))
 			for (const row of entry.rows) {
 				const input = declaration.scenarios
@@ -97,41 +81,13 @@ it('reads every request right on every arm under the oracle, each load opening i
 				.filter((entry) => entry.trial.arm === 'index')
 				.map((entry) => entry.rows.filter((row) => row.tools.join() === 'load').length),
 		).toEqual([1, 1, 1, 1, 1, 1, 1])
-		for (const entry of turns.filter((candidate) => candidate.trial.arm === 'shown')) {
-			const opening = declaration.scenarios.find((scenario) => scenario.id === entry.trial.scenario)
-				?.goals[0]?.input
-			if (!isStudyDeskInput(opening)) throw new Error('Missing opening input')
-			expect(entry.rows[0]?.tools.filter((name) => desk.has(name))).toEqual(
-				collectStudyDeskTools(opening.area),
-			)
-			expect(entry.rows[0]?.tools).toContain('load')
-		}
-		expect(
-			sealed.manifest.schedule.map((trial) => [
-				trial.arm,
-				(evidence[trial.id] ?? [])
-					.filter((row) => row.event === 'disclosure')
-					.map((row) => [row.goal, row.value]),
-			]),
-		).toEqual(
-			sealed.manifest.schedule.map((trial) => {
-				const opening = declaration.scenarios.find((scenario) => scenario.id === trial.scenario)
-					?.goals[0]?.input
-				return [
-					trial.arm,
-					trial.arm === 'shown' && isStudyDeskInput(opening)
-						? [['turn-1', { skills: [opening.area] }]]
-						: [],
-				]
-			}),
-		)
 	} finally {
 		await server.close()
 		await destroyScratch(scratch)
 	}
 }, 30000)
 
-it('marks the control down on every arm, reproducing phase 0 on its first ten requests', async () => {
+it('marks the control down on both arms, reproducing phase 0 on arm index', async () => {
 	const scratch = createScratch({ prefix: 'study-desk-control-' })
 	const server = await createMemoryServer([], {}, createStudyDeskControl(answers))
 	try {
@@ -151,42 +107,28 @@ it('marks the control down on every arm, reproducing phase 0 on its first ten re
 			evidence: new Map(Object.entries(await collectStudyEvidence(sealed))),
 		})
 		expect(summary.tallies).toMatchObject({
-			all: { requests: 42, right: 1, wrong: 41, text: 0, failed: 0, loads: 0, turns: 84 },
 			area: { requests: 42, right: 10, wrong: 32, text: 0, failed: 0, loads: 0 },
 			index: { requests: 42, right: 0, wrong: 0, text: 42, failed: 0, loads: 0, turns: 42 },
-			shown: { requests: 42, right: 6, wrong: 36, text: 0, failed: 0, loads: 0 },
 		})
-		expect(summary.shown).toMatchObject({
-			disclosed: { requests: 26, right: 6, wrong: 20, text: 0, failed: 0, loads: 0 },
-			other: { requests: 16, right: 0, wrong: 16, text: 0, failed: 0, loads: 0 },
-		})
-		expect(
-			['all', 'index'].map(
-				(arm) =>
-					summary.rows
-						.filter((row) => row.arm === arm)
-						.slice(0, 10)
-						.filter((row) => row.outcome === 'right').length,
-			),
-		).toEqual([1, 0])
 		expect(
 			summary.rows
-				.filter((row) => row.arm === 'all' && row.outcome === 'right')
-				.map((row) => row.tool),
-		).toEqual(['open_ticket'])
+				.filter((row) => row.arm === 'index')
+				.slice(0, 10)
+				.filter((row) => row.outcome === 'right'),
+		).toEqual([])
 	} finally {
 		await server.close()
 		await destroyScratch(scratch)
 	}
 }, 30000)
 
-it('rehearses one shown conversation from a frozen closure, lists its progress, and replays it keyed and offline with no request', async () => {
+it('rehearses one index conversation from a frozen closure, lists its progress, and replays it keyed and offline with no request', async () => {
 	const scratch = createScratch({ prefix: 'study-desk-cli-' })
 	const server = await createMemoryServer([], {}, createStudyDeskOracle(answers))
 	try {
 		const fixture = createStudyInstallFixture(scratch, server.url)
 		writeStudyDeskFixture(fixture, server.url)
-		const selection = ['--trial', 'r1-s1-a4']
+		const selection = ['--trial', 'r1-s1-a2']
 		const rehearsal = await rehearseStudyInstall(fixture, {
 			study: 'disclosure',
 			profile: 'screen',
@@ -198,7 +140,7 @@ it('rehearses one shown conversation from a frozen closure, lists its progress, 
 		const sealed = rehearsal.result
 		if (sealed?.status !== 'sealed') throw new Error('Execution did not seal')
 		expect(sealed.manifest.schedule.map((trial) => [trial.id, trial.arm])).toEqual([
-			['r1-s1-a4', 'shown'],
+			['r1-s1-a2', 'index'],
 		])
 		expect(sealed.attempts.map((attempt) => attempt.failure)).toEqual([undefined])
 		expect(
@@ -226,7 +168,7 @@ it('rehearses one shown conversation from a frozen closure, lists its progress, 
 				'--replay',
 				sealed.directory,
 				'--roles',
-				JSON.stringify(['agent', 'judge', 'metadata']),
+				JSON.stringify(['agent', 'metadata']),
 				'--offline',
 				'true',
 				'--out',

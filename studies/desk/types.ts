@@ -1,10 +1,8 @@
 import type {
 	createAgent,
 	createAuthority,
-	createLedger,
 	createScope,
 	createSkillManager,
-	LEDGER_QUESTIONS,
 } from '@orkestrel/agent'
 import type {
 	StudyAgentRuntime,
@@ -15,17 +13,17 @@ import type {
 	StudyTrial,
 } from '@orkestrel/study'
 import type { StudyDriverOptions } from '@orkestrel/study/server'
-import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/ollama'
+import type { createOllama, extractTiming } from '@orkestrel/ollama'
 
 /** Names one area of the fictional desk catalog, which is also the name of the skill that holds its tools.
  * @example const area: StudyDeskArea = 'orders'
  */
 export type StudyDeskArea = 'tickets' | 'customers' | 'billing' | 'orders' | 'inventory' | 'staff'
 
-/** Names one arm: every tool, the known area's tools, the skills index with `load`, or the known area's skill shown through `disclosure`.
- * @example const arm: StudyDeskArm = 'shown'
+/** Names one arm: the known area's tools through a run scope, or the skills index with `load`.
+ * @example const arm: StudyDeskArm = 'index'
  */
-export type StudyDeskArm = 'all' | 'area' | 'index' | 'shown'
+export type StudyDeskArm = 'area' | 'index'
 
 /** Names how a request ended, read from the calls the model made.
  * @example const outcome: StudyDeskOutcome = 'right'
@@ -117,13 +115,6 @@ export interface StudyDeskResultRow {
 	readonly first?: number
 }
 
-/** Holds the skills arm `shown` passed to `agent.disclosure`, retained as its trial's `disclosure` row.
- * @example const disclosure: StudyDeskDisclosure = { skills: ['orders'] }
- */
-export interface StudyDeskDisclosure {
-	readonly skills: readonly StudyDeskArea[]
-}
-
 /** Holds what one goal's retained rows show: the calls, the advertised tools of each turn, and the result.
  * @example const trace: StudyDeskTrace = readStudyDeskEvidence(rows)
  */
@@ -136,7 +127,7 @@ export interface StudyDeskTrace {
 	readonly first: number | undefined
 }
 
-/** Requires the admitted Agent runtime to expose the agent, scope, authority, skill, and ledger factories.
+/** Requires the admitted Agent runtime to expose the agent, scope, authority, and skill factories.
  * @example const runtime: StudyDeskRuntime = admittedAgent
  */
 export interface StudyDeskRuntime extends StudyAgentRuntime {
@@ -144,16 +135,13 @@ export interface StudyDeskRuntime extends StudyAgentRuntime {
 	readonly createAuthority: typeof createAuthority
 	readonly createScope: typeof createScope
 	readonly createSkillManager: typeof createSkillManager
-	readonly createLedger: typeof createLedger
-	readonly LEDGER_QUESTIONS: typeof LEDGER_QUESTIONS
 }
 
-/** Requires the admitted provider factories and the native timing reader.
+/** Requires the admitted provider factory and the native timing reader.
  * @example const provider: StudyDeskProvider = admittedOllama
  */
 export interface StudyDeskProvider {
 	readonly createOllama: typeof createOllama
-	readonly createOllamaJudge: typeof createOllamaJudge
 	readonly extractTiming: typeof extractTiming
 }
 
@@ -166,7 +154,7 @@ export interface StudyDeskSettings {
 }
 
 /** Adds the trial's arm, narrowed capabilities, and cancellation to the admitted driver options.
- * @example const options: StudyDeskSessionOptions = { ...driverOptions, arm: 'all', agent, provider, signal }
+ * @example const options: StudyDeskSessionOptions = { ...driverOptions, arm: 'index', agent, provider, signal }
  */
 export interface StudyDeskSessionOptions extends StudyDriverOptions {
 	readonly arm: StudyDeskArm
@@ -195,8 +183,6 @@ export interface StudyDeskRow {
 	readonly scenario: string
 	readonly goal: string
 	readonly initial: boolean
-	/** True if the request's area is among the skills its trial's run disclosed, read from the trial's `disclosure` row; false otherwise. */
-	readonly disclosed: boolean
 	readonly tool: string
 	readonly area: StudyDeskArea
 	readonly outcome: StudyDeskOutcome
@@ -216,7 +202,7 @@ export interface StudyDeskFirst {
 }
 
 /** Holds one arm's counts over the design's bar.
- * @example const tally: StudyDeskTally = summary.tallies.shown
+ * @example const tally: StudyDeskTally = summary.tallies.index
  */
 export interface StudyDeskTally {
 	readonly requests: number
@@ -233,19 +219,10 @@ export interface StudyDeskTally {
 	readonly first: StudyDeskFirst
 }
 
-/** Holds arm `shown`'s requests split in two: those in the disclosed area, read against the bar, and those in another area, which need a `load` as arm `index` does.
- * @example const split: StudyDeskSplit = summary.shown
- */
-export interface StudyDeskSplit {
-	readonly disclosed: StudyDeskTally
-	readonly other: StudyDeskTally
-}
-
-/** Holds every graded request, each arm's counts, and arm `shown`'s split.
+/** Holds every graded request and each arm's counts.
  * @example const summary: StudyDeskSummary = buildStudyDeskSummary(input)
  */
 export interface StudyDeskSummary {
 	readonly rows: readonly StudyDeskRow[]
 	readonly tallies: Readonly<Record<string, StudyDeskTally>>
-	readonly shown: StudyDeskSplit
 }
