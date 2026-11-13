@@ -1965,7 +1965,7 @@ The wsedit ruling and the wsfiles ruling set the lines of this bar, and the cons
 | Every request of the `rc1` differential against `9e15d18e` equal, with the handler context the one difference | the no-regression line | the review: 300 of 300 rows |
 | The guide states the caller, what a tool reaches under the `files` list, and the rebuild, with an executed case | wsedit; wsfiles | guides 238 in `agent-w43-close2-mut` and in `agent-w43-fix-mut` |
 | No fleet collision for `AgentCaller`, `isAgentCaller`, or `resolveWorkspace` | wsedit | the policy project's `surface` rule in `agent-w43-close2-mut` |
-| The turn bars read on a run that edits at every turn, a slower reading inside its bar kept | wsedit | owed at the release visit, `plan.md` § Sequence |
+| The turn bars read on a run that edits at every turn, a slower reading inside its bar kept | wsedit | read 2026-11-13 (`agent-w43-bench`, solo, 5 processes of 3000 turn samples an arm, scripted, no model): the head rebuild costs 0.048 ms at the median and 0.064 ms at p95 per turn against 0.0.43 with no rebuild, and 0.044 ms over 0.0.42, under 1% of claim 2.11's 6.6 ms bar; noise 0.001 ms at the median; the slowest turn 4.28 ms; read as a small change, kept |
 | `@orkestrel/workspace` re-pinned to 0.0.18 from the registry | wsfiles | owed at the release visit |
 | The release chain on the integrated commit, with the `distribution` project | `orkestrel-publish` | owed at the release visit |
 

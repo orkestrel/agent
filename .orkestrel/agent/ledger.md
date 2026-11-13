@@ -182,3 +182,4 @@
 | 2026-11-13 | The wave's codes in order: scaffold 0.0.134 and Workspace 0.0.18; Agent 0.0.43; Ollama 0.0.37 and Toolbox 0.0.32; Study 0.0.19 with Agent's devDependency re-pin | Orchestrator | `plan.md` § Sequence |
 | 2026-11-13 | The fix round of W43: O1 built and x4 removed, committed as `f15e8ed4` | `opus` on `opus` | `designs/disclosure.md` § Agent 0.0.43 |
 | 2026-11-13 | The records for Agent 0.0.43 and its wave | `opus` on `opus` | `plan.md` § State |
+| 2026-11-13 | The head rebuild's turn-bar reading: 0.048 ms a turn against the 6.6 ms bar, a small change kept | Orchestrator | `designs/disclosure.md` § Agent 0.0.43 |

@@ -292,7 +292,7 @@ Unapplied until Agent re-pins its devDependencies to Study 0.0.19, which carries
 Phases 0 to 3 and Agent 0.0.42 are closed, and their records are § State and `designs/disclosure.md` § Phases. The steps left, in order, with the user's code for each release:
 
 1. **Scaffold 0.0.134 and Workspace 0.0.18,** one code. Workspace is release-ready at `1fe2cf4`.
-2. **Agent 0.0.43** under `orkestrel-publish`: the visit re-pins `@orkestrel/workspace` to 0.0.18 from the registry; `verifier` reads the turn bars on a run that edits at every turn, as the wsedit ruling names; the release chain runs with the `distribution` project; then the user publishes (`designs/disclosure.md` § The bar of Agent 0.0.43).
+2. **Agent 0.0.43** under `orkestrel-publish`: the visit re-pins `@orkestrel/workspace` to 0.0.18 from the registry; the turn bars read 0.048 ms a turn for the head rebuild against the 6.6 ms bar (`agent-w43-bench`, 2026-11-13); the release chain runs with the `distribution` project; then the user publishes (`designs/disclosure.md` § The bar of Agent 0.0.43).
 3. **Ollama 0.0.37 and Toolbox 0.0.32,** one code. Each re-pins Agent 0.0.43 and Workspace 0.0.18. Toolbox carries D20, the switch removal, and unit TBW, with its local pins restored.
 4. **Study 0.0.19,** carrying P7 on Agent 0.0.43 and Ollama 0.0.37, then **Agent's devDependency re-pin** to Study 0.0.19 and Ollama 0.0.37 with the prepared Study-version consumer change and `test:studies`. This step's code can share scaffold's test 0.0.38 code.
 5. **Taverna's adoption,** at D19's trigger (§ Deferred).
