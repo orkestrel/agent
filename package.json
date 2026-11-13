@@ -1,6 +1,6 @@
 {
 	"name": "@orkestrel/agent",
-	"version": "0.0.43",
+	"version": "0.0.44",
 	"description": "A typed conversation runtime for the @orkestrel line — providers, conversations, prompt assembly, authority, and the bounded agent loop. Part of the @orkestrel line.",
 	"keywords": [
 		"agent",
@@ -108,6 +108,6 @@
 		"vitest": "^5.1.0"
 	},
 	"engines": {
-		"node": ">=22.18.0"
+		"node": "^22.18.0 || >=24.4.0"
 	}
 }
