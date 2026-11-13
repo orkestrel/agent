@@ -1,7 +1,7 @@
 import type { AgentEventName } from '../../../setup.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ProviderRequest, ProviderResult } from '@src/core'
-import type { ToolCall } from '@orkestrel/tool'
+import type { ToolCall, ToolContext } from '@orkestrel/tool'
 import type {
 	AgentEventMap,
 	AgentFrame,
@@ -101,6 +101,7 @@ import {
 	AGENT_RUN_KEYS,
 	SKILL_SECTION_HEADER,
 	WORKSPACE_INDEX_HEADER,
+	isAgentCaller,
 } from '@src/core'
 import {
 	createForeignAgent,
@@ -165,6 +166,11 @@ import {
 	omitMember,
 	readUndisclosed,
 	serveAgentArm,
+	CALLER_FILES_CASES,
+	collectCallers,
+	createInspectTool,
+	createNoteTool,
+	NOTE_TEXT,
 } from '../../../setup.js'
 import {
 	captureError,
@@ -2218,14 +2224,15 @@ describe('Agent — re-entrancy / reuse', () => {
 
 describe('Agent — cancellation timing matrix', () => {
 	it.each(AUTHORITY_STATES)(
-		'supplies no caller identity to a tool handler (authority: %s)',
+		'supplies the run caller to a tool handler, with no workspace and no files list on a bare agent (authority: %s)',
 		async (authorized) => {
 			const tools = createToolManager()
 			tools.add(
 				createTool({
 					name: 'identity',
 					execute: (_args, context) => {
-						expect(context.caller).toBeUndefined()
+						expect(isAgentCaller(context.caller)).toBe(true)
+						expect(context.caller).toEqual({ workspace: undefined, files: undefined })
 						return 'entered'
 					},
 				}),
@@ -11884,4 +11891,277 @@ describe('Agent — the option doors refuse a member their type does not declare
 			])
 		},
 	)
+})
+
+describe('Agent — the tool caller: each host call receives the run workspace and files list (claims A.1 to A.5, F.1, and F.2)', () => {
+	it('hands every host call own keys signal and caller, the caller holding the active workspace (claim A.1)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', workspaces: ['north', 'south'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		await fixture.agent.generate({ prompt: { content: 'Inspect the desk.' } })
+
+		expect(contexts.calls.map(([context]) => Reflect.ownKeys(context))).toEqual([
+			['signal', 'caller'],
+		])
+		expect(contexts.calls.map(([context]) => isAgentCaller(context.caller))).toEqual([true])
+		expect(collectCallers(contexts)[0]?.workspace).toBe(
+			fixture.agent.context.workspaces.workspace('north'),
+		)
+	})
+
+	it('hands the next turn the workspace the built-in switch selected, while the active pointer stays (claim A.2)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{
+					content: '',
+					tools: [createToolCall({ id: 's1', name: 'switch', arguments: { workspace: 'south' } })],
+				},
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', workspaces: ['north', 'south'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		await fixture.agent.generate({ prompt: { content: 'Open south.' } })
+
+		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true])
+		expect(collectCallers(contexts)[0]?.workspace).toBe(
+			fixture.agent.context.workspaces.workspace('south'),
+		)
+		expect(fixture.agent.context.workspaces.active?.id).toBe('north')
+	})
+
+	it('hands each call the workspace the workspace run option names, while the active pointer stays (claim A.2)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', workspaces: ['north', 'south'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		await fixture.agent.generate({ workspace: 'south', prompt: { content: 'Work south.' } })
+
+		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true])
+		expect(collectCallers(contexts)[0]?.workspace).toBe(
+			fixture.agent.context.workspaces.workspace('south'),
+		)
+		expect(fixture.agent.context.workspaces.active?.id).toBe('north')
+	})
+
+	it('hands each conversation the workspace that conversation shows (claim A.3)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{
+					content: '',
+					tools: [createToolCall({ id: 's1', name: 'switch', arguments: { workspace: 'south' } })],
+				},
+				{ content: 'A done' },
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'B done' },
+				{ content: '', tools: [createToolCall({ id: 'i2', name: 'inspect' })] },
+				{ content: 'A again' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', workspaces: ['north', 'south'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		const first = createConversation()
+		const second = createConversation()
+		await fixture.agent.generate({ conversation: first, prompt: { content: 'Open south.' } })
+		await fixture.agent.generate({ conversation: second, prompt: { content: 'Inspect.' } })
+		await fixture.agent.generate({ conversation: first, prompt: { content: 'Inspect again.' } })
+		const workspaces = fixture.agent.context.workspaces
+
+		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true, true])
+		expect(collectCallers(contexts)[0]?.workspace).toBe(workspaces.workspace('north'))
+		expect(collectCallers(contexts)[1]?.workspace).toBe(workspaces.workspace('south'))
+	})
+
+	it.each([
+		{ order: 'switch first', ids: ['s1', 'i1'] },
+		{ order: 'inspect first', ids: ['i1', 's1'] },
+	])(
+		'hands a call that shares its turn with switch the workspace that turn rendered, $order (claim A.4)',
+		async ({ ids }) => {
+			const contexts = createRecorder<[ToolContext]>()
+			const calls = ids.map((id) =>
+				id === 's1'
+					? createToolCall({ id, name: 'switch', arguments: { workspace: 'south' } })
+					: createToolCall({ id, name: 'inspect' }),
+			)
+			const fixture = createBuiltinAgent({
+				turns: [
+					{ content: '', tools: calls },
+					{ content: '', tools: [createToolCall({ id: 'i2', name: 'inspect' })] },
+					{ content: 'done' },
+				],
+				builtins: ['switch'],
+				scope: { name: 'desk', workspaces: ['north', 'south'] },
+			})
+			fixture.agent.context.tools.add(createInspectTool(contexts))
+			await fixture.agent.generate({ prompt: { content: 'Open south and inspect.' } })
+			const workspaces = fixture.agent.context.workspaces
+
+			expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true, true])
+			expect(collectCallers(contexts)[0]?.workspace).toBe(workspaces.workspace('north'))
+			expect(collectCallers(contexts)[1]?.workspace).toBe(workspaces.workspace('south'))
+		},
+	)
+
+	it('hands no workspace when the ceiling excludes the active one (claim A.5)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', workspaces: ['south'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		await fixture.agent.generate({ prompt: { content: 'Inspect.' } })
+
+		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true])
+		expect(collectCallers(contexts)).toEqual([{ workspace: undefined, files: undefined }])
+	})
+
+	it('hands no workspace when a request listener narrows the list after the turn rendered it (claim A.5)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', workspaces: ['north', 'south'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		fixture.agent.emitter.on('request', (index) => {
+			if (index === 0)
+				fixture.agent.context.apply(createScope({ name: 'narrow', workspaces: ['south'] }))
+		})
+		await fixture.agent.generate({ prompt: { content: 'Inspect.' } })
+
+		expect(
+			fixture.provider.calls[0]?.messages.some((message) => message.content.includes('NORTH FILE')),
+		).toBe(true)
+		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true])
+		expect(collectCallers(contexts)).toEqual([{ workspace: undefined, files: undefined }])
+	})
+
+	it.each(CALLER_FILES_CASES)(
+		'hands the ceiling files list when $name (claim F.1)',
+		async ({ context, run, expected }) => {
+			const contexts = createRecorder<[ToolContext]>()
+			const fixture = createBuiltinAgent({
+				turns: [
+					{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+					{ content: 'done' },
+				],
+				builtins: ['switch'],
+				...(context === undefined ? {} : { scope: { name: 'desk', files: context } }),
+			})
+			fixture.agent.context.tools.add(createInspectTool(contexts))
+			await fixture.agent.generate({
+				prompt: { content: 'Inspect.' },
+				...(run === undefined ? {} : { scope: createScope({ name: 'run', files: run }) }),
+			})
+			const caller = contexts.calls[0]?.[0].caller
+
+			expect(isAgentCaller(caller)).toBe(true)
+			expect(caller !== null && typeof caller === 'object' && Object.hasOwn(caller, 'files')).toBe(
+				true,
+			)
+			expect(collectCallers(contexts)[0]?.files).toEqual(expected)
+		},
+	)
+
+	it('hands the narrowed files list when a request listener narrows it after the turn rendered (claim F.2)', async () => {
+		const contexts = createRecorder<[ToolContext]>()
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'i1', name: 'inspect' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+			scope: { name: 'desk', files: ['north.txt', 'notes.md'] },
+		})
+		fixture.agent.context.tools.add(createInspectTool(contexts))
+		fixture.agent.emitter.on('request', (index) => {
+			if (index === 0)
+				fixture.agent.context.apply(createScope({ name: 'narrow', files: ['notes.md'] }))
+		})
+		await fixture.agent.generate({ prompt: { content: 'Inspect.' } })
+
+		expect(
+			fixture.provider.calls[0]?.messages.some((message) => message.content.includes('NORTH FILE')),
+		).toBe(true)
+		expect(contexts.calls.map(([context]) => 'caller' in context)).toEqual([true])
+		expect(collectCallers(contexts)[0]?.files).toEqual(['notes.md'])
+	})
+})
+
+describe('Agent — an edit to a rendered file reaches the next request (claim A.8)', () => {
+	it('rebuilds the head after a call changed a rendered file, and keeps it by id after a turn that changed none', async () => {
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'n1', name: 'note' })] },
+				{ content: '', tools: [createToolCall({ id: 'e1', name: 'echo' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+		})
+		fixture.agent.context.tools.add(
+			createNoteTool(requireValue(fixture.agent.context.workspaces.workspace('north'))),
+		)
+		await fixture.agent.generate({ prompt: { content: 'Note the refund.' } })
+		const heads = fixture.provider.calls.map(
+			(call) => call.messages.find((message) => message.role === 'user')?.id,
+		)
+
+		expect(
+			fixture.provider.calls.map((call) =>
+				call.messages.some((message) => message.content.includes(NOTE_TEXT)),
+			),
+		).toEqual([false, true, true])
+		expect(heads[1]).not.toBe(heads[0])
+		expect(heads[2]).toBe(heads[1])
+	})
+
+	it('keeps the head by id after a call changed a file of a workspace no request renders', async () => {
+		const fixture = createBuiltinAgent({
+			turns: [
+				{ content: '', tools: [createToolCall({ id: 'n1', name: 'note' })] },
+				{ content: 'done' },
+			],
+			builtins: ['switch'],
+		})
+		fixture.agent.context.tools.add(
+			createNoteTool(requireValue(fixture.agent.context.workspaces.workspace('south'))),
+		)
+		await fixture.agent.generate({ prompt: { content: 'Note the refund.' } })
+		const heads = fixture.provider.calls.map(
+			(call) => call.messages.find((message) => message.role === 'user')?.id,
+		)
+
+		expect(
+			fixture.provider.calls.map((call) =>
+				call.messages.some((message) => message.content.includes(NOTE_TEXT)),
+			),
+		).toEqual([false, false])
+		expect(heads[1]).toBe(heads[0])
+	})
 })

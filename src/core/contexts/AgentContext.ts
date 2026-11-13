@@ -31,6 +31,7 @@ import {
 	renderIndexLine,
 	renderSection,
 	renderSkillBody,
+	resolveWorkspace,
 } from './helpers.js'
 import {
 	LOADED_SECTION_HEADER,
@@ -259,19 +260,12 @@ export class AgentContext implements AgentContextInterface {
 		// The shown workspace, else the active one, is the sole document/image context, rendered only
 		// while the ceiling admits it. `build()` owns this render because a `Workspace` /
 		// `WorkspaceManager` stays file-focused, and it never moves the active workspace.
-		const selected = options?.disclosure?.workspace
-		const workspace =
-			selected === undefined ? this.#workspaces.active : this.#workspaces.workspace(selected)
-		const shown = filterAllowList(
+		const workspace = resolveWorkspace(
+			this.#workspaces,
+			options?.disclosure?.workspace,
 			scope.workspaces,
-			workspace === undefined ? [] : [workspace],
-			(one) => one.id,
 		)
-		const files = filterAllowList(
-			scope.files,
-			shown.flatMap((one) => one.files()),
-			(one) => one.path,
-		)
+		const files = filterAllowList(scope.files, workspace?.files() ?? [], (one) => one.path)
 		const workspaceTexts = files.flatMap((file) =>
 			isTextContent(file.content)
 				? [{ path: file.path, language: file.content.language, text: file.content.text }]

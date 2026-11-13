@@ -1,4 +1,4 @@
-import type { AgentBuiltin } from './types.js'
+import type { AgentBuiltin, AgentCaller } from './types.js'
 import type {
 	AgentContextInterface,
 	AgentDisclosure,
@@ -15,9 +15,15 @@ import type {
 	ToolManagerInterface,
 	ToolResult,
 } from '@orkestrel/tool'
+import type { FileInterface } from '@orkestrel/workspace'
 import { isString } from '@orkestrel/contract'
 import { createToolManager, ToolError } from '@orkestrel/tool'
-import { createScope, intersectFilters } from '../contexts/index.js'
+import {
+	createScope,
+	intersectFilters,
+	intersectKeys,
+	resolveWorkspace,
+} from '../contexts/index.js'
 import { BUILTIN_NOTES } from './constants.js'
 import { createBuiltinTool } from './factories.js'
 import {
@@ -41,6 +47,7 @@ import { filterAllowList } from '../helpers.js'
  * registers under a built-in's name is never read: `tool` and `execute` answer a built-in's name
  * from the run's manager and every other name from the host's. Each handler reads the ceiling when
  * it runs, the context scope intersected with the run scope at that moment, never a turn's copy.
+ * The `caller` each call receives reads the ceiling the same way, as the call starts.
  */
 export class AgentRun {
 	readonly #context: AgentContextInterface
@@ -54,6 +61,8 @@ export class AgentRun {
 	#ceiling: ScopeFilter = {}
 	#shown: AgentDisclosure = { skills: [] }
 	#ids: readonly string[] = []
+	// The files the shown workspace renders under the ceiling's `files` list, compared by identity.
+	#files: readonly FileInterface[] = []
 	#advertised: readonly ToolDefinition[] = []
 	// The run scope's lists as the last `observe` read them, which every build until the next one renders by.
 	#snapshot: ScopeInterface | undefined
@@ -67,6 +76,7 @@ export class AgentRun {
 				readonly ids: readonly string[]
 				readonly workspace: string | undefined
 				readonly switchable: boolean
+				readonly files: readonly FileInterface[]
 		  }
 		| undefined
 
@@ -166,6 +176,27 @@ export class AgentRun {
 	}
 
 	/**
+	 * Returns what a tool call receives as `ToolContext.caller`: the workspace the last `observe`
+	 * showed, kept only while the ceiling at this moment admits it, and that ceiling's `files` list.
+	 *
+	 * @remarks
+	 * Each read of this getter reads the `workspaces` and `files` lists of the context scope and the
+	 * run scope one time each, and no other list, so a call reads them as it starts, a narrowing made
+	 * after the turn's decision reaches that call, and a turn still reads its `tools` list once.
+	 *
+	 * @returns A fresh caller
+	 */
+	get caller(): AgentCaller {
+		const outer = this.#context.scope
+		const inner = this.#scope
+		const workspaces = intersectKeys(outer?.workspaces, inner?.workspaces)
+		return {
+			workspace: resolveWorkspace(this.#context.workspaces, this.#shown.workspace, workspaces),
+			files: intersectKeys(outer?.files, inner?.files),
+		}
+	}
+
+	/**
 	 * Returns the selection the working head rendered.
 	 *
 	 * @returns The selection, or undefined before the first build
@@ -191,8 +222,10 @@ export class AgentRun {
 	 * `load`, `unload`, or `switch` is enabled, and only the records of an enabled built-in count.
 	 * Registered skills hold their tools back only while `load` is enabled. The view compared with
 	 * the working head's is the ceiling's `instructions`, `skills`, `memos`, `files`, and
-	 * `workspaces` lists, the shown skills by id, the shown workspace, and whether `switch` is
-	 * advertised.
+	 * `workspaces` lists, the shown skills by id, the shown workspace, the files that workspace
+	 * renders under the ceiling's `files` list, compared by identity, and whether `switch` is
+	 * advertised. An edit to a rendered file, by a tool or by the host, therefore makes the head
+	 * stale, and an edit to a file no build renders does not.
 	 *
 	 * @returns True if the working head was built with another view and must be rebuilt; false otherwise
 	 */
@@ -211,6 +244,12 @@ export class AgentRun {
 		this.#ceiling = ceiling
 		this.#shown = shown
 		this.#ids = shown.skills.flatMap((name) => this.#context.skills.skill(name)?.id ?? [])
+		this.#files = filterAllowList(
+			ceiling.files,
+			resolveWorkspace(this.#context.workspaces, shown.workspace, ceiling.workspaces)?.files() ??
+				[],
+			(file) => file.path,
+		)
 		this.#advertised = filterAdvertisedTools(
 			this.#candidates(ceiling),
 			ceiling.tools,
@@ -224,7 +263,9 @@ export class AgentRun {
 			head.ids.length !== this.#ids.length ||
 			head.ids.some((id, index) => id !== this.#ids[index]) ||
 			head.workspace !== shown.workspace ||
-			head.switchable !== this.switchable
+			head.switchable !== this.switchable ||
+			head.files.length !== this.#files.length ||
+			head.files.some((file, index) => file !== this.#files[index])
 		)
 	}
 
@@ -243,6 +284,7 @@ export class AgentRun {
 			ids: this.#ids,
 			workspace: this.#shown.workspace,
 			switchable: this.switchable,
+			files: this.#files,
 		}
 	}
 

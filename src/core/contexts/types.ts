@@ -231,7 +231,9 @@ export interface ContextSectionFormat<T> {
  * message and the image files attached to the last user message — and `workspaces` decides
  * whether that workspace renders at all. Two lists bound a write as well as a read: the
  * `remember` built-in writes only a name a defined `memos` list holds, and the `switch` built-in
- * selects only an id a defined `workspaces` list holds.
+ * selects only an id a defined `workspaces` list holds. The `files` list also bounds the workspace
+ * tool of `@orkestrel/toolbox`, which receives it as `caller.files`, an
+ * {@link import('../agents/types.js').AgentCaller} member.
  */
 export interface ScopeFilter {
 	/** Lists the allowed instruction names matched against the `name` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed). */
@@ -254,7 +256,8 @@ export interface ScopeFilter {
 	 * Lists the allowed active-workspace file paths matched against the `path` property (`undefined` ⇒ all, `[]` ⇒ none, else only-listed) —
 	 * the filter {@link AgentContextInterface.build} applies to the rendered workspace's
 	 * {@link import('@orkestrel/workspace').WorkspaceInterface.files} before rendering them (text → the context message, image →
-	 * the last user message).
+	 * the last user message). Each tool call receives the list as `caller.files`, and the workspace
+	 * tool of `@orkestrel/toolbox` reaches the listed paths alone.
 	 */
 	readonly files?: readonly string[]
 	/**

@@ -17769,3 +17769,274 @@ export function buildNonPlainMessages(): readonly NonPlainMessage[] {
 		})),
 	]
 }
+
+// ── Tool caller: what each call receives, and the head an edit rebuilds ──────
+//
+// A host tool reads `ToolContext.caller`. The `inspect` tool records the context it is handed, and
+// the `note` tool edits a workspace as a workspace tool does, so a case reads whether the next
+// request carries the edit.
+
+import type { AgentCaller } from '@src/core'
+import type { ToolContext } from '@orkestrel/tool'
+import type { WorkspaceInterface } from '@orkestrel/workspace'
+import { isAgentCaller } from '@src/core'
+
+/** Holds the text the `note` tool writes to `note.txt`. */
+export const NOTE_TEXT = 'Refund approved.'
+
+/**
+ * Collects the caller of each context an `inspect` tool recorded, in call order, with `undefined`
+ * where the caller guard refuses the value.
+ *
+ * @param recorder - The recorder an `inspect` tool wrote to
+ * @returns One caller per recorded call
+ */
+export function collectCallers(
+	recorder: RecorderInterface<[ToolContext]>,
+): ReadonlyArray<AgentCaller | undefined> {
+	return recorder.calls.map(([context]) =>
+		isAgentCaller(context.caller) ? context.caller : undefined,
+	)
+}
+
+/**
+ * Creates a real tool named `inspect` on the raw route that records the execution context it is
+ * handed and returns `'ok'`, standing in for a host tool that reads `ToolContext.caller`.
+ *
+ * @param recorder - The recorder that receives each call's context
+ * @returns A working tool whose execution records its context
+ */
+export function createInspectTool(recorder: RecorderInterface<[ToolContext]>): ToolInterface {
+	return createTool({
+		name: 'inspect',
+		strict: false,
+		execute: (_args, context) => {
+			recorder.handler(context)
+			return 'ok'
+		},
+	})
+}
+
+/**
+ * Creates a real tool named `note` on the raw route that writes {@link NOTE_TEXT} to `note.txt` in
+ * the given workspace and returns `'noted'`, standing in for a tool that edits a rendered workspace.
+ *
+ * @param workspace - The workspace each call writes to
+ * @returns A working tool whose execution writes the note
+ */
+export function createNoteTool(workspace: WorkspaceInterface): ToolInterface {
+	return createTool({
+		name: 'note',
+		strict: false,
+		execute: () => {
+			workspace.write('note.txt', NOTE_TEXT)
+			return 'noted'
+		},
+	})
+}
+
+/** Describes one row of the workspace a run renders and hands its calls: the registry, the selection, the allow-list, and the expected id. */
+export interface WorkspaceResolutionCase {
+	readonly name: string
+	/** The ids the registry holds, in add order; the first is active. */
+	readonly registry: readonly string[]
+	readonly selected: string | undefined
+	readonly allowed: readonly string[] | undefined
+	/** The id of the workspace that renders, or `undefined` when none does. */
+	readonly expected: string | undefined
+}
+
+/** Lists the rows of the one workspace resolution `build` renders by and a call receives. */
+export const WORKSPACE_RESOLUTION_CASES: readonly WorkspaceResolutionCase[] = Object.freeze([
+	{
+		name: 'no selection, no list',
+		registry: ['north', 'south'],
+		selected: undefined,
+		allowed: undefined,
+		expected: 'north',
+	},
+	{
+		name: 'no selection, a list naming the active one',
+		registry: ['north', 'south'],
+		selected: undefined,
+		allowed: ['north'],
+		expected: 'north',
+	},
+	{
+		name: 'no selection, a list omitting the active one',
+		registry: ['north', 'south'],
+		selected: undefined,
+		allowed: ['south'],
+		expected: undefined,
+	},
+	{
+		name: 'no selection, an empty list',
+		registry: ['north', 'south'],
+		selected: undefined,
+		allowed: [],
+		expected: undefined,
+	},
+	{
+		name: 'a selection, no list',
+		registry: ['north', 'south'],
+		selected: 'south',
+		allowed: undefined,
+		expected: 'south',
+	},
+	{
+		name: 'a selection the list names',
+		registry: ['north', 'south'],
+		selected: 'south',
+		allowed: ['south'],
+		expected: 'south',
+	},
+	{
+		name: 'a selection the list omits, with the active one listed',
+		registry: ['north', 'south'],
+		selected: 'south',
+		allowed: ['north'],
+		expected: undefined,
+	},
+	{
+		name: 'a selection the registry does not hold',
+		registry: ['north', 'south'],
+		selected: 'ghost',
+		allowed: undefined,
+		expected: undefined,
+	},
+	{
+		name: 'an empty registry',
+		registry: [],
+		selected: undefined,
+		allowed: undefined,
+		expected: undefined,
+	},
+])
+
+/**
+ * Renders the text of the one file each workspace of a resolution case holds, so a reader finds
+ * which workspace a request renders.
+ *
+ * @param id - The workspace id
+ * @returns The file text
+ */
+export function renderWorkspaceMarker(id: string): string {
+	return `Marker of the ${id} workspace.`
+}
+
+/**
+ * Reads which of the given workspaces a built request renders, by each one's marker text.
+ *
+ * @param messages - The built messages
+ * @param ids - The workspace ids to look for
+ * @returns The ids whose marker a message carries, in the given order
+ */
+export function readRenderedWorkspaces(
+	messages: readonly Message[],
+	ids: readonly string[],
+): readonly string[] {
+	return ids.filter((id) =>
+		messages.some((message) => message.content.includes(renderWorkspaceMarker(id))),
+	)
+}
+
+/** Describes one row of the `files` list a call's caller carries: the context scope's list, the run scope's, and the expected ceiling. */
+export interface CallerFilesCase {
+	readonly name: string
+	readonly context: readonly string[] | undefined
+	readonly run: readonly string[] | undefined
+	readonly expected: readonly string[] | undefined
+}
+
+/** Lists the rows of the `files` list each call's caller carries. */
+export const CALLER_FILES_CASES: readonly CallerFilesCase[] = Object.freeze([
+	{
+		name: 'the context scope lists it',
+		context: ['notes.md'],
+		run: undefined,
+		expected: ['notes.md'],
+	},
+	{ name: 'the run scope lists it', context: undefined, run: ['notes.md'], expected: ['notes.md'] },
+	{
+		name: 'both scopes list, and the ceiling is their intersection',
+		context: ['notes.md', 'draft.md'],
+		run: ['ledger.md', 'notes.md'],
+		expected: ['notes.md'],
+	},
+	{ name: 'neither scope lists', context: undefined, run: undefined, expected: undefined },
+])
+
+/** Describes one value the caller guard reads, and whether it admits it. */
+export interface AgentCallerCase {
+	readonly name: string
+	readonly value: unknown
+	readonly admitted: boolean
+}
+
+/**
+ * Builds the values the caller guard reads: the callers it admits, and each malformed value it
+ * refuses, a record with a throwing accessor and a revoked proxy included.
+ *
+ * @param workspace - A registered workspace a caller can carry
+ * @returns The named values, each with whether the guard admits it
+ */
+export function buildAgentCallerCases(workspace: WorkspaceInterface): readonly AgentCallerCase[] {
+	const revocable = Proxy.revocable({ workspace: undefined, files: undefined }, {})
+	revocable.revoke()
+	return [
+		{
+			name: 'no workspace and no list',
+			value: { workspace: undefined, files: undefined },
+			admitted: true,
+		},
+		{ name: 'a workspace and an empty list', value: { workspace, files: [] }, admitted: true },
+		{ name: 'a workspace and a list', value: { workspace, files: ['notes.md'] }, admitted: true },
+		{ name: 'undefined', value: undefined, admitted: false },
+		{ name: 'an empty record', value: {}, admitted: false },
+		{ name: 'another caller identity', value: { subject: 'reader' }, admitted: false },
+		{ name: 'a workspace id', value: { workspace: 'returns' }, admitted: false },
+		{
+			name: 'a workspace id with a list key',
+			value: { workspace: 'returns', files: undefined },
+			admitted: false,
+		},
+		{ name: 'a null workspace', value: { workspace: null }, admitted: false },
+		{
+			name: 'a null workspace with a list key',
+			value: { workspace: null, files: undefined },
+			admitted: false,
+		},
+		{ name: 'a workspace and no list key', value: { workspace }, admitted: false },
+		{ name: 'no workspace and no list key', value: { workspace: undefined }, admitted: false },
+		{ name: 'a list and no workspace key', value: { files: undefined }, admitted: false },
+		{ name: 'a list that is a string', value: { workspace, files: 'notes.md' }, admitted: false },
+		{ name: 'a list holding a number', value: { workspace, files: [7] }, admitted: false },
+		{ name: 'a null list', value: { workspace, files: null }, admitted: false },
+		{
+			name: 'an undeclared member',
+			value: { workspace, files: undefined, conversation: 'c1' },
+			admitted: false,
+		},
+		{
+			name: 'a throwing workspace accessor',
+			value: Object.defineProperty({ files: undefined }, 'workspace', {
+				enumerable: true,
+				get: () => {
+					throw new Error('The workspace cannot be read.')
+				},
+			}),
+			admitted: false,
+		},
+		{
+			name: 'a throwing files accessor',
+			value: Object.defineProperty({ workspace }, 'files', {
+				enumerable: true,
+				get: () => {
+					throw new Error('The files cannot be read.')
+				},
+			}),
+			admitted: false,
+		},
+		{ name: 'a revoked proxy', value: revocable.proxy, admitted: false },
+	]
+}

@@ -127,6 +127,41 @@ describe('AgentRun — observe', () => {
 		expect(run.observe()).toBe(true)
 		expect(run.disclosure).toBeUndefined()
 	})
+
+	it('reports the head stale after a rendered file changed, and current after an edit no build renders (claim A.8)', () => {
+		const context = createAgentContext()
+		const north = context.workspaces.add({ id: 'north' })
+		north.write('notes.md', 'Order 42 is paid.')
+		north.write('secret.md', 'The vault code is 7731.')
+		const south = context.workspaces.add({ id: 'south' })
+		context.apply(createScope({ name: 'desk', files: ['notes.md', 'draft.md'] }))
+		const run = new AgentRun(context, createConversation(), undefined, undefined, [])
+		const selection = { messages: [], judgments: [] }
+
+		expect(run.observe()).toBe(true)
+		run.record(selection, 2)
+		expect(run.observe()).toBe(false)
+
+		north.write('secret.md', 'The vault code is 7732.')
+		south.write('south.md', 'Return 7 is open.')
+		expect(run.observe()).toBe(false)
+
+		north.write('notes.md', 'Refund approved.')
+		expect(run.observe()).toBe(true)
+		run.record(selection, 2)
+		expect(run.observe()).toBe(false)
+
+		north.write('draft.md', 'Draft.')
+		expect(run.observe()).toBe(true)
+		run.record(selection, 2)
+
+		north.move('draft.md', 'moved.md')
+		expect(run.observe()).toBe(true)
+		run.record(selection, 2)
+
+		north.remove('notes.md')
+		expect(run.observe()).toBe(true)
+	})
 })
 
 describe('AgentRun — the built-in handlers', () => {

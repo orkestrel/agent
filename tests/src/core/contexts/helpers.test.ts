@@ -12,16 +12,18 @@ import {
 	renderIndexLine,
 	renderSection,
 	renderSkillBody,
+	resolveWorkspace,
 } from '@src/core'
 import { captureError, createRecorder } from '@orkestrel/test'
 import {
 	createBinaryContent,
 	createFile,
 	createTextContent,
+	createWorkspaceManager,
 	isTextContent,
 } from '@orkestrel/workspace'
 import { describe, expect, it } from 'vitest'
-import { createToolCall } from '../../../setup.js'
+import { createToolCall, WORKSPACE_RESOLUTION_CASES } from '../../../setup.js'
 
 describe('renderFencedFile', () => {
 	it('assembles a `File:` label + a fenced code block tagged with the language', () => {
@@ -401,4 +403,18 @@ describe('renderSkillBody — one loaded skill body', () => {
 			'### refunds\n\nCheck the order first.',
 		)
 	})
+})
+
+describe('resolveWorkspace (claim A.7)', () => {
+	it.each(WORKSPACE_RESOLUTION_CASES)(
+		'returns the expected workspace when $name',
+		({ registry, selected, allowed, expected }) => {
+			const workspaces = createWorkspaceManager()
+			for (const id of registry) workspaces.add({ id })
+
+			expect(resolveWorkspace(workspaces, selected, allowed)).toBe(
+				expected === undefined ? undefined : workspaces.workspace(expected),
+			)
+		},
+	)
 })

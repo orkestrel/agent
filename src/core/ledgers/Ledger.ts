@@ -76,7 +76,12 @@ import {
 	settleToolResult,
 } from '../agents/helpers.js'
 import { createScope } from '../contexts/factories.js'
-import { intersectFilters, intersectKeys, renderIndexEntry } from '../contexts/helpers.js'
+import {
+	intersectFilters,
+	intersectKeys,
+	renderIndexEntry,
+	resolveWorkspace,
+} from '../contexts/helpers.js'
 import { createConversationManager } from '../conversations/factories.js'
 import {
 	collectExchanges,
@@ -678,10 +683,10 @@ export class Ledger implements LedgerInterface {
 		signal: AbortSignal,
 	): Promise<number> {
 		const rate = bare / estimateMessages(head)
-		const workspace = this.#show(intersectFilters(this.#agent.context.scope, undefined)).workspace
-		const workspaces = this.#agent.context.workspaces
+		const ceiling = intersectFilters(this.#agent.context.scope, undefined)
+		const workspace = this.#show(ceiling).workspace
 		const files = (
-			(workspace === undefined ? workspaces.active : workspaces.workspace(workspace))?.files() ?? []
+			resolveWorkspace(this.#agent.context.workspaces, workspace, ceiling.workspaces)?.files() ?? []
 		).flatMap((file) => (isTextContent(file.content) ? [file.path] : []))
 		// The sample carries the workspace's text alone: an image needs a user turn, which it holds none of.
 		const shown = this.#agent.context.build({

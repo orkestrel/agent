@@ -311,9 +311,18 @@ import {
 	drawRecordInput,
 	MessageInstance,
 	RECORD_INPUT_FIXTURES,
+	buildAgentCallerCases,
+	collectCallers,
+	createInspectTool,
+	createNoteTool,
+	NOTE_TEXT,
+	readRenderedWorkspaces,
+	renderWorkspaceMarker,
 } from './setup.js'
+import type { ToolContext } from '@orkestrel/tool'
 import type { TokenUsage } from '@orkestrel/budget'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
+import { createWorkspaceManager } from '@orkestrel/workspace'
 import { isRecord, rawShape, seededRandom, stringShape } from '@orkestrel/contract'
 
 // setup.test.ts — the proof of `tests/setup.ts`, the host-independent shared test-infrastructure
@@ -4038,5 +4047,76 @@ ${'r'.repeat(400)}`,
 			'record-1.md',
 		])
 		expect(two.ledger.gauge).toBeUndefined()
+	})
+})
+
+describe('tool caller fixtures', () => {
+	it('createInspectTool records the very context it is handed and returns ok', async () => {
+		const recorder = createRecorder<[ToolContext]>()
+		const tool = createInspectTool(recorder)
+		const context = { signal: new AbortController().signal, caller: { subject: 'reader' } }
+
+		expect(tool.name).toBe('inspect')
+		expect(await tool.execute({}, context)).toBe('ok')
+		expect(recorder.calls).toHaveLength(1)
+		expect(recorder.calls[0]?.[0]).toBe(context)
+	})
+
+	it('createNoteTool writes the note to the given workspace alone and returns noted', async () => {
+		const manager = createWorkspaceManager()
+		const north = manager.add({ id: 'north' })
+		const south = manager.add({ id: 'south' })
+		const tool = createNoteTool(south)
+
+		expect(tool.name).toBe('note')
+		expect(await tool.execute({}, { signal: new AbortController().signal })).toBe('noted')
+		expect(south.read('note.txt')).toBe(NOTE_TEXT)
+		expect(north.has('note.txt')).toBe(false)
+	})
+
+	it('collectCallers reads each recorded caller and refuses one the guard refuses', () => {
+		const recorder = createRecorder<[ToolContext]>()
+		const workspace = createWorkspaceManager().add({ id: 'north' })
+		const signal = new AbortController().signal
+		const caller = { workspace, files: ['notes.md'] }
+		recorder.handler({ signal, caller })
+		recorder.handler({ signal })
+		recorder.handler({ signal, caller: { subject: 'reader' } })
+
+		const callers = collectCallers(recorder)
+		expect(callers).toHaveLength(3)
+		expect(callers[0]).toBe(caller)
+		expect(callers.slice(1)).toEqual([undefined, undefined])
+	})
+
+	it('readRenderedWorkspaces finds each workspace whose marker a message carries, in the given order', () => {
+		const rendered = [
+			{ id: 'c', role: 'user', content: `## Workspace\n\n${renderWorkspaceMarker('south')}` },
+			{ id: 'p', role: 'user', content: 'Where is my order?' },
+		] as const
+
+		expect(renderWorkspaceMarker('north')).not.toBe(renderWorkspaceMarker('south'))
+		expect(readRenderedWorkspaces(rendered, ['north', 'south'])).toEqual(['south'])
+		expect(readRenderedWorkspaces([], ['north', 'south'])).toEqual([])
+	})
+
+	it('buildAgentCallerCases names each value once, admits three, and carries values that throw on read', () => {
+		const workspace = createWorkspaceManager().add({ id: 'returns' })
+		const cases = buildAgentCallerCases(workspace)
+		const named = new Map(cases.map((one) => [one.name, Object(one.value)]))
+
+		expect(named.size).toBe(cases.length)
+		expect(cases.filter((one) => one.admitted).map((one) => one.name)).toEqual([
+			'no workspace and no list',
+			'a workspace and an empty list',
+			'a workspace and a list',
+		])
+		expect(() => Reflect.ownKeys(named.get('a revoked proxy'))).toThrow(TypeError)
+		expect(() => Reflect.get(named.get('a throwing workspace accessor'), 'workspace')).toThrow(
+			'The workspace cannot be read.',
+		)
+		expect(() => Reflect.get(named.get('a throwing files accessor'), 'files')).toThrow(
+			'The files cannot be read.',
+		)
 	})
 })

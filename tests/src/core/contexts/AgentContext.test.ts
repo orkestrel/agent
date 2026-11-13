@@ -16,6 +16,7 @@ import {
 	WorkspaceManager,
 	createBinaryContent,
 	createFile,
+	createTextContent,
 	createWorkspaceManager,
 } from '@orkestrel/workspace'
 import {
@@ -30,6 +31,8 @@ import {
 	Scope,
 	WORKSPACE_INDEX_HEADER,
 	WORKSPACE_SECTION_HEADER,
+	createScope,
+	resolveWorkspace,
 } from '@src/core'
 import { describe, expect, it, expectTypeOf } from 'vitest'
 import {
@@ -47,6 +50,9 @@ import {
 	SELECTION_USAGE,
 	buildOptionDoors,
 	readDoorRefusal,
+	readRenderedWorkspaces,
+	renderWorkspaceMarker,
+	WORKSPACE_RESOLUTION_CASES,
 } from '../../../setup.js'
 import { requireValue } from '@orkestrel/test'
 
@@ -2342,4 +2348,36 @@ describe('AgentContext — the census door refuses a member its type does not de
 			Exclude<keyof ContextBuildOptions, (typeof BUILD_OPTION_KEYS)[number]>
 		>().toEqualTypeOf<never>()
 	})
+})
+
+describe('AgentContext.build — one workspace resolution (claim A.7)', () => {
+	it.each(WORKSPACE_RESOLUTION_CASES)(
+		'renders the workspace resolveWorkspace returns when $name',
+		({ registry, selected, allowed, expected }) => {
+			const workspaces = createWorkspaceManager()
+			for (const id of registry) {
+				workspaces.add({
+					id,
+					seed: [
+						createFile({
+							path: `${id}.txt`,
+							content: createTextContent(renderWorkspaceMarker(id), 'text'),
+						}),
+					],
+				})
+			}
+			const context = new AgentContext({ workspaces })
+			const messages = context.build({
+				...(selected === undefined ? {} : { disclosure: { skills: [], workspace: selected } }),
+				...(allowed === undefined
+					? {}
+					: { scope: createScope({ name: 'desk', workspaces: allowed }) }),
+			})
+
+			expect(readRenderedWorkspaces(messages, ['north', 'south'])).toEqual(
+				expected === undefined ? [] : [expected],
+			)
+			expect(resolveWorkspace(workspaces, selected, allowed)?.id).toBe(expected)
+		},
+	)
 })

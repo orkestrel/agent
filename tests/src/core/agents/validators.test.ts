@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { isAgentBuiltin, isAuthorityDecision } from '@src/core'
+import { createWorkspaceManager } from '@orkestrel/workspace'
+import { isAgentBuiltin, isAgentCaller, isAuthorityDecision } from '@src/core'
 import { createHostileValues } from '@orkestrel/test'
-import { BUILTIN_NAMES } from '../../../setup.js'
+import { BUILTIN_NAMES, buildAgentCallerCases } from '../../../setup.js'
 
 describe('isAuthorityDecision', () => {
 	it.each(['allow', 'ask', 'deny'] as const)(
@@ -97,6 +98,25 @@ describe('isAgentBuiltin', () => {
 		for (const [index, value] of createHostileValues().entries()) {
 			expect(() => isAgentBuiltin(value), `hostile value ${index}`).not.toThrow()
 			expect(isAgentBuiltin(value), `hostile value ${index}`).toBe(false)
+		}
+	})
+})
+
+describe('isAgentCaller (claims A.6 and F.3)', () => {
+	const workspace = createWorkspaceManager().add({ id: 'returns' })
+
+	it.each(buildAgentCallerCases(workspace))(
+		'reads $name as admitted: $admitted',
+		({ value, admitted }) => {
+			expect(() => isAgentCaller(value)).not.toThrow()
+			expect(isAgentCaller(value)).toBe(admitted)
+		},
+	)
+
+	it('refuses every hostile value without throwing', () => {
+		for (const [index, value] of createHostileValues().entries()) {
+			expect(() => isAgentCaller(value), `hostile value ${index}`).not.toThrow()
+			expect(isAgentCaller(value), `hostile value ${index}`).toBe(false)
 		}
 	})
 })

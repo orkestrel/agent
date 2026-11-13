@@ -20,7 +20,7 @@ import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkes
 import type { QueueStoreInterface } from '@orkestrel/queue'
 import type { ToolCall, ToolInterface, ToolManagerInterface, ToolResult } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
-import type { WorkspaceManagerInterface } from '@orkestrel/workspace'
+import type { WorkspaceInterface, WorkspaceManagerInterface } from '@orkestrel/workspace'
 
 /**
  * Names the lifecycle state of an {@link AgentInterface} turn — `idle` before a run,
@@ -38,6 +38,25 @@ export type AgentStatus = 'idle' | 'running' | 'done' | 'error'
  * agent's authority as any tool does.
  */
 export type AgentBuiltin = 'load' | 'unload' | 'memo' | 'remember' | 'switch'
+
+/**
+ * Carries what an agent run hands each tool call as `ToolContext.caller`: the workspace the run acts
+ * on and the paths it reaches there.
+ *
+ * @remarks
+ * The agent builds one for each call as the call starts, from the view of the request the model
+ * answered and the ceiling at that moment, the context scope intersected with the run scope. Both
+ * keys are always present, so a run that shows no workspace or states no `files` list says so with
+ * `undefined` rather than an omitted member. `ToolContext.caller` is unverified by contract and can
+ * reach a handler from a wire, so read it through {@link isAgentCaller} and accept its `workspace`
+ * only as the very instance your own registry holds under that id.
+ */
+export interface AgentCaller {
+	/** Holds the workspace the run acts on: the one the turn's request rendered, while the ceiling admits it at the call. */
+	readonly workspace: WorkspaceInterface | undefined
+	/** Lists the paths the run reaches in that workspace: the live ceiling's `files` list at the call (`undefined` ⇒ every path, `[]` ⇒ none). */
+	readonly files: readonly string[] | undefined
+}
 
 /**
  * Represents a streamed step of an agent turn — the union the loop yields as it runs, discriminated
@@ -850,7 +869,7 @@ export interface AgentRunOptions {
  *   judge, a tool handler, and a selection handler are awaited until they settle, because each can
  *   carry usage or finished work, so one that ignores its signal holds the run past a cancel or a
  *   timeout, and on a ledger its held scan, until it returns.
- *   The agent supplies no caller identity.
+ *   Each call's `ToolContext.caller` is an {@link AgentCaller}.
  * - **Paced + capped.** The `scheduler` (when given) yields between turns; tool
  *   iteration is capped at `limit` so the loop always terminates.
  * - **Two observation surfaces.** Pull: the {@link AgentChunk} stream (`stream().events`)

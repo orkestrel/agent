@@ -1210,7 +1210,8 @@ export class Agent implements AgentInterface {
 	// because approved calls join the map after the synchronous pass. The manager resolves a tool by
 	// name when it starts a call, and a handler's synchronous prefix runs before the next start, so
 	// each call is checked again right before it starts: the check and the manager's lookup read one
-	// instance, and the manager keeps its own policy for the call.
+	// instance, and the manager keeps its own policy for the call. Each call reads the run's caller as
+	// it starts, so it carries the workspace the turn's request rendered under the ceiling of that moment.
 	async #dispatch(
 		run: AgentRun,
 		calls: readonly ToolCall[],
@@ -1227,7 +1228,9 @@ export class Agent implements AgentInterface {
 		const { allowed, denials } = authorization
 		const entries = [...allowed].sort(([left], [right]) => left - right)
 		const started = entries.map(([, { call, tool }]) => {
-			if (!this.#changed(run, call, tool, advertised)) return run.execute(call, { signal })
+			if (!this.#changed(run, call, tool, advertised)) {
+				return run.execute(call, { signal, caller: run.caller })
+			}
 			this.#emitter.emit('deny', call, `${call.name} changed after its decision`, undefined)
 			return denyCall(call, AUTHORITY_NOTES.denied)
 		})

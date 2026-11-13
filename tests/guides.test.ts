@@ -8439,6 +8439,88 @@ await new GuideCommand({
 			)
 		})
 
+		it('hands each tool call the shown workspace and the files list, and renders its edit next turn (the caller sentences)', async () => {
+			const provider = createScriptedProvider(
+				[
+					{
+						content: '',
+						tools: [
+							{ id: 'switch-1', name: 'switch', arguments: { workspace: 'returns' } },
+							{ id: 'inspect-1', name: 'inspect', arguments: {} },
+						],
+					},
+					{ content: '', tools: [{ id: 'note-1', name: 'note', arguments: {} }] },
+					{ content: 'Noted.' },
+				],
+				{ recorded: true, repeat: false },
+			)
+			const seen = createRecorder<readonly [caller: unknown]>()
+			const agent = createAgent(provider, {
+				builtins: ['switch'],
+				authority: barrel.createAuthority({ fallback: { zone: 'default', verdict: 'allow' } }),
+				scope: createScope({
+					name: 'desk',
+					workspaces: ['orders', 'returns'],
+					files: ['returns.txt', 'note.txt'],
+				}),
+			})
+			const orders = agent.context.workspaces.add({ id: 'orders' })
+			const returns = agent.context.workspaces.add({ id: 'returns' })
+			returns.write('returns.txt', 'Return 7 is open.')
+			agent.context.tools.add([
+				createTool({
+					name: 'inspect',
+					strict: false,
+					execute: (_args, context) => {
+						seen.handler(context.caller)
+						return 'ok'
+					},
+				}),
+				createTool({
+					name: 'note',
+					strict: false,
+					execute: (_args, context) => {
+						seen.handler(context.caller)
+						// Accept the caller's workspace only as the instance this registry holds under its id.
+						const caller = context.caller
+						const workspace = barrel.isAgentCaller(caller) ? caller.workspace : undefined
+						if (
+							workspace !== undefined &&
+							agent.context.workspaces.workspace(workspace.id) === workspace
+						) {
+							workspace.write('note.txt', 'Refund approved.')
+						}
+						return 'noted'
+					},
+				}),
+			])
+			await agent.generate({ prompt: { content: 'Open the returns and note the refund.' } })
+
+			const callers = seen.calls.map(([caller]) =>
+				barrel.isAgentCaller(caller) ? caller : undefined,
+			)
+			expect(callers).toHaveLength(2)
+			expect(callers[0]?.workspace).toBe(orders)
+			expect(callers[0]?.files).toEqual(['returns.txt', 'note.txt'])
+			expect(callers[1]?.workspace).toBe(returns)
+			expect(returns.read('note.txt')).toBe('Refund approved.')
+			expect(agent.context.workspaces.active?.id).toBe('orders')
+			expect(
+				provider.calls.map((call) =>
+					call.messages.some((message) => message.content.includes('Refund approved.')),
+				),
+			).toEqual([false, false, true])
+			expect(guideText).toContain(
+				"Each tool call receives that workspace as `context.caller`, an `AgentCaller` whose `workspace` member is the live workspace the turn's request rendered, or `undefined` when the ceiling admits none at the call. A `switch` shows from the next turn, so a call that shares its turn acts on the workspace that turn's request rendered. The caller's `files` member is the ceiling's `files` list at the call, `undefined` when the ceiling states none.",
+			)
+			expect(guideText).toContain(
+				"The tool acts on the workspace the run shows, which each call receives as `context.caller`, so the model edits the workspace it reads in every conversation, and the next turn's request renders the edit.",
+			)
+			expect(guideText).toContain(
+				"An edit to a rendered file, by a tool call or by the host, therefore rebuilds the head at the next turn, and an edit to a file no request renders doesn't.",
+			)
+		})
+
 		it('advertises remember and switch only under their lists (the silent-omission paragraph)', async () => {
 			const provider = createScriptedProvider(
 				[{ content: 'Answered.' }, { content: 'Answered.' }],

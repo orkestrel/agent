@@ -1,10 +1,15 @@
 import type { Memo, ScopeFilter, Skill } from './types.js'
 import type { Message } from '../types.js'
 import type { ContractInterface } from '@orkestrel/contract'
-import type { FileInterface } from '@orkestrel/workspace'
+import type {
+	FileInterface,
+	WorkspaceInterface,
+	WorkspaceManagerInterface,
+} from '@orkestrel/workspace'
 import { ContractError, describeFaults } from '@orkestrel/contract'
 import { isBinary } from '@orkestrel/workspace'
 import { ContextError } from './errors.js'
+import { filterAllowList } from '../helpers.js'
 
 /**
  * Renders a path-addressed text body as a fenced reference block — a `File: <path>` label line
@@ -242,6 +247,39 @@ export function intersectFilters(
 		...(files === undefined ? {} : { files }),
 		...(workspaces === undefined ? {} : { workspaces }),
 	}
+}
+
+/**
+ * Resolves the workspace a run renders and acts on: the one `selected` names, else the registry's
+ * active one, kept only while `allowed` admits its id.
+ *
+ * @remarks
+ * A selection the registry does not hold resolves to `undefined` and never falls back to the active
+ * workspace. `allowed` is three-way, as {@link import('../helpers.js').filterAllowList} reads it.
+ * `AgentContext.build`, the caller an agent run hands each tool call, and a ledger's calibration
+ * resolve through it, so what a request renders and what a call receives come from one rule.
+ *
+ * @param workspaces - The workspace registry to read
+ * @param selected - The id a `switch` call or the `workspace` option selected, or `undefined`
+ * @param allowed - The ceiling's `workspaces` list (`undefined` ⇒ every id, `[]` ⇒ none)
+ * @returns The workspace, or `undefined` when none resolves
+ *
+ * @example
+ * ```ts
+ * import { resolveWorkspace } from '@orkestrel/agent'
+ *
+ * resolveWorkspace(agent.context.workspaces, 'returns', ['returns']) // the registered returns workspace
+ * ```
+ */
+export function resolveWorkspace(
+	workspaces: WorkspaceManagerInterface,
+	selected: string | undefined,
+	allowed: readonly string[] | undefined,
+): WorkspaceInterface | undefined {
+	const workspace = selected === undefined ? workspaces.active : workspaces.workspace(selected)
+	return workspace !== undefined && filterAllowList(allowed, [workspace.id], (id) => id).length > 0
+		? workspace
+		: undefined
 }
 
 /**
