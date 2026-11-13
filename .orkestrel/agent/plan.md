@@ -21,6 +21,8 @@ A host gives a small local model progressive reach to everything its principal m
 | agent | https://github.com/orkestrel/agent |
 | ollama | https://github.com/orkestrel/ollama |
 | study | https://github.com/orkestrel/study |
+| toolbox | https://github.com/orkestrel/toolbox |
+| workspace | https://github.com/orkestrel/workspace |
 
 ## Governing skills
 
@@ -150,12 +152,28 @@ A host gives a small local model progressive reach to everything its principal m
 - **The doors, by the Orchestrator over the census's 75 rows:** host-facing configuration doors and per-call options take the `refuseOptionKeys` door; stored record inputs become exact records through their contracts; internal helpers and error constructors take none, with reasons.
 - **The fix ruling, by the Orchestrator, on the round's findings on K and R:** the `'GAUGE'` text names the whole calibration call; `ConversationInput` reads as options, while `InstructionInput`, `MemoInput`, and `SkillInput` become exact records; no stored record carries a present `undefined`; the ledger's `agent` pick refuses as `Ledger agent`; the fan-out header covers a job that would not build; and the guide's surviving `disclosure` lines are checked against the documentation unit's result. F-K2 pins the comparison at capacity as the daemon's window reading rules it.
 - **The user, 2026-11-12, at 18:05, on pace:** "What can we do in parallel to speed this up?" The fix round and the records unit run beside the solo live tickets, and the closure check follows the fix round.
+- **The switch ruling, by the consultant, 2026-11-12:** Toolbox's `createWorkspaceTool` loses its `switch` and `workspaces` operations, with no option, alias, or scoped form. The host moves `active` through `manager.switch` between runs, and under Agent the model keeps the built-in `switch` (`designs/disclosure.md` § Agent 0.0.43). Built in toolbox `adc42dc`.
+- **The wsedit ruling, by the consultant, 2026-11-12,** on the wsedit probe:
+  - Agent 0.0.43 hands each tool call `context.caller`, an `AgentCaller` holding the workspace the turn's request rendered, and an edit to a rendered file rebuilds the head.
+  - Toolbox 0.0.32 acts on that workspace, accepted by identity, and waits for Agent 0.0.43. Ollama 0.0.37 and Study 0.0.19 re-pin to Agent 0.0.43 in the same wave.
+  - Scaffold 0.0.135 gains a `patterns.md` row (§ Deferred).
+- **The wsfiles ruling, by the consultant, 2026-11-12:** the scope's `files` list binds the tool.
+  - Agent 0.0.43 adds `caller.files`, built in unit W43 as claims F.1 to F.3, with claim A.6 restated and the wsedit ruling's guide sentence on the `files` list replaced.
+  - Workspace 0.0.18 adds `SearchOptions.paths`, and Toolbox 0.0.32 holds every operation to the list.
+  - The wave runs Workspace 0.0.18, then Agent 0.0.43, then Ollama 0.0.37 and Toolbox 0.0.32, then Study 0.0.19, then scaffold 0.0.135, which gains a second `patterns.md` row.
+- **The Orchestrator's rulings on the wave, 2026-11-12 and 2026-11-13:**
+  - W43 builds both rulings' Agent parts, and its three deviations are accepted: the exact `isAgentCaller`, the getter's read of two lists, and the guide sentence on the view.
+  - The W43 review's O1 and x4 go to a fix round, and its advisories A1 and A2 are recorded (`designs/disclosure.md` § Refused).
+  - Workspace's `'PATHS'` code, which the WS18 writer added under the refuse-by-default ruling, is accepted with workspace `640959f`.
+  - On Study P7: Study records no stop-time digest, so `host.daemon` holds the digest each run started from, and Study's ROADMAP item 4 leaves, because no Agent profile declares a daemon (study `c13b565`).
 - **Decisions recorded for the user,** each reversible on the user's word:
   - An option spelled `undefined` reads as omitted (the refusals ruling). Reversing it refuses `{ system: config.system }` when the value is absent, and needs a key loop the contract does not provide.
   - K.3's class `refused` moves the no-regression line: a ledger whose calibrated definitions alone exceed `capacity` refuses with `'GAUGE'` naming the remedy, where it stored a gauge measured over the window.
   - D32 closed: on D, a shown skill is priced 1.3 to 1.65 times its charge, on the safe side.
   - D16 closed: taverna sizes its own workspace text. Reversing it is a phase-sized build that opens with a viability probe on the 4B.
   - ROADMAP item 59, the user's item on refusing unknown run-option keys, was removed by the documentation unit because unit R built that refusal.
+  - `isAgentCaller` is exact: a caller holding a member beyond `workspace` and `files` refuses. Dropping exactness is one argument to `matchesExactKeys` and one table row.
+  - An `undefined` `files` list lets a tool reach every file of the shown workspace, where an `undefined` `memos` list lets `remember` write none (the wsfiles ruling).
 
 ## The roadmap items this campaign meets
 
@@ -163,14 +181,16 @@ Items 6, 8, 58, 67, and 68 meet their triggers here, and items 14, 15, 19, 52, 5
 
 ## Deferred
 
-Only hand-offs remain, each sent on 2026-11-12 by the triage ruling's § Hand-offs; Agent holds no deferred row. `designs/disclosure.md` § The deferral list maps every former row to its outcome.
+Only hand-offs remain, and Agent holds no deferred row. D19, D20, D21, P4, and P7 were sent on 2026-11-12 by the triage ruling's § Hand-offs, and the two `patterns.md` rows were sent on 2026-11-12 by the wsedit and wsfiles rulings. `designs/disclosure.md` § The deferral list maps every former row to its outcome.
 
 | Item | Trigger | Owner |
 | --- | --- | --- |
 | D19: taverna's plan records the generic list, get, and change surface as its own gate question on its own catalog, or drops it. Sent to taverna's thread as a queued message, because the user paused taverna, with taverna's notes: its workspace text is its own to size; omit `snapshot.gauge` at a model or provider change; `LEDGER_SHARE` needs `skills` under 0.0.42's `LedgerShare`, or the constant takes `Partial<LedgerShare>`; a skill's name and description are what the model loads by; and the `workspace` option and the O and D practice. | taverna's own gate, at its adoption of 0.0.42 | taverna |
-| D20: `AgentToolArguments` holds `task` alone and `AgentToolOptions` fixes the child, with no alias, because a model must not set a child's `provider`, `tools`, or `system`. Toolbox's guide sends an Agent host to the built-in `switch` and to skills and `load`; whether `createWorkspaceTool`'s `switch` operation stays for a host that is no Agent is toolbox's ruling, with a consultant question at that visit. `createAgentTool` on `AgentDelegate` waits for phase 4's release. | toolbox's visit after Agent 0.0.42, as scaffold answered at 14:50 | `@orkestrel/toolbox` |
-| D21: `methods.md`'s clause names the model-driven loader as the `load` built-in of `@orkestrel/agent`, where it named `@orkestrel/toolbox`. | carried by `@orkestrel/scaffold` commit `5dbe14d0c`; Agent reads it at its next scaffold re-pin | the scaffold session |
-| P7: an owned daemon's executable `digest` becomes an observation Study records at each pass and compares with nothing, as `84e49b7` did for the serving version; `--extend` admits a profile that declares no daemon, with empty maintenance, or Study removes `--extend` from the profile form that cannot reach it and says so in its guide. | Study's preparation after Agent 0.0.42 serves; Agent's session folds it in, as scaffold answered at 14:50 | `@orkestrel/study` |
+| D20: `AgentToolArguments` holds `task` alone and `AgentToolOptions` fixes the child, with `provider` required and no alias, because a model must not set a child's `provider`, `tools`, or `system`. Toolbox 0.0.31 shipped without it; toolbox `adc42dc` and `e4e35b4` build it, and the switch ruling removed the workspace tool's `switch` and `workspaces` in the same commits. `createAgentTool` on `AgentDelegate` waits for phase 4's release. | Toolbox 0.0.32, in the wave (§ Sequence) | `@orkestrel/toolbox` |
+| D21: `methods.md`'s clause names the model-driven loader as the `load` built-in of `@orkestrel/agent`, where it named `@orkestrel/toolbox`. | carried by `@orkestrel/scaffold` commit `5dbe14d0c`, which scaffold's 0.0.134 preparation `89e9f3ed0` holds; Agent reads it at its next scaffold re-pin | the scaffold session |
+| P7: an owned daemon's executable `digest` is an observation Study records at each start and compares with nothing, as `84e49b7` did for the serving version, and `--extend` admits a profile that declares no daemon, with empty maintenance. Built in study `c13b565` and `d9c4f2d`. | Study 0.0.19, in the wave | `@orkestrel/study` |
+| The wsedit ruling's row for `@orkestrel/scaffold` `.claude/rules/patterns.md` § Admission and refusal: "When a handler acts on a resource a run selects, take the resource from the execution context that run supplies, accept it only as the instance the handler's own registry holds, and never read a pointer other runs share." | scaffold 0.0.135, after Study 0.0.19 in the wave | the scaffold session |
+| The wsfiles ruling's row for the same section, after the wsedit ruling's: "When a list bounds what a run reads from a resource, hold every handler that reaches that resource to the same list at the call: refuse a member outside it with one text whether or not it exists, and pass the list into any operation that walks the resource." | scaffold 0.0.135 | the scaffold session |
 
 P4, `test:studies`' parallel setting, was handed to the scaffold session and owes nothing: scaffold item 165 was already closed.
 
@@ -226,12 +246,20 @@ P4, `test:studies`' parallel setting, was handed to the scaffold session and owe
 | The closure check | Closed 2026-11-12 (`tmp/units/kr-closure.md`): OPEN on F-R1's `ConversationManager.add` row alone, which the Orchestrator added and proved by mutation (1 of 60 red, restored with its digest). 40 mutations of the reviewer's own, the objective lane's 13 among them, each red but that one; gates green. |
 | Arm `taverna` live rerun and the window reading | `agent-consumer-live3` (the 18:05 `dist`) failed claim 3.15 on arm `index` request 6 at 1.346, K's sample dropping a dense workspace; the third K ruling added the cut workspace call. `agent-consumer-live4` (the 19:52 `dist`, 62 of 62 calls) is adopted: request 6 at 1.039, arm `taverna` at 1.02 and 1.016, calibration as ruled, claims 3.14, 3.15, and 3.18 pass. The daemon's window reading: 1026 reported at `num_ctx` 2048 against 6739 at 16384, a silent cut under the window, so F-K2 keeps `>`. C.7's rehearsal read 14 trials and 84 requests on that `dist`. |
 | Tree-wide chain | Green 2026-11-12 (`agent-chain-final`): format, lint, check, build; `src` 3640, policy 179 with 1 skipped, config 545 with 1 skipped, setup 363, guides 237, distribution 10, studies 228. The closure check's F-R1 row and one guide limit sentence followed it, each checked directly and by guides 237. |
-| Release path | Agent 0.0.42 re-prepared under the same number, which the registry has never served. Then scaffold's code batch with ollama, toolbox (D20), and study (P7); then Agent's devDependency re-pin to that Study and Ollama, with the prepared consumer change; then taverna adopts 0.0.42. Publication is the user's. |
-| Next | Agent 0.0.42 is published (registry-confirmed 2026-11-12) and main is pushed at `d5002f61`. Then the batch: ollama `710a650` with its Agent re-pin, study `84e49b7` with P7 and its Agent and Ollama re-pin, toolbox through scaffold; then Agent's devDependency re-pin with the prepared Study consumer change and `test:studies`; then taverna adopts. |
+| Agent 0.0.42 | Published on the user's code, registry-confirmed 2026-11-12; main pushed at `d5002f61`, with the records at `9e15d18e`. |
+| Ollama 0.0.36 and Toolbox 0.0.31 | Published on the user's second code 2026-11-12, each registry-confirmed and pushed: ollama `bc78e83` and toolbox `661537d`. Nine Ollama test callers, one hermetic and eight live, failed against Agent 0.0.42 because each passed a stored message, with its minted `id`, to `add`. Ollama `914b304`, `8e12bf7`, and `4ff5e6d` pass each caller's messages through `toMessageInputs` in Ollama's `tests/setup.ts`, and `test:service` read 89 of 89. The consumer reading before the release had covered callers outside tests alone. |
+| D20 | Missed at Toolbox 0.0.31, which shipped without it. Unit D20 built it in toolbox `adc42dc` with the switch ruling, each claim red first on `661537d`: `AgentToolArguments` holds `task` alone in an exact `agentToolShape`, `AgentToolOptions.provider` is required, the refusal of tools with no authority moved to construction, and claims S.1 to S.5 remove `switch` and `workspaces`. Toolbox's chain passed (`agent-d20-chain2`). Its review failed claim 2 on one test gap: a scoped `switch` on a surviving arm survived every test. The Orchestrator closed it in toolbox `e4e35b4`, which pins each arm's members and refuses a missing options object with a typed error, the review's advisory A1. The writer's reading that the workspace guide understated when `add` activates went to scaffold and landed in workspace `8b9cbf4`. |
+| The wsedit probe and the three rulings | `designs/disclosure.md` § Agent 0.0.43 holds the probe's reading and what the switch, wsedit, and wsfiles rulings rule; § Rulings holds each decision. |
+| W43 | Built and committed as `3509c166`: claims A.1 to A.8 and F.1 to F.3, each red first and reddened by its own mutation, with closing ticket `agent-w43-close2-mut` reading `src:core` 3696. The review confirmed, with O1 and x4 below the bar. The fix round, committed as `f15e8ed4`, hands each call the instance its request rendered (O1) and removes the calibration's redundant check (x4): `agent-w43-fix-mut` reads `src:core` 3697 and guides 238. |
+| Workspace 0.0.18 | Unit WS18 built `SearchOptions.paths` and the `'PATHS'` code as workspace `640959f`, claims S.1 to S.4 red first and each with its mutation, and its `prepublishOnly` chain passed (`agent-ws18-chain`). Its review failed claims 1 and 2 on a test gap: no test drove `paths` with `regex` or `sensitive`, or pinned exact membership and a repeated path, and mutations m2, m3, and m4 survived. The fix, workspace `d8ff0be`, adds two tests, and each of m2, m3, and m4 reddens one of them. Release-ready at `1fe2cf4` with its chain green, `ci` included, and posted to the scaffold session. |
+| Study P7 | Unit P7 built it as study `c13b565`, on the re-pin `954e170` to Agent 0.0.42 and Ollama 0.0.36. `StudyDaemon` declares no `digest`, and a declaration that carries one refuses. Study reads the executable's digest at each daemon start and records it in `host.daemon`, compared with nothing. A stop refuses only when it is unconfirmed and some fault is not a `digest` re-hash. `--extend` admits a profile with no daemon, with empty maintenance. Its chain passed (`agent-p7-chain`), and § Rulings holds the Orchestrator's rulings. Its review failed claim 3 as a proof: no test pinned that an unconfirmed stop refuses, and mutations m3a, m3b, and m3c survived. The fix, study `d9c4f2d`, adds two cases, an aborted unload beside a changed digest and a failed start whose stop Ollama reported before Study listened, and each mutant reddens one of them (`agent-p7-fix-proof`). The review widened the prepared consumer change (§ The prepared Study-version consumer change), recorded F1 below the bar (`designs/disclosure.md` § Refused), and recorded F2 as an advisory: a `digest` fault that Ollama emits during an abort's stop can precede Study's listener, in a path where the run is refused anyway. |
+| Toolbox 0.0.32 | Swap-pinned 2026-11-13 to local Agent `3509c166` and Workspace `640959f`, with an override that keeps one Workspace copy, restored at the release. Unit TBW builds the rulings' Toolbox claims T.1 to T.12 and P.1 to P.9 on those pins. |
+| Release path | The wave after 0.0.42, by the wsedit and wsfiles rulings, in § Sequence. Publication is the user's at each release. |
+| Next | The user's code for scaffold 0.0.134 and Workspace 0.0.18, then Agent 0.0.43's release visit under `orkestrel-publish` (§ Sequence). |
 
 ## The prepared Study-version consumer change
 
-Unapplied until Agent re-pins its devDependencies to the Study release that carries `84e49b7` and the Ollama release that carries `710a650`, because the installed Study 0.0.18 still requires `settings.version`. Unit U2 changed files these edits touch after they were prepared (`studies/desk/`, `studies/README.md`, `tests/setupStudy.ts`, and the desk and disclosure tests), so plan them against the tree at the re-pin with `patch.ts --plan` before they apply. It holds 42 edits over 25 files, each named here with what it changes:
+Unapplied until Agent re-pins its devDependencies to Study 0.0.19, which carries `84e49b7` and P7's `c13b565` and `d9c4f2d`, and to Ollama 0.0.37, which carries `710a650` and re-pins Agent 0.0.43, because the installed Study 0.0.18 still requires `settings.version`. Unit U2 changed files these edits touch after they were prepared (`studies/desk/`, `studies/README.md`, `tests/setupStudy.ts`, and the desk and disclosure tests), so plan them against the tree at the re-pin with `patch.ts --plan` before they apply. It holds 42 edits over 25 files, each named here with what it changes. The P7 review widened two of them to drop the daemon's `digest` beside its `version`, because Study 0.0.19 refuses a daemon declaration that carries either:
 
 - `studies/desk/types.ts`: the desk settings stop declaring a serving version.
 - `studies/desk/validators.ts`: the exact desk settings guard refuses a stale version key because the record names metadata alone.
@@ -252,25 +280,23 @@ Unapplied until Agent re-pins its devDependencies to the Study release that carr
 - `studies/README.md`: the guide stated the version refusal this change removes.
 - `tests/studies/desk/validators.test.ts`: claim 10, desk half: settings without a version admit, and a stale version key refuses; the screen profile refuses a settings record that still carries a version beside its metadata.
 - `tests/studies/disclosure/study.test.ts`: the authored screen profile holds no serving version.
-- `tests/studies/endurance/study.test.ts`: an owned daemon declaration holds no version under the released Study; the recommended profile holds no serving version.
+- `tests/studies/endurance/study.test.ts`: the owned daemon declaration in the case "pins the smallest subject and its bounds" holds no version and no digest under the released Study; the recommended profile holds no serving version.
 - `tests/studies/chat/validators.test.ts`: claim 10, chat half: import the settings guard; claim 10, chat half: settings without a version admit, and a stale version key refuses.
 - `tests/studies/memory/validators.test.ts`: claim 10, memory half: metadata and a correction admit, and a stale version key refuses.
 - `tests/studies/memory/helpers.test.ts`: a recording profile requires metadata alone.
-- `tests/setupStudy.ts`: the chat fixture rebinds the provider and keeps the authored settings, which hold no version; claim 10, memory half: a stale version key is a refused settings row; a fixture recording pins its bounds; the version `MemoryServer` answers is an observation; an owned daemon declaration holds no version under the released Study; the desk record keeps the authored settings, which hold no version; the desk record takes no version; the recording fixture profile carries no serving version under the released Study (the review's below-bar finding at line 2559).
+- `tests/setupStudy.ts`: the chat fixture rebinds the provider and keeps the authored settings, which hold no version; claim 10, memory half: a stale version key is a refused settings row; a fixture recording pins its bounds; the version `MemoryServer` answers is an observation; the owned daemon declaration in `writeMemoryTriageDaemon` holds no version and no digest under the released Study, and `hashStudyBytes` and `readFileSync` stay imported for their other callers; the desk record keeps the authored settings, which hold no version; the desk record takes no version; the recording fixture profile carries no serving version under the released Study (the review's below-bar finding at line 2559).
 - `tests/setupStudy.test.ts`: the built recording profile holds metadata alone; the released Study's declaration holds no version member.
 
 ## Sequence
 
-Phases 0 to 3 are closed, and their records are § State and `designs/disclosure.md` § Phases. The steps left, in order:
+Phases 0 to 3 and Agent 0.0.42 are closed, and their records are § State and `designs/disclosure.md` § Phases. The steps left, in order, with the user's code for each release:
 
-1. **The fix round** on the round's findings on K and R: F-K1, F-K2, F-R1 to F-R4, and the objective lane's findings, under `orkestrel-falsify`. Then one closure check by a fresh reviewer, which reads whether each closed and tests no other claim.
-2. **Arm `taverna`'s live rerun and the daemon's window reading,** solo in the shared execution lane on the 18:05 `dist`. The window reading rules F-K2's comparison, which the fix round builds.
-3. **C.7's rehearsal** on the rebuilt `dist`: 14 trials and 84 requests with no model.
-4. **The tree-wide gates,** one time, on the integrated tree, with the `distribution` project.
-5. **The records:** fill each PENDING slot, then commit by path: the code with its tests and docs; the studies; the records.
-6. **The re-prepared 0.0.42** under `orkestrel-publish`: the release preparation and its chain, then the user's publication.
-7. **The release order after it:** scaffold's code batch with ollama, toolbox (D20), and study (P7); Agent's devDependency re-pin with the prepared Study-version consumer change; taverna's adoption of 0.0.42.
-8. **Phase 4, delegation on a bare agent,** behind its checkpoint. Claim 4.11 is closed in 0.0.42, so unit 4A no longer owns it.
-9. **Phase 5, ROADMAP item 9,** so a ledger can take delegates, behind its own checkpoint.
+1. **Scaffold 0.0.134 and Workspace 0.0.18,** one code. Workspace is release-ready at `1fe2cf4`.
+2. **Agent 0.0.43** under `orkestrel-publish`: the visit re-pins `@orkestrel/workspace` to 0.0.18 from the registry; `verifier` reads the turn bars on a run that edits at every turn, as the wsedit ruling names; the release chain runs with the `distribution` project; then the user publishes (`designs/disclosure.md` § The bar of Agent 0.0.43).
+3. **Ollama 0.0.37 and Toolbox 0.0.32,** one code. Each re-pins Agent 0.0.43 and Workspace 0.0.18. Toolbox carries D20, the switch removal, and unit TBW, with its local pins restored.
+4. **Study 0.0.19,** carrying P7 on Agent 0.0.43 and Ollama 0.0.37, then **Agent's devDependency re-pin** to Study 0.0.19 and Ollama 0.0.37 with the prepared Study-version consumer change and `test:studies`. This step's code can share scaffold's test 0.0.38 code.
+5. **Taverna's adoption,** at D19's trigger (§ Deferred).
+6. **Phase 4, delegation on a bare agent,** behind its checkpoint. Claim 4.11 is closed in 0.0.42, so unit 4A no longer owns it.
+7. **Phase 5, ROADMAP item 9,** so a ledger can take delegates, behind its own checkpoint.
 
 Each phase is estimated as it is reached. Its units run tests first, each with a review. Then one `orkestrel-falsify` round on the phase, and `verifier` tree-wide, close it before the next phase starts. Publication is the user's at each release.

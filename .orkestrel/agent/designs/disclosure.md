@@ -1,6 +1,6 @@
 # Progressive disclosure: the final design
 
-Decided 2026-11-10 from every input of the design round. Agent is read at `e6a3ae75`; taverna is read at `8ae5382`. No fact of the decided design comes from a run; each "As built" and "As read" paragraph records what a later unit or run read. `.orkestrel/agent/plan.md` § Rulings holds the user's rulings of 2026-11-10, and this record reflects each where the design differs: phase 0 runs first, the durable-job unit is built after phase 2, ROADMAP item 9 is phase 5, the 4B reading is reported and holds nothing, and each phase is estimated as it is reached. The user's rulings of 2026-11-12 are reflected the same way: O is the default and D the fallback, with P and A removed; nothing is deferred; and a bar is a baseline that tells drift from an outlier. § The re-prepared 0.0.42 holds the cut, units K and R, and their claims, and each passage they restate says so.
+Decided 2026-11-10 from every input of the design round. Agent is read at `e6a3ae75`; taverna is read at `8ae5382`. No fact of the decided design comes from a run; each "As built" and "As read" paragraph records what a later unit or run read. `.orkestrel/agent/plan.md` § Rulings holds the user's rulings of 2026-11-10, and this record reflects each where the design differs: phase 0 runs first, the durable-job unit is built after phase 2, ROADMAP item 9 is phase 5, the 4B reading is reported and holds nothing, and each phase is estimated as it is reached. The user's rulings of 2026-11-12 are reflected the same way: O is the default and D the fallback, with P and A removed; nothing is deferred; and a bar is a baseline that tells drift from an outlier. § The re-prepared 0.0.42 holds the cut, units K and R, and their claims, and each passage they restate says so. § Agent 0.0.43 holds the caller each tool call receives, the head rebuild after an edit, and their claims.
 
 ## Summary
 
@@ -16,6 +16,7 @@ Decided 2026-11-10 from every input of the design round. Agent is read at `e6a3a
 10. **Size.** The weights are provisional, 19.5 units about 66 lane hours at the measured 3.4 hours a unit, plus a reading bounded at 2.4 runner hours, and each phase is estimated as it is reached.
 11. **Point 14:** the reading is reported before the phase 3 release and does not hold it. The consumer run's claims hold it, and they do not depend on what the model chooses.
 12. **The re-prepared 0.0.42.** The user ruled O the default and D the fallback and removed P and A on 2026-11-12. The cut removes the host's `disclosure` option; unit K calibrates on a bounded sample and refuses a measurement over capacity; unit R lets an allow-list without `load` decide alone, refuses a malformed job tree whole, and refuses an option member no type declares. The deferral list holds no row: each is built, refused, stated as a limit in the guide, or handed to the package that owns it.
+13. **Agent 0.0.43.** Each host tool call receives `context.caller`, an `AgentCaller` holding the workspace its request rendered and the live ceiling's `files` list, and a turn after an edit to a rendered file rebuilds the head. In the same wave Toolbox's own `switch` and `workspaces` leave, Toolbox 0.0.32 acts on the caller, and Workspace 0.0.18 gives `search` and `replace` a `paths` list.
 
 ## Legend
 
@@ -654,6 +655,93 @@ Each stop is provisional on a run. The consumer runs and the reading of 2026-11-
 | Error constructors | no door | the user's word |
 | A job's bounds | the shape states each bound a build reads, and `collectJobRefusals` holds the rest | a counterexample to claim J.4, which is a fifth case |
 | Calibration | § Phase 3, Stops | as that row states |
+
+### Agent 0.0.43
+
+**Goal.** Each host tool call acts on the workspace its turn's request rendered, inside the `files` list the ceiling states, and the next request renders the model's own edit. Agent 0.0.43 carries it; in the same wave Toolbox 0.0.32 acts on the caller and Workspace 0.0.18 gives `search` and `replace` a `paths` list, each in its own repository. `plan.md` § Rulings holds each ruling's decision; this section holds what the rulings rule into the design, the claims, and what was built.
+
+**What the probe read.** The wsedit probe ran on `9e15d18e` with a scripted provider and Toolbox's 0.0.31 build (`agent-wsedit-probe`, 6 of 6 cases), over one agent with `builtins: ['switch']`, a scope listing `orders` and `returns`, `orders` active, and Toolbox's `createWorkspaceTool` registered over `agent.context.workspaces`.
+
+- After the built-in `switch` selected `returns`, every later request rendered `returns`, and Toolbox's `write`, `replace`, and `remove` changed `orders`. The registry's `active` pointer read `orders` at every turn and after every call.
+- Each host tool call received a context whose one own key was `signal`: Agent dispatched `run.execute(call, { signal })` and supplied no caller.
+- With two conversations over one manager, conversation B's `write` landed in `orders` after conversation A switched to `returns`.
+- The model's own edits appeared in none of the requests that followed them. In the control, where the host moved `active` to `returns`, the `write` landed in `returns` and the next request still held no edit, because a file edit changed no term of the view.
+
+**What the rulings rule.** The switch ruling, the wsedit ruling, and the wsfiles ruling were each decided by the consultant on 2026-11-12, and the Orchestrator ruled on the build and the review. § Refused holds each option they refuse.
+
+- **Toolbox's own `switch` and `workspaces` operations leave** (the switch ruling). The operation let a model move one pointer that every conversation over the manager reads, with no list of what it may select. The host keeps `manager.switch` between runs, and under Agent the model keeps the built-in `switch`, per conversation, inside `ceiling.workspaces`. The ruling raised the probe's question as a finding it did not close.
+- **Agent hands each host tool call `{ signal, caller }`** (the wsedit ruling, its option (a)). `caller` is an `AgentCaller`, carried by the `caller` member that `ToolContext` of `@orkestrel/tool` 0.0.23 already declares, so that package does not change. Its `workspace` is the instance the turn's request rendered, kept while the live ceiling admits it at the call, else `undefined`. One `resolveWorkspace` serves what `build` renders and what a call receives. `AgentCaller` holds no `conversation` member, because no consumer reads one.
+- **An edit to a rendered file rebuilds the head** (the wsedit ruling). The run compares the rendered workspace's files under the ceiling's `files` list by identity at each turn, derived with no listener and no stored flag, so it reads a host's edit and any tool's edit alike. A stale `## Workspace` section shows file text that the model then edits by `replace` query and `splice` range, so the head rebuilds.
+- **A `switch` and an edit that share a turn act on the workspace that turn's request rendered,** in either call order, and the switch shows from the next turn, as the built-in's result says (the wsedit ruling).
+- **The `files` list binds a tool** (the wsfiles ruling). `AgentCaller` holds a required `files` member: the live ceiling's `files` list at the call, `undefined` when the ceiling states none. Toolbox holds every operation to it, and Workspace's `paths` keeps a file outside the list out of `search` and `replace`, so no hidden text meets a model's pattern. Under an `undefined` list a tool reaches every file of the shown workspace, where an `undefined` `memos` list lets `remember` write none; the guide states the difference.
+- **The wsfiles ruling corrects the wsedit ruling.** `{ workspace: undefined }` with no `files` key refuses, so claim F.3 restates claim A.6's table, and the guide sentence that the `files` list never filters what a tool reaches is withdrawn.
+- **The Orchestrator:**
+  - W43 builds both rulings' Agent parts in one pass.
+  - W43's three deviations are accepted at `3509c166`. `isAgentCaller` is exact and refuses a member neither ruling declares, because `context.caller` can arrive from a wire. The getter reads the `workspaces` and `files` lists of the context scope and the run scope one time each, in place of `#live()`, so a turn still reads its `tools` list one time. One more guide sentence names the files compare as a term of the view.
+  - The review's O1 and x4 go to a fix round, and its advisories A1 and A2 are recorded in § Refused, § Closed in the 0.0.43 wave, each with its reason.
+
+**Units.**
+
+| Unit | Owned files | Order | Receipt |
+| --- | --- | --- | --- |
+| The wsedit probe | throwaways | first | `agent-wsedit-probe` |
+| W43, the caller and the head rebuild, with the wsfiles ruling's claims F.1 to F.3 | `agents/types.ts`, `agents/validators.ts`, `Agent.ts`, `AgentRun.ts`, `contexts/helpers.ts`, `AgentContext.ts`, the TSDoc of `contexts/types.ts`, `Ledger.ts`, their tests, `tests/setup.ts` with its proofs, the guide's rows and sentences, and `tests/guides.test.ts` | after both rulings | `agent-w43-close2-mut`, committed as `3509c166` |
+| The review | — | after W43 | CONFIRMED |
+| The fix round on O1 and x4 | `AgentRun.ts`, `Ledger.ts`, `Agent.test.ts` | after the review | `agent-w43-fix-mut`, committed as `f15e8ed4` |
+
+**Claims,** each reddened by its own mutation. A.1 to A.8 and F.1 to F.3 were red first on `9e15d18e`, and O1 on `3509c166`. An `inspect` tool that records its context stands in for Toolbox, which Agent does not install. The agent-level tests use the `createBuiltinAgent` desk, `north` active and `south` registered, for the rulings' `orders` and `returns`. `INSTANCE` stands for a registered workspace.
+
+- **A.1** With `orders` active and no selection, the context a host tool receives has own keys `signal` and `caller`, `isAgentCaller(context.caller)` holds, and `caller.workspace` is `manager.workspace('orders')` by identity. *Mutation: the dispatch passes `{ signal }`.*
+- **A.2** After the built-in `switch` selects `returns`, and separately under the `workspace: 'returns'` run option, the next turn's call carries the `returns` instance while `manager.active` is `orders`. *Mutation: the getter reads `workspaces.active`.*
+- **A.3** After conversation A switched to `returns`, conversation B's call carries `orders`, and A's later run carries `returns`. *Mutation: as A.2.*
+- **A.4** A turn that carries `switch` to `returns` and a host call, in each order, hands the call the `orders` instance, and the next turn's call receives `returns`. *Mutation: the `switch` handler moves the shown workspace when it runs; the order with the host call first stays green, because that call starts before the handler runs.*
+- **A.5** With the ceiling's `workspaces` list holding `returns` alone, `orders` active, and no selection, `caller.workspace` is `undefined`. When a `request` listener narrows the list after the turn rendered `orders`, that turn's call receives `undefined`. *Mutation: the getter reads the turn's ceiling in place of the live lists.*
+- **A.6** `isAgentCaller` refuses `undefined`, `{}`, `{ subject: 'reader' }`, `{ workspace: 'returns' }`, `{ workspace: null }`, a record whose `workspace` accessor throws, and a revoked proxy, and throws for none; claim F.3 restates the rest of its table. *Mutation: drop the own-key test for `workspace`.*
+- **A.7** For each row of selected id, active workspace, and allow-list, the workspace `build` renders is the one `resolveWorkspace` returns. *Mutation: `build` keeps its inline expression with the allow-list test removed.*
+- **A.8** After a tool call writes to the shown workspace, the next request of that run contains the edit. A turn after which no rendered file changed reuses the head, whose messages keep their ids. *Red: the probe's control. Mutation: drop the files compare.*
+- **F.1** For a context scope listing `['notes.md']`, a run scope listing it, both scopes with their intersection, and neither, `caller.files` equals the ceiling's list, and on the last row the caller holds an own `files` key holding `undefined`. *Mutation: the getter returns `files: undefined`.*
+- **F.2** When a `request` listener narrows `files` after the turn rendered, that turn's call receives the narrowed list. *Mutation: the getter reads the turn's ceiling.*
+- **F.3** `isAgentCaller` admits `{ workspace: undefined, files: undefined }`, `{ workspace: INSTANCE, files: [] }`, and `{ workspace: INSTANCE, files: ['notes.md'] }`. It refuses `{ workspace: INSTANCE }`, `{ workspace: undefined }`, `files: 'notes.md'`, `files: [7]`, `files: null`, a record whose `files` accessor throws, and each refusal of claim A.6, and throws for none. *Mutation: drop the own-key test for `files`.*
+- **O1** With no selection, a `request` listener calls `workspaces.switch('south')` after request 0 is frozen. Request 0 renders the `north` file alone, request 1 renders the `south` file alone, `active` reads `south`, and the call's `caller.workspace` is the `north` instance. *Mutation: the getter resolves the shown id against the live `active` pointer at the call.*
+
+**As built.**
+
+- **Phase 0** (`agent-w43-p0`, `agent-w43-p0-base2`, and `agent-w43-p0-cand`) read yes on each of the wsedit ruling's probe questions before any `src/` edit.
+  - A file's value changes identity on a whole, batch, and ranged `write`, a write of the same text, a `prepend`, an empty one included, an `append`, and a `replace` that matches. A `replace` with no match keeps it.
+  - `files()` changes length on `remove`, `clear`, and a write to an absent path, and membership on `move`.
+  - `manager.workspace(id)` returns one instance at every read.
+  - With the files compare applied by temporary mutation in a scratch copy, the request after an edit carried the edit and the request after a turn with no edit kept the head by id. Without it, no request carried the edit.
+- **W43** (`3509c166`) built the following:
+  - `AgentCaller`, with both keys required.
+  - `isAgentCaller`, inside `holds`, over `isRecord` and `matchesExactKeys(value, ['workspace', 'files'])`, reading each member one time. `workspace` is `undefined` or passes `isObject`, because `@orkestrel/workspace` 0.0.17 exports no workspace guard, and `files` is `undefined` or passes `arrayOf(isString)`.
+  - `resolveWorkspace(workspaces, selected, allowed)`: the workspace `selected` names, else the active one, while `filterAllowList` admits its id. A selection the registry lacks resolves to `undefined` and never falls back to the active workspace. `AgentContext.build` resolves through it.
+  - `AgentRun.observe` stores the rendered workspace's files under the ceiling's `files` list, and the head is stale when that list differs in length or in any element by identity.
+  - The dispatch in `Agent` reads `run.caller` one time as each call starts, and `AgentInterface`'s remark reads "Each call's `ToolContext.caller` is an `AgentCaller`."
+  - The guide: the three Surface rows, both rulings' sentences at the `switch` paragraph and in § Giving the model documents to read, the wsfiles ruling's sentence beside `scope.files`, and the view sentence in § Scoping a turn. `tests/guides.test.ts` gains one executed case.
+  - Red: `agent-w43-red`, 55 failed and 5 passed on `9e15d18e`'s runtime. F.1 and F.3 read red as `isAgentCaller is not a function`, because no tree held a caller without `files`. Green: `agent-w43-green`, 60 passed. The test that asserted no caller reaches a tool handler is restated as "supplies the run caller to a tool handler, with no workspace and no files list on a bare agent", which asserts `{ workspace: undefined, files: undefined }`.
+  - Closing ticket `agent-w43-close2-mut`: `src:core` 3696, guides 238, policy 179 with 1 skipped, setup 368, config 545 with 1 skipped, studies 228, and ten mutations, each reddening its claim and restoring byte-identical. Format, lint, and both type checks pass, run directly, and the policy project's `surface` rule passes. The earlier closing ticket `agent-w43-close-mut` failed `src:core` on 3 tests, which the two-list getter and the restated test repaired.
+- **The review** (`reviewer` under `orkestrel-falsify`, a fresh context, on `3509c166`) confirmed its four claims: A.1 to A.8 and F.1 to F.3, the caller as a trust boundary, the head rebuild, and no regression.
+  - Of 15 mutations, the writer's ten and five of its own, 14 reddened their test.
+  - The `rc1` recorder read every request equal against `9e15d18e` on 300 of 300 rows, 5 surfaces by 60 seeds. The 11 rows that execute a host tool differ in the handler context alone.
+  - The adverse probe held a narrowing after the render, a run scope that excludes the active workspace, a recorded `switch` beside a run option, two conversations run concurrently, a `files` list narrowed mid-turn, and a handler that writes into its caller.
+  - The rebuild matrix of 12 cases replaced the head's message ids after each edit to a rendered file and kept them otherwise, and no hidden file's text reached a request.
+  - **O1, below the bar:** with no selection, the caller followed the registry's live `active` pointer, so a host `switch` while the provider answered handed the call a workspace its request never rendered. No ceiling was crossed.
+  - **x4, below the bar:** the calibration's `ceiling.workspaces` check survived its mutation, because the calibration's `build` applies the same list.
+- **The fix round** (`f15e8ed4`):
+  - **O1.** `record`, called right after each build, stores the instance that build rendered, resolved from the build's own inputs in the same synchronous stretch. The getter keeps that instance while the live `workspaces` list admits its id, through `filterAllowList`. A host's `switch` therefore reaches the next turn through the files compare and never the call in flight. The capture sits at the build because a request can be rebuilt after `observe`, by a compaction fold or after a `select` handler awaits.
+  - **x4.** The check leaves. The ledger's listing resolves through `resolveWorkspace` with no allow-list, and the `build` that follows applies the context scope's list.
+  - Red: `agent-w43-fix-red`, 1 failed at the identity assertion on `3509c166`. `agent-w43-fix-mut`: `src:core` 3697 and guides 238. O1's mutation reddened its test alone, 1 of 461. The mutations of A.2 and A.3, A.4, and A.5 were retargeted at the getter, and each reddened its claim. The x4 check, added back, survived, which is its redundancy receipt. Format, lint, and both type checks pass, run directly.
+
+**Stops.**
+
+| Seam | Stop | Reopens on |
+| --- | --- | --- |
+| The caller's members | `workspace` and `files`, both required, admitted exactly | a consumer that reads another member |
+| The tool contract | `ToolContext.caller` of `@orkestrel/tool`, with no member of its own | the user's word |
+| The shared pointer | the built-in `switch` never moves `active`; the host moves it between runs | the user's word |
+| The caller's workspace | the instance the request rendered, kept while the live `workspaces` list admits it | the user's word |
+| The head rebuild | an identity compare of the rendered files at each turn | a turn-bar reading outside its bar on a run that edits at every turn |
+| An `undefined` `files` list | a tool reaches every file of the shown workspace | the user's word |
 
 ### Phase 4. Delegation
 
@@ -1548,6 +1636,13 @@ The cut, unit R, and the fix round change the barrel as follows. Each export has
 - **Changed by unit R:** `agentJobShape` states the bounds of claim J.1 and the conversation roles; `filterAdvertisedTools` lets an allow-list that admits no `load` definition decide alone; `isMessageInput` is a `Guard<MessageInput>` constant built with `recordOf`, exact at its top level, where it was a function.
 - **Ordered by the fix ruling,** and read with the fix round's result in `plan.md` § State: `InstructionInput`, `MemoInput`, and `SkillInput` each gain a shape in `shapers.ts` with a guard or a contract, the memo's derived from `memoShape`'s properties.
 
+### Agent 0.0.43's surface
+
+The caller adds three exports, each with its row in the guide's Surface tables (§ Agent 0.0.43).
+
+- **Added:** `AgentCaller` in `agents/types.ts`, with `workspace: WorkspaceInterface | undefined` and `files: readonly string[] | undefined`, both keys required; `isAgentCaller` in `agents/validators.ts`, exact over those two keys and total; and `resolveWorkspace` in `contexts/helpers.ts`, the workspace `selected` names, else the active one, while the allow-list admits its id.
+- **Changed:** `AgentInterface`'s remark reads "Each call's `ToolContext.caller` is an `AgentCaller`."; `ScopeFilter`'s remark and the `files` member's TSDoc state that each tool call receives the list as `caller.files`.
+
 ### Construction and call refusals
 
 | Refusal | Thrown by | Code | Phase |
@@ -1611,8 +1706,8 @@ After the `turn` event and the scheduler yield, where the snapshot sits at 0.0.4
 2. **Shown.** `resolveDisclosure`: the skills `collectDisclosure` reads from the conversation, keeping each skill that is registered and that `ceiling.skills` admits. The workspace is the conversation's last switch, else the `workspace` option's, kept only when registered and admitted. The given value's skills came first until the cut of 2026-11-12. The loop skips the derivation when none of `load`, `unload`, and `switch` is enabled.
 3. **Advertise.** Build one candidate list: the host manager's definitions with each reserved name removed, followed by the run's own definitions from `collectBuiltinDefinitions`, without `remember` while the turn's ceiling defines no `memos` list and without `switch` while it defines no `workspaces` list. A reserved name is an enabled built-in's or a delegate's. `filterAdvertisedTools` runs over that whole list, so the turn's `tools` allow-list admits or hides a built-in exactly as it does a host tool, and `load` is among the definitions the filter reads. Filtering the manager's definitions alone and appending the built-ins after would fire no hold and let no scope hide a built-in.
 4. **Hold.** The run's `AgentRun` entity owns a `ToolManager` that holds the run's tools. Its `tool(name)` returns the run's instance for a reserved name and the host manager's for any other. The turn's held map, the approval check (A:1094), the changed-instance check (A:1115), and dispatch (A:1172) each read through it, and dispatch executes a reserved call through the run's manager and every other call through the host's. Sites that read the host manager, which holds no run tool, would deny every approved or allowed built-in as changed after its decision. The run's manager is never changed after the run starts, so the identity check on a reserved name holds by construction, and a host tool registered under that name is never read.
-5. **Refresh.** Rebuild the head when any of these differs from what the working head was built with: the ceiling's `instructions`, `skills`, `memos`, `files`, or `workspaces` list; the shown skills, compared by each skill's `id` (F41), so a skill replaced under its name counts; the shown workspace; or whether `switch` is advertised.
-6. **Compose, admit, freeze, emit `request`, dispatch,** as at 0.0.40 from A:550. The freeze follows admission, because a fold composes a second request object (A:842) and that one is dispatched; it covers the request object and its two arrays, as claim 1.7 states.
+5. **Refresh.** Rebuild the head when any of these differs from what the working head was built with: the ceiling's `instructions`, `skills`, `memos`, `files`, or `workspaces` list; the shown skills, compared by each skill's `id` (F41), so a skill replaced under its name counts; the shown workspace; or whether `switch` is advertised. From 0.0.43 the rendered workspace's files under the ceiling's `files` list, compared by identity, are a term too, so an edit to a rendered file rebuilds the head (claim A.8).
+6. **Compose, admit, freeze, emit `request`, dispatch,** as at 0.0.40 from A:550. The freeze follows admission, because a fold composes a second request object (A:842) and that one is dispatched; it covers the request object and its two arrays, as claim 1.7 states. From 0.0.43 each dispatch passes `{ signal, caller: run.caller }` (§ Agent 0.0.43).
 
 `filterAdvertisedTools` is, over the candidate list of step 3:
 
@@ -1802,6 +1897,7 @@ Built in phase 4, as its checkpoint rules it.
 | Memo body | host or model | tool role. In a ledger's answer pass, also the results note: a stored `user` message, as every successful tool result is (F42). Never `system`. | `memo` call: ceiling, `evaluate`, `ask` | `'ARGUMENTS'` with candidates |
 | `remember` call | model | `MemoManager.add` | ceiling, `evaluate`, floor, `ask`, a defined `ceiling.memos` that lists the name, create or revise-its-own, single-line check, limits; in a ledger, repeat then room | `'ARGUMENTS'`; unanswered or refused note; `overflow` |
 | Workspace index, text, images | host data | `user` context message; last user turn | `ceiling.workspaces`, `ceiling.files` | — |
+| `context.caller` | Agent, from the workspace instance the turn's build rendered and the live ceiling | each tool call's `ToolContext`, from 0.0.43 | the live `workspaces` list admits the instance's id at the call, else `undefined`; `files` is the live ceiling's list; `isAgentCaller` admits these two members alone; a consumer accepts the workspace only as the instance its own manager holds | — |
 | Delegate definition | host | the tools block | `ceiling.tools`, a skill's hold | — |
 | Delegate call | model | a child run | ceiling, `evaluate`, floor, the parent's `ask`, the delegate's `calls` cap | the authority's denial; the `spent` note |
 | `delegate.system`, `delegate.description` | host | the child's `system` message; the parent's tools block | the declaration, owned at construction | the constructor's refusals |
@@ -1816,7 +1912,7 @@ Built in phase 4, as its checkpoint rules it.
 | A stored conversation's built-in records | the loop; a host or a page that edits the store | the shown set | registered, ceiling, at every turn | an excluded or unknown name shows nothing |
 | A page's system message or definitions through a relay | the page | the relay | `system.accept`, `tools.accept`, the server's declared definitions | `422`, unchanged |
 
-Every built-in dispatch carries `{ signal }` alone (A:1172). No built-in reads a caller identity.
+Every built-in dispatch carries `{ signal }` alone (A:1172) until 0.0.43, where every dispatch, a built-in's included, carries `{ signal, caller }`. No built-in reads `caller` or a caller identity.
 
 ## The release bar
 
@@ -1858,9 +1954,24 @@ The O-and-D ruling, the triage ruling, and the refusals ruling each set lines of
 
 The triage's line on the request-bounded shown set is void: probes L1 and L2 did not adopt it. The consequence lines of the preceding list hold, as restated.
 
+### The bar of Agent 0.0.43
+
+The wsedit ruling and the wsfiles ruling set the lines of this bar, and the consequence lines of § The release bar hold. 0.0.43 reads one change into the no-regression line: a request after a turn whose calls changed a rendered file carries the edit under a rebuilt head (claim A.8), where 0.0.42 reused a head that showed the earlier text. A tool call's context gains `caller`, and a handler that ignores it runs as at 0.0.42. Publication stays the user's.
+
+| Line | Ruling | Receipt |
+| --- | --- | --- |
+| Claims A.1 to A.8, F.1 to F.3, and O1 closed, each with its mutation | wsedit; wsfiles; the Orchestrator's O1 ruling | `agent-w43-close2-mut`; `agent-w43-fix-mut`; the review, CONFIRMED |
+| No caller holds a workspace the live `workspaces` list excludes, and no file a `files` list hides reaches a request | wsedit; wsfiles | the review's adverse probe and its 12 rebuild cases |
+| Every request of the `rc1` differential against `9e15d18e` equal, with the handler context the one difference | the no-regression line | the review: 300 of 300 rows |
+| The guide states the caller, what a tool reaches under the `files` list, and the rebuild, with an executed case | wsedit; wsfiles | guides 238 in `agent-w43-close2-mut` and in `agent-w43-fix-mut` |
+| No fleet collision for `AgentCaller`, `isAgentCaller`, or `resolveWorkspace` | wsedit | the policy project's `surface` rule in `agent-w43-close2-mut` |
+| The turn bars read on a run that edits at every turn, a slower reading inside its bar kept | wsedit | owed at the release visit, `plan.md` § Sequence |
+| `@orkestrel/workspace` re-pinned to 0.0.18 from the registry | wsfiles | owed at the release visit |
+| The release chain on the integrated commit, with the `distribution` project | `orkestrel-publish` | owed at the release visit |
+
 ## The deferral list
 
-The list holds no row. On 2026-11-12, under the user's ruling "Take care of everything now, not interested in deferring anything", the triage ruling settled every row the list held and the rows `plan.md` § Deferred named. The Orchestrator reversed one closure to a build, the refusals ruling built that row and moved one row out of phase 4, and the D-window ruling closed the row the O-and-D ruling had added. Each row went to one home: built in 0.0.42 (§ The re-prepared 0.0.42), refused with its reason (§ Refused), or handed to the package that owns it (`plan.md` § Deferred). A refused row that a host meets is also stated in the guide, in § Limits unless the table names another place. Row numbers are the triage ruling's.
+The list holds no row. On 2026-11-12, under the user's ruling "Take care of everything now, not interested in deferring anything", the triage ruling settled every row the list held and the rows `plan.md` § Deferred named. The Orchestrator reversed one closure to a build, the refusals ruling built that row and moved one row out of phase 4, and the D-window ruling closed the row the O-and-D ruling had added. Each row went to one home: built in 0.0.42 (§ The re-prepared 0.0.42), refused with its reason (§ Refused), or handed to the package that owns it (`plan.md` § Deferred). A refused row that a host meets is also stated in the guide, in § Limits unless the table names another place. Row numbers are the triage ruling's. The 0.0.43 wave adds no row: the review's advisories and Study's start-time digest race are closed in § Refused, § Closed in the 0.0.43 wave.
 
 | Row | Item | Outcome |
 | --- | --- | --- |
@@ -2058,3 +2169,15 @@ Each was closed by the triage ruling unless another ruling is named, for the rea
 - **A construction check of `AgentOptions.timeout`, and `scanJobTree` taking the registry to resolve names.** A hand-built agent's bad `timeout` refuses at its first `stream()` before any state changes, and the root's `build` resolves every name before the root runs. (The refusals ruling.)
 - **A compiled contract shape for an options object, and `recordOf` with a guard a member.** Options hold live objects no shape describes, and a boolean guard names no key. (The refusals ruling.)
 - **A door on an internal helper or an error constructor.** Each helper receives a value an admitted door built or read; a refusal thrown while an error is built would mask the error it reports. (The door ruling.)
+- **Toolbox's `switch` kept as it is, kept behind an option, given an allow-list, or with `workspaces` kept as a read.** Both packages would offer a `switch` with opposite reach; an option that turns a hazard on serves no consumer; an allow-list is a second ceiling beside `ScopeFilter.workspaces` that still moves the shared pointer; and a listing with no `switch` discloses ids and file counts outside any ceiling. (The switch ruling.)
+- **A resolver option on Toolbox's tool, the built-in `switch` moving the registry's `active` pointer, and an edit tool that refuses when the shown and active workspaces differ.** The resolver leaves the defect as the default; the pointer move carries the cross-conversation hazard into Agent and reverses 0.0.42's statement that the pointer never moves; and the refusal leaves the model unable to edit after any `switch`. (The wsedit ruling.)
+- **A `conversation` member on `AgentCaller`, and a member of its own on `ToolContext`.** No consumer reads a conversation id; a workspace member would put a workspace concept in `@orkestrel/tool`, which knows none, and a tool release re-pins every dependent. (The wsedit ruling.)
+- **A guide sentence alone for the `files` list, and a filtered view of the workspace in place of the list.** The sentence leaves a file the list omits open to `read`, `search`, and `replace` by default; a view is another object, so the identity test that stops a fabricated caller would go, and `WorkspaceInterface` cannot express `search` and `replace` over a subset. (The wsfiles ruling.)
+
+### Closed in the 0.0.43 wave
+
+Each was recorded below the bar on 2026-11-12 or 2026-11-13, for the reason given; none is deferred.
+
+- **An identical write rebuilds the head and replaces its message ids** (the review's advisory A1). The compare reads identity, and phase 0 read that a file's value changes identity on a write of the same text. The rebuilt head's text is unchanged, so a provider cache keyed on content does not move; only the message ids change.
+- **The price moves at the turn after an edit to a rendered file** (the review's advisory A2). The next request carries the edited text under a rebuilt head, so a provider cache keyed on the system and context messages moves at that turn alone. 0.0.42 left a stale head, whose price was lower and whose answer was wrong. A turn that edits no rendered file prices as before, and the turn-bar reading is a line of § The bar of Agent 0.0.43.
+- **A digest change between Study's read and Ollama's pre-spawn re-read refuses that daemon start** (the Study P7 review's finding F1). Study reads the executable and hands the digest to Ollama, which re-reads and compares it before spawn. Ollama's `executable.digest` is a required member, so Study cannot remove the window, and that verification is a security check, not a version pin. The refusal needs the file to change between two reads milliseconds apart.

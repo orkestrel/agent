@@ -153,3 +153,32 @@
 | 2026-11-12 | The tree-wide chain: green | Orchestrator | `plan.md` § State |
 | 2026-11-12 | Release 0.0.42, re-prepared: the release chain green, its notes replacing those of `46ae3811`; held for the user's code | Orchestrator | `plan.md` § State |
 | 2026-11-12 | Agent 0.0.42 published on the user's code, registry-confirmed, and main pushed at `d5002f61` | user, Orchestrator | `plan.md` § State |
+| 2026-11-12 | Ollama 0.0.36 and Toolbox 0.0.31 published on the user's second code, registry-confirmed and pushed, after nine Ollama test callers took `toMessageInputs` | user, Orchestrator | `plan.md` § State |
+| 2026-11-12 | D20 found missed at Toolbox 0.0.31, so Toolbox 0.0.32 carries it | Orchestrator | `plan.md` § State |
+| 2026-11-12 | Unit P7 in Study: the daemon's digest as an observation, and `--extend` with no daemon, committed as study `c13b565` | `opus` on `opus` | `plan.md` § State |
+| 2026-11-12 | The switch ruling: Toolbox's `switch` and `workspaces` operations removed | `planner` on `fable` | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-12 | Unit D20 in Toolbox, with the switch ruling's claims S.1 to S.5, committed as toolbox `adc42dc` | `opus` on `opus` | `plan.md` § State |
+| 2026-11-12 | The wsedit probe: after the built-in `switch`, Toolbox's edits land in the registry's active workspace, and the handler's context holds `signal` alone | `opus` on `opus` | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-12 | The review of D20: FAIL 2 on a scoped `switch` no test pinned, which the Orchestrator closed in toolbox `e4e35b4` | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-12 | The workspace guide's sentence on when `add` activates sent to scaffold, which landed it in workspace `8b9cbf4` | Orchestrator | `plan.md` § State |
+| 2026-11-12 | The wsedit ruling: the caller, the head rebuild, and Toolbox acting on the caller's workspace by identity | `planner` on `fable` | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-12 | The wsedit ruling's `patterns.md` row sent to scaffold for 0.0.135 | Orchestrator | `plan.md` § Deferred |
+| 2026-11-12 | The Orchestrator's rulings on P7: no stop-time digest, and Study's ROADMAP item 4 removed | Orchestrator | `plan.md` § Rulings |
+| 2026-11-12 | The wsfiles ruling: the `files` list binds the tool, through `caller.files` and Workspace's `paths` | `planner` on `fable` | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-12 | Unit W43 extended with the wsfiles ruling's claims F.1 to F.3 | Orchestrator | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-12 | The wsfiles ruling's `patterns.md` row sent to scaffold for 0.0.135 | Orchestrator | `plan.md` § Deferred |
+| 2026-11-12 | Unit WS18 in Workspace: `SearchOptions.paths` and the `'PATHS'` code, committed as workspace `640959f` | `opus` on `opus` | `plan.md` § State |
+| 2026-11-12 | The review of P7: FAIL 3 as a proof, F1 below the bar, and the prepared consumer change widened | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-13 | The review of WS18: FAIL 1 and 2 on a test gap | `reviewer` on `sonnet` | `plan.md` § State |
+| 2026-11-13 | Unit W43: claims A.1 to A.8 and F.1 to F.3, committed as `3509c166` | `opus` on `opus` | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-13 | W43's three deviations accepted: the exact `isAgentCaller`, the getter's read of two lists, and the guide sentence on the view | Orchestrator | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-13 | Toolbox swap-pinned to local Agent `3509c166` and Workspace `640959f` | Orchestrator | `plan.md` § State |
+| 2026-11-13 | Unit TBW in Toolbox: claims T.1 to T.12 and P.1 to P.9 | `opus` on `opus` | `plan.md` § State |
+| 2026-11-13 | The fix of P7: two cases pin the refusal of an unconfirmed stop, committed as study `d9c4f2d` | `opus` on `opus` | `plan.md` § State |
+| 2026-11-13 | The fix of WS18: two tests that the review's surviving mutations redden, committed as workspace `d8ff0be` | `opus` on `opus` | `plan.md` § State |
+| 2026-11-13 | The review of W43: CONFIRMED, with O1 and x4 below the bar and advisories A1 and A2 | `reviewer` on `sonnet` | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-13 | The Orchestrator's ruling on the review of W43: O1 and x4 to a fix round, and A1 and A2 recorded | Orchestrator | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-13 | Workspace 0.0.18 ruled release-ready at `1fe2cf4`, with its chain green, and posted to the scaffold session | Orchestrator | `plan.md` § State |
+| 2026-11-13 | The wave's codes in order: scaffold 0.0.134 and Workspace 0.0.18; Agent 0.0.43; Ollama 0.0.37 and Toolbox 0.0.32; Study 0.0.19 with Agent's devDependency re-pin | Orchestrator | `plan.md` § Sequence |
+| 2026-11-13 | The fix round of W43: O1 built and x4 removed, committed as `f15e8ed4` | `opus` on `opus` | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-13 | The records for Agent 0.0.43 and its wave | `opus` on `opus` | `plan.md` § State |
