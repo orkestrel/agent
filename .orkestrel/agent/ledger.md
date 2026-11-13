@@ -183,3 +183,8 @@
 | 2026-11-13 | The fix round of W43: O1 built and x4 removed, committed as `f15e8ed4` | `opus` on `opus` | `designs/disclosure.md` § Agent 0.0.43 |
 | 2026-11-13 | The records for Agent 0.0.43 and its wave | `opus` on `opus` | `plan.md` § State |
 | 2026-11-13 | The head rebuild's turn-bar reading: 0.048 ms a turn against the 6.6 ms bar, a small change kept | Orchestrator | `designs/disclosure.md` § Agent 0.0.43 |
+| 2026-11-13 | Code 1: scaffold 0.0.134 and Workspace 0.0.18 served | user, scaffold | `plan.md` § State |
+| 2026-11-13 | Code 2: Agent 0.0.43 served and pushed | user, scaffold | `plan.md` § State |
+| 2026-11-13 | Code 3: test 0.0.38, Ollama 0.0.37, and Toolbox 0.0.32 served and pushed | user, scaffold | `plan.md` § State |
+| 2026-11-13 | Code 4: Study 0.0.19 served and pushed; its flaky result-store file filed as Study ROADMAP item 6 | user, Orchestrator | `plan.md` § State |
+| 2026-11-13 | Agent's devDependency re-pin with the prepared Study consumer change, green and pushed; the wave closed | Orchestrator | `plan.md` § State |
