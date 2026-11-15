@@ -316,7 +316,7 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Find something said earlier that isn't in the messages you can see, by an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.`,
+				description: `Find something said earlier that isn't in the messages you can see, by an owner name, an id, or one of the topics ${renderTopicNames(options.topics)}. A number given as the topic reads as its digits, so {"topic":7} searches for "7". Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.`,
 				contract: objectShape({
 					topic: stringShape({ min: 1, description: 'An owner name, an id, or a topic' }),
 				}),
