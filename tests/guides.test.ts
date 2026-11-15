@@ -8361,7 +8361,7 @@ await new GuideCommand({
 				"A record counts only while the run enables its built-in, so a host tool under a built-in's name on a run that doesn't enable it shows nothing.",
 			)
 			expect(guideText).toContain(
-				"so a `{ skill: 1 }` the contract repaired to `'1'` shows the skill `'1'`.",
+				"so a `{ skill: 1 }` the door repaired to `'1'` shows the skill `'1'`.",
 			)
 		})
 
