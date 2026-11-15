@@ -5070,7 +5070,7 @@ describe('Ledger', () => {
 		expect(description).not.toMatch(/handle/)
 		expect(description?.match(LEDGER_HANDLE) ?? []).toEqual([])
 		expect(description).toBe(
-			"Find something said earlier that isn't in the messages you can see, by an owner name, an id, or one of the topics refunds. A number given as the topic reads as its digits, so {\"topic\":7} searches for \"7\". Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.",
+			'Find something said earlier that isn\'t in the messages you can see, by an owner name, an id, or one of the topics refunds. A number given as the topic reads as its digits, so {"topic":7} searches for "7". Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.',
 		)
 		const parameters = provider.calls[0]?.tools?.find((tool) => tool.name === 'recall')?.parameters
 		expect(JSON.stringify(parameters)).toBe(
