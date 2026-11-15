@@ -34,7 +34,7 @@ import type { QueueContext, QueueOptions } from '@orkestrel/queue'
 import type { ToolCall, ToolDefinition, ToolManagerInterface, ToolResult } from '@orkestrel/tool'
 import { isBudget, isBudgetAmount, isBudgetError } from '@orkestrel/budget'
 import {
-	admitValue,
+	repairValue,
 	describeFaults,
 	attempt,
 	canonicalStringify,
@@ -1586,8 +1586,8 @@ export function resolveDisclosure(
  * {@link findToolCall}. It then folds the pairs in message order: a `load` whose message content
  * equals `BUILTIN_NOTES.loaded` adds its `skill`, an `unload` with `BUILTIN_NOTES.unloaded` removes
  * it, and a `switch` with `BUILTIN_NOTES.switched` selects its `workspace`. Each call's arguments
- * are admitted through the built-in's contract in `builtinToolContracts`, lossless repairs
- * included, as its tool's door admits them, so a `{ skill: 1 }` the door repaired to `'1'` counts
+ * are repaired through the built-in's contract in `builtinToolContracts` by `repairValue`, as
+ * its tool's door repairs them, so a `{ skill: 1 }` the door repaired to `'1'` counts
  * as `'1'`; arguments the contract refuses change nothing. A skill loaded again while shown keeps
  * its place, and one loaded again after its unload goes last. Any other message and a denied or
  * refused call change nothing. The result holds `workspace` only when a switch succeeded.
@@ -1642,10 +1642,10 @@ export function collectDisclosure(
 						? BUILTIN_NOTES.unloaded
 						: BUILTIN_NOTES.switched
 			if (message.content !== note) return shown
-			// The door's admission, its lossless repair included, decides what the call named.
-			const admitted = admitValue(builtinToolContracts[name].contract, { ...call.arguments })
-			const skill = admitted.success ? admitted.value.value['skill'] : undefined
-			const workspace = admitted.success ? admitted.value.value['workspace'] : undefined
+			// The door repairs a lossless leaf, so the repaired arguments decide what the call named.
+			const repaired = repairValue(builtinToolContracts[name].contract, { ...call.arguments })
+			const skill = repaired.success ? repaired.value.value['skill'] : undefined
+			const workspace = repaired.success ? repaired.value.value['workspace'] : undefined
 			if (name === 'load') {
 				return !isString(skill) || shown.skills.includes(skill)
 					? shown

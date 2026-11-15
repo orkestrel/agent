@@ -90,25 +90,25 @@ export const BUILTIN_TOOLS: Readonly<
 > = Object.freeze({
 	load: Object.freeze({
 		description:
-			'Loads one skill from the skills index, so its instructions join yours and its tools become callable from your next step. Example: {"skill":"refunds"}. Replies with a short acknowledgement, not the instructions; call unload when you no longer need the skill.',
+			'Loads one skill from the skills index, so its instructions join yours and its tools become callable from your next step. Example: {"skill":"refunds"}. A number given as the skill reads as its digits, so {"skill":7} loads the skill "7". Replies with a short acknowledgement, not the instructions; call unload when you no longer need the skill.',
 	}),
 	unload: Object.freeze({
 		description:
-			'Unloads one skill you loaded, so its instructions and tools leave from your next step. Example: {"skill":"refunds"}. Replies with a short acknowledgement.',
+			'Unloads one skill you loaded, so its instructions and tools leave from your next step. Example: {"skill":"refunds"}. A number given as the skill reads as its digits, so {"skill":7} unloads the skill "7". Replies with a short acknowledgement.',
 	}),
 	memo: Object.freeze({
 		description:
-			'Reads one memo from the memos index and replies with its full text. Example: {"name":"tone"}. Reading changes nothing; call remember to write a memo.',
+			'Reads one memo from the memos index and replies with its full text. Example: {"name":"tone"}. A number given as the name reads as its digits, so {"name":7} reads the memo "7". Reading changes nothing; call remember to write a memo.',
 		annotations: Object.freeze({ pure: true, untrusted: true }),
 	}),
 	remember: Object.freeze({
 		description:
-			'Saves one memo under a name you are allowed to write: a one-line description for the memos index, and the content. Example: {"name":"tone","description":"Reply tone","content":"Keep replies brief, because the user asked for that."}. Replies with a short acknowledgement; call memo to read a memo back.',
+			'Saves one memo under a name you are allowed to write: a one-line description for the memos index, and the content. Example: {"name":"tone","description":"Reply tone","content":"Keep replies brief, because the user asked for that."}. A number given for any of the three reads as its digits, so a name of 7 saves the memo "7". Replies with a short acknowledgement; call memo to read a memo back.',
 		annotations: Object.freeze({ consequential: true }),
 	}),
 	switch: Object.freeze({
 		description:
-			'Selects one workspace from the workspaces index, so its files join your context from your next step. Example: {"workspace":"orders"}. Replies with a short acknowledgement.',
+			'Selects one workspace from the workspaces index, so its files join your context from your next step. Example: {"workspace":"orders"}. A number given as the workspace reads as its digits, so {"workspace":7} selects the workspace "7". Replies with a short acknowledgement.',
 	}),
 })
 

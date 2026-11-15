@@ -722,7 +722,7 @@ describe('requireBudget', () => {
 		for (const [value, received] of [
 			[{ consume: consumed.handler }, 'object'],
 			[null, 'null'],
-			[revoked.proxy, 'object'],
+			[revoked.proxy, 'instance'],
 		] as const) {
 			const caught = captureError(() =>
 				invokeUnchecked<BudgetInterface<TokenUsage> | undefined>(undefined, requireBudget, [
@@ -754,6 +754,7 @@ describe('requireConversation', () => {
 		const received = new Map([
 			['a string', '"conversation"'],
 			['null', 'null'],
+			['a revoked proxy', 'instance'],
 		])
 		for (const [title, value] of createMalformedConversationCases()) {
 			const caught = captureError(() => requireConversation(value))
@@ -788,7 +789,7 @@ describe('requireScope', () => {
 			[{ id: 's1', name: 'reader', tools: 'search', narrow }, 'object'],
 			['reader', '"reader"'],
 			[null, 'null'],
-			[revoked.proxy, 'object'],
+			[revoked.proxy, 'instance'],
 		] as const) {
 			const caught = captureError(() => requireScope(value))
 			if (!isContractError(caught)) throw new Error('expected a ContractError')
@@ -1523,7 +1524,7 @@ describe('denyCall — the synthesized denial result', () => {
 
 	it('caps a name over 64 characters with a trailing ellipsis', () => {
 		expect(denyCall(createToolCall({ name: 'n'.repeat(100) }), 'no')).toMatchObject({
-			error: `"${'n'.repeat(63)}… did not run: no`,
+			error: `"${'n'.repeat(62)}… did not run: no`,
 		})
 	})
 

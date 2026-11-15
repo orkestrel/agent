@@ -47,7 +47,7 @@ import type { ToolCall, ToolContext, ToolDefinition, ToolResult } from '@orkestr
 import { createAbort, linkSignal } from '@orkestrel/abort'
 import {
 	describeFaults,
-	admitValue,
+	repairValue,
 	refuseOptionKeys,
 	attempt,
 	canonicalStringify,
@@ -846,9 +846,9 @@ export class Ledger implements LedgerInterface {
 		const gauge = this.#gauge
 		if (gauge === undefined) return undefined
 		const room = gauge.remainder(request.calls) - this.#predict
-		// The door's admission, its lossless repair included, decides what the call named.
-		const admitted = admitValue(builtinToolContracts[name].contract, { ...args })
-		const values: Readonly<Record<string, unknown>> = admitted.success ? admitted.value.value : {}
+		// The door repairs a lossless leaf, so the repaired arguments decide what the call named.
+		const repaired = repairValue(builtinToolContracts[name].contract, { ...args })
+		const values: Readonly<Record<string, unknown>> = repaired.success ? repaired.value.value : {}
 		if (name === 'remember') {
 			const line =
 				isString(values['name']) && isString(values['description'])
