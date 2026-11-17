@@ -63,7 +63,7 @@ describe('createFixtureServer', () => {
 			expect(requests.calls).toEqual([['question']])
 			const refused = await fetch('http://127.0.0.1:' + port + '/answer')
 			expect(refused.status).toBe(405)
-			expect(refused.headers.get('allow')).toBe('POST')
+			expect(refused.headers.get('allow')).toBe('POST, OPTIONS')
 			await refused.text()
 			const missing = await fetch('http://127.0.0.1:' + port + '/absent')
 			expect(missing.status).toBe(404)
