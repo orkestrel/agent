@@ -5559,7 +5559,7 @@ await new GuideCommand({
 					headers: { authorization: `Bearer ${bearer}` },
 				})
 				expect(declined.status).toBe(405)
-				expect(declined.headers.get('allow')).toBe('POST')
+				expect(declined.headers.get('allow')).toBe('POST, OPTIONS')
 				await declined.text()
 				const unrouted = await fetch(`http://127.0.0.1:${port}/other`, {
 					method: 'POST',
