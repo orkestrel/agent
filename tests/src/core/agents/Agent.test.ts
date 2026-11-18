@@ -1135,6 +1135,62 @@ describe('Agent — tool iteration', () => {
 		const [, second] = provider.calls
 		expect(second?.messages.at(-1)?.content).toBe('kaboom')
 	})
+
+	it('returns a thrown, a contract-refused, and a run call in call order, and never runs the refused handler', async () => {
+		const executed = createRecorder<[Readonly<Record<string, unknown>>]>()
+		const events = createRecorder<AgentEventMap['tool']>()
+		const tools = createToolManager()
+		tools.add([
+			createTool({
+				name: 'boom',
+				execute: () => {
+					throw new Error('kaboom')
+				},
+			}),
+			createTool({
+				name: 'add',
+				contract: objectShape({ a: numberShape() }),
+				execute: (args) => {
+					executed.handler(args)
+					return 5
+				},
+			}),
+			createTool({ name: 'read', execute: () => 'notes' }),
+		])
+		const calls = [
+			createToolCall({ id: 'c1', name: 'boom' }),
+			createToolCall({ id: 'c2', name: 'add', arguments: { a: 2, z: 1 } }),
+			createToolCall({ id: 'c3', name: 'read' }),
+		]
+		const provider = createScriptedProvider(
+			[{ content: '', tools: calls }, { content: 'recovered' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			on: { tool: events.handler },
+		})
+
+		const result = await agent.generate({ prompt: { content: 'Run all three.' } })
+
+		const refusal =
+			'z: extra; this key is not declared, remove it or use a declared key: a\nsend {"a": number}'
+		expect(result).toEqual({ content: 'recovered', partial: false })
+		expect(executed.calls).toEqual([])
+		expect(events.calls).toEqual([
+			[calls[0], { success: false, id: 'c1', name: 'boom', error: 'kaboom' }],
+			[calls[1], { success: false, id: 'c2', name: 'add', error: refusal }],
+			[calls[2], { success: true, id: 'c3', name: 'read', value: 'notes' }],
+		])
+		expect(provider.calls[1]?.messages.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'user', content: 'Run all three.' },
+			{ role: 'assistant', content: '', calls },
+			{ role: 'tool', content: 'kaboom', call: 'c1' },
+			{ role: 'tool', content: refusal, call: 'c2' },
+			{ role: 'tool', content: 'notes', call: 'c3' },
+		])
+	})
 })
 
 describe('Agent — tools need an authority', () => {
@@ -4415,6 +4471,7 @@ describe('Agent — automatic compaction (production hardening)', () => {
 		const resumed = await agent.generate()
 
 		expect(resumed.content).toBe('Done.')
+		expect(resumed.partial).toBe(false)
 		expect(conversation.sections).toHaveLength(1)
 		expect(conversation.sections[0]?.messages.map((message) => message.content)).toEqual([
 			'q'.repeat(40),
@@ -8911,6 +8968,47 @@ describe('Agent — the skills and memos indexes', () => {
 		expect(text).toContain(CANARY_SENTINELS.memo)
 		expect(text).toContain(CANARY_SENTINELS.gist)
 	})
+
+	it('indexes a memo a run on one conversation wrote in the first request of a run on another', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [createToolCall({ id: 'm1', name: 'note' })] },
+				{ content: 'Noted.' },
+				{ content: 'Short replies.' },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const tools = createToolManager()
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
+		tools.add(
+			createTool({
+				name: 'note',
+				execute: () => {
+					agent.context.memos.add({
+						name: 'tone',
+						description: 'Prefers short replies.',
+						content: 'Answer briefly.',
+					})
+					return 'noted'
+				},
+			}),
+		)
+
+		await agent.generate({
+			conversation: createConversation(),
+			prompt: { content: 'Remember my tone.' },
+		})
+		await agent.generate({
+			conversation: createConversation(),
+			prompt: { content: 'How should you reply?' },
+		})
+
+		expect(provider.calls).toHaveLength(3)
+		expect(provider.calls[2]?.messages.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'user', content: '## Memos\n\n- tone: Prefers short replies.' },
+			{ role: 'user', content: 'How should you reply?' },
+		])
+	})
 })
 
 describe('Agent — run-bound conversation', () => {
@@ -8956,6 +9054,35 @@ describe('Agent — run-bound conversation', () => {
 		])
 		expect(second.messages().map((message) => [message.role, message.content])).toEqual([
 			['user', 'Other thread.'],
+		])
+	})
+
+	it('sends an earlier run tool turn under its call id ahead of the next prompt', async () => {
+		const call = createToolCall({ id: 'sum-1' })
+		const provider = createScriptedProvider(
+			[{ content: 'Adding.', tools: [call] }, { content: 'Sum is 5.' }, { content: 'It was 5.' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
+		const conversation = createConversation()
+
+		await agent.generate({ conversation, prompt: { content: 'Add the numbers.' } })
+		await agent.generate({ conversation, prompt: { content: 'What was the sum?' } })
+
+		expect(provider.calls).toHaveLength(3)
+		expect(provider.calls[1]?.messages.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'user', content: 'Add the numbers.' },
+			{ role: 'assistant', content: 'Adding.', calls: [call] },
+			{ role: 'tool', content: '5', call: 'sum-1' },
+		])
+		expect(provider.calls[2]?.messages.map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'user', content: 'Add the numbers.' },
+			{ role: 'assistant', content: 'Adding.', calls: [call] },
+			{ role: 'tool', content: '5', call: 'sum-1' },
+			{ role: 'assistant', content: 'Sum is 5.' },
+			{ role: 'user', content: 'What was the sum?' },
 		])
 	})
 
@@ -11017,6 +11144,62 @@ describe('Agent — built-ins and disclosure: the head refresh', () => {
 				names?.filter((name) => name === 'refund' || name === 'claim'),
 			),
 		).toEqual([[], ['refund'], ['refund'], ['refund', 'claim']])
+	})
+
+	it('keeps the built head through a mid-run memo and instruction write, and sends both at the next run', async () => {
+		const call = createToolCall({ id: 'n1', name: 'note' })
+		const provider = createScriptedProvider(
+			[{ content: '', tools: [call] }, { content: 'Noted.' }, { content: 'Listed.' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const tools = createToolManager()
+		const agent = createAgent(provider, {
+			system: 'You are concise.',
+			tools,
+			authority: AGENT_AUTHORITY,
+		})
+		tools.add(
+			createTool({
+				name: 'note',
+				execute: () => {
+					agent.context.memos.add({
+						name: 'tone',
+						description: 'Prefers short replies.',
+						content: 'Answer briefly.',
+					})
+					agent.context.instructions.add({ name: 'format', content: 'Use lists.' })
+					return 'noted'
+				},
+			}),
+		)
+
+		await agent.generate({ prompt: { content: 'Note my tone.' } })
+		await agent.generate({ prompt: { content: 'List the steps.' } })
+		const [opening, later, next] = provider.calls.map((sent) =>
+			sent.messages.map(({ id, ...body }) => body),
+		)
+
+		expect(provider.calls).toHaveLength(3)
+		expect(opening).toStrictEqual([
+			{ role: 'system', content: 'You are concise.' },
+			{ role: 'user', content: 'Note my tone.' },
+		])
+		// A write alone leaves the view unchanged, so the run's later request sends the head it built.
+		expect(later).toStrictEqual([
+			{ role: 'system', content: 'You are concise.' },
+			{ role: 'user', content: 'Note my tone.' },
+			{ role: 'assistant', content: '', calls: [call] },
+			{ role: 'tool', content: 'noted', call: 'n1' },
+		])
+		expect(next).toStrictEqual([
+			{ role: 'system', content: 'You are concise.\n\n## Instructions\n\nUse lists.' },
+			{ role: 'user', content: '## Memos\n\n- tone: Prefers short replies.' },
+			{ role: 'user', content: 'Note my tone.' },
+			{ role: 'assistant', content: '', calls: [call] },
+			{ role: 'tool', content: 'noted', call: 'n1' },
+			{ role: 'assistant', content: 'Noted.' },
+			{ role: 'user', content: 'List the steps.' },
+		])
 	})
 })
 

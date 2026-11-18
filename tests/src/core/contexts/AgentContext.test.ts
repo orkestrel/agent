@@ -1844,7 +1844,7 @@ describe('AgentContext — the skills and memos indexes', () => {
 		])
 	})
 
-	it('renders no header when scoped out', () => {
+	it('renders no header when scoped out, and both headers again after apply(undefined)', () => {
 		const skills = createSkillManager()
 		skills.add({ name: 'review', description: 'Reviews a change.', content: 'Read the diff.' })
 		const memos = createMemoManager()
@@ -1860,6 +1860,13 @@ describe('AgentContext — the skills and memos indexes', () => {
 
 		expect(context.build().map(({ id, ...body }) => body)).toStrictEqual([
 			{ role: 'system', content: 'sys' },
+		])
+
+		context.apply(undefined)
+
+		expect(context.build().map(({ id, ...body }) => body)).toStrictEqual([
+			{ role: 'system', content: 'sys\n\n## Skills\n\n- review: Reviews a change.' },
+			{ role: 'user', content: '## Memos\n\n- tone: Prefers bullet lists.' },
 		])
 	})
 
