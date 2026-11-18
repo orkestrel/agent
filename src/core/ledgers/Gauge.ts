@@ -5,7 +5,7 @@ import { estimateMessages } from '../agents/helpers.js'
 import { GAUGE_OPTION_KEYS } from './constants.js'
 import { LedgerError } from './errors.js'
 import { isPositiveSafeInteger } from '../validators.js'
-import { buildRecallMessage, fitSlope, resolvePredict } from './helpers.js'
+import { buildRecallMessage, fitSlope, requirePredict } from './helpers.js'
 
 /**
  * Prices prompts in tokens from a measured scale and overhead cost, and measures the room a request
@@ -21,7 +21,7 @@ import { buildRecallMessage, fitSlope, resolvePredict } from './helpers.js'
  *
  * @example
  * ```ts
- * const gauge = new Gauge({ scale: 1.16, overhead: 498, capacity: 32768 })
+ * const gauge = new Gauge({ scale: 1.16, overhead: 498, capacity: 32768, predict: 8192 })
  * gauge.room([{ estimate: 1719, prompt: 2498, tools: 3 }], '') // estimate units a recall result can take
  * ```
  */
@@ -40,7 +40,7 @@ export class Gauge implements GaugeInterface {
 	 * @param options - The starting `scale` and `overhead` price and the context `capacity`
 	 * @throws {LedgerError} Thrown when `scale` is not finite and above 0, or `overhead` is not finite and at least 0 (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when `capacity` is not a positive safe integer (code `'CAPACITY'`)
-	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
+	 * @throws {LedgerError} Thrown when `predict` is not a positive safe integer less than `capacity` (code `'CAPACITY'`)
 	 */
 	constructor(options: GaugeOptions) {
 		refuseOptionKeys(options, GAUGE_OPTION_KEYS, 'Gauge', 'GaugeOptions')
@@ -56,7 +56,7 @@ export class Gauge implements GaugeInterface {
 		this.#scale = options.scale
 		this.#overhead = options.overhead
 		this.#capacity = options.capacity
-		this.#predict = resolvePredict(options.predict, options.capacity)
+		this.#predict = requirePredict(options.predict, options.capacity)
 		this.#replay = options.replay ?? 'none'
 	}
 

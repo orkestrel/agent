@@ -11,6 +11,7 @@ import type {
 	NoulQuestion,
 } from '../types.js'
 import type { LEDGER_CATEGORIES } from './constants.js'
+import type { LedgerError } from './errors.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolInterface } from '@orkestrel/tool'
 import type { SchedulerInterface } from '@orkestrel/workflow'
@@ -91,7 +92,8 @@ export interface LedgerTopic {
  * skills can take: their bodies and the definitions they add beyond the calibrated set. A `load`
  * that would take the shown skills, the loads its batch already admitted, and its own skill past it
  * is denied with the {@link LedgerNote} `overflow` text.
- * Each share must be finite, greater than 0, and at most 1.
+ * Each share must be finite, greater than 0, and at most 1. Default: the `DEFAULT_LEDGER_SHARE`
+ * constant, leaf by leaf.
  */
 export interface LedgerShare {
 	readonly prompt: number
@@ -120,32 +122,6 @@ export interface LedgerNote {
 	readonly closure: string
 	/** Holds the reason the ledger denies a `load`, a `remember`, or a `switch` the request or the thread has no room for. */
 	readonly overflow: string
-}
-
-/**
- * Configures the ledger's `recall` tool.
- *
- * @remarks
- * `limit` caps the `recall` calls one request can make before the tool refuses with the
- * {@link LedgerNote} `closure` text; it must be a nonnegative safe integer. Default: the
- * `DEFAULT_RECALL_LIMIT` constant.
- * Recall identity is the trimmed `{ topic }` alone; other arguments do not change its identity.
- */
-export interface LedgerRecallOptions {
-	readonly limit?: number
-}
-
-/**
- * Narrows the pair questions the ledger asks about each correction.
- *
- * @remarks
- * `narrow` is a measured option that asks fewer pair questions at the risk of a missed filing. If
- * `true`, a correction compares only the earlier messages the unset rule admits that also share a
- * registry entity or a literal with it, so a topic alone admits no pair and a true filing outside
- * that set is never asked; if `false`, the unset rule applies. Default: `false`.
- */
-export interface LedgerCorrectionOptions {
-	readonly narrow?: boolean
 }
 
 /**
@@ -378,11 +354,11 @@ export interface LedgerGaugeSnapshot extends LedgerGauge {
  * libraries add to the head. `scheduler` also reaches the ledger's classifier, which hands the host
  * a turn while it files, so a page passes it to keep the filing out of one long task. The classifier
  * and the loop race its yield against the run signal, so a scheduler that ignores its signal still
- * ends on a cancel. `strict` defaults to `true`: a judge failure or another selection failure rejects
- * that `respond` call after the `fault` event, and the next call asks the judge again about whatever is
- * still unanswered. With `strict: false` the request goes on with that question undecided, or from the
- * conversation's messages. A provider failure in the first pass is the one
- * failure the answer pass recovers under either value. `authority` gates every lookup and write:
+ * ends on a cancel. The ledger's agent is always strict: a transient judge failure or another
+ * selection failure rejects that `respond` call after the `fault` event, and the next call asks the
+ * judge again about whatever is still unanswered. A question the judge refuses is held, as
+ * {@link LedgerOptions} states, and the request goes on. A provider failure in the first pass is
+ * the one failure the answer pass recovers. `authority` gates every lookup and write:
  * the ledger passes its agent one authority that denies a name the ledger doesn't advertise, allows
  * `recall`, and hands every other call to this authority's `evaluate`, and every asked call to its
  * `ask`. Without it, the ledger allows each lookup and holds no approver, so a `consequential`
@@ -408,7 +384,6 @@ export type LedgerAgentOptions = Pick<
 	| 'skills'
 	| 'memos'
 	| 'workspaces'
-	| 'strict'
 	| 'authority'
 	| 'builtins'
 	| 'workspace'
@@ -416,8 +391,8 @@ export type LedgerAgentOptions = Pick<
 
 /**
  * Configures a ledger: its judge and the wording and cutoffs it files with, the desk topics, the
- * context capacity, and the optional first-pass thinking, lookups, writes, gauge, shares, snapshot,
- * recall limit, correction filter, and agent options.
+ * context capacity and generation cap, and the optional first-pass thinking, lookups, writes,
+ * gauge, shares, snapshot, and agent options.
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
@@ -425,9 +400,20 @@ export type LedgerAgentOptions = Pick<
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
- * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
- * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
- * `'CAPACITY'` otherwise. The plan budgets
+ * The `recall` tool takes at most `LEDGER_RECALL_LIMIT` calls in one request and then refuses with
+ * the {@link LedgerNote} `closure` text; a recall's identity is its trimmed `topic` alone.
+ * A judge rejection with a `JudgeError` coded `'QUESTION'` is deterministic: the ledger holds that
+ * question as a refused `Judgment` under its key, with a `missing` list naming every candidate,
+ * reports a `LedgerError` coded `'HOLD'` through the agent's `fault` event once, and goes on with
+ * the question undecided. Every later request, and a ledger hydrated from the snapshot, reads the held
+ * question as `'skipped'` and asks it no more, until the wording, a topic, the message, or the judge's
+ * `model` changes, or the host removes the judgment or its message. One key holds one judgment, so a
+ * judge that alternates between models A, B, and A asks a held question again on its return to A.
+ * Every other judge rejection is transient: it rejects that `respond` call after the `fault` event,
+ * stores nothing, and the next call asks again.
+ * `predict` is the generation cap in tokens, including thinking. It must be a positive safe
+ * integer less than `capacity`; construction throws `LedgerError` with code `'CAPACITY'`
+ * otherwise. The plan budgets
  * `max(0, (capacity - predict) * share.prompt - (overhead - spared + added) - holdback) / (1 + LEDGER_SCALE_DRIFT)`.
  * `spared` and `added` are what `computeToolPrice` returns for the definitions the first pass
  * advertises with the thread's shown skills, against the calibrated set. While that pass advertises
@@ -457,7 +443,7 @@ export interface LedgerOptions {
 	readonly questions: LedgerQuestion
 	readonly thresholds: LedgerThreshold
 	readonly capacity: number
-	readonly predict?: number
+	readonly predict: number
 	/**
 	 * Selects thinking for the first pass; the answer pass always runs with thinking off.
 	 * If `true`, the first pass requests thinking; if `false`, it suppresses thinking; omission
@@ -470,8 +456,6 @@ export interface LedgerOptions {
 	readonly lookups?: readonly LedgerLookup[]
 	readonly writes?: readonly LedgerWrite[]
 	readonly share?: Partial<LedgerShare>
-	readonly recall?: LedgerRecallOptions
-	readonly correction?: LedgerCorrectionOptions
 	readonly agent?: LedgerAgentOptions
 	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none and the gauge priced the same tool definitions, because a `gauge` option wins over `snapshot.gauge`. */
 	readonly snapshot?: LedgerSnapshot
@@ -490,8 +474,8 @@ export interface LedgerOptions {
  * before its first pass; a gauge with no `digest` refuses the snapshot, and `snapshot()` omits a gauge
  * whose definitions JSON cannot render. The gauge's observations of earlier requests are
  * not carried, so a hydrated ledger sizes and closes `recall` from its fallback reserve until it
- * completes a request. A question a `strict: false` classifier held after a deterministic judge
- * failure is not carried, so a hydrated ledger asks it again. Hydrating a second ledger from one snapshot forks
+ * completes a request. A held question is a refused judgment of `conversation`, so a hydrated
+ * ledger under the same judge identity asks it no more. Hydrating a second ledger from one snapshot forks
  * it at the parent's frontier. `window`, when present, retains sent request copies, reply ids,
  * sentence receipts, and accepted amendment edges. The next plan keeps the same conversation
  * prefix when the live and hydrated reserves admit the same exchange rung. A rung between those
@@ -810,7 +794,10 @@ export interface LedgerInterface {
 	 * model generation, whatever the agent's `limit`; when every call of that turn failed, the ledger
 	 * stores the reply without its calls, as a call-free turn stores it. That pass ends with the
 	 * reply's text and `partial: false`, or partial with empty content when the reply carries no text. A rejected first pass counts as unfinished; when the
-	 * answer pass rejects as well, `respond` rejects with that pass's error. A `respond` or `calibrate` call while either is in flight
+	 * answer pass rejects as well, `respond` rejects with that pass's error. A transient judge failure,
+	 * or another selection failure, rejects `respond` after the agent's `fault` event; a question the
+	 * judge refuses is held and reported through `fault` as {@link LedgerOptions} states, and the
+	 * request goes on. A `respond` or `calibrate` call while either is in flight
 	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error. A calibration call, with the
 	 * tool definitions, without them, or with the workspace text, that reports a prompt over `capacity`, the head included,
@@ -1042,7 +1029,7 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
 
 /**
  * Configures a classifier: the conversation it files, the judge and the wording it asks with, the
- * desk topics, the cutoffs, the ledger's handlers, and the optional correction filter and scheduler.
+ * desk topics, the cutoffs, the ledger's handlers, and the optional scheduler.
  *
  * @remarks
  * `assign` decides the category of a message the ledger wrote or a tool returned, without a
@@ -1050,15 +1037,11 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
  * While it pairs corrections, the `classify` method reads each message's quiet flag and near set at
  * most once per call and reuses them for every later correction, so a change to the conversation,
  * its judgments, or the judge's model made while the call waits on the judge or a host turn reaches
- * the next call. The `narrow` member of `correction` keeps only the earlier messages sharing a
- * registry entity or a literal with the correction, reading each message's literals at most once
- * per call. `scheduler` paces the
+ * the next call. `scheduler` paces the
  * filing: before a step, when the `LEDGER_SLICE` constant's milliseconds have run since the last host turn, the call awaits the scheduler's `yield` method. With
  * no scheduler, the call takes no host turn and reads no added clock.
  */
 export interface ClassifierOptions {
-	/** Sets what a refused question or a deterministic judge failure leaves behind. Default `true`: nothing, so the next call asks again. `false` holds the question, so no later call asks it. */
-	readonly strict?: boolean
 	readonly conversation: ConversationInterface
 	readonly judge: JudgeInterface
 	readonly questions: LedgerQuestion
@@ -1066,7 +1049,6 @@ export interface ClassifierOptions {
 	readonly thresholds: LedgerThreshold
 	readonly assign: LedgerCategoryHandler
 	readonly entities: LedgerEntityHandler
-	readonly correction?: LedgerCorrectionOptions
 	readonly scheduler?: SchedulerInterface
 }
 
@@ -1077,9 +1059,13 @@ export type ClassifierPhase = 'category' | 'topic' | 'amends' | 'supersedes'
  * Names what became of one filing question.
  *
  * @remarks
- * `cached` means the conversation already held a matching judgment, so the classifier did not call the judgment manager.
- * `skipped` means the classifier held the question, after a deterministic failure under `strict: false` or because a message it names left the conversation, and did not call the judgment manager.
- * `resolved` means the judgment manager's resolve call fulfilled. `failed` means it rejected while the caller's signal was live.
+ * `cached` means the conversation already held a matching judgment with an answer, so the classifier did not call the judgment manager.
+ * `skipped` means the conversation held a matching judgment with a refusal, a held question or a
+ * question a wire refused, or a message the question names left the conversation, and the
+ * classifier did not call the judgment manager.
+ * `resolved` means the judgment manager's resolve call fulfilled, with an answer or a refusal.
+ * `failed` means it rejected while the caller's signal was live; the attempt that holds a question
+ * the judge refused reads `failed` too.
  * `aborted` means it rejected with a `JudgeAbortError` or after the caller's signal aborted.
  */
 export type ClassifierOutcome = 'cached' | 'skipped' | 'resolved' | 'failed' | 'aborted'
@@ -1107,15 +1093,18 @@ export interface ClassifierAttempt {
  *
  * @remarks
  * `attempts` lists one {@link ClassifierAttempt} per logical question, in asking order, including
- * the attempt a caller abort interrupted. Each result owns its array.
+ * the attempt a caller abort interrupted. `holds` lists one `LedgerError` coded `'HOLD'` per
+ * question this call held: its `cause` is the judge's rejection and its `context` holds the
+ * question's `key`, `phase`, and `sources`. Each result owns its arrays.
  */
 export interface ClassifierResult {
 	readonly judgments: readonly string[]
 	readonly usage?: TokenUsage
 	readonly attempts: readonly ClassifierAttempt[]
+	readonly holds: readonly LedgerError[]
 	/** Holds the error when an assign or entities handler throw, a scheduler rejection, or a caller abort interrupts classification; judgments and usage retain the partial result. A judge rejection under a live signal sets no fault. */
 	readonly fault?: Error
-	/** Holds the first judge rejection of this call under a live signal: that question stays undecided and the filing goes on, so the result is whole but for it. A question held from an earlier call reports nothing. */
+	/** Holds the first transient judge rejection of this call under a live signal: that question stays undecided and the filing goes on, so the result is whole but for it. A held question sets none. */
 	readonly failure?: Error
 }
 
@@ -1124,15 +1113,18 @@ export interface ClassifierResult {
  *
  * @remarks
  * Every reading derives from the conversation's recorded judgments and the cutoffs; the classifier
- * stores only the failures it holds. A judge error leaves its item undecided.
+ * keeps no filing state of its own. A judge rejection with a `JudgeError` coded `'QUESTION'` under a live
+ * signal records a refused judgment under the question's key, whose `missing` list names every
+ * candidate, and every later call reads it as held. Any other judge error leaves its item
+ * undecided and records nothing.
  */
 export interface ClassifierInterface {
 	/**
-	 * Asks every filing question the conversation's judgments lack an answer for.
+	 * Asks every filing question the conversation's judgments lack a reading for.
 	 *
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The signal that aborts the questions; completed judgments stay recorded
-	 * @returns The judgment keys, usage spent, and one attempt per logical question; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets `failure`
+	 * @returns The judgment keys, usage spent, one attempt per logical question, and the holds this call recorded; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a transient judge rejection under a live signal leaves that question undecided and sets `failure`
 	 */
 	classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult>
 	/**
@@ -1204,9 +1196,9 @@ export interface GaugeCall {
  * Configures a gauge: its starting price of a prompt and the context capacity it measures against.
  *
  * @remarks
- * `predict` is the generation cap in tokens, including thinking. Default: 0. It must be a
- * nonnegative safe integer less than `capacity`; construction throws `LedgerError` with code
- * `'CAPACITY'` otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
+ * `predict` is the generation cap in tokens, including thinking. It must be a positive safe
+ * integer less than `capacity`; construction throws `LedgerError` with code `'CAPACITY'`
+ * otherwise. `replay` names the thinking the next request carries. Default: `'none'`.
  * Measured use is `prompt + completion - (thinking ?? 0)` for `'none'`, and `prompt + completion`
  * otherwise; absent completion counts as 0. Without prompt usage, use is
  * `max(0, overhead - (spared ?? 0)) + (added ?? 0) + scale * estimate`.
@@ -1221,7 +1213,7 @@ export interface GaugeCall {
  */
 export interface GaugeOptions extends LedgerGauge {
 	readonly capacity: number
-	readonly predict?: number
+	readonly predict: number
 	readonly replay?: ThinkingReplay
 }
 
@@ -1288,13 +1280,15 @@ export type LedgerPlanGroup = 1 | 2 | 3
 export type LedgerErrorCode =
 	/** Reports a selection whose request is neither an active `respond` call's request nor a ledger note. */
 	| 'REQUEST'
+	/** Reports a question the judge refused, which the ledger holds as a refused judgment and reports through the agent's `fault` event. */
+	| 'HOLD'
 	/** Reports a threshold that is not finite or lies outside the interval above 0 up to and including 1. */
 	| 'THRESHOLD'
 	/** Reports a share that is not finite or lies outside the interval above 0 up to and including 1. */
 	| 'SHARE'
-	/** Reports an invalid capacity or a generation cap that is not a nonnegative safe integer less than capacity. */
+	/** Reports an invalid capacity or a generation cap that is not a positive safe integer less than capacity. */
 	| 'CAPACITY'
-	/** Reports a recall limit that is not a nonnegative safe integer, or an agent limit that is not a positive safe integer. */
+	/** Reports an agent limit that is not a positive safe integer. */
 	| 'LIMIT'
 	/** Reports a topic with an empty name or a name another topic carries. */
 	| 'TOPIC'

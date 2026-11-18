@@ -8,7 +8,6 @@ import type {
 	ConversationSnapshot,
 	LEDGER_NOTES,
 	LEDGER_QUESTIONS,
-	LedgerCorrectionOptions,
 	LedgerSnapshot,
 	createAuthority,
 	createConversationManager,
@@ -31,8 +30,6 @@ export interface StudyMemoryOptions {
 	readonly checkpoints?: readonly string[] | undefined
 	/** Bounds the metadata passes a recording declares; absent, the unrecorded default bounds them. */
 	readonly metadata?: StudyOllamaMetadata | undefined
-	/** Mirrors `LedgerOptions.correction`; forwarded only in the records arm. */
-	readonly correction?: LedgerCorrectionOptions | undefined
 	/** Places the records judge on this host; `gpu` is forwarded as Ollama's `num_gpu`, so 0 runs the judge on the CPU. Forwarded only in the records arm. */
 	readonly judge?: { readonly gpu: number } | undefined
 }

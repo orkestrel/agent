@@ -111,9 +111,13 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 
 /**
  * Supplies the default prompt, tail, and skills shares.
+ *
+ * @remarks
+ * The prompt and tail shares are the ones the chat and memory study sessions pass, at which every
+ * records reading in `studies/README.md` ran.
  */
 export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
-	prompt: 0.7,
+	prompt: 1,
 	tail: 0.35,
 	skills: 0.5,
 })
@@ -126,7 +130,7 @@ export const DEFAULT_LEDGER_LIMIT = 8
 /**
  * Caps the `recall` calls of one request at 2 calls.
  */
-export const DEFAULT_RECALL_LIMIT = 2
+export const LEDGER_RECALL_LIMIT = 2
 
 /**
  * Sets the 5 milliseconds a paced classifier files between host turns.
@@ -156,9 +160,6 @@ export const LEDGER_SCALE_DRIFT = 0.06
  */
 export const LEDGER_WORD = /[\p{L}\p{N}]+/gu
 
-/** Matches the logprob decoding failure `invalid or duplicate top logprob token`, which the ledger holds for the ledger's life. */
-export const DETERMINISTIC_JUDGE_ERROR = /invalid or duplicate top logprob token/
-
 /**
  * Lists the members `LedgerOptions` declares, frozen — the keys the `Ledger` constructor admits.
  *
@@ -179,8 +180,6 @@ export const LEDGER_OPTION_KEYS = Object.freeze([
 	'lookups',
 	'writes',
 	'share',
-	'recall',
-	'correction',
 	'agent',
 	'snapshot',
 ] as const) satisfies ReadonlyArray<keyof LedgerOptions>
@@ -203,7 +202,6 @@ export const LEDGER_AGENT_KEYS = Object.freeze([
 	'skills',
 	'memos',
 	'workspaces',
-	'strict',
 	'authority',
 	'builtins',
 	'workspace',
@@ -211,7 +209,6 @@ export const LEDGER_AGENT_KEYS = Object.freeze([
 
 /** Lists the members `ClassifierOptions` declares, frozen — the keys the `Classifier` constructor admits. */
 export const CLASSIFIER_OPTION_KEYS = Object.freeze([
-	'strict',
 	'conversation',
 	'judge',
 	'questions',
@@ -219,7 +216,6 @@ export const CLASSIFIER_OPTION_KEYS = Object.freeze([
 	'thresholds',
 	'assign',
 	'entities',
-	'correction',
 	'scheduler',
 ] as const) satisfies ReadonlyArray<keyof ClassifierOptions>
 

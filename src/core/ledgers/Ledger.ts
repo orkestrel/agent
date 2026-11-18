@@ -94,7 +94,7 @@ import {
 	stripThinking,
 	sumUsage,
 } from '../helpers.js'
-import { isNonNegativeSafeInteger, isPositiveSafeInteger } from '../validators.js'
+import { isPositiveSafeInteger } from '../validators.js'
 import { Classifier } from './Classifier.js'
 import { Gauge } from './Gauge.js'
 import { LedgerRequest } from './LedgerRequest.js'
@@ -147,7 +147,7 @@ import {
 	linkOwners,
 	matchEntities,
 	rankLedgerCut,
-	resolvePredict,
+	requirePredict,
 	renderLedgerAnnotation,
 	renderLedgerPinned,
 	renderLedgerRecord,
@@ -224,9 +224,7 @@ export class Ledger implements LedgerInterface {
 		}
 		if (!isPositiveSafeInteger(options.capacity))
 			throw new LedgerError('CAPACITY', 'capacity must be a positive safe integer')
-		this.#predict = resolvePredict(options.predict, options.capacity)
-		if (options.recall?.limit !== undefined && !isNonNegativeSafeInteger(options.recall.limit))
-			throw new LedgerError('LIMIT', 'a recall limit must be a nonnegative safe integer')
+		this.#predict = requirePredict(options.predict, options.capacity)
 		if (options.agent?.limit !== undefined && !isPositiveSafeInteger(options.agent.limit))
 			throw new LedgerError('LIMIT', 'an agent limit must be a positive safe integer')
 		// `Array.from` visits a hole in either list as an undefined entry, as iteration does, so the
@@ -295,9 +293,7 @@ export class Ledger implements LedgerInterface {
 					partial,
 				)
 			},
-			...(options.correction === undefined ? {} : { correction: options.correction }),
 			...(options.agent?.scheduler === undefined ? {} : { scheduler: options.agent.scheduler }),
-			...(options.agent?.strict === undefined ? {} : { strict: options.agent.strict }),
 		})
 		const tools = createToolManager()
 		for (const { tool } of [...(options.lookups ?? []), ...(options.writes ?? [])]) {
@@ -345,6 +341,8 @@ export class Ledger implements LedgerInterface {
 		})
 		this.#agent = createAgent(provider, {
 			...options.agent,
+			// A selection fault rejects the request it belongs to; a held question is a recovery, never a fault.
+			strict: true,
 			conversations,
 			system: options.system,
 			tools,
@@ -527,7 +525,7 @@ export class Ledger implements LedgerInterface {
 	 * Appends a request and serves it, recovering an unfinished or rejected first pass with one answer pass.
 	 * In either pass, a call the model makes in a turn that advertises no tools runs nothing and ends the pass after that generation, whatever the agent's `limit`, and when every call of that turn failed, the ledger stores the reply without its calls: a reply with text ends the pass complete, and one without text ends it partial with empty content.
 	 * A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error. A calibration call, with the tool definitions, without them, or with the workspace text, that reports a prompt over `capacity`, the head included, rejects with the same code and stores no request.
-	 * When the answer pass rejects, `respond` rejects with that error, and under the default `strict` a judge failure or another selection failure rejects it too. A rejection belongs to its own call: the ledger stays free, and the next call asks the judge again about whatever is still unanswered.
+	 * When the answer pass rejects, `respond` rejects with that error, and a transient judge failure or another selection failure rejects it too, after the agent's `fault` event. A question the judge refuses is held, reported through `fault` once, and the request goes on. A rejection belongs to its own call: the ledger stays free, and the next call asks the judge again about whatever is still unanswered.
 	 * @param content - The request text
 	 * @param signal - The caller's cancellation signal; an abort during calibration rejects with its reason
 	 * @returns The final pass, the usage of every pass, and the filing attempts of this request alone
@@ -541,7 +539,7 @@ export class Ledger implements LedgerInterface {
 		if (this.#busy()) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
 		const abort = createAbort({ ...(signal === undefined ? {} : { signal }) })
 		const caller = abort.signal
-		const request = new LedgerRequest(content, this.#options.recall?.limit)
+		const request = new LedgerRequest(content)
 		// Each pass binds the scope the request entered with, so a scope widened during the request
 		// adds nothing before the next one, and a narrowing still reaches the next turn.
 		const scope = this.#agent.context.scope
@@ -556,7 +554,7 @@ export class Ledger implements LedgerInterface {
 			const entered = request.enter(this.#conversation)
 			this.#requests.add(entered.id)
 			// The answer pass recovers a provider failure in the first pass; the agent's error event carries
-			// its cause. A selection failure that reached here rejected under `strict`, and it stands.
+			// its cause. A selection failure that reached here rejected the strict run, and it stands.
 			const first = this.#dropStrayCalls(
 				request,
 				await this.#generatePass(request, caller, this.#options.think, scope).catch(
@@ -1234,8 +1232,9 @@ export class Ledger implements LedgerInterface {
 		return scan
 	}
 
-	// Files a classification's attempts into the request and plans the selection, falling back to
-	// the conversation view when the filing faulted or planning threw.
+	// Files a classification's attempts into the request and plans the selection, which lists the
+	// questions the filing held as recoveries. A filing fault, a transient judge failure, or a plan
+	// that throws falls back to the conversation view with that error as the fault.
 	#file(
 		classified: ClassifierResult,
 		request: LedgerRequest,
@@ -1243,26 +1242,20 @@ export class Ledger implements LedgerInterface {
 		message: Message,
 		filter: ScopeFilter | undefined,
 	): Selection {
-		const { attempts, failure, ...filed } = classified
+		const { attempts, failure, holds, fault, ...filed } = classified
+		const recovered = holds.length === 0 ? filed : { ...filed, recoveries: holds }
 		const planned = attempt(() => {
-			if (filed.fault !== undefined) throw filed.fault
+			if (fault !== undefined) throw fault
+			if (failure !== undefined) throw failure
 			const { draft, ...plan } = this.#plan(selected, this.#rescan(), filter)
-			return {
-				draft,
-				selection: {
-					...plan,
-					...filed,
-					// A lenient run keeps the plan beside the filing failure.
-					...(failure === undefined ? {} : { fault: failure }),
-				},
-			}
+			return { draft, selection: { ...plan, ...recovered } }
 		})
 		request.file(
 			attempts,
 			planned.success ? planned.value.selection : undefined,
 			planned.success ? planned.value.draft : undefined,
 		)
-		if (!planned.success) return this.#refuse(planned.error, filed, this.#conversation)
+		if (!planned.success) return this.#refuse(planned.error, recovered, this.#conversation)
 		const selection = planned.value.selection
 		return this.#annotations.has(message.id)
 			? {
@@ -1273,10 +1266,10 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// Falls back to the given conversation's view with the failure as the selection's fault, keeping
-	// the filing completed before it.
+	// the filing completed before it and the questions it held.
 	#refuse(
 		error: unknown,
-		filed: Omit<ClassifierResult, 'attempts'>,
+		filed: Pick<Selection, 'judgments' | 'usage' | 'recoveries'>,
 		conversation: ConversationInterface,
 	): Selection {
 		if (conversation === this.#conversation && !(isLedgerError(error) && error.code === 'REQUEST'))

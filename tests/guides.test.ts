@@ -179,6 +179,7 @@ await new GuideCommand({
 		isLedgerError,
 		JudgeAbortError,
 		JudgeError,
+		LEDGER_CATEGORIES,
 		LEDGER_NOTES,
 		LEDGER_QUESTIONS,
 		LEDGER_SCALE_DRIFT,
@@ -1602,6 +1603,7 @@ await new GuideCommand({
 				questions: LEDGER_QUESTIONS,
 				thresholds,
 				capacity: 32_768,
+				predict: 8_192,
 				lookups: [lookup],
 			})
 			const copies: Array<string | undefined> = []
@@ -1682,6 +1684,7 @@ await new GuideCommand({
 				questions: LEDGER_QUESTIONS,
 				thresholds: LEDGER_DESK_THRESHOLDS,
 				capacity: 32_768,
+				predict: 8_192,
 				lookups: [createGuideOrderLookup()],
 			}
 			const parent = createRecorder<readonly [readonly Message[]]>()
@@ -2816,7 +2819,7 @@ await new GuideCommand({
 		})
 
 		it('learns only exact overhead and subtracts spared overhead in estimated use, as the gauge claims', () => {
-			const gauge = new Gauge({ scale: 2, overhead: 120, capacity: 1000 })
+			const gauge = new Gauge({ scale: 2, overhead: 120, capacity: 1000, predict: 1 })
 			expect(gauge.remainder([{ estimate: 100, tools: 1 }])).toBe(680)
 			expect(gauge.remainder([{ estimate: 100, tools: 1, spared: 40 }])).toBe(720)
 			expect(gauge.remainder([{ estimate: 100, tools: 0, spared: 150 }])).toBe(800)
@@ -2958,56 +2961,6 @@ await new GuideCommand({
 			)
 		})
 
-		it('narrows correction pairs as the guide says', async () => {
-			const asks: Array<readonly string[]> = []
-			for (const correction of [{}, { narrow: true }]) {
-				const conversation = createConversation()
-				const [desk, account, shared, later] = conversation.add([
-					{ role: 'user', content: 'The refund desk stayed open.' },
-					{ role: 'user', content: 'Account BW-20931 asked about a refund.' },
-					{ role: 'user', content: 'A refund of 20 went out.' },
-					{ role: 'user', content: 'Correction: account BW-20931 gets a refund of 20.' },
-				])
-				const classifier = new Classifier({
-					conversation,
-					judge: createPhraseJudge([]),
-					questions: LEDGER_QUESTIONS,
-					topics: [LEDGER_REFUNDS_TOPIC],
-					thresholds: LEDGER_DESK_THRESHOLDS,
-					assign: () => undefined,
-					entities: (text) => barrel.extractLiterals(text).ids,
-					correction,
-				})
-				const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
-				asks.push(
-					filed.attempts
-						.filter((attempt) => attempt.phase === 'amends')
-						.map((attempt) =>
-							attempt.key === JSON.stringify(['amends', desk?.id, later?.id])
-								? 'desk'
-								: attempt.key === JSON.stringify(['amends', account?.id, later?.id])
-									? 'account'
-									: attempt.key === JSON.stringify(['amends', shared?.id, later?.id])
-										? 'shared'
-										: attempt.key,
-						),
-				)
-			}
-
-			// The desk message shares only the topic; the account shares an entity, and the amount a number.
-			expect(asks).toEqual([
-				['desk', 'account', 'shared'],
-				['account', 'shared'],
-			])
-			expect(guideText).toContain(
-				'The `narrow` member of the `correction` option keeps only the eligible earlier messages that also share a registry entity with the correction or an id or a number in their content, so a desk topic alone admits no pair, and a correction with no id, owner, or desk topic still asks no pair.',
-			)
-			expect(guideText).toContain(
-				'The ledger never compares an earlier message that shares only a desk topic with the correction, so a supersession on a pair sharing no registry entity and no id or number is never filed.',
-			)
-			expect(guideText).toContain('| `LedgerCorrectionOptions` | interface | `{ narrow? }`')
-		})
-
 		it('fits the tail inside the tail share of the prompt budget less the overhead cost, as the plan claims', async () => {
 			const capacity = 600
 			const measured: Array<readonly [overhead: number, tail: number]> = []
@@ -3113,15 +3066,15 @@ await new GuideCommand({
 			)
 		})
 
-		it('budgets a ledger at W + P with predict P like one at W without thinking (the thinking budget)', async () => {
+		it('budgets a ledger at W + P with predict P like one at W + 1 with predict 1 without thinking (the thinking budget)', async () => {
 			const window = 600
 			const cap = 400
 
 			// The plan half: the reserved cap leaves the prompt exactly the window's budget, while the
-			// same capacity without the cap plans a longer prompt.
+			// same capacity with the smallest cap plans a longer prompt.
 			const reserved = await planLedgerDelivery(window + cap, cap)
-			expect(reserved).toEqual(await planLedgerDelivery(window))
-			expect((await planLedgerDelivery(window + cap)).length).toBeGreaterThan(reserved.length)
+			expect(reserved).toEqual(await planLedgerDelivery(window + 1, 1))
+			expect((await planLedgerDelivery(window + cap, 1)).length).toBeGreaterThan(reserved.length)
 
 			// The gauge half: under replay 'none', a call's thinking leaves the measured use, so the room
 			// and the close rule read what a call without thinking leaves at the window.
@@ -3131,7 +3084,7 @@ await new GuideCommand({
 				capacity: 32_768 + 4_096,
 				predict: 4_096,
 			})
-			const plain = new Gauge({ scale: 1.25, overhead: 120, capacity: 32_768 })
+			const plain = new Gauge({ scale: 1.25, overhead: 120, capacity: 32_768 + 1, predict: 1 })
 			const carried = new Gauge({
 				scale: 1.25,
 				overhead: 120,
@@ -3141,15 +3094,15 @@ await new GuideCommand({
 			})
 			const thought = [{ estimate: 400, prompt: 640, completion: 330, thinking: 300, tools: 2 }]
 			const bare = [{ estimate: 400, prompt: 640, completion: 30, tools: 2 }]
-			expect(thinking.remainder(thought) - 4_096).toBe(plain.remainder(bare))
+			expect(thinking.remainder(thought) - 4_096).toBe(plain.remainder(bare) - 1)
 			expect(thinking.room(thought, '')).toBe(plain.room(bare, ''))
 			thinking.observe(thought, thought[0])
 			plain.observe(bare, bare[0])
 			expect(thinking.reserve(thought, '')).toBe(plain.reserve(bare, ''))
 			// Under replay 'turn' the next request carries the thinking, so the gauge counts it.
-			expect(carried.remainder(thought) - 4_096).toBe(plain.remainder(bare) - 300)
+			expect(carried.remainder(thought) - 4_096).toBe(plain.remainder(bare) - 1 - 300)
 			expect(guideText).toContain(
-				"With replay `'none'`, a ledger at a `capacity` of `W + P` with a `predict` of `P`, where `W` is a context window and `P` a generation cap, budgets like a ledger at `W` without thinking.",
+				"With replay `'none'`, a ledger at a `capacity` of `W + P` with a `predict` of `P`, where `W` is a context window and `P` a generation cap, budgets like a ledger at a `capacity` of `W + 1` with a `predict` of 1 that doesn't think.",
 			)
 		})
 
@@ -3520,7 +3473,6 @@ await new GuideCommand({
 					stream: (...args) => provider.stream(...args),
 				},
 				buildGuideLedgerOptions({
-					agent: { strict: false },
 					judge: createPhraseJudge([]),
 					capacity: 32_768,
 					gauge: { scale: 1, overhead: 0 },
@@ -3664,48 +3616,48 @@ await new GuideCommand({
 			await expect(strict.ledger.respond('What is open on the desk?')).resolves.toMatchObject({
 				content: 'Noted.',
 			})
-
-			const lenient = Promise.withResolvers<void>()
-			const scheduler = createGatedScheduler(lenient)
-			const loose = createPacedLedger(seed.snapshot, [{ content: 'Noted.' }], scheduler, {
-				agent: { strict: false },
-			})
-			const served = loose.ledger.respond('What is the status of OR-1000?')
-			await scheduler.reached
-			const before = loose.ledger.conversation.count
-			loose.ledger.conversation.add({ role: 'user', content: 'Order OR-1000 is on hold.' })
-			lenient.resolve()
-			expect((await served).content).toBe('Noted.')
-			const [faulted] = requireValue(loose.selections.calls[0], 'Missing faulted selection')
-			expect(faulted.fault?.message).toContain('changed during selection')
-			expect(faulted.messages).toEqual(loose.ledger.conversation.messages().slice(0, before + 1))
 			expect(guideText).toContain(
-				"A selection reads the conversation it was asked about, so a host append or removal while a `respond` call's selection runs faults it with a `changed during selection` error. Under the default `strict`, `respond` rejects with that error before it reaches the provider,",
+				"A selection reads the conversation it was asked about, so a host append or removal while a `respond` call's selection runs faults it with a `changed during selection` error. The `respond` call rejects with that error, after the agent's `fault` event and before it reaches the provider,",
 			)
 			expect(guideText).toContain(
-				'When the selection faults, the run rejects under the default `strict`, and under `strict: false` the agent builds the prompt from the whole conversation view instead, earlier requests and replies included, with no records.',
+				"When the selection faults, the `respond` call rejects after the agent's `fault` event.",
 			)
 		})
 
-		it('holds a refused question and the logprob failure and asks any other failure again, as the filing claims', async () => {
+		it('holds a refused question, keeps a wire refusal, and asks a transient failure again, as the filing claims', async () => {
 			const [refused, garbled, transient] = LEDGER_FAILURE_MESSAGES
+			const refusal = new JudgeError('QUESTION', 'judge error: refused before inference')
+			const reset = new Error('judge error: connection reset')
 			const asked = createRecorder<readonly [text: string]>()
+			const faults = createRecorder<[error: unknown]>()
 			const phrases = createPhraseJudge([])
 			const ledger = createLedger(
 				createScriptedProvider([{ content: 'Done.' }]),
 				buildGuideLedgerOptions({
-					agent: { strict: false },
+					agent: { on: { fault: faults.handler } },
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
 							const state = isString(request.state) ? request.state : ''
-							for (const text of LEDGER_FAILURE_MESSAGES)
-								if (state.includes(text)) asked.handler(text)
-							if (state.includes(refused))
-								throw new JudgeError('QUESTION', 'judge error: refused before inference')
-							if (state.includes(garbled))
-								throw new Error('judge error: invalid or duplicate top logprob token')
-							if (state.includes(transient)) throw new Error('judge error: connection reset')
+							const choice = Object.values(request.questions).some(
+								(question) => question.form === 'choice',
+							)
+							const text = LEDGER_FAILURE_MESSAGES.find((one) => state.includes(one))
+							if (!choice || text === undefined) return phrases.ask(request, signal)
+							asked.handler(text)
+							if (text === refused) throw refusal
+							if (text === garbled)
+								return {
+									model: 'scripted',
+									answers: {},
+									refusals: Object.fromEntries(
+										Object.keys(request.questions).map((id) => [
+											id,
+											{ missing: [...LEDGER_CATEGORIES] },
+										]),
+									),
+								}
+							if (asked.calls.filter(([one]) => one === transient).length === 1) throw reset
 							return phrases.ask(request, signal)
 						},
 					},
@@ -3717,21 +3669,37 @@ await new GuideCommand({
 				LEDGER_FAILURE_MESSAGES.map((content): MessageInput => ({ role: 'user', content })),
 			)
 
-			await ledger.respond('Review the desk.')
-			const prefix = asked.count
-			await ledger.respond('Review the desk again.')
+			await expect(ledger.respond('Review the desk.')).rejects.toBe(reset)
+			const result = await ledger.respond('Review the desk again.')
 
-			// The asks of each text before and after the second request, counted from the one log.
-			const first = Map.groupBy(asked.calls.slice(0, prefix), ([text]) => text)
-			const total = Map.groupBy(asked.calls, ([text]) => text)
-			for (const text of LEDGER_FAILURE_MESSAGES) expect(first.get(text)?.length).toBeGreaterThan(0)
-			expect(total.get(refused)?.length).toBe(first.get(refused)?.length)
-			expect(total.get(garbled)?.length).toBe(first.get(garbled)?.length)
-			expect(total.get(transient)?.length).toBe(
-				2 * requireValue(first.get(transient), 'Missing transient asks').length,
+			const counts = Map.groupBy(asked.calls, ([text]) => text)
+			expect([refused, garbled, transient].map((text) => counts.get(text)?.length)).toEqual([
+				1, 1, 2,
+			])
+			expect(
+				faults.calls.map(([error]) =>
+					isLedgerError(error) ? [error.code, error.cause] : [undefined, error],
+				),
+			).toEqual([
+				['HOLD', refusal],
+				[undefined, reset],
+			])
+			expect(
+				result.attempts
+					.filter((attempt) => attempt.phase === 'category')
+					.map((attempt) => attempt.outcome),
+			).toEqual(['skipped', 'skipped', 'resolved'])
+			expect(guideText).toContain(
+				'A transient judge failure, such as an HTTP or protocol failure, a timeout, or a network error, rejects the `respond` call it belongs to, after the `fault` event, and stores nothing, so the next request asks the judge again about every question still unanswered.',
 			)
 			expect(guideText).toContain(
-				"Under the default `strict`, a judge failure rejects the `respond` call it belongs to, after the `fault` event, and holds nothing, so the next request asks the judge again about every question still unanswered. A failure that repeats rejects that request too, so a question the judge always refuses stops each request until you remove its message or set `strict: false`. Under `strict: false`, a judge failure leaves its question unanswered, and the next request asks it again, except for two failures that hold the question so that no later request asks it: a refused question, which the judge reports as a `JudgeError` with code `'QUESTION'`, and the deterministic logprob failure the `DETERMINISTIC_JUDGE_ERROR` constant matches.",
+				"A question the judge refuses before inference, which it reports as a `JudgeError` with code `'QUESTION'`, refuses again under the same wording, message, and judge, so the ledger holds it: it stores a refused `Judgment` under the question's key, whose `missing` list names every candidate, reports a `LedgerError` with code `'HOLD'` through the agent's `fault` event once, in the request that held it, and serves that request with the question undecided.",
+			)
+			expect(guideText).toContain(
+				'Every later request, and a ledger hydrated from the snapshot, reads the held question as `skipped` and asks it no more.',
+			)
+			expect(guideText).toContain(
+				'A question a wire refuses, such as one whose top logprob token repeats on Ollama, arrives as a stored refusal and reads the same way, with no `fault`.',
 			)
 		})
 
@@ -3900,7 +3868,7 @@ await new GuideCommand({
 			expect(isLedgerError(refused) ? refused.code : refused).toBe('OVERFLOW')
 			expect(isLedgerError(refused) ? refused.context : refused).toMatchObject({
 				capacity,
-				predict: 0,
+				predict: 1,
 			})
 			expect(provider.calls).toHaveLength(0)
 			expect(first.at(-1)?.content).toBe(request)
@@ -3944,7 +3912,6 @@ await new GuideCommand({
 			const ledger = createLedger(
 				provider,
 				buildGuideLedgerOptions({
-					agent: { strict: false },
 					judge: createPhraseJudge([]),
 					capacity,
 					gauge: { scale: 1, overhead: 0 },
@@ -4064,13 +4031,13 @@ await new GuideCommand({
 				},
 				{ content: 'Done.' },
 			])
-			// The judge fails the caller's filing until the third request begins: each of the first two
-			// requests streams a lookup call and a reply, so the provider has started 4 calls by then.
+			// The judge refuses the caller's filing until the third request begins, so the ledger holds it:
+			// each of the first two requests streams a lookup call and a reply, so the provider has started
+			// 4 calls by then, and the host removes the hold so the third request asks again.
 			const phrases = createPhraseJudge(['Refunds over'])
 			const ledger = createLedger(
 				provider,
 				buildGuideLedgerOptions({
-					agent: { strict: false },
 					judge: {
 						...phrases,
 						ask: async (request, signal) => {
@@ -4079,7 +4046,8 @@ await new GuideCommand({
 								(question) => question.form === 'choice',
 							)
 							if (choice && state.includes(caller)) {
-								if (provider.started < 4) throw new Error('judge error: connection reset')
+								if (provider.started < 4)
+									throw new JudgeError('QUESTION', 'judge error: refused before inference')
 								return {
 									model: 'scripted',
 									answers: Object.fromEntries(
@@ -4114,7 +4082,7 @@ await new GuideCommand({
 					selection.messages.map((message) => extractLedgerRecords([message])).join('\n\n'),
 				),
 			)
-			ledger.conversation.add([
+			const [, called] = ledger.conversation.add([
 				{ role: 'user', content: rule },
 				{ role: 'user', content: caller },
 			])
@@ -4122,6 +4090,9 @@ await new GuideCommand({
 			await ledger.respond('Look up order BW-5512.')
 			await ledger.respond('Look up order bw-5512 again for Brightwater Studio.')
 			expect(provider.started).toBe(4)
+			ledger.conversation.judgments.remove(
+				JSON.stringify(['category', requireValue(called, 'Missing caller').id]),
+			)
 			for (const amount of LEDGER_REFUND_AMOUNTS)
 				await ledger.respond(`Does the $${amount} Brightwater Studio refund need a manager?`)
 
@@ -4142,7 +4113,7 @@ await new GuideCommand({
 
 		it('serves one pass and refuses a repeated lookup and a spent recall, as the ledger request fence claims', () => {
 			const conversation = createConversation()
-			const request = new LedgerRequest('Does the $148.50 refund need a manager?', 1)
+			const request = new LedgerRequest('Does the $148.50 refund need a manager?')
 			const message = request.enter(conversation)
 			expect(message).toMatchObject({
 				role: 'user',
@@ -4179,6 +4150,7 @@ await new GuideCommand({
 			expect(request.denied('refund_order', { id: 'BW-5512' })).toBe(true)
 			expect(request.denied('refund_order', { id: 'BW-5513' })).toBe(false)
 			request.recall()
+			request.recall()
 			expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)
 
 			const listed = 'lookup_order {"id":"BW-5512"}: Refund due $148.50.'
@@ -4213,7 +4185,7 @@ await new GuideCommand({
 				"request.denied('refund_order', { id: 'BW-5513' }) // false — other arguments are another call",
 			)
 			expect(guideText).toContain(
-				'request.recall() // throws Error(LEDGER_NOTES.closure) — the 1 recall call is spent',
+				'request.recall() // throws Error(LEDGER_NOTES.closure) — the 2 recall calls are spent',
 			)
 		})
 
@@ -4265,13 +4237,13 @@ await new GuideCommand({
 			expect(classifier.topics(rule.id)).toEqual(new Set(['refunds']))
 			expect(classifier.classification().categories.get(rule.id)).toBe('rule')
 
-			const gauge = new Gauge({ scale: 1.25, overhead: 120, capacity: 32_768 })
+			const gauge = new Gauge({ scale: 1.25, overhead: 120, capacity: 32_768, predict: 8_192 })
 			const calls = [{ estimate: 400, prompt: 640, completion: 30, tools: 2 }]
 			expect(estimateMessages([rule])).toBe(13)
 			expect(gauge.rate(calls)).toBe(1.25)
 			expect(gauge.remainder(calls)).toBe(32_098)
 			expect(gauge.reserve(calls, '')).toBe(36.25)
-			expect(gauge.room(calls, '')).toBeCloseTo(12_824.7, 9)
+			expect(gauge.room(calls, '')).toBeCloseTo(9_547.9, 9)
 			gauge.observe(calls)
 			expect(gauge.scale).toBe(1.3)
 			// A fence comment that drifts from the value asserted earlier fails here, because each line must appear verbatim.
@@ -8249,64 +8221,6 @@ await new GuideCommand({
 			)
 		})
 
-		it('asks a replaced value only when unset', async () => {
-			const asks: Array<readonly string[]> = []
-			const stated = barrel.extractLiterals('the refund limit is 500')
-			const later = barrel.extractLiterals('no, the refund limit is 600')
-			for (const correction of [{}, { narrow: true }]) {
-				const conversation = createConversation()
-				const [first, second] = conversation.add([
-					{ role: 'user', content: 'the refund limit is 500' },
-					{ role: 'user', content: 'no, the refund limit is 600' },
-				])
-				const classifier = new Classifier({
-					conversation,
-					judge: {
-						id: 'scripted',
-						name: 'scripted',
-						model: 'scripted',
-						ask: async (request) => ({
-							model: 'scripted',
-							answers: Object.fromEntries(
-								Object.entries(request.questions).map(([id, question]): [string, JudgeAnswer] => [
-									id,
-									question.form === 'choice'
-										? buildCategoryAnswer(
-												isString(request.state) && request.state.includes('no, the refund')
-													? { correction: 1 }
-													: { fact: 1 },
-											)
-										: { form: 'noul', noul: id.startsWith('["topic"') ? 0.9 : 0.1 },
-								]),
-							),
-						}),
-					},
-					questions: LEDGER_QUESTIONS,
-					topics: [LEDGER_REFUNDS_TOPIC],
-					thresholds: LEDGER_DESK_THRESHOLDS,
-					assign: () => undefined,
-					entities: () => new Set(),
-					correction,
-				})
-				const filed = await classifier.classify(new Set(), AbortSignal.timeout(30_000))
-				asks.push(
-					filed.attempts
-						.filter((attempt) => attempt.phase === 'amends')
-						.map((attempt) =>
-							attempt.key === JSON.stringify(['amends', first?.id, second?.id])
-								? 'pair'
-								: attempt.key,
-						),
-				)
-			}
-
-			expect([...stated.numbers].some((number) => later.numbers.has(number))).toBe(false)
-			expect(asks).toEqual([['pair'], []])
-			expect(guideText).toContain(
-				'For example, "the refund limit is 500" then "no, the refund limit is 600" shares no literal, so with no shared registry entity `narrow` never asks about that pair, where the unset rule does.',
-			)
-		})
-
 		it('asks pair questions until an abort', async () => {
 			const counts: number[] = []
 			for (const earlier of [2, 4]) {
@@ -8370,7 +8284,9 @@ await new GuideCommand({
 					.map((attempt) => attempt.outcome),
 			).toEqual(['resolved', 'aborted'])
 			expect(guideText).toContain("**Nothing caps a correction's pair questions.**")
-			expect(guideText).toContain("and the caller's abort signal ends them.")
+			expect(guideText).toContain(
+				"inside 109 judge calls and 196 s on the Mica v0.1 4B judge. The caller's abort signal ends them.",
+			)
 		})
 
 		it('refuses a second select during a filing', async () => {

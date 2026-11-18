@@ -1,8 +1,7 @@
 import type { ClassifierAttempt, Selection } from '@src/core'
-import { createConversation, DEFAULT_RECALL_LIMIT, LEDGER_NOTES, LedgerRequest } from '@src/core'
+import { createConversation, LEDGER_NOTES, LEDGER_RECALL_LIMIT, LedgerRequest } from '@src/core'
 import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { LEDGER_INVALID_LIMITS, computeLedgerErrorCode } from '../../../setup.js'
 
 describe('LedgerRequest', () => {
 	it('replaces copy receipts with a successful plan and discards them on fallback', () => {
@@ -32,15 +31,6 @@ describe('LedgerRequest', () => {
 		request.observe({ estimate: 1, tools: 0 }, 1)
 		expect(request.sent).toBeUndefined()
 	})
-	it('refuses a recall limit that is not a nonnegative safe integer and accepts its boundaries', () => {
-		for (const limit of LEDGER_INVALID_LIMITS) {
-			expect(computeLedgerErrorCode(() => new LedgerRequest('Check.', limit))).toBe('LIMIT')
-		}
-		for (const limit of [0, -0, Number.MAX_SAFE_INTEGER]) {
-			expect(computeLedgerErrorCode(() => new LedgerRequest('Check.', limit))).toBeUndefined()
-		}
-	})
-
 	it('appends its content once on enter and holds the message', () => {
 		const conversation = createConversation()
 		const request = new LedgerRequest('What approval is needed?')
@@ -247,16 +237,16 @@ describe('LedgerRequest', () => {
 		expect(request.denied('update', cycle)).toBe(false)
 	})
 
-	it('counts recalls up to its limit and closes after it', () => {
+	it('counts recalls up to the fixed limit of 2 and closes on the third', () => {
 		const request = new LedgerRequest('Check.')
-		Array.from({ length: DEFAULT_RECALL_LIMIT }).forEach(() => request.recall())
+		expect(LEDGER_RECALL_LIMIT).toBe(2)
+		request.recall()
+		request.recall()
 		expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)
-		const closed = new LedgerRequest('Check.', 0)
-		expect(() => closed.recall()).toThrow(LEDGER_NOTES.closure)
 	})
 
 	it('closes its recall tool before the limit is spent', () => {
-		const request = new LedgerRequest('Check.', 3)
+		const request = new LedgerRequest('Check.')
 		request.recall()
 		request.close()
 		expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)

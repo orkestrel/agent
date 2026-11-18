@@ -78,11 +78,11 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		if (!isRecord(value)) return false
 		if (
 			Object.keys(value).some(
-				(key) => !['observe', 'checkpoints', 'metadata', 'correction', 'judge'].includes(key),
+				(key) => !['observe', 'checkpoints', 'metadata', 'judge'].includes(key),
 			)
 		)
 			return false
-		const { observe, checkpoints, metadata, correction, judge } = value
+		const { observe, checkpoints, metadata, judge } = value
 		if (
 			judge !== undefined &&
 			(!recordOf({ gpu: isFiniteNumber })(judge) ||
@@ -91,7 +91,6 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		)
 			return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
-		if (correction !== undefined && !recordOf({ narrow: isBoolean }, true)(correction)) return false
 		if (observe !== undefined && !isBoolean(observe)) return false
 		if (checkpoints === undefined) return true
 		return (

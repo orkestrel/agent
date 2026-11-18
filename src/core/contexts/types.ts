@@ -294,6 +294,8 @@ export interface Selection {
 	readonly usage?: TokenUsage
 	/** Holds the error a handler gave up on, or the fault `select` raises over a handler's selection (a disallowed role or a changed conversation); `messages` is then the conversation's `messages()`. */
 	readonly fault?: Error
+	/** Lists the errors a handler recovered from and built this selection past; the agent reports each through its `fault` event before it builds, and none rejects a run. */
+	readonly recoveries?: readonly Error[]
 }
 
 /**
@@ -303,7 +305,8 @@ export interface Selection {
  * Receives the run's conversation, the user message the run serves (captured by the loop at run
  * entry), and the run's abort signal. A handler that spent judge calls before giving up returns a
  * {@link Selection} with `fault` set, `messages` as the conversation's `messages()`, and the usage
- * spent, rather than throwing. A handler that recovers from an error returns no `fault`.
+ * spent, rather than throwing. A handler that recovers from an error returns no `fault` and lists
+ * that error in `recoveries`, so the host still observes it.
  *
  * @param conversation - The conversation whose messages the handler selects
  * @param request - The user message captured at run entry
@@ -1047,7 +1050,7 @@ export interface AgentContextInterface {
 	 * after it settles, reading no other conversation, the active one included: an unchanged
 	 * conversation returns the handler's {@link Selection}; a changed one returns a selection whose
 	 * `fault` names the change, whose `messages` are the current `messages()`, and which carries the
-	 * handler's `judgments` and `usage`. An unchanged conversation whose selection holds a message whose
+	 * handler's `judgments`, `usage`, and `recoveries`. An unchanged conversation whose selection holds a message whose
 	 * role is not a `ConversationRole`, such as a `system` message, returns the same shape with a
 	 * `ConversationError` coded `'ROLE'` as its `fault`, which names the message's index and role and
 	 * carries the handler's own `fault` as its `cause`. A handler throw rejects the returned promise

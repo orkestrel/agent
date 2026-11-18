@@ -4615,7 +4615,9 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 	})
 
 	it('advertises the same definitions on every turn with a subset selection as without a handler', async () => {
-		expectTypeOf<keyof Selection>().toEqualTypeOf<'messages' | 'judgments' | 'usage' | 'fault'>()
+		expectTypeOf<keyof Selection>().toEqualTypeOf<
+			'messages' | 'judgments' | 'usage' | 'fault' | 'recoveries'
+		>()
 		const subset = createRecordedSelection({ keep: (message) => message.role === 'user' })
 		const advertised = await Promise.all(
 			[undefined, subset.handler].map(async (select) => {
@@ -5029,6 +5031,42 @@ describe('Agent — a selection fault follows the strict rules', () => {
 
 		expect(consumed.calls).toEqual([[SELECTION_USAGE.total]])
 		expect(budgetRecorder.calls.map(([value]) => value)[0]).toEqual(SELECTION_USAGE)
+	})
+
+	it('reports each recovery through fault before select and answers from the selection under strict', async () => {
+		const order: string[] = []
+		const recoveries = [
+			new Error('the judge refused the category question'),
+			new Error('the judge refused the topic question'),
+		]
+		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
+		const agent = createAgent(provider, {
+			strict: true,
+			select: async (_conversation, request) => ({
+				messages: [request],
+				judgments: [],
+				recoveries,
+				usage: SELECTION_USAGE,
+			}),
+			on: {
+				fault: (error) => order.push(`fault ${String(error)}`),
+				select: () => order.push('select'),
+			},
+		})
+		agent.context.messages.add([
+			{ role: 'user', content: 'The invoice total is wrong.' },
+			{ role: 'user', content: 'Invoice 42.' },
+		])
+
+		const result = await agent.generate()
+
+		expect(order).toEqual([
+			'fault Error: the judge refused the category question',
+			'fault Error: the judge refused the topic question',
+			'select',
+		])
+		expect(result).toEqual({ content: 'done', usage: SELECTION_USAGE, partial: false })
+		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual(['Invoice 42.'])
 	})
 
 	it.each(SELECTION_FAULT_CASES)(

@@ -310,8 +310,9 @@ export type AgentEventMap = {
 	readonly exhaust: readonly [turns: number]
 	/**
 	 * Reports a failure the run recovered from or is about to settle on: a thrown selection handler,
-	 * a returned selection `fault`, a conversation changed under the handler, or, under
-	 * `strict: false`, a final answer that misses the run's `schema`. The run still settles through
+	 * a returned selection `fault`, each error a selection lists in `recoveries`, which never rejects
+	 * the run, a conversation changed under the handler, or, under `strict: false`, a final answer
+	 * that misses the run's `schema`. The run still settles through
 	 * the other events — `finish` when it continues, and `error` when {@link AgentOptions.strict}
 	 * rethrows the same value — so `fault` reports the failure and never the run's own outcome. A
 	 * domain event (the emitter isolates a listener throw separately, routing it to its `error`

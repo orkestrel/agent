@@ -6,7 +6,7 @@ import type {
 	LedgerRecord,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
-import { estimateTokens, LEDGER_SCALE_DRIFT } from '@src/core'
+import { estimateTokens, LEDGER_QUESTIONS, LEDGER_SCALE_DRIFT } from '@src/core'
 import {
 	collectRecallMessages,
 	collectRetiredFindings,
@@ -26,7 +26,6 @@ import {
 	collectProjectionIds,
 	extractWords,
 	findLedgerCut,
-	renderCauseChain,
 	renderTopicNames,
 	scanAmendments,
 	splitWords,
@@ -43,7 +42,8 @@ import {
 	computeThinking,
 	computeToolDensity,
 	computeToolPrice,
-	resolvePredict,
+	requirePredict,
+	collectQuestionKeys,
 	rankLedgerCut,
 	cutListing,
 	fitSlope,
@@ -64,7 +64,7 @@ import {
 	splitSentences,
 	splitTopic,
 } from '../../../../src/core/ledgers/helpers.js'
-import { captureError, createRecorder, requireValue } from '@orkestrel/test'
+import { captureError, createRecorder, invokeUnchecked, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
 	throwProxyRead,
@@ -500,18 +500,6 @@ describe('extracted ledger leaves', () => {
 		expect(renderTopicNames([])).toBe('')
 	})
 
-	it('renders arbitrary causes and bounds cyclic cause chains', () => {
-		expect(renderCauseChain(undefined)).toBe('')
-		expect(renderCauseChain(new Error('refused', { cause: 'offline' }))).toBe(
-			'Error: refused <- offline',
-		)
-		const error = new Error('cycle')
-		error.cause = error
-		expect(renderCauseChain(error)).toBe(
-			'Error: cycle <- Error: cycle <- Error: cycle <- Error: cycle',
-		)
-	})
-
 	it('extracts Unicode words and excludes names at sentence boundaries', () => {
 		const result = extractWords({
 			id: 'note',
@@ -664,14 +652,36 @@ describe('computeThinking', () => {
 	})
 })
 
-describe('resolvePredict', () => {
-	it('resolves the default, preserves valid boundaries, and refuses invalid caps', () => {
-		expect(resolvePredict(undefined, 4096)).toBe(0)
-		for (const predict of [0, -0, 4095]) expect(resolvePredict(predict, 4096)).toBe(predict)
-		for (const predict of [-1, 0.5, 4096, 4097, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
-			expect(() => resolvePredict(predict, 4096)).toThrow(
+describe('requirePredict', () => {
+	it('returns a cap at its boundaries and refuses an absent, zero, or invalid cap', () => {
+		for (const predict of [1, 4095]) expect(requirePredict(predict, 4096)).toBe(predict)
+		expect(() => invokeUnchecked(undefined, requirePredict, [undefined, 4096])).toThrow(
+			expect.objectContaining({ code: 'CAPACITY' }),
+		)
+		for (const predict of [0, -0, -1, 0.5, 4096, 4097, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+			expect(() => requirePredict(predict, 4096)).toThrow(
 				expect.objectContaining({ code: 'CAPACITY' }),
 			)
+	})
+})
+
+describe('collectQuestionKeys', () => {
+	it('lists the candidate keys of each question form in reading order', () => {
+		expect(collectQuestionKeys({ form: 'noul' })).toEqual(['true', 'false'])
+		expect(collectQuestionKeys(LEDGER_QUESTIONS.category)).toEqual([
+			'fact',
+			'rule',
+			'correction',
+			'request',
+			'opinion',
+			'chatter',
+			'distractor',
+		])
+		expect(collectQuestionKeys({ form: 'score', criteria: ['low', 'mid', 'high'] })).toEqual([
+			'0',
+			'1',
+			'2',
+		])
 	})
 })
 

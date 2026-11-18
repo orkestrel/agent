@@ -76,15 +76,15 @@ describe('memory declaration and mechanical evidence', () => {
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, false])
 	})
 
-	it('admits metadata and a correction, and refuses a stale version key', () => {
+	it('admits metadata, and refuses a retired correction and a stale version key', () => {
 		const metadata = { calls: 8192, bytes: 67108864, duration: 600000 }
+		expect(isStudyMemoryOptions({ metadata })).toBe(true)
 		for (const settings of [
-			{ metadata },
 			{ correction: {} },
 			{ metadata, correction: { narrow: true } },
+			{ version: '0.40.13', metadata },
 		])
-			expect([settings, isStudyMemoryOptions(settings)]).toEqual([settings, true])
-		expect(isStudyMemoryOptions({ version: '0.40.13', metadata })).toBe(false)
+			expect([settings, isStudyMemoryOptions(settings)]).toEqual([settings, false])
 	})
 
 	it('admits a non-negative safe integer judge placement and refuses malformed placements', () => {
@@ -105,19 +105,6 @@ describe('memory declaration and mechanical evidence', () => {
 			0,
 		])
 			expect([judge, isStudyMemoryOptions({ judge })]).toEqual([judge, false])
-	})
-
-	it('admits a boolean narrow and refuses any other', () => {
-		for (const correction of [{ narrow: true }, { narrow: false }])
-			expect([correction, isStudyMemoryOptions({ correction })]).toEqual([correction, true])
-		for (const correction of [
-			{ narrow: 'true' },
-			{ narrow: 1 },
-			{ narrow: null },
-			{ limit: 13 },
-			{ Narrow: true },
-		])
-			expect([correction, isStudyMemoryOptions({ correction })]).toEqual([correction, false])
 	})
 
 	it('checks each admitted capability its treatments invoke and tolerates a hostile namespace', () => {

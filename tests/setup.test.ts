@@ -2528,9 +2528,9 @@ describe('guide scenario fixtures', () => {
 		expect((await fileLedgerCorrection([])).pairs).toEqual([])
 	})
 	it('returns prompt snapshots with a reserved generation cap', async () => {
-		expect(await planLedgerDelivery(1000, 400)).toEqual(await planLedgerDelivery(600))
-		expect((await planLedgerDelivery(1000)).length).toBeGreaterThan(
-			(await planLedgerDelivery(600)).length,
+		expect(await planLedgerDelivery(1000, 400)).toEqual(await planLedgerDelivery(601, 1))
+		expect((await planLedgerDelivery(1000, 1)).length).toBeGreaterThan(
+			(await planLedgerDelivery(601, 1)).length,
 		)
 	})
 	it('returns the retained desk fragments at the supplied capacity', async () => {

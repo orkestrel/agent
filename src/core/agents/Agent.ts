@@ -767,9 +767,9 @@ export class Agent implements AgentInterface {
 	}
 
 	// A resolved selection: charge its usage before the abort check, because judge calls were spent
-	// either way and the charge can itself trip the run's bound; then build from it unless a cancel or
-	// a strict fault intervenes. A cancelled site builds from the conversation's `messages()` and
-	// emits no `select`.
+	// either way and the charge can itself trip the run's bound; report each recovered error, then
+	// build from it unless a cancel or a strict fault intervenes. A cancelled site builds from the
+	// conversation's `messages()` and emits no `select`.
 	#adopt(
 		run: AgentRun,
 		selection: Selection,
@@ -778,6 +778,8 @@ export class Agent implements AgentInterface {
 	) {
 		const usage = selection.usage === undefined ? undefined : sanitizeUsage(selection.usage)
 		if (usage !== undefined) chargeUsage(budget, usage, 0)
+		if (abort.signal.aborted) return { messages: this.#build(run), usage }
+		for (const recovery of selection.recoveries ?? []) this.#emitter.emit('fault', recovery)
 		if (abort.signal.aborted) return { messages: this.#build(run), usage }
 		if (selection.fault !== undefined) {
 			this.#emitter.emit('fault', selection.fault)

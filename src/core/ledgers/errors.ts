@@ -15,7 +15,9 @@ import { INTRINSICS, holds, isFunction, isObject } from '@orkestrel/contract'
  * throws this with `'SNAPSHOT'`, its `context` holding the `faults`. Narrow a caught value with {@link isLedgerError} and
  * branch on `error.code`. A selection without an active `respond` call, for a conversation other
  * than the ledger's, or for a request other than that call's request or a ledger note, reports
- * `'REQUEST'` through the selection's fault.
+ * `'REQUEST'` through the selection's fault. A question the judge refused reports `'HOLD'` through
+ * the agent's `fault` event, never thrown: its `cause` is the judge's rejection and its `context`
+ * holds the question's `key`, `phase`, and `sources`.
  */
 export class LedgerError extends Error {
 	/** Names the machine-readable condition; the {@link LedgerErrorCode} union describes each code. */
@@ -65,6 +67,7 @@ export function isLedgerError(value: unknown): value is LedgerError {
 		if (
 			!(
 				code === 'REQUEST' ||
+				code === 'HOLD' ||
 				code === 'THRESHOLD' ||
 				code === 'SHARE' ||
 				code === 'CAPACITY' ||

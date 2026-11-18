@@ -349,6 +349,7 @@ export class AgentContext implements AgentContextInterface {
 				messages: after,
 				judgments: selection.judgments,
 				...(selection.usage === undefined ? {} : { usage: selection.usage }),
+				...(selection.recoveries === undefined ? {} : { recoveries: selection.recoveries }),
 				fault: new ConversationError(
 					'ROLE',
 					reason,
@@ -361,6 +362,7 @@ export class AgentContext implements AgentContextInterface {
 			messages: after,
 			judgments: selection.judgments,
 			...(selection.usage === undefined ? {} : { usage: selection.usage }),
+			...(selection.recoveries === undefined ? {} : { recoveries: selection.recoveries }),
 			fault:
 				selection.fault === undefined
 					? new Error(text)

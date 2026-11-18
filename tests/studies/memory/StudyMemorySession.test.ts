@@ -1501,8 +1501,8 @@ describe('repeated and denied tool calls', () => {
 		expect(readMemoryEvents(records.evidence, 'denial', 'opening')).toEqual([denial])
 	})
 
-	it('forwards the narrow switch', async () => {
-		// Every message shares the topic, and the first statement alone shares a number with the correction.
+	it('asks the pair questions of every earlier statement a correction shares its topic with', async () => {
+		// Every message shares the topic, so the correction pairs with each earlier statement.
 		const trial: MemoryTrialFixture = {
 			arm: 'records',
 			responses: ['A', 'A', 'A', 'C'].map(buildMemoryVerdict),
@@ -1522,14 +1522,9 @@ describe('repeated and denied tool calls', () => {
 				},
 			],
 		}
-		const narrow = await runMemoryTrial({ ...trial, settings: { correction: { narrow: true } } })
-		const off = await runMemoryTrial({ ...trial, settings: { correction: { narrow: false } } })
-		const absent = await runMemoryTrial(trial)
-		expect(narrow.failure).toBeUndefined()
-		expect(off.failure).toBeUndefined()
-		expect(countMemoryPairs(narrow.requests)).toBe(2)
-		expect(countMemoryPairs(off.requests)).toBe(6)
-		expect(off.requests).toEqual(absent.requests)
+		const result = await runMemoryTrial(trial)
+		expect(result.failure).toBeUndefined()
+		expect(countMemoryPairs(result.requests)).toBe(6)
 	})
 })
 

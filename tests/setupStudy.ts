@@ -891,8 +891,8 @@ export const STUDY_MEMORY_MALFORMED_SETTINGS = Object.freeze([
 		settings: Object.freeze({ metadata: Object.freeze({ calls: 0, bytes: 1, duration: 1 }) }),
 	}),
 	Object.freeze({
-		name: 'unknown correction member',
-		settings: Object.freeze({ correction: Object.freeze({ other: 1 }) }),
+		name: 'retired correction key',
+		settings: Object.freeze({ correction: Object.freeze({ narrow: true }) }),
 	}),
 ])
 

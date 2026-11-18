@@ -11,9 +11,7 @@ import type {
 } from './types.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import { canonicalStringify } from '@orkestrel/contract'
-import { isNonNegativeSafeInteger } from '../validators.js'
-import { DEFAULT_RECALL_LIMIT, LEDGER_NOTES } from './constants.js'
-import { LedgerError } from './errors.js'
+import { LEDGER_NOTES, LEDGER_RECALL_LIMIT } from './constants.js'
 import { computeThinking } from './helpers.js'
 import { LedgerPass } from './LedgerPass.js'
 
@@ -28,17 +26,17 @@ import { LedgerPass } from './LedgerPass.js'
  *
  * @example
  * ```ts
- * const request = new LedgerRequest('What approval is needed?', 1)
+ * const request = new LedgerRequest('What approval is needed?')
  * request.enter(conversation) // the appended user message
  * request.admit('lookup', { id: 'BW-20931' })
  * request.admit('lookup', { id: 'BW-20931' }) // throws Error(LEDGER_NOTES.repeat)
  * request.recall()
- * request.recall() // throws Error(LEDGER_NOTES.closure): the limit of 1 is spent
+ * request.recall()
+ * request.recall() // throws Error(LEDGER_NOTES.closure): the limit of LEDGER_RECALL_LIMIT is spent
  * ```
  */
 export class LedgerRequest implements LedgerRequestInterface {
 	readonly #content: string
-	readonly #limit: number
 	// The errors this request's run reported through `fault`, so `respond` tells a selection failure from a provider one.
 	readonly #faults = new Set<unknown>()
 	#message: Message | undefined
@@ -56,17 +54,12 @@ export class LedgerRequest implements LedgerRequestInterface {
 	#closed = false
 
 	/**
-	 * Holds the request's content and its recall limit.
+	 * Holds the request's content; its `recall` calls close at the `LEDGER_RECALL_LIMIT` constant.
 	 *
 	 * @param content - The request text `enter` appends
-	 * @param limit - The `recall` calls the request can make. Default: the `DEFAULT_RECALL_LIMIT` constant
-	 * @throws {LedgerError} Thrown when `limit` is not a nonnegative safe integer (code `'LIMIT'`)
 	 */
-	constructor(content: string, limit: number = DEFAULT_RECALL_LIMIT) {
-		if (!isNonNegativeSafeInteger(limit))
-			throw new LedgerError('LIMIT', 'limits must be nonnegative safe integers')
+	constructor(content: string) {
 		this.#content = content
-		this.#limit = limit
 	}
 
 	/**
@@ -247,7 +240,7 @@ export class LedgerRequest implements LedgerRequestInterface {
 	}
 
 	recall(): void {
-		if (this.#recalls >= this.#limit) this.#closed = true
+		if (this.#recalls >= LEDGER_RECALL_LIMIT) this.#closed = true
 		if (this.#closed) throw new Error(LEDGER_NOTES.closure)
 		this.#recalls += 1
 	}

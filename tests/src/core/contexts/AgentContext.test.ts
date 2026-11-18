@@ -1338,11 +1338,17 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 	})
 
 	it('turns a selection into a fault over `messages()` when the conversation changed under the handler', async () => {
+		const held = new Error('the judge refused the category question')
 		const context = new AgentContext({
 			select: async (conversation) => {
 				const view = conversation.messages()
 				conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
-				return { messages: view, judgments: ['needed:invoice'], usage: SELECTION_USAGE }
+				return {
+					messages: view,
+					judgments: ['needed:invoice'],
+					usage: SELECTION_USAGE,
+					recoveries: [held],
+				}
 			},
 		})
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
@@ -1356,6 +1362,7 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		expect(selected.messages).toHaveLength(2)
 		expect(selected.judgments).toEqual(['needed:invoice'])
 		expect(selected.usage).toEqual(SELECTION_USAGE)
+		expect(selected.recoveries).toEqual([held])
 		expect(selected.fault).toBeInstanceOf(Error)
 		expect(selected.fault?.message).toBe(
 			`conversation ${conversation.id} changed during selection: 1 messages before, 2 after`,
@@ -1415,6 +1422,7 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 				judgments: ['needed:invoice'],
 				usage: SELECTION_USAGE,
 				fault: gaveUp,
+				recoveries: [gaveUp],
 			}),
 		})
 		const request = context.messages.add({ role: 'user', content: 'Invoice 42.' })
@@ -1433,6 +1441,7 @@ describe('AgentContext — select resolves the active scope handler, else the ag
 		expect(selected.messages).toEqual(conversation.messages())
 		expect(selected.judgments).toEqual(['needed:invoice'])
 		expect(selected.usage).toEqual(SELECTION_USAGE)
+		expect(selected.recoveries).toEqual([gaveUp])
 	})
 
 	it('cuts a selected role to 32 characters', async () => {

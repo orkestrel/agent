@@ -1,22 +1,23 @@
 import type { LedgerAgentOptions, LedgerLookup, LedgerOptions, LedgerTopic } from '@src/core'
 import { Classifier, Gauge, Ledger, createLedger } from '@src/core'
-import { captureError } from '@orkestrel/test'
+import { isContractError } from '@orkestrel/contract'
+import { captureError, invokeUnchecked } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	LEDGER_INVALID_LIMITS,
-	buildCorrectionSeed,
-	buildGuideLedgerOptions,
 	buildLedgerOptions,
 	createEmptyLedgerLookup,
-	createPhraseJudge,
 	createScriptedProvider,
 } from '../../../setup.js'
 
 describe('createLedger', () => {
 	it('exports the entity, classifier, gauge, and factory through the core barrel', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })
-		expectTypeOf<LedgerAgentOptions>().toHaveProperty('strict')
+		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('strict')
+		expectTypeOf<LedgerOptions>().not.toHaveProperty('recall')
+		expectTypeOf<LedgerOptions>().not.toHaveProperty('correction')
+		expectTypeOf<LedgerOptions['predict']>().toEqualTypeOf<number>()
 		expectTypeOf<LedgerAgentOptions>().toHaveProperty('authority')
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('budget')
 		expectTypeOf<LedgerAgentOptions>().not.toHaveProperty('signal')
@@ -31,8 +32,20 @@ describe('createLedger', () => {
 		const ledger = createLedger(createScriptedProvider([]), options)
 		expect(ledger).toBeInstanceOf(Ledger)
 		expect(Classifier).toBeTypeOf('function')
-		expect(new Gauge({ scale: 1, overhead: 0, capacity: 4096 }).scale).toBe(1)
+		expect(new Gauge({ scale: 1, overhead: 0, capacity: 4096, predict: 1 }).scale).toBe(1)
 		expect(ledger.agent.context.conversations.count).toBe(1)
+	})
+	it('exports no deterministic judge matcher, recall limit default, cause renderer, or predict default resolver', async () => {
+		const core = await import('@src/core')
+		expect(
+			[
+				'DETERMINISTIC_JUDGE_ERROR',
+				'DEFAULT_RECALL_LIMIT',
+				'renderCauseChain',
+				'resolvePredict',
+			].filter((name) => Object.hasOwn(core, name)),
+		).toEqual([])
+		expect(core.LEDGER_RECALL_LIMIT).toBe(2)
 	})
 	it('checks missing threshold keys on both construction routes', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })
@@ -64,7 +77,7 @@ describe('createLedger', () => {
 			}),
 		).not.toThrow()
 	})
-	it('rejects shares, capacity, and limits with their matching codes and accepts a zero recall limit', () => {
+	it('rejects shares, capacity, a generation cap, and an agent limit with their matching codes', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const value of [0, -1, 1.1, NaN, Infinity]) {
 			expect(() =>
@@ -78,38 +91,54 @@ describe('createLedger', () => {
 			expect(() =>
 				createLedger(createScriptedProvider([]), { ...options, capacity: value }),
 			).toThrow(expect.objectContaining({ code: 'CAPACITY' }))
-		for (const value of LEDGER_INVALID_LIMITS) {
-			expect(() =>
-				createLedger(createScriptedProvider([]), { ...options, recall: { limit: value } }),
-			).toThrow(expect.objectContaining({ code: 'LIMIT' }))
+		for (const value of LEDGER_INVALID_LIMITS)
 			expect(() =>
 				createLedger(createScriptedProvider([]), { ...options, agent: { limit: value } }),
 			).toThrow(expect.objectContaining({ code: 'LIMIT' }))
-		}
 		expect(() =>
 			createLedger(createScriptedProvider([]), { ...options, agent: { limit: 0 } }),
 		).toThrow(expect.objectContaining({ code: 'LIMIT' }))
-		expect(() =>
-			createLedger(createScriptedProvider([]), { ...options, recall: { limit: 0 } }),
-		).not.toThrow()
 	})
-	it('forwards the narrow option through the factory', async () => {
-		const ledger = createLedger(
-			createScriptedProvider([{ content: 'Noted.' }]),
-			buildGuideLedgerOptions({
-				judge: createPhraseJudge([], ['Correction:']),
-				correction: { narrow: true },
-			}),
-		)
-		const [, account, later] = ledger.conversation.add([
-			{ role: 'user', content: 'The refund desk stayed open.' },
-			...buildCorrectionSeed(1),
-		])
-		const result = await ledger.respond('Is the refund for account BW-20931 settled?')
+	it('refuses a generation cap that is absent, zero, or not a positive safe integer under capacity, and accepts its boundaries', () => {
+		const { predict: _predict, ...absent } = buildLedgerOptions({ topics: [], lookups: [] })
+		const options = { ...absent, capacity: 4096 }
 		expect(
-			result.attempts.filter((attempt) => attempt.phase === 'amends').map((attempt) => attempt.key),
-		).toEqual([JSON.stringify(['amends', account?.id, later?.id])])
+			captureError(() =>
+				createLedger(
+					createScriptedProvider([]),
+					invokeUnchecked(undefined, Object.assign, [{}, options]),
+				),
+			),
+		).toMatchObject({ code: 'CAPACITY' })
+		for (const predict of [0, -0, -1, 0.5, NaN, Infinity, 4096, 4097])
+			expect(
+				captureError(() => createLedger(createScriptedProvider([]), { ...options, predict })),
+			).toMatchObject({
+				code: 'CAPACITY',
+			})
+		for (const predict of [1, 4095])
+			expect(() => createLedger(createScriptedProvider([]), { ...options, predict })).not.toThrow()
 	})
+	it.each(['recall', 'correction'])(
+		'refuses a %s member as one LedgerOptions does not declare',
+		(member) => {
+			const error = captureError(() =>
+				createLedger(
+					createScriptedProvider([]),
+					invokeUnchecked(undefined, Object.assign, [
+						{},
+						buildLedgerOptions({ topics: [], lookups: [] }),
+						{ [member]: {} },
+					]),
+				),
+			)
+
+			expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+				'structure',
+				{ path: [member], shape: 'LedgerOptions' },
+			])
+		},
+	)
 	it('rejects empty or duplicate topics and duplicate or reserved lookup names', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })
 		for (const name of ['', '  '])

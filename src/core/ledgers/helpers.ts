@@ -1,5 +1,5 @@
 import type { Skill } from '../contexts/types.js'
-import type { Message } from '../types.js'
+import type { JudgeQuestion, Message } from '../types.js'
 import type {
 	GaugeCall,
 	LedgerAmendment,
@@ -25,7 +25,7 @@ import type {
 	LedgerReceipt,
 } from './types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
-import { attempt, canonicalStringify, isError, isFiniteNumber, isString } from '@orkestrel/contract'
+import { attempt, canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
 import { renderSkillBody } from '../contexts/helpers.js'
 import {
@@ -35,7 +35,7 @@ import {
 	hasCalls,
 	renderJSON,
 } from '../helpers.js'
-import { isNonNegativeSafeInteger } from '../validators.js'
+import { isPositiveSafeInteger } from '../validators.js'
 import {
 	LEDGER_OWNER_PREFIX,
 	LEDGER_RULES_KEY,
@@ -417,27 +417,24 @@ export function renderTopicNames(topics: readonly LedgerTopic[]): string {
 }
 
 /**
- * Renders an error and its causes, stopping after 4 entries.
- * @param error - The thrown value to describe
- * @returns The names and messages joined by a cause separator
+ * Collects the candidate keys of a judge question: a choice's criteria keys in their order, a
+ * score's level indexes as text, and `true` and `false` for a noul.
+ *
+ * @remarks
+ * A refused judgment lists these keys as `missing`, because a refused question has no reading for
+ * any candidate.
+ *
+ * @param question - The question whose candidates to list
+ * @returns The candidate keys, in the order a reading names them
  * @example
  * ```ts
- * renderCauseChain(new Error('refused', { cause: 'offline' })) // 'Error: refused <- offline'
+ * collectQuestionKeys({ form: 'noul' }) // ['true', 'false']
  * ```
  */
-export function renderCauseChain(error: unknown): string {
-	// The error, then at most three causes: each step extends the chain by the last entry's cause.
-	return Array.from({ length: 3 })
-		.reduce<readonly unknown[]>(
-			(chain) => {
-				const last = chain.at(-1)
-				const cause = isError(last) ? last.cause : undefined
-				return cause === undefined ? chain : [...chain, cause]
-			},
-			error === undefined ? [] : [error],
-		)
-		.map((one) => (isError(one) ? `${one.name}: ${one.message}` : String(one)))
-		.join(' <- ')
+export function collectQuestionKeys(question: JudgeQuestion): readonly string[] {
+	if (question.form === 'noul') return ['true', 'false']
+	if (question.form === 'choice') return Object.keys(question.criteria)
+	return Array.from(question.criteria.keys(), (level) => String(level))
 }
 
 /**
@@ -561,25 +558,24 @@ export function buildLedgerCut(
 }
 
 /**
- * Resolves the generation cap and checks it against the context capacity.
+ * Checks the generation cap against the context capacity and returns it.
  *
- * @param predict - The optional generation cap in tokens; see {@link LedgerOptions}
+ * @param predict - The generation cap in tokens; see {@link LedgerOptions}
  * @param capacity - The context capacity in tokens
- * @returns The validated cap
- * @throws {LedgerError} Thrown when the cap is not a nonnegative safe integer less than capacity (code `'CAPACITY'`)
+ * @returns The cap
+ * @throws {LedgerError} Thrown when the cap is not a positive safe integer less than capacity (code `'CAPACITY'`)
  * @example
  * ```ts
- * resolvePredict(1024, 4096) // 1024
+ * requirePredict(1024, 4096) // 1024
  * ```
  */
-export function resolvePredict(predict: number | undefined, capacity: number): number {
-	const resolved = predict ?? 0
-	if (!isNonNegativeSafeInteger(resolved) || resolved >= capacity)
+export function requirePredict(predict: number, capacity: number): number {
+	if (!isPositiveSafeInteger(predict) || predict >= capacity)
 		throw new LedgerError(
 			'CAPACITY',
-			'predict must be a nonnegative safe integer less than capacity',
+			`predict must be a positive safe integer less than capacity ${capacity}: the generation cap in tokens each request reserves for the reply`,
 		)
-	return resolved
+	return predict
 }
 
 /**

@@ -7,12 +7,18 @@ import type {
 } from '@src/core'
 import { createConversation, createLedger, isConversationError, JudgeAbortError } from '@src/core'
 import { isRecord, isContractError } from '@orkestrel/contract'
-import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
+import {
+	captureError,
+	createRecorder,
+	invokeUnchecked,
+	requireValue,
+	waitForDelay,
+} from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
 import { describe, expect, it, onTestFinished, expectTypeOf } from 'vitest'
 import { Classifier } from '../../../../src/core/ledgers/Classifier.js'
 import {
-	DETERMINISTIC_JUDGE_ERROR,
+	LEDGER_CATEGORIES,
 	LEDGER_QUESTIONS,
 	LEDGER_SLICE,
 } from '../../../../src/core/ledgers/constants.js'
@@ -22,7 +28,7 @@ import {
 	collectLive,
 	matchEntities,
 } from '../../../../src/core/ledgers/helpers.js'
-import { JudgeError } from '../../../../src/core/providers/errors.js'
+import { isJudgeError, JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildCategoryAnswer,
 	buildLedgerExchange,
@@ -50,7 +56,6 @@ import {
 	createRecordedScheduler,
 	LEDGER_DESK_THRESHOLDS,
 	LEDGER_REFUNDS_TOPIC,
-	type AttemptSummary,
 	RecordedTransport,
 	SilentJudge,
 	ScriptedJudge,
@@ -341,7 +346,7 @@ describe('Classifier', () => {
 	})
 
 	it.each(LEDGER_ONCE_FAILURES)(
-		'holds nothing after a %s by default, reporting it once and asking again',
+		'holds nothing after a %s, reporting it once and asking again',
 		async (_, failure) => {
 			const conversation = createConversation()
 			conversation.add({ role: 'user', content: 'The depot opens at nine.' })
@@ -360,7 +365,7 @@ describe('Classifier', () => {
 		},
 	)
 
-	it('keeps held fingerprints when the judge model alternates A B A', async () => {
+	it('asks a held question again on its return to model A after B, because one key holds one judgment', async () => {
 		const conversation = createConversation()
 		const message = conversation.add({ role: 'user', content: 'Refund AB-12 is 20.' })
 		const transport = new RecordedTransport(() => {
@@ -374,19 +379,18 @@ describe('Classifier', () => {
 				fetch: transport.fetch,
 			}),
 		)
-		const classifier = new Classifier(
-			buildClassifierOptions({
-				strict: false,
-				conversation,
-				judge,
-				topics: [],
-			}),
-		)
+		const classifier = new Classifier(buildClassifierOptions({ conversation, judge, topics: [] }))
+		const outcomes: Array<readonly string[]> = []
 		for (const next of ['A', 'A', 'B', 'B', 'A']) {
 			judge.use(next)
-			await classifier.classify(new Set(), new AbortController().signal)
+			const result = await classifier.classify(new Set(), new AbortController().signal)
+			outcomes.push(result.attempts.map((attempt) => attempt.outcome))
 		}
-		expect(transport.requests).toHaveLength(2)
+		expect(outcomes).toEqual([['failed'], ['skipped'], ['failed'], ['skipped'], ['failed']])
+		expect(transport.requests).toHaveLength(3)
+		expect(conversation.judgments.judgment(JSON.stringify(['category', message.id]))?.model).toBe(
+			'A',
+		)
 		expect(classifier.category(message.id)).toBeUndefined()
 	})
 
@@ -400,22 +404,27 @@ describe('Classifier', () => {
 			refuse: key,
 			fetch: new RecordedTransport(() => Response.json({ model: 'filing' })).fetch,
 		})
-		const classifier = new Classifier(
-			buildClassifierOptions({
-				strict: false,
-				conversation,
-				judge,
-				topics: [],
-			}),
-		)
+		const classifier = new Classifier(buildClassifierOptions({ conversation, judge, topics: [] }))
 		const first = await classifier.classify(new Set(), new AbortController().signal)
-		expect(first.judgments).toEqual([])
+		expect(first.judgments).toEqual([key])
+		expect(first.failure).toBeUndefined()
+		expect(
+			first.holds.map((hold) => [
+				hold.code,
+				isJudgeError(hold.cause) && hold.cause.code,
+				hold.context,
+			]),
+		).toEqual([['HOLD', 'QUESTION', { key, phase: 'category', sources: [message.id] }]])
+		expect(conversation.judgments.judgment(key)?.refusal).toEqual({
+			missing: [...LEDGER_CATEGORIES],
+		})
 		expect(summarizeAttempts(first.attempts)).toEqual([
 			{ key, phase: 'category', outcome: 'failed', duration: 'valid' },
 		])
 		expect(judge.bodies).toHaveLength(1)
 		const second = await classifier.classify(new Set(), new AbortController().signal)
-		expect(second.judgments).toEqual([])
+		expect(second.judgments).toEqual([key])
+		expect(second.holds).toEqual([])
 		expect(summarizeAttempts(second.attempts)).toEqual([
 			{ key, phase: 'category', outcome: 'skipped', duration: 'absent' },
 		])
@@ -502,6 +511,7 @@ describe('Classifier', () => {
 				'["supersedes","m1","m2"]',
 			],
 			usage: { prompt: 20, completion: 10, total: 30 },
+			holds: [],
 		})
 		expect(summarizeAttempts(attempts)).toEqual(
 			buildAttemptSummaries(CLASSIFIER_PINNED_ASKS, 'resolved'),
@@ -745,66 +755,51 @@ describe('Classifier', () => {
 		expect(classifier.classification().supersessions.get('whole')).toEqual(['last'])
 	})
 
-	it('holds deterministic failures for their exact spec, retries transient failures, and resets with its lifetime', async () => {
+	it('holds a refused question for its exact spec in the conversation, across classifier lifetimes, and asks a transient failure again', async () => {
 		const conversation = createConversation()
 		const first = conversation.add({ role: 'user', content: 'First statement.' })
 		const second = conversation.add({ role: 'user', content: 'Second statement.' })
-		const transport: RecordedTransport = new RecordedTransport(() =>
-			Response.json(
-				{
-					error:
-						transport.requests.length === 1
-							? 'invalid or duplicate top logprob token'
-							: 'temporarily unavailable',
-				},
-				{ status: 500 },
-			),
+		const keys = [first, second].map((message) => JSON.stringify(['category', message.id]))
+		const transport = new RecordedTransport(() =>
+			Response.json({ error: 'temporarily unavailable' }, { status: 500 }),
 		)
-		const judge = new SequentialSystemOneJudge({
+		const judge = new ScriptedJudge({
 			url: 'http://judge.test',
 			model: 'filing',
-			batch: false,
+			refuse: requireValue(keys[0]),
 			fetch: transport.fetch,
 		})
-		const classifier = new Classifier(
-			buildClassifierOptions({
-				strict: false,
-				conversation,
-				judge,
-				topics: [],
-			}),
-		)
-		const keys = [first, second].map((message) => JSON.stringify(['category', message.id]))
+		const options = buildClassifierOptions({ conversation, judge, topics: [] })
+		const classifier = new Classifier(options)
 		const initial = await classifier.classify(new Set(), new AbortController().signal)
-		expect(initial.judgments).toEqual([])
+		expect(initial.judgments).toEqual([keys[0]])
+		expect(initial.holds.map((hold) => hold.context?.key)).toEqual([keys[0]])
+		expect(initial.failure).toBeDefined()
 		expect(summarizeAttempts(initial.attempts)).toEqual(
 			buildAttemptSummaries(
 				keys.map((key) => ['category', key] as const),
 				'failed',
 			),
 		)
-		expect(transport.requests).toHaveLength(2)
+		expect(transport.requests).toHaveLength(1)
 		const retried = await classifier.classify(new Set(), new AbortController().signal)
-		expect(retried.judgments).toEqual([])
+		expect(retried.holds).toEqual([])
 		expect(summarizeAttempts(retried.attempts)).toEqual([
 			{ key: keys[0], phase: 'category', outcome: 'skipped', duration: 'absent' },
 			{ key: keys[1], phase: 'category', outcome: 'failed', duration: 'valid' },
 		])
+		expect(transport.requests).toHaveLength(2)
+		const replacement = await new Classifier(options).classify(
+			new Set(),
+			new AbortController().signal,
+		)
+		expect(summarizeAttempts(replacement.attempts).map(({ outcome }) => outcome)).toEqual([
+			'skipped',
+			'failed',
+		])
 		expect(transport.requests).toHaveLength(3)
 		expect(await requireValue(transport.requests[2]).json()).toMatchObject({
 			state: `user: ${second.content}`,
-		})
-		const replacement = new Classifier(
-			buildClassifierOptions({
-				conversation,
-				judge,
-				topics: [],
-			}),
-		)
-		await replacement.classify(new Set([second.id]), new AbortController().signal)
-		expect(transport.requests).toHaveLength(4)
-		expect(await requireValue(transport.requests[3]).json()).toMatchObject({
-			state: `user: ${first.content}`,
 		})
 	})
 
@@ -952,6 +947,7 @@ describe('Classifier', () => {
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
 			attempts: [],
+			holds: [],
 			fault,
 		})
 	})
@@ -984,6 +980,7 @@ describe('Classifier', () => {
 		expect(await classifier.classify(new Set(), new AbortController().signal)).toEqual({
 			judgments: [],
 			attempts: [],
+			holds: [],
 		})
 		expect(judge.requests).toEqual([])
 		expect(classifier.classification()).toEqual({
@@ -1102,7 +1099,7 @@ describe('Classifier', () => {
 		)
 	})
 
-	it('holds a deterministic failure that sits as the cause of another error', async () => {
+	it('asks again after a failure whose cause is a refused question, because only a refused question itself is held', async () => {
 		const conversation = createConversation()
 		const statement = conversation.add({ role: 'user', content: 'First statement.' })
 		const asked = createRecorder<readonly [key: string]>()
@@ -1111,22 +1108,20 @@ describe('Classifier', () => {
 			() =>
 				Promise.reject(
 					new Error('judge failed', {
-						cause: new JudgeError('PROTOCOL', DETERMINISTIC_JUDGE_ERROR.source),
+						cause: new JudgeError('QUESTION', 'judge error: refused before inference'),
 					}),
 				),
 			'wrapping-model',
 		)
-		const classifier = new Classifier(
-			buildClassifierOptions({
-				strict: false,
-				conversation,
-				judge,
-				topics: [],
-			}),
-		)
+		const classifier = new Classifier(buildClassifierOptions({ conversation, judge, topics: [] }))
+		const first = await classifier.classify(new Set(), new AbortController().signal)
 		await classifier.classify(new Set(), new AbortController().signal)
-		await classifier.classify(new Set(), new AbortController().signal)
-		expect(asked.calls).toEqual([[JSON.stringify(['category', statement.id])]])
+		expect(first.holds).toEqual([])
+		expect(asked.calls).toEqual([
+			[JSON.stringify(['category', statement.id])],
+			[JSON.stringify(['category', statement.id])],
+		])
+		expect(conversation.judgments.judgments()).toEqual([])
 	})
 
 	it('keeps the recorded topic of an assigned message and files an assigned distractor as quiet', () => {
@@ -1325,7 +1320,7 @@ describe('Classifier', () => {
 		)
 	})
 
-	describe('under the narrow option', () => {
+	describe('the pairs of a correction', () => {
 		const whole = buildLedgerMessage('whole', 'user', 'Odile Marlow called.')
 		const call: Message = {
 			...buildLedgerMessage('call', 'assistant', ''),
@@ -1342,7 +1337,7 @@ describe('Classifier', () => {
 		})
 		const seeded = createConversation({
 			snapshot: {
-				id: 'narrow',
+				id: 'pairs',
 				messages: [whole, call, number, desk, refused, quiet, later],
 			},
 		})
@@ -1369,45 +1364,26 @@ describe('Classifier', () => {
 			entities: (text, partial) => matchEntities(index, text, partial),
 		})
 
-		it('drops a topic-only pair, keeps the entity and shared-literal pairs, and leaves a refused literal pair unasked', async () => {
-			const asks: Array<readonly unknown[]> = []
-			for (const correction of [undefined, { narrow: true }]) {
-				const judge = new SilentJudge()
-				const classifier = new Classifier({
-					...options,
-					conversation: createConversation({ snapshot }),
-					judge,
-					...(correction === undefined ? {} : { correction }),
-				})
-				await classifier.classify(new Set(), new AbortController().signal)
-				asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
-			}
-			expect(asks).toEqual([
-				[
-					'["amends","whole","later"]',
-					'["amends","call","later"]',
-					'["amends","number","later"]',
-					'["amends","desk","later"]',
-				],
-				['["amends","whole","later"]', '["amends","call","later"]', '["amends","number","later"]'],
-			])
-		})
-
-		it('keeps the whole and call pairs, files nothing on amends alone, and files both on supersedes', async () => {
-			const conversation = createConversation({ snapshot })
+		it('asks the entity, shared-literal, and topic-only pairs, and leaves a refused literal pair unasked', async () => {
 			const judge = new SilentJudge()
 			const classifier = new Classifier({
 				...options,
-				conversation,
+				conversation: createConversation({ snapshot }),
 				judge,
-				correction: { narrow: true },
 			})
 			await classifier.classify(new Set(), new AbortController().signal)
 			expect(judge.requests.map((request) => Object.keys(request.questions)[0])).toEqual([
 				'["amends","whole","later"]',
 				'["amends","call","later"]',
 				'["amends","number","later"]',
+				'["amends","desk","later"]',
 			])
+		})
+
+		it('files nothing on amends alone, and files both the whole and call pairs on supersedes', async () => {
+			const conversation = createConversation({ snapshot })
+			const classifier = new Classifier({ ...options, conversation, judge: new SilentJudge() })
+			await classifier.classify(new Set(), new AbortController().signal)
 			for (const earlier of [whole, call])
 				conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 0.8))
 			expect(classifier.classification().amendments.size).toBe(0)
@@ -1423,154 +1399,85 @@ describe('Classifier', () => {
 			expect(filed.supersessions).toEqual(filed.amendments)
 		})
 
-		it('asks fewer questions over a burst holding one true supersession and files the same classification', async () => {
-			const filedRecords: Array<{
-				readonly asked: readonly string[]
-				readonly classification: unknown
-			}> = []
-			for (const correction of [undefined, { narrow: true }]) {
-				const asked = createRecorder<readonly [key: string]>()
-				const classifier = new Classifier({
-					...options,
-					conversation: createConversation({ snapshot }),
-					judge: createLedgerJudge(
-						asked,
-						(request) =>
-							Promise.resolve({
-								model: 'recording-model',
-								answers: Object.fromEntries(
-									Object.keys(request.questions).map((key): readonly [string, JudgeAnswer] => [
-										key,
-										{ form: 'noul', noul: key.includes('"whole"') ? 1 : 0.1 },
-									]),
-								),
-							}),
-						'recording-model',
-					),
-					...(correction === undefined ? {} : { correction }),
-				})
-				await classifier.classify(new Set(), new AbortController().signal)
-				filedRecords.push({
-					asked: asked.calls.map(([key]) => key),
-					// Spreading each set and map keeps its iteration order in the comparison.
-					classification: Object.entries(classifier.classification()).map(([name, value]) => [
-						name,
-						[...value],
-					]),
-				})
-			}
-			const [unset, narrow] = filedRecords
-			expect(requireValue(unset).asked).toEqual([
+		it('asks supersedes only after an amends that reaches its cutoff, and files that supersession', async () => {
+			const asked = createRecorder<readonly [key: string]>()
+			const classifier = new Classifier({
+				...options,
+				conversation: createConversation({ snapshot }),
+				judge: createLedgerJudge(
+					asked,
+					(request) =>
+						Promise.resolve({
+							model: 'recording-model',
+							answers: Object.fromEntries(
+								Object.keys(request.questions).map((key): readonly [string, JudgeAnswer] => [
+									key,
+									{ form: 'noul', noul: key.includes('"whole"') ? 1 : 0.1 },
+								]),
+							),
+						}),
+					'recording-model',
+				),
+			})
+			await classifier.classify(new Set(), new AbortController().signal)
+			expect(asked.calls.map(([key]) => key)).toEqual([
 				'["amends","whole","later"]',
 				'["supersedes","whole","later"]',
 				'["amends","call","later"]',
 				'["amends","number","later"]',
 				'["amends","desk","later"]',
 			])
-			expect(requireValue(narrow).asked).toEqual([
-				'["amends","whole","later"]',
-				'["supersedes","whole","later"]',
-				'["amends","call","later"]',
-				'["amends","number","later"]',
-			])
-			expect(requireValue(narrow).classification).toEqual(requireValue(unset).classification)
-			expect(requireValue(narrow).classification).toContainEqual([
-				'supersessions',
-				[['whole', ['later']]],
-			])
+			expect(classifier.classification().supersessions).toEqual(new Map([['whole', ['later']]]))
 		})
 
-		it('reads alike with narrow false and with no narrow', async () => {
-			const filedRecords: Array<{
-				readonly requests: readonly unknown[]
-				readonly attempts: readonly AttemptSummary[]
-				readonly classification: unknown
-			}> = []
-			for (const correction of [undefined, {}, { narrow: false }]) {
-				const judge = new SilentJudge()
-				const classifier = new Classifier({
-					...options,
-					conversation: createConversation({ snapshot }),
-					judge,
-					...(correction === undefined ? {} : { correction }),
-				})
-				const result = await classifier.classify(new Set(), new AbortController().signal)
-				filedRecords.push({
-					requests: judge.requests,
-					attempts: summarizeAttempts(result.attempts),
-					classification: Object.entries(classifier.classification()).map(([name, value]) => [
-						name,
-						[...value],
-					]),
-				})
-			}
-			const [unset, ...rest] = filedRecords
-			expect(requireValue(unset).requests).toHaveLength(4)
-			for (const record of rest) expect(record).toEqual(unset)
-		})
-
-		it('asks no pair for a correction sharing no entity and no literal, and none for an empty near set', async () => {
+		it('asks a topic-only pair, and no pair for a correction whose near set is empty', async () => {
 			const asks: Array<readonly unknown[]> = []
 			for (const [earlier, weight, content] of [
 				[desk, 1, 'The refund stays open.'],
 				[number, 0, 'Nothing moved at 1730.'],
 			] as const) {
 				const correction = buildLedgerMessage('lone', 'user', content)
-				for (const arm of [undefined, { narrow: true }]) {
-					const conversation = createConversation({
-						snapshot: { id: 'lone', messages: [earlier, correction] },
-					})
-					conversation.judgments.add(buildLedgerJudgment(earlier))
-					conversation.judgments.add(
-						buildLedgerJudgment(correction, {
-							answer: buildCategoryAnswer({ correction: 1 }),
-						}),
-					)
-					conversation.judgments.add(buildLedgerTopicJudgment(earlier, LEDGER_REFUNDS_TOPIC, 1))
-					conversation.judgments.add(
-						buildLedgerTopicJudgment(correction, LEDGER_REFUNDS_TOPIC, weight),
-					)
-					const judge = new SilentJudge()
-					const classifier = new Classifier({
-						...options,
-						conversation,
-						judge,
-						...(arm === undefined ? {} : { correction: arm }),
-					})
-					await classifier.classify(new Set(), new AbortController().signal)
-					asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
-				}
-			}
-			expect(asks).toEqual([['["amends","desk","lone"]'], [], [], []])
-		})
-
-		it('asks a same-topic pair with different numbers unset and not under narrow', async () => {
-			const stated = buildLedgerMessage('stated', 'user', 'The refund limit is 500.')
-			const replaced = buildLedgerMessage('replaced', 'user', 'No, the refund limit is 600.')
-			const asks: Array<readonly unknown[]> = []
-			for (const correction of [undefined, { narrow: true }]) {
 				const conversation = createConversation({
-					snapshot: { id: 'replaced', messages: [stated, replaced] },
+					snapshot: { id: 'lone', messages: [earlier, correction] },
 				})
-				conversation.judgments.add(buildLedgerJudgment(stated))
+				conversation.judgments.add(buildLedgerJudgment(earlier))
 				conversation.judgments.add(
-					buildLedgerJudgment(replaced, {
+					buildLedgerJudgment(correction, {
 						answer: buildCategoryAnswer({ correction: 1 }),
 					}),
 				)
-				for (const message of [stated, replaced])
-					conversation.judgments.add(buildLedgerTopicJudgment(message, LEDGER_REFUNDS_TOPIC, 1))
+				conversation.judgments.add(buildLedgerTopicJudgment(earlier, LEDGER_REFUNDS_TOPIC, 1))
+				conversation.judgments.add(
+					buildLedgerTopicJudgment(correction, LEDGER_REFUNDS_TOPIC, weight),
+				)
 				const judge = new SilentJudge()
-				const classifier = new Classifier({
-					...options,
-					conversation,
-					judge,
-					...(correction === undefined ? {} : { correction }),
-				})
+				const classifier = new Classifier({ ...options, conversation, judge })
 				await classifier.classify(new Set(), new AbortController().signal)
 				asks.push(judge.requests.map((request) => Object.keys(request.questions)[0]))
 			}
-			expect(asks).toEqual([['["amends","stated","replaced"]'], []])
+			expect(asks).toEqual([['["amends","desk","lone"]'], []])
+		})
+
+		it('asks a same-topic pair whose numbers differ', async () => {
+			const stated = buildLedgerMessage('stated', 'user', 'The refund limit is 500.')
+			const replaced = buildLedgerMessage('replaced', 'user', 'No, the refund limit is 600.')
+			const conversation = createConversation({
+				snapshot: { id: 'replaced', messages: [stated, replaced] },
+			})
+			conversation.judgments.add(buildLedgerJudgment(stated))
+			conversation.judgments.add(
+				buildLedgerJudgment(replaced, {
+					answer: buildCategoryAnswer({ correction: 1 }),
+				}),
+			)
+			for (const message of [stated, replaced])
+				conversation.judgments.add(buildLedgerTopicJudgment(message, LEDGER_REFUNDS_TOPIC, 1))
+			const judge = new SilentJudge()
+			const classifier = new Classifier({ ...options, conversation, judge })
+			await classifier.classify(new Set(), new AbortController().signal)
+			expect(judge.requests.map((request) => Object.keys(request.questions)[0])).toEqual([
+				'["amends","stated","replaced"]',
+			])
 		})
 
 		it('reads each message once per call for its entities, and never a quiet message', async () => {
@@ -1579,7 +1486,6 @@ describe('Classifier', () => {
 				...options,
 				conversation: createConversation({ snapshot }),
 				judge: new SilentJudge(),
-				correction: { narrow: true },
 				entities: (text, partial) => {
 					texts.handler(text)
 					return matchEntities(index, text, partial)
@@ -1805,5 +1711,23 @@ describe('Classifier — the census door refuses a member its type does not decl
 		expectTypeOf<
 			Exclude<keyof ClassifierOptions, (typeof CLASSIFIER_OPTION_KEYS)[number]>
 		>().toEqualTypeOf<never>()
+	})
+
+	it('refuses a strict member as one ClassifierOptions does not declare', () => {
+		const error = captureError(
+			() =>
+				new Classifier(
+					invokeUnchecked(undefined, Object.assign, [
+						{},
+						buildClassifierOptions(),
+						{ strict: false },
+					]),
+				),
+		)
+
+		expect(isContractError(error) ? [error.code, error.context] : error).toEqual([
+			'structure',
+			{ path: ['strict'], shape: 'ClassifierOptions' },
+		])
 	})
 })

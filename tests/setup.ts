@@ -2296,11 +2296,11 @@ export function createFailingJudge(failure: Error): JudgeInterface {
 	return { id: 'failing', name: 'failing', model: 'failing', ask: () => Promise.reject(failure) }
 }
 
-/** Lists the failures a judge can raise once: a transient one, and the two `strict: false` holds. */
+/** Lists transient failures a judge can raise once, none of which the ledger holds: a plain error, an HTTP failure, and a malformed logprob body. */
 export const LEDGER_ONCE_FAILURES: ReadonlyArray<readonly [string, Error]> = Object.freeze([
 	['transient failure', new Error('judge error: connection reset')],
-	['refused question', new JudgeError('QUESTION', 'judge error: refused before inference')],
-	['deterministic failure', new Error('judge error: invalid or duplicate top logprob token')],
+	['HTTP failure', new JudgeError('HTTP', 'judge error: the server answered 503')],
+	['malformed logprob body', new JudgeError('PROTOCOL', 'judge error: invalid top logprob token')],
 ])
 
 /**
@@ -6576,6 +6576,7 @@ export const LEDGER_GAUGE_SEED: GaugeOptions = Object.freeze({
 	scale: 1.1634671320535195,
 	overhead: 498,
 	capacity: 32768,
+	predict: 8192,
 })
 
 /**
@@ -6654,6 +6655,7 @@ export function buildLedgerOptions(overrides: Partial<LedgerOptions> = {}): Ledg
 		thresholds: LEDGER_DESK_THRESHOLDS,
 		topics: [{ name: 'refunds', criterion: 'Refund amounts' }],
 		capacity: 4096,
+		predict: 1,
 		gauge: { scale: 1, overhead: 0 },
 		lookups: [
 			{
@@ -6757,6 +6759,53 @@ export function createLedgerJudge(
 		},
 	}
 }
+
+/**
+ * Creates a judge that records question keys, rejects every category question whose state names a
+ * phrase with one failure, and answers every other question as {@link createPhraseJudge} does with
+ * no rules.
+ *
+ * @remarks
+ * The classifier sends one question per request, so a rejection reaches exactly that question.
+ * Every answer reports `model`, so a hydrated ledger under another identity reads it as that judge's.
+ *
+ * @param asked - The question-key recorder
+ * @param phrase - The text whose category question the judge rejects
+ * @param failure - The failure each rejected question raises
+ * @param model - The model identity
+ * @returns The judge fixture
+ */
+export function createRefusingJudge(
+	asked: RecorderInterface<readonly [key: string]>,
+	phrase: string,
+	failure: Error,
+	model = 'filing',
+): JudgeInterface {
+	const inner = createPhraseJudge([])
+	return {
+		id: model,
+		name: model,
+		model,
+		ask: (request, signal) => {
+			const keys = Object.keys(request.questions)
+			for (const key of keys) asked.handler(key)
+			return keys.some((key) => key.startsWith('["category"')) &&
+				isString(request.state) &&
+				request.state.includes(phrase)
+				? Promise.reject(failure)
+				: inner.ask(request, signal).then((result) => ({ ...result, model }))
+		},
+	}
+}
+
+/** Supplies the statement, request, and failure the hold cases file, and the request that follows. */
+export const LEDGER_HOLD_FIXTURE = Object.freeze({
+	statement: 'Brightwater Studio needs a manager for the $148.50 refund.',
+	rule: 'Refunds above $100 need a manager.',
+	request: 'Does the Brightwater Studio refund need a manager?',
+	followup: 'Is that every refund?',
+	failure: new JudgeError('QUESTION', 'judge error: refused before inference'),
+})
 
 /**
  * Wraps a judge whose reported model a test changes between calls, so the model outlives each
@@ -8125,12 +8174,12 @@ export async function fileLedgerCorrection(
 /**
  * Plans a ledger prompt from a fixed delivery history.
  * @param capacity - The context capacity
- * @param predict - The optional generation cap
+ * @param predict - The generation cap
  * @returns The roles and content sent to the provider
  */
 export async function planLedgerDelivery(
 	capacity: number,
-	predict?: number,
+	predict: number,
 ): Promise<ReadonlyArray<readonly string[]>> {
 	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 	const ledger = createLedger(
@@ -8138,7 +8187,7 @@ export async function planLedgerDelivery(
 		buildGuideLedgerOptions({
 			judge: createPhraseJudge([]),
 			capacity,
-			...(predict === undefined ? {} : { predict }),
+			predict,
 			gauge: { scale: 1, overhead: 0 },
 		}),
 	)
@@ -9194,7 +9243,7 @@ export const GUIDE_CLASSIFIER_LINES = Object.freeze([
 	'gauge.rate(calls) // 1.25 — the scale, because no two calls with one tool count are observed',
 	"gauge.remainder(calls) // 32098 — the capacity less the last call's prompt and completion",
 	"gauge.reserve(calls, '') // 36.25 — an empty reply and one recall call, priced at the rate",
-	"gauge.room(calls, '') // 12824.7 — half of what is left beyond the reserve, in estimate units",
+	"gauge.room(calls, '') // 9547.9 — half of what is left beyond the generation cap and the reserve, in estimate units",
 	"gauge.scale // 1.3 — the first call's prompt less the overhead cost, over its estimate",
 ])
 
@@ -9435,7 +9484,6 @@ export async function serveCanaryDesk(): Promise<CanaryDesk> {
 			capacity: 4096,
 			share: { prompt: 1, tail: 0.001 },
 			agent: {
-				strict: false,
 				skills: createCanarySkills(),
 				memos: createCanaryMemos(),
 			},
@@ -13131,7 +13179,7 @@ export async function serveLedgerRoomKept(scope: ScopeInput): Promise<LedgerRoom
 	const gauge = { scale: 1.25, overhead: 120 }
 	const { options } = buildLedgerBuiltinOptions(
 		{ builtins: ['load'] },
-		{ capacity: 1600, predict: 0, share: { prompt: 1, tail: 0.25 }, gauge },
+		{ capacity: 1600, predict: 1, share: { prompt: 1, tail: 0.25 }, gauge },
 	)
 	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 	const ledger = createLedger(provider, options)
@@ -13160,7 +13208,7 @@ export async function serveLedgerRoomKept(scope: ScopeInput): Promise<LedgerRoom
 					gauge,
 				),
 			),
-		) + new Gauge({ ...gauge, capacity: 1600 }).reserve([], 'Noted.')
+		) + new Gauge({ ...gauge, capacity: 1600, predict: 1 }).reserve([], 'Noted.')
 	const stored = ledger.conversation.messages()
 	const request = requireValue(stored.find((message) => message.content === 'Check the desk.'))
 	const seed = stored.slice(0, LEDGER_PLAN_SEED.length)
@@ -14316,7 +14364,7 @@ export const LEDGER_ROOM_KINDS = Object.freeze([
 
 /** Holds the settings every room-sweep arm shares unless it names its own. */
 export const LEDGER_ROOM_BASE = Object.freeze({
-	predicts: [0, 100, 300],
+	predicts: [1, 100, 300],
 	swap: false,
 	workspace: 'none',
 	host: false,
@@ -14684,13 +14732,13 @@ export function buildLedgerRoomLedger(
  */
 export async function runLedgerRoomCase(seed: number, arm: LedgerRoomArm): Promise<LedgerRoomCase> {
 	const random = seededRandom(seed)
-	// A host-act arm draws the re-auditor's ranges: a capacity of 700 to 8000, and `predict` up to
+	// A host-act arm draws the re-auditor's ranges: a capacity of 700 to 8000, and `predict` from 1 up to
 	// 0.92 of it. Each range is one draw, so every other arm keeps its stream.
 	const acting = arm.act !== 'none'
 	const capacity = acting ? 700 + Math.floor(random() * 7301) : 2600 + Math.floor(random() * 5401)
 	const predict = acting
-		? Math.floor(random() * 0.92 * capacity)
-		: (arm.predicts[Math.floor(random() * arm.predicts.length)] ?? 0)
+		? Math.max(1, Math.floor(random() * 0.92 * capacity))
+		: (arm.predicts[Math.floor(random() * arm.predicts.length)] ?? 1)
 	const skills = createSkillManager()
 	const tools = [0, 1, 2, 3, 4, 5].flatMap((area): LedgerLookup[] => {
 		const names = Array.from({ length: 2 + Math.floor(random() * 3) }, (_, at) => `s${area}_t${at}`)
@@ -15211,7 +15259,7 @@ export async function serveLedgerSwitch(
 	shift: number,
 	seeded: boolean,
 ): Promise<LedgerSwitch> {
-	const measuring = buildLedgerSwitch(0, turns, seeded)
+	const measuring = buildLedgerSwitch(1, turns, seeded)
 	const gauge = await measuring.ledger.calibrate(new AbortController().signal)
 	const shown = seeded ? ['billing'] : []
 	const grow =
@@ -15278,7 +15326,7 @@ export const LEDGER_PAGE_LOOKUP: LedgerLookup = Object.freeze({
 export function buildLedgerPageOptions(capacity: number, builtins = true): LedgerOptions {
 	const overrides = {
 		capacity,
-		predict: 0,
+		predict: 1,
 		gauge: { scale: 1, overhead: 0 },
 		share: { prompt: 1, tail: 0.001 },
 		lookups: [...(buildLedgerOptions().lookups ?? []), ...LEDGER_SKILL_LOOKUPS, LEDGER_PAGE_LOOKUP],
@@ -15377,7 +15425,7 @@ export async function runLedgerRoomMeasure(
 					ask: async () => true,
 				},
 			},
-			{ capacity: 8192, predict: 0, gauge: { scale: 1, overhead: 0 } },
+			{ capacity: 8192, predict: 1, gauge: { scale: 1, overhead: 0 } },
 		).options,
 	)
 	measured.agent.emitter.on('tool', (call) => order.handler('tool', call.id))
@@ -15442,7 +15490,7 @@ export async function measureLedgerRoom(
 	)
 	const note = LEDGER_ROOM_SENTENCE.repeat(count)
 	const run = await runLedgerRoomMeasure(agent, batch, note, scoped)
-	const reserve = new Gauge({ scale: 1, overhead: 0, capacity: 8192 }).reserve([], '')
+	const reserve = new Gauge({ scale: 1, overhead: 0, capacity: 8192, predict: 1 }).reserve([], '')
 	const results = batch.map((call) => {
 		const stored = run.evaluated.get(call.id)
 		if (stored === undefined) return undefined
@@ -15533,7 +15581,7 @@ export async function serveLedgerGateEdge(
 		measuring,
 		buildLedgerBuiltinOptions(
 			{ builtins: ['load', 'unload'] },
-			{ capacity: 8192, predict: 0, gauge },
+			{ capacity: 8192, predict: 1, gauge },
 		).options,
 	)
 	await measured.respond('Open billing.')
@@ -16121,8 +16169,9 @@ export interface LedgerStatedRun {
 }
 
 /**
- * Builds the options of a stated-gauge ledger: no built-in, no `predict`, and twelve lookups
- * beside the default one, whose definitions the gauge's overhead prices.
+ * Builds the options of a stated-gauge ledger: no built-in, the smallest `predict`, the prompt share
+ * of 0.7, which keeps the hidden recall fact out of the seed tail at every capacity a case serves, and
+ * twelve lookups beside the default one, whose definitions the gauge's overhead prices.
  *
  * @param capacity - The context capacity
  * @returns The options, uncalibrated
@@ -16131,7 +16180,8 @@ export function buildLedgerStatedOptions(capacity: number): Omit<LedgerOptions, 
 	return buildUncalibratedOptions(
 		buildLedgerOptions({
 			capacity,
-			predict: 0,
+			predict: 1,
+			share: { prompt: 0.7 },
 			lookups: [
 				...(buildLedgerOptions().lookups ?? []),
 				...Array.from({ length: 12 }, (_, at): LedgerLookup => ({
@@ -16257,7 +16307,7 @@ export async function serveLedgerAnswerGrowth(growth: number): Promise<LedgerAns
 			],
 			{ recorded: true },
 		),
-		buildUncalibratedOptions(buildLedgerOptions({ capacity: 12000, predict: 0 })),
+		buildUncalibratedOptions(buildLedgerOptions({ capacity: 12000, predict: 1 })),
 	)
 	ledger.agent.context.workspaces.add({
 		id: 'w0',
@@ -16321,7 +16371,8 @@ export interface LedgerLiveRates {
  * @returns What the request read
  */
 export async function serveLedgerLiveRates(limit: number, shown = 41): Promise<LedgerLiveRates> {
-	const capacity = Math.max(limit, LEDGER_RECORD_ROOM.capacity)
+	// The generation cap is positive, so a limit at or over the record room sits 1 under capacity.
+	const capacity = Math.max(limit + 1, LEDGER_RECORD_ROOM.capacity)
 	const provider = new RatedLedgerProvider(
 		[{ content: '' }, { content: '' }, { content: 'Answered.' }, { content: 'Answered.' }],
 		{ recorded: true },
@@ -16736,7 +16787,6 @@ export function buildRequiredLedgerAgentOptions(): Required<LedgerAgentOptions> 
 		skills: createSkillManager(),
 		memos: createMemoManager(),
 		workspaces: createWorkspaceManager(),
-		strict: true,
 		authority: AGENT_AUTHORITY,
 		builtins: ['memo'],
 		workspace: 'north',
@@ -16745,7 +16795,7 @@ export function buildRequiredLedgerAgentOptions(): Required<LedgerAgentOptions> 
 
 /**
  * Builds ledger options that hold every declared member, each admitted: the desk options with a
- * write, a share, a recall limit, a correction, the full agent pick, and a fresh ledger's snapshot.
+ * write, a share, the full agent pick, and a fresh ledger's snapshot.
  *
  * @returns The options
  */
@@ -16758,14 +16808,12 @@ export function buildRequiredLedgerOptions(): Required<LedgerOptions> {
 		questions: base.questions,
 		thresholds: base.thresholds,
 		capacity: base.capacity,
-		predict: 0,
+		predict: 1,
 		think: false,
 		gauge: { scale: 1, overhead: 0 },
 		lookups: base.lookups ?? [],
 		writes: [createGuideContactWrite()],
 		share: { prompt: 1 },
-		recall: { limit: 2 },
-		correction: { narrow: false },
 		agent: buildRequiredLedgerAgentOptions(),
 		snapshot: createLedger(createScriptedProvider([]), buildLedgerOptions()).snapshot(),
 	}

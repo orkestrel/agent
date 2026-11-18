@@ -24,12 +24,12 @@ import { isJudgeError } from '../providers/errors.js'
 import {
 	CLASSIFIER_OPTION_KEYS,
 	DECISIVE_CATEGORIES,
-	DETERMINISTIC_JUDGE_ERROR,
 	LEDGER_CATEGORIES,
 	LEDGER_SLICE,
 	QUIET_CATEGORIES,
 } from './constants.js'
-import { renderCauseChain } from './helpers.js'
+import { LedgerError } from './errors.js'
+import { collectQuestionKeys } from './helpers.js'
 
 /**
  * Files messages through the conversation's judgment manager and reads their categories and corrections.
@@ -43,7 +43,6 @@ import { renderCauseChain } from './helpers.js'
  */
 export class Classifier implements ClassifierInterface {
 	readonly #options: ClassifierOptions
-	readonly #failed = new Set<string>()
 	#slice = 0
 
 	/**
@@ -59,7 +58,7 @@ export class Classifier implements ClassifierInterface {
 	 * Asks the judge every question the filing still lacks, in the measured order.
 	 * @param requests - The request ids, which skip category questions and receive only enabled request-topic questions
 	 * @param signal - The caller's signal; an abort returns a fault with completed judgments and usage
-	 * @returns The judgment keys, summed usage, and one attempt per logical question, in asking order; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a judge rejection under a live signal leaves that question undecided and sets `failure`
+	 * @returns The judgment keys, summed usage, one attempt per logical question in asking order, and the holds this call recorded; a throw from the assign or entities handler, a scheduler rejection, or a caller abort returns the partial result with `fault`; a transient judge rejection under a live signal leaves that question undecided and sets `failure`
 	 */
 	async classify(requests: ReadonlySet<string>, signal: AbortSignal): Promise<ClassifierResult> {
 		const results: ClassifierResult[] = []
@@ -75,6 +74,7 @@ export class Classifier implements ClassifierInterface {
 		return {
 			judgments: results.flatMap((result) => result.judgments),
 			attempts: results.flatMap((result) => result.attempts),
+			holds: results.flatMap((result) => result.holds),
 			...(fault === undefined ? {} : { fault }),
 			...(failure === undefined ? {} : { failure }),
 			...(usage === undefined ? {} : { usage }),
@@ -246,7 +246,6 @@ export class Classifier implements ClassifierInterface {
 		}
 		const nears = new Map<string, ReadonlySet<string>>()
 		const entities = new Map<string, ReadonlySet<string>>()
-		const literals = new Map<string, LiteralSet>()
 		for (const later of asked) {
 			if (
 				later.role !== 'user' ||
@@ -259,7 +258,7 @@ export class Classifier implements ClassifierInterface {
 			for (const earlier of messages) {
 				if (earlier.id === later.id) break
 				if (this.#spent()) await this.#turn(signal)
-				if (!this.#eligible(earlier, later, near, quiets, nears, entities, literals)) continue
+				if (!this.#eligible(earlier, near, quiets, nears, entities)) continue
 				const spec = this.#buildPair('amends', earlier.id, later.id)
 				results.push(await this.#ask(spec, 'amends', signal, results))
 				if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
@@ -404,15 +403,6 @@ export class Classifier implements ClassifierInterface {
 		return near
 	}
 
-	// Reads a message's literals from this call's memo, extracting them on the first read.
-	#readLiterals(message: Message, literals: Map<string, LiteralSet>): LiteralSet {
-		const known = literals.get(message.id)
-		if (known !== undefined) return known
-		const found = extractLiterals(message.content)
-		literals.set(message.id, found)
-		return found
-	}
-
 	// Reads a message's quiet flag from this call's memo, reading it on the first request.
 	#readQuiet(id: string, quiets: Map<string, boolean>): boolean {
 		const known = quiets.get(id)
@@ -430,41 +420,19 @@ export class Classifier implements ClassifierInterface {
 		)
 	}
 
-	// Reports whether two messages share a registry entity, topics excluded, or a literal of their content.
-	#sharesEntityOrLiteral(
-		earlier: Message,
-		later: Message,
-		entities: Map<string, ReadonlySet<string>>,
-		literals: Map<string, LiteralSet>,
-	): boolean {
-		const near = this.#readEntities(later, entities)
-		return (
-			[...this.#readEntities(earlier, entities)].some((entity) => near.has(entity)) ||
-			this.#sharesLiteral(
-				this.#readLiterals(earlier, literals),
-				this.#readLiterals(later, literals),
-			)
-		)
-	}
-
 	// Reports whether a correction is compared against an earlier message: the message is not quiet
-	// and its near set shares a member with the correction's, and under `narrow` the two also share a
-	// registry entity or a literal. The quiet flag is read first, so a quiet message's near set is
-	// never read, and with `narrow` unset no literal is read here.
+	// and its near set shares a member with the correction's. The quiet flag is read first, so a
+	// quiet message's near set is never read.
 	#eligible(
 		earlier: Message,
-		later: Message,
 		near: ReadonlySet<string>,
 		quiets: Map<string, boolean>,
 		nears: Map<string, ReadonlySet<string>>,
 		entities: Map<string, ReadonlySet<string>>,
-		literals: Map<string, LiteralSet>,
 	): boolean {
 		return (
 			!this.#readQuiet(earlier.id, quiets) &&
-			[...this.#readNear(earlier, nears, entities)].some((topic) => near.has(topic)) &&
-			(this.#options.correction?.narrow !== true ||
-				this.#sharesEntityOrLiteral(earlier, later, entities, literals))
+			[...this.#readNear(earlier, nears, entities)].some((topic) => near.has(topic))
 		)
 	}
 
@@ -474,14 +442,19 @@ export class Classifier implements ClassifierInterface {
 		signal: AbortSignal,
 		results: ClassifierResult[],
 	): Promise<ClassifierResult> {
-		if (this.#read(spec) !== undefined)
-			return { judgments: [spec.id], attempts: [{ key: spec.id, phase, outcome: 'cached' }] }
-		const fingerprint = JSON.stringify(spec)
-		if (this.#failed.has(fingerprint))
-			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
+		// A recorded refusal is a held question or one a wire refused: it has no reading to cache.
+		const recorded = this.#read(spec)
+		if (recorded !== undefined)
+			return {
+				judgments: [spec.id],
+				attempts: [
+					{ key: spec.id, phase, outcome: recorded.refusal === undefined ? 'cached' : 'skipped' },
+				],
+				holds: [],
+			}
 		signal.throwIfAborted()
 		if (spec.sources.some((id) => this.#options.conversation.message(id) === undefined))
-			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }] }
+			return { judgments: [], attempts: [{ key: spec.id, phase, outcome: 'skipped' }], holds: [] }
 		const started = performance.now()
 		try {
 			const [judgment] = await this.#options.conversation.judgments.resolve(
@@ -494,11 +467,12 @@ export class Classifier implements ClassifierInterface {
 				{ key: spec.id, phase, outcome: 'resolved', duration: performance.now() - started },
 			]
 			return judgment === undefined
-				? { judgments: [], attempts }
+				? { judgments: [], attempts, holds: [] }
 				: {
 						judgments: [spec.id],
 						...(judgment.usage === undefined ? {} : { usage: judgment.usage }),
 						attempts,
+						holds: [],
 					}
 		} catch (error) {
 			// A rejection records its attempt in the pushed result alone, so the empty result returned under a live signal repeats none.
@@ -519,19 +493,35 @@ export class Classifier implements ClassifierInterface {
 							: [],
 					...(error.partial.usage === undefined ? {} : { usage: error.partial.usage }),
 					attempts,
+					holds: [],
 				})
-			else results.push({ judgments: [], attempts })
+			else results.push({ judgments: [], attempts, holds: [] })
 			if (signal.aborted) throw error
+			// The judge refused the question before inference, so the same question refuses again: it is
+			// held as a refused judgment, which every later call and every hydrate reads as held.
+			if (isJudgeError(error) && error.code === 'QUESTION') {
+				this.#options.conversation.judgments.add({
+					id: spec.id,
+					question: spec.question,
+					refusal: { missing: collectQuestionKeys(spec.question) },
+					model: spec.model,
+					sources: spec.sources,
+					state: spec.state,
+				})
+				return {
+					judgments: [spec.id],
+					attempts: [],
+					holds: [
+						new LedgerError(
+							'HOLD',
+							`the judge refused the ${phase} question ${spec.id}, so the ledger holds it undecided until its wording, its messages, or the judge's model changes; remove the judgment to ask it again`,
+							{ cause: error, context: { key: spec.id, phase, sources: spec.sources } },
+						),
+					],
+				}
+			}
 			const failure = isError(error) ? error : new Error(errorToMessage(error))
-			// Under the default `strict` this failure rejects the request it belongs to and the next request
-			// asks again; a lenient request goes on past it, so a question that cannot succeed is held.
-			if (
-				this.#options.strict === false &&
-				((isJudgeError(error) && error.code === 'QUESTION') ||
-					DETERMINISTIC_JUDGE_ERROR.test(renderCauseChain(error)))
-			)
-				this.#failed.add(fingerprint)
-			return { judgments: [], attempts: [], failure }
+			return { judgments: [], attempts: [], failure, holds: [] }
 		}
 	}
 }

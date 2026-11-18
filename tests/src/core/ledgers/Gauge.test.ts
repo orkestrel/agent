@@ -2,6 +2,7 @@ import type { GAUGE_OPTION_KEYS } from '@src/core'
 import type { GaugeOptions } from '@src/core'
 import type { GaugeCall } from '../../../../src/core/ledgers/types.js'
 import { isContractError } from '@orkestrel/contract'
+import { invokeUnchecked } from '@orkestrel/test'
 import { describe, expect, it, expectTypeOf } from 'vitest'
 import { Gauge } from '../../../../src/core/ledgers/Gauge.js'
 import {
@@ -15,8 +16,16 @@ import {
 // assistant message is 4 overhead plus ceil(65 / 4) = 17 for its serialized call, the tool message 4.
 
 describe('Gauge construction', () => {
-	it('refuses an invalid generation cap and accepts its boundaries', () => {
+	it('refuses an absent, zero, or invalid generation cap and accepts its boundaries', () => {
+		const { predict: _predict, ...absent } = LEDGER_GAUGE_SEED
+		expect(
+			computeLedgerErrorCode(
+				() => new Gauge(invokeUnchecked(undefined, Object.assign, [{}, absent])),
+			),
+		).toBe('CAPACITY')
 		for (const predict of [
+			0,
+			-0,
 			-1,
 			0.5,
 			LEDGER_GAUGE_SEED.capacity,
@@ -29,7 +38,7 @@ describe('Gauge construction', () => {
 				'CAPACITY',
 			)
 		}
-		for (const predict of [0, -0, LEDGER_GAUGE_SEED.capacity - 1]) {
+		for (const predict of [1, LEDGER_GAUGE_SEED.capacity - 1]) {
 			expect(
 				computeLedgerErrorCode(() => new Gauge({ ...LEDGER_GAUGE_SEED, predict })),
 			).toBeUndefined()
@@ -65,7 +74,7 @@ describe('Gauge construction', () => {
 describe('Gauge.observe', () => {
 	it('retains scale for partial overhead and learns with all or no overhead', () => {
 		for (const spared of [undefined, 0, 150, 190, 300]) {
-			const gauge = new Gauge({ scale: 2, overhead: 190, capacity: 8192 })
+			const gauge = new Gauge({ scale: 2, overhead: 190, capacity: 8192, predict: 1 })
 			gauge.observe([
 				{
 					estimate: 100,
@@ -79,7 +88,7 @@ describe('Gauge.observe', () => {
 	})
 	it('subtracts only advertised overhead and floors spared overhead at zero', () => {
 		for (const spared of [0, 150, 190, 300]) {
-			const gauge = new Gauge({ scale: 1.16, overhead: 190, capacity: 8192 })
+			const gauge = new Gauge({ scale: 1.16, overhead: 190, capacity: 8192, predict: 1 })
 			const overhead = Math.max(0, 190 - spared)
 			const call = { estimate: 201, tools: 1, spared }
 			expect(gauge.remainder([call])).toBeCloseTo(8192 - overhead - 201 * 1.16)
@@ -98,7 +107,7 @@ describe('Gauge.observe', () => {
 	})
 
 	it('keeps the scale when the first call has no usage, no estimate, or a prompt at or under the overhead cost', () => {
-		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 1000 })
+		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 1000, predict: 1 })
 		gauge.observe([{ estimate: 50, tools: 0 }])
 		gauge.observe([{ estimate: 0, prompt: 500, tools: 0 }])
 		gauge.observe([{ estimate: 50, prompt: 100, tools: 0 }])
@@ -107,7 +116,7 @@ describe('Gauge.observe', () => {
 
 	it('keeps the scale when the first call advertised definitions beyond the calibrated set', () => {
 		for (const added of [undefined, 0, 1, 250]) {
-			const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 8192 })
+			const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 8192, predict: 1 })
 			gauge.observe([
 				{
 					estimate: 100,
@@ -121,7 +130,7 @@ describe('Gauge.observe', () => {
 	})
 
 	it('reproduces the seed scale from the seed prompt', () => {
-		const gauge = new Gauge({ scale: 5, overhead: 498, capacity: 32768 })
+		const gauge = new Gauge({ scale: 5, overhead: 498, capacity: 32768, predict: 1 })
 		gauge.observe([{ estimate: 1719, prompt: 2498, tools: 3 }])
 		expect(gauge.scale).toBeCloseTo(1.1634671320535195, 12)
 	})
@@ -129,7 +138,7 @@ describe('Gauge.observe', () => {
 
 describe('Gauge.rate', () => {
 	it('falls back to the scale before two calls of one tool count exist', () => {
-		const gauge = new Gauge({ scale: 1.5, overhead: 0, capacity: 1000 })
+		const gauge = new Gauge({ scale: 1.5, overhead: 0, capacity: 1000, predict: 1 })
 		expect(gauge.rate([])).toBe(1.5)
 		expect(gauge.rate([{ estimate: 100, prompt: 200, tools: 1 }])).toBe(1.5)
 	})
@@ -137,7 +146,7 @@ describe('Gauge.rate', () => {
 	it('fits within each tool count and pools, where one slope across both reads 0', () => {
 		// Tools 3: (100, 300), (200, 400), slope 1. Tools 1: (300, 250), (400, 350), slope 1.
 		// One line through all four points has slope 0.
-		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000, predict: 1 })
 		gauge.observe([
 			{ estimate: 100, prompt: 300, tools: 3 },
 			{ estimate: 200, prompt: 400, tools: 3 },
@@ -151,7 +160,7 @@ describe('Gauge.rate', () => {
 
 	it('pools the kept requests with the calls in progress', () => {
 		// Kept: (100, 150), (200, 250), slope 1. Live: (100, 100), (200, 400), slope 3. Equal spreads pool to 2.
-		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000, predict: 1 })
 		gauge.observe([
 			{ estimate: 100, prompt: 150, tools: 0 },
 			{ estimate: 200, prompt: 250, tools: 0 },
@@ -164,13 +173,13 @@ describe('Gauge.rate', () => {
 	})
 
 	it('returns the scale when the fit slope is negative or zero', () => {
-		const declined = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+		const declined = new Gauge({ scale: 9, overhead: 0, capacity: 10000, predict: 1 })
 		declined.observe([
 			{ estimate: 100, prompt: 300, tools: 0 },
 			{ estimate: 200, prompt: 200, tools: 0 },
 		])
 		expect(declined.rate([])).toBe(3)
-		const flat = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+		const flat = new Gauge({ scale: 9, overhead: 0, capacity: 10000, predict: 1 })
 		flat.observe([
 			{ estimate: 100, prompt: 300, tools: 0 },
 			{ estimate: 200, prompt: 300, tools: 0 },
@@ -179,7 +188,7 @@ describe('Gauge.rate', () => {
 	})
 
 	it('keeps its own copy of the observed calls', () => {
-		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000, predict: 1 })
 		const calls = [
 			{ estimate: 100, prompt: 150, tools: 0 },
 			{ estimate: 200, prompt: 250, tools: 0 },
@@ -190,7 +199,7 @@ describe('Gauge.rate', () => {
 	})
 
 	it('ignores a call with no usage', () => {
-		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000 })
+		const gauge = new Gauge({ scale: 9, overhead: 0, capacity: 10000, predict: 1 })
 		expect(
 			gauge.rate([
 				{ estimate: 100, tools: 0 },
@@ -203,20 +212,20 @@ describe('Gauge.rate', () => {
 describe('Gauge.remainder', () => {
 	it('counts the whole completion when thinking is replayed within a turn or across turns', () => {
 		for (const replay of ['turn', 'all'] as const) {
-			const retained = new Gauge({ scale: 1, overhead: 0, capacity: 1000, replay })
+			const retained = new Gauge({ scale: 1, overhead: 0, capacity: 1000, predict: 1, replay })
 			expect(
 				retained.remainder([
 					{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 },
 				]),
 			).toBe(600)
 		}
-		const dropped = new Gauge({ scale: 1, overhead: 0, capacity: 1000 })
+		const dropped = new Gauge({ scale: 1, overhead: 0, capacity: 1000, predict: 1 })
 		expect(
 			dropped.remainder([{ estimate: 100, prompt: 100, completion: 300, thinking: 250, tools: 0 }]),
 		).toBe(850)
 	})
 
-	const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
+	const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000, predict: 1 })
 
 	it('subtracts the last prompt and completion', () => {
 		expect(gauge.remainder([{ estimate: 1, prompt: 3000, completion: 500, tools: 0 }])).toBe(6500)
@@ -255,7 +264,7 @@ describe('Gauge.remainder', () => {
 describe('Gauge.reserve', () => {
 	it('excludes thinking from the reply reserve under every replay policy', () => {
 		for (const replay of ['none', 'turn', 'all'] as const) {
-			const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 1000, replay })
+			const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 1000, predict: 1, replay })
 			gauge.observe([], { estimate: 10, completion: 900, thinking: 850, tools: 0 })
 			expect(gauge.reserve([], '')).toBe(75)
 		}
@@ -263,13 +272,13 @@ describe('Gauge.reserve', () => {
 
 	it('prices the longest text and one recall call at the rate before any reply is observed', () => {
 		// Rate 2. Longest 40 characters: 10 + 4 = 14 units. Recall call 25 units. (14 + 25) * 2 = 78.
-		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
+		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000, predict: 1 })
 		expect(gauge.reserve([], 'a'.repeat(40))).toBe(78)
 	})
 
 	it('uses the final answer completion instead of a larger tool completion', () => {
 		// Observing (100, 300) sets scale 3 and rate 3. Reply 70, recall 25 * 3 = 75.
-		const gauge = new Gauge({ scale: 2, overhead: 0, capacity: 10000 })
+		const gauge = new Gauge({ scale: 2, overhead: 0, capacity: 10000, predict: 1 })
 		gauge.observe(
 			[
 				{ estimate: 100, prompt: 300, completion: 900, tools: 1 },
@@ -281,7 +290,7 @@ describe('Gauge.reserve', () => {
 	})
 
 	it('keeps the longest completion across requests', () => {
-		const gauge = new Gauge({ scale: 2, overhead: 0, capacity: 10000 })
+		const gauge = new Gauge({ scale: 2, overhead: 0, capacity: 10000, predict: 1 })
 		gauge.observe([{ estimate: 100, prompt: 300, completion: 70, tools: 0 }], {
 			estimate: 100,
 			completion: 70,
@@ -295,7 +304,7 @@ describe('Gauge.reserve', () => {
 		expect(gauge.reserve([], '')).toBe(145)
 	})
 	it('keeps the text fallback when a request delivered no final answer', () => {
-		const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 10000 })
+		const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 10000, predict: 1 })
 		gauge.observe([{ estimate: 100, prompt: 100, completion: 900, tools: 1 }])
 		expect(gauge.reserve([], '')).toBe(29)
 	})
@@ -303,7 +312,7 @@ describe('Gauge.reserve', () => {
 
 describe('Gauge.room', () => {
 	it('preserves room, reserve, and recall closure when capacity grows by the generation cap', () => {
-		const plain = new Gauge({ scale: 1, overhead: 0, capacity: 3072 })
+		const plain = new Gauge({ scale: 1, overhead: 0, capacity: 3073, predict: 1 })
 		const thinking = new Gauge({
 			scale: 1,
 			overhead: 0,
@@ -316,24 +325,26 @@ describe('Gauge.room', () => {
 		for (const prompt of [1000, 2600, 2822, 2823, 2900]) {
 			const plainCalls = [{ estimate: 100, prompt, completion: 0, tools: 0 }]
 			const thinkingCalls = [{ estimate: 100, prompt, completion: 700, thinking: 700, tools: 0 }]
-			expect(thinking.remainder(thinkingCalls) - 1024).toBe(plain.remainder(plainCalls))
+			expect(thinking.remainder(thinkingCalls) - 1024).toBe(plain.remainder(plainCalls) - 1)
 			expect(thinking.reserve(thinkingCalls, '')).toBe(plain.reserve(plainCalls, ''))
 			expect(thinking.room(thinkingCalls, '')).toBe(plain.room(plainCalls, ''))
 			expect(
 				thinking.remainder(thinkingCalls) - 1024 < 2 * thinking.reserve(thinkingCalls, ''),
 			).toBe(prompt > 2822)
-			expect(plain.remainder(plainCalls) < 2 * plain.reserve(plainCalls, '')).toBe(prompt > 2822)
+			expect(plain.remainder(plainCalls) - 1 < 2 * plain.reserve(plainCalls, '')).toBe(
+				prompt > 2822,
+			)
 		}
 	})
 
 	it('halves what the call left beyond the reserve and divides by the rate', () => {
-		// Left 10000 - 2100 = 7900. Reserve 78 at rate 2. (7900 - 78) / 2 / 2 = 1955.5.
-		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
-		expect(gauge.room([{ estimate: 1000, tools: 0 }], 'a'.repeat(40))).toBe(1955.5)
+		// Left 10000 - 2100 = 7900. Generation cap 1. Reserve 78 at rate 2. (7900 - 1 - 78) / 2 / 2 = 1955.25.
+		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000, predict: 1 })
+		expect(gauge.room([{ estimate: 1000, tools: 0 }], 'a'.repeat(40))).toBe(1955.25)
 	})
 
 	it('floors at 0 when the reserve exceeds what is left', () => {
-		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000 })
+		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000, predict: 1 })
 		expect(gauge.room([{ estimate: 1, prompt: 9990, tools: 0 }], 'a'.repeat(40))).toBe(0)
 		expect(gauge.room([{ estimate: 1, prompt: 9999, completion: 500, tools: 0 }], '')).toBe(0)
 	})
