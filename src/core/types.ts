@@ -52,7 +52,7 @@ export interface Message {
 	/**
 	 * Holds the reasoning the provider call that produced an assistant turn separated from its
 	 * `content`. It is present only on an assistant turn whose call surfaced reasoning. It never
-	 * enters `content`, judge state, a ledger's records, or a summary. The agent loop, a relay
+	 * enters `content`, judge state, or a ledger's records. The agent loop, a relay
 	 * server, and a ledger apply the provider's `replay` policy before calling it. A direct
 	 * `generate` or `stream` call sends messages as given.
 	 */
@@ -82,7 +82,7 @@ export interface MessageInput {
 	/**
 	 * Holds the reasoning the provider call that produced an assistant turn separated from its
 	 * `content`. It is present only on an assistant turn whose call surfaced reasoning. It never
-	 * enters `content`, judge state, a ledger's records, or a summary. The agent loop, a relay
+	 * enters `content`, judge state, or a ledger's records. The agent loop, a relay
 	 * server, and a ledger apply the provider's `replay` policy before calling it. A direct
 	 * `generate` or `stream` call sends messages as given.
 	 */

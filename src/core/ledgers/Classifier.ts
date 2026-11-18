@@ -18,9 +18,8 @@ import {
 	parseJSONAs,
 	refuseOptionKeys,
 } from '@orkestrel/contract'
-import { raceSignal } from '../conversations/index.js'
 import { isJudgeAbortError } from '../errors.js'
-import { extractLiterals, matchesJudgment, renderJSON, sumUsage } from '../helpers.js'
+import { extractLiterals, matchesJudgment, raceSignal, renderJSON, sumUsage } from '../helpers.js'
 import { isJudgeError } from '../providers/errors.js'
 import {
 	CLASSIFIER_OPTION_KEYS,

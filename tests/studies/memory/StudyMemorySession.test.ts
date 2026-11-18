@@ -3,16 +3,10 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
-import {
-	isStudyError,
-	parseStudyProfile,
-	readStudyFailure,
-	validateStudyInputs,
-} from '@orkestrel/study'
+import { parseStudyProfile, readStudyFailure, validateStudyInputs } from '@orkestrel/study'
 import {
 	isStudyMemoryProvider,
 	isStudyMemoryAgent,
-	STUDY_MEMORY_REPEAT,
 	STUDY_MEMORY_SYSTEM,
 	StudyMemoryDriver,
 	StudyMemorySession,
@@ -20,8 +14,6 @@ import {
 import {
 	buildMemoryCall,
 	buildMemoryCapture,
-	buildMemoryEdge,
-	buildMemoryFoldGoals,
 	buildMemoryObservationGoals,
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
@@ -29,7 +21,6 @@ import {
 	buildMemoryReply,
 	buildMemorySeedLedger,
 	buildMemorySeedResponses,
-	buildMemorySummaryGoals,
 	buildMemoryVerdict,
 	countMemoryPairs,
 	createMemoryContext,
@@ -49,7 +40,6 @@ import {
 	readMemorySnapshot,
 	readMemoryTimeline,
 	readMemoryToolResults,
-	runMemorySummary,
 	runMemoryTrial,
 	totalMemoryUsage,
 	STUDY_MEMORY_CALIBRATION,
@@ -57,13 +47,6 @@ import {
 	STUDY_MEMORY_ESTIMATE_KEYS,
 	STUDY_MEMORY_EVENT_KEYS,
 	STUDY_MEMORY_OBSERVED_EVENTS,
-	STUDY_MEMORY_REFUSAL_KEYS,
-	STUDY_MEMORY_FIXED_PROJECTION,
-	STUDY_MEMORY_FIXED_SETTINGS,
-	STUDY_MEMORY_SUMMARY_FOLDS,
-	STUDY_MEMORY_SUMMARY_LIMIT,
-	STUDY_MEMORY_SUMMARY_PROJECTIONS,
-	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_INERT_EXCHANGES,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVATION_GOALS,
@@ -73,11 +56,9 @@ import {
 	STUDY_MEMORY_PASSIVE_SETTINGS,
 	STUDY_MEMORY_RELEASE_GOALS,
 	STUDY_MEMORY_REPLAY_REFUSAL,
-	STUDY_MEMORY_PARAMETER_PINS,
 	STUDY_MEMORY_SEED_GOALS,
 	STUDY_MEMORY_SEED_SETTINGS,
-	STUDY_MEMORY_SETTINGS,
-	WINDOW_GOAL,
+	STUDY_MEMORY_SHORT_GOAL,
 	STUDY_MEMORY_TIMING,
 } from '../../setupStudy.js'
 
@@ -268,7 +249,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		}
 	})
 
-	it('runs the full arm with no declared judge or recap and pins only the served model', async () => {
+	it('runs the full arm with no declared judge and pins only the served model', async () => {
 		const server = await createMemoryServer()
 		const base = buildMemoryProfile({ url: server.url })
 		const declared = base.provider
@@ -280,7 +261,6 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				judge: undefined,
 				digest: { model: declared.digest.model, judge: undefined },
 			},
-			room: { ...base.room, recap: undefined },
 		}
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
@@ -288,7 +268,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			fixture.context.signal,
 		)
 		try {
-			await expect(session.execute(WINDOW_GOAL, fixture.context)).resolves.toEqual({
+			await expect(session.execute(STUDY_MEMORY_SHORT_GOAL, fixture.context)).resolves.toEqual({
 				value: { content: 'Receipt retained.' },
 				partial: false,
 			})
@@ -405,9 +385,9 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		}
 	})
 
-	it('executes an agent reply cut at the output allowance under the smallest byte bound', async () => {
-		const smallest = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recordssmallest.json', 'utf8')),
+	it('executes an agent reply cut at the output allowance under the recommended byte bound', async () => {
+		const recommended = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
 		)
 		// Each streamed row is 136 B, the chunk size goal 53's cut reply read.
 		const chunk = `${JSON.stringify({
@@ -420,19 +400,19 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			...STUDY_MEMORY_CALIBRATION,
 			{
 				path: '/api/chat',
-				body: `${chunk.repeat(smallest.room.output - 1)}${buildMemoryReply({
+				body: `${chunk.repeat(recommended.room.output - 1)}${buildMemoryReply({
 					content: '',
 					reason: 'length',
-					completion: smallest.room.output,
+					completion: recommended.room.output,
 				})}`,
 			},
 		])
-		const base = buildMemoryProfile({ url: server.url, room: smallest.room, duration: 15000 })
+		const base = buildMemoryProfile({ url: server.url, room: recommended.room, duration: 15000 })
 		const profile = {
 			...base,
 			bounds: {
 				...base.bounds,
-				request: { ...base.bounds.request, bytes: smallest.bounds.request.bytes },
+				request: { ...base.bounds.request, bytes: recommended.bounds.request.bytes },
 			},
 		}
 		const fixture = createMemoryContext(profile)
@@ -451,11 +431,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(result.failure).toBeUndefined()
 			const results = readMemoryEvents(fixture.evidence, 'result')
 			expect(results).toEqual([expect.objectContaining({ partial: false })])
-			expect(results[0]?.content).toHaveLength(17 * (smallest.room.output - 1))
+			expect(results[0]?.content).toHaveLength(17 * (recommended.room.output - 1))
 			const wire = readMemoryEvents(fixture.evidence, 'wire')
 				.filter((row) => row.role === 'agent')
 				.at(-1)
-			expect(wire).toMatchObject({ finish: 'length', completion: smallest.room.output })
+			expect(wire).toMatchObject({ finish: 'length', completion: recommended.room.output })
 			// The reply outgrows the bound the failing run held, 1048576 B.
 			expect(wire?.bytes).toBeGreaterThan(1048576)
 			expect(readMemoryEvents(fixture.evidence, 'stop')).toEqual([])
@@ -690,45 +670,6 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		}
 	})
 
-	it('uses the actual Conversation summary path under an Agent window budget', async () => {
-		const server = await createMemoryServer()
-		const profile = buildMemoryProfile({
-			url: server.url,
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-			settings: STUDY_MEMORY_SETTINGS,
-		})
-		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-			{ id: 'compact-1', scenario: 'public', arm: 'compaction', repetition: 0 },
-			fixture.context.signal,
-		)
-		try {
-			await session.execute(
-				{
-					id: 'opening',
-					input: {
-						prompt: 'Retain obligations',
-						arrivals: Array.from({ length: 8 }, (_, index) => ({
-							id: `source-${index}`,
-							content: `Obligation ${index}. ${'Maintain this source detail. '.repeat(40)}`,
-						})),
-						records: [],
-					},
-				},
-				fixture.context,
-			)
-			expect(fixture.evidence.some((row) => row.event === 'summary')).toBe(true)
-			expect(fixture.context.meter.usage.some((row) => row.role === 'summary')).toBe(true)
-			expect(fixture.context.meter.usage).toHaveLength(
-				server.requests.filter((request) => request.path === '/api/chat').length,
-			)
-		} finally {
-			await session.close()
-			fixture.close()
-			await server.close()
-		}
-	})
-
 	it('latches http failures before subsequent dispatch', async () => {
 		const server = await createMemoryServer([
 			{ path: '/api/chat', body: 'Unavailable', status: 503 },
@@ -861,187 +802,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		}
 	})
 
-	it('admits a request priced one unit below the window max and leaves the provider payload unchanged', async () => {
-		const server = await createMemoryServer()
-		const base = buildMemoryProfile({ url: server.url })
-		const profile = { ...base, settings: buildMemoryEdge(base, -2) }
-		const fixture = createMemoryContext(profile)
-		const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
-		try {
-			for (const arm of ['compaction', 'full']) {
-				const session = await driver.open(
-					{ id: arm, scenario: 'public', arm, repetition: 0 },
-					fixture.context.signal,
-				)
-				try {
-					await expect(session.execute(WINDOW_GOAL, fixture.context)).resolves.toEqual({
-						value: { content: 'Receipt retained.' },
-						partial: false,
-					})
-				} finally {
-					await session.close()
-				}
-			}
-			const chats = server.requests.filter((request) => request.path === '/api/chat')
-			expect(chats).toHaveLength(2)
-			const [windowed, plain] = chats.map((request) => parseJSON(request.body))
-			if (!isRecord(windowed) || !isRecord(plain)) throw new Error('Invalid chat request')
-			expect(windowed).toMatchObject({
-				model: 'model',
-				stream: true,
-				think: false,
-				options: { num_ctx: 32768, num_predict: 512, ...STUDY_MEMORY_PARAMETER_PINS.agent },
-			})
-			// Every chat carries a false truncate, and Compaction adds only a false shift; every other member matches the plain request.
-			expect(Object.keys(windowed).toSorted()).toEqual([...Object.keys(plain), 'shift'].toSorted())
-			expect([windowed.truncate, windowed.shift]).toEqual([false, false])
-			expect(plain.truncate).toBe(false)
-			expect('shift' in plain).toBe(false)
-			expect(windowed.options).toEqual(plain.options)
-			expect(windowed.tools).toEqual(plain.tools)
-			expect(chats[0]?.body).not.toContain('overhead')
-			expect(chats[0]?.body).not.toContain('"gauge"')
-		} finally {
-			fixture.close()
-			await server.close()
-		}
-	})
-
-	it('refuses a request priced at the window max before dispatch, attributes capacity to the agent and stays latched', async () => {
-		const server = await createMemoryServer()
-		const base = buildMemoryProfile({ url: server.url })
-		const profile = { ...base, settings: buildMemoryEdge(base, -1) }
-		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-			{ id: 'edge', scenario: 'public', arm: 'compaction', repetition: 0 },
-			fixture.context.signal,
-		)
-		try {
-			const refused = await session.execute(WINDOW_GOAL, fixture.context).then(
-				() => undefined,
-				(reason: unknown) => reason,
-			)
-			expect(isStudyError(refused)).toBe(true)
-			expect(refused).toMatchObject({
-				code: 'CAPACITY',
-				failure: { cause: 'capacity', role: 'agent' },
-			})
-			expect(readStudyFailure(refused)).toMatchObject({ cause: 'capacity', role: 'agent' })
-			expect(server.requests.filter((request) => request.path === '/api/chat')).toEqual([])
-			expect(
-				fixture.evidence.filter(
-					(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.role !== 'metadata',
-				),
-			).toEqual([])
-			expect(
-				fixture.context.meter.usage.filter((row) => row.role === 'agent' || row.role === 'summary'),
-			).toEqual([])
-			const again = await session.execute(WINDOW_GOAL, fixture.context).then(
-				() => undefined,
-				(reason: unknown) => reason,
-			)
-			expect(again).toBe(refused)
-			expect(server.requests.filter((request) => request.path === '/api/chat')).toEqual([])
-		} finally {
-			await session.close()
-			fixture.close()
-			await server.close()
-		}
-	})
-
-	it('prices the same request by the declared scale', async () => {
-		const server = await createMemoryServer()
-		const base = buildMemoryProfile({ url: server.url })
-		const outcomes: unknown[] = []
-		try {
-			for (const scale of [1, 1_000_000]) {
-				const profile = { ...base, settings: { gauge: { scale, overhead: 0 } } }
-				const fixture = createMemoryContext(profile)
-				const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-					{ id: `scale-${scale}`, scenario: 'public', arm: 'compaction', repetition: 0 },
-					fixture.context.signal,
-				)
-				try {
-					outcomes.push(
-						await session.execute(WINDOW_GOAL, fixture.context).then(
-							(product) => product,
-							(reason: unknown) => reason,
-						),
-					)
-				} finally {
-					await session.close()
-					fixture.close()
-				}
-			}
-			expect(outcomes[0]).toEqual({ value: { content: 'Receipt retained.' }, partial: false })
-			expect(outcomes[1]).toMatchObject({
-				code: 'CAPACITY',
-				failure: { cause: 'capacity', role: 'agent' },
-			})
-			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
-		} finally {
-			await server.close()
-		}
-	})
-
-	it('preserves a failing summarizer instead of reporting window capacity', async () => {
-		const server = await createMemoryServer([
-			{ path: '/api/chat', body: 'Unavailable', status: 503 },
-		])
-		const profile = buildMemoryProfile({
-			url: server.url,
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-			settings: STUDY_MEMORY_SETTINGS,
-		})
-		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-			{ id: 'summarizer', scenario: 'public', arm: 'compaction', repetition: 0 },
-			fixture.context.signal,
-		)
-		try {
-			const failed = await session
-				.execute(
-					{
-						id: 'opening',
-						input: {
-							prompt: 'Retain obligations',
-							arrivals: Array.from({ length: 8 }, (_, index) => ({
-								id: `source-${index}`,
-								content: `Obligation ${index}. ${'Maintain this source detail. '.repeat(40)}`,
-							})),
-							records: [],
-						},
-					},
-					fixture.context,
-				)
-				.then(
-					() => undefined,
-					(reason: unknown) => reason,
-				)
-			expect(failed).toBeDefined()
-			expect(failed).not.toMatchObject({ code: 'CAPACITY' })
-			expect(readStudyFailure(failed).cause).not.toBe('capacity')
-			const dispatched = fixture.evidence
-				.filter((row) => row.event === 'dispatch')
-				.map((row) => (isRecord(row.value) ? row.value.role : undefined))
-			expect(dispatched).toContain('summary')
-			expect(dispatched).not.toContain('agent')
-			const requests = server.requests.length
-			await expect(
-				session.execute(
-					{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
-					fixture.context,
-				),
-			).rejects.toMatchObject({ code: 'FAULT', message: expect.stringContaining('503') })
-			expect(server.requests).toHaveLength(requests)
-		} finally {
-			await session.close()
-			fixture.close()
-			await server.close()
-		}
-	})
-
-	it('keeps parent cancellation distinct from window capacity', async () => {
+	it('keeps parent cancellation distinct from capacity', async () => {
 		const server = await createMemoryServer([
 			{
 				path: '/api/chat',
@@ -1049,15 +810,15 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				open: true,
 			},
 		])
-		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })
+		const profile = buildMemoryProfile({ url: server.url })
 		const controller = new AbortController()
 		const fixture = createMemoryContext(profile, controller.signal)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-			{ id: 'cancelled', scenario: 'public', arm: 'compaction', repetition: 0 },
+			{ id: 'cancelled', scenario: 'public', arm: 'full', repetition: 0 },
 			controller.signal,
 		)
 		try {
-			const running = session.execute(WINDOW_GOAL, fixture.context).then(
+			const running = session.execute(STUDY_MEMORY_SHORT_GOAL, fixture.context).then(
 				() => undefined,
 				(reason: unknown) => reason,
 			)
@@ -1079,189 +840,6 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	})
 })
 
-describe('summary admission under the Compaction gauge', () => {
-	it('refuses a summary request over the summary room before the provider and retains its admission and refusal', async () => {
-		const projected = STUDY_MEMORY_SUMMARY_PROJECTIONS.over
-		const result = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.over, 400, [], true)
-		expect(result.failure).toContain('Summary request')
-		// Neither the summary nor any agent request reached the model.
-		expect(result.requests.filter((request) => request.path === '/api/chat')).toEqual([])
-		const contexts = readMemoryEvents(result.evidence, 'context')
-		const admissions = contexts.filter((value) => value.role === 'summary')
-		expect(admissions).toHaveLength(1)
-		const [admission] = admissions
-		expect(admission).toMatchObject({ stage: 'admission', estimate: projected, projected })
-		expect(Object.keys(admission ?? {}).sort()).toEqual(listMemoryKeys(STUDY_MEMORY_CONTEXT_KEYS))
-		expect(typeof admission?.revision).toBe('string')
-		expect(readMemoryParts(admission?.parts)).toEqual({
-			count: 8,
-			tools: 0,
-			schema: 0,
-			total: projected,
-		})
-		expect(readMemoryOrigins(admission?.origins).at(-1)).toEqual({
-			origin: 'instructions',
-			source: 'summary',
-		})
-		const refusals = readMemoryEvents(result.evidence, 'refusal')
-		expect(refusals).toHaveLength(1)
-		expect(Object.keys(refusals[0] ?? {}).sort()).toEqual(STUDY_MEMORY_REFUSAL_KEYS)
-		expect(refusals[0]).toMatchObject({
-			cause: 'capacity',
-			role: 'summary',
-			ordinal: admission?.ordinal,
-			revision: admission?.revision,
-			max: STUDY_MEMORY_SUMMARY_LIMIT,
-		})
-		for (const event of ['dispatch', 'wire', 'failure'])
-			expect(
-				readMemoryEvents(result.evidence, event).filter(
-					(value) => value.role === 'summary' || value.role === 'agent',
-				),
-			).toEqual([])
-		expect(result.usage.filter((row) => row.role === 'summary' || row.role === 'agent')).toEqual([])
-		const agent = contexts.filter((value) => value.role === 'agent')
-		expect(agent.length).toBeGreaterThan(0)
-		expect(
-			agent.every(
-				(value) =>
-					value.stage === 'admission' && Number(value.ordinal) < Number(admission?.ordinal),
-			),
-		).toBe(true)
-	})
-
-	it('sends the summary instruction once as the final user message after the folded originals', async () => {
-		const result = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.below, 400, [], true)
-		expect(result.failure).toBeUndefined()
-		const [chat] = result.requests.filter((request) => request.path === '/api/chat')
-		if (chat === undefined) throw new Error('Missing summary chat request')
-		const body = parseJSON(chat.body)
-		if (!isRecord(body) || !Array.isArray(body.messages)) throw new Error('Invalid chat request')
-		const sent = body.messages.map((message) => {
-			if (!isRecord(message)) throw new Error('Invalid chat message')
-			return { role: message.role, content: message.content }
-		})
-		const instruction =
-			'Summarize the conversation while preserving source identifiers, corrections, unresolved obligations and handoffs.'
-		// The folded originals are the declared arrivals before the live one, in arrival order, untouched.
-		const input = buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400)[0]?.input
-		if (!isRecord(input) || !Array.isArray(input.arrivals)) throw new Error('Invalid summary goal')
-		const folded = input.arrivals.slice(0, -1).map((arrival) => {
-			if (!isRecord(arrival)) throw new Error('Invalid summary arrival')
-			return { role: 'user', content: `[Source ${String(arrival.id)}] ${String(arrival.content)}` }
-		})
-		expect(folded).toHaveLength(STUDY_MEMORY_SUMMARY_FOLDS.below.length)
-		expect(sent.filter((message) => message.content === instruction)).toHaveLength(1)
-		expect(sent.at(-1)).toEqual({ role: 'user', content: instruction })
-		expect(sent.slice(0, -1)).toEqual(folded)
-		// The retained context row and summary event agree with the sent order.
-		const row = readMemoryEvents(result.evidence, 'context').find(
-			(value) => value.role === 'summary' && value.stage === 'dispatch',
-		)
-		const origins = readMemoryOrigins(row?.origins)
-		expect(origins).toHaveLength(sent.length)
-		expect(origins.at(-1)).toEqual({ origin: 'instructions', source: 'summary' })
-		expect(origins.slice(0, -1)).toEqual(
-			folded.map((_message, index) => ({ origin: 'arrival', source: `a${index}` })),
-		)
-		const [summary] = readMemoryEvents(result.evidence, 'summary')
-		// The summary names exactly the folded messages, never its own instruction.
-		const sources = summary?.sources
-		if (!Array.isArray(sources)) throw new Error('Invalid summary sources')
-		expect(sources).toHaveLength(folded.length)
-		expect(new Set(sources).size).toBe(folded.length)
-		expect(sources).not.toContain('summary-instruction')
-	})
-
-	it.each(['x', ' x\n'])(
-		'returns the nonblank summary %j unchanged into the next agent request',
-		async (content) => {
-			const result = await runMemorySummary(
-				STUDY_MEMORY_SUMMARY_FOLDS.below,
-				400,
-				[{ path: '/api/chat', body: buildMemoryReply({ content }) }],
-				true,
-			)
-			expect(result.failure).toBeUndefined()
-			const chats = result.requests.filter((request) => request.path === '/api/chat')
-			expect(chats).toHaveLength(2)
-			expect(chats[1]?.body).toContain(JSON.stringify(`[Summary of earlier messages] ${content}`))
-			expect(readMemoryEvents(result.evidence, 'summary')[0]?.content).toBe(content)
-			expect(readMemoryEvents(result.evidence, 'refusal')).toEqual([])
-		},
-	)
-
-	it('derives the summary limit from the room and prices summary admission by the declared gauge', async () => {
-		const { context, output, safety, recap } = STUDY_MEMORY_SUMMARY_ROOM
-		expect(context - recap - safety).toBe(STUDY_MEMORY_SUMMARY_LIMIT)
-		expect(context - output - safety).toBe(1920)
-		// The instruction is 113 characters: ceil(113 / 4) = 29 plus 4 of framing.
-		const instruction = 29 + 4
-		const counted = Object.fromEntries(
-			Object.entries(STUDY_MEMORY_SUMMARY_FOLDS).map(([name, lengths]) => [
-				name,
-				instruction + lengths.reduce((sum, length) => sum + length / 4 + 4, 0),
-			]),
-		)
-		expect(counted).toEqual(STUDY_MEMORY_SUMMARY_PROJECTIONS)
-		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.equal).toBe(STUDY_MEMORY_SUMMARY_LIMIT)
-		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.below).toBe(STUDY_MEMORY_SUMMARY_LIMIT - 1)
-		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.over).toBeGreaterThan(STUDY_MEMORY_SUMMARY_LIMIT)
-		expect(STUDY_MEMORY_SUMMARY_PROJECTIONS.small).toBeLessThan(STUDY_MEMORY_SUMMARY_LIMIT)
-		const input = buildMemorySummaryGoals([2196, 2192], 400)[0]?.input
-		if (!isRecord(input) || !Array.isArray(input.arrivals)) throw new Error('Invalid summary goal')
-		expect(
-			input.arrivals.map((arrival) =>
-				isRecord(arrival) ? `[Source ${String(arrival.id)}] ${String(arrival.content)}`.length : 0,
-			),
-		).toEqual([2196, 2192, 400])
-		// The session derives the summary limit from the room; the declared gauge prices the request against it.
-		const scaled = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [],
-			goals: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400),
-			settings: { gauge: { scale: 2, overhead: 7 }, observe: true },
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-		})
-		expect(scaled.failure).toContain('Summary request')
-		expect(scaled.requests.filter((request) => request.path === '/api/chat')).toEqual([])
-		expect(
-			readMemoryEvents(scaled.evidence, 'context').find((value) => value.role === 'summary'),
-		).toMatchObject({ stage: 'admission', estimate: 3903, projected: 7813 })
-		expect(readMemoryEvents(scaled.evidence, 'refusal')).toMatchObject([
-			{ role: 'summary', consumed: 7813, max: 3904 },
-		])
-		expect(readMemoryEvents(scaled.evidence, 'refusal')[0]?.max).toBe(context - recap - safety)
-	})
-
-	it('links an Agent window refusal to its own admission after an admitted summary', async () => {
-		const result = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.small, 8000, [], true)
-		expect(result.failure).toBeDefined()
-		// Only the admitted summary reached the model; the post-fold agent request was refused by the window.
-		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
-		const contexts = readMemoryEvents(result.evidence, 'context')
-		const summary = contexts.find((value) => value.role === 'summary')
-		expect(summary).toMatchObject({
-			stage: 'dispatch',
-			projected: STUDY_MEMORY_SUMMARY_PROJECTIONS.small,
-		})
-		const last = contexts
-			.filter((value) => value.role === 'agent' && value.stage === 'admission')
-			.at(-1)
-		expect(Number(last?.ordinal)).toBeGreaterThan(Number(summary?.ordinal))
-		const refusals = readMemoryEvents(result.evidence, 'refusal')
-		expect(refusals).toHaveLength(1)
-		expect(refusals[0]).toMatchObject({
-			cause: 'capacity',
-			role: 'agent',
-			ordinal: last?.ordinal,
-			revision: last?.revision,
-			max: 1920,
-		})
-		expect(refusals[0]?.ordinal).not.toBe(summary?.ordinal)
-	})
-})
-
 describe('passive observation of actual memory requests', () => {
 	const goals = STUDY_MEMORY_OBSERVATION_GOALS
 	const base: MemoryTrialFixture = {
@@ -1274,46 +852,17 @@ describe('passive observation of actual memory requests', () => {
 		{
 			name: 'Full',
 			trial: base,
-			settings: undefined,
 			observed: STUDY_MEMORY_OBSERVED_SETTINGS,
 			changed: buildMemoryObservationGoals('Look up order-2'),
 			products: ['Initial handoff', 'Corrected handoff', 'Closed handoff'],
 			chats: 4,
 			tools: 1,
 		},
-		{
-			name: 'Compaction',
-			trial: { ...base, arm: 'compaction' as const },
-			settings: STUDY_MEMORY_FIXED_SETTINGS,
-			observed: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
-			changed: buildMemoryObservationGoals('Look up order-2'),
-			products: ['Initial handoff', 'Corrected handoff', 'Closed handoff'],
-			chats: 4,
-			tools: 1,
-		},
-		{
-			name: 'fold',
-			trial: {
-				arm: 'compaction' as const,
-				responses: [],
-				goals: buildMemoryFoldGoals(),
-				room: STUDY_MEMORY_SUMMARY_ROOM,
-			},
-			settings: STUDY_MEMORY_SETTINGS,
-			observed: { ...STUDY_MEMORY_SETTINGS, observe: true },
-			changed: buildMemoryFoldGoals('Maintain this other detail. '),
-			products: ['Receipt retained.'],
-			chats: 2,
-			tools: 0,
-		},
 	])(
 		'keeps the $name trajectory identical with observation off and on, and fails on a changed byte',
-		async ({ trial, settings, observed, changed, products, chats, tools }) => {
-			const off = await runMemoryTrial({
-				...trial,
-				...(settings === undefined ? {} : { settings }),
-			})
-			const control = await runMemoryTrial({ ...trial, settings: { ...settings, observe: false } })
+		async ({ trial, observed, changed, products, chats, tools }) => {
+			const off = await runMemoryTrial(trial)
+			const control = await runMemoryTrial({ ...trial, settings: { observe: false } })
 			const on = await runMemoryTrial({ ...trial, settings: observed })
 			const moved = await runMemoryTrial({ ...trial, goals: changed, settings: observed })
 			expect(off.failure).toBeUndefined()
@@ -1480,12 +1029,12 @@ describe('passive observation of actual memory requests', () => {
 	})
 
 	it('appends a checkpoint row after result', async () => {
-		for (const arm of ['records', 'compaction'] as const) {
+		for (const arm of ['records', 'full'] as const) {
 			const result = await runMemoryTrial({
 				arm,
 				responses: buildMemorySeedResponses(arm),
 				goals: STUDY_MEMORY_OBSERVATION_GOALS,
-				settings: { ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['correction'] },
+				settings: { observe: true, checkpoints: ['correction'] },
 			})
 			expect(result.failure).toBeUndefined()
 			const rows = result.evidence.filter((row) => row.goal === 'correction')
@@ -1500,7 +1049,7 @@ describe('passive observation of actual memory requests', () => {
 				arm,
 				responses: [{ path: '/api/chat', status: 503, body: 'unavailable' }],
 				goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1),
-				settings: { ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['opening'] },
+				settings: { observe: true, checkpoints: ['opening'] },
 			})
 			expect(failed.failure).toBeDefined()
 			expect(failed.evidence.filter((row) => row.event === 'checkpoint')).toEqual([])
@@ -1509,8 +1058,8 @@ describe('passive observation of actual memory requests', () => {
 
 	it('holds the end of a goal in a checkpoint row', async () => {
 		const result = await runMemoryTrial({
-			arm: 'compaction',
-			responses: buildMemorySeedResponses('compaction'),
+			arm: 'full',
+			responses: buildMemorySeedResponses('full'),
 			goals: STUDY_MEMORY_OBSERVATION_GOALS,
 			settings: STUDY_MEMORY_SEED_SETTINGS,
 		})
@@ -1531,7 +1080,7 @@ describe('passive observation of actual memory requests', () => {
 	})
 
 	it('seeds goal three byte-identical', async () => {
-		for (const arm of ['records', 'compaction'] as const) {
+		for (const arm of ['records', 'full'] as const) {
 			const uninterrupted = await runMemoryTrial({
 				arm,
 				responses: buildMemorySeedResponses(arm),
@@ -1770,57 +1319,32 @@ describe('passive observation of actual memory requests', () => {
 		})
 	})
 
-	it('retains one ordered estimate row per agent dispatch and a projection only for Compaction', async () => {
+	it('retains one ordered estimate row per agent dispatch, with no projection, only while observing', async () => {
 		const full = await runMemoryTrial({ ...base, settings: STUDY_MEMORY_PASSIVE_SETTINGS })
-		const compaction = await runMemoryTrial({
-			...base,
-			arm: 'compaction',
-			settings: { ...STUDY_MEMORY_FIXED_SETTINGS, observe: true },
-		})
-		const silent = await runMemoryTrial({
-			...base,
-			arm: 'compaction',
-			settings: STUDY_MEMORY_FIXED_SETTINGS,
-		})
+		const silent = await runMemoryTrial(base)
 		expect(silent.evidence.some((row) => row.event === 'estimate')).toBe(false)
-		for (const result of [full, compaction]) {
-			expect(result.failure).toBeUndefined()
-			const rows = readMemoryEvents(result.evidence, 'estimate')
-			const dispatched = readMemoryEvents(result.evidence, 'dispatch').filter(
-				(value) => value.role === 'agent',
-			)
-			expect(rows).toHaveLength(dispatched.length)
-			expect(rows).toHaveLength(4)
-			for (const goal of goals)
-				expect(readMemoryEvents(result.evidence, 'estimate', goal.id)).toHaveLength(
-					readMemoryEvents(result.evidence, 'dispatch', goal.id).filter(
-						(value) => value.role === 'agent',
-					).length,
-				)
-			expect(rows.map((row) => Object.keys(row).sort())).toEqual(
-				rows.map(() => STUDY_MEMORY_ESTIMATE_KEYS),
-			)
-			const estimates = rows.map((row) => row.estimate)
-			expect(estimates.every((value) => typeof value === 'number' && value > 0)).toBe(true)
-			// Each request appends the previous reply and any tool receipt, so the complete request only grows.
-			expect(estimates).toEqual(estimates.toSorted((a, b) => Number(a) - Number(b)))
-			expect(new Set(estimates).size).toBe(estimates.length)
-		}
-		expect(readMemoryEvents(full.evidence, 'estimate').map((row) => row.projected)).toEqual([
-			null,
-			null,
-			null,
-			null,
-		])
-		expect(readMemoryEvents(compaction.evidence, 'estimate').map((row) => row.projected)).toEqual([
-			STUDY_MEMORY_FIXED_PROJECTION,
-			STUDY_MEMORY_FIXED_PROJECTION,
-			STUDY_MEMORY_FIXED_PROJECTION,
-			STUDY_MEMORY_FIXED_PROJECTION,
-		])
-		expect(readMemoryEvents(compaction.evidence, 'estimate').map((row) => row.estimate)).toEqual(
-			readMemoryEvents(full.evidence, 'estimate').map((row) => row.estimate),
+		expect(full.failure).toBeUndefined()
+		const rows = readMemoryEvents(full.evidence, 'estimate')
+		const dispatched = readMemoryEvents(full.evidence, 'dispatch').filter(
+			(value) => value.role === 'agent',
 		)
+		expect(rows).toHaveLength(dispatched.length)
+		expect(rows).toHaveLength(4)
+		for (const goal of goals)
+			expect(readMemoryEvents(full.evidence, 'estimate', goal.id)).toHaveLength(
+				readMemoryEvents(full.evidence, 'dispatch', goal.id).filter(
+					(value) => value.role === 'agent',
+				).length,
+			)
+		expect(rows.map((row) => Object.keys(row).sort())).toEqual(
+			rows.map(() => STUDY_MEMORY_ESTIMATE_KEYS),
+		)
+		const estimates = rows.map((row) => row.estimate)
+		expect(estimates.every((value) => typeof value === 'number' && value > 0)).toBe(true)
+		// Each request appends the previous reply and any tool receipt, so the complete request only grows.
+		expect(estimates).toEqual(estimates.toSorted((a, b) => Number(a) - Number(b)))
+		expect(new Set(estimates).size).toBe(estimates.length)
+		expect(rows.map((row) => row.projected)).toEqual([null, null, null, null])
 	})
 
 	it('retains one dispatch context row per agent request, joined to its estimate, dispatch and wire rows by ordinal, canonical id and revision', async () => {
@@ -1919,130 +1443,16 @@ describe('passive observation of actual memory requests', () => {
 		).toBe(false)
 	})
 
-	it('records pre-fold and rebuilt post-fold admissions, the summary dispatch and an oversize refusal as separate joined measurements', async () => {
-		const settings = { ...STUDY_MEMORY_SETTINGS, observe: true }
-		const result = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [],
-			goals: buildMemoryFoldGoals(),
-			settings,
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-		})
-		expect(result.failure).toBeUndefined()
-		const max =
-			STUDY_MEMORY_SUMMARY_ROOM.context -
-			STUDY_MEMORY_SUMMARY_ROOM.output -
-			STUDY_MEMORY_SUMMARY_ROOM.safety
-		const contexts = readMemoryEvents(result.evidence, 'context')
-		const sequence = contexts.map((value) => `${String(value.stage)}:${String(value.role)}`)
-		const summaryAt = sequence.indexOf('dispatch:summary')
-		expect(summaryAt).toBeGreaterThan(0)
-		expect(sequence[0]).toBe('admission:agent')
-		expect(sequence.at(-1)).toBe('dispatch:agent')
-		expect(sequence.slice(summaryAt + 1)).toContain('admission:agent')
-		// Ordinals are one increasing count over admissions and dispatches of both roles.
-		expect(contexts.map((value) => value.ordinal)).toEqual(
-			Array.from({ length: contexts.length }, (_, index) => index + 1),
-		)
-		const admissions = contexts.filter((value) => value.stage === 'admission')
-		const first = admissions[0]
-		const final = admissions.at(-1)
-		expect(Number(first?.projected)).toBeGreaterThan(max)
-		expect(Number(final?.projected)).toBeLessThanOrEqual(max)
-		expect(first?.revision).not.toBe(final?.revision)
-		expect(final?.dispatch).toBeUndefined()
-		// Summary and agent dispatches keep their own canonical ids across the interleaving.
-		const summary = contexts[summaryAt]
-		const dispatched = contexts.filter((value) => value.stage === 'dispatch')
-		expect(dispatched.map((value) => value.dispatch)).toEqual(
-			Array.from({ length: dispatched.length }, (_, index) => index + 1),
-		)
-		for (const role of ['summary', 'agent']) {
-			const rows = dispatched.filter((value) => value.role === role)
-			const sent = readMemoryEvents(result.evidence, 'dispatch').filter(
-				(value) => value.role === role,
-			)
-			const settled = readMemoryEvents(result.evidence, 'wire').filter(
-				(value) => value.role === role,
-			)
-			expect(rows.length).toBeGreaterThan(0)
-			for (const events of [sent, settled]) {
-				expect([role, events.map((value) => value.canonical)]).toEqual([
-					role,
-					rows.map((value) => value.dispatch),
-				])
-				expect([role, events.map((value) => value.revision)]).toEqual([
-					role,
-					rows.map((value) => value.revision),
-				])
-			}
-		}
-		// The summary request is exactly its instruction plus the folded messages: no tools, no schema.
-		expect(readMemoryParts(summary?.parts)).toMatchObject({ tools: 0, schema: 0 })
-		expect(readMemoryOrigins(summary?.origins).at(-1)).toEqual({
-			origin: 'instructions',
-			source: 'summary',
-		})
-		// An admitted summary is stamped with the very estimate and gauge projection it was admitted on.
-		expect(summary?.projected).toBe(summary?.estimate)
-		expect(Number(summary?.projected)).toBeLessThan(STUDY_MEMORY_SUMMARY_LIMIT)
-		expect(Number(readMemoryParts(summary?.parts).count)).toBeGreaterThan(2)
-		// An oversize request retains its admission measurements and a single refusal, with no agent dispatch.
-		const edge = buildMemoryEdge(buildMemoryProfile({ url: 'http://127.0.0.1:1' }), -1)
-		const oversize = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [],
-			goals: [WINDOW_GOAL],
-			settings: { ...edge, observe: true },
-		})
-		expect(oversize.failure).toBeDefined()
-		expect(oversize.requests.filter((request) => request.path === '/api/chat')).toEqual([])
-		const measured = readMemoryEvents(oversize.evidence, 'context')
-		expect(measured.length).toBeGreaterThan(0)
-		expect(measured.map((value) => [value.stage, value.role])).toEqual(
-			measured.map(() => ['admission', 'agent']),
-		)
-		expect(measured.map((value) => Object.keys(value).sort())).toEqual(
-			measured.map(() => listMemoryKeys(STUDY_MEMORY_CONTEXT_KEYS)),
-		)
-		expect(
-			readMemoryEvents(oversize.evidence, 'dispatch').filter((value) => value.role === 'agent'),
-		).toEqual([])
-		expect(readMemoryEvents(oversize.evidence, 'estimate')).toEqual([])
-		const refusals = readMemoryEvents(oversize.evidence, 'refusal')
-		expect(refusals).toHaveLength(1)
-		const [refusal] = refusals
-		const last = measured.at(-1)
-		expect(Object.keys(refusal ?? {}).sort()).toEqual(STUDY_MEMORY_REFUSAL_KEYS)
-		expect(refusal).toMatchObject({ cause: 'capacity', role: 'agent', max: 32128 })
-		expect(refusal?.ordinal).toBe(last?.ordinal)
-		expect(refusal?.revision).toBe(last?.revision)
-		expect(typeof refusal?.revision).toBe('string')
-		// The window refused the very projection the final admission row retained.
-		expect(refusal?.consumed).toBe(last?.projected)
-		expect(Number(refusal?.consumed)).toBeGreaterThanOrEqual(32128)
-		const parts = readMemoryParts(last?.parts)
-		expect(parts.total).toBe(last?.estimate)
-		expect(parts.tools).toBeGreaterThan(0)
-	})
-
 	it.each([
 		['unknown counts', { unknown: true }],
 		['a zero prompt count', { prompt: 0 }],
-	])('refuses %s only for a gauged request', async (_name, reply) => {
+	])('accepts %s on a request no gauge prices', async (_name, reply) => {
 		const goal: ReadonlyArray<MemoryTrialFixture['goals'][number]> = [
 			{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } },
 		]
 		const responses = [{ path: '/api/chat', body: buildMemoryReply(reply) }]
 		const ungauged = await runMemoryTrial({ arm: 'full', responses, goals: goal })
 		expect(ungauged.failure).toBeUndefined()
-		const gauged = await runMemoryTrial({
-			arm: 'compaction',
-			responses,
-			goals: goal,
-			settings: STUDY_MEMORY_FIXED_SETTINGS,
-		})
-		expect(gauged.failure).toContain('usable prompt count')
 	})
 })
 
@@ -2050,62 +1460,6 @@ describe('repeated and denied tool calls', () => {
 	const first = STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1)
 	const lookup = buildMemoryCall('lookup', { id: 'order-1' })
 	const answer = { path: '/api/chat', body: buildMemoryReply({ content: 'Answered' }) }
-	const receipt = 'order-1: Owner\nConfirmed reference'
-	const refused = `"lookup" did not run: ${STUDY_MEMORY_REPEAT}`
-
-	it('denies a repeated compaction lookup', async () => {
-		const result = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [lookup, lookup, answer],
-			goals: first,
-			settings: STUDY_MEMORY_SETTINGS,
-		})
-		expect(result.failure).toBeUndefined()
-		expect(STUDY_MEMORY_REPEAT).toBe(
-			'the earlier result is in the conversation. Answer from it or call something else.',
-		)
-		const last = result.requests.filter((request) => request.path === '/api/chat').at(-1)
-		expect(readMemoryToolResults(last?.body ?? '')).toEqual([receipt, refused])
-		expect(readMemoryEvents(result.evidence, 'lookup')).toEqual([{ id: 'order-1', found: true }])
-		expect(readMemoryEvents(result.evidence, 'denial', 'opening')).toEqual([
-			{ id: expect.any(String), name: 'lookup', reason: STUDY_MEMORY_REPEAT },
-		])
-	})
-
-	it('resets the repeat rule on each run', async () => {
-		const result = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [lookup, answer, lookup, answer],
-			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
-			settings: STUDY_MEMORY_SETTINGS,
-		})
-		expect(result.failure).toBeUndefined()
-		const last = result.requests.filter((request) => request.path === '/api/chat').at(-1)
-		expect(readMemoryToolResults(last?.body ?? '')).toEqual([receipt, receipt])
-		expect(readMemoryEvents(result.evidence, 'lookup')).toEqual([
-			{ id: 'order-1', found: true },
-			{ id: 'order-1', found: true },
-		])
-		expect(readMemoryEvents(result.evidence, 'denial')).toEqual([])
-	})
-
-	it('compares canonical arguments', async () => {
-		const result = await runMemoryTrial({
-			arm: 'compaction',
-			responses: [
-				buildMemoryCall('lookup', { id: 'order-1', scope: 'desk' }),
-				buildMemoryCall('lookup', { scope: 'desk', id: 'order-1' }),
-				answer,
-			],
-			goals: first,
-			settings: STUDY_MEMORY_SETTINGS,
-		})
-		expect(result.failure).toBeUndefined()
-		const last = result.requests.filter((request) => request.path === '/api/chat').at(-1)
-		expect(readMemoryToolResults(last?.body ?? '')).toEqual([receipt, refused])
-		expect(readMemoryEvents(result.evidence, 'lookup')).toHaveLength(1)
-		expect(readMemoryEvents(result.evidence, 'denial')).toHaveLength(1)
-	})
 
 	it('files a ledger repeat as a denial row', async () => {
 		const result = await runMemoryTrial({
@@ -2131,20 +1485,19 @@ describe('repeated and denied tool calls', () => {
 			name: 'absent',
 			reason: 'absent is not in the active scope',
 		}
-		const compaction = await runMemoryTrial({
-			arm: 'compaction',
+		const full = await runMemoryTrial({
+			arm: 'full',
 			responses: [absent, answer],
 			goals: first,
-			settings: STUDY_MEMORY_SETTINGS,
 		})
 		const records = await runMemoryTrial({
 			arm: 'records',
 			responses: [...STUDY_MEMORY_CALIBRATION, absent, answer],
 			goals: first,
 		})
-		expect(compaction.failure).toBeUndefined()
+		expect(full.failure).toBeUndefined()
 		expect(records.failure).toBeUndefined()
-		expect(readMemoryEvents(compaction.evidence, 'denial', 'opening')).toEqual([denial])
+		expect(readMemoryEvents(full.evidence, 'denial', 'opening')).toEqual([denial])
 		expect(readMemoryEvents(records.evidence, 'denial', 'opening')).toEqual([denial])
 	})
 
@@ -2233,7 +1586,7 @@ describe('recording declarations of a memory session', () => {
 		const profile = buildMemoryRecordProfile(server.url)
 		const fixture = createMemoryContext(profile)
 		const trial = { id: 'captured', scenario: 'public', arm: 'full', repetition: 0 }
-		const capture = buildMemoryCapture(profile, trial, WINDOW_GOAL)
+		const capture = buildMemoryCapture(profile, trial, STUDY_MEMORY_SHORT_GOAL)
 		try {
 			const session = await new StudyMemoryDriver({
 				...STUDY_MEMORY_MODULES,
@@ -2242,7 +1595,7 @@ describe('recording declarations of a memory session', () => {
 				replay: capture.replay,
 			}).open(trial, fixture.context.signal)
 			try {
-				await expect(session.execute(WINDOW_GOAL, fixture.context)).rejects.toThrow(
+				await expect(session.execute(STUDY_MEMORY_SHORT_GOAL, fixture.context)).rejects.toThrow(
 					STUDY_MEMORY_REPLAY_REFUSAL,
 				)
 			} finally {

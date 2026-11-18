@@ -3267,7 +3267,7 @@ describe('Ledger', () => {
 		await pending
 		expect(isLedgerError(rejected?.fault)).toBe(true)
 		expect(rejected?.fault).toMatchObject({ code: 'REQUEST' })
-		expect(rejected?.messages).toEqual(ledger.conversation.view())
+		expect(rejected?.messages).toEqual(ledger.conversation.messages())
 		expect(after).toBe(asked)
 		expect(recorded).toEqual(judgments)
 		// The head alone: 'Serve the desk.' estimates 4, and the message's framing 4.
@@ -3682,20 +3682,11 @@ describe('Ledger', () => {
 		expect(ledger.conversation.messages()[1]?.thinking).toBe('secret'.repeat(100))
 	})
 
-	it('resolves with a hydrated cyclic call and refuses that call through add', async () => {
+	it('refuses a hydrated cyclic call as it refuses that call through add', () => {
 		const options = buildLedgerOptions()
 		const args: Record<string, unknown> = {}
 		args.self = args
-		const provider = createScriptedProvider(
-			[
-				{
-					content: '',
-					thinking: 'plan',
-					usage: { prompt: 100, completion: 10, total: 110 },
-				},
-			],
-			{ recorded: true },
-		)
+		const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
 		const message = {
 			id: 'cyclic-message',
 			role: 'assistant',
@@ -3705,20 +3696,23 @@ describe('Ledger', () => {
 		expect(captureError(() => createConversation().add(message))).toSatisfy(
 			(error: unknown) => isConversationError(error) && error.code === 'MESSAGE',
 		)
-		const ledger = createLedger(provider, {
-			...options,
-			agent: { limit: 1 },
-			snapshot: {
-				conversation: { id: 'cyclic', sections: [], messages: [message] },
-				requests: [],
-				notes: [],
-				failures: [],
-			},
-		})
-		await expect(ledger.respond('Review.')).resolves.toMatchObject({ thinking: 'plan\n\nplan' })
-		expect(
-			ledger.conversation.messages().some((stored) => stored.calls?.[0]?.arguments === args),
-		).toBe(true)
+		// The conversation owns every stored message through JSON, so a hydrate refuses what JSON cannot carry.
+		const refused = captureError(() =>
+			createLedger(provider, {
+				...options,
+				agent: { limit: 1 },
+				snapshot: {
+					conversation: { id: 'cyclic', messages: [message] },
+					requests: [],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		expect(refused).toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
+		expect(provider.calls).toEqual([])
 	})
 
 	it('keeps the replay policy captured at construction through calibration and respond', async () => {
@@ -4161,8 +4155,6 @@ describe('Ledger', () => {
 					message.content === first.messages.at(-1)?.content || message.content === 'Approved.',
 			),
 		).toHaveLength(2)
-		expect(ledger.conversation.summarizable).toBe(false)
-		expect(ledger.conversation.sections).toEqual([])
 	})
 
 	it('keeps leading seed messages, empty assistants, and text from dropped calls', async () => {
@@ -4363,9 +4355,9 @@ describe('Ledger', () => {
 		expect((await ledger.respond('Second.')).content).toBe('Done.')
 	})
 
-	it('renders a seeded lookup whose arguments JSON cannot carry under its bare tool name', async () => {
+	it('refuses a seeded lookup whose arguments JSON cannot carry at hydrate', () => {
 		const options = buildLedgerOptions()
-		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
 		const messages: readonly MessageInput[] = [
 			{ role: 'user', content: 'Brightwater Studio called.' },
 			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.', 'seed', {
@@ -4373,31 +4365,24 @@ describe('Ledger', () => {
 				count: 1n,
 			}),
 		]
-		const ledger = createLedger(provider, {
-			...options,
-			snapshot: {
-				conversation: {
-					id: 'seeded',
-					sections: [],
-					messages: messages.map((message, index) => ({ ...message, id: `seed-${index}` })),
+		const refused = captureError(() =>
+			createLedger(provider, {
+				...options,
+				snapshot: {
+					conversation: {
+						id: 'seeded',
+						messages: messages.map((message, index) => ({ ...message, id: `seed-${index}` })),
+					},
+					requests: [],
+					notes: [],
+					failures: [],
 				},
-				requests: [],
-				notes: [],
-				failures: [],
-			},
-		})
-		const selected = waitForEvent<readonly [selection: Selection]>(
-			(listener) => ledger.agent.emitter.once('select', listener),
-			'the planned selection',
+			}),
 		)
-		await ledger.respond('Check Brightwater Studio.')
-		const [selection] = await selected
-		expect(selection.fault).toBeUndefined()
-		const sent = requireValue(provider.calls[0]).messages
-		expect(sent.find((message) => message.call === 'seed')?.content).toBe(
-			'lookup: result shown under Records below',
+		expect(refused).toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
 		)
-		expect(extractLedgerRecords(sent)).toContain('- Account BW-20931: Brightwater Studio.')
+		expect(provider.calls).toEqual([])
 	})
 
 	it('closes recall on the first call at a zero recall limit', async () => {
@@ -4628,7 +4613,7 @@ describe('Ledger', () => {
 		ledger.agent.emitter.on('start', () => phases.handler('start'))
 		ledger.agent.emitter.on('select', (selection) => {
 			phases.handler('select')
-			selections.handler(selection, ledger.conversation.view())
+			selections.handler(selection, ledger.conversation.messages())
 		})
 		expect((await ledger.respond('Check the account.')).content).toBe('Recovered.')
 		expect(phases.calls).toEqual([['start'], ['select'], ['start'], ['select']])
@@ -4720,7 +4705,7 @@ describe('Ledger', () => {
 		const result = await ledger.respond('Inspect the statement.')
 		const [selection] = await selected
 		expect(selection).toEqual({
-			messages: ledger.conversation.view().slice(0, -1),
+			messages: ledger.conversation.messages().slice(0, -1),
 			judgments: [JSON.stringify(['category', request.id])],
 			usage: { prompt: 50, completion: 1, total: 51 },
 			fault,
@@ -8576,42 +8561,44 @@ describe('Ledger — the request copy', () => {
 })
 
 describe('Ledger — snapshot and hydrate', () => {
-	it('leaves no derived window when reading its evidence throws', async () => {
-		const ledger = createLedger(createScriptedProvider([]), {
-			...buildLedgerOptions(),
-			snapshot: {
-				conversation: {
-					id: 'unreadable',
-					sections: [],
-					messages: [
-						{
-							id: 'request',
-							role: 'user',
-							content: 'First.',
-							calls: [
-								{
-									id: 'call',
-									name: 'lookup',
-									arguments: {
-										a: {
-											get b() {
-												throw new Error('read')
+	it('refuses at hydrate a message whose evidence throws when read', () => {
+		const refused = captureError(() =>
+			createLedger(createScriptedProvider([]), {
+				...buildLedgerOptions(),
+				snapshot: {
+					conversation: {
+						id: 'unreadable',
+						messages: [
+							{
+								id: 'request',
+								role: 'user',
+								content: 'First.',
+								calls: [
+									{
+										id: 'call',
+										name: 'lookup',
+										arguments: {
+											a: {
+												get b() {
+													throw new Error('read')
+												},
 											},
 										},
 									},
-								},
-							],
-						},
-						{ id: 'reply', role: 'assistant', content: 'First reply.' },
-					],
+								],
+							},
+							{ id: 'reply', role: 'assistant', content: 'First reply.' },
+						],
+					},
+					requests: ['request'],
+					notes: [],
+					failures: [],
 				},
-				requests: ['request'],
-				notes: [],
-				failures: [],
-			},
-		})
-		await expect(ledger.respond('Continue.')).rejects.toThrow('read')
-		expect(ledger.snapshot()).not.toHaveProperty('window')
+			}),
+		)
+		expect(refused).toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
 	})
 
 	it('renders the later unit sentence without repeating its held owner sentence', async () => {
@@ -8924,34 +8911,34 @@ describe('Ledger — snapshot and hydrate', () => {
 		).not.toContain('Stale injected copy.')
 	})
 
-	it('omits a window holding an unencodable hydrated message', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const ledger = createLedger(provider, {
-			...buildLedgerOptions({ capacity: 32768 }),
-			snapshot: {
-				conversation: {
-					id: 'unencodable',
-					sections: [],
-					messages: [
-						{
-							id: 'request',
-							role: 'user',
-							content: 'First request.',
-							calls: [{ id: 'call', name: 'lookup', arguments: { amount: undefined } }],
-						},
-						{ id: 'reply', role: 'assistant', content: 'First reply.' },
-					],
+	it('refuses at hydrate a message JSON would change', () => {
+		const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
+		const refused = captureError(() =>
+			createLedger(provider, {
+				...buildLedgerOptions({ capacity: 32768 }),
+				snapshot: {
+					conversation: {
+						id: 'unencodable',
+						messages: [
+							{
+								id: 'request',
+								role: 'user',
+								content: 'First request.',
+								calls: [{ id: 'call', name: 'lookup', arguments: { amount: undefined } }],
+							},
+							{ id: 'reply', role: 'assistant', content: 'First reply.' },
+						],
+					},
+					requests: ['request'],
+					notes: [],
+					failures: [],
 				},
-				requests: ['request'],
-				notes: [],
-				failures: [],
-			},
-		})
-		await ledger.respond('Continue.')
-		expect(requireValue(provider.calls[0]).messages.map((message) => message.content)).toContain(
-			'First reply.',
+			}),
 		)
-		expect(ledger.snapshot()).not.toHaveProperty('window')
+		expect(refused).toSatisfy(
+			(error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT',
+		)
+		expect(provider.calls).toEqual([])
 	})
 	it.each([
 		'Lovelace at Brightwater Studio phoned about BW-20931.',
@@ -10036,7 +10023,7 @@ describe('Ledger — run-bound conversation', () => {
 			ledger.conversation.messages().find((message) => message.content === 'Second request.'),
 		)
 		const copy = createConversation({
-			snapshot: { id: 'copy', sections: [], messages: [request] },
+			snapshot: { id: 'copy', messages: [request] },
 		})
 		const leaked = await ledger.agent.context.select(copy, request, new AbortController().signal)
 		release.resolve()
@@ -10165,7 +10152,7 @@ describe('Ledger — host turns', () => {
 		expect(faulted.fault?.message).toBe(
 			`conversation ${ledger.conversation.id} changed during selection: ${before} messages before, ${before + 1} after`,
 		)
-		expect(faulted.messages).toEqual(ledger.conversation.view().slice(0, before + 1))
+		expect(faulted.messages).toEqual(ledger.conversation.messages().slice(0, before + 1))
 		expect(asked.count).toBe(0)
 		await ledger.respond('What is open on the desk?')
 		expect(asked.calls).toContainEqual([JSON.stringify(['category', added.id])])
@@ -10474,7 +10461,7 @@ describe('Ledger — a bound pass scope', () => {
 		const host = createScope({
 			name: 'host',
 			tools: ['lookup', 'recall'],
-			select: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+			select: async (conversation) => ({ messages: conversation.messages(), judgments: [] }),
 		})
 		ledger.agent.context.apply(host)
 		const scopes = createRecorder<readonly [unknown]>()
@@ -11401,7 +11388,7 @@ describe('Ledger — calibration on the head alone (claims K.1 and K.2)', () => 
 			const fresh = buildLedgerSampleShape(0, 0)
 			const shaped = buildLedgerSampleShape(thread, records)
 			const shown = shaped.ledger.agent.context.build({
-				selection: { messages: shaped.ledger.conversation.view(), judgments: [] },
+				selection: { messages: shaped.ledger.conversation.messages(), judgments: [] },
 			})
 			expect(estimateMessages(shown)).toBeGreaterThan(LEDGER_SAMPLE_CAPACITY)
 			expect(shaped.ledger.gauge).toBeUndefined()

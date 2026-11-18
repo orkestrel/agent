@@ -6,9 +6,8 @@ import { createRecorder } from '@orkestrel/test'
 
 // Claim 2.11: `collectDisclosure` over 1600 stored messages reads at most 6.6 ms, 1% of the 660 ms
 // selection stop `methods.md` records, and at 3200 messages at most 2.5 times its 1600 reading.
-// Half of each conversation sits in sections and half in the live tail. Each arm, with unique and
-// with per-turn call ids, discards 20 warmup readings and takes the median of 60, and the test logs
-// one JSON line per arm with the host's other load. The growth bar is the instrument's failing
+// Each arm, with unique and with per-turn call ids, discards 20 warmup readings and takes the median
+// of 60, and the test logs one JSON line per arm with the host's other load. The growth bar is the instrument's failing
 // control: a derivation that searches the prefix for each owner grows past it.
 
 it(
@@ -23,12 +22,8 @@ it(
 		]
 		const readings = createRecorder<readonly [size: number, unique: boolean, median: number]>()
 		for (const { size, unique } of arms) {
-			const conversation = await createDisclosureScale(size, unique)
-			expect(conversation.sections.length).toBeGreaterThan(0)
-			expect(
-				conversation.sections.flatMap((section) => section.messages).length +
-					conversation.messages().length,
-			).toBe(size)
+			const conversation = createDisclosureScale(size, unique)
+			expect(conversation.messages().length).toBe(size)
 			expect(
 				Array.from({ length: 20 }, () => collectDisclosure(conversation, BUILTIN_NAMES)),
 			).toHaveLength(20)

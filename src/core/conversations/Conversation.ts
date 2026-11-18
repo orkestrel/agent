@@ -1,155 +1,96 @@
 import type {
-	CompactOptions,
 	ConversationEventMap,
 	ConversationInterface,
 	ConversationOptions,
 	ConversationReferenceOptions,
 	ConversationSnapshot,
-	ConversationSummaryHandler,
 	JudgmentManagerInterface,
-	Section,
 } from './types.js'
 import type { Message, MessageInput } from '../types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
 import { isArray, refuseOptionKeys } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
+import { freezeJSON } from '../cloners.js'
 import { messageInputContract } from '../contracts.js'
-import { collectExchanges, removeEntries, stripThinking } from '../helpers.js'
 import { conversationSnapshotContract } from './contracts.js'
-import {
-	COMPACT_OPTION_KEYS,
-	CONVERSATION_OPTION_KEYS,
-	DEFAULT_CONVERSATION_KEEP,
-	REFERENCE_OPTION_KEYS,
-} from './constants.js'
+import { CONVERSATION_OPTION_KEYS, REFERENCE_OPTION_KEYS } from './constants.js'
 import { ConversationError } from './errors.js'
 import {
-	buildRecapMessage,
-	buildSummaryMessage,
-	raceSignal,
+	collectRemovals,
+	renderReference,
 	requireConversationSnapshot,
+	requireLabel,
 	requireMessageInput,
-	requireKeep,
-	requireCumulative,
-	requireSectionsCap,
-	requireSummary,
+	requireStoredMessage,
 } from './helpers.js'
 import { JudgmentManager } from './JudgmentManager.js'
 
 /**
- * Represents a conversation — a live uncompacted tail of messages it owns directly above a flat
- * message store, plus compacted, summarized {@link Section} records and a `summarizable` flag,
- * with on-demand `rehydrate` and substring `search`, driven by a provider-agnostic
- * {@link ConversationSummaryHandler} seam so `core` never imports a provider. Observable through
- * its own `emitter`.
+ * Represents a conversation — the messages it owns in insertion order, the judgments recorded about
+ * them, a substring `search`, a fenced cross-conversation `reference`, and a JSON `snapshot`,
+ * observable through its own `emitter`.
  *
  * @remarks
- * - **Live tail + sections.** The conversation owns its live tail directly — `#messages` is an
- *   insertion-ordered `Map` of immutable {@link Message} records keyed by their minted id
- *   (`add` / `message` / `messages` / `remove` / `clear` / `count`), exactly as a `Workspace`
- *   owns its files (no separate per-value manager). `#sections` are the compacted history
- *   (oldest → newest), each a summarized slice that retains its originals.
- * - **Stored roles.** Every stored message plays a `ConversationRole`. `add` checks every role of
- *   a batch before it stores any and throws `ConversationError` code `'ROLE'` for a `system` or
- *   unknown role; the `system` message is built per request and never stored. A hydrating
- *   `snapshot` is checked by `requireConversationSnapshot` before any member is seated: a
- *   malformed snapshot or a repeated id across section ids, section message ids, and live message
- *   ids throws `'SNAPSHOT'`, and a stored `system` message throws `'ROLE'`. The checked
- *   snapshot's top-level members are read once, and its section and message objects are seated by
- *   reference.
- * - **`view()`.** Each section folds to one synthetic summary message (role `'assistant'` — a
- *   prior-context recap — keyed by the stable `id` of the section), then the live messages
- *   verbatim. The per-section summaries are the compaction benefit.
- * - **`compact()`.** Folds the oldest `count - keep` live messages into a section (its
- *   `summary` from `#summarize`), removes them from the live tail by id, and emits `compact`.
- *   The fold stops before the newest user message, so the request a run serves and its turns
- *   stay live. An exchange is a user message and every message after it up to the next user
- *   message. Leading messages form a separate exchange, retained until the first user exchange
- *   can also fold. A cut inside an exchange moves back to its start, so a fold removes whole
- *   exchanges. A cut inside an assistant call group, which only a group spanning two exchanges
- *   allows, moves before the group, so a tool result never stays live without its call. Returns
- *   the section, or `undefined` when nothing folds. A {@link ConversationError} is thrown when no
- *   `#summarize` was supplied. Calls run one at a time, a fold commits only when its messages are
- *   still the live entries after the summarizer settles, and `options.signal` rejects the call
- *   with its reason at once and commits nothing after the abort. A digest that is not a string or
- *   whose trimmed text is empty refuses the fold it would commit with `'SUMMARY'`; such a digest for
- *   a capped merge refuses the merge and keeps the fold already committed, one section over the cap,
- *   which the next sound merge collapses.
- * - **Cumulative.** With `cumulative`, a fold makes one summarizer call over the framed recaps of all
- *   prior sections then the slice, and replaces those sections with one that retains their
- *   originals then the slice. It emits `compact` once and never `collapse`, commits nothing when
- *   the call throws, aborts, or the slice or prior sections changed, and cannot combine with a
- *   `sections` cap (`'SECTIONS'`).
- * - **`rehydrate(id)` / `search(query)`.** `rehydrate` returns the full original messages of a
- *   known section and emits its `id` through `rehydrate`, even when the list is empty. An unknown
- *   id returns `undefined` without an event. The read never reinserts messages. `search` is a case-insensitive
- *   substring scan of `content` across all messages (the originals of every section + the live
- *   tail).
- * - **Observable.** The owned {@link emitter} ({@link ConversationEventMap}) carries
- *   `compact` / `collapse` / `rehydrate`, emitted directly, strictly after the state change;
- *   the emitter isolates a listener throw and routes it to its `error` handler (the `error`
- *   option), so a buggy observer can never corrupt a compaction.
+ * - **Owned messages.** `#messages` is an insertion-ordered `Map` keyed by each message's minted
+ *   id. Every stored message is owned through JSON and deep-frozen, from `add` and from a hydrating
+ *   `snapshot` alike, so a holder can keep one by reference and its content never changes.
+ * - **Stored roles.** Every stored message plays a `ConversationRole`. `add` checks every input of a
+ *   batch before it stores any and throws `ConversationError` code `'ROLE'` for a `system` or
+ *   unknown role and `'MESSAGE'` for a malformed input; the `system` message is built per request
+ *   and never stored. A hydrating `snapshot` is checked by `requireConversationSnapshot` before any
+ *   member is seated: a malformed snapshot, a repeated id, or call arguments JSON cannot carry
+ *   throws `'SNAPSHOT'`, and a stored `system` message throws `'ROLE'`.
+ * - **Call groups.** `remove` takes the whole call group of any message it removes, as
+ *   `collectRemovals` collects it, so a provider never receives half a group.
+ * - **Judgments.** `remove` and `clear` also remove every judgment whose `sources` name a removed
+ *   message, so its text survives neither in memory nor in the next snapshot.
+ * - **Observable.** The owned {@link emitter} ({@link ConversationEventMap}) carries `add`,
+ *   `remove`, and `clear`, emitted directly after each mutation is whole; the emitter isolates a
+ *   listener throw and routes it to its `error` handler (the `error` option). `destroy()` tears it
+ *   down last.
  *
  * @example
  * ```ts
- * const conversation = new Conversation({ summarize: async (m) => `recap of ${m.length}` })
+ * const conversation = new Conversation({ id: 'desk' })
  * conversation.add([
- * 	{ role: 'user', content: 'Hello' },
- * 	{ role: 'assistant', content: 'Hi there' },
- * 	{ role: 'user', content: 'What did I say?' },
+ * 	{ role: 'user', content: 'The Brightwater refund is $148.50.' },
+ * 	{ role: 'assistant', content: 'Noted.' },
  * ])
- * const section = await conversation.compact() // folds the first two into one summarized section
- * conversation.view() // [<recap of 2>, { role: 'user', content: 'What did I say?' }]
+ * conversation.search('refund') // [the user message]
  * ```
  */
 export class Conversation implements ConversationInterface {
 	readonly #id: string
-	// The push observation surface — owned, never inherited. The emitter isolates a
-	// listener throw (routing it to the `error` handler), so it can never escape into a compaction.
+	// The push observation surface — owned, never inherited. The emitter isolates a listener throw
+	// (routing it to the `error` handler), so it can never interrupt a mutation.
 	readonly #emitter: Emitter<ConversationEventMap>
-	// The provider-agnostic summarizer seam — `undefined` ⇒ `compact()` throws (a conversation
-	// can still store + view a live tail; it cannot fold).
-	readonly #summarize: ConversationSummaryHandler | undefined
-	// How many recent live messages a `compact()` retains verbatim (older ones fold).
-	readonly #keep: number
-	// The optional cap on the compacted sections list — `undefined` ⇒ unlimited. Enforced
-	// after appending a fresh `compact()` fold: an overflow folds the oldest sections into one.
-	readonly #cap: number | undefined
-	// Whether a fold replaces every prior section with one that digests their recaps and the slice.
-	// Never combined with a cap.
-	readonly #cumulative: boolean
-	// The compacted history, oldest → newest — each summarized slice retains its originals.
-	// Replaced on every change rather than mutated in place.
-	#sections: readonly Section[]
-	// The live uncompacted tail the conversation owns directly — an insertion-ordered Map of
-	// immutable messages keyed by their minted id.
+	// The messages the conversation owns — an insertion-ordered Map of frozen messages keyed by id.
 	readonly #messages: Map<string, Message>
 	readonly #judgments: JudgmentManager
-	// The folds in flight, one per `compact()` call from its start until it settles. A later call
-	// waits on every member it finds, so an aborted waiter never releases it ahead of a fold still
-	// running.
-	readonly #pending = new Set<Promise<Section | undefined>>()
 
 	constructor(options?: ConversationOptions) {
 		refuseOptionKeys(options, CONVERSATION_OPTION_KEYS, 'Conversation', 'ConversationOptions')
-		// A summarizer is a function and is never serialized, so it comes from options beside the
-		// snapshot. Restoring is silent: nothing was edited, so no event fires. The snapshot is checked
-		// before any member is seated, and every member is seated from the checked read alone.
+		// Restoring is silent: nothing was edited, so no event fires. The snapshot is checked before
+		// any member is seated, and every member is seated from the checked read alone.
 		const supplied = options?.snapshot
 		const snapshot =
 			supplied === undefined
 				? undefined
 				: requireConversationSnapshot(supplied, conversationSnapshotContract)
+		// The copy reads each message again, so the owned copy is checked too.
+		const owned = (snapshot?.messages ?? []).map((message) =>
+			requireStoredMessage(freezeJSON(message), 'SNAPSHOT'),
+		)
+		this.#messages = new Map(owned.map((message) => [message.id, message]))
+		if (this.#messages.size !== owned.length) {
+			throw new ConversationError(
+				'SNAPSHOT',
+				'a conversation snapshot repeats a message id on its second read; pass what snapshot() returned',
+			)
+		}
 		this.#judgments = new JudgmentManager(snapshot?.judgments)
 		this.#id = snapshot?.id ?? options?.id ?? crypto.randomUUID()
 		this.#emitter = new Emitter<ConversationEventMap>(options)
-		this.#summarize = options?.summarize
-		this.#keep = requireKeep(options?.keep ?? DEFAULT_CONVERSATION_KEEP)
-		this.#cap = requireSectionsCap(options?.sections)
-		this.#cumulative = options?.cumulative ?? false
-		requireCumulative(this.#cumulative, this.#cap)
-		this.#sections = snapshot === undefined ? [] : [...snapshot.sections]
-		this.#messages = new Map(snapshot?.messages.map((message) => [message.id, message]))
 	}
 
 	get id(): string {
@@ -164,17 +105,6 @@ export class Conversation implements ConversationInterface {
 		return this.#emitter
 	}
 
-	get sections(): readonly Section[] {
-		return [...this.#sections]
-	}
-
-	get summarizable(): boolean {
-		// True exactly when a summarizer was supplied — the clean signal the automatic compaction of
-		// the agent loop gates on (a non-summarizable conversation is never auto-compacted, so the
-		// auto path never throws the `SUMMARIZER` ConversationError). A manual `compact()` still throws.
-		return this.#summarize !== undefined
-	}
-
 	get count(): number {
 		return this.#messages.size
 	}
@@ -183,11 +113,20 @@ export class Conversation implements ConversationInterface {
 	add(inputs: readonly MessageInput[]): readonly Message[]
 	add(input: MessageInput | readonly MessageInput[]): Message | readonly Message[] {
 		if (isArray(input)) {
-			// Every input is checked before any element is stored, so a refused batch stores nothing.
-			input.forEach((one) => requireMessageInput(one, messageInputContract))
-			return input.map((one) => this.#create(one))
+			// Every input is checked and owned before any element is stored, so a refused batch stores
+			// nothing, and every message is stored before the first `add` event. `Array.from` visits a
+			// hole as an undefined input, which the check refuses; `map` would skip it.
+			const created = Array.from(input, (one) =>
+				this.#create(requireMessageInput(one, messageInputContract)),
+			)
+			for (const message of created) this.#messages.set(message.id, message)
+			for (const message of created) this.#emitter.emit('add', message)
+			return created
 		}
-		return this.#create(requireMessageInput(input, messageInputContract))
+		const message = this.#create(requireMessageInput(input, messageInputContract))
+		this.#messages.set(message.id, message)
+		this.#emitter.emit('add', message)
+		return message
 	}
 
 	message(id: string): Message | undefined {
@@ -201,189 +140,62 @@ export class Conversation implements ConversationInterface {
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
 	remove(ids: string | readonly string[]): boolean {
-		if (isArray(ids)) {
-			return removeEntries(ids, (id) => this.#messages.delete(id))
-		}
-		return this.#messages.delete(ids)
+		const named = isArray(ids) ? ids : [ids]
+		// Presence is read before anything leaves, so a batch naming two members of one call group
+		// still counts both as present.
+		// `Array.from` passes a hole in `named` to the check as `undefined`, which no message holds.
+		const present = Array.from(named, (id) => this.#messages.has(id)).every((held) => held)
+		const removed = collectRemovals([...this.#messages.values()], named)
+		this.#drop(removed)
+		for (const id of removed) this.#emitter.emit('remove', id)
+		return present
 	}
 
 	clear(): void {
-		this.#messages.clear()
-	}
-
-	view(): readonly Message[] {
-		// The recap is framed (a `[Summary of earlier messages]` label prefix) so a small model reads
-		// it as a condensed recap of prior turns, not as a literal assistant turn it must echo / treat
-		// as the latest answer — a lean label (a handful of tokens), proven no-bloat by a test guard.
-		return [
-			...this.#sections.map((section) => buildRecapMessage(section)),
-			...this.#messages.values(),
-		]
-	}
-
-	async compact(options?: CompactOptions): Promise<Section | undefined> {
-		refuseOptionKeys(options, COMPACT_OPTION_KEYS, 'Conversation', 'CompactOptions')
-		const summarize = this.#summarize
-		if (summarize === undefined) {
-			throw new ConversationError(
-				'SUMMARIZER',
-				'cannot compact a conversation without a summarizer',
-			)
-		}
-		const cap = requireSectionsCap(options?.sections ?? this.#cap)
-		requireCumulative(this.#cumulative, cap)
-		const keep = requireKeep(options?.keep ?? this.#keep)
-		const signal = options?.signal
-		signal?.throwIfAborted()
-		// Queue behind every earlier fold, captured before this call adds its own. An earlier waiter
-		// that aborts leaves the folds it waited on in the set, so a later call still waits for them.
-		const previous = this.#pending.size === 0 ? undefined : Promise.allSettled([...this.#pending])
-		const fold = this.#fold(previous, summarize, cap, keep, signal)
-		this.#pending.add(fold)
-		void fold.then(
-			() => this.#pending.delete(fold),
-			() => this.#pending.delete(fold),
-		)
-		return fold
-	}
-
-	rehydrate(id: string): readonly Message[] | undefined {
-		const section = this.#sections.find((one) => one.id === id)
-		if (section === undefined) return undefined
-		// Emitted after resolving, because a read has no mutation for a listener to perturb.
-		this.#emitter.emit('rehydrate', id)
-		return section.messages
+		this.#drop([...this.#messages.keys()])
+		this.#emitter.emit('clear')
 	}
 
 	search(query: string): readonly Message[] {
-		// Section originals (oldest → newest) come before the live tail.
 		const needle = query.toLowerCase()
-		const all = [
-			...this.#sections.flatMap((section) => section.messages),
-			...this.#messages.values(),
-		]
-		return all.filter((message) => message.content.toLowerCase().includes(needle))
+		return [...this.#messages.values()].filter((message) =>
+			message.content.toLowerCase().includes(needle),
+		)
 	}
 
 	reference(options?: ConversationReferenceOptions): string {
 		refuseOptionKeys(options, REFERENCE_OPTION_KEYS, 'Conversation', 'ConversationReferenceOptions')
-		// The leading marker states the block is not part of the live conversation, so a small
-		// model reads the cherry-picked excerpts as foreign material it attributes to that source,
-		// never as its own latest turns.
-		const label = options?.label ?? this.#id
-		const messages = options?.messages ?? []
-		// `Array.from` visits a hole in `messages` as an undefined message, as iteration does; `map` skips it.
-		return [
-			`[Reference — conversation "${label}" — NOT part of this conversation]`,
-			...(messages.length > 0
-				? [
-						'Relevant messages:',
-						...Array.from(messages, (message) => `- ${message.role}: ${message.content}`),
-					]
-				: []),
-		].join('\n')
+		// The markers state the block is not part of the live conversation, so a small model reads the
+		// cherry-picked excerpts as foreign material it attributes to that source.
+		return renderReference(requireLabel(options?.label ?? this.#id), options?.messages ?? [])
 	}
 
 	snapshot(): ConversationSnapshot {
-		// The summarizer / keep are not serialized — they are live config re-supplied on hydrate
-		// (a ConversationSummaryHandler is a function, not data).
 		return {
 			id: this.#id,
-			sections: this.sections,
 			messages: this.messages(),
 			...(this.#judgments.count === 0 ? {} : { judgments: this.#judgments.judgments() }),
 		}
 	}
 
-	// One serialized fold: wait for the earlier call, read the live tail, summarize, then commit
-	// only what is unchanged. Every await is raced against the signal and followed by a check, so
-	// an abort commits nothing after it.
-	async #fold(
-		previous: Promise<unknown> | undefined,
-		summarize: ConversationSummaryHandler,
-		cap: number | undefined,
-		keep: number,
-		signal: AbortSignal | undefined,
-	): Promise<Section | undefined> {
-		if (previous !== undefined) await raceSignal(previous, signal)
-		signal?.throwIfAborted()
-		const live = [...this.#messages.values()]
-		// The newest user message is the request a run serves, so it and its turns stay live.
-		const newest = live.findLastIndex((message) => message.role === 'user')
-		const first = live.findIndex((message) => message.role === 'user')
-		const wanted = Math.min(
-			keep <= 0 ? live.length : live.length - keep,
-			newest === -1 ? live.length : newest,
-		)
-		// A cut inside an exchange moves back to that exchange's start so a whole exchange folds or
-		// stays. At most one exchange strictly contains the cut.
-		const { aligned } = collectExchanges(live).reduce(
-			(cut, exchange) => {
-				const end = cut.start + exchange.length
-				return { start: end, aligned: cut.start < wanted && wanted < end ? cut.start : cut.aligned }
-			},
-			{ start: 0, aligned: wanted },
-		)
-		// Retain the leading context until the first user exchange can fold with it.
-		const fold = first >= 0 && aligned <= first ? 0 : aligned
-		if (fold <= 0) return undefined
-		const slice = live.slice(0, fold)
-		// A cumulative fold digests every prior recap (framed, oldest first) ahead of the slice in one
-		// call; the originals behind those recaps are never sent.
-		const prior = this.#cumulative ? this.#sections : []
-		const request = [...prior.map((one) => buildRecapMessage(one)), ...stripThinking(slice, 'none')]
-		const summary = await raceSignal(summarize(request, signal), signal)
-		signal?.throwIfAborted()
-		requireSummary(summary)
-		// A `remove` or `clear` while the summarizer ran changed what this fold covers, so commit
-		// nothing rather than fold messages the caller dropped back into a section.
-		if (!slice.every((message) => this.#messages.get(message.id) === message)) return undefined
-		// The recaps the digest covers must still be the sections held, or the replacement would drop
-		// a section it never summarized.
-		if (
-			this.#cumulative &&
-			(this.#sections.length !== prior.length ||
-				!prior.every((one, index) => this.#sections[index] === one))
-		) {
-			return undefined
-		}
-		const section: Section = {
-			id: crypto.randomUUID(),
-			summary,
-			messages: this.#cumulative ? [...prior.flatMap((one) => one.messages), ...slice] : slice,
-		}
-		for (const message of slice) this.#messages.delete(message.id)
-		this.#sections = this.#cumulative ? [section] : [...this.#sections, section]
-		// Preserve the original sections if the merge fails by replacing them only after summarizing.
-		if (cap !== undefined && this.#sections.length > cap) {
-			const overflow = this.#sections.length - cap + 1
-			const folded = this.#sections.slice(0, overflow)
-			const digest = await raceSignal(
-				summarize(
-					folded.map((one) => buildSummaryMessage(one)),
-					signal,
-				),
-				signal,
-			)
-			signal?.throwIfAborted()
-			requireSummary(digest)
-			// Only a fold changes `#sections`, and folds run one at a time, so the head holds here;
-			// the check keeps a merge from ever replacing sections it did not summarize.
-			if (!folded.every((one, index) => this.#sections[index] === one)) return undefined
-			const merged: Section = {
-				id: crypto.randomUUID(),
-				summary: digest,
-				messages: folded.flatMap((one) => one.messages),
-			}
-			this.#sections = [merged, ...this.#sections.slice(overflow)]
-			this.#emitter.emit('collapse', merged)
-		}
-		// Observe the section last, so a swallowed listener throw can't perturb the fold.
-		this.#emitter.emit('compact', section)
-		return section
+	destroy(): void {
+		this.#emitter.destroy()
 	}
 
-	// Spread each optional only when present, so an absent optional is never stored as `undefined`.
+	// Deletes the messages by id, then every judgment whose sources name one of them, so a removed
+	// message's text leaves the judgment store with it.
+	#drop(ids: readonly string[]): void {
+		const removed = new Set(ids)
+		for (const id of removed) this.#messages.delete(id)
+		const quoting = this.#judgments
+			.judgments()
+			.filter((judgment) => judgment.sources.some((source) => removed.has(source)))
+			.map((judgment) => judgment.id)
+		if (quoting.length > 0) this.#judgments.remove(quoting)
+	}
+
+	// Builds the message from its checked input, spreading each optional only when present so an
+	// absent optional is never stored as `undefined`, then owns and freezes it through JSON.
 	#create(input: MessageInput): Message {
 		const message: Message = {
 			id: crypto.randomUUID(),
@@ -402,7 +214,6 @@ export class Conversation implements ConversationInterface {
 			...(input.images === undefined ? {} : { images: input.images }),
 			...(input.thinking === undefined ? {} : { thinking: input.thinking }),
 		}
-		this.#messages.set(message.id, message)
-		return message
+		return requireStoredMessage(freezeJSON(message), 'MESSAGE')
 	}
 }

@@ -181,7 +181,6 @@ export const AGENT_OPTION_KEYS = Object.freeze([
 	'signal',
 	'authority',
 	'conversations',
-	'window',
 	'strict',
 	'select',
 	'builtins',

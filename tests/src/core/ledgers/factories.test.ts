@@ -32,7 +32,6 @@ describe('createLedger', () => {
 		expect(ledger).toBeInstanceOf(Ledger)
 		expect(Classifier).toBeTypeOf('function')
 		expect(new Gauge({ scale: 1, overhead: 0, capacity: 4096 }).scale).toBe(1)
-		expect(ledger.conversation.summarizable).toBe(false)
 		expect(ledger.agent.context.conversations.count).toBe(1)
 	})
 	it('checks missing threshold keys on both construction routes', () => {

@@ -1,4 +1,4 @@
-import type { ConversationInterface, ConversationSnapshot, Section } from './types.js'
+import type { ConversationInterface, ConversationSnapshot } from './types.js'
 import type { Judgment, Message, MessageInput } from '../types.js'
 import type { Guard } from '@orkestrel/contract'
 import { isTokenUsage } from '@orkestrel/budget'
@@ -6,7 +6,6 @@ import {
 	arrayOf,
 	attempt,
 	holds,
-	isBoolean,
 	isFiniteNumber,
 	isFunction,
 	isObject,
@@ -147,78 +146,44 @@ export const isJudgment: Guard<Judgment> = unionOf(
 )
 
 /**
- * Checks whether an `unknown` is structurally a {@link Section} record — a `string` `id` and
- * `summary` beside a `messages` array of valid {@link Message} records, the per-section step of
- * the {@link isConversationSnapshot} read-boundary narrow. Total, never throwing, and never an
- * assertion.
- *
- * @remarks
- * A total guard (it never throws — untrusted input, a throwing getter included, returns
- * `false`). It checks the shape of the section: a record with a `string` `id`, a `string`
- * `summary`, and a dense `messages` array every element of which is a valid {@link Message}
- * record ({@link isMessage}), and no other member; a sparse `messages` array is refused. Enough to
- * safely impose the {@link Section} type at a storage boundary without a cast.
- *
- * @param value - The value to test (one element of a snapshot's `sections` array)
- * @returns True if `value` has the structural shape of a {@link Section}; false otherwise
- *
- * @example
- * ```ts
- * isSection({ id: 's', summary: 'recap', messages: [{ id: '1', role: 'user', content: 'hi' }] }) // true
- * isSection({ id: 's', summary: 'recap', messages: 'nope' }) // false
- * isSection({ id: 's', messages: [] }) // false (missing summary)
- * ```
- */
-export function isSection(value: unknown): value is Section {
-	return holds(() => {
-		if (!isRecord(value) || Object.keys(value).length !== 3) return false
-		const { id, summary, messages } = value
-		return isString(id) && isString(summary) && arrayOf(isMessage)(messages)
-	})
-}
-
-/**
- * Narrows an `unknown` to a {@link ConversationSnapshot} — a `string` `id` and valid
- * `sections` and `messages` arrays; the total boundary guard for an untrusted snapshot read (a storage row a
+ * Narrows an `unknown` to a {@link ConversationSnapshot} — a `string` `id`, a valid `messages`
+ * array, and valid `judgments` when present; the total boundary guard for an untrusted snapshot read
+ * (a storage row a
  * {@link import('./stores/DatabaseConversationStore.js').DatabaseConversationStore}
- * reads back from its opaque JSON column, a snapshot loaded from disk), never throwing. The exact
+ * reads back from its opaque JSON column, a snapshot loaded from disk), never throwing. The
  * analogue of {@link import('@orkestrel/workspace').isWorkspaceSnapshot}.
  *
  * @remarks
  * A total guard (it never throws — untrusted input returns `false`). It checks the shape of the
- * snapshot: a `string` `id`, a `sections` array every element of which is a valid
- * {@link Section} ({@link isSection}), a `messages` array every element of which is a
- * valid {@link Message} ({@link isMessage}), and optional valid `judgments` — enough to safely
- * impose the
- * {@link ConversationSnapshot} type at a storage boundary without a cast. The structural twin of
- * {@link import('@orkestrel/workspace').isWorkspaceSnapshot}. The guard is exact: an unknown member, a
- * 0.0.35 snapshot's conversation `summary` included, and an own `undefined` `judgments` return
- * `false`, as a malformed blob (a non-record, a missing / non-string `id`, a non-array `sections` /
- * `messages`, or any malformed element) does, so a
+ * snapshot: a `string` `id`, a `messages` array every element of which is a valid {@link Message}
+ * ({@link isMessage}), and optional valid `judgments` — enough to safely impose the
+ * {@link ConversationSnapshot} type at a storage boundary without a cast. The guard is exact: an
+ * unknown member, a `sections` member included, and an own `undefined` `judgments` return `false`,
+ * as a malformed blob (a non-record, a missing / non-string `id`, a non-array `messages`, or any
+ * malformed element) does, so a
  * {@link import('./stores/DatabaseConversationStore.js').DatabaseConversationStore}
  * read refuses it rather than seating a broken conversation. The guard is structural: it admits a
- * stored `system` role and a repeated id, which `requireConversationSnapshot` and the
- * {@link import('./Conversation.js').Conversation} constructor then refuse as the stored-data
- * check a conversation runs at hydrate.
+ * stored `system` role, a repeated id, and call arguments JSON cannot carry, which
+ * `requireConversationSnapshot` then refuses as the stored-data check a conversation runs at
+ * hydrate.
  *
  * @param value - The value to test (an opaque storage read)
  * @returns True if `value` has the structural shape of a {@link ConversationSnapshot}; false otherwise
  *
  * @example
  * ```ts
- * isConversationSnapshot({ id: 'c1', sections: [], messages: [] }) // true
- * isConversationSnapshot({ id: 'c1', sections: 'nope', messages: [] }) // false
- * isConversationSnapshot({ sections: [], messages: [] }) // false (missing id)
+ * isConversationSnapshot({ id: 'c1', messages: [] }) // true
+ * isConversationSnapshot({ id: 'c1', sections: [], messages: [] }) // false (unknown member)
+ * isConversationSnapshot({ messages: [] }) // false (missing id)
  * ```
  */
 export function isConversationSnapshot(value: unknown): value is ConversationSnapshot {
 	return holds(() => {
 		if (!isRecord(value)) return false
-		const { id, sections, messages, judgments } = value
+		const { id, messages, judgments } = value
 		return (
-			Object.keys(value).length === (judgments === undefined ? 3 : 4) &&
+			Object.keys(value).length === (judgments === undefined ? 2 : 3) &&
 			isString(id) &&
-			arrayOf(isSection)(sections) &&
 			arrayOf(isMessage)(messages) &&
 			optionalOf(arrayOf(isJudgment))(judgments)
 		)
@@ -227,7 +192,7 @@ export function isConversationSnapshot(value: unknown): value is ConversationSna
 
 /**
  * Checks whether a value carries the {@link ConversationInterface} members a run reads: a string
- * `id`, a boolean `summarizable`, and `view`, `add`, `compact`, and `messages` methods.
+ * `id` and `add` and `messages` methods.
  *
  * @remarks
  * A total guard: a throwing getter, a revoked `Proxy`, and any other malformed input return false.
@@ -247,10 +212,7 @@ export function isConversation(value: unknown): value is ConversationInterface {
 		if (!isObject(value)) return false
 		return (
 			isString(Reflect.get(value, 'id')) &&
-			isBoolean(Reflect.get(value, 'summarizable')) &&
-			isFunction(Reflect.get(value, 'view')) &&
 			isFunction(Reflect.get(value, 'add')) &&
-			isFunction(Reflect.get(value, 'compact')) &&
 			isFunction(Reflect.get(value, 'messages'))
 		)
 	})

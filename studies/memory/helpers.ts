@@ -1,11 +1,10 @@
 import type { JSONValue } from '@orkestrel/contract'
-import type { LedgerGauge, Message, JudgeQuestion, JudgeResult } from '@orkestrel/agent'
+import type { Message, JudgeQuestion, JudgeResult } from '@orkestrel/agent'
 import type {
 	StudyEvidence,
 	StudyJudgment,
 	StudyProfile,
 	StudyProvider,
-	StudyRoom,
 	StudyScenario,
 } from '@orkestrel/study'
 import type {
@@ -19,20 +18,17 @@ import type {
 	StudyMemoryArm,
 	StudyMemoryPolicy,
 	StudyMemoryTriage,
-	StudyMemoryCompaction,
 	StudyMemoryObservation,
 	StudyMemoryProvenance,
 	StudyMemoryCarriageInput,
 	StudyMemoryProgress,
 	StudyMemoryProvenanceSource,
-	StudyMemoryRetentionInput,
 	StudyMemoryTally,
 } from './types.js'
-import { canonicalStringify, isArray, isRecord, parseJSON, preview } from '@orkestrel/contract'
+import { canonicalStringify, isArray, isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
 import {
 	STUDY_MEMORY_LEDGER_REPEAT,
-	STUDY_MEMORY_REPEAT,
 	STUDY_MEMORY_PARAMETERS,
 	STUDY_MEMORY_POLICY,
 	STUDY_MEMORY_TOLERANCE,
@@ -125,26 +121,6 @@ export function filterStudyMemoryResult(result: JudgeResult, ids: readonly strin
 	}
 }
 
-/** Reads the explicit compaction gauge without supplying a fallback. @param settings - Profile settings. @returns A copy of the declared gauge. @throws StudyError - CONFIG when the settings are absent, malformed or declare no gauge. */
-export function readStudyMemoryGauge(settings: unknown): LedgerGauge {
-	if (!isStudyMemoryOptions(settings) || settings.gauge === undefined)
-		throw new StudyError('CONFIG', 'Memory compaction requires an explicit settings gauge')
-	return { scale: settings.gauge.scale, overhead: settings.gauge.overhead }
-}
-
-/** Reads the recap allowance only the compaction arm uses. @param room - Declared room. @returns The recap allowance. @throws StudyError - CONFIG when the room declares none. */
-export function readStudyMemoryRecap(room: StudyRoom): number {
-	if (room.recap === undefined)
-		throw new StudyError('CONFIG', 'Memory compaction requires a declared recap allowance')
-	return room.recap
-}
-
-/** Reads what only the compaction arm declares: its explicit gauge and recap allowance. @param profile - Runtime profile. @returns The gauge copy and the recap allowance. @throws StudyError - CONFIG when the gauge is absent or malformed, or the profile declares no recap allowance. */
-export function readStudyMemoryCompaction(profile: StudyProfile): StudyMemoryCompaction {
-	const gauge = readStudyMemoryGauge(profile.settings)
-	return { gauge, recap: readStudyMemoryRecap(profile.room) }
-}
-
 /** Reads the judge model only the records arm uses. @param provider - Declared serving identities. @returns The judge model name. @throws StudyError - CONFIG when the judge model or its digest is not declared. */
 export function readStudyMemoryJudge(provider: StudyProvider): string {
 	if (provider.judge === undefined || provider.digest.judge === undefined)
@@ -161,14 +137,13 @@ export function resolveStudyMemoryObservation(settings: unknown): StudyMemoryObs
 	return { observe, checkpoints: new Set(observe ? (settings.checkpoints ?? []) : []) }
 }
 
-/** Reads one message's origin from session-held joins only, never from its text or position. @param message - A message of a measured request. @param source - The session's explicit ids, section ids and conversation membership. @returns The nonadditive origin; `unknown` when no join applies. */
+/** Reads one message's origin from session-held joins only, never from its text or position. @param message - A message of a measured request. @param source - The session's explicit ids and conversation membership. @returns The nonadditive origin; `unknown` when no join applies. */
 export function readStudyMemoryProvenance(
 	message: Message,
 	source: StudyMemoryProvenanceSource,
 ): StudyMemoryProvenance {
 	const explicit = source.explicit.get(message.id)
 	if (explicit !== undefined) return explicit
-	if (source.sections.has(message.id)) return { origin: 'summary', source: message.id }
 	if (message.role === 'tool') return { origin: 'tool' }
 	if (message.role === 'system')
 		return source.composed ? { origin: 'mixed' } : { origin: 'instructions', source: 'desk' }
@@ -188,7 +163,7 @@ export function buildStudyMemoryOrigins(
 	})
 }
 
-/** Checks well-formed driver settings, then the generic provider and room declarations through Study's guards, then what only the selected arms require. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest and the compaction arm a recap allowance. @returns Nothing when admitted. @throws StudyError - CONFIG when the settings, the provider declaration (exact digests and uncredentialed origin) or the room (positive finite integers leaving prompt capacity) is invalid, a declared recording names no metadata, or an arm's requirement is not met. */
+/** Checks well-formed driver settings, then the generic provider and room declarations through Study's guards, then what only the selected arms require. @param profile - Runtime profile. @param arms - The arms the study dispatches; the records arm requires a judge model and digest. @returns Nothing when admitted. @throws StudyError - CONFIG when the settings, the provider declaration (exact digests and uncredentialed origin) or the room (positive finite integers leaving prompt capacity) is invalid, a declared recording names no metadata, or an arm's requirement is not met. */
 export function validateStudyMemoryProfile(
 	profile: StudyProfile,
 	arms: readonly StudyMemoryArm[],
@@ -209,22 +184,6 @@ export function validateStudyMemoryProfile(
 			'Memory requires an exact judge model and digest where one is used',
 		)
 	if (!isStudyRoom(room)) throw new StudyError('CONFIG', 'Memory room declaration is invalid')
-	if (arms.includes('compaction') && room.recap === undefined)
-		throw new StudyError('CONFIG', 'Memory compaction requires a declared recap allowance')
-}
-
-/** Checks that a memory declaration schedules exactly one strategy, records or compaction, with `full` as the only other arm, so the two strategies run as separate studies. @param name - The declaration's name, JSON-encoded and capped by `preview` in a refusal. @param arms - The declaration's admitted arms. @returns Nothing when admitted. @throws StudyError - CONFIG when the arms list both strategies, or list neither. */
-export function validateStudyMemoryStrategy(name: string, arms: readonly StudyMemoryArm[]): void {
-	if (arms.includes('records') && arms.includes('compaction'))
-		throw new StudyError(
-			'CONFIG',
-			`Memory declaration ${preview(name)} lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study`,
-		)
-	if (!arms.includes('records') && !arms.includes('compaction'))
-		throw new StudyError(
-			'CONFIG',
-			`Memory declaration ${preview(name)} lists neither strategy in its arms; list one of records or compaction, with full as the only other arm`,
-		)
 }
 
 /** Checks the checkpoint list against the scenarios a declaration holds, which only the adapter sees whole under a goal range. @param settings - Profile settings, already well formed. @param scenarios - The declaration's complete scenarios. @returns Nothing when admitted. @throws StudyError - CONFIG when the list is longer than the largest scenario's goal count or an id names no goal of a scenario. */
@@ -248,14 +207,13 @@ export function validateStudyMemoryCheckpoints(
 			)
 }
 
-/** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room. @param arm - The treatment; only compaction declares the summary role and the strict native flags, and only records declares the one-token judge. @returns The agent role, plus the summary role for compaction and the judge role for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */
+/** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room. @param arm - The treatment; only records declares the one-token judge and the triage. @returns The agent role, plus the judge role, and the triage role when declared, for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */
 export function buildStudyMemoryRoles(
 	profile: StudyProfile,
 	arm: StudyMemoryArm,
 ): StudyOllamaTransportOptions['roles'] {
 	const { provider, room } = profile
 	if (provider === undefined) throw new StudyError('CONFIG', 'Memory provider is required')
-	const compaction = arm === 'compaction'
 	if ((provider.triage === undefined) !== (provider.digest.triage === undefined))
 		throw new StudyError('CONFIG', 'Memory triage requires a model and digest together')
 	const placement = isStudyMemoryOptions(profile.settings) ? profile.settings.judge : undefined
@@ -268,26 +226,11 @@ export function buildStudyMemoryRoles(
 				...STUDY_MEMORY_PARAMETERS.agent,
 			},
 			think: room.think,
-			strict: compaction,
+			strict: false,
 			length: true,
 		},
 		...(arm === 'records' && provider.triage !== undefined
 			? { triage: { model: provider.triage, tokens: profile.bounds.request.tokens } }
-			: {}),
-		...(compaction
-			? {
-					summary: {
-						model: provider.model,
-						options: {
-							num_ctx: room.context,
-							num_predict: readStudyMemoryRecap(room),
-							...STUDY_MEMORY_PARAMETERS.summary,
-						},
-						think: false,
-						strict: true,
-						length: false,
-					},
-				}
 			: {}),
 		...(arm === 'records'
 			? {
@@ -327,8 +270,9 @@ export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeVerdic
 					(row) =>
 						row.goal === criterion.goal &&
 						row.event === assertion.observation &&
-						(assertion.observation === 'summary' ||
-							(isRecord(row.value) && 'id' in assertion && row.value.id === assertion.id)),
+						isRecord(row.value) &&
+						'id' in assertion &&
+						row.value.id === assertion.id,
 				)
 			: -1
 	const unread: { verdict: StudyJudgment['verdict']; references: readonly StudyReference[] } = {
@@ -374,19 +318,6 @@ export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeVerdic
 /** Derives a share from a tally. @param tally - Found and counted literals. @returns `found / total`, or `undefined` when nothing was counted. */
 export function computeStudyMemoryShare(tally: StudyMemoryTally): number | undefined {
 	return tally.total === 0 ? undefined : tally.found / tally.total
-}
-
-/** Reads literal retention: the history ids that recur in later requests, and how many of them the post-fold view still carries. @param input - Folded slice, later texts, post-fold view and literal reader. @returns The tally over the recurring ids. */
-export function computeStudyMemoryRetention(input: StudyMemoryRetentionInput): StudyMemoryTally {
-	const later = new Set<string>()
-	for (const text of input.later) for (const id of input.literals(text)) later.add(id)
-	const view = new Set<string>()
-	for (const text of input.view) for (const id of input.literals(text)) view.add(id)
-	const recurring = new Set<string>()
-	for (const text of input.history)
-		for (const id of input.literals(text)) if (later.has(id)) recurring.add(id)
-	const found = [...recurring].filter((id) => view.has(id)).length
-	return { found, total: recurring.size }
 }
 
 /** Reads carriage: the ids of a referenced prior product that the built prompt carries. @param input - Product text, prompt texts and literal reader. @returns The tally over the product ids. */
@@ -495,9 +426,7 @@ export function readStudyMemoryProgress(evidence: readonly StudyEvidence[]): Stu
 		...(reasons.length === 0
 			? {}
 			: {
-					repeats: reasons.filter(
-						(reason) => reason === STUDY_MEMORY_REPEAT || reason === STUDY_MEMORY_LEDGER_REPEAT,
-					).length,
+					repeats: reasons.filter((reason) => reason === STUDY_MEMORY_LEDGER_REPEAT).length,
 				}),
 		...(system === undefined ? {} : { system }),
 		...(cache.length === 0 ? {} : { cache }),

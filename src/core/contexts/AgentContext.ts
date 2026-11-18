@@ -60,13 +60,13 @@ import {
  * - **The default conversation — the conversation registry's active conversation.** `conversations`
  *   is a {@link ConversationManagerInterface}. The constructor adds a default conversation when the
  *   manager has no active one, so the dynamic `messages` getter — `this.#conversations.active` — is
- *   always defined. `messages` returns the active conversation itself (it owns the live tail + the
+ *   always defined. `messages` returns the active conversation itself (it owns its messages and the
  *   message verbs directly, satisfying
  *   {@link import('../conversations/index.js').MessageManagerInterface} structurally — the same
- *   reference, no duplication), and `build()` with no selection folds that conversation's `view()`
- *   (its per-section summaries + live tail) as the authoritative message inclusion — the scope does
- *   not filter the conversation (it owns inclusion through compaction; scope filters only
- *   instructions / skills / memos / tools / workspace files / workspaces). An agent run binds a conversation at
+ *   reference, no duplication), and `build()` with no selection folds that conversation's
+ *   `messages()` as the authoritative message inclusion — the scope does not filter the
+ *   conversation (scope filters only instructions / skills / memos / tools / workspace files /
+ *   workspaces). An agent run binds a conversation at
  *   its call, the active one unless the run names another, and builds through a selection over that
  *   conversation, so `conversations.switch(id)` sets the next run's default at any moment and never
  *   moves a live run; `select(conversation, request, signal)` checks the conversation it is given.
@@ -77,8 +77,8 @@ import {
  *   `system` message (prepended only when at least one part exists), then the scope-filtered memos
  *   index (the same block), the listed workspace ids, and the rendered workspace's text files into
  *   one `user` context message (present only when one of those sections renders), then
- *   appends the active conversation's `view()` (the conversation owns message inclusion through
- *   compaction — the scope does not filter the conversation). The instruction manager resolves
+ *   appends the active conversation's `messages()` (the scope does not filter the conversation).
+ *   The instruction manager resolves
  *   each `open` / item / `close` most-specific-first: `open` = manager-options-override >
  *   built-in; per item = item-override > manager-options-override > built-in; `close` =
  *   manager-options-override (no built-in ⇒ no closing line when unset) (see
@@ -89,9 +89,9 @@ import {
  *   always reflects the current managers / messages / scope / workspaces; it never mutates a
  *   manager or the stored messages. `build(selection)` adds at most one `system` message of its own
  *   and reads the selection's messages as conversation parts without a role check; the select path
- *   refuses a selected `system` role as a `'ROLE'` fault over `view()`; a host's direct
- *   `build(selection)` is host-trusted, and a conversation a host implements itself whose `view()`
- *   holds a `system` message is read as host-trusted too.
+ *   refuses a selected `system` role as a `'ROLE'` fault over `messages()`; a host's direct
+ *   `build(selection)` is host-trusted, and a conversation a host implements itself whose
+ *   `messages()` holds a `system` message is read as host-trusted too.
  * - **The rendered workspace, by carrier — the sole document/image context.**
  *   The rendered workspace has its {@link import('@orkestrel/workspace').FileInterface} values scope-filtered by `scope.files`,
  *   then split: text files fold into a dedicated `## Workspace` section (fenced reference blocks)
@@ -130,7 +130,7 @@ export class AgentContext implements AgentContextInterface {
 	readonly #workspaces: WorkspaceManagerInterface
 	// The conversation registry whose active conversation is a run's default: the dynamic `messages`
 	// getter returns `#conversations.active`, which the constructor seeds when absent, and `build()`
-	// with no selection folds that conversation's `view()`. The registry is structural; switch its
+	// with no selection folds that conversation's `messages()`. The registry is structural; switch its
 	// active conversation through `conversations.switch(id)`.
 	readonly #conversations: ConversationManagerInterface
 	readonly #tools: ToolManagerInterface
@@ -284,13 +284,12 @@ export class AgentContext implements AgentContextInterface {
 			(block) => block,
 			this.#memos.close,
 		)
-		// With no selection, the active conversation's `view()` is authoritative (the per-section
-		// summaries + the live tail) — the conversation owns message inclusion through compaction, so the
-		// scope does not filter the conversation here (scope filters only the preceding instructions /
-		// skills / memos / tools / workspace files / workspaces). The active conversation is always present (the
+		// With no selection, the active conversation's `messages()` are authoritative — the scope does not
+		// filter the conversation here (scope filters only the preceding instructions / skills / memos /
+		// tools / workspace files / workspaces). The active conversation is always present (the
 		// constructor adds one), with `#ensureConversation()` as a total fallback if a caller emptied its
 		// supplied registry.
-		const conversation = options?.selection?.messages ?? this.#ensureConversation().view()
+		const conversation = options?.selection?.messages ?? this.#ensureConversation().messages()
 		// A vision provider reads image payloads from a user turn.
 		const tail = attachUserImages(conversation, collectImageData(files))
 		// The admitted ids, only while the run can switch the workspace.
@@ -319,19 +318,20 @@ export class AgentContext implements AgentContextInterface {
 		return [system, ...context, ...tail]
 	}
 
-	// Another run can append to the conversation while the handler awaits, so the view's ids are
+	// Another run can append to the conversation while the handler awaits, so its message ids are
 	// recorded before the call (an async body runs synchronously up to its first `await`) and
-	// compared after it; a changed view turns the handler's selection into a fault over `view()`.
-	// Over an unchanged view, a selected message whose role is not a conversation role does the same.
+	// compared after it; a changed conversation turns the handler's selection into a fault over
+	// `messages()`. Over an unchanged conversation, a selected message whose role is not a
+	// conversation role does the same.
 	async #check(
 		handler: SelectionHandler,
 		conversation: ConversationInterface,
 		request: Message,
 		signal: AbortSignal,
 	): Promise<Selection> {
-		const before = conversation.view().map((message) => message.id)
+		const before = conversation.messages().map((message) => message.id)
 		const selection = await handler(conversation, request, signal)
-		const after = conversation.view()
+		const after = conversation.messages()
 		if (
 			after.length === before.length &&
 			after.every((message, index) => message.id === before[index])

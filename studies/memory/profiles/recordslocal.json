@@ -28,7 +28,7 @@
 		"digest": { "model": "REQUIRED_ACTUAL_SHA256", "judge": "REQUIRED_ACTUAL_SHA256" }
 	},
 	"qualification": "tmp/studies/recordscapacity",
-	"room": { "context": 32768, "output": 2048, "safety": 1024, "recap": 1024, "think": false },
+	"room": { "context": 32768, "output": 2048, "safety": 1024, "think": false },
 	"bounds": {
 		"request": { "duration": 120000, "calls": 1, "tokens": 31744, "bytes": 1048576 },
 		"goal": { "duration": 600000, "calls": 256, "tokens": 8388608, "bytes": 268435456 },

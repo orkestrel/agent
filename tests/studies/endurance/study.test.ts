@@ -13,7 +13,6 @@ import {
 	buildMemoryProfile,
 	loadMemoryInputs,
 	STUDY_ENDURANCE_BOUNDARIES,
-	STUDY_MEMORY_SETTINGS,
 } from '../../setupStudy.js'
 
 describe('prospective public endurance declarations', () => {
@@ -241,37 +240,32 @@ describe('prospective public endurance declarations', () => {
 		)
 	})
 
-	it('pins the smallest subject and its bounds', async () => {
-		const smallest = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recordssmallest.json', 'utf8')),
-		)
+	it('pins the recommended subject and its bounds', async () => {
 		const recommended = parseStudyProfile(
 			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
 		)
-		const provider = smallest.provider
-		if (provider === undefined) throw new Error('Missing smallest provider')
-		expect(smallest.bounds.goal.calls).toBe(512)
-		// A reply at the output allowance fits one request: 136 B per chunk is goal 53's reply, 1014630 B over 7496 chunks, and 46120 B is the largest recorded request, compaction ev-03-2.
-		expect(smallest.bounds.request.bytes).toBeGreaterThan(smallest.room.output * 136 + 46120)
+		const provider = recommended.provider
+		if (provider === undefined) throw new Error('Missing recommended provider')
+		expect(recommended.bounds.goal.calls).toBe(512)
+		// A reply at the output allowance fits one request: 136 B per chunk is goal 53's reply, 1014630 B over 7496 chunks, and 46120 B is the largest request a recorded run sent, ev-03-2.
+		expect(recommended.bounds.request.bytes).toBeGreaterThan(recommended.room.output * 136 + 46120)
 		expect(provider.digest.model).toMatch(/^[0-9a-f]{64}$/)
-		// Both profiles hold the same room and the same roots.
-		expect(smallest.room).toEqual(recommended.room)
-		expect(smallest.roots).toEqual(recommended.roots)
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
 			'recordsqualification',
 		)
 		const goals = new Set(fixture.scenarios[0]?.goals.map((goal) => goal.id))
-		const settings = smallest.settings
+		const settings = recommended.settings
 		if (!isRecord(settings) || !Array.isArray(settings.checkpoints))
-			throw new Error('Missing smallest checkpoints')
+			throw new Error('Missing recommended checkpoints')
 		expect(settings.checkpoints.length).toBeGreaterThan(0)
 		expect(settings.checkpoints.filter((id) => !goals.has(id))).toEqual([])
 		const model = { name: provider.model, digest: provider.digest.model }
 		const judge = { name: provider.judge, digest: provider.digest.judge }
+		const triage = { name: provider.triage, digest: provider.digest.triage }
 		const daemon = {
 			executable: process.execPath,
-			models: [model, judge],
+			models: [model, judge, triage],
 		}
 		// The profile names the default Ollama, which an owned daemon can't take: Study refuses port 11434 there.
 		const owned = { ...provider, url: 'http://127.0.0.1:41435' }
@@ -281,10 +275,7 @@ describe('prospective public endurance declarations', () => {
 	})
 
 	it('pins the finite recommended profile and keeps every endurance semantic judgment independently unknown', async () => {
-		const profile = buildMemoryProfile({
-			url: 'http://127.0.0.1:1',
-			settings: STUDY_MEMORY_SETTINGS,
-		})
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:1' })
 		const capacity = await loadMemoryInputs(profile, 'recordsqualification')
 		const quality = await loadMemoryInputs(profile, 'recordsendurance')
 		const recommended = parseStudyProfile(
@@ -311,12 +302,11 @@ describe('prospective public endurance declarations', () => {
 				},
 			},
 			record: { bytes: 536870912, calls: 4096, duration: 2400000 },
-			room: { context: 20480, output: 8192, safety: 512, recap: 2048, think: false },
+			room: { context: 20480, output: 8192, safety: 512, think: false },
 			settings: {
 				observe: true,
 				judge: { gpu: 0 },
 				metadata: { calls: 8192, bytes: 67108864, duration: 600000 },
-				gauge: { scale: 1, overhead: 352 },
 			},
 			bounds: {
 				request: { duration: 360000, calls: 1, tokens: 19968, bytes: 2097152 },

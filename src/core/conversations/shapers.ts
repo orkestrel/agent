@@ -40,13 +40,6 @@ export const judgmentShape = unionShape(
 	}),
 ) satisfies ContractShape
 
-/** Describes a compacted section: its id, its summary, and the originals it folded. */
-export const sectionShape = objectShape({
-	id: stringShape(),
-	summary: stringShape(),
-	messages: arrayShape(messageShape),
-}) satisfies ContractShape
-
 /**
  * Describes a conversation snapshot exactly: an unknown key refuses, so a key a later version adds never
  * reads as absent.
@@ -57,7 +50,6 @@ export const sectionShape = objectShape({
  */
 export const conversationSnapshotShape = objectShape({
 	id: stringShape(),
-	sections: arrayShape(sectionShape),
 	messages: arrayShape(messageShape),
 	judgments: optionalShape(arrayShape(judgmentShape)),
 }) satisfies ContractShape

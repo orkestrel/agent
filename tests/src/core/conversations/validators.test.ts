@@ -5,7 +5,6 @@ import {
 	isConversationSnapshot,
 	isJudgment,
 	isMessage,
-	isSection,
 	JudgmentManager,
 } from '@src/core'
 import { createRecorder, roundTripJSON } from '@orkestrel/test'
@@ -15,7 +14,6 @@ import {
 	judgmentContract,
 	messageContract,
 	messageInputContract,
-	sectionContract,
 } from '@src/core'
 import {
 	CONVERSATION_SNAPSHOT_FIXTURES,
@@ -30,8 +28,6 @@ import {
 	buildCallsSnapshot,
 	buildConversationSnapshot,
 	createMalformedConversationCases,
-	REWRITTEN_CONVERSATION_SNAPSHOT,
-	SUMMARIZED_CONVERSATION_SNAPSHOT,
 	TOOL_SNAPSHOT,
 	JUDGMENT_EDGE_RECORDS,
 	JUDGMENT_RECORD,
@@ -66,7 +62,7 @@ describe('isJudgment and snapshot carriage', () => {
 		expect(isJudgment({ ...JUDGMENT_RECORD, answer: TEV1_SCORE })).toBe(true)
 		expect(JUDGMENT_SNAPSHOT.judgments?.every(isJudgment)).toBe(true)
 		expect(isConversationSnapshot(JUDGMENT_SNAPSHOT)).toBe(true)
-		expect(isConversationSnapshot({ id: 'old', sections: [], messages: [] })).toBe(true)
+		expect(isConversationSnapshot({ id: 'old', messages: [] })).toBe(true)
 		expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: null })).toBe(false)
 		expect(isConversationSnapshot({ ...JUDGMENT_SNAPSHOT, judgments: {} })).toBe(false)
 	})
@@ -134,103 +130,53 @@ describe('isJudgment and snapshot carriage', () => {
 	})
 })
 
-// The conversation read-boundary guards — `isSection` and `isConversationSnapshot`. Each is
-// TOTAL: adversarial input returns `false` and never throws, so an untrusted storage read narrows
-// through a guard rather than an assertion. Real data throughout — `buildConversationSnapshot`
-// produces a genuine compacted conversation, no mocks.
+// The conversation read-boundary guard — `isConversationSnapshot`. It is TOTAL: adversarial input
+// returns `false` and never throws, so an untrusted storage read narrows through a guard rather than
+// an assertion. Real data throughout — `buildConversationSnapshot` produces a genuine conversation,
+// no mocks.
 
-describe('isSection — the per-section shape guard (total + defensive)', () => {
-	it('accepts the real Section shape, including an empty retained list', () => {
+describe('isConversationSnapshot — the read-boundary guard (total + defensive)', () => {
+	it('accepts a real snapshot (messages + judgments)', async () => {
+		expect(isConversationSnapshot(await buildConversationSnapshot())).toBe(true)
+		// An empty snapshot is still valid (a fresh conversation).
+		expect(isConversationSnapshot({ id: 'c', messages: [] })).toBe(true)
+		expect(isConversationSnapshot(TOOL_SNAPSHOT)).toBe(true)
+	})
+
+	it('refuses the sections and the summary an older snapshot carries, as unknown members', () => {
+		expect(isConversationSnapshot({ id: 'c', sections: [], messages: [] })).toBe(false)
 		expect(
-			isSection({
-				id: 's',
-				summary: 'recap',
-				messages: [{ id: '1', role: 'user', content: 'hi' }],
+			isConversationSnapshot({
+				id: 'c',
+				sections: [{ id: 's', summary: 'recap', messages: [] }],
+				messages: [],
 			}),
-		).toBe(true)
-		expect(isSection({ id: 's', summary: 'recap', messages: [] })).toBe(true)
+		).toBe(false)
+		expect(isConversationSnapshot({ id: 'c', summary: 'recap', messages: [] })).toBe(false)
+		expect(isConversationSnapshot({ id: 'c', summary: 7, messages: [] })).toBe(false)
 	})
 
-	it('rejects a non-record, a nullish, and a primitive without throwing', () => {
-		expect(isSection(undefined)).toBe(false)
-		expect(isSection(null)).toBe(false)
-		expect(isSection(42)).toBe(false)
-		expect(isSection('section')).toBe(false)
-	})
-
-	it('rejects a missing required field, a non-array messages, and a malformed element', () => {
-		expect(isSection({ id: 's', messages: [] })).toBe(false) // no summary
-		expect(isSection({ summary: 'recap', messages: [] })).toBe(false) // no id
-		expect(isSection({ id: 's', summary: 7, messages: [] })).toBe(false)
-		expect(isSection({ id: 's', summary: 'recap', messages: 'nope' })).toBe(false)
-		expect(isSection({ id: 's', summary: 'recap', messages: [{ id: 'm', role: 'user' }] })).toBe(
-			false,
-		)
-	})
-
-	it('rejects a sparse messages array, as the snapshot guard rejects one', () => {
+	it('rejects a sparse messages array', () => {
 		const sparse: unknown[] = []
 		sparse.length = 1
-		expect(isSection({ id: 's', summary: 'recap', messages: sparse })).toBe(false)
-		expect(isConversationSnapshot({ id: 'c', sections: [], messages: sparse })).toBe(false)
+		expect(isConversationSnapshot({ id: 'c', messages: sparse })).toBe(false)
 	})
 
 	it('returns false for a throwing getter and a revoked proxy without throwing', () => {
-		const sectionReads = createRecorder<readonly [string]>()
-		const snapshotReads = createRecorder<readonly [string]>()
+		const reads = createRecorder<readonly [string]>()
 		const revoked = Proxy.revocable({}, {})
 		revoked.revoke()
 		expect(
-			isSection({
-				id: 's',
-				summary: 'recap',
+			isConversationSnapshot({
+				id: 'c',
 				get messages(): never {
-					sectionReads.handler('messages')
+					reads.handler('messages')
 					throw new Error('unreadable')
 				},
 			}),
 		).toBe(false)
-		expect(sectionReads.calls).toEqual([['messages']])
-		expect(isSection(revoked.proxy)).toBe(false)
-		expect(
-			isConversationSnapshot({
-				id: 'c',
-				sections: [
-					{
-						id: 's',
-						summary: 'recap',
-						get messages(): never {
-							snapshotReads.handler('messages')
-							throw new Error('unreadable')
-						},
-					},
-				],
-				messages: [],
-			}),
-		).toBe(false)
-		expect(snapshotReads.calls).toEqual([['messages']])
-	})
-})
-
-describe('isConversationSnapshot — the read-boundary guard (total + defensive)', () => {
-	it('accepts a real snapshot (sections + tail)', async () => {
-		expect(isConversationSnapshot(await buildConversationSnapshot())).toBe(true)
-		// An empty-sections + empty-tail snapshot is still valid (a fresh conversation, no summary).
-		expect(isConversationSnapshot({ id: 'c', sections: [], messages: [] })).toBe(true)
-		expect(isConversationSnapshot(TOOL_SNAPSHOT)).toBe(true)
-	})
-
-	it('refuses the conversation summary a 0.0.29 snapshot carries, as an unknown member', () => {
-		expect(isConversationSnapshot(SUMMARIZED_CONVERSATION_SNAPSHOT)).toBe(false)
-		expect(
-			isConversationSnapshot({
-				id: 'c',
-				summary: 7,
-				sections: [],
-				messages: [],
-			}),
-		).toBe(false)
-		expect(isConversationSnapshot(REWRITTEN_CONVERSATION_SNAPSHOT)).toBe(true)
+		expect(reads.calls).toEqual([['messages']])
+		expect(isConversationSnapshot(revoked.proxy)).toBe(false)
 	})
 
 	it('rejects malformed input without throwing (total guard)', () => {
@@ -240,27 +186,13 @@ describe('isConversationSnapshot — the read-boundary guard (total + defensive)
 		expect(isConversationSnapshot(42)).toBe(false)
 		expect(isConversationSnapshot('snapshot')).toBe(false)
 		// Missing / wrong-typed `id`.
-		expect(isConversationSnapshot({ sections: [], messages: [] })).toBe(false)
-		expect(isConversationSnapshot({ id: 1, sections: [], messages: [] })).toBe(false)
-		// `sections` / `messages` not arrays.
-		expect(isConversationSnapshot({ id: 'c', sections: 'nope', messages: [] })).toBe(false)
-		expect(isConversationSnapshot({ id: 'c', sections: [], messages: { a: 1 } })).toBe(false)
+		expect(isConversationSnapshot({ messages: [] })).toBe(false)
+		expect(isConversationSnapshot({ id: 1, messages: [] })).toBe(false)
+		// `messages` not an array, or missing.
+		expect(isConversationSnapshot({ id: 'c', messages: { a: 1 } })).toBe(false)
+		expect(isConversationSnapshot({ id: 'c' })).toBe(false)
 		// `messages` carries a malformed message element (missing content).
-		expect(
-			isConversationSnapshot({ id: 'c', sections: [], messages: [{ id: 'm', role: 'user' }] }),
-		).toBe(false)
-		// `sections` carries a malformed section element (missing summary).
-		expect(
-			isConversationSnapshot({ id: 'c', sections: [{ id: 's', messages: [] }], messages: [] }),
-		).toBe(false)
-		// A section whose `messages` carries a malformed element.
-		expect(
-			isConversationSnapshot({
-				id: 'c',
-				sections: [{ id: 's', summary: 'r', messages: [{ id: 'm', role: 'user' }] }],
-				messages: [],
-			}),
-		).toBe(false)
+		expect(isConversationSnapshot({ id: 'c', messages: [{ id: 'm', role: 'user' }] })).toBe(false)
 	})
 
 	it('rejects a snapshot whose assistant calls[] carries a tampered element (fail-closed)', () => {
@@ -458,10 +390,7 @@ describe('isConversation', () => {
 		const calls = createRecorder<[]>()
 		const conversation = {
 			id: 'c1',
-			summarizable: true,
-			view: calls.handler,
 			add: calls.handler,
-			compact: calls.handler,
 			messages: calls.handler,
 		}
 		expect(isConversation(conversation)).toBe(true)
@@ -493,35 +422,21 @@ describe('the owned conversation guards, in lockstep with their shapes', () => {
 		expect(conversationSnapshotContract.is(snapshot)).toBe(false)
 	})
 
-	it('holds both ways on a judgment and a section of the fixtures', () => {
+	it('holds both ways on a judgment of the fixtures', () => {
 		expect(isJudgment(JUDGMENT_RECORD)).toBe(true)
 		expect(judgmentContract.is(JUDGMENT_RECORD)).toBe(true)
-		const section = { id: 's', summary: 'recap', messages: MESSAGE_FIXTURES.slice(0, 1) }
-		expect(isSection(section)).toBe(true)
-		expect(sectionContract.is(section)).toBe(true)
 	})
 })
 
 describe('the owned conversation guards are exact', () => {
 	it.each([
-		[
-			'an unknown snapshot key, as a 0.0.35 summary',
-			{ id: 'c', sections: [], messages: [], summary: 'x' },
-		],
-		['an own undefined judgments', { id: 'c', sections: [], messages: [], judgments: undefined }],
-		[
-			'an unknown section key',
-			{
-				id: 'c',
-				sections: [{ id: 's', summary: 'r', messages: [], at: 1 }],
-				messages: [],
-			},
-		],
+		['an unknown snapshot key, as a 0.0.35 summary', { id: 'c', messages: [], summary: 'x' }],
+		['the sections key an older snapshot carries', { id: 'c', sections: [], messages: [] }],
+		['an own undefined judgments', { id: 'c', messages: [], judgments: undefined }],
 		[
 			'an unknown message key',
 			{
 				id: 'c',
-				sections: [],
 				messages: [{ id: 'm', role: 'user', content: '', at: 1 }],
 			},
 		],
@@ -529,7 +444,6 @@ describe('the owned conversation guards are exact', () => {
 			'an own undefined message optional',
 			{
 				id: 'c',
-				sections: [],
 				messages: [{ id: 'm', role: 'user', content: '', call: undefined }],
 			},
 		],

@@ -531,7 +531,7 @@ describe('JudgmentManager', () => {
 
 	it('creates an independent manager per conversation and restores snapshot records', () => {
 		const conversation = createConversation({
-			snapshot: { id: 'saved', sections: [], messages: [], judgments: [JUDGMENT_RECORD] },
+			snapshot: { id: 'saved', messages: [], judgments: [JUDGMENT_RECORD] },
 		})
 		expect(conversation.snapshot().judgments).toEqual([JUDGMENT_RECORD])
 		expect(createConversation().judgments.count).toBe(0)

@@ -5,7 +5,7 @@ import type {
 	ClassifierOptions,
 	CLASSIFIER_OPTION_KEYS,
 } from '@src/core'
-import { createConversation, createLedger, JudgeAbortError } from '@src/core'
+import { createConversation, createLedger, isConversationError, JudgeAbortError } from '@src/core'
 import { isRecord, isContractError } from '@orkestrel/contract'
 import { captureError, createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { createScheduler } from '@orkestrel/workflow'
@@ -295,8 +295,19 @@ describe('Classifier', () => {
 		expect(conversation.judgments.count).toBe(1)
 	})
 
-	it('pairs a correction with assistant calls carrying bigint or JSON arguments', async () => {
-		for (const key of [1n, 1]) {
+	it('pairs a correction with assistant calls carrying JSON arguments, which a hydrate requires', async () => {
+		const unowned = {
+			id: 'earlier',
+			role: 'assistant',
+			content: 'Refund AB-12 is 20.',
+			calls: [{ id: 'lookup', name: 'lookup', arguments: { key: 1n } }],
+		} as const
+		expect(
+			captureError(() =>
+				createConversation({ snapshot: { id: 'correction', messages: [unowned] } }),
+			),
+		).toSatisfy((error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT')
+		for (const key of [1, 'AB-12']) {
 			const earlier = {
 				id: 'earlier',
 				role: 'assistant',
@@ -304,7 +315,7 @@ describe('Classifier', () => {
 				calls: [{ id: 'lookup', name: 'lookup', arguments: { key } }],
 			} as const
 			const conversation = createConversation({
-				snapshot: { id: 'correction', sections: [], messages: [earlier] },
+				snapshot: { id: 'correction', messages: [earlier] },
 			})
 			const later = conversation.add({ role: 'user', content: 'Refund AB-12 is 30, not 20.' })
 			conversation.judgments.add(
@@ -416,7 +427,6 @@ describe('Classifier', () => {
 		const conversation = createConversation({
 			snapshot: {
 				id: 'filing',
-				sections: [],
 				messages: [
 					buildLedgerMessage('m1', 'user', 'Refund AB-12 is 20.'),
 					buildLedgerMessage('m2', 'user', 'Correction: refund AB-12 is 30, not 20.'),
@@ -669,7 +679,6 @@ describe('Classifier', () => {
 		const conversation = createConversation({
 			snapshot: {
 				id: 'pairs',
-				sections: [],
 				messages: [
 					buildLedgerMessage('partial', 'user', 'Odile called.'),
 					buildLedgerMessage('whole', 'user', 'Odile Marlow called.'),
@@ -1211,7 +1220,6 @@ describe('Classifier', () => {
 		const conversation = createConversation({
 			snapshot: {
 				id: 'near',
-				sections: [],
 				messages: [
 					buildLedgerMessage('early', 'user', 'Shipping is delayed.'),
 					buildLedgerMessage('order', 'user', 'Refund AB-12 is 20.'),
@@ -1335,7 +1343,6 @@ describe('Classifier', () => {
 		const seeded = createConversation({
 			snapshot: {
 				id: 'narrow',
-				sections: [],
 				messages: [whole, call, number, desk, refused, quiet, later],
 			},
 		})
@@ -1511,7 +1518,7 @@ describe('Classifier', () => {
 				const correction = buildLedgerMessage('lone', 'user', content)
 				for (const arm of [undefined, { narrow: true }]) {
 					const conversation = createConversation({
-						snapshot: { id: 'lone', sections: [], messages: [earlier, correction] },
+						snapshot: { id: 'lone', messages: [earlier, correction] },
 					})
 					conversation.judgments.add(buildLedgerJudgment(earlier))
 					conversation.judgments.add(
@@ -1543,7 +1550,7 @@ describe('Classifier', () => {
 			const asks: Array<readonly unknown[]> = []
 			for (const correction of [undefined, { narrow: true }]) {
 				const conversation = createConversation({
-					snapshot: { id: 'replaced', sections: [], messages: [stated, replaced] },
+					snapshot: { id: 'replaced', messages: [stated, replaced] },
 				})
 				conversation.judgments.add(buildLedgerJudgment(stated))
 				conversation.judgments.add(

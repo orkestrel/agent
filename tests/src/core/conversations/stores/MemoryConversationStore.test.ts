@@ -17,8 +17,7 @@ import {
 // The C-c MemoryConversationStore — the in-memory default behind the ConversationStoreInterface
 // persistence seam (get / set / delete, async, keyed by a snapshot's own id). It persists the
 // ConversationSnapshot (the self-contained, pure-JSON conversation state) UNCHANGED. REAL data only
-// — a real Conversation's `snapshot()` carrying BOTH compacted sections AND a live tail
-// (produced by a genuine compaction over a data-stub summarizer), NO mocks.
+// — a real Conversation's `snapshot()` carrying BOTH messages AND a judgment, NO mocks.
 
 // The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
 // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
@@ -26,7 +25,7 @@ import {
 // each scenario as a plain function returning its result (NO `describe` / `it` / `expect` bound in), so
 // THIS file registers the battery against the memory factory and asserts on what each scenario
 // returns, keeping only its TWIN-SPECIFIC blocks: the JSON driver-swap-parity round-trip and the
-// tool-message round-trip. The snapshot, section, and message guards live in
+// tool-message round-trip. The snapshot and message guards live in
 // tests/src/core/conversations/validators.test.ts, beside their module.
 describe('MemoryConversationStore', () => {
 	it('round trips judgment answers, refusals, and recorded times', async () => {
@@ -36,24 +35,20 @@ describe('MemoryConversationStore', () => {
 		)
 		expect(got).toEqual(JUDGMENT_SNAPSHOT)
 	})
-	describe('set → get round-trip (sections + live tail)', () => {
-		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
+	describe('set → get round-trip (messages + judgments)', () => {
+		it('set → get returns an equal snapshot (messages + judgments survive)', async () => {
 			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
 				createMemoryConversationStore,
 				buildConversationSnapshot,
 			)
 			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
 			expect(got).toEqual(snapshot)
-			// It carries a compacted section AND a live tail (round-trip is non-vacuous).
-			expect(got?.sections).toHaveLength(1)
-			expect(got?.sections[0]?.summary).toBe(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.summary,
-			)
-			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages,
-			)
+			// It carries messages AND a judgment (round-trip is non-vacuous).
 			expect(got?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.tail,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.messages,
+			)
+			expect(got?.judgments?.map((judgment) => judgment.id)).toEqual(
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.judgments,
 			)
 		})
 	})
@@ -132,6 +127,6 @@ describe('MemoryConversationStore — tool messages with and without call', () =
 		expect(got).toEqual(TOOL_SNAPSHOT)
 		expect(roundTripJSON<unknown>(got)).toEqual(TOOL_SNAPSHOT)
 		expect(got?.messages.at(-1)?.call).toBe('call-oslo')
-		expect(got?.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
+		expect(got?.messages.find((message) => message.id === 'tool-paris')).not.toHaveProperty('call')
 	})
 })

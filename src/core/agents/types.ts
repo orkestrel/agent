@@ -170,24 +170,20 @@ export interface AgentRunResult {
  *
  * @remarks
  * `content` is the final answer on an `answer` turn and the content the provider streamed on any
- * other turn. `thinking` and `usage` are this turn's own non-empty reasoning and sanitized usage;
- * `spent` is the sanitized usage of a selection this turn's admission rebuilt through. `messages`
- * is the working conversation the next turn starts from. `partial` is the run's partial flag if the
- * run ends after this turn, and `futile` is the compaction latch after this turn's admission.
- * `estimate` is the token estimate of the content this turn's call streamed, `undefined` on a turn
- * a cancel stopped before its call. `interrupted` reports that the run's signal had aborted when
- * this turn's call returned, before its usage was reconciled. `truncated` reports that the model
- * ended this turn's final answer at its own token limit.
+ * other turn. `thinking` and `usage` are this turn's own non-empty reasoning and sanitized usage.
+ * `messages` is the working conversation the next turn starts from. `partial` is the run's partial
+ * flag if the run ends after this turn. `estimate` is the token estimate of the content this turn's
+ * call streamed, `undefined` on a turn a cancel stopped before its call. `interrupted` reports that
+ * the run's signal had aborted when this turn's call returned, before its usage was reconciled.
+ * `truncated` reports that the model ended this turn's final answer at its own token limit.
  */
 export interface AgentTurn {
 	readonly content: string
 	readonly thinking: string | undefined
 	readonly usage: TokenUsage | undefined
-	readonly spent: TokenUsage | undefined
 	readonly messages: readonly Message[]
 	readonly outcome: 'answer' | 'tools' | 'cancel'
 	readonly partial: boolean
-	readonly futile: boolean
 	readonly estimate: number | undefined
 	readonly interrupted: boolean
 	readonly truncated: boolean
@@ -313,30 +309,25 @@ export type AgentEventMap = {
 	 */
 	readonly exhaust: readonly [turns: number]
 	/**
-	 * Reports automatic compaction's summarizer throwing — a non-fatal warn channel (the run continues; see
-	 * {@link AgentOptions.window}). When the loop's pre-dispatch auto-compaction
-	 * (`conversation.compact()`) rejects, the run does not crash: the loop skips compaction that
-	 * turn and surfaces the caught error here so the failure is observable, never silently lost.
-	 * The run still settles through the other events — `finish` for the lenient default, and
-	 * `error` when {@link AgentOptions.strict} rethrows the same caught value — so `fault` reports
-	 * the best-effort optimization that failed and never the run's own outcome. A manual
-	 * `conversation.compact()` still propagates its own error; only the agent's auto path is
-	 * resilient. A domain event (the emitter isolates a listener throw separately, routing it to
-	 * its `error` handler).
+	 * Reports a failure the run recovered from or is about to settle on: a thrown selection handler,
+	 * a returned selection `fault`, a conversation changed under the handler, or, under
+	 * `strict: false`, a final answer that misses the run's `schema`. The run still settles through
+	 * the other events — `finish` when it continues, and `error` when {@link AgentOptions.strict}
+	 * rethrows the same value — so `fault` reports the failure and never the run's own outcome. A
+	 * domain event (the emitter isolates a listener throw separately, routing it to its `error`
+	 * handler).
 	 */
 	readonly fault: readonly [error: unknown]
 	/**
-	 * Reports the {@link Selection} a handler returned, after the loop built the prompt from it —
-	 * at run entry and after each automatic compaction rebuild, so twice before turn 0 when the
-	 * pre-first-turn compaction folds. A returned `fault` the lenient run builds from still fires
-	 * it, so the receipt carries the cost; a thrown handler and a run aborted during selection
-	 * fire none.
+	 * Reports the {@link Selection} a handler returned, after the loop built the prompt from it at
+	 * run entry. A returned `fault` the lenient run builds from still fires it, so the receipt
+	 * carries the cost; a thrown handler and a run aborted during selection fire none.
 	 */
 	readonly select: readonly [selection: Selection]
 	/**
 	 * Reports the exact request a turn dispatches, with the turn's `index` and the conversation its
-	 * run is bound to, once a turn after the loop admits the request and before the provider receives
-	 * it, so after a compaction fold it carries the rebuilt request. The request object and its
+	 * run is bound to, once a turn after the loop composes the request and before the provider
+	 * receives it. The request object and its
 	 * `messages` and `tools` arrays are frozen; each message, `options`, and each definition is a
 	 * shared object, so a listener is host code that reads the request and never writes to it. A
 	 * request whose turn advertises no tool carries no `tools` member, and a turn cancelled before
@@ -521,11 +512,9 @@ export interface ApproverInterface {
 /**
  * Configures `createAgent` — the loop's bounds and pacing, the reserved `on` hooks, the
  * construction-time context wiring (`instructions` / `skills` / `memos` / `workspaces` / `scope`), the `conversations`
- * registry holding every run's default, the context `window` budget that opts into automatic
- * compaction of the run's conversation, the `builtins` each run serves and the `workspace` it
- * renders, and the `strict` switch that settles the run `error` on
- * an automatic-compaction summarizer failure, a selection fault, or a request still over the
- * window, or continues past them when `false`.
+ * registry holding every run's default, the `builtins` each run serves and the `workspace` it
+ * renders, and the `strict` switch that settles the run `error` on a selection fault or a schema
+ * miss, or continues past them when `false`.
  *
  * @remarks
  * An own enumerable member this type does not declare refuses at construction with a
@@ -554,29 +543,21 @@ export interface ApproverInterface {
  *   code `'AUTHORITY'` without it. Omitted with no `tools` ⇒ the agent holds no authority, and the
  *   loop denies a call to a tool added later through `context.tools`.
  * - `conversations` — an optional {@link ConversationManagerInterface} forwarded to the agent's
- *   context (so `context.messages` is its active conversation's live tail); a run binds that
- *   active conversation when it names no `conversation` of its own. Omitted ⇒ a fresh registry
- *   holding one default conversation. Auto-compaction (`window`) folds the run's conversation when
- *   it is summarizable.
- * - `window` — an optional context {@link BudgetInterface} over the complete
- *   {@link ProviderRequest} for automatic conversation compaction: when set, the loop measures the
- *   exact request, messages after replay, advertised tools, and per-call options, before every
- *   provider dispatch (its `consumer` is a token estimator, its `max` the context window) and, when
- *   the request reaches the window and the run's conversation is summarizable, compacts that
- *   conversation once + dispatches the rebuilt smaller request — compact-and-continue, distinct from
- *   hard abort of the `budget` object. Omitted ⇒ no auto-compaction.
- * - `strict` — when `true`, a summarizer failure during automatic compaction aborts the run
- *   (rethrown after the `fault` event, propagating through `#execute` to a genuine `error`
- *   settle) instead of skipping compaction and continuing over-window. The selection faults (a
- *   thrown handler, a returned `fault`, a conversation changed under the handler, a selected
- *   message whose role is not a `ConversationRole`) settle the same way, and a request still over
- *   the `window` after the permitted fold, or one that cannot fold, settles `error` with an
- *   `AgentError` coded `'WINDOW'` before the provider is called. When `false`, the run continues
- *   over-window, or on `view()` after a selection fault. Default: `true`.
+ *   context (so `context.messages` is its active conversation); a run binds that active
+ *   conversation when it names no `conversation` of its own. Omitted ⇒ a fresh registry holding one
+ *   default conversation. The loop sends every message the run's conversation holds; serve a
+ *   conversation that can outgrow the model's context through `createLedger`, which bounds every
+ *   request it sends.
+ * - `strict` — when `true`, the selection faults (a thrown handler, a returned `fault`, a
+ *   conversation changed under the handler, a selected message whose role is not a
+ *   `ConversationRole`) settle the run `error` after the `fault` event, and a final answer that misses
+ *   the run's `schema` settles `error` with an `AgentError` coded `'SCHEMA'`. When `false`, the run
+ *   continues on the conversation's `messages()` after a selection fault, and with the raw content
+ *   after a schema miss. Default: `true`.
  * - `select` — an optional default {@link SelectionHandler} forwarded to the agent's context; the
  *   active scope's `select` overrides it, and a run scope's `select` overrides both for its run.
- *   The loop runs it at run entry and after each automatic compaction rebuild, emits each {@link Selection} it builds from on `select`, and charges the
- *   selection's usage to `budget` and the result's `usage`.
+ *   The loop runs it at run entry, emits the {@link Selection} it builds from on `select`, and
+ *   charges the selection's usage to `budget` and the result's `usage`.
  * - `instructions` — an optional pre-built {@link InstructionManagerInterface} forwarded to the
  *   agent's context; an empty one is created when omitted (mirrors {@link AgentContextOptions.instructions}).
  * - `skills` — an optional pre-built {@link SkillManagerInterface} forwarded to the agent's context,
@@ -628,8 +609,7 @@ export interface AgentOptions {
 	 * a `turn` listener reaches for the same turn: the snapshot decides the advertised tools, and a
 	 * changed `instructions`, `skills`, `memos`, `files`, or `workspaces` list rebuilds the head for
 	 * that turn over the same messages. A `select` change, and an instruction text edit with no list
-	 * change, wait for the next build or select site: run entry, the pre-first-turn compaction fold,
-	 * or a compaction rebuild.
+	 * change, wait for the next run's entry build.
 	 */
 	readonly scope?: ScopeInterface
 	/**
@@ -683,53 +663,27 @@ export interface AgentOptions {
 	/**
 	 * Holds an optional {@link ConversationManagerInterface} forwarded to the
 	 * {@link AgentContextInterface} the agent builds, so `agent.context.messages` is its active
-	 * conversation's live tail and `build()` folds that conversation's `view()` (the per-section
-	 * summaries + the live tail). A run with no {@link AgentRunOptions.conversation} binds the
-	 * conversation active at its call. Omitted ⇒ a fresh registry holding one default conversation.
-	 * With `window` set, automatic compaction folds the run's conversation between turns (when it is
-	 * summarizable).
+	 * conversation and `build()` folds that conversation's `messages()`. A run with no
+	 * {@link AgentRunOptions.conversation} binds the conversation active at its call. Omitted ⇒ a
+	 * fresh registry holding one default conversation.
 	 */
 	readonly conversations?: ConversationManagerInterface
 	/**
-	 * Holds an optional context {@link BudgetInterface} that admits each provider request. Its
-	 * `consumer` is a token estimator over the complete {@link ProviderRequest} (for example the
-	 * exported {@link import('./helpers.js').estimateRequest}) and its `max` is the context window.
-	 * Before every provider dispatch the loop measures the exact request it will send: the messages
-	 * after the provider's `replay` policy, the tools the turn advertises after the scope's
-	 * allow-list, and the per-call `options` (`think`, `schema`). The budget is cleared, consumes that
-	 * request, and the request is over the window when the budget is `exhausted`, which includes a
-	 * request equal to `max`. When it is over and the run's conversation is summarizable, the loop
-	 * **compacts the run's conversation once, rebuilds with the same tools and options, measures the
-	 * rebuilt request, and dispatches it** (compact-and-continue) — the same consume-to-a-ceiling
-	 * primitive as the cost `budget`, but compaction is the ceiling action instead of abort. A
-	 * non-summarizable conversation is still measured, but cannot fold. After a run `consumed` holds
-	 * the last measured request. With {@link AgentOptions.strict}, a request still over the window
-	 * after the one permitted fold, or one that cannot fold, is refused before dispatch with an
-	 * `AgentError` coded `'WINDOW'`. Omit to disable.
-	 */
-	readonly window?: BudgetInterface<ProviderRequest>
-	/**
-	 * If `true`, a summarizer failure during automatic compaction emits `fault` and settles the
-	 * run `error`; a thrown selection handler, a returned selection `fault`, and a conversation
-	 * changed during selection follow the same rule. A request that the {@link AgentOptions.window}
-	 * still finds over the window, equal to `max` included, after the one permitted fold, or that
-	 * cannot fold, is refused before the provider is called: the run settles `error` with an
-	 * `AgentError` coded `'WINDOW'` whose `context` holds the `agent`, the measured `consumed`, and
-	 * the window `max`, and no `fault` fires for it. A final answer that misses the run's `schema`
-	 * settles `error` with an `AgentError` coded `'SCHEMA'`. If `false`, the run continues —
-	 * over-window after a summarizer failure or a futile fold, on the run's conversation's `view()`
-	 * after a selection fault, and with the raw content after a schema miss, which emits `fault`. A
-	 * cancel at a selection site or a fold, a `fault` listener's included, settles partial instead of
-	 * `error`. Default: `true`.
+	 * If `true`, a thrown selection handler, a returned selection `fault`, a conversation changed
+	 * during selection, and a selected message whose role is not a `ConversationRole` emit `fault`
+	 * and settle the run `error`, and a final answer that misses the run's `schema` settles `error`
+	 * with an `AgentError` coded `'SCHEMA'`. If `false`, the run continues — on the run's
+	 * conversation's `messages()` after a selection fault, and with the raw content after a schema
+	 * miss, which emits `fault`. A cancel at the selection site, a `fault` listener's included,
+	 * settles partial instead of `error`. Default: `true`.
 	 */
 	readonly strict?: boolean
 	/**
 	 * Holds the default selection handler forwarded to the agent's context; the active scope's
 	 * `select` overrides it while that scope is active, and a run scope's `select` overrides both for
-	 * its run. The loop runs it at run entry and after
-	 * each automatic compaction rebuild, for the user message that ends the run's conversation, and
-	 * charges its usage to the cost `budget`. Omitted ⇒ with no scope handler either, the loop
-	 * builds from the run's conversation's `view()` and awaits nothing.
+	 * its run. The loop runs it at run entry, for the user message that ends the run's conversation,
+	 * and charges its usage to the cost `budget`. Omitted ⇒ with no scope handler either, the loop
+	 * builds from the run's conversation's `messages()` and awaits nothing.
 	 */
 	readonly select?: SelectionHandler
 	/** Lists the built-in tools each run serves itself, each subject to the ceiling and the authority. Default: none. */
@@ -805,16 +759,16 @@ export interface AgentRunOptions {
 	 */
 	readonly signal?: AbortSignal
 	/**
-	 * Binds the run to this conversation: the run reads its request from its tail, selects and
-	 * builds over its `view()`, appends every assistant and tool message to it, and folds it under
-	 * the `window`. A later `switch`, `open`, `remove`, `clear`, or same-id `add` on the registry
-	 * never moves the run, and the conversation needs no registration. Omitted ⇒ the conversation
-	 * active when `stream()` or `generate()` is called.
+	 * Binds the run to this conversation: the run reads its request from its last message, selects
+	 * and builds over its `messages()`, and appends every assistant and tool message to it. A later
+	 * `switch`, `open`, `remove`, `clear`, or same-id `add` on the registry never moves the run, and
+	 * the conversation needs no registration. Omitted ⇒ the conversation active when `stream()` or
+	 * `generate()` is called.
 	 *
 	 * @remarks
 	 * The guard compares conversation instances: two `Conversation` values opened from one stored
-	 * snapshot are distinct to it and run at once on an agent with no `window` and distinct budgets,
-	 * so a host opens each thread once and keys its thread registry by principal and thread.
+	 * snapshot are distinct to it and run at once on an agent with distinct budgets, so a host opens
+	 * each thread once and keys its thread registry by principal and thread.
 	 */
 	readonly conversation?: ConversationInterface
 	/**
@@ -862,10 +816,10 @@ export interface AgentRunOptions {
  *   before tool dispatch; exhaustion ends the run without dispatching, never inside a handler. An abort before dispatch
  *   appends neither the assistant call turn nor tool messages and emits no tool chunk;
  *   streamed content remains in the partial result. Cancellation after entry is cooperative:
- *   the loop awaits a running handler even when it ignores the signal, records its tool message,
- *   and folds nothing before the run settles; the next run's pre-first-turn check compacts
- *   instead. The loop races a scheduler's yield, the approver's answer, and the summarizer against
- *   the run signal, so one that ignores its signal still ends on a cancel; a provider stream, a
+ *   the loop awaits a running handler even when it ignores the signal and records one tool message
+ *   for every call of the turn, so the conversation never holds half a call group. The loop races a
+ *   scheduler's yield and the approver's answer against the run signal, so one that ignores its
+ *   signal still ends on a cancel; a provider stream, a
  *   judge, a tool handler, and a selection handler are awaited until they settle, because each can
  *   carry usage or finished work, so one that ignores its signal holds the run past a cancel or a
  *   timeout, and on a ledger its held scan, until it returns.
@@ -894,9 +848,8 @@ export interface AgentInterface {
 	 *
 	 * @remarks
 	 * A run started while another is live throws an {@link import('./errors.js').AgentError} with
-	 * `code: 'CONCURRENCY'` when the agent carries a `window`, when the run's effective
-	 * `budget` or `allowance` is an instance a live run holds, or when a live run is bound to the
-	 * run's conversation; a run whose `limit` is not a positive safe
+	 * `code: 'CONCURRENCY'` when the run's effective `budget` or `allowance` is an instance a live run
+	 * holds, or when a live run is bound to the run's conversation; a run whose `limit` is not a positive safe
 	 * integer throws one with `code: 'LIMIT'`. A `prompt` that `agentPromptContract` refuses, a
 	 * `budget` or `allowance` that does not implement `BudgetInterface`, a `conversation` that does
 	 * not implement `ConversationInterface`, a `scope` that does not implement `ScopeInterface`, or a
@@ -909,7 +862,7 @@ export interface AgentInterface {
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns The settled {@link AgentResult} (`partial: true` when cancelled)
-	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares a budget or allowance instance or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
 	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, the `conversation` does not implement `ConversationInterface`, the `scope` does not implement `ScopeInterface`, or the `workspace` is not a string (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	generate(options?: AgentRunOptions): Promise<AgentResult>
@@ -919,8 +872,8 @@ export interface AgentInterface {
 	 * on a genuine error.
 	 *
 	 * @remarks
-	 * Like `generate()`, a run that would share the `window`, a live run's budget or allowance
-	 * instance, or a live run's conversation throws an {@link import('./errors.js').AgentError} with
+	 * Like `generate()`, a run that would share a live run's budget or allowance instance or a live
+	 * run's conversation throws an {@link import('./errors.js').AgentError} with
 	 * `code: 'CONCURRENCY'`, a `limit` that is not a positive safe integer throws one with `code: 'LIMIT'`, and a `prompt` that
 	 * `agentPromptContract` refuses, a `budget` or `allowance` that does not implement
 	 * `BudgetInterface`, a `conversation` that does not implement `ConversationInterface`, a `scope`
@@ -929,15 +882,15 @@ export interface AgentInterface {
 	 * {@link AgentStreamInterface} handle is even returned, so it cannot be caught by chaining
 	 * off the (never-produced) handle; wrap the call itself in `try`/`catch`. Each of those leaves
 	 * the run's conversation unchanged. The guard compares conversation instances: two `Conversation`
-	 * values opened from one stored snapshot are distinct to it and run at once on an agent with no
-	 * `window` and distinct budgets, so a host opens each thread once and keys its thread registry by
-	 * principal and thread. A `signal` that `AbortSignal.any` refuses throws its
+	 * values opened from one stored snapshot are distinct to it and run at once on an agent with
+	 * distinct budgets, so a host opens each thread once and keys its thread registry by principal
+	 * and thread. A `signal` that `AbortSignal.any` refuses throws its
 	 * `TypeError` the same way, before any deadline is armed, but after the `prompt` is appended, so
 	 * the prompt stays in the conversation.
 	 *
 	 * @param options - Optional per-run {@link AgentRunOptions} (for example `think`); omitted ⇒ defaults
 	 * @returns A live {@link AgentStreamInterface} handle (events + result + abort)
-	 * @throws {AgentError} Thrown when a live run shares the `window`, a budget or allowance instance, or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
+	 * @throws {AgentError} Thrown when a live run shares a budget or allowance instance or the run's conversation (`code: 'CONCURRENCY'`) or the `limit` is not a positive safe integer (`code: 'LIMIT'`), synchronously before a handle returns.
 	 * @throws {ContractError} Thrown when the `prompt` is not an exact `AgentPrompt`, the `budget` or `allowance` does not implement `BudgetInterface`, the `conversation` does not implement `ConversationInterface`, the `scope` does not implement `ScopeInterface`, or the `workspace` is not a string (`code: 'placement'`), synchronously before a handle returns.
 	 */
 	stream(options?: AgentRunOptions): AgentStreamInterface
@@ -1275,7 +1228,7 @@ export interface AgentRunnerOptions {
 	readonly timeout?: number
 }
 
-/** Names the machine-readable agent approver, authority, built-in, concurrency, limit, registry, schema, and window failures. */
+/** Names the machine-readable agent approver, authority, built-in, concurrency, limit, registry, and schema failures. */
 export type AgentErrorCode =
 	| 'APPROVER'
 	| 'AUTHORITY'
@@ -1284,7 +1237,6 @@ export type AgentErrorCode =
 	| 'LIMIT'
 	| 'REGISTRY'
 	| 'SCHEMA'
-	| 'WINDOW'
 
 /**
  * Holds the disjoint estimate components of one message, in heuristic estimate units.

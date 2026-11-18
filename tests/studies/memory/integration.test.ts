@@ -5,8 +5,6 @@ import {
 	parseStudyAssessment,
 	parseStudyProfile,
 	parseStudyRubric,
-	isStudyError,
-	readStudyFailure,
 } from '@orkestrel/study'
 import { collectStudyEvidence, readStudyExchanges, readStudyResult } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
@@ -15,31 +13,20 @@ import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { StudyMemoryDriver } from '../../../studies/memory/index.js'
 import {
 	assertMemoryReplay,
-	buildMemoryProfile,
-	buildMemoryReply,
-	createMemoryContext,
 	createMemoryInstall,
-	createMemoryServer,
 	destroyMemoryInstall,
 	executeStudyInstall,
 	executeStudyTopology,
 	readMemoryControls,
 	readMemoryEvents,
 	readMemoryProgressRows,
-	runMemoryFailure,
-	runMemorySummary,
 	runMemoryTrial,
-	STUDY_MEMORY_ACTUAL_REFUSALS,
 	STUDY_MEMORY_GOALS,
-	STUDY_MEMORY_MODULES,
-	STUDY_MEMORY_NATIVE_MALFORMED,
 	STUDY_MEMORY_PASSIVE_SETTINGS,
 	STUDY_MEMORY_SCHEDULE,
-	STUDY_MEMORY_SUMMARY_FOLDS,
-	WINDOW_GOAL,
+	STUDY_MEMORY_SHORT_GOAL,
 } from '../../setupStudy.js'
 
 it('loads the actual recommended native topology with two distinct captured Agent occurrences', async () => {
@@ -597,73 +584,12 @@ describe('the captured install', () => {
 	})
 })
 
-it.each(STUDY_MEMORY_ACTUAL_REFUSALS)(
-	'stops before the next request, tool and goal on $name',
-	async ({ settings, room, goal, body, message, role }) => {
-		const server = await createMemoryServer([
-			{ path: '/api/chat', body },
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
-		])
-		const profile = buildMemoryProfile({ url: server.url, room, settings })
-		const fixture = createMemoryContext(profile)
-		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-			{ id: 'stop', scenario: 'public', arm: 'compaction', repetition: 0 },
-			fixture.context.signal,
-		)
-		try {
-			if (goal === undefined) throw new Error('Missing goal fixture')
-			await expect(session.execute(goal, fixture.context)).rejects.toBeDefined()
-			const sent = server.requests.length
-			// The first failure is latched, so the next goal rethrows the very error the wire raised.
-			const latched = await session
-				.execute(
-					{ id: 'next', input: { prompt: 'Continue', arrivals: [], records: [] } },
-					fixture.context,
-				)
-				.then(
-					() => undefined,
-					(error: unknown) => error,
-				)
-			expect(isStudyError(latched)).toBe(true)
-			expect(latched).toMatchObject({ code: 'CAPACITY', message: expect.stringContaining(message) })
-			// A returned actual-capacity failure stays attributable to the role that sent the request.
-			expect(readStudyFailure(latched)).toMatchObject({ cause: 'capacity', role })
-			expect(server.requests).toHaveLength(sent)
-			expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
-			expect(server.responses).toHaveLength(1)
-			expect(readMemoryEvents(fixture.evidence, 'lookup')).toEqual([])
-			expect(
-				readMemoryEvents(fixture.evidence, 'wire').filter(
-					(value) => value.role === 'agent' || value.role === 'summary',
-				),
-			).toHaveLength(1)
-		} finally {
-			await session.close()
-			fixture.close()
-			await server.close()
-		}
-	},
-)
-
-it('sends a false shift only for Compaction chat requests, beside the false truncate every chat carries, and marks only their dispatch evidence', async () => {
-	const compaction = await runMemorySummary(STUDY_MEMORY_SUMMARY_FOLDS.below, 400, [], true)
-	expect(compaction.failure).toBeUndefined()
-	expect(readMemoryControls(compaction.requests)).toEqual([
-		{ truncate: false, shift: false },
-		{ truncate: false, shift: false },
-	])
-	const dispatches = readMemoryEvents(compaction.evidence, 'dispatch')
-	const models = dispatches.filter((value) => value.role === 'agent' || value.role === 'summary')
-	expect(models.map((value) => value.role)).toEqual(['summary', 'agent'])
-	expect(models.map((value) => value.strict)).toEqual([true, true])
-	const metadata = dispatches.filter((value) => value.role === 'metadata')
-	expect(metadata.length).toBeGreaterThan(0)
-	expect(metadata.some((value) => 'strict' in value)).toBe(false)
+it('sends a false truncate and no shift on every chat request, and marks no dispatch evidence strict', async () => {
 	for (const arm of ['full', 'records'] as const) {
 		const result = await runMemoryTrial({
 			arm,
 			responses: [],
-			goals: [WINDOW_GOAL],
+			goals: [STUDY_MEMORY_SHORT_GOAL],
 			settings: STUDY_MEMORY_PASSIVE_SETTINGS,
 		})
 		expect(result.failure).toBeUndefined()
@@ -675,27 +601,3 @@ it('sends a false shift only for Compaction chat requests, beside the false trun
 		)
 	}
 })
-
-it.each(STUDY_MEMORY_NATIVE_MALFORMED)(
-	'fails $name once as $code with the role retained, usage unknown and no later request',
-	async ({ role, trial, status, body, code, message }) => {
-		const result = await runMemoryFailure({
-			...trial,
-			responses: [
-				{ path: '/api/chat', status, body },
-				{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
-			],
-		})
-		expect(result.first).toBeDefined()
-		expect(result.products).toEqual([])
-		expect(isStudyError(result.latched)).toBe(true)
-		expect(result.latched).toMatchObject({ code, message: expect.stringContaining(message) })
-		expect(readStudyFailure(result.latched)).toMatchObject({ cause: 'infrastructure', role })
-		expect(result.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
-		expect(result.requests).toHaveLength(result.sent)
-		expect(result.queued).toBe(1)
-		expect(result.usage.filter((row) => row.role === role)).toMatchObject([
-			{ role, calls: 1, tokens: undefined },
-		])
-	},
-)

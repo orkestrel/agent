@@ -137,7 +137,7 @@ export function stripThinking(
  * messages cost the next request, not an exact tokenizer count — it never calls a provider,
  * so the agent layer stays provider-agnostic and synchronous where it can be.
  *
- * @param text - The text to estimate (a section summary, a message's content)
+ * @param text - The text to estimate (a message's content, a rendered record)
  * @returns The estimated token count (`ceil(text.length / 4)`; `0` for empty text)
  *
  * @example
@@ -165,8 +165,8 @@ export function estimateTokens(text: string): number {
  * @returns The refusal's text
  * @example
  * ```ts
- * describeSnapshotRefusal('conversation', 'c1', [{ reason: 'extra', path: ['summary'] }])
- * // 'conversation "c1" holds a snapshot this version refuses (extra key "summary" at the root; ...'
+ * describeSnapshotRefusal('conversation', 'c1', [{ reason: 'extra', path: ['sections'] }])
+ * // 'conversation "c1" holds a snapshot this version refuses (extra key "sections" at the root; ...'
  * ```
  */
 export function describeSnapshotRefusal(
@@ -419,6 +419,47 @@ export function removeEntries<K>(keys: readonly K[], remove: (key: K) => boolean
 }
 
 /**
+ * Settles with a promise, or rejects with the reason of a signal that aborts first, so a caller
+ * is released at once even when the work behind the promise ignores the signal.
+ *
+ * @remarks
+ * An absent signal returns `promise` itself. An already-aborted signal rejects with its reason
+ * without waiting. The abort listener is removed as soon as `promise` settles. A rejection of
+ * `promise` after the abort is handled here and never surfaces as unhandled. The agent loop races a
+ * scheduler's yield and an approver's answer through it, and a ledger's classifier its scheduler's
+ * yield.
+ *
+ * @param promise - The work to wait for
+ * @param signal - The cancellation signal, or `undefined` for none
+ * @returns A promise that settles as `promise` does, or rejects with `signal.reason` on abort
+ *
+ * @example
+ * ```ts
+ * const controller = new AbortController()
+ * const raced = raceSignal(new Promise<string>(() => {}), controller.signal)
+ * controller.abort(new Error('stop'))
+ * await raced // rejects with the Error 'stop'
+ * ```
+ */
+export function raceSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+	if (signal === undefined) return promise
+	return new Promise<T>((resolve, reject) => {
+		// Aborting `settled` removes the abort listener after the promise settles.
+		const settled = new AbortController()
+		if (signal.aborted) reject(signal.reason)
+		else {
+			signal.addEventListener('abort', () => reject(signal.reason), {
+				once: true,
+				signal: settled.signal,
+			})
+		}
+		// Settling an already-rejected race is a no-op, and this handler is what keeps a late
+		// rejection of `promise` from surfacing as unhandled.
+		void promise.then(resolve, reject).finally(() => settled.abort())
+	})
+}
+
+/**
  * Collects whole exchanges, joining every exchange spanned by a tool group.
  *
  * @remarks
@@ -489,8 +530,8 @@ export function hasCalls(message: Pick<Message, 'calls'>): boolean {
  * A tool message belongs to the one assistant message whose calls hold its `call` id. Without that
  * unique owner, it belongs to the assistant message that leads its run of tool messages when that
  * leader holds the id, repeats a call id, or the tool message has no `call`. Any other tool message
- * joins the orphan run it sits in. Compaction and the stock selection each keep a group on one side
- * of their cut.
+ * joins the orphan run it sits in. The stock selection keeps a group on one side of its cut, and a
+ * conversation's `remove` takes an owned group whole.
  *
  * @param messages - The messages in prompt order
  * @returns The owned groups in owner order, then the orphan runs, each in prompt order

@@ -6,39 +6,31 @@ The current strategy is the records strategy as the `recordsrecommended` profile
 
 The `@orkestrel/study` package fixes the shape: `studies/<name>/study.json` declares a study with its rubric, and `studies/<driver>/` holds a driver bundle with its scenarios, its profiles, and its `index.ts`. Several studies can share one bundle. The following table lists each study:
 
-| Study                     | Driver   | Purpose   | What it's for                                                                                                            |
-| ------------------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `chat`                    | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                       |
-| `compactioncapacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for compaction and the full conversation within its bounds.    |
-| `compactionendurance`     | `memory` | quality   | How compaction keeps work, corrections, and obligations over the whole public endurance workload.                        |
-| `compactionmemory`        | `memory` | quality   | How compaction and the full conversation keep corrections and obligations on the `handoff` trajectory.                   |
-| `compactionqualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload for compaction. Every long compaction run goes through it. |
-| `disclosure`              | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.                      |
-| `recordscapacity`         | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for records and the full conversation within its bounds.       |
-| `recordsendurance`        | `memory` | quality   | How records keep work, corrections, and obligations over the whole public endurance workload.                            |
-| `recordsmemory`           | `memory` | quality   | How records and the full conversation keep corrections and obligations on the `handoff` trajectory.                      |
-| `recordsqualification`    | `memory` | capacity  | Whether the selected profile completes the endurance workload for records. Every long records run goes through it.       |
+| Study                  | Driver   | Purpose   | What it's for                                                                                                      |
+| ---------------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `chat`                 | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                 |
+| `disclosure`           | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.                |
+| `recordscapacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for records and the full conversation within its bounds. |
+| `recordsendurance`     | `memory` | quality   | How records keep work, corrections, and obligations over the whole public endurance workload.                      |
+| `recordsmemory`        | `memory` | quality   | How records and the full conversation keep corrections and obligations on the `handoff` trajectory.                |
+| `recordsqualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload for records. Every long records run goes through it. |
 
-Each study on the `memory` driver schedules one strategy, records or compaction, with `full` as its only other arm, so the two strategies run as separate executions and never together. The adapter refuses a memory declaration that lists both strategies, or neither. Each quality study is qualified by the capacity study of its strategy: `recordsmemory` by `recordscapacity`, `compactionmemory` by `compactioncapacity`, `recordsendurance` by `recordsqualification`, and `compactionendurance` by `compactionqualification`.
+Each study on the `memory` driver schedules records, with `full`, the whole conversation, as its only other arm and its control. The adapter refuses a memory declaration that lists no records arm, or an arm the driver doesn't implement. Each quality study is qualified by its capacity study: `recordsmemory` by `recordscapacity`, and `recordsendurance` by `recordsqualification`.
 
 The following table lists each driver bundle:
 
-| Bundle            | What it's for                                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `studies/memory/` | The records, compaction, and full-conversation arms over a support desk, with their session and profiles. |
-| `studies/chat/`   | The sealed chat battery over fresh ledgers with one Mica judge and three ledger capacities.               |
-| `studies/desk/`   | The desk catalog's two disclosure arms over bare agents, with its one `screen` profile.                   |
+| Bundle            | What it's for                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `studies/memory/` | The records and full-conversation arms over a support desk, with their session and profiles. |
+| `studies/chat/`   | The sealed chat battery over fresh ledgers with one Mica judge and three ledger capacities.  |
+| `studies/desk/`   | The desk catalog's two disclosure arms over bare agents, with its one `screen` profile.      |
 
-The following table lists the memory profiles under `studies/memory/profiles/`. Each pair holds the same bytes except `name` and `qualification`, which names the capacity result its strategy's quality study pairs with:
+The following table lists the memory profiles under `studies/memory/profiles/`. Each names, as its `qualification`, the capacity result its quality study pairs with:
 
-| Profile                 | What it is                                                                                                                                                                                                             | Its studies                                      |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `recordsrecommended`    | The current strategy, on the 4B agent model. It was formerly `recommended`, and `q4` before that, the name the plan's history uses.                                                                                    | `recordsqualification`, `recordsendurance`       |
-| `compactionrecommended` | The same profile for the compaction studies.                                                                                                                                                                           | `compactionqualification`, `compactionendurance` |
-| `recordssmallest`       | The smallest model's gate, on the 2B agent model with the judge sharing the GPU. It was formerly `smallest`, and `q2` before that. It shares `recordsrecommended`'s capacity slot, so the two run one after the other. | `recordsqualification`, `recordsendurance`       |
-| `compactionsmallest`    | The same gate for the compaction studies, sharing `compactionrecommended`'s capacity slot.                                                                                                                             | `compactionqualification`, `compactionendurance` |
-| `recordslocal`          | The unpinned default template, whose `REQUIRED_` values are placeholders a host fills. It was formerly `local`, and the test fixtures fill it.                                                                         | `recordscapacity`, `recordsmemory`               |
-| `compactionlocal`       | The same template for the compaction studies.                                                                                                                                                                          | `compactioncapacity`, `compactionmemory`         |
+| Profile              | What it is                                                                                                                                     | Its studies                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `recordsrecommended` | The current strategy, on the 4B agent model. It was formerly `recommended`, and `q4` before that, the name the plan's history uses.            | `recordsqualification`, `recordsendurance` |
+| `recordslocal`       | The unpinned default template, whose `REQUIRED_` values are placeholders a host fills. It was formerly `local`, and the test fixtures fill it. | `recordscapacity`, `recordsmemory`         |
 
 ## The current strategy
 
@@ -98,8 +90,6 @@ npx study freeze recordsqualification --profile recordsrecommended --to ABSOLUTE
 npx study check recordsqualification --profile recordsrecommended --closure ABSOLUTE_CLOSURE_PATH --trial r1-s1-a1 --goals ev-01-1..ev-04-4
 npx study execute recordsqualification --profile recordsrecommended --closure ABSOLUTE_CLOSURE_PATH --trial r1-s1-a1 --goals ev-01-1..ev-04-4 --out tmp/studies/STEM
 ```
-
-Run compaction as its own study, only when it's asked for: replace `recordsqualification` with `compactionqualification` and `recordsrecommended` with `compactionrecommended` in every command of this section.
 
 Grade a closure's result through the closure's own entry, from the closure's root, with absolute paths, because the repository's entry refuses a closure's roots. `ABSOLUTE_RESULT_PATH` is the `path` member `study execute` prints:
 

@@ -3,13 +3,12 @@ import type { TokenUsage } from '@orkestrel/budget'
 import type { ProviderRequest, ProviderResult } from '@src/core'
 import type { ToolCall, ToolContext } from '@orkestrel/tool'
 import type {
+	AgentErrorCode,
 	AgentEventMap,
 	AgentFrame,
 	AgentResult,
 	AgentStreamInterface,
 	AuthorityDecision,
-	ConversationEventMap,
-	Message,
 	MessageInput,
 	ProviderDelta,
 	ProviderIncrement,
@@ -26,11 +25,7 @@ import {
 	AGENT_EVENTS,
 	computeUsageTotal,
 	createEchoProvider,
-	COMPACT_SCRIPT,
-	measureMessages,
 	readCallRequest,
-	seedCompactionAgent,
-	createAnswerProvider,
 	requestConversation,
 	createGatedProvider,
 	createAbortingGatedProvider,
@@ -67,10 +62,9 @@ import {
 	agentChunkToFrame,
 	agentResultToJSON,
 	agentStreamToFrames,
+	AgentError,
 	AUTHORITY_NOTES,
-	CONVERSATION_RECAP_PREFIX,
 	createAgent,
-	createAgentContext,
 	createApprover,
 	createAuthority,
 	createConversation,
@@ -80,7 +74,6 @@ import {
 	createScope,
 	createSkillManager,
 	denyCall,
-	estimateMessages,
 	estimateRequest,
 	isAgentError,
 	isConversationError,
@@ -122,15 +115,12 @@ import {
 	createRecordedSelection,
 	createScriptedProvider,
 	createSeededToolManager,
-	createStubSummarizer,
 	createToolCall,
 	createLoopTool,
-	RECORDED_COMPACTION_REQUEST,
 	RECORDED_REQUEST,
 	REFUSED_WIRE_PROMPTS,
 	rejectSelection,
 	type ScriptedTurn,
-	seedCompactionArm,
 	seedFramedAgent,
 	SELECTION_FAULT_CASES,
 	serveIngressCanary,
@@ -203,9 +193,9 @@ it('commits a partial agent result when final usage aborts the caller', async ()
 })
 
 describe('Agent — thinking replay', () => {
-	it('resolves replay at construction for every call and context estimate', async () => {
+	it('resolves replay at construction for every call and request event', async () => {
 		// The policy getter answers `all` once, then `none`: only a construction-time read keeps
-		// the recorded thinking in every later request and estimate.
+		// the recorded thinking in every later request and in what the `request` event reports.
 		const replays: readonly ThinkingReplay[] = ['all']
 		const policies = replays.values()
 		const provider = createScriptedProvider(
@@ -215,9 +205,7 @@ describe('Agent — thinking replay', () => {
 			],
 			{ recorded: true },
 		)
-		const estimated = createRecorder<[ProviderRequest]>()
-		const conversations = createConversationManager({ summarize: createStubSummarizer().summarize })
-		conversations.add()
+		const requested = createRecorder<[ProviderRequest]>()
 		const tools = createToolManager()
 		tools.add(createAddTool())
 		const agent = createAgent(
@@ -233,14 +221,7 @@ describe('Agent — thinking replay', () => {
 			{
 				tools,
 				authority: AGENT_AUTHORITY,
-				conversations,
-				window: createBudget<ProviderRequest>({
-					max: 10000,
-					consumer: (request) => {
-						estimated.handler(request)
-						return estimateRequest(request)
-					},
-				}),
+				on: { request: (_index, request) => requested.handler(request) },
 			},
 		)
 		agent.context.messages.add({ role: 'user', content: 'go' })
@@ -248,8 +229,8 @@ describe('Agent — thinking replay', () => {
 		expect(provider.calls).toHaveLength(2)
 		const sent = requireValue(provider.calls[1]).messages
 		expect(sent.map((message) => message.thinking)).toContain('first')
-		const [measured] = requireValue(estimated.calls.at(-1))
-		expect(measured.messages.map((message) => message.thinking)).toContain('first')
+		const [observed] = requireValue(requested.calls.at(-1))
+		expect(observed.messages.map((message) => message.thinking)).toContain('first')
 	})
 
 	it('defaults an absent provider policy to none and omits empty thinking on both assistant paths', async () => {
@@ -408,52 +389,6 @@ describe('Agent — thinking replay', () => {
 			expect(bodies[1]).toEqual(bodies[0])
 		}
 	})
-
-	it('estimates replayed thinking at run entry and between tool calls before compacting', async () => {
-		for (const replay of ['none', 'all'] as const) {
-			const conversations = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-				keep: 0,
-			})
-			const conversation = conversations.add()
-			conversation.add([
-				{ role: 'user', content: 'earlier' },
-				{ role: 'assistant', content: 'reply', thinking: 'h'.repeat(8000) },
-				{ role: 'user', content: 'go' },
-			])
-			// This case pins message arithmetic, so the window explicitly measures request messages alone.
-			const window = createBudget<ProviderRequest>({ max: 100, consumer: measureMessages })
-			expect(estimateMessages(conversation.view())).toBeGreaterThan(window.max)
-			const responses = ['tool', 'answer'].values()
-			const transport = new RecordedTransport(
-				() => new Response(requireValue(responses.next().value)),
-			)
-			const provider = new ScriptedWire({
-				strict: false,
-				url: 'https://provider.test',
-				fetch: transport.fetch,
-				replay,
-				records: new Map<string, ProviderIncrement>([
-					['tool', { content: '', thinking: 't'.repeat(8000), tools: [createToolCall()] }],
-					['answer', { content: 'done', thinking: '', tools: [] }],
-				]),
-			})
-			const tools = createToolManager()
-			tools.add(createAddTool())
-			const agent = createAgent(provider, {
-				strict: false,
-				tools,
-				authority: AGENT_AUTHORITY,
-				conversations,
-				window,
-			})
-			expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
-			expect(conversation.sections).toHaveLength(replay === 'none' ? 0 : 1)
-			// These charges independently include framing, tool-call JSON, and permitted thinking.
-			expect(window.consumed).toBe(replay === 'none' ? 37 : 2039)
-			expect(window.exhausted).toBe(replay === 'all')
-		}
-	})
 })
 
 describe('Agent — single turn', () => {
@@ -558,17 +493,6 @@ describe('Agent — the recorded request per layout arm', () => {
 		const bodies = sent.map(({ id, ...body }) => body)
 		expect(bodies).toStrictEqual(RECORDED_REQUEST)
 		expect(JSON.stringify(bodies)).toBe(JSON.stringify(RECORDED_REQUEST))
-	})
-
-	it('sends the recorded 0.0.34 messages for the compaction arm', async () => {
-		const provider = createScriptedProvider([{ result: { content: 'done' } }], AGENT_SCRIPT_OPTIONS)
-		await (await seedCompactionArm(provider)).generate()
-
-		const sent = requireValue(provider.calls[0]).messages
-		expect(sent.every((message) => message.id.length > 0)).toBe(true)
-		const bodies = sent.map(({ id, ...body }) => body)
-		expect(bodies).toStrictEqual(RECORDED_COMPACTION_REQUEST)
-		expect(JSON.stringify(bodies)).toBe(JSON.stringify(RECORDED_COMPACTION_REQUEST))
 	})
 })
 
@@ -2803,25 +2727,22 @@ describe('Agent — a refused prompt names what it refused', () => {
 })
 
 describe('Agent — strict by default', () => {
-	it('refuses a request over the window when strict is not passed', async () => {
+	it('refuses an answer that misses the run schema when strict is not passed', async () => {
 		const provider = createScriptedProvider([{ content: 'answer' }], AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			window: createBudget<ProviderRequest>({ max: 1, consumer: estimateRequest }),
-		})
+		const agent = createAgent(provider)
 		agent.context.messages.add({ role: 'user', content: 'go' })
-		const error = await agent.generate().catch((caught: unknown) => caught)
-		expect(isAgentError(error) && error.code).toBe('WINDOW')
-		expect(provider.calls).toEqual([])
+		const error = await agent
+			.generate({ schema: { type: 'object' } })
+			.catch((caught: unknown) => caught)
+		expect(isAgentError(error) && error.code).toBe('SCHEMA')
+		expect(provider.calls).toHaveLength(1)
 	})
 
-	it('sends the request over the window under strict: false', async () => {
+	it('settles the raw answer under strict: false', async () => {
 		const provider = createScriptedProvider([{ content: 'answer' }], AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			strict: false,
-			window: createBudget<ProviderRequest>({ max: 1, consumer: estimateRequest }),
-		})
+		const agent = createAgent(provider, { strict: false })
 		agent.context.messages.add({ role: 'user', content: 'go' })
-		expect((await agent.generate()).content).toBe('answer')
+		expect((await agent.generate({ schema: { type: 'object' } })).content).toBe('answer')
 	})
 })
 
@@ -4017,490 +3938,19 @@ describe('Agent — emitter (push observation surface)', () => {
 	})
 })
 
-// ── Automatic compaction (the context `window` budget) ───────────────────────
-//
-// The context budget measures the working prompt and triggers compaction at its ceiling.
-describe('Agent — automatic compaction (context window budget)', () => {
-	it('fires when the prompt reaches the window, continues on the compacted view, and rebuilds smaller', async () => {
-		// An earlier exchange sits before the run's request 'go', and the window sits one token preceding
-		// the opening prompt, so the first admission passes and the second turn's appends cross it:
-		//  • Turn 1 dispatches `[earlier, reply, go]` (3 messages) and appends asst(40x) + tool("5").
-		//  • Turn 2's admission finds the request EXHAUSTED → compact() (keep 0) folds the 2
-		//    messages before the request into `recap of 2`; the working array rebuilds to
-		//    `[<recap of 2>, go, 40x, "5"]` (4 messages), which is dispatched.
-		//  • Turn 3's admission, after asst(40y) + tool("5"), is still over the window → compact() has
-		//    nothing before the request to fold, so it returns `undefined` and the run latches futile;
-		//    the turn (no tools) answers 'the answer is 42'.
-		// So compaction fires EXACTLY once; without it turn 2 would see 5 messages. Record the
-		// conversation's own `compact` event (the observability surface — NO added Agent event).
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'h'.repeat(40) },
-			{ role: 'assistant', content: 'k'.repeat(40) },
-			{ role: 'user', content: 'go' },
-		])
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			// Message arithmetic is the claim here, so the window measures request messages alone.
-			window: createBudget({
-				max: estimateMessages(conversation.view()) + 1,
-				consumer: measureMessages,
-			}),
-			limit: 5,
-		})
-		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
-			'compact',
-		])
-
-		const result = await agent.generate()
-
-		// (a) Auto-compaction fired mid-run — EXACTLY one fold, of the earlier exchange alone.
-		expect(conversation.sections.length).toBe(1)
-		expect(conversation.sections[0]?.messages.map((message) => message.content)).toEqual([
-			'h'.repeat(40),
-			'k'.repeat(40),
-		])
-		// (b) The run still produced the CORRECT final answer (the loop continued on the compacted
-		// view through to turn 3 — proving the rebuilt working array stayed a valid prompt).
-		expect(result.content).toBe('the answer is 42')
-		expect(result.partial).toBe(false)
-		// (c) The conversation's `compact` event fired once, carrying the section.
-		expect(compacted.compact.calls.map(([section]) => section.summary)).toEqual(['recap of 2'])
-		// (d) The REBUILD shrank the prompt: turn 2 ran on 4 messages instead of the uncompacted 5,
-		// and the request stayed live in every prompt.
-		const promptSizes = provider.calls.map((call) => call.messages.length)
-		expect(promptSizes).toEqual([3, 4, 6])
-		expect(provider.calls.map((call) => call.messages.some((one) => one.content === 'go'))).toEqual(
-			[true, true, true],
-		)
-	})
-
-	it('does NOT fire when the prompt stays below the window (same answer, budget holds the FULL prompt size)', async () => {
-		// A HIGH max (10_000) the prompt never reaches → no fold, yet the multi-turn run still
-		// produces the same answer. With NO compaction the working array only grows, so the LAST
-		// between-turns check (turn 2) measures the whole accumulated prompt `[go, 40x(+calls), "5",
-		// 40y(+calls), "5"]` -- 10_000 leaves ample headroom over that genuine estimate either way.
-		const window = createBudget({ max: 10_000, consumer: measureMessages })
-		const { agent, conversation } = seedCompactionAgent(window)
-		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
-			'compact',
-		])
-
-		const result = await agent.generate()
-
-		expect(conversation.sections.length).toBe(0)
-		expect(compacted.compact.calls).toEqual([])
-		expect(result.content).toBe('the answer is 42')
-		expect(result.partial).toBe(false)
-		// The budget was re-measured each turn against the ABSOLUTE prompt and never crossed the
-		// ceiling. Its final value is turn 2's full prompt, including message overhead and tool calls.
-		const turn2Prompt: readonly Message[] = [
-			{ id: 'u', role: 'user', content: 'go' },
-			{ id: 'a1', role: 'assistant', content: 'x'.repeat(40), calls: [createToolCall()] },
-			{ id: 't1', role: 'tool', content: JSON.stringify(5) },
-			{
-				id: 'a2',
-				role: 'assistant',
-				content: 'y'.repeat(40),
-				calls: [createToolCall({ id: 'c2' })],
-			},
-			{ id: 't2', role: 'tool', content: JSON.stringify(5) },
-		]
-		expect(window.consumed).toBe(estimateMessages(turn2Prompt))
-		expect(window.consumed).toBe(65)
-		expect(window.exhausted).toBe(false)
-	})
-
-	it('is PURELY ADDITIVE — with NO window budget the injected conversation is never compacted (regression)', async () => {
-		// The SAME scenario (injected conversation, same multi-turn script) with NO `window` budget.
-		// The trigger block is skipped entirely, so the conversation is NEVER folded — and the run
-		// produces the identical final answer the windowed run produced. This is the byte-for-byte
-		// additive proof: omitting `window` leaves the loop exactly as the cost-budget-only path.
-		const { agent, conversation } = seedCompactionAgent(undefined)
-		const compacted = createRecorders<ConversationEventMap, 'compact'>(conversation.emitter, [
-			'compact',
-		])
-
-		const result = await agent.generate()
-
-		expect(conversation.sections.length).toBe(0)
-		expect(compacted.compact.calls).toEqual([])
-		expect(result.content).toBe('the answer is 42')
-		expect(result.partial).toBe(false)
-	})
-
-	it('measures but never folds a NON-SUMMARIZABLE conversation when a window budget is set (regression)', async () => {
-		// A LOW-max window budget but the DEFAULT conversation (no summarizer ⇒ `summarizable` is
-		// false). The fold guard fails, so the multi-turn loop runs exactly as the no-window path and
-		// ends correctly in the lenient default — the loop never throws the SUMMARIZER error — but
-		// every request is still measured, so the budget holds the last request's estimate.
-		const window = createBudget({ max: 1, consumer: measureMessages })
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			strict: false,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window,
-			limit: 5,
-		})
-		expect(agent.context.conversations.active?.summarizable).toBe(false)
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		const result = await agent.generate()
-
-		expect(result.content).toBe('the answer is 42')
-		expect(result.partial).toBe(false)
-		// Three scripted turns ran (two tool turns + the final), none over-running the script.
-		expect(provider.calls).toHaveLength(3)
-		// The final dispatch carried `[go, 40x(+calls), "5", 40y(+calls), "5"]`, counted at 65 above.
-		expect(window.consumed).toBe(65)
-		expect(window.exhausted).toBe(true)
-	})
-})
-
-// ── Automatic compaction — production hardening ──────────────────────────────
-//
-// Beyond the between-turns preceding trigger, the production path adds: a PRE-FIRST-TURN check (a
-// resumed / long conversation whose INITIAL prompt already exceeds the window compacts BEFORE the
-// first provider call, not only after a tool turn); a NON-FATAL summarizer failure (a thrown auto
-// `compact()` does NOT crash the run — it is caught, surfaced as a `fault` event, and the run
-// continues); and the FUTILE-COMPACTION guard (a `compact()` that folds nothing while still over the
-// window latches a per-run flag that STOPS auto-compacting for the rest of the run — no per-turn
-// churn — letting the over-window prompt proceed to the provider). All deterministic (scripted
-// provider + the real `estimateMessages`), all PURELY ADDITIVE atop the prior loop. The `window`
-// budget reuses the same `contextBudget` / estimator as the block preceding.
-describe('Agent — automatic compaction (production hardening)', () => {
-	it('PRE-FIRST-TURN: a conversation whose INITIAL prompt already exceeds the window compacts before the first provider call', async () => {
-		// Seed the conversation's live tail with ONE big earlier user message (200 chars ⇒
-		// ceil(200/4) = 50 tokens) and the short request BEFORE the run. With a window max of 20 and NO
-		// system prompt, the build()'d initial prompt already exceeds the window — so the loop's
-		// first turn's admission fires `compact()` (keep 0 folds the message before the request into
-		// `recap of 1`) and rebuilds BEFORE the dispatch. The single provider call must therefore see
-		// the COMPACTED view (the framed `recap of 1`, then the request), not the 200-char seed — the
-		// proof the admission ran ahead of the provider.
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
-		const conversation = conversations.add() // auto-activates — the agent's message source
-		const seed = 'q'.repeat(200)
-		conversation.add({ role: 'user', content: seed })
-		conversation.add({ role: 'user', content: 'hi' })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget({ max: 20, consumer: estimateRequest }),
-			limit: 5,
-		})
-
-		const result = await agent.generate()
-
-		// Compaction fired BEFORE the first (only) provider turn — one section, authored `recap of 1`.
-		expect(conversation.sections.length).toBe(1)
-		expect(conversation.sections[0]?.summary).toBe('recap of 1')
-		// The single provider call saw the COMPACTED view — the framed recap message, NOT the
-		// 200-char seed. view() prefixes the section summary with the lean RECAP label.
-		expect(provider.calls).toHaveLength(1)
-		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
-			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
-			'hi',
-		])
-		expect(JSON.stringify(provider.calls[0]?.messages)).not.toContain(seed)
-		// The run still produced the correct final answer through the compacted context.
-		expect(result.content).toBe('final answer')
-		expect(result.partial).toBe(false)
-	})
-
-	it('PRE-FIRST-TURN: an UNDER-window initial prompt is left untouched (no spurious fold)', async () => {
-		// The mirror guard: a small initial prompt does NOT trigger the pre-first-turn fold, so the
-		// provider sees the live message verbatim and no section is created.
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
-		const conversation = conversations.add() // auto-activates — the agent's message source
-		conversation.add({ role: 'user', content: 'hi' })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget({ max: 10_000, consumer: estimateRequest }),
-			limit: 5,
-		})
-
-		const result = await agent.generate()
-
-		expect(conversation.sections.length).toBe(0)
-		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual(['hi'])
-		expect(result.content).toBe('final answer')
-	})
-
-	it('NON-FATAL summarizer failure: a thrown auto compact() does NOT crash the run — it fires fault and continues', async () => {
-		// A summarizer that ALWAYS throws, a conversation with keep 0 (so there IS a tail to fold), and
-		// a low window crossed by every request. Each turn's admission calls
-		// `compact()`, which rejects — the loop CATCHES it (the run does not reject), surfaces a
-		// `fault` event, skips compaction that turn, and continues to the final answer. No
-		// section is ever created (every fold attempt threw). A MANUAL compact() still throws (asserted
-		// separately) — only the agent's AUTO path is resilient.
-		const boom = new Error('summarizer exploded')
-		const conversations = createConversationManager({
-			summarize: async () => {
-				throw boom
-			},
-			keep: 0,
-		})
-		const conversation = conversations.add() // auto-activates — the agent's message source
-		// An earlier exchange gives each fold a slice before the run's request.
-		conversation.add([
-			{ role: 'user', content: 'Earlier question.' },
-			{ role: 'assistant', content: 'Earlier answer.' },
-		])
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window: createBudget({ max: 12, consumer: measureMessages }),
-			limit: 5,
-		})
-		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
-			'fault',
-			'error',
-			'finish',
-		])
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		const result = await agent.generate()
-
-		// The run SURVIVED a throwing summarizer — it settled the correct final answer, not partial,
-		// and `error` never fired (a non-fatal warn, not a genuine failure).
-		expect(result.content).toBe('the answer is 42')
-		expect(result.partial).toBe(false)
-		expect(events.error.calls).toEqual([])
-		expect(events.finish.calls).toEqual([[result]])
-		// `fault` fired (≥ once — the prompt crossed the window each tool turn), carrying the
-		// thrown summarizer error verbatim; and NOTHING folded (every attempt threw).
-		expect(new Set(events.fault.calls.map(([error]) => error))).toEqual(new Set([boom]))
-		expect(conversation.sections.length).toBe(0)
-		// A MANUAL compact() still PROPAGATES the throw — only the AUTO path is resilient.
-		await expect(conversation.compact()).rejects.toThrow('summarizer exploded')
-	})
-
-	it('FUTILE guard: a compact() that folds NOTHING while over the window stops auto-compacting for the rest of the run (no churn)', async () => {
-		// `keep` is huge (50), so `compact()` ALWAYS folds nothing (count <= keep) and resolves
-		// `undefined` — yet the request is over the window. The first turn's admission folds nothing
-		// without latching; the second turn's admission folds nothing and latches the per-run futile
-		// flag. Every request is still measured, so the window consumer records one measurement per
-		// dispatch, and the lenient default sends each over-window request.
-		const stub = createStubSummarizer()
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 50 })
-		const conversation = conversations.add() // auto-activates — the agent's message source
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		// Each tool turn appends a big assistant message so the absolute prompt stays over the window
-		// on every between-turns check (the futile guard must hold across BOTH tool turns).
-		const script: readonly ScriptedTurn[] = [
-			{ result: { content: 'x'.repeat(80), tools: [createToolCall()] } },
-			{ result: { content: 'y'.repeat(80), tools: [createToolCall({ id: 'c2' })] } },
-			{ result: { content: 'done' } },
-		]
-		const provider = createScriptedProvider(script, AGENT_SCRIPT_OPTIONS)
-		const measured = createRecorder<[ProviderRequest]>()
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window: createBudget<ProviderRequest>({
-				max: 12,
-				consumer: (request) => {
-					measured.handler(request)
-					return estimateRequest(request)
-				},
-			}),
-			limit: 5,
-		})
-		const events = createRecorders<AgentEventMap, 'fault' | 'finish'>(agent.emitter, [
-			'fault',
-			'finish',
-		])
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		const result = await agent.generate()
-
-		// Nothing ever folded (keep 50 ⇒ compact() always a no-op), yet the run completed cleanly.
-		expect(conversation.sections.length).toBe(0)
-		expect(result.content).toBe('done')
-		expect(result.partial).toBe(false)
-		expect(events.finish.calls).toEqual([[result]])
-		// One measurement per dispatch, latched or not (the final assertion pairs them); nothing
-		// folded, so the summarizer never ran and no `fault` fired.
-		expect(stub.calls).toEqual([])
-		expect(events.fault.calls).toEqual([])
-		// The over-window run still ran all three scripted turns (the futile request proceeded to the
-		// provider rather than looping on compaction), and each measured request is the dispatched one.
-		expect(provider.calls).toHaveLength(3)
-		expect(measured.calls.map(([request]) => request)).toEqual(provider.calls.map(readCallRequest))
-	})
-
-	// A `turn` listener adds a user message as the numbered turn begins, which makes the conversation
-	// foldable at that turn's admission (the earlier exchange sits before the newest user message).
-	// Whether that fold runs shows whether the earlier undefined fold latched: the first turn's does
-	// not, a later turn's does. The user message arrives between exchanges, never inside a tool group.
-	it.each([
-		{ added: 1, folds: 1, label: 'an undefined fold on the first turn does not latch' },
-		{ added: 2, folds: 0, label: 'an undefined fold on a later turn latches the run' },
-	])('FUTILE guard: $label', async ({ added, folds }) => {
-		const stub = createStubSummarizer()
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
-		const conversation = conversations.add()
-		const provider = createScriptedProvider(
-			[
-				{ result: { content: 'a', tools: [createToolCall({ name: 'note' })] } },
-				{ result: { content: 'b', tools: [createToolCall({ name: 'note', id: 'c2' })] } },
-				{ result: { content: 'c', tools: [createToolCall({ name: 'note', id: 'c3' })] } },
-				{ result: { content: 'done' } },
-			],
-			AGENT_SCRIPT_OPTIONS,
-		)
-		const tools = createToolManager()
-		const executed = createRecorder<[args: Readonly<Record<string, unknown>>]>()
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			// Every request is over the window, and the opening request is the lone user message. The
-			// original message-only policy is explicit: the latch, not the tools, is the subject.
-			window: createBudget({ max: 3, consumer: measureMessages }),
-			limit: 6,
-			on: {
-				turn: (index) => {
-					if (index === added) agent.context.messages.add({ role: 'user', content: 'later' })
-				},
-			},
-		})
-		tools.add(
-			createTool({
-				name: 'note',
-				strict: false,
-				execute: (args) => {
-					executed.handler(args)
-					return 'noted'
-				},
-			}),
-		)
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		const result = await agent.generate()
-
-		expect(result.content).toBe('done')
-		expect(executed.calls).toEqual([[{}], [{}], [{}]])
-		expect(stub.calls).toHaveLength(folds)
-		expect(conversation.sections).toHaveLength(folds)
-	})
-
-	it('folds nothing after a tool aborts the run, and the next run folds the whole exchange first', async () => {
-		const stub = createStubSummarizer()
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(40) },
-			{ role: 'assistant', content: 'Nice.' },
-			{ role: 'user', content: 'go' },
-		])
-		// The opening prompt fits the window, so only a later admission can reach it, and the abort
-		// stops the loop before that admission.
-		const window = createBudget({
-			max: estimateMessages(conversation.view()) + 1,
-			consumer: measureMessages,
-		})
-		const provider = createScriptedProvider(
-			[
-				{ result: { content: 'x'.repeat(40), tools: [createToolCall({ name: 'reply' })] } },
-				{ result: { content: 'Done.' } },
-			],
-			AGENT_SCRIPT_OPTIONS,
-		)
-		const tools = createToolManager()
-		const agent = createAgent(provider, {
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window,
-			limit: 5,
-		})
-		tools.add(
-			createTool({
-				name: 'reply',
-				execute: () => {
-					agent.abort('replied')
-					return 'sent'
-				},
-			}),
-		)
-
-		const aborted = await agent.generate()
-
-		expect(aborted.partial).toBe(true)
-		expect(stub.calls).toEqual([])
-		expect(conversation.sections).toHaveLength(0)
-		expect(conversation.messages().map((message) => message.role)).toEqual([
-			'user',
-			'assistant',
-			'user',
-			'assistant',
-			'tool',
-		])
-
-		agent.context.messages.add({ role: 'user', content: 'next' })
-		const resumed = await agent.generate()
-
-		expect(resumed.content).toBe('Done.')
-		expect(resumed.partial).toBe(false)
-		expect(conversation.sections).toHaveLength(1)
-		expect(conversation.sections[0]?.messages.map((message) => message.content)).toEqual([
-			'q'.repeat(40),
-			'Nice.',
-			'go',
-			'x'.repeat(40),
-			'sent',
-		])
-		expect(provider.calls.at(-1)?.messages.map((message) => message.content)).toEqual([
-			`${CONVERSATION_RECAP_PREFIX}recap of 5`,
-			'next',
-		])
-	})
-})
-
 // ── Multi-conversation — one agent serving many threads ──────────────────────
 //
 // The real app pattern: ONE Agent over a `ConversationManager` of threads (the agent's own
 // `context.conversations`), switching the ACTIVE conversation per request (NOT an agent per thread).
 // Each "request" makes the thread `id` active (creating through `add({ id })` when absent, then
 // `switch(id)`), appends the user turn, and runs `generate()`. These prove each conversation
-// accumulates its OWN independent history AND compacts INDEPENDENTLY (one conversation's sections
-// never leak into another), all served by the SAME agent. Deterministic: a scripted provider + a stub
-// summarizer + (for the compaction proof) small per-run window budgets — real behavior.
+// accumulates its OWN independent history, all served by the SAME agent. Deterministic: a scripted
+// provider — real behavior.
 describe('Agent — multi-conversation (one agent, a ConversationManager of threads)', () => {
 	it('accumulates independent histories across switched conversations (no cross-talk)', async () => {
-		// No window (no compaction) — a no-tools provider that echoes the LAST user turn, so each
-		// conversation's answers are distinguishable. One agent serves an interleaved A / B / A / B
-		// sequence; each conversation's live tail must hold ONLY its own user turns + their answers.
+		// A no-tools provider that echoes the LAST user turn, so each conversation's answers are
+		// distinguishable. One agent serves an interleaved A / B / A / B sequence; each conversation
+		// must hold ONLY its own user turns + their answers.
 		const provider = createConversationEchoProvider()
 		// The manager is the agent's OWN registry (its message source). The context adds a default
 		// conversation when the supplied registry is empty, so the agent's registry IS this `manager`.
@@ -4534,61 +3984,6 @@ describe('Agent — multi-conversation (one agent, a ConversationManager of thre
 		// Neither thread carries a trace of the other's content.
 		expect(JSON.stringify(aContents)).not.toContain('b-')
 		expect(JSON.stringify(bContents)).not.toContain('a-')
-	})
-
-	it('compacts each conversation INDEPENDENTLY — one thread’s sections never leak into another', async () => {
-		// One agent WITH a small window + a ConversationManager (keep 0). A no-tools provider that
-		// always finishes, so each request is a single turn whose admission compacts the
-		// conversation after its accumulated history exceeds the window. Two requests per thread: the
-		// 2nd request's admission folds that thread's own accumulated tail into ITS OWN
-		// section (retaining ITS OWN originals). The window resets per run (run-entry `clear()`), so the
-		// two threads compact on their own schedules with no shared state.
-		const { summarize } = createStubSummarizer()
-		const manager = createConversationManager({ summarize, keep: 0 })
-		const provider = createScriptedProvider([{ result: { content: 'ok' } }], {
-			name: 'ans',
-			recorded: true,
-			repeat: true,
-		})
-		// A window small enough that a 2nd-request prompt (prior user "alpha-1"/"bravo-1" + 'ok' answer
-		// + new user turn — three messages, each MESSAGE_TOKEN_OVERHEAD (4) alone already at/near the
-		// 10-token ceiling) exceeds it, but a 1st-request prompt (one short user
-		// turn: content ~2 tokens + 4 overhead = ~6) does not (max 10). The manager (with its summarizer)
-		// is the agent's OWN registry, so each thread is summarizable.
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations: manager,
-			window: createBudget({ max: 10, consumer: estimateRequest }),
-			limit: 5,
-		})
-
-		// Round 1 — each thread's first request: a single short user turn, under the window ⇒ no fold.
-		await requestConversation(agent, manager, 'A', 'alpha-1')
-		await requestConversation(agent, manager, 'B', 'bravo-1')
-		expect(manager.conversation('A')?.sections.length).toBe(0)
-		expect(manager.conversation('B')?.sections.length).toBe(0)
-
-		// Round 2 — each thread now has [user, 'ok'] accumulated; the new user turn (added before
-		// generate) pushes the prompt over the window, so the admission folds THAT thread's
-		// earlier exchange into one section and keeps the second request live.
-		await requestConversation(agent, manager, 'A', 'alpha-2')
-		await requestConversation(agent, manager, 'B', 'bravo-2')
-
-		const a = manager.conversation('A')
-		const b = manager.conversation('B')
-		// Each thread compacted EXACTLY once, into its OWN section.
-		expect(a?.sections.length).toBe(1)
-		expect(b?.sections.length).toBe(1)
-		// INDEPENDENCE: each section RETAINS only its OWN thread's originals — A's folded originals are
-		// A's turns, B's are B's. No leakage in either direction.
-		const aOriginals = a?.sections[0]?.messages.map((message) => message.content) ?? []
-		const bOriginals = b?.sections[0]?.messages.map((message) => message.content) ?? []
-		expect(aOriginals).toEqual(['alpha-1', 'ok'])
-		expect(bOriginals).toEqual(['bravo-1', 'ok'])
-		expect(JSON.stringify(aOriginals)).not.toContain('bravo')
-		expect(JSON.stringify(bOriginals)).not.toContain('alpha')
-		// And the SAME agent served both — its active conversation is whichever was last switched in.
-		expect(agent.context.conversations.active).toBe(b)
 	})
 })
 
@@ -4972,32 +4367,12 @@ describe('Agent — per-run schema', () => {
 	})
 })
 
-// ── Concurrency guard — a `window` context budget, or a budget instance a live run holds, would
-// race a second concurrent run's charges against the same instance; `stream()` (and thus
-// `generate()`) THROWS an `AgentError` ('CONCURRENCY') SYNCHRONOUSLY when a run is already in
-// flight AND that hazard applies. Runs with no window and distinct budget instances are exempt, and
-// sequential (awaited) runs on a construction-budget agent are unaffected (never concurrent).
-describe('Agent — concurrency guard (shared window/budget instance)', () => {
-	it('a construction `window` -- starting a 2nd run while the 1st is in flight throws AgentError(CONCURRENCY); the 1st still completes', async () => {
-		const gate = Promise.withResolvers<void>()
-		const agent = createAgent(createGatedProvider(gate), {
-			window: createBudget({ max: 1_000_000, consumer: estimateRequest }),
-		})
-		agent.context.messages.add({ role: 'user', content: 'hi' })
-
-		const run1 = agent.stream()
-		const caught = captureError(() => agent.stream())
-		if (!isAgentError(caught)) throw new Error('expected an AgentError')
-		expect(caught.code).toBe('CONCURRENCY')
-		expect(caught.context).toEqual({ agent: agent.id })
-
-		const drained = collect(run1.events)
-		gate.resolve()
-		await drained
-		const result1 = await run1.result
-		expect(result1).toEqual({ content: 'full', partial: false })
-	})
-
+// ── Concurrency guard — a budget instance a live run holds would race a second concurrent run's
+// charges against the same instance; `stream()` (and thus `generate()`) THROWS an `AgentError`
+// ('CONCURRENCY') SYNCHRONOUSLY when a run is already in flight AND that hazard applies. Runs with
+// distinct budget instances are exempt, and sequential (awaited) runs on a construction-budget agent
+// are unaffected (never concurrent).
+describe('Agent — concurrency guard (shared budget instance)', () => {
 	it('a construction `budget` with NO per-run override on the 2nd call throws AgentError(CONCURRENCY)', async () => {
 		const gate = Promise.withResolvers<void>()
 		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
@@ -5081,7 +4456,7 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 		])
 	})
 
-	it('a construction `budget` with a per-run `budget` override and NO window -- both concurrent runs settle', async () => {
+	it('a construction `budget` with a per-run `budget` override -- both concurrent runs settle', async () => {
 		const gate = Promise.withResolvers<void>()
 		const agent = createAgent(createGatedProvider(gate), {
 			budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
@@ -5130,550 +4505,6 @@ describe('Agent — concurrency guard (shared window/budget instance)', () => {
 		// Sequential (awaited, never overlapping) runs never trip the concurrency guard, and the
 		// SAME construction budget accumulates charges across both.
 		expect(budget.consumed).toBeGreaterThanOrEqual(usage.total * 2)
-	})
-})
-
-// ── Strict compaction — a summarizer failure during AUTOMATIC window compaction; strict:
-// true emits `fault` THEN rethrows (the run rejects, status error, an `error` event). The
-// lenient default (`strict` omitted) emits `fault` and continues -- already covered by
-// 'NON-FATAL summarizer failure' in the earlier 'automatic compaction (production hardening)' block.
-describe('Agent — strict compaction', () => {
-	it('strict: true -- a throwing auto-compact summarizer emits fault THEN rethrows, rejecting the run', async () => {
-		const boom = new Error('strict summarizer exploded')
-		const conversations = createConversationManager({
-			summarize: async () => {
-				throw boom
-			},
-			keep: 0,
-		})
-		// An earlier exchange gives the fold a slice before the run's request.
-		conversations.add().add([
-			{ role: 'user', content: 'Earlier question.' },
-			{ role: 'assistant', content: 'Earlier answer.' },
-		])
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window: createBudget({ max: 12, consumer: measureMessages }),
-			limit: 5,
-			strict: true,
-		})
-		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
-			'fault',
-			'error',
-			'finish',
-		])
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		await expect(agent.generate()).rejects.toThrow('strict summarizer exploded')
-
-		expect(agent.status).toBe('error')
-		// `fault` fired BEFORE the rejection (the loop surfaces it observably, then rethrows).
-		expect(events.fault.calls).toEqual([[boom]])
-		expect(events.error.calls).toEqual([[boom]])
-		expect(events.finish.calls).toEqual([])
-	})
-})
-
-// ── Blank compaction digest — a summarizer that returns only whitespace is refused by the
-// conversation with a SUMMARY ConversationError; the automatic path keeps its lenient and strict
-// behavior (fault then continue, or fault then rethrow).
-describe('Agent — blank compaction digest', () => {
-	it('lenient: fires fault with a SUMMARY error, folds no section, and settles the final answer', async () => {
-		const conversations = createConversationManager({
-			summarize: async () => '  \n',
-			keep: 0,
-		})
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'Earlier question.' },
-			{ role: 'assistant', content: 'Earlier answer.' },
-		])
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window: createBudget({ max: 12, consumer: measureMessages }),
-			limit: 5,
-		})
-		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
-			'fault',
-			'error',
-			'finish',
-		])
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		const result = await agent.generate()
-
-		expect(result.content).toBe('the answer is 42')
-		expect(conversation.sections).toEqual([])
-		expect(events.error.calls).toEqual([])
-		expect(events.fault.calls.length).toBeGreaterThan(0)
-		for (const [fault] of events.fault.calls) {
-			expect(fault).toEqual(expect.objectContaining({ name: 'ConversationError', code: 'SUMMARY' }))
-		}
-	})
-
-	it('strict: fires fault then error with the SUMMARY error, rejects the run, and never finishes', async () => {
-		const conversations = createConversationManager({
-			summarize: async () => '  \n',
-			keep: 0,
-		})
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'Earlier question.' },
-			{ role: 'assistant', content: 'Earlier answer.' },
-		])
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window: createBudget({ max: 12, consumer: measureMessages }),
-			limit: 5,
-			strict: true,
-		})
-		const events = createRecorders<AgentEventMap, 'fault' | 'error' | 'finish'>(agent.emitter, [
-			'fault',
-			'error',
-			'finish',
-		])
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		const error = await agent.generate().then(
-			() => undefined,
-			(reason: unknown) => reason,
-		)
-
-		expect(error).toEqual(expect.objectContaining({ name: 'ConversationError', code: 'SUMMARY' }))
-		expect(agent.status).toBe('error')
-		expect(events.fault.calls).toEqual([[error]])
-		expect(events.error.calls).toEqual([[error]])
-		expect(events.finish.calls).toEqual([])
-	})
-})
-
-// ── Strict window admission — with `strict: true` a request that is still over the window after
-// the admission step (a fold that left it over, a futile fold, or a conversation that can't fold) is
-// refused with an AgentError coded WINDOW before any provider call. The window `max` is 10 and the
-// request 'hi' alone estimates 5 tokens, so every case is over by the real estimator, never at the
-// boundary. The non-strict counterparts stay in 'automatic compaction (production hardening)'.
-describe('Agent — strict window admission', () => {
-	it('strict window: refuses a request still over max after a successful fold, with zero provider calls', async () => {
-		const stub = createStubSummarizer()
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
-		const conversation = conversations.add()
-		const seed = 'q'.repeat(200)
-		conversation.add([
-			{ role: 'user', content: seed },
-			{ role: 'user', content: 'hi' },
-		])
-		const window = createBudget({ max: 10, consumer: estimateRequest })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, { conversations, window, limit: 5, strict: true })
-
-		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
-
-		// The run reached the fold: the summarizer folded the seed alone, yet the rebuilt view
-		// (framed recap + request) still estimates above the window max.
-		expect(stub.calls).toHaveLength(1)
-		expect(stub.calls[0]?.map((message) => message.content)).toEqual([seed])
-		expect(conversation.sections).toHaveLength(1)
-		expect(estimateMessages(conversation.view())).toBeGreaterThan(10)
-		expect(agent.status).toBe('error')
-		expect(provider.calls).toEqual([])
-	})
-
-	it('strict window: refuses an over-max request when the fold returns undefined, with zero provider calls', async () => {
-		const stub = createStubSummarizer()
-		// `keep` 50 leaves nothing foldable, so `compact()` resolves undefined for this conversation.
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 50 })
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'user', content: 'hi' },
-		])
-		const window = createBudget({ max: 10, consumer: estimateRequest })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, { conversations, window, limit: 5, strict: true })
-		// The setup is over the window and the fold is futile before the run starts.
-		expect(estimateMessages(conversation.view())).toBeGreaterThan(10)
-		expect(await conversation.compact()).toBeUndefined()
-
-		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
-
-		expect(stub.calls).toEqual([])
-		expect(conversation.sections).toHaveLength(0)
-		expect(agent.status).toBe('error')
-		expect(provider.calls).toEqual([])
-	})
-
-	it('strict window: refuses an exhausted window on a non-summarizable conversation, with zero provider calls', async () => {
-		// The default conversation has no summarizer, so no fold can ever run for it.
-		const window = createBudget({ max: 1, consumer: estimateRequest })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, { window, limit: 5, strict: true })
-		expect(agent.context.conversations.active?.summarizable).toBe(false)
-		agent.context.messages.add({ role: 'user', content: 'hi' })
-		expect(estimateMessages(agent.context.build())).toBeGreaterThan(1)
-
-		await expect(agent.generate()).rejects.toMatchObject({ code: 'WINDOW' })
-
-		expect(agent.status).toBe('error')
-		expect(provider.calls).toEqual([])
-	})
-
-	it('strict window: refuses a request equal to max, naming the agent, the measure, and the max', async () => {
-		const window = createBudget({ max: 5, consumer: estimateRequest })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, { window, limit: 5, strict: true })
-		agent.context.messages.add({ role: 'user', content: 'hi' })
-		// 'hi' is 1 token plus 4 of framing, and the request advertises no tools and no options.
-		expect(estimateRequest({ messages: agent.context.build() })).toBe(5)
-
-		await expect(agent.generate()).rejects.toMatchObject({
-			code: 'WINDOW',
-			message: 'the request measures 5 against a window of 5 and this run folds no further',
-			context: { agent: agent.id, consumed: 5, max: 5 },
-		})
-
-		expect(provider.calls).toEqual([])
-	})
-
-	it('strict window: sends a request one token under max', async () => {
-		const window = createBudget({ max: 6, consumer: estimateRequest })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, { window, limit: 5, strict: true })
-		agent.context.messages.add({ role: 'user', content: 'hi' })
-
-		const result = await agent.generate()
-
-		expect(result.content).toBe('final answer')
-		expect(provider.calls).toHaveLength(1)
-		expect(window.consumed).toBe(5)
-		expect(window.exhausted).toBe(false)
-	})
-
-	it('strict window: refuses a later turn whose request grows past max with nothing to fold, after the first dispatch', async () => {
-		const stub = createStubSummarizer()
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
-		const conversation = conversations.add()
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		// The lone request 'go' is 5 tokens, under max 6. The tool turn appends the 40-char answer
-		// (10 + 4, plus 11 for its 41-char call JSON) and the result '5' (1 + 4), so the next request
-		// measures 5 + 25 + 5 = 35 messages-only, and the newest user message is all there is to keep.
-		const window = createBudget({ max: 6, consumer: measureMessages })
-		const agent = createAgent(provider, {
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window,
-			limit: 5,
-			strict: true,
-		})
-		agent.context.messages.add({ role: 'user', content: 'go' })
-
-		await expect(agent.generate()).rejects.toMatchObject({
-			code: 'WINDOW',
-			message: 'the request measures 35 against a window of 6 and this run folds no further',
-			context: { agent: agent.id, consumed: 35, max: 6 },
-		})
-
-		expect(provider.calls).toHaveLength(1)
-		expect(stub.calls).toEqual([])
-		expect(conversation.sections).toHaveLength(0)
-		expect(agent.status).toBe('error')
-	})
-
-	it('strict window: a fault listener that cancels during a failed fold settles partial, not error', async () => {
-		const failure = new Error('summarizer failure')
-		const controller = new AbortController()
-		const conversations = createConversationManager({
-			summarize: async () => {
-				throw failure
-			},
-			keep: 0,
-		})
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'user', content: 'hi' },
-		])
-		const provider = createAnswerProvider()
-		const faults = createRecorder<AgentEventMap['fault']>()
-		const errors = createRecorder<AgentEventMap['error']>()
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget({ max: 10, consumer: estimateRequest }),
-			limit: 5,
-			strict: true,
-			signal: controller.signal,
-			on: { fault: faults.handler, error: errors.handler },
-		})
-		agent.emitter.on('fault', () => controller.abort('the operator closed the ticket'))
-
-		const result = await agent.generate()
-
-		expect(result.partial).toBe(true)
-		expect(faults.calls).toEqual([[failure]])
-		expect(errors.calls).toEqual([])
-		expect(provider.started).toBe(0)
-		expect(agent.status).toBe('done')
-	})
-
-	it('lenient window: a fault listener that cancels during a failed fold dispatches nothing', async () => {
-		const failure = new Error('summarizer failure')
-		const controller = new AbortController()
-		const conversations = createConversationManager({
-			summarize: async () => {
-				throw failure
-			},
-			keep: 0,
-		})
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'user', content: 'hi' },
-		])
-		const provider = createAnswerProvider()
-		const faults = createRecorder<AgentEventMap['fault']>()
-		const errors = createRecorder<AgentEventMap['error']>()
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget({ max: 10, consumer: estimateRequest }),
-			limit: 5,
-			strict: false,
-			signal: controller.signal,
-			on: { fault: faults.handler, error: errors.handler },
-		})
-		agent.emitter.on('fault', () => controller.abort('the operator closed the ticket'))
-
-		const result = await agent.generate()
-
-		expect(result.partial).toBe(true)
-		expect(faults.calls).toEqual([[failure]])
-		expect(errors.calls).toEqual([])
-		expect(provider.started).toBe(0)
-		expect(agent.status).toBe('done')
-	})
-
-	it('strict window: a cancel during the fold settles partial, not WINDOW, with no fault and zero provider calls', async () => {
-		const controller = new AbortController()
-		const summarized = createRecorder<[readonly Message[]]>()
-		const conversations = createConversationManager({
-			summarize: async (messages) => {
-				summarized.handler(messages)
-				controller.abort('the operator closed the ticket')
-				return 'recap'
-			},
-			keep: 0,
-		})
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'user', content: 'hi' },
-		])
-		const provider = createAnswerProvider()
-		const faults = createRecorder<AgentEventMap['fault']>()
-		const errors = createRecorder<AgentEventMap['error']>()
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget({ max: 10, consumer: estimateRequest }),
-			limit: 5,
-			strict: true,
-			signal: controller.signal,
-			on: { fault: faults.handler, error: errors.handler },
-		})
-
-		const result = await agent.generate()
-
-		expect(summarized.calls.map(([messages]) => messages.map((one) => one.content))).toEqual([
-			['q'.repeat(200)],
-		])
-		expect(result.partial).toBe(true)
-		expect(faults.calls).toEqual([])
-		expect(errors.calls).toEqual([])
-		expect(conversation.sections).toHaveLength(0)
-		expect(provider.calls).toEqual([])
-		expect(agent.status).toBe('done')
-	})
-})
-
-// ── Complete-request window admission — the window measures the exact request each dispatch sends
-// (messages after replay, advertised tools, per-call options), folds at most once per turn, and the
-// lenient default still sends an over-window request. Arithmetic is counted by hand beside each case.
-describe('Agent — complete-request window admission', () => {
-	it.each(['none', 'all'] as const)(
-		'measures the exact request each dispatch sends under replay %s, through tools, options, and a scope narrowed by a turn listener',
-		async (replay) => {
-			const conversations = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-			})
-			conversations.add()
-			const tools = createToolManager()
-			tools.add(createAddTool())
-			tools.add(createTool({ name: 'other', execute: () => 'o' }))
-			const provider = createScriptedProvider(
-				[
-					{
-						result: {
-							content: '',
-							thinking: 'first',
-							tools: [createToolCall()],
-						},
-					},
-					{ result: { content: '{}' } },
-				],
-				{ ...AGENT_SCRIPT_OPTIONS, replay },
-			)
-			const measured = createRecorder<[ProviderRequest]>()
-			const agent = createAgent(provider, {
-				conversations,
-				tools,
-				authority: AGENT_AUTHORITY,
-				window: createBudget<ProviderRequest>({
-					max: 1_000_000,
-					consumer: (request) => {
-						measured.handler(request)
-						return estimateRequest(request)
-					},
-				}),
-				on: {
-					turn: (index) => {
-						if (index === 1) agent.context.apply(createScope({ name: 'add-only', tools: ['add'] }))
-					},
-				},
-			})
-			agent.context.messages.add({ role: 'user', content: 'go' })
-			const schema = { type: 'object' }
-
-			await agent.generate({ schema, think: true })
-
-			const requests = measured.calls.map(([request]) => request)
-			expect(provider.calls).toHaveLength(2)
-			expect(requests).toEqual(provider.calls.map(readCallRequest))
-			expect(requests.map((request) => request.tools?.map(({ name }) => name))).toEqual([
-				['add', 'other'],
-				['add'],
-			])
-			expect(requests.map((request) => request.options)).toEqual([
-				{ think: true, schema },
-				{ think: true, schema },
-			])
-			// The replayed thinking is part of what was measured exactly when it was sent.
-			expect(requests[1]?.messages.some((message) => message.thinking === 'first')).toBe(
-				replay === 'all',
-			)
-			for (const [index, call] of provider.calls.entries()) {
-				expect(call.tools).toBe(requests[index]?.tools)
-				expect(call.options).toBe(requests[index]?.options)
-			}
-		},
-	)
-
-	it.each([
-		{ advertise: true, folds: 1 },
-		{ advertise: false, folds: 0 },
-	])(
-		'counts advertised tools toward the window, so tools alone fold a request (advertised: $advertise)',
-		async ({ advertise, folds }) => {
-			const stub = createStubSummarizer()
-			const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
-			const conversation = conversations.add()
-			conversation.add([
-				{ role: 'user', content: 'q'.repeat(40) },
-				{ role: 'assistant', content: 'Nice.' },
-				{ role: 'user', content: 'go' },
-			])
-			const tools = createToolManager()
-			if (advertise) {
-				tools.add(createTool({ name: 'lookup', description: 'd'.repeat(400), execute: () => 'ok' }))
-			}
-			// The messages alone sit one token under max, so only the 400-character description, at
-			// 100 tokens or more, can carry the request to max.
-			const window = createBudget({
-				max: estimateMessages(conversation.view()) + 1,
-				consumer: estimateRequest,
-			})
-			const provider = createAnswerProvider()
-			const agent = createAgent(provider, {
-				strict: false,
-				conversations,
-				tools,
-				authority: AGENT_AUTHORITY,
-				window,
-				limit: 5,
-			})
-
-			await agent.generate()
-
-			expect(stub.calls).toHaveLength(folds)
-			expect(conversation.sections).toHaveLength(folds)
-			expect(provider.calls).toHaveLength(1)
-			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(
-				advertise ? ['lookup'] : undefined,
-			)
-		},
-	)
-
-	it('sends the rebuilt request under strict: false when the fold leaves it over max', async () => {
-		const stub = createStubSummarizer()
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'user', content: 'hi' },
-		])
-		const window = createBudget({ max: 10, consumer: estimateRequest })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, { strict: false, conversations, window, limit: 5 })
-
-		const result = await agent.generate()
-
-		expect(result.content).toBe('final answer')
-		expect(stub.calls).toHaveLength(1)
-		expect(provider.calls).toHaveLength(1)
-		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
-			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
-			'hi',
-		])
-		// The window holds the rebuilt request: the 30-character recap prefix and the 10-character
-		// summary are 10 tokens plus 4 of framing, and 'hi' is 1 plus 4.
-		expect(window.consumed).toBe(19)
-		expect(window.exhausted).toBe(true)
-	})
-
-	it('neither measures nor folds a run whose limit refuses', () => {
-		const stub = createStubSummarizer()
-		const conversations = createConversationManager({ summarize: stub.summarize, keep: 0 })
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'user', content: 'hi' },
-		])
-		const window = createBudget({ max: 10, consumer: estimateRequest })
-		const provider = createAnswerProvider()
-		const agent = createAgent(provider, { conversations, window })
-
-		const error = captureError(() => agent.stream({ limit: 0 }))
-
-		expect(isAgentError(error) && error.code).toBe('LIMIT')
-		expect(stub.calls).toEqual([])
-		expect(conversation.sections).toHaveLength(0)
-		expect(provider.calls).toEqual([])
-		expect(window.consumed).toBe(0)
 	})
 })
 
@@ -5895,7 +4726,7 @@ describe('Agent — a selection handler shapes the prompt and never the tools', 
 			authority: AGENT_AUTHORITY,
 			select: async (conversation) => {
 				agent.context.apply(createScope({ name: 'answer', tools: [] }))
-				return { messages: conversation.view(), judgments: [] }
+				return { messages: conversation.messages(), judgments: [] }
 			},
 			on: { deny: denied.handler },
 		})
@@ -5990,7 +4821,7 @@ describe('Agent — the select event follows each select-site build', () => {
 		const agent = createAgent(provider, {
 			system: 'Be brief.',
 			select: async (conversation) => ({
-				messages: conversation.view().map((message) => ({
+				messages: conversation.messages().map((message) => ({
 					...message,
 					content: `Plan: refund invoice 42.\n\n## Request\n${message.content}`,
 				})),
@@ -6010,81 +4841,46 @@ describe('Agent — the select event follows each select-site build', () => {
 		expect(selected.calls[0]?.[0].messages).toEqual(sent?.slice(1))
 	})
 
-	it('fires again after each compaction rebuild with the request captured at entry', async () => {
+	it('fires once, at run entry before turn 0, with the request captured there, however many turns the run takes', async () => {
 		const selection = createRecordedSelection()
 		const selected = createRecorder<AgentEventMap['select']>()
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
+		const order: string[] = []
+		const tools = createToolManager()
+		tools.add(createAddTool())
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'x'.repeat(40), tools: [createToolCall()] } },
+				{ result: { content: 'y'.repeat(40), tools: [createToolCall({ id: 'c2' })] } },
+				{ result: { content: 'the answer is 42' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
+		const agent = createAgent(provider, {
+			tools,
+			authority: AGENT_AUTHORITY,
+			limit: 5,
+			select: selection.handler,
+			on: {
+				select: (picked) => {
+					selected.handler(picked)
+					order.push('select')
+				},
+				turn: (index) => order.push(`turn ${index}`),
+			},
 		})
-		const conversation = conversations.add()
-		conversation.add([
+		agent.context.messages.add([
 			{ role: 'user', content: 'h'.repeat(40) },
 			{ role: 'assistant', content: 'k'.repeat(40) },
 		])
-		const request = conversation.add({ role: 'user', content: 'go' })
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window: createBudget({
-				max: estimateMessages(conversation.view()) + 1,
-				consumer: measureMessages,
-			}),
-			limit: 5,
-			select: selection.handler,
-			on: { select: selected.handler },
-		})
+		const request = agent.context.messages.add({ role: 'user', content: 'go' })
 
 		const result = await agent.generate()
 
 		expect(result.content).toBe('the answer is 42')
-		expect(provider.calls.map((call) => call.messages.length)).toEqual([3, 4, 6])
-		expect(selection.selections).toEqual([expect.any(Object), expect.any(Object)])
+		expect(order).toEqual(['select', 'turn 0', 'turn 1', 'turn 2'])
+		expect(provider.calls.map((call) => call.messages.length)).toEqual([3, 5, 7])
+		expect(selection.calls.map(([, received]) => received)).toEqual([request])
 		expect(selected.calls.map(([picked]) => picked)).toEqual(selection.selections)
-		expect(selection.calls.map(([, received]) => received)).toEqual([request, request])
-		expect(selection.calls.every(([, received]) => received === request)).toBe(true)
-		expect(selection.selections[1]?.messages.some((message) => message.id === request.id)).toBe(
-			true,
-		)
-	})
-
-	it('fires after turn 0 begins when the first admission folds, before its provider call', async () => {
-		const selection = createRecordedSelection()
-		const order: string[] = []
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
-		conversations.add().add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'user', content: 'hi' },
-		])
-		const provider = createScriptedProvider([{ content: 'final answer' }], AGENT_SCRIPT_OPTIONS)
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget({ max: 20, consumer: estimateRequest }),
-			limit: 5,
-			select: selection.handler,
-			on: {
-				select: () => order.push('select'),
-				turn: (index) => order.push(`turn ${index}`),
-			},
-		})
-
-		await agent.generate()
-
-		// The entry select, then the turn begins, then the admission fold rebuilds through select
-		// before the single provider call.
-		expect(order).toEqual(['select', 'turn 0', 'select'])
-		expect(provider.calls[0]?.messages.map((message) => message.content)).toEqual([
-			`${CONVERSATION_RECAP_PREFIX}recap of 1`,
-			'hi',
-		])
 	})
 
 	it('fires none and calls no provider when the run aborts during selection', async () => {
@@ -6094,7 +4890,7 @@ describe('Agent — the select event follows each select-site build', () => {
 		const agent = createAgent(provider, {
 			select: async (conversation, _request, signal) => {
 				await waitForAbort(signal)
-				return { messages: conversation.view(), judgments: [], usage: SELECTION_USAGE }
+				return { messages: conversation.messages(), judgments: [], usage: SELECTION_USAGE }
 			},
 			strict: true,
 			on: { select: selected.handler, fault: faults.handler },
@@ -6119,7 +4915,7 @@ describe('Agent — the select event follows each select-site build', () => {
 			limit: 1,
 			select: async (conversation, _request, signal) => {
 				await waitForAbort(signal)
-				return { messages: conversation.view(), judgments: [], usage: SELECTION_USAGE }
+				return { messages: conversation.messages(), judgments: [], usage: SELECTION_USAGE }
 			},
 			on: { select: selected.handler },
 		})
@@ -6134,7 +4930,7 @@ describe('Agent — the select event follows each select-site build', () => {
 	})
 })
 
-describe('Agent — a selection fault follows the compaction fault rules', () => {
+describe('Agent — a selection fault follows the strict rules', () => {
 	it('commits partial with no fault when the handler throws after the run aborts', async () => {
 		const faults = createRecorder<AgentEventMap['fault']>()
 		const provider = createScriptedProvider([{ content: 'never sent' }], AGENT_SCRIPT_OPTIONS)
@@ -6156,7 +4952,7 @@ describe('Agent — a selection fault follows the compaction fault rules', () =>
 		expect(provider.calls).toEqual([])
 	})
 
-	it('emits fault for a thrown handler and sends view() without a select event', async () => {
+	it('emits fault for a thrown handler and sends the conversation without a select event', async () => {
 		const faults = createRecorder<AgentEventMap['fault']>()
 		const selected = createRecorder<AgentEventMap['select']>()
 		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
@@ -6380,48 +5176,33 @@ describe('Agent — selection usage reaches the budget and the result, never a u
 })
 
 describe('Agent — the handler resolves once per select site, scope first', () => {
-	it('applies a scope changed during the handler at the next select site only', async () => {
+	it('applies a scope changed during the handler at the next run only', async () => {
 		const gate = Promise.withResolvers<void>()
 		const first = createRecordedSelection()
 		const second = createRecordedSelection()
 		const selected = createRecorder<AgentEventMap['select']>()
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
-		const history = conversations.add()
-		history.add([
-			{ role: 'user', content: 'h'.repeat(40) },
-			{ role: 'assistant', content: 'k'.repeat(40) },
-			{ role: 'user', content: 'go' },
-		])
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+		const provider = createScriptedProvider(
+			[{ content: 'first' }, { content: 'second' }],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			window: createBudget({
-				max: estimateMessages(history.view()) + 1,
-				consumer: measureMessages,
-			}),
-			limit: 5,
 			select: async (conversation, request, signal) => {
 				await gate.promise
 				return first.handler(conversation, request, signal)
 			},
 			on: { select: selected.handler },
 		})
+		agent.context.messages.add({ role: 'user', content: 'go' })
 
 		const run = agent.stream()
 		agent.context.apply(createScope({ name: 'second', select: second.handler }))
 		gate.resolve()
 		await run.result
+		agent.context.messages.add({ role: 'user', content: 'again' })
+		await agent.generate()
 
 		expect(first.calls.map(([, request]) => request.content)).toEqual(['go'])
-		expect(second.calls.map(([, request]) => request.content)).toEqual(['go'])
+		expect(second.calls.map(([, request]) => request.content)).toEqual(['again'])
 		expect(selected.calls.map(([picked]) => picked)).toEqual([
 			first.selections[0],
 			second.selections[0],
@@ -6530,7 +5311,7 @@ describe('Agent — with no handler in either home the loop adds no await', () =
 })
 
 describe('Agent — run boundaries', () => {
-	it('stores a tool failure for a value JSON cannot carry, and the next run estimates its window', async () => {
+	it('stores a tool failure for a value JSON cannot carry, and the next run sends it', async () => {
 		const graph: Record<string, unknown> = { name: 'route' }
 		graph.next = graph
 		const tools = createToolManager()
@@ -6554,14 +5335,7 @@ describe('Agent — run boundaries', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		const conversations = createConversationManager({ summarize: createStubSummarizer().summarize })
-		conversations.add()
-		const agent = createAgent(provider, {
-			tools,
-			authority: AGENT_AUTHORITY,
-			conversations,
-			window: createBudget<ProviderRequest>({ max: 1_000_000, consumer: estimateRequest }),
-		})
+		const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 		agent.context.messages.add({ role: 'user', content: 'Ship order 42.' })
 
 		expect(await agent.generate()).toEqual({ content: 'Delivered.', partial: false })
@@ -6578,6 +5352,9 @@ describe('Agent — run boundaries', () => {
 
 		agent.context.messages.add({ role: 'user', content: 'Confirm the delivery.' })
 		expect(await agent.generate()).toEqual({ content: 'Still delivered.', partial: false })
+		expect(
+			provider.calls.at(-1)?.messages.filter((message) => message.role === 'tool'),
+		).toHaveLength(3)
 	})
 
 	it('refuses a limit that is not a positive safe integer at construction and per run', () => {
@@ -6615,43 +5392,11 @@ describe('Agent — run boundaries', () => {
 		await run.result
 		expect(process.getActiveResourcesInfo().filter((one) => one === 'Timeout').length).toBe(before)
 	})
-
-	it('cuts off a summarizer that ignores its signal at the run deadline and settles partial without a fault', async () => {
-		const finished = createRecorder<[messages: readonly Message[]]>()
-		const conversations = createConversationManager({
-			summarize: async (messages) => {
-				await waitForDelay(AGENT_DEADLINE * 10)
-				finished.handler(messages)
-				return 'Late recap.'
-			},
-			keep: 0,
-		})
-		const conversation = conversations.add()
-		conversation.add([
-			{ role: 'user', content: 'q'.repeat(200) },
-			{ role: 'assistant', content: 'Noted.' },
-			{ role: 'user', content: 'Summarize the ticket.' },
-		])
-		const provider = createScriptedProvider([{ content: 'never' }], AGENT_SCRIPT_OPTIONS)
-		const faults = createRecorder<AgentEventMap['fault']>()
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget<ProviderRequest>({ max: 20, consumer: estimateRequest }),
-			timeout: AGENT_DEADLINE,
-			on: { fault: faults.handler },
-		})
-
-		expect(await agent.generate()).toEqual({ content: '', partial: true })
-		expect(finished.calls).toEqual([])
-		expect(faults.calls).toEqual([])
-		expect(conversation.sections).toHaveLength(0)
-		expect(provider.calls).toEqual([])
-	})
 })
 
 describe('Agent — turn records', () => {
 	it('enters the provider stream and fires turn before stream() returns on the default path', async () => {
-		// No select handler and no `window`: nothing before the provider call awaits.
+		// No select handler: nothing before the provider call awaits.
 		const provider = createScriptedProvider([{ content: 'done' }], AGENT_SCRIPT_OPTIONS)
 		const turns = createRecorder<AgentEventMap['turn']>()
 		const agent = createAgent(provider, { on: { turn: turns.handler } })
@@ -6676,41 +5421,18 @@ describe('Agent — turn records', () => {
 		expect(provider.calls).toHaveLength(2)
 	})
 
-	it("counts a rebuild selection's usage when the run cancels right after the rebuild", async () => {
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
-		conversations.add().add([
-			{ role: 'user', content: 'h'.repeat(40) },
-			{ role: 'assistant', content: 'k'.repeat(40) },
-			{ role: 'user', content: 'go' },
-		])
+	it("counts the entry selection's usage when the run cancels right after it", async () => {
 		const provider = createScriptedProvider([{ content: 'never' }], AGENT_SCRIPT_OPTIONS)
-		const selected = createRecorder<AgentEventMap['select']>()
 		const recorded = createRecordedSelection({ usage: SELECTION_USAGE })
-		const agent = createAgent(provider, {
-			conversations,
-			window: createBudget({ max: 1, consumer: measureMessages }),
-			select: recorded.handler,
-		})
-		// The second `select` is the compaction rebuild's; cancelling there stops the turn before its call.
-		const cancels = [false, true].values()
-		agent.emitter.on('select', (selection) => {
-			selected.handler(selection)
-			if (cancels.next().value === true) agent.abort()
-		})
+		const agent = createAgent(provider, { select: recorded.handler })
+		agent.context.messages.add({ role: 'user', content: 'go' })
+		agent.emitter.on('select', () => agent.abort())
+
 		const result = await agent.generate()
-		// The entry selection and the rebuild selection were each observed, and nothing selected after.
-		expect(recorded.selections).toEqual([expect.any(Object), expect.any(Object)])
-		expect(selected.calls).toEqual(recorded.selections.map((selection) => [selection]))
-		expect([...cancels]).toEqual([])
+
+		expect(recorded.selections).toEqual([expect.any(Object)])
 		expect(provider.calls).toEqual([])
-		expect(result).toEqual({
-			content: '',
-			partial: true,
-			usage: { prompt: 60, completion: 4, total: 64 },
-		})
+		expect(result).toEqual({ content: '', partial: true, usage: SELECTION_USAGE })
 	})
 
 	it('sums one turn usage with one selection usage and keeps a lone turn usage by identity', async () => {
@@ -8672,57 +7394,6 @@ describe('Agent — authority ask', () => {
 		)
 	})
 
-	it('ordering 9: a consequential instance added during a fold never runs without an ask', async () => {
-		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
-		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
-		const denied = createRecorder<AgentEventMap['deny']>()
-		const approver = createScriptedApprover([true])
-		const tools = createToolManager()
-		tools.add(createRecordedTool('read', original))
-		const call = createToolCall({ name: 'read' })
-		const conversations = createConversationManager({
-			summarize: async () => {
-				tools.add(
-					createTool({
-						name: 'read',
-						annotations: { consequential: true },
-						strict: false,
-						execute: (args) => {
-							replaced.handler(args)
-							return 'ran the replacement'
-						},
-					}),
-				)
-				return 'digest'
-			},
-			keep: 0,
-		})
-		conversations.add().add([
-			{ role: 'user', content: 'q'.repeat(4000) },
-			{ role: 'user', content: 'hi' },
-		])
-		const provider = createScriptedProvider(
-			[{ result: { content: 'working', tools: [call] } }, { result: { content: 'done' } }],
-			AGENT_SCRIPT_OPTIONS,
-		)
-		const agent = createAgent(provider, {
-			tools,
-			conversations,
-			window: createBudget<ProviderRequest>({ max: 300, consumer: estimateRequest }),
-			authority: createAuthority({
-				fallback: { zone: 'default', verdict: 'allow' },
-				rules: [],
-				ask: approver.ask,
-			}),
-			on: { deny: denied.handler },
-		})
-		expect(await agent.generate()).toMatchObject({ content: 'done', partial: false })
-		expect(replaced.calls).toEqual([])
-		expect(original.calls).toEqual([])
-		expect(approver.calls).toEqual([])
-		expect(denied.calls).toEqual([[call, 'read changed after its decision', undefined]])
-	})
-
 	it('ordering 4: a tool a deny listener replaces after its check is denied too', async () => {
 		const original = createRecorder<[Readonly<Record<string, unknown>>]>()
 		const replaced = createRecorder<[Readonly<Record<string, unknown>>]>()
@@ -9086,13 +7757,10 @@ describe('Agent — run-bound conversation', () => {
 		])
 	})
 
-	it('folds the bound thread under a switch', async () => {
+	it('appends to the bound thread under a switch', async () => {
 		const entered = Promise.withResolvers<void>()
 		const gate = Promise.withResolvers<void>()
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
+		const conversations = createConversationManager()
 		const first = conversations.add()
 		const tools = createToolManager()
 		tools.add(
@@ -9112,14 +7780,11 @@ describe('Agent — run-bound conversation', () => {
 			],
 			AGENT_SCRIPT_OPTIONS,
 		)
-		// The opening request measures under the window and the request after the tools turn over it,
-		// so the one fold runs at the second turn's admission, after the switch.
 		const agent = createAgent(provider, {
 			strict: false,
 			conversations,
 			tools,
 			authority: AGENT_AUTHORITY,
-			window: createBudget({ max: 60, consumer: measureMessages }),
 		})
 		first.add([
 			{ role: 'user', content: 'Earlier question.' },
@@ -9135,63 +7800,15 @@ describe('Agent — run-bound conversation', () => {
 		gate.resolve()
 		await run
 
-		expect(first.sections).toHaveLength(1)
-		expect(second.sections).toEqual([])
+		expect(second.messages().map((message) => message.content)).toEqual(['Other thread.'])
 		expect(provider.calls).toHaveLength(2)
 		expect(provider.calls[1]?.messages.map((message) => [message.role, message.content])).toEqual(
 			first
-				.view()
+				.messages()
 				.slice(0, -1)
 				.map((message) => [message.role, message.content]),
 		)
-	})
-
-	it('hands select the bound thread mid-fold', async () => {
-		const entered = Promise.withResolvers<void>()
-		const release = Promise.withResolvers<void>()
-		const conversations = createConversationManager({
-			summarize: async (messages) => {
-				entered.resolve()
-				await release.promise
-				return `recap of ${messages.length}`
-			},
-			keep: 0,
-		})
-		const first = conversations.add()
-		const tools = createToolManager()
-		tools.add(createAddTool())
-		const provider = createScriptedProvider(
-			[
-				{ result: { content: 'x'.repeat(400), tools: [createToolCall()] } },
-				{ result: { content: 'Sum is 5.' } },
-			],
-			AGENT_SCRIPT_OPTIONS,
-		)
-		const selection = createRecordedSelection()
-		const agent = createAgent(provider, {
-			strict: false,
-			conversations,
-			tools,
-			authority: AGENT_AUTHORITY,
-			select: selection.handler,
-			window: createBudget({ max: 60, consumer: measureMessages }),
-		})
-		first.add([
-			{ role: 'user', content: 'Earlier question.' },
-			{ role: 'assistant', content: 'Earlier answer.' },
-			{ role: 'user', content: 'Add the numbers.' },
-		])
-
-		const run = agent.generate()
-		await entered.promise
-		const second = conversations.add()
-		second.add({ role: 'user', content: 'Other thread.' })
-		conversations.switch(second.id)
-		release.resolve()
-		await run
-
-		expect(first.sections).toHaveLength(1)
-		expect(selection.calls.map(([conversation]) => conversation.id)).toEqual([first.id, first.id])
+		expect(first.messages().at(-1)?.content).toBe('Sum is 5.')
 	})
 
 	it('runs on a named thread, active unchanged', async () => {
@@ -9313,13 +7930,10 @@ describe('Agent — run-bound conversation', () => {
 		])
 	})
 
-	it('rebuilds the head with a mid-run rule', async () => {
+	it('builds the next run head with a rule added mid-run', async () => {
 		const entered = Promise.withResolvers<void>()
 		const gate = Promise.withResolvers<void>()
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
+		const conversations = createConversationManager()
 		const first = conversations.add()
 		const tools = createToolManager()
 		tools.add(
@@ -9345,7 +7959,6 @@ describe('Agent — run-bound conversation', () => {
 			conversations,
 			tools,
 			authority: AGENT_AUTHORITY,
-			window: createBudget({ max: 60, consumer: measureMessages }),
 		})
 		first.add([
 			{ role: 'user', content: 'Earlier question.' },
@@ -9363,9 +7976,8 @@ describe('Agent — run-bound conversation', () => {
 		await agent.generate()
 
 		expect(provider.calls[0]?.messages[0]?.role).toBe('user')
-		expect(provider.calls[1]?.messages[0]?.role).toBe('system')
-		expect(provider.calls[1]?.messages[0]?.content).toContain('Be terse.')
 		expect(provider.calls[2]?.messages[0]?.role).toBe('system')
+		expect(provider.calls[2]?.messages[0]?.content).toContain('Be terse.')
 		expect(provider.calls[2]?.messages[0]?.content).toContain('Use lists.')
 	})
 
@@ -10060,19 +8672,19 @@ describe('Agent — the prompt option', () => {
 
 	it('appends no prompt on a refused run', async () => {
 		const prompt = { content: 'Check the invoice.' }
-		const windowed = createScriptedProvider([{ content: 'held' }], AGENT_SCRIPT_OPTIONS)
-		const window = createBudget<ProviderRequest>({ max: 1_000_000, consumer: estimateRequest })
-		const shared = createAgent(windowed, { window })
+		const budgeted = createScriptedProvider([{ content: 'held' }], AGENT_SCRIPT_OPTIONS)
+		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
+		const shared = createAgent(budgeted, { budget })
 		const live = createConversation()
 		live.add({ role: 'user', content: 'Check the receipt.' })
 		const other = createConversation()
 		const first = shared.stream({ conversation: live })
-		const before = windowed.calls.length
+		const before = budgeted.calls.length
 
 		const crossed = captureError(() => shared.stream({ conversation: other, prompt }))
 
 		expect(isAgentError(crossed) && crossed.code).toBe('CONCURRENCY')
-		expect([other.messages().length, windowed.calls.length]).toEqual([0, before])
+		expect([other.messages().length, budgeted.calls.length]).toEqual([0, before])
 		await first.result
 
 		const provider = createScriptedProvider([{ content: 'held' }], AGENT_SCRIPT_OPTIONS)
@@ -10293,14 +8905,11 @@ describe('Agent — a run scope narrows each turn ceiling', () => {
 
 	it.each([
 		{ title: 'its default build', selected: false, selections: 0 },
-		{ title: 'the run scope handler', selected: true, selections: 2 },
+		{ title: 'the run scope handler', selected: true, selections: 1 },
 	])(
-		'rebuilds the head under the run scope after a fold, through $title',
+		'keeps the head under the run scope on every turn, through $title',
 		async ({ selected, selections }) => {
-			const conversations = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-				keep: 0,
-			})
+			const conversations = createConversationManager()
 			const conversation = conversations.add()
 			conversation.add([
 				{ role: 'user', content: 'h'.repeat(40) },
@@ -10320,8 +8929,14 @@ describe('Agent — a run scope narrows each turn ceiling', () => {
 				{ name: 'tone', content: 'TONE TEXT' },
 				{ name: 'safety', content: 'SAFETY TEXT' },
 			])
-			const opening = createAgentContext({ system: 'Desk.', instructions })
-			const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+			const provider = createScriptedProvider(
+				[
+					{ result: { content: 'x'.repeat(40), tools: [createToolCall()] } },
+					{ result: { content: 'y'.repeat(40), tools: [createToolCall({ id: 'c2' })] } },
+					{ result: { content: 'the answer is 42' } },
+				],
+				AGENT_SCRIPT_OPTIONS,
+			)
 			const agent = createAgent(provider, {
 				system: 'Desk.',
 				instructions,
@@ -10330,22 +8945,11 @@ describe('Agent — a run scope narrows each turn ceiling', () => {
 				tools,
 				authority: AGENT_AUTHORITY,
 				limit: 5,
-				// The window sits one token over the scoped opening prompt, so a later turn folds.
-				window: createBudget({
-					max:
-						estimateMessages(
-							opening.build({
-								selection: { messages: conversation.view(), judgments: [] },
-								scope,
-							}),
-						) + 1,
-					consumer: measureMessages,
-				}),
 			})
 
 			await agent.generate({ scope })
 
-			expect(conversation.sections).toHaveLength(1)
+			expect(provider.calls).toHaveLength(3)
 			expect(provider.calls.map((call) => call.messages[0]?.content)).toEqual(
 				provider.calls.map(() => 'Desk.\n\n## Instructions\n\nSAFETY TEXT'),
 			)
@@ -10564,11 +9168,8 @@ describe('Agent — the request event', () => {
 		])
 	})
 
-	it('carries the request a fold rebuilt, frozen', async () => {
-		const conversations = createConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 0,
-		})
+	it('carries each turn request whole, frozen', async () => {
+		const conversations = createConversationManager()
 		const conversation = conversations.add()
 		conversation.add([
 			{ role: 'user', content: 'h'.repeat(40) },
@@ -10577,25 +9178,27 @@ describe('Agent — the request event', () => {
 		])
 		const tools = createToolManager()
 		tools.add(createAddTool())
-		const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
+		const provider = createScriptedProvider(
+			[
+				{ result: { content: 'x'.repeat(40), tools: [createToolCall()] } },
+				{ result: { content: 'y'.repeat(40), tools: [createToolCall({ id: 'c2' })] } },
+				{ result: { content: 'the answer is 42' } },
+			],
+			AGENT_SCRIPT_OPTIONS,
+		)
 		const requests = createRecorder<AgentEventMap['request']>()
 		const agent = createAgent(provider, {
 			strict: false,
 			conversations,
 			tools,
 			authority: AGENT_AUTHORITY,
-			window: createBudget({
-				max: estimateMessages(conversation.view()) + 1,
-				consumer: measureMessages,
-			}),
 			limit: 5,
 			on: { request: requests.handler },
 		})
 
 		await agent.generate()
 
-		expect(conversation.sections).toHaveLength(1)
-		expect(requests.calls.map(([, request]) => request.messages.length)).toEqual([3, 4, 6])
+		expect(requests.calls.map(([, request]) => request.messages.length)).toEqual([3, 5, 7])
 		for (const [index, request] of requests.calls) {
 			expect(Object.isFrozen(request.messages)).toBe(true)
 			expect(request).toEqual(readCallRequest(requireValue(provider.calls[index])))
@@ -10985,43 +9588,6 @@ describe('Agent — built-ins and disclosure: one system message at index 0', ()
 				content?.includes(BUILTIN_CLAIMS_BODY),
 			),
 		).toBe(true)
-	})
-
-	it('keeps the loaded body and the run scope in a head a fold rebuilds on the turn after the load', async () => {
-		const script: readonly ScriptedTurn[] = [
-			{
-				content: '',
-				tools: [createToolCall({ id: 'l1', name: 'load', arguments: { skill: 'billing' } })],
-			},
-			{ content: 'done' },
-		]
-		const seed: readonly MessageInput[] = [
-			{ role: 'user', content: `Earlier question. ${'context '.repeat(400)}` },
-			{ role: 'assistant', content: `Earlier answer. ${'detail '.repeat(400)}` },
-		]
-		const twin = createBuiltinAgent({ turns: script, builtins: ['load', 'unload'], seed })
-		await twin.agent.generate({
-			prompt: { content: 'Refund invoice 42.' },
-			scope: createScope({ name: 'run', tools: ['refund', 'load'] }),
-		})
-		const window = estimateRequest(readCallRequest(requireValue(twin.provider.calls[1]))) - 1
-		const fixture = createBuiltinAgent({
-			turns: script,
-			builtins: ['load', 'unload'],
-			seed,
-			window,
-			summarize: true,
-		})
-		await fixture.agent.generate({
-			prompt: { content: 'Refund invoice 42.' },
-			scope: createScope({ name: 'run', tools: ['refund', 'load'] }),
-		})
-		const folded = fixture.provider.calls[1]
-
-		expect(fixture.agent.context.messages.sections).toHaveLength(1)
-		expect(folded?.messages.filter((message) => message.role === 'system')).toHaveLength(1)
-		expect(folded?.messages[0]?.content.endsWith(BUILTIN_BILLING_BODY)).toBe(true)
-		expect(folded?.tools?.map((definition) => definition.name)).toEqual(['refund', 'load'])
 	})
 })
 
@@ -11934,7 +10500,7 @@ describe('Agent — the option doors refuse a member their type does not declare
 
 		expect(isContractError(error) && error.code).toBe('structure')
 		expect(isContractError(error) ? error.message : '').toBe(
-			'Agent: unknown option "sytem"; the options are on, error, system, tools, instructions, skills, memos, workspaces, scope, limit, timeout, budget, allowance, scheduler, signal, authority, conversations, window, strict, select, builtins, workspace',
+			'Agent: unknown option "sytem"; the options are on, error, system, tools, instructions, skills, memos, workspaces, scope, limit, timeout, budget, allowance, scheduler, signal, authority, conversations, strict, select, builtins, workspace',
 		)
 		expect(isContractError(error) ? error.context : undefined).toEqual({
 			path: ['sytem'],
@@ -12374,5 +10940,97 @@ describe('Agent — an edit to a rendered file reaches the next request (claim A
 			),
 		).toEqual([false, false])
 		expect(heads[1]).toBe(heads[0])
+	})
+})
+
+describe('Agent — the loop sends what its conversation holds', () => {
+	it('refuses a window option as a member AgentOptions does not declare (claim A2-1)', () => {
+		const error = captureError(() =>
+			invokeUnchecked(undefined, createAgent, [
+				createScriptedProvider([{ content: 'Done.' }]),
+				{ window: createBudget({ max: 4096, consumer: estimateRequest }) },
+			]),
+		)
+
+		expect(isContractError(error) && error.code).toBe('structure')
+	})
+
+	it("narrows no AgentError coded 'WINDOW' (claim A2-2)", () => {
+		const constructed: unknown = Reflect.construct(AgentError, ['WINDOW', 'Over the window.'])
+		const known: unknown = Reflect.construct(AgentError, ['CONCURRENCY', 'A live run holds it.'])
+
+		expect([isAgentError(constructed), isAgentError(known)]).toEqual([false, true])
+		expectTypeOf<'WINDOW'>().not.toExtend<AgentErrorCode>()
+	})
+
+	it('dispatches the whole of a long conversation in one provider call and makes no other (claim A2-3)', async () => {
+		const provider = createScriptedProvider([{ content: 'The refund is approved.' }], {
+			recorded: true,
+		})
+		const agent = createAgent(provider)
+		agent.context.messages.add(
+			Array.from({ length: 400 }, (_unused, index): MessageInput => ({
+				role: index % 2 === 0 ? 'user' : 'assistant',
+				content: `Turn ${index} of the Brightwater refund thread. ${'Detail. '.repeat(200)}`,
+			})),
+		)
+		agent.context.messages.add({ role: 'user', content: 'Is the Brightwater refund approved?' })
+		const stored = agent.context.messages.messages()
+
+		expect(await agent.generate()).toEqual({ content: 'The refund is approved.', partial: false })
+		expect(provider.calls).toHaveLength(1)
+		expect(provider.calls[0]?.messages.slice(-stored.length)).toEqual(stored)
+		expect(agent.context.messages.messages().slice(0, stored.length)).toEqual(stored)
+	})
+
+	it('still refuses a run that shares a live run’s budget, allowance, or conversation (claim A2-4)', async () => {
+		const gate = Promise.withResolvers<void>()
+		const budget = createTokenBudget({ max: 1_000_000, scope: 'total' })
+		const allowance = createTokenBudget({ max: 1_000_000, scope: 'completion' })
+		const agent = createAgent(createGatedProvider(gate))
+		agent.context.messages.add({ role: 'user', content: 'Check the refund.' })
+		const thread = agent.context.conversations.add()
+		thread.add({ role: 'user', content: 'Check the order.' })
+
+		const first = agent.stream({ budget, allowance })
+		const refusals = [
+			captureError(() =>
+				agent.stream({ budget, conversation: thread, allowance: createTokenBudget({ max: 9 }) }),
+			),
+			captureError(() => agent.stream({ allowance, conversation: thread })),
+			captureError(() => agent.stream({ budget: createTokenBudget({ max: 9 }) })),
+		]
+		const second = agent.stream({
+			budget: createTokenBudget({ max: 1_000_000, scope: 'total' }),
+			conversation: thread,
+		})
+		gate.resolve()
+
+		expect(refusals.map((error) => isAgentError(error) && error.code)).toEqual([
+			'CONCURRENCY',
+			'CONCURRENCY',
+			'CONCURRENCY',
+		])
+		expect(await Promise.all([first.result, second.result])).toEqual([
+			{ content: 'full', partial: false },
+			{ content: 'full', partial: false },
+		])
+	})
+
+	it('keeps estimateRequest, measureRequest, and isAgentError exported (claim A2-5)', async () => {
+		const core = await import('@src/core')
+		const request: ProviderRequest = {
+			messages: [{ id: 'greeting', role: 'user', content: 'hello' }],
+		}
+
+		expect(core.estimateRequest(request)).toBe(6)
+		expect(core.measureRequest(request)).toEqual({
+			messages: [
+				{ id: 'greeting', role: 'user', content: 2, uniform: 4, calls: 0, thinking: 0, images: 0 },
+			],
+			tools: 0,
+			schema: 0,
+		})
+		expect(core.isAgentError(new core.AgentError('LIMIT', 'A limit of 0.'))).toBe(true)
 	})
 })

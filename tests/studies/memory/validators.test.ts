@@ -36,43 +36,28 @@ describe('memory declaration and mechanical evidence', () => {
 		for (const triage of MEMORY_TRIAGE_INVALID) expect(isStudyMemoryOptions({ triage })).toBe(false)
 	})
 	it('accepts exactly the declared settings members and refuses unknown keys and invalid values', () => {
-		const gauge = { scale: 1.5, overhead: 0 }
 		const names = Array.from({ length: 13 }, (_, index) => `checkpoint-${index}`)
 		const accepted: ReadonlyArray<readonly [string, unknown]> = [
 			['empty', {}],
-			['gauge', { gauge }],
-			['smallest scale', { gauge: { scale: Number.MIN_VALUE, overhead: 7 } }],
 			['observe false', { observe: false }],
 			['observe true', { observe: true }],
 			['no checkpoints', { observe: true, checkpoints: [] }],
 			['longest checkpoint', { observe: true, checkpoints: ['x'.repeat(128)] }],
-			['all members', { gauge, observe: true, checkpoints: names.slice(0, 12) }],
+			['all members', { observe: true, checkpoints: names.slice(0, 12) }],
 			['more checkpoints than the former cap', { observe: true, checkpoints: names }],
-			['undefined members', { gauge: undefined, observe: undefined, checkpoints: undefined }],
+			['undefined members', { observe: undefined, checkpoints: undefined }],
 		]
 		const refused: ReadonlyArray<readonly [string, unknown]> = [
 			['undefined', undefined],
 			['null', null],
 			['array', []],
-			['string', 'gauge'],
+			['string', 'observe'],
 			['number', 7],
 			['unknown key', { extra: 1 }],
-			['unknown key beside gauge', { gauge, extra: true }],
-			['cased key', { Gauge: gauge }],
-			['zero scale', { gauge: { scale: 0, overhead: 0 } }],
-			['negative scale', { gauge: { scale: -1, overhead: 0 } }],
-			['NaN scale', { gauge: { scale: Number.NaN, overhead: 0 } }],
-			['infinite scale', { gauge: { scale: Number.POSITIVE_INFINITY, overhead: 0 } }],
-			['negative overhead', { gauge: { scale: 1, overhead: -1 } }],
-			['NaN overhead', { gauge: { scale: 1, overhead: Number.NaN } }],
-			['infinite overhead', { gauge: { scale: 1, overhead: Number.POSITIVE_INFINITY } }],
-			['text scale', { gauge: { scale: '1', overhead: 0 } }],
-			['missing overhead', { gauge: { scale: 1 } }],
-			['missing scale', { gauge: { overhead: 0 } }],
-			['unknown gauge key', { gauge: { scale: 1, overhead: 0, extra: 0 } }],
-			['array gauge', { gauge: [] }],
-			['null gauge', { gauge: null }],
-			['number gauge', { gauge: 1 }],
+			['unknown key beside observe', { observe: true, extra: true }],
+			['cased key', { Observe: true }],
+			['the gauge the removed compaction arm read', { gauge: { scale: 1, overhead: 0 } }],
+			['an undefined gauge', { gauge: undefined }],
 			['text observe', { observe: 'true' }],
 			['null observe', { observe: null }],
 			['checkpoints without observe', { checkpoints: ['a'] }],
@@ -83,7 +68,7 @@ describe('memory declaration and mechanical evidence', () => {
 			['duplicate checkpoint', { observe: true, checkpoints: ['a', 'a'] }],
 			['long checkpoint', { observe: true, checkpoints: ['x'.repeat(129)] }],
 			['non-text checkpoint', { observe: true, checkpoints: [1] }],
-			['rolling key', { gauge, rolling: true }],
+			['rolling key', { observe: true, rolling: true }],
 		]
 		for (const [label, value] of accepted)
 			expect([label, isStudyMemoryOptions(value)]).toEqual([label, true])
@@ -242,9 +227,12 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(isStudyMemoryAgent({})).toBe(false)
 		expect(isStudyMemoryProvider({})).toBe(false)
 		expect(isStudyMemoryArm('records')).toBe(true)
+		expect(isStudyMemoryArm('full')).toBe(true)
+		expect(isStudyMemoryArm('compaction')).toBe(false)
 		expect(isStudyMemoryArm('unsupported')).toBe(false)
 		expect(isStudyMemoryAssertion({ observation: 'result', partial: false })).toBe(true)
 		expect(isStudyMemoryAssertion({ observation: 'result', partial: 'false' })).toBe(false)
+		expect(isStudyMemoryAssertion({ observation: 'summary' })).toBe(false)
 	})
 })
 

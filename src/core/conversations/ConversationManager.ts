@@ -4,17 +4,11 @@ import type {
 	ConversationManagerInterface,
 	ConversationManagerOptions,
 	ConversationStoreInterface,
-	ConversationSummaryHandler,
 } from './types.js'
 import { isArray, preview, refuseOptionKeys } from '@orkestrel/contract'
-import {
-	CONVERSATION_INPUT_KEYS,
-	CONVERSATION_MANAGER_KEYS,
-	DEFAULT_CONVERSATION_KEEP,
-} from './constants.js'
+import { CONVERSATION_INPUT_KEYS, CONVERSATION_MANAGER_KEYS } from './constants.js'
 import { Conversation } from './Conversation.js'
 import { ConversationError } from './errors.js'
-import { requireKeep } from './helpers.js'
 import { removeEntries } from '../helpers.js'
 
 /**
@@ -27,11 +21,10 @@ import { removeEntries } from '../helpers.js'
  *
  * @remarks
  * - **Registry.** Conversations live in an insertion-ordered `Map` keyed by `id`. `add(input?)`
- *   mints a {@link Conversation} (its `id` from `input` or `crypto.randomUUID()`), flowing the
- *   default `#summarize` / `#keep` of the manager in unless the `input` overrides them, and stores
- *   it (an already-present `id` throws a `ConversationError` coded `'ID'`, because replacing a live
- *   conversation would orphan its turns). `count` is the map size,
- *   `conversation(id)` looks one up, `conversations()` lists them in insertion order.
+ *   mints a {@link Conversation} (its `id` from `input` or `crypto.randomUUID()`) and stores it (an
+ *   already-present `id` throws a `ConversationError` coded `'ID'`, because replacing a live
+ *   conversation would orphan its turns). `count` is the map size, `conversation(id)` looks one up,
+ *   `conversations()` lists them in insertion order.
  * - **Active pointer.** `active` is the active conversation (the conversation an agent run binds
  *   when it names none), `undefined` until the first `add` (which auto-activates it — a registry
  *   with conversations always has one active). A subsequent `add` leaves `active` unchanged.
@@ -46,7 +39,7 @@ import { removeEntries } from '../helpers.js'
  *
  * @example
  * ```ts
- * const manager = new ConversationManager({ summarize: async (m) => `recap of ${m.length}` })
+ * const manager = new ConversationManager()
  * const conversation = manager.add() // auto-activates — active === conversation
  * manager.add({ id: 'scratch' }) // leaves active unchanged
  * manager.switch('scratch') // re-points active to the 'scratch' conversation
@@ -59,13 +52,6 @@ export class ConversationManager implements ConversationManagerInterface {
 	// first `add` auto-activates one (kept as an id, never a stale reference, so a re-add / removal
 	// of that id is reflected through the live map lookup in `active`).
 	#active: string | undefined
-	// The default summarizer flowed into every conversation `add` creates (a per-`add` override
-	// wins); a conversation created with neither cannot `compact` (it throws a ConversationError).
-	readonly #summarize: ConversationSummaryHandler | undefined
-	// The default retained-tail size flowed into every conversation `add` creates (overridable).
-	readonly #keep: number
-	// The default `sections` cap flowed into every conversation `add` creates (overridable); `undefined` ⇒ unlimited.
-	readonly #sections: number | undefined
 	// The optional durable store backing `open` / `save`; `undefined` ⇒ registry-only (both lenient).
 	readonly #store: ConversationStoreInterface | undefined
 
@@ -76,9 +62,6 @@ export class ConversationManager implements ConversationManagerInterface {
 			'ConversationManager',
 			'ConversationManagerOptions',
 		)
-		this.#summarize = options?.summarize
-		this.#keep = requireKeep(options?.keep ?? DEFAULT_CONVERSATION_KEEP)
-		this.#sections = options?.sections
 		this.#store = options?.store
 	}
 
@@ -108,18 +91,11 @@ export class ConversationManager implements ConversationManagerInterface {
 				{ context: { conversation: held } },
 			)
 		}
-		// An optional `snapshot` hydrates through the declared `ConversationOptions.snapshot` seam,
-		// so the live summarize / keep ride beside it in the same options object.
-		const sections = input?.sections ?? this.#sections
-		const summarize = input?.summarize ?? this.#summarize
+		// An optional `snapshot` hydrates through the declared `ConversationOptions.snapshot` seam.
 		const conversation = new Conversation({
 			...(input?.id === undefined ? {} : { id: input.id }),
 			...(input?.on === undefined ? {} : { on: input.on }),
 			...(input?.error === undefined ? {} : { error: input.error }),
-			...(summarize === undefined ? {} : { summarize }),
-			keep: input?.keep ?? this.#keep,
-			...(sections === undefined ? {} : { sections }),
-			...(input?.cumulative === undefined ? {} : { cumulative: input.cumulative }),
 			...(input?.snapshot === undefined ? {} : { snapshot: input.snapshot }),
 		})
 		this.#conversations.set(conversation.id, conversation)
@@ -160,7 +136,6 @@ export class ConversationManager implements ConversationManagerInterface {
 				`the store answered ${preview(id)} with the snapshot of ${preview(snapshot.id)}; a store returns only the row of the id it is asked`,
 			)
 		}
-		// Reuse `add` so the default summarize / keep of the manager flow into the rehydrated conversation.
 		const conversation = this.add({ snapshot })
 		// Re-point `active` explicitly: `add` only auto-activates the first conversation, so an open
 		// into a non-empty registry must still make the rehydrated one active.

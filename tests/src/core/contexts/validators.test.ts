@@ -204,7 +204,7 @@ describe('isScope', () => {
 		const scope = createScope({
 			name: 'reader',
 			tools: ['search'],
-			select: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+			select: async (conversation) => ({ messages: conversation.messages(), judgments: [] }),
 		})
 		expect(isScope(scope)).toBe(true)
 		expect(isScope(scope.narrow({ files: [] }))).toBe(true)

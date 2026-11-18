@@ -282,7 +282,7 @@ export function createSkillManager(options?: SkillManagerOptions): SkillManagerI
  * created when omitted). `build()` folds the system prompt, the scoped instructions, and the scoped
  * skills index into one leading `system` message, renders the scoped memos index and the active
  * workspace's scope-filtered text files (fenced) into one `user` context message after it, and
- * appends the active conversation's `view()` (attaching the active workspace's scope-filtered image
+ * appends the active conversation's `messages()` (attaching the active workspace's scope-filtered image
  * files' `base64` payload to the last user message), built
  * fresh each call; the scope never filters the conversation. The active workspace is the sole
  * document/image context. Tools are advertised structurally (through

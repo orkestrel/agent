@@ -17,7 +17,6 @@ import {
 	buildStudyChatProfile,
 	captureStudyPackages,
 	createStudyMeterFixture,
-	buildMemoryEdge,
 	buildMemoryCall,
 	buildMemoryCapture,
 	buildMemoryCriterion,
@@ -25,7 +24,6 @@ import {
 	buildMemoryVerdict,
 	countMemoryPairs,
 	omitMemoryAuxiliaries,
-	buildMemoryFoldGoals,
 	buildMemoryObservationGoals,
 	buildMemoryObservationResponses,
 	buildMemoryProfile,
@@ -65,10 +63,8 @@ import {
 	STUDY_MEMORY_RECORD,
 	STUDY_MEMORY_REFUSAL_KEYS,
 	STUDY_MEMORY_REPLAY_REFUSAL,
-	STUDY_MEMORY_SETTINGS,
-	STUDY_MEMORY_SUMMARY_ROOM,
+	STUDY_MEMORY_SHORT_GOAL,
 	STUDY_MEMORY_TIMING,
-	WINDOW_GOAL,
 } from './setupStudy.js'
 
 describe('study meter fixture lifecycle', () => {
@@ -148,8 +144,6 @@ describe('study replay content comparison', () => {
 			'content',
 			'ledger.conversation.messages.content',
 			'ledger.conversation.messages.calls.id',
-			'ledger.conversation.sections.id',
-			'ledger.conversation.sections.summary',
 			'ledger.conversation.judgments.state',
 			'ledger.conversation.judgments.model',
 			'ledger.conversation.judgments.question.question',
@@ -175,11 +169,9 @@ describe('study replay content comparison', () => {
 		for (const member of [
 			'conversation.id',
 			'conversation.messages.id',
-			'conversation.sections.messages.id',
 			'conversation.judgments.sources',
 			'ledger.conversation.id',
 			'ledger.conversation.messages.id',
-			'ledger.conversation.sections.messages.id',
 			'ledger.conversation.judgments.sources',
 			'ledger.requests',
 			'ledger.notes',
@@ -473,7 +465,6 @@ describe('study install fixtures', () => {
 				agent: entry,
 				subject: entry,
 				qualification: 'tmp/studies/recordscapacity',
-				settings: { gauge: { scale: 1, overhead: 0 } },
 				bounds: {
 					request: { duration: 3000 },
 					goal: { duration: 30000 },
@@ -766,20 +757,16 @@ describe('study install fixtures', () => {
 		}
 	})
 
-	it('leaves the authored local profiles without settings', () => {
-		for (const name of ['recordslocal', 'compactionlocal'])
-			expect(
-				parseJSON(readFileSync(`studies/memory/profiles/${name}.json`, 'utf8')),
-			).not.toHaveProperty('settings')
+	it('leaves the authored local profile without settings', () => {
+		expect(
+			parseJSON(readFileSync('studies/memory/profiles/recordslocal.json', 'utf8')),
+		).not.toHaveProperty('settings')
 	})
 
 	it('emits supplied profile settings verbatim, including an explicit absence', () => {
 		const url = 'http://127.0.0.1:7'
-		const settings = { gauge: { scale: 2, overhead: 3 }, observe: true, checkpoints: ['a'] }
+		const settings = { observe: true, checkpoints: ['a'] }
 		expect(buildMemoryProfile({ url, settings }).settings).toEqual(settings)
-		expect(buildMemoryProfile({ url, settings: STUDY_MEMORY_SETTINGS }).settings).toEqual({
-			gauge: { scale: 1, overhead: 0 },
-		})
 		for (const profile of [
 			buildMemoryProfile({ url }),
 			buildMemoryProfile({ url, settings: undefined }),
@@ -789,21 +776,16 @@ describe('study install fixtures', () => {
 		}
 	})
 
-	it('removes only the judge and recap a workflow does not use and requires a declared provider', () => {
-		const profile = buildMemoryProfile({
-			url: 'http://127.0.0.1:7',
-			settings: STUDY_MEMORY_SETTINGS,
-		})
+	it('removes only the judge a workflow does not use and requires a declared provider', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const bare = omitMemoryAuxiliaries(profile)
 		expect(bare.provider).toEqual({
 			...profile.provider,
 			judge: undefined,
 			digest: { model: 'a'.repeat(64), judge: undefined },
 		})
-		expect(bare.room).toEqual({ ...profile.room, recap: undefined })
-		expect({ ...bare, provider: profile.provider, room: profile.room }).toEqual(profile)
+		expect({ ...bare, provider: profile.provider }).toEqual(profile)
 		expect(profile.provider?.judge).toBe('judge')
-		expect(profile.room.recap).toBe(256)
 		expect(() => omitMemoryAuxiliaries({ ...profile, provider: undefined })).toThrow(
 			'Missing fixture provider',
 		)
@@ -818,25 +800,16 @@ describe('study install fixtures', () => {
 			critical: true,
 			assertion: { observation: 'operational' },
 		})
-		expect(buildMemoryCriterion('late', 'trace', { observation: 'summary' }, 'later')).toEqual({
+		expect(
+			buildMemoryCriterion('late', 'trace', { observation: 'arrival', id: 'a1' }, 'later'),
+		).toEqual({
 			id: 'late',
 			scenario: 'desk',
 			goal: 'later',
 			method: 'trace',
 			critical: false,
-			assertion: { observation: 'summary' },
+			assertion: { observation: 'arrival', id: 'a1' },
 		})
-	})
-
-	it('places a gauge at a signed distance from the window max of the profile room', () => {
-		const base = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
-		expect(buildMemoryEdge(base, -1)).toEqual({ gauge: { scale: 1e-9, overhead: 32127 } })
-		expect(buildMemoryEdge(base, 0)).toEqual({ gauge: { scale: 1e-9, overhead: 32128 } })
-		const narrow = buildMemoryProfile({
-			url: 'http://127.0.0.1:7',
-			room: { context: 1024, output: 128, safety: 128 },
-		})
-		expect(buildMemoryEdge(narrow, -2)).toEqual({ gauge: { scale: 1e-9, overhead: 766 } })
 	})
 
 	it('reads native controls from exact chat bytes', () => {
@@ -961,35 +934,6 @@ describe('study install fixtures', () => {
 			expect(() => readMemoryOrigins(malformed)).toThrow('Invalid')
 	})
 
-	it('builds the fold goal and lets a room reach a real trial', async () => {
-		const goals = buildMemoryFoldGoals()
-		expect(goals.map((goal) => goal.id)).toEqual(['opening'])
-		const input = goals[0]?.input
-		if (!isRecord(input) || !Array.isArray(input.arrivals)) throw new Error('Invalid fold goal')
-		expect(input.arrivals).toHaveLength(8)
-		expect(
-			new Set(input.arrivals.map((arrival) => (isRecord(arrival) ? arrival.id : undefined))).size,
-		).toBe(8)
-		expect(JSON.stringify(buildMemoryFoldGoals('other. '))).not.toBe(JSON.stringify(goals))
-		expect(JSON.stringify(buildMemoryFoldGoals('other. '))).toContain('other. ')
-		const result = await runMemoryTrial({
-			arm: 'full',
-			responses: [],
-			goals: [{ id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }],
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-		})
-		expect(result.failure).toBeUndefined()
-		const body = parseJSON(
-			result.requests.find((request) => request.path === '/api/chat')?.body ?? '',
-		)
-		expect(body).toMatchObject({
-			options: {
-				num_ctx: STUDY_MEMORY_SUMMARY_ROOM.context,
-				num_predict: STUDY_MEMORY_SUMMARY_ROOM.output,
-			},
-		})
-	})
-
 	it('runs a real trial, reads its retained shapes and releases resources when the treatment is refused', async () => {
 		const goal = { id: 'opening', input: { prompt: 'Respond', arrivals: [], records: [] } }
 		const result = await runMemoryTrial({ arm: 'full', responses: [], goals: [goal] })
@@ -1017,9 +961,6 @@ describe('study install fixtures', () => {
 			expect.objectContaining({ content: 'Receipt retained.', partial: false }),
 		])
 		expect(readMemoryEvents(result.evidence, 'result', 'absent')).toEqual([])
-		await expect(
-			runMemoryTrial({ arm: 'compaction', responses: [], goals: [goal] }),
-		).rejects.toThrow(expect.objectContaining({ code: 'CONFIG' }))
 		await expect(
 			runMemoryTrial({
 				arm: 'full',
@@ -1113,7 +1054,6 @@ describe('study install fixtures', () => {
 				record: STUDY_MEMORY_RECORD.record,
 				settings: {
 					...STUDY_MEMORY_RECORD.settings,
-					gauge: STUDY_MEMORY_SETTINGS.gauge,
 					observe: true,
 					checkpoints: ['opening'],
 				},
@@ -1147,7 +1087,7 @@ describe('study install fixtures', () => {
 		const capture = buildMemoryCapture(
 			buildMemoryRecordProfile('http://127.0.0.1:7'),
 			{ id: 'captured', scenario: 'public', arm: 'full', repetition: 0 },
-			WINDOW_GOAL,
+			STUDY_MEMORY_SHORT_GOAL,
 		)
 		expect(capture.exchanges.declaration).toMatchObject({
 			phase: 'declaration',

@@ -15,7 +15,7 @@ import type {
 } from './types.js'
 import type { ProviderInterface, ProviderRequest, ProviderResult } from '../providers/index.js'
 import type { AgentContextInterface, Selection } from '../contexts/index.js'
-import type { ConversationInterface, Section } from '../conversations/index.js'
+import type { ConversationInterface } from '../conversations/index.js'
 import type { Message, ThinkingReplay } from '../types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { BudgetInterface, MeterInterface, TokenUsage } from '@orkestrel/budget'
@@ -40,7 +40,6 @@ import {
 import { createTimeout } from '@orkestrel/timeout'
 import { Emitter } from '@orkestrel/emitter'
 import { AgentContext } from '../contexts/index.js'
-import { raceSignal } from '../conversations/index.js'
 import {
 	AGENT_OPTION_KEYS,
 	AGENT_RUN_KEYS,
@@ -71,6 +70,7 @@ import { isAuthorityDecision } from './validators.js'
 import {
 	estimateTokens,
 	filterAllowList,
+	raceSignal,
 	sanitizeUsage,
 	stripThinking,
 	sumUsage,
@@ -146,18 +146,8 @@ export class Agent implements AgentInterface {
 	// The gate consulted for each admitted call; `undefined` only on an agent built with no `tools`,
 	// where a tool a host adds later through `context.tools` is denied rather than run.
 	readonly #authority: AuthorityInterface | undefined
-	// The context budget that admits each provider request — its `consumer` is a token estimator
-	// over the complete `ProviderRequest`, its `max` the context window. `#admit` re-measures the
-	// exact request (replay-filtered messages, advertised tools, per-call options) against it before
-	// every dispatch; `undefined` ⇒ disabled, and the loop never calls `#admit`. Reset (`clear()`)
-	// at run entry so no stale `consumed` carries across runs / a conversation switch. Not the hard
-	// cost `budget` ceiling — when the request reaches its `max` this compacts + continues
-	// (non-fatal on a summarizer throw, futile-guarded) and never aborts; only `strict` refuses.
-	readonly #window: BudgetInterface<ProviderRequest> | undefined
-	// True by default: a summarizer failure during automatic compaction rethrows (after the `fault`
-	// event) instead of skipping compaction and continuing over-window, a request still over the
-	// window after the permitted fold is refused with a WINDOW error before dispatch, and an answer
-	// that fails the run's `schema` is refused with a SCHEMA error.
+	// True by default: a selection fault rethrows after the `fault` event instead of building from the
+	// conversation, and an answer that fails the run's `schema` is refused with a SCHEMA error.
 	readonly #strict: boolean
 	// The push observation surface — owned, never inherited. The emitter isolates a
 	// listener throw (routing it to the `error` handler), so it can never escape into the loop. No
@@ -227,7 +217,6 @@ export class Agent implements AgentInterface {
 		this.#scheduler = options?.scheduler
 		this.#signal = options?.signal
 		this.#authority = options?.authority
-		this.#window = options?.window
 		this.#strict = options?.strict ?? true
 		this.#emitter = new Emitter<AgentEventMap>(options)
 	}
@@ -296,19 +285,14 @@ export class Agent implements AgentInterface {
 			(one, index, all): one is BudgetInterface<TokenUsage> =>
 				one !== undefined && all.indexOf(one) === index,
 		)
-		// Concurrency guard: a `window` is one context budget every run clears and measures, and a
-		// budget instance carries one signal that `start()` replaces — a second live run on either
-		// would race the first run's accounting or orphan its bound. Thrown synchronously, before
-		// any state mutation or emit, so a sequential/awaited caller is never affected and runs
-		// holding distinct budget instances with no `window` still overlap.
-		if (
-			this.#runs.size > 0 &&
-			(this.#window !== undefined ||
-				[...this.#runs.values()].some((live) => live.budgets.some((one) => held.includes(one))))
-		) {
+		// Concurrency guard: a budget instance carries one signal that `start()` replaces — a second
+		// live run on it would race the first run's accounting or orphan its bound. Thrown
+		// synchronously, before any state mutation or emit, so a sequential/awaited caller is never
+		// affected and runs holding distinct budget instances still overlap.
+		if ([...this.#runs.values()].some((live) => live.budgets.some((one) => held.includes(one)))) {
 			throw new AgentError(
 				'CONCURRENCY',
-				'a live run on this agent holds the window or this budget or allowance instance; use separate agents or distinct instances per run',
+				'a live run on this agent holds this budget or allowance instance; use separate agents or distinct instances per run',
 				{ context: { agent: this.#id } },
 			)
 		}
@@ -493,9 +477,8 @@ export class Agent implements AgentInterface {
 		allowance: BudgetInterface<TokenUsage> | undefined,
 	): AsyncGenerator<AgentChunk, AgentRunResult> {
 		const conversation = run.conversation
-		// Compaction can fold the request into a section, so every select site receives the object
-		// captured at run entry.
-		const last = conversation.view().at(-1)
+		// The request is the user message that ends the conversation at run entry.
+		const last = conversation.messages().at(-1)
 		const request = last?.role === 'user' ? last : undefined
 		// The entry build renders what the run shows from its first request, so the view is resolved first.
 		run.observe()
@@ -513,12 +496,9 @@ export class Agent implements AgentInterface {
 						...(think === undefined ? {} : { think }),
 						...(schema === undefined ? {} : { schema }),
 					}
-		// Reset `#window` at run entry so no stale `consumed` carries across runs / a conversation
-		// switch.
-		this.#window?.clear()
 		// One readonly record per turn; the turn index is the list length.
 		const turns: AgentTurn[] = []
-		// One turn per step: observe it, pace the boundary, admit the request, stream the provider,
+		// One turn per step: observe it, pace the boundary, compose the request, stream the provider,
 		// reconcile the usage, then dispatch the requested tools or record the final answer. A cancel
 		// appends a `cancel` record, which ends the loop; a genuine error throws. The section before
 		// the provider call adds no `await` on the default path, so the provider's `stream()` is
@@ -526,17 +506,14 @@ export class Agent implements AgentInterface {
 		while (turns.length < limit && (turns.at(-1)?.outcome ?? 'tools') === 'tools') {
 			const index = turns.length
 			const prior = turns.at(-1)?.messages ?? entry.messages
-			const futile = turns.at(-1)?.futile ?? false
 			// The record of a turn a cancel stopped before its provider call.
 			const stopped: AgentTurn = {
 				content: '',
 				thinking: undefined,
 				usage: undefined,
-				spent: undefined,
 				messages: prior,
 				outcome: 'cancel',
 				partial: true,
-				futile,
 				estimate: undefined,
 				interrupted: false,
 				truncated: false,
@@ -574,49 +551,17 @@ export class Agent implements AgentInterface {
 				advertised.map((definition) => [definition.name, run.tool(definition.name)]),
 			)
 			const definitions = advertised.length > 0 ? advertised : undefined
-			// Admit the request: compose it once from the replay-filtered messages and this turn's tool
-			// and option snapshot, measure it against `#window`, and dispatch exactly the request the
-			// window last measured (the rebuilt one after a fold). With no `window` it is composed and
-			// dispatched with no extra `await`.
-			const composed = this.#compose(base, definitions, options)
-			const admitted =
-				this.#window === undefined
-					? { dispatch: composed, messages: base, spent: undefined, futile }
-					: await this.#admit(
-							this.#window,
-							run,
-							composed,
-							base,
-							request,
-							index > 0,
-							futile,
-							abort,
-							budget,
-						)
-			if (admitted.dispatch === undefined) {
-				turns.push({
-					...stopped,
-					messages: admitted.messages,
-					spent: admitted.spent,
-					futile: admitted.futile,
-				})
-				continue
-			}
-			// The request the provider receives, frozen one level deep so a `request` listener reads it
-			// and cannot change what is dispatched.
-			const dispatch = admitted.dispatch
+			// The request the provider receives: composed once from the replay-filtered messages and
+			// this turn's tool and option snapshot, then frozen one level deep so a `request` listener
+			// reads it and cannot change what is dispatched.
+			const dispatch = this.#compose(base, definitions, options)
 			Object.freeze(dispatch.messages)
 			if (dispatch.tools !== undefined) Object.freeze(dispatch.tools)
 			this.#emitter.emit('request', index, Object.freeze(dispatch), conversation)
 			// A run aborted while the turn's `request` listeners ran sends nothing for the turn: it ends
 			// as a cancel stopped before its provider call.
 			if (abort.signal.aborted) {
-				turns.push({
-					...stopped,
-					messages: admitted.messages,
-					spent: admitted.spent,
-					futile: admitted.futile,
-				})
+				turns.push({ ...stopped, messages: base })
 				continue
 			}
 			// The turn's streamed content, one entry per content delta; the meter charges only when an
@@ -627,7 +572,7 @@ export class Agent implements AgentInterface {
 					? undefined
 					: createTokenMeter({ budget: allowance, estimator: estimateTokens })
 			const provided = yield* this.#provide(dispatch, abort.signal, streamed, meter)
-			const settled = this.#reconcile(provided, abort, streamed, admitted, meter, budget, allowance)
+			const settled = this.#reconcile(provided, abort, streamed, base, meter, budget, allowance)
 			if (!provided.success) {
 				turns.push({ ...settled, outcome: 'cancel', partial: true })
 				continue
@@ -657,19 +602,25 @@ export class Agent implements AgentInterface {
 					calls: result.tools,
 					...recorded,
 				})
+				// A tool manager that rejects stops the run; its assistant turn leaves with it, so the
+				// conversation never holds a call group with no results.
 				const results = await this.#dispatch(
 					run,
 					result.tools,
 					abort.signal,
 					authorization,
 					advertised,
-				)
-				// Each dispatched call's tool message, appended per step of a loop that yields.
+				).catch((error: unknown) => {
+					conversation.remove(assistant.id)
+					throw error
+				})
+				// One tool message per call, appended per step of a loop that yields, so the stored call
+				// group is always whole: a position with no result reads as a denial.
 				const replies: Message[] = []
 				for (const [position, call] of result.tools.entries()) {
-					const dispatched = results[position]
-					if (dispatched === undefined) continue
-					const { outcome, content } = settleToolResult(dispatched)
+					const { outcome, content } = settleToolResult(
+						results[position] ?? denyCall(call, undefined),
+					)
 					// Observe the dispatched tool + its result — beside the `tool` yield (the result
 					// already exists). Carries the same pair the chunk carries.
 					this.#emitter.emit('tool', call, outcome)
@@ -678,11 +629,10 @@ export class Agent implements AgentInterface {
 					// `position` names `calls[position]` even when a supplied tool manager returns another id.
 					replies.push(conversation.add({ role: 'tool', content, call: call.id }))
 				}
-				// The next turn's admission measures and folds the grown prompt, so a final answer never
-				// pays for a fold. A tools turn's truncation does not end the run, so it is not recorded.
+				// A tools turn's truncation does not end the run, so it is not recorded.
 				turns.push({
 					...settled,
-					messages: [...admitted.messages, assistant, ...replies],
+					messages: [...base, assistant, ...replies],
 					outcome: 'tools',
 					partial: true,
 				})
@@ -712,12 +662,8 @@ export class Agent implements AgentInterface {
 			content:
 				final?.outcome === 'answer' ? final.content : turns.map((turn) => turn.content).join(''),
 			thinking: thinkings.length === 0 ? undefined : thinkings.join('\n\n'),
-			// Every turn's usage, then the entry selection's, then each rebuild's, in turn order.
-			usage: [
-				...turns.map((turn) => turn.usage),
-				entry.usage,
-				...turns.map((turn) => turn.spent),
-			].reduce<TokenUsage | undefined>(
+			// Every turn's usage, then the entry selection's.
+			usage: [...turns.map((turn) => turn.usage), entry.usage].reduce<TokenUsage | undefined>(
 				(total, one) => (one === undefined ? total : sumUsage(total, one)),
 				undefined,
 			),
@@ -736,7 +682,7 @@ export class Agent implements AgentInterface {
 		provided: Result<ProviderResult>,
 		abort: AbortInterface,
 		streamed: readonly string[],
-		admitted: Pick<AgentTurn, 'messages' | 'spent' | 'futile'>,
+		messages: readonly Message[],
 		meter: MeterInterface | undefined,
 		budget: BudgetInterface<TokenUsage> | undefined,
 		allowance: BudgetInterface<TokenUsage> | undefined,
@@ -773,9 +719,7 @@ export class Agent implements AgentInterface {
 			content,
 			thinking,
 			usage,
-			spent: admitted.spent,
-			messages: admitted.messages,
-			futile: admitted.futile,
+			messages,
 			estimate,
 			interrupted,
 			truncated: false,
@@ -787,8 +731,8 @@ export class Agent implements AgentInterface {
 	// options. Keys are omitted when undefined, so the provider receives no tools and no options
 	// object when there are none. The request owns its messages array, a shallow copy after the
 	// replay filter, because that filter returns the working array itself for a policy that keeps
-	// every message. The admission step measures this object and `#provide` sends it, so the
-	// measured and the dispatched request can never diverge.
+	// every message. The `request` event reads this object and `#provide` sends it, so the observed
+	// and the dispatched request can never diverge.
 	#compose(
 		messages: readonly Message[],
 		tools: ProviderRequest['tools'],
@@ -801,126 +745,9 @@ export class Agent implements AgentInterface {
 		}
 	}
 
-	// Admits one request against the context `window` budget immediately before its provider
-	// dispatch, so only called when a window is set. `clear()` then consuming the request makes
-	// `window.consumed` its estimated footprint, and `exhausted` means it has reached `max`. A
-	// request over the window folds the run's conversation once when it is summarizable and not
-	// latched futile, then rebuilds through selection, recomposes with the same tool and option
-	// snapshot, and measures again; the request that measures last is the one dispatched. A
-	// non-summarizable conversation is measured but never folded, so the auto path never throws the
-	// `compact()` SUMMARIZER error. A cancel anywhere returns no dispatch so the run settles partial,
-	// and wins over `strict`; otherwise `strict` refuses a request still over the window with a
-	// WINDOW error before any dispatch, while `strict: false` sends it.
-	async #admit(
-		window: BudgetInterface<ProviderRequest>,
-		run: AgentRun,
-		composed: ProviderRequest,
-		messages: readonly Message[],
-		request: Message | undefined,
-		latch: boolean,
-		futile: boolean,
-		abort: AbortInterface,
-		budget: BudgetInterface<TokenUsage> | undefined,
-	) {
-		window.clear()
-		window.consume(composed)
-		if (!window.exhausted) return { dispatch: composed, messages, spent: undefined, futile }
-		// A cancelled run is about to settle, so a fold would spend summarizer time on a request no
-		// provider reads; the next run's first admission folds instead.
-		if (abort.signal.aborted) return { dispatch: undefined, messages, spent: undefined, futile }
-		const conversation = run.conversation
-		if (!conversation.summarizable || futile) {
-			return { dispatch: this.#enforce(window, composed), messages, spent: undefined, futile }
-		}
-		// The run signal bounds the fold: `compact()` rejects with its reason on a cancel and
-		// commits nothing, even when the summarizer ignores the signal.
-		return conversation.compact({ signal: abort.signal }).then(
-			(section) =>
-				this.#refold(section, window, run, composed, messages, request, latch, abort, budget),
-			(error: unknown) => this.#unfold(error, composed, messages, abort),
-		)
-	}
-
-	// A fold that settled: a cancel wins; nothing folded latches on a later turn, where the tail had
-	// its chance to grow, but not on the first; otherwise rebuild through selection (compaction
-	// changed the view the handler evaluates) and measure the rebuilt request.
-	async #refold(
-		section: Section | undefined,
-		window: BudgetInterface<ProviderRequest>,
-		run: AgentRun,
-		composed: ProviderRequest,
-		messages: readonly Message[],
-		request: Message | undefined,
-		latch: boolean,
-		abort: AbortInterface,
-		budget: BudgetInterface<TokenUsage> | undefined,
-	) {
-		if (abort.signal.aborted)
-			return { dispatch: undefined, messages, spent: undefined, futile: false }
-		if (section === undefined) {
-			return {
-				dispatch: this.#enforce(window, composed),
-				messages,
-				spent: undefined,
-				futile: latch,
-			}
-		}
-		const selection = this.#select(run, request, abort, budget)
-		const rebuilt =
-			selection === undefined ? { messages: this.#build(run), usage: undefined } : await selection
-		if (abort.signal.aborted) {
-			return {
-				dispatch: undefined,
-				messages: rebuilt.messages,
-				spent: rebuilt.usage,
-				futile: false,
-			}
-		}
-		const dispatch = this.#compose(rebuilt.messages, composed.tools, composed.options)
-		window.clear()
-		window.consume(dispatch)
-		return {
-			dispatch: this.#enforce(window, dispatch),
-			messages: rebuilt.messages,
-			spent: rebuilt.usage,
-			futile: false,
-		}
-	}
-
-	// A fold that rejected: a cancel wins over the failure it caused, as on the select path;
-	// otherwise surface the summarizer failure observably, rethrow under `strict`, and send the
-	// over-window request leniently.
-	#unfold(
-		error: unknown,
-		composed: ProviderRequest,
-		messages: readonly Message[],
-		abort: AbortInterface,
-	) {
-		if (abort.signal.aborted)
-			return { dispatch: undefined, messages, spent: undefined, futile: false }
-		this.#emitter.emit('fault', error)
-		// A fault listener can cancel the run synchronously; the cancel then wins over strict, as in #reject.
-		if (abort.signal.aborted)
-			return { dispatch: undefined, messages, spent: undefined, futile: false }
-		if (this.#strict) throw error
-		return { dispatch: composed, messages, spent: undefined, futile: false }
-	}
-
-	// Refuses, under `strict`, a request the window still measures over its max; returns it otherwise.
-	#enforce(window: BudgetInterface<ProviderRequest>, request: ProviderRequest): ProviderRequest {
-		if (this.#strict && window.exhausted) {
-			throw new AgentError(
-				'WINDOW',
-				`the request measures ${window.consumed} against a window of ${window.max} and this run folds no further`,
-				{ context: { agent: this.#id, consumed: window.consumed, max: window.max } },
-			)
-		}
-		return request
-	}
-
-	// One select site: the handler's pending selection settled into the working messages and the
+	// The select site: the handler's pending selection settled into the working messages and the
 	// usage it spent, or `undefined` when there is no request or no handler, so the caller builds from
-	// `view()` without an await.
+	// the conversation's `messages()` without an await.
 	#select(
 		run: AgentRun,
 		request: Message | undefined,
@@ -941,7 +768,8 @@ export class Agent implements AgentInterface {
 
 	// A resolved selection: charge its usage before the abort check, because judge calls were spent
 	// either way and the charge can itself trip the run's bound; then build from it unless a cancel or
-	// a strict fault intervenes. A cancelled site builds from `view()` and emits no `select`.
+	// a strict fault intervenes. A cancelled site builds from the conversation's `messages()` and
+	// emits no `select`.
 	#adopt(
 		run: AgentRun,
 		selection: Selection,
@@ -972,11 +800,11 @@ export class Agent implements AgentInterface {
 	}
 
 	// Every build of a run renders its bound conversation: a selection's messages when one is given,
-	// else that conversation's `view()`, never the pointer a later `switch` may have moved, under the
-	// context scope intersected with the run scope, with what the run's last view shows. The run
+	// else that conversation's `messages()`, never the pointer a later `switch` may have moved, under
+	// the context scope intersected with the run scope, with what the run's last view shows. The run
 	// records the selection, the built length, and that view, which the next turn compares.
 	#build(run: AgentRun, selection?: Selection): readonly Message[] {
-		const rendered = selection ?? { messages: run.conversation.view(), judgments: [] }
+		const rendered = selection ?? { messages: run.conversation.messages(), judgments: [] }
 		const scope = run.snapshot
 		const disclosure = run.disclosure
 		const messages = this.#context.build({

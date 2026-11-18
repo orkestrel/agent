@@ -15,6 +15,7 @@ import {
 	matchesJudgment,
 	stripThinking,
 	MESSAGE_ROLES,
+	raceSignal,
 	removeEntries,
 	renderJSON,
 	sanitizeToken,
@@ -22,7 +23,7 @@ import {
 	sumUsage,
 } from '@src/core'
 import { canonicalStringify, parseJSONAs } from '@orkestrel/contract'
-import { createRecorder, requireValue } from '@orkestrel/test'
+import { createRecorder, requireValue, waitForDelay } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	buildExchangeMessages,
@@ -664,5 +665,49 @@ describe('extractLiterals', () => {
 	it('reads nothing from an empty text', () => {
 		const literals = extractLiterals('')
 		expect(literals.ids.size + literals.numbers.size).toBe(0)
+	})
+})
+
+describe('raceSignal', () => {
+	it('returns the promise itself when no signal is supplied', () => {
+		const promise = Promise.resolve('value')
+		expect(raceSignal(promise, undefined)).toBe(promise)
+	})
+
+	it('settles as the promise does while the signal stays live', async () => {
+		const failure = new Error('failed')
+		await expect(raceSignal(Promise.resolve('value'), new AbortController().signal)).resolves.toBe(
+			'value',
+		)
+		await expect(raceSignal(Promise.reject(failure), new AbortController().signal)).rejects.toBe(
+			failure,
+		)
+	})
+
+	it('rejects with the reason of an already-aborted signal without waiting', async () => {
+		const reason = new Error('cancelled')
+		const never = Promise.withResolvers<string>()
+		await expect(raceSignal(never.promise, AbortSignal.abort(reason))).rejects.toBe(reason)
+	})
+
+	it('rejects with the abort reason while the promise is pending, and handles its later rejection', async () => {
+		const pending = Promise.withResolvers<string>()
+		const controller = new AbortController()
+		const reason = new Error('cancelled')
+		const raced = raceSignal(pending.promise, controller.signal)
+
+		controller.abort(reason)
+		await expect(raced).rejects.toBe(reason)
+		// Vitest fails the run on an unhandled rejection, so this late reject must be handled.
+		pending.reject(new Error('late'))
+		await waitForDelay()
+	})
+
+	it('ignores an abort that lands after the promise settled', async () => {
+		const controller = new AbortController()
+		const raced = raceSignal(Promise.resolve('value'), controller.signal)
+		await expect(raced).resolves.toBe('value')
+		controller.abort(new Error('late'))
+		await expect(raced).resolves.toBe('value')
 	})
 })

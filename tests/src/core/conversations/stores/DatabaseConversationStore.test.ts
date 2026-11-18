@@ -24,8 +24,8 @@ import {
 // set / delete, async, keyed by a snapshot's own id). It persists the ConversationSnapshot as ONE
 // OPAQUE JSON column over a `databases` table (driver default = createMemoryDriver), narrowing the
 // column back to a ConversationSnapshot on `get` (the total boundary guard). Exercised over a REAL
-// memory driver, with REAL ConversationSnapshot values (NO mocks) — a genuine `compact()`
-// produces real sections plus a live tail.
+// memory driver, with REAL ConversationSnapshot values (NO mocks) — a real conversation's
+// messages and judgments.
 
 // The shared `ConversationStoreInterface` contract scenarios (round-trip / upsert / delete & absent /
 // two-ids-coexist) plus the real `buildConversationSnapshot` fixture both store twins drive live in
@@ -72,24 +72,20 @@ describe('DatabaseConversationStore', () => {
 			createDatabaseConversationStore(driver).get(JUDGMENT_SNAPSHOT.id),
 		).rejects.toSatisfy((error: unknown) => isConversationError(error) && error.code === 'SNAPSHOT')
 	})
-	describe('set → get round-trip (sections + live tail)', () => {
-		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
+	describe('set → get round-trip (messages + judgments)', () => {
+		it('set → get returns an equal snapshot (messages + judgments survive)', async () => {
 			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
 				() => createDatabaseConversationStore(createMemoryDriver()),
 				buildConversationSnapshot,
 			)
 			// The retrieved snapshot deep-equals what was stored (the durable payload survives intact).
 			expect(got).toEqual(snapshot)
-			// It carries a compacted section AND a live tail (round-trip is non-vacuous).
-			expect(got?.sections).toHaveLength(1)
-			expect(got?.sections[0]?.summary).toBe(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.summary,
-			)
-			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages,
-			)
+			// It carries messages AND a judgment (round-trip is non-vacuous).
 			expect(got?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.tail,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.messages,
+			)
+			expect(got?.judgments?.map((judgment) => judgment.id)).toEqual(
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.judgments,
 			)
 		})
 	})
@@ -189,7 +185,6 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 			id: 'poisoned',
 			snapshot: {
 				id: 'poisoned',
-				sections: [],
 				messages: [{ id: 'a1', role: 'assistant', content: '', calls: [null, 'x'] }],
 			},
 		})
@@ -206,7 +201,7 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 		)
 		expect(got).toEqual(TOOL_SNAPSHOT)
 		expect(got?.messages.at(-1)?.call).toBe('call-oslo')
-		expect(got?.sections[0]?.messages.at(-1)).not.toHaveProperty('call')
+		expect(got?.messages.find((message) => message.id === 'tool-paris')).not.toHaveProperty('call')
 	})
 
 	it('a TAMPERED row (a non-string call) throws SNAPSHOT from get (fail-closed)', async () => {
@@ -215,7 +210,6 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 			id: 'poisoned',
 			snapshot: {
 				id: 'poisoned',
-				sections: [],
 				messages: [{ id: 't1', role: 'tool', content: 'sunny', call: 7 }],
 			},
 		})
@@ -275,22 +269,22 @@ describe('DatabaseConversationStore — driver overloads & durability', () => {
 })
 
 describe('DatabaseConversationStore — a present row that fails the guard throws', () => {
-	it('names the id, the key, the table, and store.delete when a row carries a summary', async () => {
+	it('names the id, the key, the table, and store.delete when a row carries sections', async () => {
 		const driver = createMemoryDriver()
 		await plantSnapshotRow(driver, 'conversations', {
 			id: 'c1',
-			snapshot: { id: 'c1', sections: [], messages: [], summary: 'x' },
+			snapshot: { id: 'c1', sections: [], messages: [] },
 		})
 		const store = createDatabaseConversationStore(driver)
 		const error = await store.get('c1').catch((caught: unknown) => caught)
 		expect(isConversationError(error) && error.code).toBe('SNAPSHOT')
 		const message = isConversationError(error) ? error.message : ''
 		expect(message).toContain('"c1"')
-		expect(message).toContain('"summary"')
+		expect(message).toContain('"sections"')
 		expect(message).toContain('your own table')
 		expect(message).toContain('store.delete("c1")')
 		expect(isConversationError(error) && error.context?.faults).toEqual([
-			{ reason: 'extra', path: ['summary'] },
+			{ reason: 'extra', path: ['sections'] },
 		])
 	})
 
@@ -298,7 +292,7 @@ describe('DatabaseConversationStore — a present row that fails the guard throw
 		const driver = createMemoryDriver()
 		await plantSnapshotRow(driver, 'conversations', {
 			id: 'c1',
-			snapshot: { id: 'c2', sections: [], messages: [] },
+			snapshot: { id: 'c2', messages: [] },
 		})
 		const store = createDatabaseConversationStore(driver)
 		const error = await store.get('c1').catch((caught: unknown) => caught)
@@ -314,7 +308,7 @@ describe('DatabaseConversationStore — a present row that fails the guard throw
 
 	it('writes nothing for a malformed snapshot', async () => {
 		const store = createDatabaseConversationStore(createMemoryDriver())
-		const malformed = { id: 'c1', sections: [], messages: [], summary: 'x' }
+		const malformed = { id: 'c1', messages: [], summary: 'x' }
 		const error = await Reflect.apply(store.set, store, [malformed]).catch(
 			(caught: unknown) => caught,
 		)

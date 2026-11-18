@@ -113,7 +113,7 @@ export function isLedgerQuestion(value: unknown): value is LedgerQuestion {
  * @returns True if the value has the shape of a ledger snapshot whose marked ids name messages of its own conversation; false otherwise
  * @example
  * ```ts
- * const conversation = { id: 'c1', sections: [], messages: [{ id: 'm1', role: 'user', content: 'Check FX-111.' }] }
+ * const conversation = { id: 'c1', messages: [{ id: 'm1', role: 'user', content: 'Check FX-111.' }] }
  * isLedgerSnapshot({ conversation, requests: ['m1'], notes: [], failures: [] }) // true
  * isLedgerSnapshot({ conversation, requests: [], notes: [], failures: ['m1'] }) // false
  * ```

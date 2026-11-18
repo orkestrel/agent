@@ -932,7 +932,7 @@ const cases = [
 	['ProviderAbortError', [{ content: '' }]],
 	['ProviderError', ['HTTP', 'failure', { status: 503 }]],
 	['JudgeError', ['QUESTION', 'failure']],
-	['ConversationError', ['KEEP', 'failure', { context: {} }]],
+	['ConversationError', ['LABEL', 'failure', { context: {} }]],
 	['ContextError', ['SNAPSHOT', 'failure', { context: {} }]],
 	['AgentJobError', ['failure', { content: '', partial: true }]],
 	['AgentError', ['LIMIT', 'failure', { context: {} }]],

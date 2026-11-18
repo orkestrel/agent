@@ -381,7 +381,7 @@ export interface LedgerGaugeSnapshot extends LedgerGauge {
  * ends on a cancel. `strict` defaults to `true`: a judge failure or another selection failure rejects
  * that `respond` call after the `fault` event, and the next call asks the judge again about whatever is
  * still unanswered. With `strict: false` the request goes on with that question undecided, or from the
- * conversation's `view()`. A provider failure in the first pass is the one
+ * conversation's messages. A provider failure in the first pass is the one
  * failure the answer pass recovers under either value. `authority` gates every lookup and write:
  * the ledger passes its agent one authority that denies a name the ledger doesn't advertise, allows
  * `recall`, and hands every other call to this authority's `evaluate`, and every asked call to its
@@ -481,7 +481,7 @@ export interface LedgerOptions {
  * Holds the JSON-serializable state a ledger hydrates from: its conversation and the message ids it marked.
  *
  * @remarks
- * `conversation` carries the messages, sections, and judgments. `requests` lists the user messages
+ * `conversation` carries the messages and judgments. `requests` lists the user messages
  * `respond` appended, `notes` the user messages carrying `LEDGER_NOTES` text, and `failures` the
  * tool messages whose call or reading failed, each in conversation order. Each id names a message
  * of `conversation.messages`: a request or note a `user` message and a failure a `tool` message.

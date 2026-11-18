@@ -399,8 +399,7 @@ export function inferStop(
  * Estimates the context-token footprint of a batch of messages — each message's content plus
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}, a tool-call JSON estimate, a thinking estimate, and
  * {@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} for each attached image. The {@link estimateRequest} message term
- * for an agent's context budget (the
- * {@link import('./types.js').AgentOptions} `window`), a provider-independent approximation for conforming messages rather than an exact tokenizer count.
+ * and the unit a ledger prices its requests in, a provider-independent approximation for conforming messages rather than an exact tokenizer count.
  *
  * @remarks
  * Sums, per message, {@link estimateTokens} over its `content` (the `ceil(length / 4)` character
@@ -409,9 +408,8 @@ export function inferStop(
  * `calls` plus, when present, {@link estimateTokens} over its `thinking` plus `images.length * `{@link import('./constants.js').IMAGE_TOKEN_ESTIMATE} (a coarse,
  * deliberately-approximate per-image cost — a base64 length is not a token proxy). Deterministic
  * and provider-free — the same messages always yield the same estimate, with an empty batch `0`.
- * It is the message term of the request estimate an agent's auto-compaction context budget
- * measures; a caller wanting a sharper count supplies its own `consumer` to `createBudget`
- * instead. A `calls` list JSON cannot carry (a circular or `BigInt`
+ * It is the message term of {@link estimateRequest}; a caller wanting a sharper count measures
+ * with its own tokenizer instead. A `calls` list JSON cannot carry (a circular or `BigInt`
  * `ToolCall.arguments`) contributes a fixed
  * {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD} (the same per-message overhead scale)
  * instead of an estimate of the (unreachable) serialized length.
@@ -473,7 +471,7 @@ export function measureMessage(message: Message): MessageMeasure {
 /**
  * Estimates the context-token footprint of a complete provider request — its messages through
  * {@link estimateMessages}, plus the rendered advertised `tools`, plus the rendered
- * `options.schema`. The `consumer` estimator an agent's `window` budget measures every request
+ * `options.schema`. A `consumer` a context budget over provider requests can measure each request
  * through, a provider-independent heuristic rather than an exact tokenizer count.
  *
  * @remarks
@@ -483,7 +481,7 @@ export function measureMessage(message: Message): MessageMeasure {
  * cannot carry contributes a fixed {@link import('./constants.js').MESSAGE_TOKEN_OVERHEAD}. The
  * estimate counts JSON characters, not a provider's template: the chat template's own tokens, how
  * a provider encodes tool definitions, and the `think` flag are not counted, and no tokenizer
- * runs. A model's real prompt count can exceed it, so choose the window `max` with headroom
+ * runs. A model's real prompt count can exceed it, so choose a budget `max` with headroom
  * measured against the provider.
  *
  * @param request - The {@link ProviderRequest} to estimate: messages, advertised tools, call options
@@ -1556,7 +1554,7 @@ export function matchesHeadLists(left: ScopeFilter, right: ScopeFilter): boolean
  */
 export function resolveDisclosure(
 	context: AgentContextInterface,
-	conversation: Pick<ConversationInterface, 'sections' | 'messages'>,
+	conversation: Pick<ConversationInterface, 'messages'>,
 	workspace: string | undefined,
 	ceiling: ScopeFilter,
 	builtins: readonly AgentBuiltin[],
@@ -1581,7 +1579,7 @@ export function resolveDisclosure(
  * record, counting only the built-ins a run enables.
  *
  * @remarks
- * Pure. It reads each section's retained originals, oldest first, then the live tail, and pairs
+ * Pure. It reads every stored message, in insertion order, and pairs
  * each tool message with the call that owns it through {@link collectToolGroups} and
  * {@link findToolCall}. It then folds the pairs in message order: a `load` whose message content
  * equals `BUILTIN_NOTES.loaded` adds its `skill`, an `unload` with `BUILTIN_NOTES.unloaded` removes
@@ -1610,17 +1608,14 @@ export function resolveDisclosure(
  * ```
  */
 export function collectDisclosure(
-	conversation: Pick<ConversationInterface, 'sections' | 'messages'>,
+	conversation: Pick<ConversationInterface, 'messages'>,
 	builtins: readonly AgentBuiltin[],
 ): AgentDisclosure {
 	const counted = new Set<string>(
 		builtins.filter((name) => name === 'load' || name === 'unload' || name === 'switch'),
 	)
 	if (counted.size === 0) return { skills: [] }
-	const stored = [
-		...conversation.sections.flatMap((section) => section.messages),
-		...conversation.messages(),
-	]
+	const stored = conversation.messages()
 	// Groups come back in owner order, so the fold walks the stored order, not the groups.
 	const owners = new Map(
 		collectToolGroups(stored).flatMap((group) =>

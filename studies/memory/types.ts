@@ -9,7 +9,6 @@ import type {
 	LEDGER_NOTES,
 	LEDGER_QUESTIONS,
 	LedgerCorrectionOptions,
-	LedgerGauge,
 	LedgerSnapshot,
 	createAuthority,
 	createConversationManager,
@@ -26,8 +25,6 @@ import type {
 
 /** Holds the memory driver's interpretation of `StudyProfile.settings`. */
 export interface StudyMemoryOptions {
-	/** Prices a complete request for the compaction window; required to open or validate a compaction arm. */
-	readonly gauge?: LedgerGauge | undefined
 	/** Enables passive request and classifier observations. */
 	readonly observe?: boolean | undefined
 	/** Names observation checkpoints and requires `observe: true`. */
@@ -66,7 +63,7 @@ export interface StudyMemoryInput {
 /**
  * Holds one goal's end state as the `checkpoint` evidence row.
  * @remarks
- * The arm's strategy names which state member is present: `ledger` on `records` and `conversation` on every other arm. A session opened with this value hydrates that state, its released records, and the arrival ids it already took. Provenance is not carried, so an arrival from before the seed reads origin `history`.
+ * The arm names which state member is present: `ledger` on `records` and `conversation` on `full`. A session opened with this value hydrates that state, its released records, and the arrival ids it already took. Provenance is not carried, so an arrival from before the seed reads origin `history`.
  */
 export interface StudyMemoryCheckpoint {
 	readonly ledger?: LedgerSnapshot
@@ -164,17 +161,10 @@ export interface StudyMemoryObservation {
 	readonly checkpoints: ReadonlySet<string>
 }
 
-/** Holds the declarations only the compaction arm reads: its explicit gauge and its recap allowance. */
-export interface StudyMemoryCompaction {
-	readonly gauge: LedgerGauge
-	readonly recap: number
-}
-
 /** Names where a request message came from, or that the composer mixes sources (`mixed`) or the consumer cannot tell (`unknown`). */
 export type StudyMemoryOrigin =
 	| 'input'
 	| 'arrival'
-	| 'summary'
 	| 'tool'
 	| 'history'
 	| 'instructions'
@@ -189,10 +179,8 @@ export interface StudyMemoryProvenance {
 
 /** Holds the session state a message's origin is joined from; no text, position or substring is consulted. */
 export interface StudyMemoryProvenanceSource {
-	/** Holds message ids the consumer itself added or named: the current input, each arrival and the summary instruction. */
+	/** Holds message ids the consumer itself added or named: the current input and each arrival. */
 	readonly explicit: ReadonlyMap<string, StudyMemoryProvenance>
-	/** Holds the ids of the conversation's compacted sections, which are also the ids of their recap messages. */
-	readonly sections: ReadonlySet<string>
 	/** Holds the ids of the messages the conversation stores. */
 	readonly members: ReadonlySet<string>
 	/** Reports that a composer builds the request from several sources, so its system messages are mixed. */
@@ -215,8 +203,8 @@ export interface StudyMemoryDriverOptions {
 	readonly replay?: StudyOllamaReplayInterface
 }
 
-/** Holds the shared implementation's irreducible memory treatment. */
-export type StudyMemoryArm = 'records' | 'compaction' | 'full'
+/** Holds the shared implementation's irreducible memory treatment: the ledger's records, or the full conversation as the control. */
+export type StudyMemoryArm = 'records' | 'full'
 
 /**
  * Holds a fresh session's admitted dependencies and parent cancellation.
@@ -243,7 +231,6 @@ export type StudyMemoryAssertion =
 	| { readonly observation: 'result'; readonly partial: boolean }
 	| { readonly observation: 'arrival'; readonly id: string }
 	| { readonly observation: 'lookup'; readonly id: string }
-	| { readonly observation: 'summary' }
 	| { readonly observation: 'operational' }
 
 /** Reads the ids one text carries; the study wiring passes `(text) => extractLiterals(text).ids`. */
@@ -253,18 +240,6 @@ export type StudyMemoryLiteralHandler = (text: string) => ReadonlySet<string>
 export interface StudyMemoryTally {
 	readonly found: number
 	readonly total: number
-}
-
-/** Holds one literal-retention reading: the folded slice, the later requests the reading covers, and the post-fold view. */
-export interface StudyMemoryRetentionInput {
-	/** Texts of the folded slice. */
-	readonly history: readonly string[]
-	/** Texts of the requests after the boundary the reading covers (the next 3, then the next 8, as two readings). */
-	readonly later: readonly string[]
-	/** Texts of the post-fold view. */
-	readonly view: readonly string[]
-	/** Reads the ids one text carries. */
-	readonly literals: StudyMemoryLiteralHandler
 }
 
 /** Holds one carriage reading: the referenced prior product and the built prompt. */

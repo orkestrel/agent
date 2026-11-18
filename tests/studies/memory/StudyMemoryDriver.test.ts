@@ -28,7 +28,6 @@ import {
 	STUDY_MEMORY_MALFORMED_SETTINGS,
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_OBSERVATION_GOALS,
-	STUDY_MEMORY_SETTINGS,
 	STUDY_MEMORY_TIMING,
 } from '../../setupStudy.js'
 
@@ -275,16 +274,16 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	})
 	it('refuses a malformed seed', async () => {
 		const server = await createMemoryServer()
-		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })
+		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
-		const compaction = await runMemoryTrial({
-			arm: 'compaction',
+		const full = await runMemoryTrial({
+			arm: 'full',
 			responses: [],
 			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 1),
-			settings: { ...STUDY_MEMORY_SETTINGS, observe: true, checkpoints: ['opening'] },
+			settings: { observe: true, checkpoints: ['opening'] },
 		})
-		const row = readMemoryCheckpoint(compaction.evidence, 'opening')
+		const row = readMemoryCheckpoint(full.evidence, 'opening')
 		const records = { id: 'records', scenario: 'public', arm: 'records', repetition: 0 }
 		try {
 			for (const seed of [
@@ -305,7 +304,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 					code: 'CONFIG',
 				})
 			await expect(
-				driver.open({ ...records, arm: 'compaction' }, fixture.context.signal, {
+				driver.open({ ...records, arm: 'full' }, fixture.context.signal, {
 					ledger: {},
 					records: [],
 					arrivals: [],
@@ -320,7 +319,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 
 	it('constructs from the selected runtime without reading the subject and needs Ledger and judge factories only for records', async () => {
 		const server = await createMemoryServer()
-		const profile = buildMemoryProfile({ url: server.url, settings: STUDY_MEMORY_SETTINGS })
+		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const { agent, provider } = STUDY_MEMORY_MODULES
 		// The subject identifies the tested artifact: an object that throws on any read proves it is never touched.
@@ -356,13 +355,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				provider: lean,
 				profile,
 			})
-			for (const arm of ['full', 'compaction']) {
-				const session = await driver.open(
-					{ id: arm, scenario: 'public', arm, repetition: 0 },
-					fixture.context.signal,
-				)
-				await session.close()
-			}
+			const plain = await driver.open(
+				{ id: 'full', scenario: 'public', arm: 'full', repetition: 0 },
+				fixture.context.signal,
+			)
+			await plain.close()
 			await expect(driver.open(records, fixture.context.signal)).rejects.toThrow(
 				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('Ledger') }),
 			)
@@ -388,7 +385,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	})
 
 	it.each([undefined, {}, { observe: true }])(
-		'refuses a compaction arm declared with settings %j before any model request',
+		'refuses the removed compaction arm and opens records and full under settings %j before any model request',
 		async (settings) => {
 			const server = await createMemoryServer()
 			const profile = buildMemoryProfile({ url: server.url, settings })
@@ -397,11 +394,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			try {
 				await expect(
 					driver.open(
-						{ id: 'ungauged', scenario: 'public', arm: 'compaction', repetition: 0 },
+						{ id: 'compaction', scenario: 'public', arm: 'compaction', repetition: 0 },
 						fixture.context.signal,
 					),
 				).rejects.toThrow(
-					expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('gauge') }),
+					expect.objectContaining({ code: 'CONFIG', message: 'Unsupported memory arm' }),
 				)
 				for (const arm of ['records', 'full']) {
 					const session = await driver.open(
@@ -452,11 +449,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	})
 
 	it('refuses malformed settings when the driver is constructed', () => {
-		for (const settings of [
-			{ extra: 1 },
-			{ gauge: { scale: 0, overhead: 0 } },
-			{ gauge: { scale: 1, overhead: -1 } },
-		])
+		for (const settings of [{ extra: 1 }, { gauge: { scale: 1, overhead: 0 } }, { observe: 'yes' }])
 			expect(
 				() =>
 					new StudyMemoryDriver({

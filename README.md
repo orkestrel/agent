@@ -2,9 +2,8 @@
 
 > The conversation runtime for the `@orkestrel` line: the `ProviderInterface` inference
 > boundary with the host-independent HTTP engine and browser relay that implement it, the
-> conversation layer that feeds it — messages, compaction, instructions, scopes, and prompt
-> assembly — and the bounded context → provider → tools → repeat loop that carries a turn to
-> its end.
+> conversation layer that feeds it — messages, instructions, scopes, and prompt assembly — and
+> the bounded context → provider → tools → repeat loop that carries a turn to its end.
 
 Build an agent with the `createAgent` function over a `ProviderInterface` implementation,
 seed the conversation through `agent.context.messages`, then run the turn as a one-shot

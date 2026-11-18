@@ -87,8 +87,6 @@ import {
 	requireBuiltins,
 	resolveDisclosure,
 	collectDisclosure,
-	collectToolGroups,
-	findToolCall,
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
 import { attempt, isContractError, isRecord, parseJSONValue } from '@orkestrel/contract'
@@ -127,16 +125,13 @@ import {
 	PLAIN_LINE_CASES,
 	ADMITTED_DISCLOSURE_CASES,
 	ENABLED_DISCLOSURE_CASES,
-	createFoldedConversation,
 	DISCLOSURE_CASES,
-	DISCLOSURE_FOLD_CASES,
 	DISCLOSURE_LOAD_BILLING,
 	DISCLOSURE_LOAD_CLAIMS,
 	DISCLOSURE_LOOP_CASES,
 	DISCLOSURE_REFUSAL,
 	DISCLOSURE_SWITCH_NORTH,
 	DISCLOSURE_UNLOAD_BILLING,
-	DISCLOSURE_UNLOAD_CLAIMS,
 	executeDisclosureLoop,
 	restoreConversation,
 	JOB_REFUSAL_CASES,
@@ -1948,7 +1943,7 @@ describe('agentStreamToFrames — the page projection of one run', () => {
 			select: async (conversation) => ({
 				messages: [
 					{ id: 'copy', role: 'user', content: `Recall ${CANARY_SENTINELS.copy} too.` },
-					...conversation.view(),
+					...conversation.messages(),
 				],
 				judgments: [],
 			}),
@@ -2292,98 +2287,35 @@ describe('collectDisclosure — the derivation table (claim 2.3)', () => {
 		)
 	})
 
-	it.each(DISCLOSURE_FOLD_CASES)('$name', async ({ exchanges, tail, options, expected }) => {
-		const { conversation } = await createFoldedConversation(exchanges, tail, options)
-		expect(conversation.sections.length).toBeGreaterThan(0)
-		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual(expected)
-	})
-
 	it('reads an empty conversation as nothing shown, with no workspace member', () => {
 		const disclosure = collectDisclosure(createStoredConversation([]), BUILTIN_NAMES)
 		expect(disclosure).toStrictEqual({ skills: [] })
 		expect(Object.keys(disclosure)).toEqual(['skills'])
 	})
 
-	it('a fold leaves no call group split across a section and the tail', async () => {
-		const { conversation } = await createFoldedConversation(
-			[DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS],
-			DISCLOSURE_UNLOAD_BILLING,
-			{},
-		)
-		expect(conversation.sections).toHaveLength(2)
-		for (const section of conversation.sections) {
-			const tools = section.messages.filter((message) => message.role === 'tool')
-			const owned = collectToolGroups(section.messages).flatMap((group) =>
-				group.filter((message) => findToolCall(group, message) !== undefined),
-			)
-			expect(owned).toHaveLength(tools.length)
-		}
-	})
-
-	it('a cumulative fold holds one section whose originals start with the first exchange', async () => {
-		const { conversation } = await createFoldedConversation(
-			[DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS, DISCLOSURE_UNLOAD_CLAIMS],
-			[],
-			{ cumulative: true },
-		)
-		expect(conversation.sections).toHaveLength(1)
-		expect(conversation.sections[0]?.messages[0]?.content).toBe('open billing')
-	})
-
-	it('a capped merge emits collapse and its merged section holds the earliest load', async () => {
-		const { conversation, collapsed } = await createFoldedConversation(
-			[
-				DISCLOSURE_LOAD_BILLING,
-				DISCLOSURE_LOAD_CLAIMS,
-				DISCLOSURE_UNLOAD_BILLING,
-				DISCLOSURE_LOAD_BILLING,
-			],
-			[],
-			{ sections: 2 },
-		)
-		expect(collapsed).toBeGreaterThan(0)
-		expect(conversation.sections.length).toBeLessThanOrEqual(2)
-		expect(conversation.sections[0]?.messages[0]?.content).toBe('open billing')
-	})
-
-	it('a conversation restored from its stored snapshot derives the same value', async () => {
-		const { conversation } = await createFoldedConversation(
-			[
-				DISCLOSURE_LOAD_BILLING,
-				DISCLOSURE_LOAD_CLAIMS,
-				DISCLOSURE_UNLOAD_BILLING,
-				DISCLOSURE_LOAD_BILLING,
-			],
-			DISCLOSURE_SWITCH_NORTH,
-			{ sections: 2 },
-		)
+	it('a conversation restored from its stored snapshot derives the same value', () => {
+		const conversation = createStoredConversation([
+			...DISCLOSURE_LOAD_BILLING,
+			...DISCLOSURE_LOAD_CLAIMS,
+			...DISCLOSURE_UNLOAD_BILLING,
+			...DISCLOSURE_LOAD_BILLING,
+			...DISCLOSURE_SWITCH_NORTH,
+		])
 		const restored = restoreConversation(conversation)
 		const expected = { skills: ['claims', 'billing'], workspace: 'north' }
 		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual(expected)
 		expect(collectDisclosure(restored, BUILTIN_NAMES)).toStrictEqual(expected)
-		expect(restored.sections).toHaveLength(conversation.sections.length)
+		expect(restored.messages()).toEqual(conversation.messages())
 	})
 
-	it('rehydrating a section changes neither the messages nor the derivation', async () => {
-		const { conversation } = await createFoldedConversation(
-			[DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS],
-			DISCLOSURE_UNLOAD_BILLING,
-			{},
-		)
-		const before = collectDisclosure(conversation, BUILTIN_NAMES)
-		const count = conversation.count
-		expect(conversation.rehydrate(conversation.sections[0]?.id ?? '')?.length).toBeGreaterThan(0)
-		expect(conversation.count).toBe(count)
-		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual(before)
-	})
-
-	it('a host that removes the tool message of a load unloads it (stated limit)', () => {
+	it('a host that removes the tool message of a load removes its call group and unloads it', () => {
 		const conversation = createStoredConversation([
 			...DISCLOSURE_LOAD_BILLING,
 			...DISCLOSURE_LOAD_CLAIMS,
 		])
 		const note = conversation.messages().find((message) => message.call === 'a1')
 		expect(conversation.remove(note?.id ?? '')).toBe(true)
+		expect(conversation.messages().some((message) => message.calls?.[0]?.id === 'a1')).toBe(false)
 		expect(collectDisclosure(conversation, BUILTIN_NAMES)).toStrictEqual({ skills: ['claims'] })
 	})
 })

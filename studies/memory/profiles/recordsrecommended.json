@@ -39,7 +39,6 @@
 		"context": 20480,
 		"output": 8192,
 		"safety": 512,
-		"recap": 2048,
 		"think": false
 	},
 	"settings": {
@@ -51,10 +50,6 @@
 			"calls": 8192,
 			"bytes": 67108864,
 			"duration": 600000
-		},
-		"gauge": {
-			"scale": 1,
-			"overhead": 352
 		},
 		"checkpoints": [
 			"ev-01-1",

@@ -15,59 +15,43 @@ import { MemoryConversationStore } from './stores/MemoryConversationStore.js'
 import { DatabaseConversationStore } from './stores/DatabaseConversationStore.js'
 
 /**
- * Creates a conversation — a {@link ConversationInterface} grouping messages above a flat
- * message store it owns directly, with compaction into summarized sections, on-demand
- * `rehydrate`, and substring `search`, driven by a provider-agnostic
- * {@link ConversationSummaryHandler} seam.
+ * Creates a conversation — a {@link ConversationInterface} holding owned, frozen messages in
+ * insertion order beside the judgments recorded about them, with substring `search`, a fenced
+ * `reference`, and a JSON `snapshot`.
  *
  * @remarks
- * Append turns through the conversation's own `add` (the live tail it owns); `view()` is the model input
- * (each section as a summary message, then the live tail). `compact()` folds the older live
- * messages into a summarized {@link Section}, whole exchanges at a time — it requires a
- * `summarize` (without one `compact()` throws a `ConversationError`); `keep` retains a recent
- * tail (Default: `DEFAULT_CONVERSATION_KEEP`, which folds up to the newest user message).
- * `rehydrate(id)` / `search(query)` read the retained originals. Observable (`emitter` —
- * `compact` / `collapse` / `rehydrate`), wired
- * through the reserved `on` option; the emitter isolates a listener throw and routes it to
- * its `error` handler (the `error` option), so it can never corrupt a compaction.
+ * Append turns through the conversation's own `add`; `messages()` is what a run sends. `remove` of
+ * any member of a call group removes the whole group, and `remove` and `clear` drop every judgment
+ * that quotes a removed message. Observable (`emitter` — `add` / `remove` / `clear`), wired through
+ * the reserved `on` option; the emitter isolates a listener throw and routes it to its `error`
+ * handler (the `error` option). Serve a conversation that outgrows a model's context through
+ * `createLedger`, which bounds every request it sends.
  *
- * @param options - Optional `id` / `on` hooks + the `summarize` seam + `keep` + `sections` (see {@link ConversationOptions})
+ * @param options - Optional `id` / `on` hooks / `error` handler / `snapshot` (see {@link ConversationOptions})
  * @returns A working {@link ConversationInterface}
  *
- * @example Conversations & compaction
+ * @example Conversations
  * ```ts
- * import type { ProviderInterface } from '@orkestrel/agent'
  * import { createConversation } from '@orkestrel/agent'
  *
- * declare const provider: ProviderInterface // any concrete implementation supplied by the host app
- * // The summarizer seam — built from the provider by the runtime; core stays provider-agnostic.
- * // Append the instruction as the FINAL user turn: a chat model emits nothing when the prompt
- * // ends on an assistant turn, so a leading-system instruction is unreliable.
- * const conversation = createConversation({
- * 	summarize: async (messages, signal) =>
- * 		(
- * 			await provider.generate(
- * 				[
- * 					...messages,
- * 					{ id: 's', role: 'user', content: 'Summarize the conversation so far concisely.' },
- * 				],
- * 				signal ?? AbortSignal.timeout(30_000), // the compact() call's signal, when it passed one
- * 			)
- * 		).content,
- * 	keep: 2, // retain at least the 2 most recent messages verbatim on each compaction
- * })
- * conversation.add([
- * 	{ role: 'user', content: 'My name is Ada.' },
- * 	{ role: 'assistant', content: 'Nice to meet you, Ada.' },
- * 	{ role: 'user', content: 'Book a table for two at 19:00.' },
- * 	{ role: 'assistant', content: 'Booked for two at 19:00.' },
- * 	{ role: 'user', content: 'What did I say my name was?' },
+ * const conversation = createConversation({ id: 'desk' })
+ * const [, call] = conversation.add([
+ * 	{ role: 'user', content: 'Is order LH-81660 late?' },
+ * 	{
+ * 		role: 'assistant',
+ * 		content: '',
+ * 		calls: [{ id: 'order', name: 'lookup', arguments: { order: 'LH-81660' } }],
+ * 	},
+ * 	{ role: 'tool', content: 'LH-81660 ships on Friday.', call: 'order' },
+ * 	{ role: 'assistant', content: 'It ships on Friday.' },
  * ])
  *
- * const section = await conversation.compact() // folds the first exchange → a summarized section
- * conversation.view() // [<section summary message>, ...the retained recent exchanges] — the model input
- * conversation.search('ada') // case-insensitive across sections' originals + the live tail
- * section && conversation.rehydrate(section.id) // the section's full original messages (a pure read)
+ * conversation.search('friday').length // 2 — case-insensitive over every stored message
+ * Object.isFrozen(call) // true — every stored message is owned and frozen
+ * conversation.remove(call?.id ?? '') // true — removes the call and its tool result together
+ * conversation.count // 2
+ * conversation.reference({ label: 'orders', messages: conversation.messages() })
+ * // a block fenced by [Reference — conversation "orders" — …] and [End of reference "orders"]
  * ```
  */
 export function createConversation(options?: ConversationOptions): ConversationInterface {
@@ -78,30 +62,26 @@ export function createConversation(options?: ConversationOptions): ConversationI
  * Creates a conversation registry — a {@link ConversationManagerInterface} holding
  * {@link ConversationInterface} instances keyed by their `id`, in insertion order, with an active pointer:
  * the id-keyed store over the conversation layer plus the `active` / `switch` seam the context
- * renders. `add` auto-activates the first conversation and flows the registry's default
- * `summarize` / `keep` into every conversation it creates.
+ * renders. `add` auto-activates the first conversation.
  *
  * @remarks
  * Starts empty; `add(input?)` mints a {@link ConversationInterface} (its `id` from the input
- * or a random UUID), flowing the manager's default `summarize` / `keep` in unless the input
- * overrides them, and stores it (an already-present `id` throws, code `'ID'`) — and
+ * or a random UUID) and stores it (an already-present `id` throws, code `'ID'`) — and
  * auto-activates the first one (a registry with conversations always has one `active`); a later
  * `add` leaves `active` unchanged. `switch(id)` re-points `active` (an unknown `id` returns
  * `undefined`, leaving `active` unchanged — lenient, never throws); `conversation(id)` /
  * `conversations()` look up; `remove` (one or a batch) reports `true` only when every supplied id
  * was removed and clears `active` if it was a removed one; `clear` empties it and clears `active`.
- * Event-free
- * (each conversation owns its own observable `emitter`). A conversation created with neither a
- * manager default nor a per-`add` `summarize` cannot `compact` (it throws a `ConversationError`).
+ * Event-free (each conversation owns its own observable `emitter`).
  *
- * @param options - Optional default `summarize` / `keep` (see {@link ConversationManagerOptions})
+ * @param options - Optional durable `store` (see {@link ConversationManagerOptions})
  * @returns An empty {@link ConversationManagerInterface}
  *
  * @example
  * ```ts
  * import { createConversationManager } from '@orkestrel/agent'
  *
- * const conversations = createConversationManager({ summarize: async (m) => `recap of ${m.length}` })
+ * const conversations = createConversationManager()
  * const chat = conversations.add() // auto-activates — conversations.active === chat
  * chat.add({ role: 'user', content: 'Hello' })
  * ```
@@ -128,8 +108,7 @@ export function createConversationManager(
  * {@link createDatabaseConversationStore} (the snapshot as one opaque JSON column over a `databases`
  * table) — for a durable store pass it a JSON / SQLite / IndexedDB driver, and it swaps in without
  * touching the manager or the conversation. Hydration stays a manager concern: read a snapshot back
- * and rebuild the live conversation through the `snapshot` option (re-supplying the live
- * `summarize` / `keep`).
+ * and rebuild the live conversation through the `snapshot` option.
  *
  * @returns A memory-backed {@link ConversationStoreInterface}
  *
@@ -187,8 +166,8 @@ export function createDatabaseConversationStore(
 	driver: DriverInterface = createMemoryDriver(),
 ): ConversationStoreInterface {
 	// The snapshot is stored as one opaque JSON column (`rawShape`), so the row infers flat —
-	// `{ id: string; snapshot: unknown }` = `ConversationSnapshotRow` — and the sections/messages
-	// snapshot shape never forces a contract `Infer`.
+	// `{ id: string; snapshot: unknown }` = `ConversationSnapshotRow` — and the snapshot shape never
+	// forces a contract `Infer`.
 	const columns = { id: stringShape(), snapshot: rawShape({}) }
 	const database = createDatabase({ driver, tables: { conversations: columns } })
 	const table: TableInterface<ConversationSnapshotRow> = database.table('conversations')

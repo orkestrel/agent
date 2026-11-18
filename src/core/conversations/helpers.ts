@@ -1,4 +1,4 @@
-import type { ConversationSnapshot, Section } from './types.js'
+import type { ConversationSnapshot } from './types.js'
 import type {
 	ConversationRole,
 	JudgeAnswer,
@@ -17,14 +17,13 @@ import {
 	isArray,
 	isJSONValue,
 	isRecord,
-	isString,
 	preview,
 } from '@orkestrel/contract'
-import { CONVERSATION_RECAP_PREFIX } from './constants.js'
+import { REFERENCE_BREAK_PATTERN, REFERENCE_LABEL_PATTERN } from './constants.js'
 import { ConversationError } from './errors.js'
-import { isConversationSnapshot, isJudgment, isMessageInput } from './validators.js'
+import { isConversationSnapshot, isJudgment, isMessage, isMessageInput } from './validators.js'
 import { CONVERSATION_ROLES } from '../constants.js'
-import { isNonNegativeSafeInteger, isPositiveSafeInteger } from '../validators.js'
+import { collectToolGroups } from '../helpers.js'
 
 /**
  * Reads what a judge result holds for one question, from its own keys alone.
@@ -119,57 +118,6 @@ export function buildJudgments(
 			},
 		]
 	})
-}
-
-/**
- * Builds the raw synthetic summary message for one compacted section — role `'assistant'`, the
- * section's stable `id`, and its `summary` verbatim as content.
- *
- * @remarks
- * Pure and total. This is the unframed form a `sections` cap merge digests when it folds the
- * oldest sections into one (a summary over their section summaries); the recap label is absent
- * from that merge input. A cumulative fold instead re-reads the framed recap — see
- * {@link buildRecapMessage}.
- *
- * @param section - The compacted section to render
- * @returns The synthetic summary message
- *
- * @example
- * ```ts
- * buildSummaryMessage({ id: 's1', summary: 'recap', messages: [] })
- * // { id: 's1', role: 'assistant', content: 'recap' }
- * ```
- */
-export function buildSummaryMessage(section: Section): Message {
-	return { id: section.id, role: 'assistant', content: section.summary }
-}
-
-/**
- * Builds the framed recap message for one compacted section — the same role and stable `id` as
- * {@link buildSummaryMessage}, with the content prefixed by {@link
- * import('./constants.js').CONVERSATION_RECAP_PREFIX}.
- *
- * @remarks
- * Pure and total. The prefix is what makes a small model read the message as a condensed
- * recap of earlier turns rather than a literal assistant turn to echo or answer from. It is a
- * fixed handful of tokens, so a conversation's `view()` stays lean however many sections it
- * carries.
- *
- * @param section - The compacted section to render
- * @returns The framed recap message
- *
- * @example
- * ```ts
- * buildRecapMessage({ id: 's1', summary: 'recap', messages: [] })
- * // { id: 's1', role: 'assistant', content: `${CONVERSATION_RECAP_PREFIX}recap` }
- * ```
- */
-export function buildRecapMessage(section: Section): Message {
-	return {
-		id: section.id,
-		role: 'assistant',
-		content: `${CONVERSATION_RECAP_PREFIX}${section.summary}`,
-	}
 }
 
 /**
@@ -275,30 +223,31 @@ export function requireMessageInput(
 }
 
 /**
- * Returns a conversation snapshot after checking its shape, its stored roles, and its ids, or
- * throws a coded error.
+ * Returns a conversation snapshot after checking its shape, its stored roles, its ids, and its call
+ * arguments, or throws a coded error.
  *
  * @remarks
  * The check reads every own member of `value` once and builds a candidate from those reads: each
  * array member becomes a fresh array holding the same element objects, and a member that is not an
  * array stays as read, so the guard refuses it. The candidate must pass `isConversationSnapshot`, which
- * is exact, so an unknown key refuses rather than being dropped; every section message and live message
- * must play a `ConversationRole`; and no id may repeat across section ids, section message ids, and live
- * message ids. The `'ROLE'` refusal of a `system` message names the row a snapshot written before
- * 0.0.35 can hold, and each `'SNAPSHOT'` refusal asks for what `snapshot()` returned. The candidate
- * is returned, never `value`, so the check and the seating share one read. Element objects are kept
- * by reference, so a host is trusted not to edit a seated message object or to back its members
- * with accessors. The contract's `audit` runs only after the guard refused, to fill `context.faults`.
+ * is exact, so an unknown key refuses rather than being dropped, a `sections` member included; every
+ * message must play a `ConversationRole`; no message id may repeat; and every call's arguments must be
+ * a JSON value, as `add` requires, because the conversation owns each message through JSON and a value
+ * JSON would change is one `snapshot()` never wrote. The `'ROLE'` refusal of a `system` message names
+ * the row a snapshot written before 0.0.35 can hold, and each `'SNAPSHOT'` refusal asks for what
+ * `snapshot()` returned. The candidate is returned, never `value`, so the check and the seating share
+ * one read of the top-level members. The contract's `audit` runs only after the guard refused, to fill
+ * `context.faults`.
  *
  * @param value - The snapshot to check, typically a stored read
  * @param contract - The snapshot contract, whose `audit` is read only on a refusal
  * @returns The candidate snapshot
- * @throws ConversationError Thrown when the value fails `isConversationSnapshot` (code `'SNAPSHOT'`, its faults under `context.faults`), repeats an id (code `'SNAPSHOT'`), or holds a message whose role is not a `ConversationRole` (code `'ROLE'`)
+ * @throws ConversationError Thrown when the value fails `isConversationSnapshot` (code `'SNAPSHOT'`, its faults under `context.faults`), repeats an id or holds call arguments JSON cannot carry (code `'SNAPSHOT'`), or holds a message whose role is not a `ConversationRole` (code `'ROLE'`)
  *
  * @example
  * ```ts
- * requireConversationSnapshot({ id: 'c1', sections: [], messages: [] }, conversationSnapshotContract) // { id: 'c1', sections: [], messages: [] }
- * requireConversationSnapshot({ id: 'c1', sections: 'nope', messages: [] }, conversationSnapshotContract) // throws ConversationError ('SNAPSHOT')
+ * requireConversationSnapshot({ id: 'c1', messages: [] }, conversationSnapshotContract) // { id: 'c1', messages: [] }
+ * requireConversationSnapshot({ id: 'c1', sections: [], messages: [] }, conversationSnapshotContract) // throws ConversationError ('SNAPSHOT')
  * ```
  */
 export function requireConversationSnapshot(
@@ -308,10 +257,9 @@ export function requireConversationSnapshot(
 	const candidate = attempt(() => {
 		if (!isRecord(value)) return undefined
 		const read = { ...value }
-		const { sections, messages, judgments } = read
+		const { messages, judgments } = read
 		return {
 			...read,
-			sections: isArray(sections) ? Array.from(sections) : sections,
 			messages: isArray(messages) ? Array.from(messages) : messages,
 			...(judgments === undefined
 				? {}
@@ -329,27 +277,20 @@ export function requireConversationSnapshot(
 		const faults = contract.audit(candidate.value)
 		throw new ConversationError(
 			'SNAPSHOT',
-			`a conversation snapshot must carry a string id, valid sections and messages, valid judgments when present, and no other member; pass what snapshot() returned\n${describeFaults(faults, contract.schema)}`,
+			`a conversation snapshot must carry a string id, valid messages, valid judgments when present, and no other member; pass what snapshot() returned\n${describeFaults(faults, contract.schema)}`,
 			{ context: { faults } },
 		)
 	}
 	const snapshot = candidate.value
-	snapshot.sections
-		.flatMap((section) => section.messages)
-		.concat(snapshot.messages)
-		.forEach((message) => {
-			if (message.role === 'system')
-				throw new ConversationError(
-					'ROLE',
-					'a conversation snapshot holds a system message; a snapshot written before 0.0.35 can hold a system row; remove it before loading',
-				)
-			requireRole(message.role)
-		})
-	const ids = [
-		...snapshot.sections.map((section) => section.id),
-		...snapshot.sections.flatMap((section) => section.messages.map((message) => message.id)),
-		...snapshot.messages.map((message) => message.id),
-	]
+	snapshot.messages.forEach((message) => {
+		if (message.role === 'system')
+			throw new ConversationError(
+				'ROLE',
+				'a conversation snapshot holds a system message; a snapshot written before 0.0.35 can hold a system row; remove it before loading',
+			)
+		requireRole(message.role)
+	})
+	const ids = snapshot.messages.map((message) => message.id)
 	// Built from the reversed pairs, the map keeps each id's first index.
 	const pairs = ids.map((id, index): readonly [string, number] => [id, index])
 	const firsts = new Map(pairs.toReversed())
@@ -360,154 +301,155 @@ export function requireConversationSnapshot(
 			`a conversation snapshot repeats the id ${JSON.stringify(repeated.slice(0, 64))}; pass what snapshot() returned`,
 		)
 	}
+	const unowned = snapshot.messages.find(
+		(message) =>
+			message.calls !== undefined && !message.calls.every((call) => isJSONValue(call.arguments)),
+	)
+	if (unowned !== undefined) {
+		throw new ConversationError(
+			'SNAPSHOT',
+			`a conversation snapshot holds call arguments JSON cannot carry on message ${JSON.stringify(unowned.id.slice(0, 64))}; pass what snapshot() returned`,
+		)
+	}
 	return snapshot
 }
 
 /**
- * Returns a `sections` cap after checking it is a positive safe integer, or throws a coded error.
+ * Returns the owned copy of a stored message after checking it is a message of a conversation role,
+ * or throws a coded error.
  *
  * @remarks
- * A fraction, positive infinity, and `NaN` are refused with `0` and a negative, because a count of
- * sections is a whole number. An absent cap leaves the sections list unbounded.
+ * A conversation owns each message through JSON before it stores it, as `freezeJSON` returns it, and
+ * this narrows that copy. The door checked the value it was given before the copy read it again, so a
+ * refusal here means a member read differently on the second read, as an accessor can; the error then
+ * carries the door's own code.
  *
- * @param cap - The cap to check, or `undefined` for no cap
- * @returns The cap unchanged, or `undefined` when none was supplied
- * @throws ConversationError Thrown when the cap is not a positive safe integer (code `'SECTIONS'`)
+ * @param value - The owned copy of a message, as `freezeJSON` returns it
+ * @param code - The code of the door that admitted the message: `'MESSAGE'` for `add`, `'SNAPSHOT'` for a hydrate
+ * @returns The copy, narrowed to a {@link Message}
+ * @throws ConversationError Thrown when the copy is not a message of a conversation role (with `code`)
  *
  * @example
  * ```ts
- * requireSectionsCap(2) // 2
- * requireSectionsCap(undefined) // undefined
- * requireSectionsCap(0) // throws ConversationError ('SECTIONS')
+ * requireStoredMessage(freezeJSON({ id: 'm1', role: 'user', content: 'Hello.' }), 'MESSAGE') // the frozen copy
+ * requireStoredMessage(undefined, 'SNAPSHOT') // throws ConversationError ('SNAPSHOT')
  * ```
  */
-export function requireSectionsCap(cap: number | undefined): number | undefined {
-	if (cap !== undefined && !isPositiveSafeInteger(cap)) {
-		throw new ConversationError('SECTIONS', 'a sections cap must be a positive safe integer', {
-			context: { sections: cap },
-		})
+export function requireStoredMessage(value: unknown, code: 'MESSAGE' | 'SNAPSHOT'): Message {
+	if (!isMessage(value) || !CONVERSATION_ROLES.some((role) => role === value.role)) {
+		throw new ConversationError(
+			code,
+			'a stored message must be a record of a conversation role that JSON carries and that reads the same on every read; pass a plain record',
+		)
 	}
-	return cap
+	return value
 }
 
 /**
- * Returns the cumulative switch after checking it does not combine with a `sections` cap, or throws a
+ * Collects the ids a removal takes, in message order: every supplied id a message holds, and every
+ * other member of each call group one of them belongs to.
+ *
+ * @remarks
+ * Pure. A call group is an assistant message that carries calls and the tool messages that answer
+ * it, as {@link import('../helpers.js').collectToolGroups} groups them, so removing any member takes
+ * the whole group and a provider never receives half of one. A tool message no assistant message owns
+ * belongs to no call group and leaves alone. A supplied id no message holds adds nothing.
+ *
+ * @param messages - The stored messages, in insertion order
+ * @param ids - The ids a caller asked to remove
+ * @returns The ids to remove, in message order
+ *
+ * @example
+ * ```ts
+ * collectRemovals(
+ * 	[
+ * 		{ id: 'lookup', role: 'assistant', content: '', calls: [{ id: 'order', name: 'lookup', arguments: {} }] },
+ * 		{ id: 'result', role: 'tool', content: 'LH-81660 is late', call: 'order' },
+ * 	],
+ * 	['result'],
+ * ) // ['lookup', 'result']
+ * ```
+ */
+export function collectRemovals(
+	messages: readonly Message[],
+	ids: readonly string[],
+): readonly string[] {
+	// `Array.from` visits a hole in `ids` as `undefined`, which names no message; `new Set` would too.
+	const named = new Set<unknown>(Array.from(ids))
+	const grouped = collectToolGroups(messages).flatMap((group) => {
+		const [leader] = group
+		return leader?.role === 'assistant' && group.some((message) => named.has(message.id))
+			? group.map((message) => message.id)
+			: []
+	})
+	const removed = new Set<unknown>([...named, ...grouped])
+	return messages.filter((message) => removed.has(message.id)).map((message) => message.id)
+}
+
+/**
+ * Returns a reference label after checking it holds no double quote and no line break, or throws a
  * coded error.
  *
  * @remarks
- * A cumulative conversation keeps one section, so a cap has nothing to bound. The cap checked is the
- * effective one: inherited from a manager, configured on the conversation, or supplied to one
- * `compact()` call.
+ * The label is interpolated between double quotes in both markers of a reference block, so a double
+ * quote would close the quoted name early and a line break would start a line a small model could
+ * read as a marker or an excerpt. A line break is any of line feed, vertical tab, form feed,
+ * carriage return, next line, line separator, and paragraph separator. The refusal names the label
+ * JSON-encoded and cut to 64 characters.
  *
- * @param cumulative - Whether folds accumulate every prior section into one
- * @param cap - The effective `sections` cap, or `undefined` for none
- * @returns The cumulative switch unchanged
- * @throws ConversationError Thrown when `cumulative` is true and a cap is present (code `'SECTIONS'`)
+ * @param label - The label to check
+ * @returns The label unchanged
+ * @throws ConversationError Thrown when the label holds a double quote or a line break (code `'LABEL'`)
  *
  * @example
  * ```ts
- * requireCumulative(true, undefined) // true
- * requireCumulative(false, 2) // false
- * requireCumulative(true, 2) // throws ConversationError ('SECTIONS')
+ * requireLabel('planning') // 'planning'
+ * requireLabel('planning "desk"') // throws ConversationError ('LABEL')
  * ```
  */
-export function requireCumulative(cumulative: boolean, cap: number | undefined): boolean {
-	if (cumulative && cap !== undefined) {
-		throw new ConversationError('SECTIONS', 'cumulative cannot combine with a sections cap', {
-			context: { sections: cap },
-		})
+export function requireLabel(label: string): string {
+	if (REFERENCE_LABEL_PATTERN.test(label)) {
+		throw new ConversationError(
+			'LABEL',
+			`a reference label must hold no double quote and no line break, either of which could rewrite the block's markers; received ${JSON.stringify(label.slice(0, 64))}`,
+			{ context: { label: label.slice(0, 64) } },
+		)
 	}
-	return cumulative
+	return label
 }
 
 /**
- * Returns a retained-tail size after checking it is a nonnegative safe integer, or throws a coded
- * error.
+ * Renders a reference block: an opening marker naming the label, the excerpts under a
+ * `Relevant messages:` line when there are any, and a closing marker naming the label.
  *
  * @remarks
- * The check is {@link import('../validators.js').isNonNegativeSafeInteger}, so `0` and `-0`
- * pass while `NaN`, a fraction, a negative, and either infinity are refused. The error's `context`
- * carries the refused value as `keep`.
+ * Pure. Each excerpt renders as `- role: content`, and every line of it after its first is indented
+ * by two spaces, so no excerpt text starts a line at the margin, where it could read as another
+ * excerpt or as a marker; a carriage return before a line feed counts as one break. The caller checks
+ * the label with {@link requireLabel} first. A hole in `messages` is visited as an undefined message,
+ * as iteration visits it, and its read throws.
  *
- * @param keep - The retained-tail size to check
- * @returns The size unchanged
- * @throws ConversationError Thrown when `keep` is not a nonnegative safe integer (code `'KEEP'`)
+ * @param label - The provenance label, already checked
+ * @param messages - The excerpts, in the order to render them
+ * @returns The block, its lines joined with line feeds
  *
  * @example
  * ```ts
- * requireKeep(2) // 2
- * requireKeep(1.5) // throws ConversationError ('KEEP')
+ * renderReference('desk', [{ id: 'm1', role: 'user', content: 'Line one\nLine two' }])
+ * // '[Reference — conversation "desk" — NOT part of this conversation]\nRelevant messages:\n- user: Line one\n  Line two\n[End of reference "desk"]'
  * ```
  */
-export function requireKeep(keep: number): number {
-	if (!isNonNegativeSafeInteger(keep)) {
-		throw new ConversationError('KEEP', 'a keep must be a nonnegative safe integer', {
-			context: { keep },
-		})
-	}
-	return keep
-}
-
-/**
- * Returns a summarizer digest after checking it carries non-whitespace text, or throws a coded error.
- *
- * @remarks
- * A digest whose trimmed text is empty would commit a section that recaps nothing, so it is
- * refused. Any digest with a non-whitespace character passes unchanged, surrounding whitespace
- * included.
- *
- * @param summary - The summarizer digest to check
- * @returns The digest unchanged
- * @throws ConversationError Thrown when the digest is not a string or its trimmed text is empty (code `'SUMMARY'`)
- *
- * @example
- * ```ts
- * requireSummary('recap') // 'recap'
- * requireSummary('  \n') // throws ConversationError ('SUMMARY')
- * ```
- */
-export function requireSummary(summary: string): string {
-	if (!isString(summary) || summary.trim() === '') {
-		throw new ConversationError('SUMMARY', 'a summarizer digest must carry non-whitespace text')
-	}
-	return summary
-}
-
-/**
- * Settles with a promise, or rejects with the reason of a signal that aborts first, so a caller
- * is released at once even when the work behind the promise ignores the signal.
- *
- * @remarks
- * An absent signal returns `promise` itself. An already-aborted signal rejects with its reason
- * without waiting. The abort listener is removed as soon as `promise` settles. A rejection of
- * `promise` after the abort is handled here and never surfaces as unhandled.
- *
- * @param promise - The work to wait for
- * @param signal - The cancellation signal, or `undefined` for none
- * @returns A promise that settles as `promise` does, or rejects with `signal.reason` on abort
- *
- * @example
- * ```ts
- * const controller = new AbortController()
- * const raced = raceSignal(new Promise<string>(() => {}), controller.signal)
- * controller.abort(new Error('stop'))
- * await raced // rejects with the Error 'stop'
- * ```
- */
-export function raceSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
-	if (signal === undefined) return promise
-	return new Promise<T>((resolve, reject) => {
-		// Aborting `settled` removes the abort listener after the promise settles.
-		const settled = new AbortController()
-		if (signal.aborted) reject(signal.reason)
-		else {
-			signal.addEventListener('abort', () => reject(signal.reason), {
-				once: true,
-				signal: settled.signal,
-			})
-		}
-		// Settling an already-rejected race is a no-op, and this handler is what keeps a late
-		// rejection of `promise` from surfacing as unhandled.
-		void promise.then(resolve, reject).finally(() => settled.abort())
-	})
+export function renderReference(label: string, messages: readonly Message[]): string {
+	return [
+		`[Reference — conversation "${label}" — NOT part of this conversation]`,
+		...(messages.length > 0
+			? [
+					'Relevant messages:',
+					...Array.from(messages, (message) =>
+						`- ${message.role}: ${message.content}`.split(REFERENCE_BREAK_PATTERN).join('\n  '),
+					),
+				]
+			: []),
+		`[End of reference "${label}"]`,
+	].join('\n')
 }

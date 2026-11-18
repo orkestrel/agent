@@ -12,25 +12,17 @@ import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkes
  * Names the machine-readable condition a {@link import('./errors.js').ConversationError} reports.
  *
  * @remarks
- * `'SUMMARIZER'`: a `compact()` with no summarizer. `'SECTIONS'`: a `sections` cap below `1`, or
- * any `sections` cap combined with `cumulative`.
  * `'JUDGMENT'`: a judgment or judge request that JSON cannot carry, or whose copy fails its guard.
- * `'KEEP'`: a `keep` that is not a nonnegative safe integer.
- * `'SUMMARY'`: a summarizer digest whose trimmed text is empty.
  * `'ROLE'`: a stored or selected message whose role is not a `ConversationRole`.
- * `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot` or repeats an id; a judgment the
- * guard admits but JSON cannot carry still raises `'JUDGMENT'`.
+ * `'MESSAGE'`: a message input that is not a plain record or whose other members fail
+ * `isMessageInput`.
+ * `'SNAPSHOT'`: a snapshot that fails `isConversationSnapshot`, repeats an id, or holds call
+ * arguments JSON cannot carry; a judgment the guard admits but JSON cannot carry still raises
+ * `'JUDGMENT'`.
+ * `'ID'`: a manager's `add` of an id it already holds.
+ * `'LABEL'`: a `reference` label that holds a double quote or a line break.
  */
-export type ConversationErrorCode =
-	| 'SUMMARIZER'
-	| 'SECTIONS'
-	| 'JUDGMENT'
-	| 'KEEP'
-	| 'SUMMARY'
-	| 'ROLE'
-	| 'MESSAGE'
-	| 'SNAPSHOT'
-	| 'ID'
+export type ConversationErrorCode = 'JUDGMENT' | 'ROLE' | 'MESSAGE' | 'SNAPSHOT' | 'ID' | 'LABEL'
 
 /**
  * Stores judgments by caller key and resolves requests by reusing matching records.
@@ -104,7 +96,6 @@ export interface JudgmentManagerInterface {
  *   `messages()` lists every message in insertion order.
  * - **Removal.** `remove` drops one by id, or a batch — `true` only when every supplied id
  *   was removed; `clear` empties the store.
- * - **Event-free.** A purely data store — no Emitter, no events.
  */
 export interface MessageManagerInterface {
 	readonly count: number
@@ -144,165 +135,56 @@ export interface MessageManagerInterface {
 }
 
 /**
- * Summarizes a conversation, provider-agnostically — the seam the agent runtime supplies so core
- * never imports a provider. Given the folded messages, it resolves their digest, the model-written
- * summary of a compacted {@link Section} or of the oldest sections a `sections` cap merges.
+ * Maps the push observation surface of a {@link ConversationInterface} — the mutations a
+ * fire-and-forget observer subscribes to through `conversation.emitter.on`.
  *
  * @remarks
- * The agent runtime builds one from its `ProviderInterface` (for example
- * `async (messages) => (await provider.generate([systemPrompt, ...messages], signal)).content`)
- * and hands it to a {@link ConversationInterface} / {@link ConversationManagerInterface}.
- * The core conversation layer treats it as an opaque async function — it never reads which
- * backend produced the digest, keeping `core` free of any provider coupling.
- *
- * `signal` is the {@link CompactOptions.signal} of the `compact()` call the fold serves, or
- * `undefined` when that call supplied none. A summarizer must stop its work when it aborts. One
- * that ignores it still cannot hold the caller: `compact()` races the summarizer against the
- * signal, rejects with the abort reason, and discards a digest that arrives later.
- *
- * A digest whose trimmed text is empty rejects the `compact()` call with code `'SUMMARY'`: a
- * refused fold commits nothing and emits nothing, and a refused overflow merge leaves the
- * appended section, as a throwing merge does.
- *
- * @param messages - The folded messages to digest into a summary
- * @param signal - The cancellation signal of the `compact()` call, or `undefined` when it supplied none
- * @returns The summary text (the model-written digest of those messages)
- */
-export type ConversationSummaryHandler = (
-	messages: readonly Message[],
-	signal?: AbortSignal,
-) => Promise<string>
-
-/**
- * Holds a slice of folded messages digested into a summary — the unit of compaction a
- * {@link ConversationInterface} produces when its `compact()` call folds the live tail.
- *
- * @remarks
- * `summary` is the model-written digest of this slice (through the
- * {@link ConversationSummaryHandler}); `messages` are the folded originals, retained in full so
- * `rehydrate` can pull them back and `search` can scan them (compaction shrinks the model
- * input, never discards history).
- */
-export interface Section {
-	readonly id: string
-	/** Holds the model-written digest of this slice (the output of its {@link ConversationSummaryHandler}). */
-	readonly summary: string
-	/** Retains the folded original messages in full for `rehydrate` / `search`. */
-	readonly messages: readonly Message[]
-}
-
-/**
- * Maps the push observation surface of a {@link ConversationInterface} — the compaction
- * moments a fire-and-forget observer subscribes to through `conversation.emitter.on`.
- *
- * @remarks
- * `compact` carries the newly folded {@link Section}; `collapse` carries a section
- * created by folding multiple older sections together (a bounded-`sections` cap enforcement,
- * distinct from the fresh live-tail fold that `compact` reports); `rehydrate` carries the `id`
- * of a section whose originals were pulled back. Listener isolation is the emitter's:
- * every event is emitted directly and a listener throw is routed to the `error` handler of the
- * emitter (the `error` option), never onto this map, so a buggy observer can never
- * corrupt a compaction. A `type` alias (not `interface extends EventMap`) so the
- * type-literal satisfies `EventMap` structurally.
+ * Each event fires after its mutation is whole. A batch `add` stores every message, then emits
+ * `add` once per message in insertion order. A `remove` deletes every message it removes, the
+ * rest of each call group included, and every judgment that quotes one, then emits `remove` once
+ * per removed message in insertion order. `clear` emits one `clear`. Listener isolation is the
+ * emitter's: a listener throw is routed to the `error` handler of the emitter (the `error`
+ * option), never onto this map, so an observer cannot interrupt a mutation. A `type` alias (not
+ * `interface extends EventMap`) so the type-literal satisfies `EventMap` structurally.
  */
 export type ConversationEventMap = {
-	/** Reports a section folded from the live tail — the created section. */
-	readonly compact: readonly [section: Section]
-	/** Reports the original messages of a section pulled back — the `id` of the section. */
-	readonly rehydrate: readonly [id: string]
-	/**
-	 * Reports the bounded-`sections` cap folding the oldest sections into one merged section — the
-	 * merged {@link Section} that replaced them.
-	 */
-	readonly collapse: readonly [section: Section]
+	/** Reports one stored message, after it is stored. */
+	readonly add: readonly [message: Message]
+	/** Reports one removed message by id, after it and the judgments that quote it are removed. */
+	readonly remove: readonly [id: string]
+	/** Reports the conversation emptied, once per `clear` call. */
+	readonly clear: readonly []
 }
 
 /**
- * Configures `createConversation` — the optional `id`, the reserved `on` hooks, the
- * provider-agnostic `summarize` seam, the retained-tail size, an optional cap on the compacted
- * `sections` list, and a {@link ConversationSnapshot} to hydrate from.
+ * Configures `createConversation` — the optional `id`, the reserved `on` hooks, the emitter's
+ * `error` handler, and a {@link ConversationSnapshot} to hydrate from.
  *
  * @remarks
- * `id` is the identity of the conversation. Default: a random UUID. `on` is the reserved
- * listener key (initial {@link ConversationEventMap} listeners). `summarize` is the
- * {@link ConversationSummaryHandler} compaction needs — without it `compact()` throws a
- * {@link import('./errors.js').ConversationError} (a conversation can still store + view a
- * live tail; it cannot fold). `keep` is how many recent live messages a `compact()`
- * retains verbatim (folding only the older ones); it must be a nonnegative safe integer, else
- * construction throws a {@link import('./errors.js').ConversationError} with code `'KEEP'`.
- * Default: {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP} (`0` — a manual `compact()`
- * folds every exchange before the newest user message into one section). `sections` is an
- * optional cap on the compacted `sections` list — when set (`>= 1`), a `compact()` that would
- * leave more than `sections` entries folds the oldest overflow into one merged section,
- * emitting `collapse`. A successful capped merge retains at most `Math.ceil(sections)` entries;
- * fractions and positive infinity are accepted. Default: no cap. `cumulative` makes each `compact()`
- * one summarizer call over the framed recaps of every prior section then the slice, replacing all
- * prior sections with one that retains their originals then the slice, with one `compact` event
- * and no `collapse`; it cannot combine with `sections`, which throws a `ConversationError` with
- * code `'SECTIONS'`. Default: `false`.
- * `snapshot` is the hydration seam — a {@link ConversationSnapshot} whose `id`, compacted
- * `sections`, and live tail are restored into the conversation, with the live `summarize` /
- * `keep` / `on` supplied alongside it (a summarizer is a function, not serialized data).
- * Restoring is silent (no events — nothing was edited), and a `snapshot.id` wins over `id` (the
- * snapshot is the identity of the conversation). It is what lets `createConversation` hydrate,
- * and what a {@link ConversationManagerInterface.open} reads a stored snapshot back through.
+ * An own enumerable member this type does not declare refuses at construction with a
+ * `ContractError` coded `'structure'`. `id` is the identity of the conversation. Default: a
+ * random UUID. `on` is the reserved listener key (initial {@link ConversationEventMap}
+ * listeners). `error` is the listener-error handler of the emitter. `snapshot` is the hydration
+ * seam — a {@link ConversationSnapshot} whose `id`, messages, and judgments are restored into the
+ * conversation. Restoring is silent (no events — nothing was edited), and a `snapshot.id` wins
+ * over `id` (the snapshot is the identity of the conversation). It is what lets
+ * `createConversation` hydrate, and what a {@link ConversationManagerInterface.open} reads a
+ * stored snapshot back through.
  */
 export interface ConversationOptions {
 	readonly id?: string
 	readonly on?: EmitterHooks<ConversationEventMap>
 	/** Holds the listener-error handler of the emitter — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
-	/** Supplies the summarizer compaction needs; without it `compact()` throws a `ConversationError`. */
-	readonly summarize?: ConversationSummaryHandler
-	/** Keeps this many recent live messages verbatim on `compact`. Default: `DEFAULT_CONVERSATION_KEEP` (`0`). */
-	readonly keep?: number
-	/** Caps the compacted `sections` list (`>= 1`); overflow folds into one merged section. Default: no cap. */
-	readonly sections?: number
-	/**
-	 * Accumulates every fold into one section: the summarizer digests the framed recaps of all prior
-	 * sections followed by the slice, and one section retaining their originals then the slice
-	 * replaces them. Combining it with a `sections` cap throws a `ConversationError` (`'SECTIONS'`).
-	 * Default: `false`.
-	 */
-	readonly cumulative?: boolean
 	/**
 	 * Hydrates from a {@link ConversationSnapshot} — its `id` wins over `id`; restoring is silent.
 	 * The constructor checks it with `requireConversationSnapshot` before seating any member: a
-	 * malformed snapshot or a repeated id throws `ConversationError` code `'SNAPSHOT'`, and a
-	 * stored `system` message throws code `'ROLE'`. Its section and message objects are seated by
-	 * reference, so a host is trusted not to edit them after hydrate or to back their members
-	 * with accessors.
+	 * malformed snapshot, a repeated id, or call arguments JSON cannot carry throw
+	 * `ConversationError` code `'SNAPSHOT'`, and a stored `system` message throws code `'ROLE'`.
+	 * Each message is then owned through JSON and deep-frozen, so the conversation shares no object
+	 * with the snapshot.
 	 */
 	readonly snapshot?: ConversationSnapshot
-}
-
-/**
- * Configures one {@link ConversationInterface.compact} call — the retained-tail size, the
- * `sections` cap, or both, overridden for one fold.
- *
- * @remarks
- * `keep` overrides the configured retained-tail size of the conversation for this compaction
- * only (at most the older `count - keep` live messages fold, cut back to whole exchanges, never
- * the newest user message or a message after it; when nothing is left to fold, `compact()` is a
- * no-op returning `undefined`). Default: the `keep` of the conversation (its option, or
- * `DEFAULT_CONVERSATION_KEEP`). `sections` overrides the configured `sections` cap of the
- * conversation for this compaction only — after the folded section is appended, an overflow past
- * `sections` folds the oldest sections into one merged section. Default: the cap of the
- * conversation (or no cap). `keep` must be a nonnegative safe integer; any other value throws a
- * {@link import('./errors.js').ConversationError} with code `'KEEP'`. A `sections` cap on a
- * cumulative conversation throws code `'SECTIONS'`. `signal` cancels this
- * compaction: an already-aborted signal rejects with its reason before the summarizer is called,
- * the signal is passed to the {@link ConversationSummaryHandler}, and an abort while the
- * summarizer runs rejects with the reason at once and commits nothing after the abort. A fold
- * committed before an aborted overflow merge stays. Default: no signal.
- */
-export interface CompactOptions {
-	/** Overrides the retained-tail size for this compaction. Default: the `keep` of the conversation. */
-	readonly keep?: number
-	/** Overrides the `sections` cap for this compaction. Default: the cap of the conversation (or no cap). */
-	readonly sections?: number
-	/** Cancels this compaction and is passed to the summarizer. Default: no signal. */
-	readonly signal?: AbortSignal
 }
 
 /**
@@ -315,290 +197,165 @@ export interface CompactOptions {
  * The rendered block is a cross-conversation reference a small model must read as foreign
  * material, not as part of the live thread — so every member keeps it concise and unmistakably
  * attributed:
- * - `label` — the human provenance name shown in the leading marker of the block (for example
- *   `'planning'`). It is what the model attributes the content to. Default: the `id` of the
- *   conversation.
+ * - `label` — the human provenance name shown in the opening and closing markers of the block
+ *   (for example `'planning'`). It is what the model attributes the content to, so it holds no
+ *   double quote and no line break. Default: the `id` of the conversation.
  * - `messages` — the cherry-picked excerpts to include (each rendered `role: content`). The
- *   intended source is the `search(query)` / `rehydrate(id)` output of the conversation (select
- *   the few relevant turns), not its whole history — dumping every message defeats the point (it
- *   re-bloats the destination context a small model then has to wade through). Default: none.
+ *   intended source is the `search(query)` output of the conversation (select the few relevant
+ *   turns), not its whole history — dumping every message re-bloats the destination context a
+ *   small model then has to wade through. Default: none.
  */
 export interface ConversationReferenceOptions {
-	/** Names the human provenance label in the marker of the block. Default: the `id` of the conversation. */
+	/** Names the human provenance label in the markers of the block. Default: the `id` of the conversation. */
 	readonly label?: string
 	/** Lists the cherry-picked excerpts to include (`role: content`). Default: none. */
 	readonly messages?: readonly Message[]
 }
 
 /**
- * Groups messages above the flat {@link MessageManagerInterface} — a live uncompacted tail plus
- * compacted, summarized {@link Section} records, with on-demand `rehydrate`, substring `search`, a
- * cross-conversation `reference`, and a JSON `snapshot`, driven by a provider-agnostic
- * {@link ConversationSummaryHandler} seam; `summarizable` reports whether that seam was supplied,
- * and the agent loop gates automatic compaction on it.
+ * Holds one conversation's messages in insertion order, the judgments recorded about them, a
+ * substring `search`, a fenced cross-conversation `reference`, and a JSON `snapshot` — the log a
+ * memory strategy and a host share, observable through its own emitter.
  *
  * @remarks
- * - **Live tail + sections.** The conversation owns its live uncompacted tail directly — a
- *   caller appends turns through its own message verbs (`add` mints each `id`, `message` /
- *   `messages` look up, `remove` / `clear` drop, `count` tallies), exactly as a `Workspace`
- *   owns its files (no separate per-value manager). `sections` are the compacted history
- *   (oldest → newest), each a summarized slice that retains its originals.
- * - **Message verbs.** `add` takes one {@link MessageInput} or a batch, mints the `id` of each
- *   message (a random UUID), stores it, and returns the created message or messages; a stored
- *   message is immutable. `message(id)` resolves one (`undefined` when absent); `messages()`
- *   lists the live tail in insertion order; `remove` drops one by id or a batch (`true` only when
- *   every supplied id was removed); `clear` empties the tail; `count` is how many live messages
- *   are stored.
- * - **`view()` — the model input.** Each section folds to one synthetic summary message,
- *   followed by the live messages verbatim: `[...sections-as-summary-messages, ...live]`. The
- *   per-section summaries are the compaction benefit.
- * - **`compact()` — fold older live → a section.** Folds the oldest `count - keep` live
- *   messages, cut short at the newest user message and moved back to whole exchanges and
- *   before any call group the cut would split, into a {@link Section} (its `summary` from
- *   `summarize`), removes them from the live tail, and emits `compact` — returning the section
- *   (or `undefined` when nothing folds). A {@link import('./errors.js').ConversationError} is
- *   thrown when no `summarize` was supplied.
- * - **`summarizable` — whether a `compact()` can fold.** `true` when a
- *   {@link ConversationSummaryHandler} was supplied, `false` otherwise. The automatic compaction
- *   of the agent loop (`AgentOptions.window`) gates its fold on it so a conversation that has no
- *   summarizer is never auto-compacted (and the loop never throws the `compact()` `SUMMARIZER`
- *   error from the auto path); the loop still measures its requests against the window, and a
- *   strict agent refuses one that is over. A manual `compact()` still throws without a summarizer
- *   — only the auto path is guarded.
- * - **`rehydrate(id)` / `search(query)` — read the retained originals.** `rehydrate` returns
- *   the full original messages of a known section and emits its `id` through `rehydrate`, even
- *   when the list is empty. An unknown id returns `undefined` without an event. The read never
- *   reinserts messages. `search` is a case-insensitive substring scan of `content` across all messages
- *   (the originals of every section + the live tail).
- * - **`reference(options?)` — pull this conversation into another with provenance.** A pure
- *   string render (no model call) of a self-labeled, fenced cross-conversation block of
- *   cherry-picked excerpts, framed so a small model reads it as foreign material. Written into
- *   the context of the active conversation through the active workspace
- *   (`context.workspaces.active?.write(path, block)`); the cherry-pick comes from the `search` /
- *   `rehydrate` of this conversation, never its whole history.
- * - **Observable.** The owned `emitter` ({@link ConversationEventMap}) carries
- *   `compact` / `collapse` / `rehydrate`; the emitter isolates a listener throw and routes it
- *   to its `error` handler (the `error` option).
+ * - **Message verbs.** `add` takes one {@link MessageInput} or a batch, checks every input before
+ *   it stores any, mints the `id` of each message (a random UUID), owns the message through JSON,
+ *   deep-freezes it, stores it, and returns the stored message or messages. `message(id)` resolves
+ *   one (`undefined` when absent); `messages()` lists them in insertion order; `count` is how many
+ *   are stored. A stored message never changes, so identity equality is content equality.
+ * - **Call groups.** An assistant message with `calls` and the tool messages that answer it, as
+ *   {@link import('../helpers.js').collectToolGroups} groups them, leave together: `remove` of any
+ *   member removes the whole group, so a provider never receives half a group. A tool message no
+ *   assistant message owns leaves alone.
+ * - **Judgments.** `judgments` stores frozen records by key. `remove` and `clear` also remove every
+ *   judgment whose `sources` name a removed message, so a removed message's text survives neither
+ *   in memory nor in a snapshot; a judgment with no source stays.
+ * - **`search(query)` / `reference(options?)`.** `search` is a case-insensitive substring scan of
+ *   every stored message's `content`. `reference` is a pure string render (no model call) of a
+ *   self-labeled block fenced at both ends, holding cherry-picked excerpts, framed so a small model
+ *   reads it as foreign material.
+ * - **Synchronous.** Every member completes in one synchronous call, so no mutation interleaves
+ *   with another, and each event fires after its mutation is whole.
+ * - **Observable.** The owned `emitter` ({@link ConversationEventMap}) carries `add`, `remove`, and
+ *   `clear`; the emitter isolates a listener throw and routes it to its `error` handler (the `error`
+ *   option). `destroy()` tears the emitter down.
  */
 export interface ConversationInterface {
 	readonly id: string
 	/** Holds the judgments recorded beside the messages of this conversation. */
 	readonly judgments: JudgmentManagerInterface
 	readonly emitter: EmitterInterface<ConversationEventMap>
-	/** Lists the compacted history, oldest → newest. */
-	readonly sections: readonly Section[]
-	/**
-	 * Reports whether a `compact()` can fold — `true` when a {@link ConversationSummaryHandler} was supplied.
-	 * The automatic compaction of the agent loop (`AgentOptions.window`) gates its fold on it (a
-	 * non-summarizable conversation is never auto-compacted, so the auto path never throws the
-	 * `SUMMARIZER` error, though its requests are still measured); a manual `compact()` still throws
-	 * without a summarizer.
-	 */
-	readonly summarizable: boolean
-	/** Counts the live (uncompacted) messages stored in the tail. */
+	/** Counts the stored messages. */
 	readonly count: number
 	/**
-	 * Appends one {@link MessageInput} to the live tail, or a batch — mints each message's `id`
-	 * (a random UUID) and returns the created message or messages; a stored message is
-	 * immutable.
+	 * Appends one {@link MessageInput}, or a batch — mints each message's `id` (a random UUID),
+	 * stores an owned, deep-frozen copy, emits `add` per message, and returns the stored message or
+	 * messages.
 	 *
 	 * @param input - One {@link MessageInput}, or a batch
-	 * @returns The created {@link Message} record or records, each with its minted `id` value
-	 * @throws ConversationError Thrown when a role is not a `ConversationRole` (code `'ROLE'`), before any message of the batch is stored
+	 * @returns The stored {@link Message} record or records, each with its minted `id` value
+	 * @throws ConversationError Thrown when an input is not a plain record or a member fails its declared type (code `'MESSAGE'`), or a role is not a `ConversationRole` (code `'ROLE'`), before any message of the batch is stored
 	 */
 	add(input: MessageInput): Message
 	add(inputs: readonly MessageInput[]): readonly Message[]
 	/**
-	 * Looks up one live message by id (`undefined` when absent).
+	 * Looks up one stored message by id (`undefined` when absent).
 	 *
 	 * @param id - The message id to resolve
 	 * @returns The {@link Message}, or `undefined` when absent
 	 */
 	message(id: string): Message | undefined
 	/**
-	 * Lists every live, uncompacted message in the tail, in insertion order.
+	 * Lists every stored message, in insertion order.
 	 *
-	 * @returns The live tail, in insertion order
+	 * @returns Every stored message, in insertion order
 	 */
 	messages(): readonly Message[]
 	/**
-	 * Removes one live message by id, or a batch, from the tail — `true` only when every
-	 * supplied id was removed.
+	 * Removes one message by id, or a batch, with the rest of each call group a removed message
+	 * belongs to and every judgment that quotes a removed message, then emits `remove` per removed
+	 * message — `true` only when every supplied id was present.
 	 *
 	 * @param id - One message id, or a batch
 	 * @returns True if every supplied id was present and removed; false otherwise
 	 */
 	remove(id: string): boolean
 	remove(ids: readonly string[]): boolean
-	/** Empties the live tail, leaving the compacted `sections` untouched. */
+	/** Removes every stored message and every judgment that quotes one, then emits one `clear`. */
 	clear(): void
 	/**
-	 * Builds the model input for the next turn — each section as one synthetic recap message,
-	 * its summary prefixed with `CONVERSATION_RECAP_PREFIX` so a small model reads it as a
-	 * recap rather than a literal turn, then the live tail verbatim.
-	 *
-	 * @returns `[...sections-as-summary-messages, ...live messages]`
-	 */
-	view(): readonly Message[]
-	/**
-	 * Folds whole exchanges from the oldest `count - keep` live messages, cut short at the newest
-	 * user message, into a summarized {@link Section} through the
-	 * {@link ConversationSummaryHandler}, removes them from the live tail, and emits `compact` —
-	 * resolving `undefined` when nothing folds.
-	 *
-	 * @remarks
-	 * The effective `keep` comes from `options`, else the `keep` of the conversation. The newest
-	 * user message is the request a run serves, so it and every message after it stay live. An
-	 * exchange is a user message and every message after it up to the next user message. Leading
-	 * messages form their own exchange, retained until the first user exchange can also fold. A cut
-	 * inside an exchange moves back to its start, so a fold removes whole exchanges. An assistant
-	 * message with calls and the tool messages that answer it, grouped as
-	 * {@link import('../helpers.js').collectToolGroups} groups them, stay on one side: a cut inside
-	 * a group moves before its assistant message, then back to whole exchanges again. Only a group
-	 * that spans two exchanges reaches that rule.
-	 *
-	 * A cumulative conversation makes one summarizer call per fold, over the framed recaps of every
-	 * prior section followed by the slice with thinking stripped; the originals behind the recaps
-	 * are not sent. After the call settles, the slice and the prior sections must be unchanged; the
-	 * prior sections are then replaced atomically by one section retaining their originals in order
-	 * and then the slice, and the slice leaves the live tail. It emits `compact` once and never
-	 * `collapse`. A throw, an abort, or a changed input commits nothing. A fold with no eligible
-	 * slice makes no call. A `sections` cap, configured or supplied here, throws `'SECTIONS'`.
-	 *
-	 * When a `sections` cap is set and the fold pushes the section count over it, an overflow
-	 * merge step folds the oldest sections into one. If the `summarize` call of that merge throws,
-	 * the merge is skipped (sections transiently sit at `cap + 1`, no loss), no `compact` is
-	 * emitted, and the error propagates; the next successful `compact()` merges the section count
-	 * back to `cap`.
-	 *
-	 * A digest whose trimmed text is empty rejects with code `'SUMMARY'`: a refused fold commits
-	 * nothing and emits nothing, and a refused overflow merge leaves the appended section, as a
-	 * throwing merge does.
-	 *
-	 * Calls run one at a time: a call made while another is in flight waits for it, then computes
-	 * its own fold from the live tail it finds. A fold commits only when every folded message is
-	 * still the same live entry after the summarizer settles, and a merge commits only when the
-	 * folded sections are still the oldest; otherwise the call resolves `undefined` and emits
-	 * nothing, so a `remove` or `clear` during the summarizer leaves no section.
-	 *
-	 * A summarizer must not call `compact` on the conversation it serves. A call that finds no fold in
-	 * flight calls its summarizer before its own fold counts as in flight, so that summarizer's own
-	 * `compact` finds nothing to wait for and summarizes the same slice again; the preceding commit check
-	 * keeps one section, because the later fold finds its slice already folded and resolves
-	 * `undefined`. A call queued behind an earlier fold counts as in flight before its summarizer
-	 * runs, so its summarizer's own `compact` waits for the fold that called it.
-	 *
-	 * `options.signal` cancels the call. An already-aborted signal rejects with its reason before
-	 * the summarizer is called. An abort while waiting for an earlier call or while the summarizer
-	 * runs rejects with the reason at once, even when the summarizer ignores the signal, and the
-	 * call commits nothing afterwards; a fold committed before an aborted merge stays, as when the
-	 * merge throws.
-	 *
-	 * @param options - Optional {@link CompactOptions} (`keep`, `sections`, `signal`)
-	 * @returns The folded {@link Section}, or `undefined` when nothing folded or the folded
-	 * messages or sections changed while the summarizer ran
-	 * @throws ConversationError Thrown when no summarizer was supplied (code `'SUMMARIZER'`), when the
-	 * effective sections cap does not satisfy `>= 1` or combines with `cumulative` (code `'SECTIONS'`,
-	 * including `NaN`), or when
-	 * the effective `keep` is not a nonnegative safe integer (code `'KEEP'`), or when a summarizer
-	 * digest has empty trimmed text (code `'SUMMARY'`)
-	 */
-	compact(options?: CompactOptions): Promise<Section | undefined>
-	/**
-	 * Returns the full original messages of a known section and emits its `id` through `rehydrate`,
-	 * including an empty list; returns `undefined` without an event for an unknown `id`.
-	 * Never reinserts messages.
-	 *
-	 * @param id - The {@link Section} `id` to pull back
-	 * @returns The retained original messages of the section, or `undefined` when no section has `id`
-	 */
-	rehydrate(id: string): readonly Message[] | undefined
-	/**
-	 * Searches `content` for a case-insensitive substring across every message — the retained
-	 * originals of each section, then the live tail.
+	 * Searches every stored message's `content` for a case-insensitive substring.
 	 *
 	 * @param query - The substring to match (case-insensitive)
-	 * @returns The matching messages, section originals first then the live tail
+	 * @returns The matching messages, in insertion order
 	 */
 	search(query: string): readonly Message[]
 	/**
-	 * Renders this conversation as a self-labeled, fenced provenance block to pull into another
-	 * conversation — a pure string with no model call: a leading
+	 * Renders this conversation as a self-labeled provenance block fenced at both ends, to pull into
+	 * another conversation — a pure string with no model call: an opening
 	 * `[Reference — conversation "<label>" — NOT part of this conversation]` marker, then the
-	 * cherry-picked excerpts (`- role: content`) when `messages` is supplied. The `label` option
-	 * names the source. Default: the `id`.
+	 * cherry-picked excerpts (`- role: content`) when `messages` is supplied, then a closing
+	 * `[End of reference "<label>"]` marker.
 	 *
 	 * @remarks
-	 * The block leads with an unmistakable provenance marker
-	 * (`[Reference — conversation "<label>" — NOT part of this conversation]`), then the
-	 * cherry-picked `Relevant messages:` (each `- role: content`) when `options.messages` is
-	 * supplied. The intended flow is to pull another conversation B into the active workspace of the
-	 * active conversation A: select the few right turns with `B.search(query)` / `B.rehydrate(id)`,
-	 * frame them here, then
+	 * Every line of an excerpt after its first is indented by two spaces, so no excerpt text starts
+	 * a line at the margin, where it could read as another excerpt or as a marker. The intended flow
+	 * is to pull another conversation B into the active workspace of the active conversation A:
+	 * select the few right turns with `B.search(query)`, frame them here, then
 	 * `A.context.workspaces.active?.write(\`conversation:${B.id}.md\`, B.reference({ label, messages }))`.
 	 * Keep the excerpts cherry-picked, never the whole history of B — this content enters another
 	 * context a small model must read.
 	 *
 	 * @param options - The {@link ConversationReferenceOptions} (label / cherry-picked messages)
-	 * @returns The rendered provenance block (a concise, fenced, self-attributed string)
+	 * @returns The rendered provenance block
+	 * @throws ConversationError Thrown when the effective label holds a double quote or a line break (code `'LABEL'`)
 	 */
 	reference(options?: ConversationReferenceOptions): string
 	/**
 	 * Serializes this conversation to a plain, JSON-serializable {@link ConversationSnapshot} —
-	 * its `id`, the compacted `sections`, and the live tail; the live `summarize` / `keep` are
-	 * configuration re-supplied on hydrate rather than serialized.
+	 * its `id`, its messages, and its judgments when it holds one.
 	 *
 	 * @remarks
-	 * The container serializes itself (`{ id, sections, messages, judgments? }`) — the payload of
-	 * the {@link ConversationStoreInterface} persistence seam, the exact analogue of the `snapshot`
-	 * method of {@link import('@orkestrel/workspace').WorkspaceInterface}. The summarizer /
-	 * `keep` are not serialized — they are live config re-supplied on hydrate (a
-	 * `ConversationSummaryHandler` is a function, not data). The snapshot is the durable analogue
-	 * of the `snapshot` option: a {@link ConversationManagerInterface} hydrates a conversation from
-	 * it through that seam (see {@link ConversationManagerInterface.open}). Pure — the sections +
-	 * messages are already plain immutable records (so a `structuredClone` call or a JSON round
-	 * trip keeps the snapshot lossless), and snapshotting mutates nothing. The snapshot's judgments
-	 * are the judgment store's frozen records, so a host copies one before changing it.
+	 * The container serializes itself (`{ id, messages, judgments? }`) — the payload of the
+	 * {@link ConversationStoreInterface} persistence seam, the analogue of the `snapshot` method of
+	 * {@link import('@orkestrel/workspace').WorkspaceInterface}. Pure: the messages and the
+	 * judgments are the stored frozen records, so a JSON round trip keeps the snapshot lossless,
+	 * snapshotting mutates nothing, and a host copies a record before changing it. A
+	 * {@link ConversationManagerInterface} hydrates a conversation from it through the `snapshot`
+	 * option (see {@link ConversationManagerInterface.open}).
 	 *
-	 * @returns The {@link ConversationSnapshot} (`{ id, sections, messages, judgments? }`), the
-	 * judgments present only when the store holds one
+	 * @returns The {@link ConversationSnapshot} (`{ id, messages, judgments? }`), the judgments
+	 * present only when the store holds one
 	 */
 	snapshot(): ConversationSnapshot
+	/** Tears down the emitter: drops every listener, so later mutations reach no observer. */
+	destroy(): void
 }
 
 /**
- * Holds a JSON-serializable snapshot of the state of a conversation — its `id`, the compacted
- * `sections`, and the live tail `messages` — the durable payload the
- * {@link ConversationStoreInterface} persists. The exact analogue of
- * {@link import('@orkestrel/workspace').WorkspaceSnapshot}.
+ * Holds a JSON-serializable snapshot of the state of a conversation — its `id`, its `messages`,
+ * and its judgments — the durable payload the {@link ConversationStoreInterface} persists. The
+ * analogue of {@link import('@orkestrel/workspace').WorkspaceSnapshot}.
  *
  * @remarks
- * Pure JSON data (no class instances, no functions): each {@link Section} and
- * {@link Message} is already a plain record that a `structuredClone` call or a JSON round trip
- * keeps lossless. The snapshot carries the compacted `sections` (each retaining its folded
- * originals) and the live uncompacted tail `messages` — but not the `summarize` / `keep`, which
- * are live config re-supplied on hydrate (a summarizer is a function, not serializable data). The
- * container produces the snapshot from itself ({@link ConversationInterface.snapshot}); it is the
- * durable analogue of the {@link ConversationOptions.snapshot} hydration seam. A
- * {@link ConversationManagerInterface} hydrates a conversation from it through that seam (see
- * {@link ConversationManagerInterface.open}). It is narrowed back from an untrusted storage read by
- * {@link import('./validators.js').isConversationSnapshot} (the total boundary guard), which
- * is exact: an unknown member refuses, so a 0.0.29 snapshot that carries a conversation `summary`
- * throws until its row is rewritten without the key.
+ * Pure JSON data (no class instances, no functions): each {@link Message} and {@link Judgment} is
+ * a plain record that a JSON round trip keeps lossless. The container produces the snapshot from
+ * itself ({@link ConversationInterface.snapshot}); it is the durable analogue of the
+ * {@link ConversationOptions.snapshot} hydration seam. It is narrowed back from an untrusted
+ * storage read by {@link import('./validators.js').isConversationSnapshot} (the total boundary
+ * guard), which is exact: an unknown member refuses, a `sections` member included.
  */
 export interface ConversationSnapshot {
 	readonly id: string
-	/** Carries recorded judgments; absent in snapshots saved before judgment storage. */
+	/** Carries recorded judgments; absent when the conversation holds none. */
 	readonly judgments?: readonly Judgment[]
-	/** Lists the compacted history, oldest → newest (each section retains its folded originals). */
-	readonly sections: readonly Section[]
-	/** Lists the live uncompacted tail, in insertion order. */
+	/** Lists the stored messages, in insertion order. */
 	readonly messages: readonly Message[]
 }
 
 /**
  * Persists a {@link ConversationSnapshot} durably — the async `get` / `set` / `delete` primitives,
- * keyed by a conversation id and holding no expiry, the exact analogue of {@link
+ * keyed by a conversation id and holding no expiry, the analogue of {@link
  * import('@orkestrel/workspace').WorkspaceStoreInterface}.
  *
  * @remarks
@@ -610,7 +367,7 @@ export interface ConversationSnapshot {
  * {@link import('./stores/DatabaseConversationStore.js').DatabaseConversationStore} (the
  * snapshot as one opaque JSON column) share this one interface. Hydration is not a store concern
  * — a {@link ConversationManagerInterface} reads a snapshot back and rebuilds the live conversation
- * through the {@link ConversationOptions.snapshot} seam (re-supplying the live `summarize` / `keep`; see
+ * through the {@link ConversationOptions.snapshot} seam (see
  * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save}).
  *
  * Every primitive is async (a `Promise`), so a durable backend (a database round-trip) fits the
@@ -649,17 +406,16 @@ export interface ConversationStoreInterface {
  * Represents one row of the table a {@link
  * import('./stores/DatabaseConversationStore.js').DatabaseConversationStore} persists
  * — a conversation `id` plus its {@link ConversationSnapshot} held as one opaque JSON column, read
- * back as `unknown` and narrowed on `get`. The exact analogue of {@link
+ * back as `unknown` and narrowed on `get`. The analogue of {@link
  * import('@orkestrel/workspace').WorkspaceSnapshotRow}.
  *
  * @remarks
  * The Database twin of {@link ConversationStoreInterface} stores the snapshot whole (the `snapshot`
  * column is a `rawShape`, an opaque JSON blob — exactly as
  * {@link import('@orkestrel/workspace').WorkspaceSnapshotRow} stores a workspace snapshot), so the
- * row type stays flat and the sections/messages snapshot shape never
- * forces the contract to `Infer` it. The column therefore reads back as the broad `unknown`; the
- * store narrows it to a {@link ConversationSnapshot} on `get`
- * ({@link import('./validators.js').isConversationSnapshot}, the total boundary guard). `id`
+ * row type stays flat and the snapshot shape never forces the contract to `Infer` it. The column
+ * therefore reads back as the broad `unknown`; the store narrows it to a {@link ConversationSnapshot}
+ * on `get` ({@link import('./validators.js').isConversationSnapshot}, the total boundary guard). `id`
  * mirrors {@link ConversationSnapshot.id} (the primary key), so a `set` writes
  * `{ id: snapshot.id, snapshot }`.
  */
@@ -671,37 +427,24 @@ export interface ConversationSnapshotRow {
 
 /**
  * Carries the data to author a {@link ConversationInterface} through a {@link
- * ConversationManagerInterface} — the optional `id`, a `summarize` override, a `keep` override, a
- * `sections` cap override, the `cumulative` switch, the reserved `on` hooks, and a
- * {@link ConversationSnapshot} to hydrate from.
+ * ConversationManagerInterface} — the optional `id`, the reserved `on` hooks, the emitter's `error`
+ * handler, and a {@link ConversationSnapshot} to hydrate from.
  *
  * @remarks
- * `id` is the identity of the conversation. Default: a minted id. `summarize` overrides the
- * default {@link ConversationSummaryHandler} of the manager for this conversation. Default: the
- * manager default. `keep` overrides the default retained-tail size of the manager. `sections`
- * overrides the default `sections` cap of the manager. `cumulative` switches on cumulative folds; a
- * manager `sections` default it would inherit throws `'SECTIONS'`. `on` is the reserved listener key
- * (initial {@link ConversationEventMap} listeners). `error` is the listener-error handler of the
- * conversation's emitter, so a throwing `on` listener reports there. Default: the emitter's own
- * handler. `snapshot` is the construction-time hydration
- * seam — a {@link ConversationSnapshot} whose `id` / `sections` / live tail are restored into the
- * conversation (the live `summarize` / `keep` / `on` re-supplied alongside it), the conversation
- * analogue of the `seed` option of {@link import('@orkestrel/workspace').WorkspaceOptions},
- * carried onto {@link ConversationOptions.snapshot}, that a
- * {@link ConversationManagerInterface.open} reads a stored snapshot back through; hydration is
- * silent (no events). When both `snapshot.id` and `id` are given, `snapshot.id` wins (the snapshot
- * is the identity of the conversation).
+ * An own enumerable member this type does not declare refuses with a `ContractError` coded
+ * `'structure'`. `id` is the identity of the conversation. Default: a minted id. `on` is the
+ * reserved listener key (initial {@link ConversationEventMap} listeners). `error` is the
+ * listener-error handler of the conversation's emitter, so a throwing `on` listener reports there.
+ * Default: the emitter's own handler. `snapshot` is the construction-time hydration seam — a
+ * {@link ConversationSnapshot} whose `id`, messages, and judgments are restored into the
+ * conversation, the conversation analogue of the `seed` option of
+ * {@link import('@orkestrel/workspace').WorkspaceOptions}, carried onto
+ * {@link ConversationOptions.snapshot}, that a {@link ConversationManagerInterface.open} reads a
+ * stored snapshot back through; hydration is silent (no events). When both `snapshot.id` and `id`
+ * are given, `snapshot.id` wins (the snapshot is the identity of the conversation).
  */
 export interface ConversationInput {
 	readonly id?: string
-	/** Overrides the default summarizer of the manager for this conversation. */
-	readonly summarize?: ConversationSummaryHandler
-	/** Overrides the default retained-tail size of the manager for this conversation. */
-	readonly keep?: number
-	/** Overrides the default `sections` cap of the manager for this conversation. */
-	readonly sections?: number
-	/** Accumulates every fold of this conversation into one section, passed on as {@link ConversationOptions.cumulative}. Default: `false`; the manager holds no default. */
-	readonly cumulative?: boolean
 	readonly on?: EmitterHooks<ConversationEventMap>
 	/** Holds the listener-error handler of the conversation's emitter — a listener throw routes here, not to a domain event. */
 	readonly error?: EmitterErrorHandler
@@ -713,33 +456,19 @@ export interface ConversationInput {
 }
 
 /**
- * Configures `createConversationManager` — the default `ConversationSummaryHandler`, retained-tail
- * size, and `sections` cap the conversations it creates inherit, plus the optional durable `store`
- * backing `open` / `save`.
+ * Configures `createConversationManager` — the optional durable `store` backing `open` / `save`.
  *
  * @remarks
- * `summarize` is the default summarizer flowed into every conversation the manager creates
- * (a per-`add` {@link ConversationInput.summarize} overrides it); a conversation created
- * with neither cannot `compact` (it throws a `ConversationError`). `keep` is the default
- * retained-tail size (a per-`add` {@link ConversationInput.keep} overrides it); it must be a
- * nonnegative safe integer, else construction throws a `ConversationError` with code `'KEEP'`. Default:
- * {@link import('./constants.js').DEFAULT_CONVERSATION_KEEP}. `sections` is the default cap
- * on the compacted `sections` list of a created conversation (a per-`add`
- * {@link ConversationInput.sections} overrides it). Default: no cap.
+ * An own enumerable member this type does not declare refuses at construction with a
+ * `ContractError` coded `'structure'`.
  */
 export interface ConversationManagerOptions {
-	/** Supplies the default summarizer for conversations this manager creates (a per-`add` override wins). */
-	readonly summarize?: ConversationSummaryHandler
-	/** Sets the default retained-tail size (a per-`add` override wins). Default: `DEFAULT_CONVERSATION_KEEP`. */
-	readonly keep?: number
-	/** Sets the default `sections` cap for conversations this manager creates (a per-`add` override wins). Default: no cap. */
-	readonly sections?: number
 	/**
 	 * Holds the optional durable {@link ConversationStoreInterface} backing
 	 * {@link ConversationManagerInterface.open} / {@link ConversationManagerInterface.save} — a memory
 	 * / JSON / SQLite / IndexedDB store a conversation is hydrated from (`open` a registry-miss) and
 	 * persisted to (`save`). Default: none, so the manager is registry-only: `open` resolves only
-	 * what is already registered, and `save` is a no-op (`false`). The exact analogue of the `store`
+	 * what is already registered, and `save` is a no-op (`false`). The analogue of the `store`
 	 * option of {@link import('@orkestrel/workspace').WorkspaceManagerOptions}.
 	 */
 	readonly store?: ConversationStoreInterface
@@ -754,8 +483,7 @@ export interface ConversationManagerOptions {
  *
  * @remarks
  * - **Registry.** `count` is how many are stored. `add(input?)` mints a
- *   {@link ConversationInterface} (its `id` from `input` or a random UUID), flowing the
- *   default `summarize` / `keep` of the manager in unless the `input` overrides them; `add` of an
+ *   {@link ConversationInterface} (its `id` from `input` or a random UUID); `add` of an
  *   already-present `id` throws (code `'ID'`). `conversation(id)` looks one up
  *   (`undefined` when absent); `conversations()` lists them in insertion order.
  * - **Active pointer.** `active` is the active conversation (the conversation an agent run binds
@@ -770,11 +498,10 @@ export interface ConversationManagerOptions {
  *   registry and sets `active` to `undefined`.
  * - **Durable open / save (the optional `store` seam).** When a {@link ConversationStoreInterface}
  *   is supplied (the `store` option), `open(id)` hydrates a conversation from the store on a registry
- *   miss (rebuilding it through the `snapshot` option, flowing the default `summarize` / `keep`
- *   of the manager in) and `save(id)` persists the {@link ConversationInterface.snapshot} of a
- *   registered conversation. Both are lenient without a store — `open` resolves only registered
- *   ids, `save` is a no-op (`false`) — consistent with the lenient `switch`. It mirrors the
- *   `open` / `save` seam of the workspace package manager.
+ *   miss (rebuilding it through the `snapshot` option) and `save(id)` persists the
+ *   {@link ConversationInterface.snapshot} of a registered conversation. Both are lenient without a
+ *   store — `open` resolves only registered ids, `save` is a no-op (`false`) — consistent with the
+ *   lenient `switch`. It mirrors the `open` / `save` seam of the workspace package manager.
  * - **Event-free.** A purely registry store — no Emitter, no events (each conversation owns
  *   its own).
  */
@@ -796,13 +523,12 @@ export interface ConversationManagerInterface {
 	 */
 	conversations(): readonly ConversationInterface[]
 	/**
-	 * Mints a conversation, taking its `id` from the input or a fresh UUID and flowing the
-	 * default `summarize` / `keep` of the manager in unless the input overrides them —
-	 * auto-activates the first, and an already-present `id` throws.
+	 * Mints a conversation, taking its `id` from the input or a fresh UUID — auto-activates the
+	 * first, and an already-present `id` throws.
 	 *
 	 * @param input - Optional {@link ConversationInput} overrides
 	 * @returns The created conversation
-	 * @throws ConversationError Thrown when the `id` is already live (code `'ID'`), or when `snapshot` is malformed or repeats an id (code `'SNAPSHOT'`) or holds a message whose role is not a `ConversationRole` (code `'ROLE'`); nothing registers and `active` is unchanged
+	 * @throws ConversationError Thrown when the `id` is already live (code `'ID'`), or when `snapshot` is malformed, repeats an id, or holds call arguments JSON cannot carry (code `'SNAPSHOT'`) or holds a message whose role is not a `ConversationRole` (code `'ROLE'`); nothing registers and `active` is unchanged
 	 */
 	add(input?: ConversationInput): ConversationInterface
 	/**
@@ -822,23 +548,19 @@ export interface ConversationManagerInterface {
 	 * - If `id` is already registered, it is activated through `switch` and returned — no store hit.
 	 * - Else if a `store` is set, `store.get(id)` is awaited; on a hit the snapshot is rehydrated
 	 *   into a fresh {@link ConversationInterface} through the `snapshot` option
-	 *   (`add({ snapshot, ... })`, flowing the default `summarize` / `keep` of the manager in),
-	 *   which registers and activates it, and it is returned.
+	 *   (`add({ snapshot })`), which registers and activates it, and it is returned.
 	 * - A conversation registered under `id` while the store read was pending wins: it is
 	 *   activated and returned, and the stored snapshot is discarded. So a concurrent `add({ id })`
 	 *   keeps its turns, and concurrent `open(id)` calls return the one registered instance.
-	 * - Else (no store, a store miss, or a stored snapshot whose `id` is not `id`) ⇒ `undefined`
-	 *   (lenient — no throw).
-	 * - A stored snapshot that holds a message whose role is not a `ConversationRole` or repeats an
-	 *   id rejects with the constructor's `ConversationError` (code `'ROLE'` or `'SNAPSHOT'`) and
-	 *   leaves the registry and `active` unchanged. A malformed snapshot rejects the same way (code
-	 *   `'SNAPSHOT'`) only when the store returns it unguarded: `DatabaseConversationStore` narrows
-	 *   its read through `isConversationSnapshot` and resolves `undefined` for one, so `open`
-	 *   resolves `undefined` as for a store miss.
+	 * - Else (no store, or a store miss) ⇒ `undefined` (lenient — no throw).
+	 * - A stored snapshot whose `id` is not `id`, that holds a message whose role is not a
+	 *   `ConversationRole`, that repeats an id, or that is malformed rejects with a
+	 *   `ConversationError` (code `'SNAPSHOT'` or `'ROLE'`) and leaves the registry and `active`
+	 *   unchanged. `DatabaseConversationStore` refuses a malformed row itself, with `'SNAPSHOT'`.
 	 *
 	 * @param id - The conversation id to open
 	 * @returns The activated {@link ConversationInterface}, or `undefined` when neither registered nor stored
-	 * @throws ConversationError Thrown when the stored snapshot holds a message whose role is not a `ConversationRole` (code `'ROLE'`) or repeats an id (code `'SNAPSHOT'`), or is malformed and the store returned it unguarded (code `'SNAPSHOT'`)
+	 * @throws ConversationError Thrown when the stored snapshot names another id, holds a message whose role is not a `ConversationRole` (code `'ROLE'`), repeats an id, or is malformed (code `'SNAPSHOT'`)
 	 */
 	open(id: string): Promise<ConversationInterface | undefined>
 	/**

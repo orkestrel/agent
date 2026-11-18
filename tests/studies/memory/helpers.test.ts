@@ -10,19 +10,14 @@ import {
 	computeStudyMemoryCacheShares,
 	computeStudyMemoryCarriage,
 	computeStudyMemoryReacquisition,
-	computeStudyMemoryRetention,
 	computeStudyMemoryShare,
-	readStudyMemoryCompaction,
 	readStudyMemoryGrade,
-	readStudyMemoryGauge,
 	readStudyMemoryJudge,
 	readStudyMemoryProvenance,
-	readStudyMemoryRecap,
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_LOOKUPS,
 	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
-	validateStudyMemoryStrategy,
 } from '../../../studies/memory/index.js'
 import {
 	buildMemoryCriterion,
@@ -36,7 +31,6 @@ import {
 	MEMORY_TRIAGE_SECOND,
 	MEMORY_EVIDENCE,
 	MEMORY_LITERALS,
-	MEMORY_RETENTION,
 	MEMORY_WIRE_ROWS,
 	omitMemoryAuxiliaries,
 	readMemoryOrigins,
@@ -44,9 +38,6 @@ import {
 	STUDY_MEMORY_MODULES,
 	STUDY_MEMORY_RECORD,
 	STUDY_MEMORY_PARAMETER_PINS,
-	STUDY_MEMORY_SETTINGS,
-	STUDY_MEMORY_STRATEGY_ADMITTED,
-	STUDY_MEMORY_STRATEGY_REFUSALS,
 } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
@@ -60,7 +51,6 @@ describe('memory declaration and mechanical evidence', () => {
 			tokens: 32640,
 		})
 		expect(buildStudyMemoryRoles(profile, 'full').triage).toBeUndefined()
-		expect(buildStudyMemoryRoles(profile, 'compaction').triage).toBeUndefined()
 		const provider = profile.provider
 		if (provider === undefined) throw new Error('Missing provider')
 		const { triage, ...untriaged } = provider
@@ -110,7 +100,7 @@ describe('memory declaration and mechanical evidence', () => {
 	})
 	it('validates finite room, actual digest syntax and exact uncredentialed origin', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
-		const every = ['records', 'compaction', 'full'] as const
+		const every = ['records', 'full'] as const
 		expect(() => validateStudyMemoryProfile(profile, every)).not.toThrow()
 		expect(() =>
 			validateStudyMemoryProfile(
@@ -149,29 +139,7 @@ describe('memory declaration and mechanical evidence', () => {
 		).toThrow('Memory provider declaration is invalid')
 	})
 
-	it.each(STUDY_MEMORY_STRATEGY_ADMITTED)('admits the one strategy of arms $arms', ({ arms }) => {
-		expect(() => validateStudyMemoryStrategy('memory', arms)).not.toThrow()
-	})
-
-	it.each(STUDY_MEMORY_STRATEGY_REFUSALS)(
-		'refuses arms $arms with its exact correction',
-		({ arms, refusal }) => {
-			expect(() => validateStudyMemoryStrategy('memory', arms)).toThrow(
-				expect.objectContaining({ code: 'CONFIG', message: refusal }),
-			)
-		},
-	)
-
-	it('encodes and caps the declaration name a strategy refusal names', () => {
-		expect(() => validateStudyMemoryStrategy('say "hi"\nnow', ['records', 'compaction'])).toThrow(
-			'Memory declaration "say \\"hi\\"\\nnow" lists both strategies',
-		)
-		expect(() => validateStudyMemoryStrategy('x'.repeat(200), ['full'])).toThrow(
-			`Memory declaration "${'x'.repeat(62)}… lists neither strategy`,
-		)
-	})
-
-	it('requires a judge only for the records arm and a recap only for the compaction arm', () => {
+	it('requires a judge only for the records arm', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const provider = profile.provider
 		if (provider === undefined) throw new Error('Missing fixture provider')
@@ -179,20 +147,14 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(() => validateStudyMemoryProfile(bare, [])).not.toThrow()
 		expect(() => validateStudyMemoryProfile(bare, ['full'])).not.toThrow()
 		expect(() => validateStudyMemoryProfile(bare, ['records'])).toThrow('judge model and digest')
-		expect(() => validateStudyMemoryProfile(bare, ['compaction'])).toThrow(
-			'Memory compaction requires a declared recap allowance',
-		)
-		expect(() => validateStudyMemoryProfile(bare, ['records', 'compaction', 'full'])).toThrow(
+		expect(() => validateStudyMemoryProfile(bare, ['records', 'full'])).toThrow(
 			'judge model and digest',
 		)
-		// Declaring the auxiliary role is enough for the arm that uses it.
-		expect(() =>
-			validateStudyMemoryProfile({ ...bare, room: profile.room }, ['compaction']),
-		).not.toThrow()
+		// Declaring the judge is enough for the arm that uses it.
 		expect(() => validateStudyMemoryProfile({ ...bare, provider }, ['records'])).not.toThrow()
-		// A declared auxiliary is validated whichever arm is selected.
+		// A declared room member is validated whichever arm is selected.
 		expect(() =>
-			validateStudyMemoryProfile({ ...bare, room: { ...bare.room, recap: 0 } }, ['full']),
+			validateStudyMemoryProfile({ ...bare, room: { ...bare.room, output: 0 } }, ['full']),
 		).toThrow('Memory room declaration is invalid')
 		expect(() =>
 			validateStudyMemoryProfile(
@@ -205,54 +167,25 @@ describe('memory declaration and mechanical evidence', () => {
 		).toThrow('Memory provider declaration is invalid')
 	})
 
-	it('admits absent or valid profile settings, refuses malformed ones and reads the gauge only when explicit', () => {
+	it('admits absent or valid profile settings and refuses malformed ones, a gauge included', () => {
 		const url = 'http://127.0.0.1:7'
-		for (const settings of [undefined, {}, { observe: true }, STUDY_MEMORY_SETTINGS])
+		for (const settings of [undefined, {}, { observe: true }])
 			expect(() =>
 				validateStudyMemoryProfile(buildMemoryProfile({ url, settings }), ['records', 'full']),
 			).not.toThrow()
 		for (const settings of [
 			{ extra: 1 },
-			{ gauge: { scale: 0, overhead: 0 } },
+			{ gauge: { scale: 1, overhead: 0 } },
 			{ checkpoints: ['a'] },
 		])
 			expect(() =>
 				validateStudyMemoryProfile(buildMemoryProfile({ url, settings }), ['records', 'full']),
 			).toThrow('settings')
-		const declared = { scale: 2, overhead: 5 }
-		const gauge = readStudyMemoryGauge({ gauge: declared, observe: false })
-		expect(gauge).toEqual(declared)
-		expect(gauge).not.toBe(declared)
-		for (const settings of [
-			undefined,
-			null,
-			{},
-			{ observe: true },
-			{ gauge: { scale: 1 } },
-			{ gauge: { scale: 0, overhead: 0 } },
-			{ gauge: { scale: 1, overhead: 0 }, extra: 1 },
-		])
-			expect(() => readStudyMemoryGauge(settings)).toThrow(
-				expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('gauge') }),
-			)
 	})
 
-	it('reads the compaction declarations together and the judge only where one is declared', () => {
-		const profile = buildMemoryProfile({
-			url: 'http://127.0.0.1:7',
-			settings: { gauge: { scale: 2, overhead: 5 } },
-		})
-		expect(readStudyMemoryRecap(profile.room)).toBe(256)
-		expect(readStudyMemoryCompaction(profile)).toEqual({
-			gauge: { scale: 2, overhead: 5 },
-			recap: 256,
-		})
+	it('reads the judge only where one is declared', () => {
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const bare = omitMemoryAuxiliaries(profile)
-		expect(() => readStudyMemoryRecap(bare.room)).toThrow(
-			expect.objectContaining({ code: 'CONFIG', message: expect.stringContaining('recap') }),
-		)
-		expect(() => readStudyMemoryCompaction(bare)).toThrow('recap')
-		expect(() => readStudyMemoryCompaction({ ...profile, settings: undefined })).toThrow('gauge')
 		const declared = profile.provider
 		const undeclared = bare.provider
 		if (declared === undefined || undeclared === undefined)
@@ -268,7 +201,7 @@ describe('memory declaration and mechanical evidence', () => {
 			observe: false,
 			checkpoints: new Set(),
 		})
-		for (const settings of [{}, { observe: false }, STUDY_MEMORY_SETTINGS])
+		for (const settings of [{}, { observe: false }])
 			expect(resolveStudyMemoryObservation(settings)).toEqual({
 				observe: false,
 				checkpoints: new Set(),
@@ -279,7 +212,6 @@ describe('memory declaration and mechanical evidence', () => {
 		})
 		expect(
 			resolveStudyMemoryObservation({
-				...STUDY_MEMORY_SETTINGS,
 				observe: true,
 				checkpoints: ['a', 'b'],
 			}),
@@ -305,17 +237,6 @@ describe('memory declaration and mechanical evidence', () => {
 			length: true,
 		}
 		expect(buildStudyMemoryRoles(profile, 'full')).toEqual({ agent })
-		// Compaction alone declares the summary role and the strict native flags on every chat role.
-		expect(buildStudyMemoryRoles(profile, 'compaction')).toEqual({
-			agent: { ...agent, strict: true },
-			summary: {
-				model: 'model',
-				options: { num_ctx: 32768, num_predict: 256, ...STUDY_MEMORY_PARAMETER_PINS.summary },
-				think: false,
-				strict: true,
-				length: false,
-			},
-		})
 		// Records alone declares the one-token judge, which sends no strict fields.
 		expect(buildStudyMemoryRoles(profile, 'records')).toEqual({
 			agent,
@@ -337,7 +258,6 @@ describe('memory declaration and mechanical evidence', () => {
 		})
 		const bare = omitMemoryAuxiliaries(profile)
 		expect(buildStudyMemoryRoles(bare, 'full')).toEqual({ agent })
-		expect(() => buildStudyMemoryRoles(bare, 'compaction')).toThrow('recap')
 		expect(() => buildStudyMemoryRoles(bare, 'records')).toThrow('judge')
 		expect(() => buildStudyMemoryRoles({ ...profile, provider: undefined }, 'full')).toThrow(
 			expect.objectContaining({ code: 'CONFIG' }),
@@ -347,12 +267,8 @@ describe('memory declaration and mechanical evidence', () => {
 	it('places only the records judge and preserves serialized options without placement', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const placed = { ...profile, settings: { judge: { gpu: 0 } } }
-		for (const arm of ['full', 'compaction'] as const) {
-			const original = buildStudyMemoryRoles(profile, arm)
-			const roles = buildStudyMemoryRoles(placed, arm)
-			expect(roles).toEqual(original)
-			expect(roles.judge).toBeUndefined()
-		}
+		expect(buildStudyMemoryRoles(placed, 'full')).toEqual(buildStudyMemoryRoles(profile, 'full'))
+		expect(buildStudyMemoryRoles(placed, 'full').judge).toBeUndefined()
 		const original = buildStudyMemoryRoles(profile, 'records')
 		const roles = buildStudyMemoryRoles(placed, 'records')
 		expect(roles.agent).toEqual(original.agent)
@@ -369,18 +285,16 @@ describe('memory declaration and mechanical evidence', () => {
 
 	it('every role sends every pinned sampling key', () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
-		const budgets = { agent: 512, summary: 256, judge: 1 }
-		const sent = (['full', 'compaction', 'records'] as const).flatMap((arm) => {
+		const budgets = { agent: 512, judge: 1 }
+		const sent = (['full', 'records'] as const).flatMap((arm) => {
 			const roles = buildStudyMemoryRoles(profile, arm)
-			return (['agent', 'summary', 'judge'] as const).flatMap((role) => {
+			return (['agent', 'judge'] as const).flatMap((role) => {
 				const options = roles[role]?.options
 				return options === undefined ? [] : [{ arm, role, options }]
 			})
 		})
 		expect(sent.map((entry) => [entry.arm, entry.role])).toEqual([
 			['full', 'agent'],
-			['compaction', 'agent'],
-			['compaction', 'summary'],
 			['records', 'agent'],
 			['records', 'judge'],
 		])
@@ -410,10 +324,9 @@ describe('memory declaration and mechanical evidence', () => {
 			explicit: new Map<string, StudyMemoryProvenance>([
 				['in', { origin: 'input', source: 'opening' }],
 				['ar', { origin: 'arrival', source: 'source-1' }],
-				['ti', { origin: 'instructions', source: 'summary' }],
+				['ti', { origin: 'instructions', source: 'triage' }],
 			]),
-			sections: new Set(['sec']),
-			members: new Set(['in', 'sec', 'kept', 'tool', 'rules']),
+			members: new Set(['in', 'kept', 'tool', 'rules']),
 			composed: false,
 		}
 		const composed = { ...source, composed: true }
@@ -435,14 +348,8 @@ describe('memory declaration and mechanical evidence', () => {
 			[
 				'explicit instruction beats system role',
 				{ id: 'ti', role: 'system', content: 'x' },
-				{ origin: 'instructions', source: 'summary' },
-				{ origin: 'instructions', source: 'summary' },
-			],
-			[
-				'section recap beats membership',
-				{ id: 'sec', role: 'assistant', content: 'x' },
-				{ origin: 'summary', source: 'sec' },
-				{ origin: 'summary', source: 'sec' },
+				{ origin: 'instructions', source: 'triage' },
+				{ origin: 'instructions', source: 'triage' },
 			],
 			[
 				'tool by role beats membership',
@@ -487,7 +394,6 @@ describe('memory declaration and mechanical evidence', () => {
 			explicit: new Map<string, StudyMemoryProvenance>([
 				['d', { origin: 'arrival', source: 'source-1' }],
 			]),
-			sections: new Set<string>(),
 			members: new Set(['x']),
 			composed: false,
 		}
@@ -551,19 +457,6 @@ function literals(text: string): ReadonlySet<string> {
 describe('memory measurement instruments', () => {
 	it('pins the ledger repeat reason', () => {
 		expect(STUDY_MEMORY_LEDGER_REPEAT).toBe(STUDY_MEMORY_MODULES.agent.LEDGER_NOTES.repeat)
-	})
-
-	it('reads literal retention over the recurring ids and fails the recap-only control', () => {
-		const { history, later, anchored, recap } = MEMORY_RETENTION
-		expect(computeStudyMemoryRetention({ history, later, view: anchored, literals })).toEqual({
-			found: 2,
-			total: 2,
-		})
-		const control = computeStudyMemoryRetention({ history, later, view: recap, literals })
-		expect(control.found).toBe(0)
-		expect(control.found).toBeLessThan(2)
-		// CC-303 sits in history and view but never recurs, so it adds nothing to the population.
-		expect(computeStudyMemoryRetention({ history, later, view: anchored, literals }).total).toBe(2)
 	})
 
 	it('reads carriage over the product ids and fails the seed-only control', () => {

@@ -5,8 +5,6 @@ import {
 	createOnceFailingJudge,
 	LEDGER_ONCE_FAILURES,
 	createSettledJudge,
-	REWRITTEN_CONVERSATION_SNAPSHOT,
-	SUMMARIZED_CONVERSATION_SNAPSHOT,
 	buildJudgmentRecords,
 	buildLedgerBenchOptions,
 	buildLedgerBlock,
@@ -47,7 +45,6 @@ import {
 	collectMessageThinking,
 	createBoundedRelay,
 	buildGuideLedgerOptions,
-	measureMessages,
 	readCallRequest,
 } from './setup.js'
 import {
@@ -86,12 +83,10 @@ import {
 	collectPaced,
 	AccessedAgentResult,
 	createInvalidAgentResultCases,
-	seedCompactionAgent,
 	seedLookupAgent,
 	requestConversation,
 	createConversationEchoProvider,
 	createEchoProvider,
-	createAnswerProvider,
 	createTurnRegistry,
 	createInterleavedThinkingProvider,
 	createPacedProvider,
@@ -119,7 +114,6 @@ import {
 	MALFORMED_CONVERSATION_SNAPSHOTS,
 	MESSAGE_GUARD_CASES,
 	RECORDED_ANSWER_REQUEST,
-	RECORDED_COMPACTION_REQUEST,
 	RECORDED_FIRST_REQUEST,
 	RECORDED_LATE_REQUEST,
 	REFUSED_WIRE_ANSWERS,
@@ -136,7 +130,6 @@ import {
 	extractLedgerRecords,
 	readWireFrames,
 	seedCanaryContext,
-	seedCompactionArm,
 	serveCanaryDesk,
 	serveIngressCanary,
 	serveRecordsDesk,
@@ -156,7 +149,6 @@ import {
 	LedgerError,
 	LEDGER_QUESTIONS,
 	buildRecords,
-	CONVERSATION_RECAP_PREFIX,
 	createSystemOneJudge,
 	ConversationManager,
 	createConversation,
@@ -203,7 +195,7 @@ import {
 	JUDGE_PROTOCOL_CASES,
 	buildConversationSnapshot,
 	chunkWholeDelta,
-	compactSeedTurns,
+	addSeedTurns,
 	CONVERSATION_STORE_ROUND_TRIP_EXPECTATION,
 	createAddTool,
 	createAgentJob,
@@ -221,7 +213,6 @@ import {
 	createScriptedProvider,
 	createSeededToolManager,
 	createStreamingTransport,
-	createStubSummarizer,
 	createTokenUsage,
 	createToolCall,
 	drainProvider,
@@ -240,7 +231,6 @@ import {
 	SYSTEM_ONE_TEV1,
 	recordGlobalTransport,
 	rejectTransportOnAbort,
-	renderRecap,
 	resolveSectionOpen,
 	resolveSectionRender,
 	returnDomain,
@@ -405,11 +395,7 @@ describe('agent scenario infrastructure', () => {
 		expect(cases.map(([name]) => name)).toContain('revoked root proxy')
 	})
 
-	it('seeds the compaction scenario and drives a named conversation request', async () => {
-		const seeded = seedCompactionAgent(undefined)
-		expect(seeded.conversation.messages().map((message) => message.content)).toEqual(['go'])
-		expect(seeded.agent.context.tools.definitions().map((tool) => tool.name)).toEqual(['add'])
-		expect((await seeded.agent.generate()).content).toBe('the answer is 42')
+	it('drives a named conversation request', async () => {
 		const agent = createAgent(createConversationEchoProvider())
 		const result = await requestConversation(
 			agent,
@@ -423,9 +409,6 @@ describe('agent scenario infrastructure', () => {
 			(await createEchoProvider().generate([createMessage('input')], new AbortController().signal))
 				.content,
 		).toBe('ok:input')
-		expect((await createAnswerProvider().generate([], new AbortController().signal)).content).toBe(
-			'final answer',
-		)
 		expect(
 			(await createTurnRegistry({ content: 'registered' }).build(createAgentJob()).generate())
 				.content,
@@ -865,11 +848,9 @@ describe('agent data builders', () => {
 			content: '',
 			thinking: undefined,
 			usage: undefined,
-			spent: undefined,
 			messages: [],
 			outcome: 'answer',
 			partial: false,
-			futile: false,
 			estimate: 0,
 			interrupted: false,
 			truncated: false,
@@ -913,24 +894,6 @@ describe('canonical tools', () => {
 	it('mints an independent tool on every call', () => {
 		expect(createAddTool()).not.toBe(createAddTool())
 		expect(createLoopTool()).not.toBe(createLoopTool())
-	})
-})
-
-describe('createStubSummarizer', () => {
-	it('digests a slice into its folded count and records every slice digested', async () => {
-		const stub = createStubSummarizer()
-		const pair: readonly Message[] = [
-			{ id: 'a', role: 'user', content: 'first' },
-			{ id: 'b', role: 'assistant', content: 'second' },
-		]
-		const single: readonly Message[] = [{ id: 'c', role: 'user', content: 'third' }]
-		const digests = [await stub.summarize(pair), await stub.summarize(single)]
-		// The digest names the slice's own length, so two different slices digest differently —
-		// the property a compaction test leans on when it reads a section summary back.
-		expect(digests).toEqual(['recap of 2', 'recap of 1'])
-		// The recorder holds each digested slice in order, so a test can prove the summarizer
-		// calls one compaction makes.
-		expect(stub.calls).toEqual([pair, single])
 	})
 })
 
@@ -1052,24 +1015,17 @@ describe('ScriptedReads', () => {
 })
 
 describe('buildConversationSnapshot', () => {
-	it('folds the oldest turns into one summarized section and keeps the last live', async () => {
+	it('holds three turns and one judgment that quotes the first', async () => {
 		const snapshot = await buildConversationSnapshot()
-		expect(snapshot.sections).toHaveLength(1)
-		const section = snapshot.sections[0]
-		if (section === undefined) throw new Error('expected one compacted section')
-		// The fold is non-vacuous on BOTH halves: the section retained more than one original
-		// and the live tail still carries the kept turn.
-		expect(section.messages.length).toBeGreaterThan(1)
-		expect(snapshot.messages).toHaveLength(1)
-		// The section matches the declared literals, not a formula the module folded with.
-		expect(section.summary).toBe(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.summary)
-		expect(section.messages.map((message) => message.content)).toEqual(
-			CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages,
+		// The snapshot matches the declared literals, not a formula the module built with.
+		expect(snapshot.messages.map((message) => message.content)).toEqual(
+			CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.messages,
 		)
-		expect('summary' in snapshot).toBe(false)
-		// The folded originals never linger in the live tail.
-		const live = snapshot.messages.map((message) => message.id)
-		expect(section.messages.some((message) => live.includes(message.id))).toBe(false)
+		expect(snapshot.judgments?.map((judgment) => judgment.id)).toEqual(
+			CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.judgments,
+		)
+		expect(snapshot.judgments?.[0]?.sources).toEqual([snapshot.messages[0]?.id])
+		expect(isConversationSnapshot(snapshot)).toBe(true)
 	})
 
 	it('takes the conversation id from its argument and defaults to chat', async () => {
@@ -1083,22 +1039,18 @@ describe('buildConversationSnapshot', () => {
 // stopped returning a real result, or returned one a conforming store cannot satisfy, reddens this
 // file. The store twins keep their own registration and their own twin-specific blocks.
 describe('conversation-store contract scenarios run against a conforming store', () => {
-	describe('set → get round-trip (sections + live tail)', () => {
-		it('set → get returns an equal snapshot (sections + tail survive)', async () => {
+	describe('set → get round-trip (messages + judgments)', () => {
+		it('set → get returns an equal snapshot (messages + judgments survive)', async () => {
 			const { snapshot, got } = await exerciseConversationStoreRoundTrip(
 				createMemoryConversationStore,
 				buildConversationSnapshot,
 			)
 			expect(got).toEqual(snapshot)
-			expect(got?.sections).toHaveLength(1)
-			expect(got?.sections[0]?.summary).toBe(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.summary,
-			)
-			expect(got?.sections[0]?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages,
-			)
 			expect(got?.messages.map((message) => message.content)).toEqual(
-				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.tail,
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.messages,
+			)
+			expect(got?.judgments?.map((judgment) => judgment.id)).toEqual(
+				CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.judgments,
 			)
 		})
 	})
@@ -1424,10 +1376,9 @@ describe('system boundary canary fixtures', () => {
 			'scan.png',
 			'notes.txt',
 		])
-		expect(conversation.sections.map((section) => section.summary)).toEqual([
-			CANARY_SENTINELS.summary,
-		])
 		expect(conversation.messages().map((message) => message.content)).toEqual([
+			'Open the desk.',
+			'The desk is open.',
 			`Ask ${CANARY_SENTINELS.user} now.`,
 			`Check ${CANARY_SENTINELS.assistant} first.`,
 			`Found ${CANARY_SENTINELS.tool} only.`,
@@ -1456,26 +1407,11 @@ describe('system boundary canary fixtures', () => {
 		).toEqual(['Check Brightwater Studio.', 'Check Brightwater Studio again.'])
 	})
 
-	it('seeds the compaction arm with a desk instruction and one compacted section', async () => {
-		const agent = await seedCompactionArm(createScriptedProvider([{ content: 'x' }]))
-		const conversation = requireValue(agent.context.conversations.active)
-
-		expect(agent.context.system).toBeUndefined()
-		expect(agent.context.instructions.instructions().map((one) => one.name)).toEqual(['desk'])
-		expect(conversation.sections.map((section) => section.summary)).toEqual(['recap of 2'])
-		expect(conversation.messages().map((message) => message.content)).toEqual([
-			'Order 2 shipped.',
-			'Noted.',
-			'Which orders shipped?',
-		])
-	})
-
 	it('pins each recorded arm with one system message first and a user message last', () => {
 		for (const recorded of [
 			RECORDED_FIRST_REQUEST,
 			RECORDED_ANSWER_REQUEST,
 			RECORDED_LATE_REQUEST,
-			RECORDED_COMPACTION_REQUEST,
 		]) {
 			expect(recorded.filter((message) => message.role === 'system')).toHaveLength(1)
 			expect(recorded[0]?.role).toBe('system')
@@ -1715,41 +1651,24 @@ describe('resolveSectionOpen / resolveSectionRender', () => {
 })
 
 describe('seedConversation', () => {
-	it('registers a conversation carrying a compacted section and a live tail', async () => {
-		const manager = new ConversationManager({
-			summarize: createStubSummarizer().summarize,
-			keep: 1,
-		})
-		await seedConversation(manager, 'doc')
+	it('registers and returns a conversation holding the three seed turns', () => {
+		const manager = new ConversationManager()
+		const seeded = seedConversation(manager, 'doc')
 
-		const conversation = requireValue(manager.conversation('doc'))
-		// Three turns added, `keep: 1` folds the oldest two into one summarized section.
-		expect(conversation.sections).toHaveLength(1)
-		expect(requireValue(conversation.sections[0]).messages.map((one) => one.content)).toEqual([
-			'first',
-			'second',
-		])
-		expect(conversation.messages().map((one) => one.content)).toEqual(['third'])
+		expect(manager.conversation('doc')).toBe(seeded)
+		expect(seeded.messages().map((one) => one.content)).toEqual(['first', 'second', 'third'])
 	})
 })
 
 describe('buildCallsSnapshot', () => {
-	it('plants the calls value on the one live assistant message of an otherwise valid snapshot', () => {
+	it('plants the calls value on the one assistant message of an otherwise valid snapshot', () => {
 		const calls = [{ id: 'c1', name: 'search', arguments: { q: 'acme' } }]
 		expect(buildCallsSnapshot(calls)).toEqual({
 			id: 'c',
-			sections: [],
 			messages: [{ id: 'a1', role: 'assistant', content: '', calls }],
 		})
 		expect(isConversationSnapshot(buildCallsSnapshot(calls))).toBe(true)
 		expect(isConversationSnapshot(buildCallsSnapshot([null]))).toBe(false)
-	})
-})
-
-describe('renderRecap', () => {
-	it('prefixes the summary with the exported recap prefix', () => {
-		expect(renderRecap('recap of 2')).toBe('[Summary of earlier messages] recap of 2')
-		expect(renderRecap('')).toBe(CONVERSATION_RECAP_PREFIX)
 	})
 })
 
@@ -2024,29 +1943,21 @@ describe('buildMemoSnapshot', () => {
 	})
 })
 
-describe('compactSeedTurns', () => {
-	it('adds three turns and folds the oldest two into one summarized section', async () => {
-		const conversation = createConversation({
-			summarize: createStubSummarizer().summarize,
-			keep: 1,
-		})
-		await compactSeedTurns(conversation)
+describe('addSeedTurns', () => {
+	it('adds three turns and returns them in insertion order', () => {
+		const conversation = createConversation()
+		const added = addSeedTurns(conversation)
 
-		expect(conversation.sections).toHaveLength(1)
-		expect(requireValue(conversation.sections[0]).messages.map((one) => one.content)).toEqual([
-			'first',
-			'second',
-		])
-		expect(conversation.messages().map((one) => one.content)).toEqual(['third'])
+		expect(added.map((one) => one.content)).toEqual(['first', 'second', 'third'])
+		expect(conversation.messages()).toEqual(added)
 	})
 })
 
 describe('CONVERSATION_STORE_ROUND_TRIP_EXPECTATION', () => {
 	it('freezes the declaration and its lists', () => {
 		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION)).toBe(true)
-		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section)).toBe(true)
-		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.section.messages)).toBe(true)
-		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.tail)).toBe(true)
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.messages)).toBe(true)
+		expect(Object.isFrozen(CONVERSATION_STORE_ROUND_TRIP_EXPECTATION.judgments)).toBe(true)
 	})
 })
 
@@ -2084,11 +1995,6 @@ describe('judge fixtures', () => {
 		const request = { state: 'text', questions: {} }
 		expect(await createSettledJudge(result).ask(request, signal)).toBe(result)
 		await expect(createFailingJudge(failure).ask(request, signal)).rejects.toBe(failure)
-	})
-
-	it('rewrites the summarized snapshot without its summary, keeping the rest', () => {
-		const { summary: _summary, ...rewritten } = SUMMARIZED_CONVERSATION_SNAPSHOT
-		expect(REWRITTEN_CONVERSATION_SNAPSHOT).toEqual(rewritten)
 	})
 })
 
@@ -2493,7 +2399,7 @@ describe('ledger setup leaves', () => {
 		const fixture = LEDGER_TRIM_ORDER_FIXTURE
 		const ledger = createLedger(createScriptedProvider([]), buildLedgerOptions())
 		seedLedgerTrimOrder(ledger)
-		expect(ledger.conversation.view().map((message) => message.content)).toEqual([
+		expect(ledger.conversation.messages().map((message) => message.content)).toEqual([
 			'',
 			fixture.seed,
 			fixture.older,
@@ -2663,16 +2569,8 @@ describe('guide scenario fixtures', () => {
 		expect(outcome.result.content).toBe('Refunded $148.50.')
 		expect((await exerciseThinkingReplay(undefined)).sent).toEqual([[], []])
 	})
-	it('measures only request messages and reads a recorded call as its request', () => {
+	it('reads a recorded call as its request', () => {
 		const hello = [createMessage('hello')]
-		// 'hello' is 2 tokens plus 4 of framing; the tool list and schema are not counted.
-		expect(
-			measureMessages({
-				messages: hello,
-				tools: [{ name: 'lookup', description: 'Finds a ticket.', parameters: { type: 'object' } }],
-				options: { schema: { type: 'object' } },
-			}),
-		).toBe(6)
 		const signal = new AbortController().signal
 		expect(
 			readCallRequest({ messages: hello, tools: undefined, options: undefined, signal }),
@@ -3245,10 +3143,7 @@ describe('malformed conversation cases', () => {
 					typeof value === 'object' &&
 						value !== null &&
 						typeof Reflect.get(value, 'id') === 'string' &&
-						typeof Reflect.get(value, 'summarizable') === 'boolean' &&
-						['view', 'add', 'compact', 'messages'].every(
-							(key) => typeof Reflect.get(value, key) === 'function',
-						),
+						['add', 'messages'].every((key) => typeof Reflect.get(value, key) === 'function'),
 				]
 			} catch {
 				return [title, false]

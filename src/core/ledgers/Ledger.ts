@@ -1283,7 +1283,7 @@ export class Ledger implements LedgerInterface {
 			this.#current()?.file([])
 		return {
 			...filed,
-			messages: conversation.view(),
+			messages: conversation.messages(),
 			fault: isError(error) ? error : new Error(String(error)),
 		}
 	}

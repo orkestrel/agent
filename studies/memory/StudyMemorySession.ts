@@ -1,10 +1,4 @@
-import type {
-	AgentInterface,
-	AuthorityContext,
-	ConversationInterface,
-	LedgerInterface,
-	ProviderRequest,
-} from '@orkestrel/agent'
+import type { AgentInterface, ConversationInterface, LedgerInterface } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { ToolContext, ToolManagerInterface } from '@orkestrel/tool'
 import type { StudyContext, StudyGoal, StudyProduct, StudySessionInterface } from '@orkestrel/study'
@@ -16,13 +10,11 @@ import type {
 	StudyMemorySessionOptions,
 	StudyMemoryObservation,
 } from './types.js'
-import { createBudget } from '@orkestrel/budget'
-import { canonicalStringify, cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
+import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
 	STUDY_CHECKPOINT_EVENT,
-	StudyAgentSummary,
 	StudyAgentTrace,
 	StudyOllamaTransport,
 	buildStudyAgentAttempts,
@@ -33,8 +25,6 @@ import {
 import {
 	STUDY_MEMORY_JUDGE,
 	STUDY_MEMORY_METADATA,
-	STUDY_MEMORY_REPEAT,
-	STUDY_MEMORY_SUMMARY,
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
@@ -42,7 +32,6 @@ import {
 import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
-	readStudyMemoryCompaction,
 	resolveStudyMemoryObservation,
 } from './helpers.js'
 import { isStudyMemoryInput, isStudyMemoryOptions, isStudyMemoryRuntime } from './validators.js'
@@ -62,25 +51,18 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #abort = new AbortController()
 	readonly #arrivals = new Set<string>()
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
-	// Message ids this consumer added or named, joined to their origin; the summary instruction is fixed.
-	readonly #explicit = new Map<string, StudyMemoryProvenance>([
-		['summary-instruction', { origin: 'instructions', source: 'summary' }],
-	])
+	// Message ids this consumer added or named, joined to their origin.
+	readonly #explicit = new Map<string, StudyMemoryProvenance>()
 	// The goal in flight: added when it starts, deleted on every path that ends it, and capped at one by the busy refusal.
 	readonly #live = new Set<StudyOllamaActivity>()
 	readonly #flights = new Set<Promise<StudyProduct>>()
 	// A recording's declared goal range, so its preflight and postflight join the range's two ends.
 	readonly #goals: readonly string[] | undefined
-	// The calls the compaction arm dispatched in this run, replaced on each admission as `LedgerRequest` replaces its own.
-	#repeats: ReadonlySet<string> = new Set()
 	#input: string | undefined
 	#closed: Promise<void> | undefined
 
 	/** Composes a fresh real runtime from admitted public factories. @param options - Trial dependencies and memory treatment. */
 	constructor(options: StudyMemorySessionOptions) {
-		const compaction =
-			options.arm === 'compaction' ? readStudyMemoryCompaction(options.profile) : undefined
-		const gauge = compaction?.gauge
 		this.#options = options
 		const seed = options.seed
 		for (const record of seed?.records ?? [])
@@ -134,32 +116,10 @@ export class StudyMemorySession implements StudySessionInterface {
 					this.#transport.fetch('agent', input, init, this.#trace.canonical('agent')),
 			}),
 			runtime: options.agent,
-			gauge,
-			enforced: gauge !== undefined,
+			gauge: undefined,
+			enforced: false,
 			record: (measurement, request) => this.#trace.record(measurement, request),
 		})
-		const recap = compaction === undefined ? undefined : roles.summary
-		if (compaction !== undefined && recap === undefined)
-			throw new StudyError('CONFIG', 'Memory compaction requires a summary role')
-		const summary =
-			compaction === undefined || recap === undefined
-				? undefined
-				: new StudyAgentSummary({
-						provider: options.provider.createOllama({
-							...buildStudyOllamaOptions(recap),
-							url: provider.url,
-							timeout: options.profile.bounds.request.duration,
-							fetch: (input, init) =>
-								this.#transport.fetch('summary', input, init, this.#trace.canonical('summary')),
-						}),
-						runtime: options.agent,
-						trace: this.#trace,
-						latch: this.#transport,
-						gauge: compaction.gauge,
-						limit: room.context - compaction.recap - room.safety,
-						instruction: { id: 'summary-instruction', role: 'user', content: STUDY_MEMORY_SUMMARY },
-						signal: options.signal,
-					})
 		// The raw triage: `#lookup` owns a malformed call, which settles the trial with its known cost.
 		const lookup = createTool({
 			name: 'lookup',
@@ -253,16 +213,10 @@ export class StudyMemorySession implements StudySessionInterface {
 		} else {
 			this.#ledger = undefined
 			const conversations = options.agent.createConversationManager()
-			const held = seed?.conversation === undefined ? {} : { snapshot: seed.conversation }
 			this.#conversation = conversations.add(
-				summary === undefined
-					? held
-					: {
-							...held,
-							keep: 2,
-							summarize: (messages, signal) => summary.summarize(messages, signal),
-						},
+				seed?.conversation === undefined ? {} : { snapshot: seed.conversation },
 			)
+			// The control sends the whole conversation, as a plain agent does.
 			this.#agent = new options.agent.Agent(observer, {
 				conversations,
 				tools: this.#tools,
@@ -270,34 +224,11 @@ export class StudyMemorySession implements StudySessionInterface {
 				limit: 8,
 				timeout: options.profile.bounds.goal.duration,
 				signal: options.signal,
-				...(compaction === undefined
-					? {
-							authority: options.agent.createAuthority({
-								fallback: { zone: 'study', verdict: 'allow' },
-							}),
-						}
-					: {
-							window: createBudget<ProviderRequest>({
-								max: room.context - room.output - room.safety,
-								consumer: (request) => this.#trace.admit(request, compaction.gauge),
-							}),
-							authority: options.agent.createAuthority({
-								rules: [
-									{
-										match: (context) => this.#repeat(context),
-										zone: 'study',
-										verdict: 'deny',
-										reason: STUDY_MEMORY_REPEAT,
-									},
-								],
-								fallback: { zone: 'study', verdict: 'allow' },
-							}),
-						}),
+				authority: options.agent.createAuthority({
+					fallback: { zone: 'study', verdict: 'allow' },
+				}),
 				on: {
 					fault: (error) => this.#trace.translate(error),
-					start: () => {
-						this.#repeats = new Set()
-					},
 					deny: (call, reason) =>
 						this.#trace.append('denial', buildStudyAgentToolDenial(call, reason)),
 				},
@@ -336,7 +267,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		const activity = { goal, context, checkpoint: this.#checkpoint(goal, input) }
 		this.#transport.prepare(activity)
 		this.#trace.start(goal)
-		// The previous goal's input is history now; membership or a section names it from here on.
+		// The previous goal's input is history now; membership names it from here on.
 		if (this.#input !== undefined) this.#explicit.delete(this.#input)
 		this.#input = undefined
 		this.#live.add(activity)
@@ -418,20 +349,9 @@ export class StudyMemorySession implements StudySessionInterface {
 		}
 	}
 
-	// Keys one dispatched call as `LedgerRequest` keys its own; the authority evaluates each call once.
-	#repeat(context: AuthorityContext): boolean {
-		const key = canonicalStringify([context.call.name, context.call.arguments])
-		if (key === undefined)
-			throw new StudyError('FAULT', 'Tool arguments have no canonical identity')
-		if (this.#repeats.has(key)) return true
-		this.#repeats = new Set([...this.#repeats, key])
-		return false
-	}
-
 	#provenance(): StudyMemoryProvenanceSource {
 		return {
 			explicit: this.#explicit,
-			sections: new Set(this.#conversation.sections.map((section) => section.id)),
 			members: new Set(this.#conversation.messages().map((message) => message.id)),
 			composed: this.#options.arm === 'records',
 		}
@@ -519,6 +439,6 @@ export class StudyMemorySession implements StudySessionInterface {
 		this.#tools.destroy()
 		this.#agent?.emitter.destroy()
 		this.#ledger?.agent.emitter.destroy()
-		this.#conversation.emitter.destroy()
+		this.#conversation.destroy()
 	}
 }

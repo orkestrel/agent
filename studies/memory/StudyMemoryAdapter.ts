@@ -7,16 +7,14 @@ import type {
 	StudyProgressTarget,
 	StudyValidation,
 } from '@orkestrel/study/server'
-import { isJSONValue } from '@orkestrel/contract'
+import { isJSONValue, preview } from '@orkestrel/contract'
 import { StudyError } from '@orkestrel/study'
 import { gradeStudyEvidence } from '@orkestrel/study/server'
 import {
-	readStudyMemoryCompaction,
 	readStudyMemoryGrade,
 	readStudyMemoryProgress,
 	validateStudyMemoryCheckpoints,
 	validateStudyMemoryProfile,
-	validateStudyMemoryStrategy,
 } from './helpers.js'
 import { StudyMemoryDriver } from './StudyMemoryDriver.js'
 import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from './validators.js'
@@ -31,10 +29,14 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 				'CONFIG',
 				'Memory declaration requires the shared memory driver and supported arms',
 			)
-		validateStudyMemoryStrategy(input.definition.name, arms)
+		// The full conversation is the control, so a declaration without records measures no strategy.
+		if (!arms.includes('records'))
+			throw new StudyError(
+				'CONFIG',
+				`Memory declaration ${preview(input.definition.name)} lists no records arm; list records, with full as the only other arm`,
+			)
 		validateStudyMemoryProfile(input.profile, arms)
 		validateStudyMemoryCheckpoints(input.profile.settings, input.scenarios)
-		if (arms.includes('compaction')) readStudyMemoryCompaction(input.profile)
 		if (input.definition.purpose === 'quality' && input.profile.qualification === undefined)
 			throw new StudyError('CONFIG', 'Memory quality requires a sealed capacity qualification')
 		for (const scenario of input.scenarios)

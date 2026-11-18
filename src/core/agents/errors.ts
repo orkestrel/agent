@@ -129,7 +129,7 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
 // `catch` branches on `error.code`, mirroring `ConversationError` in `conversations/errors.ts`.
 
 /**
- * Reports an `ask` on an authority that has no approver or that its approver refuses, an authority missing its fallback or a rule's verdict, tools set with no authority, a run sharing accounting or a conversation with a live run, a `limit` that is not a positive safe integer, a name absent from a registry pool, a strict run's answer that fails its schema, or a strict run whose request exceeds its window. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise; a `'WINDOW'` refusal rejects the run's `result` instead, and an `'APPROVER'` refusal rejects the promise the `ask` method of an `Authority` or the `ask` handler of an `Approver` returns. Await the call inside `try`/`catch` to catch it.
+ * Reports an `ask` on an authority that has no approver or that its approver refuses, an authority missing its fallback or a rule's verdict, tools set with no authority, a run sharing accounting or a conversation with a live run, a `limit` that is not a positive safe integer, a name absent from a registry pool, or a strict run's answer that fails its schema. Agent construction, the `stream` and `generate` methods, and registry accessors throw synchronously, before returning a handle or promise; a `'SCHEMA'` refusal rejects the run's `result` instead, and an `'APPROVER'` refusal rejects the promise the `ask` method of an `Authority` or the `ask` handler of an `Approver` returns. Await the call inside `try`/`catch` to catch it.
  *
  * @remarks
  * `'APPROVER'` reports an `ask` on an `Authority` built with no `ask` handler, or an ask an
@@ -143,25 +143,22 @@ export function isAgentJobError(value: unknown): value is AgentJobError {
  * without `load`, and a tool manager holding a tool under an enabled built-in's name, each thrown
  * at construction.
  * `'CONCURRENCY'` reports a run started while another run on the same agent is live, when the
- * agent carries a `window` (a shared context budget) or when the run's effective `budget` or
- * `allowance` is an instance a live run holds — the second run's `start()` would replace that
- * instance's signal and race its charges against the first run's — or when a live run is bound to
- * the run's conversation, whose turns the two runs would interleave; its `context` names the
- * `agent` id, and the `conversation` id for a shared conversation. For concurrent runs, use
- * separate agents, or one agent with no `window`, distinct budget and allowance instances per
- * run, and a distinct conversation per run.
+ * run's effective `budget` or `allowance` is an instance a live run holds — the second run's
+ * `start()` would replace that instance's signal and race its charges against the first run's — or
+ * when a live run is bound to the run's conversation, whose turns the two runs would interleave; its
+ * `context` names the `agent` id, and the `conversation` id for a shared conversation. For
+ * concurrent runs, use separate agents, or one agent with distinct budget and allowance instances
+ * per run and a distinct conversation per run.
  * `'LIMIT'` reports a construction or per-run `limit` that is not a positive safe integer.
  * `'REGISTRY'` reports a rehydration name absent from its registry pool, on `provider` / `tool` /
  * `authority` / `scheduler` / `build`, whose `context` names the `category` and the `name`, and a
  * job `build` refuses as a record, whose `context` holds the contract's `faults` or the
- * `refusals` lines `collectJobRefusals` returns. `'WINDOW'` reports a `strict` run whose
- * complete provider request is still over the `window` budget, equal to its `max` included, after
- * the one permitted fold or with no fold possible; it settles the run `error` before the provider
- * is called, and its `context` holds the `agent` id, the measured `consumed`, and the window `max`.
+ * `refusals` lines `collectJobRefusals` returns. `'SCHEMA'` reports a `strict` run whose final
+ * answer fails the run's `schema`; it rejects the run's `result`.
  * Narrow a caught value with {@link isAgentError} and branch on `error.code`.
  */
 export class AgentError extends Error {
-	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver, or one its approver refuses; `'AUTHORITY'`: an authority missing its fallback or a rule's verdict, or tools set with no authority; `'BUILTIN'`: a built-in list the agent cannot serve; `'CONCURRENCY'`: a run sharing accounting or a conversation with a live run; `'LIMIT'`: a `limit` that is not a positive safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'WINDOW'`: a strict run whose complete request is still over its window budget. */
+	/** Names the machine-readable condition — `'APPROVER'`: an `ask` on an authority that has no approver, or one its approver refuses; `'AUTHORITY'`: an authority missing its fallback or a rule's verdict, or tools set with no authority; `'BUILTIN'`: a built-in list the agent cannot serve; `'CONCURRENCY'`: a run sharing accounting or a conversation with a live run; `'LIMIT'`: a `limit` that is not a positive safe integer; `'REGISTRY'`: a rehydration name absent from its registry pool; `'SCHEMA'`: a strict run's final answer that fails the run's schema. */
 	readonly code: AgentErrorCode
 	/** Holds the values that locate the failure, such as the `agent` id of a refused run, or `undefined` when none were supplied. */
 	readonly context: Readonly<Record<string, unknown>> | undefined
@@ -217,8 +214,7 @@ export function isAgentError(value: unknown): value is AgentError {
 				code === 'CONCURRENCY' ||
 				code === 'LIMIT' ||
 				code === 'REGISTRY' ||
-				code === 'SCHEMA' ||
-				code === 'WINDOW'
+				code === 'SCHEMA'
 			)
 		)
 			return false

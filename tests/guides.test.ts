@@ -27,7 +27,6 @@ import type {
 	ProviderRequest,
 	ProviderResult,
 	ScopeInterface,
-	Section,
 	Selection,
 	SelectionHandler,
 } from '@src/core'
@@ -145,7 +144,7 @@ await new GuideCommand({
 	const { createAbort } = await import('@orkestrel/abort')
 	const { createTool, createToolManager } = await import('@orkestrel/tool')
 	const { createMemoryDriver } = await import('@orkestrel/database')
-	const { createBudget, createTokenBudget } = await import('@orkestrel/budget')
+	const { createTokenBudget } = await import('@orkestrel/budget')
 	const { createRunner } = await import('@orkestrel/workflow')
 	// The relay fence's server half: its router and its adapter are the server application's
 	// dependencies, declared here for development so the transcription can run the real hop.
@@ -173,7 +172,6 @@ await new GuideCommand({
 		createSystemOneJudge,
 		DEFAULT_LEDGER_SHARE,
 		estimateMessages,
-		estimateRequest,
 		Gauge,
 		isJudgeAbortError,
 		isJudgeEntry,
@@ -240,7 +238,6 @@ await new GuideCommand({
 		buildGuideLedgerOptions,
 		createRecordedSelection,
 		createScriptedProvider,
-		createStubSummarizer,
 		createToolCall,
 		drainProvider,
 		FailingProvider,
@@ -681,58 +678,6 @@ await new GuideCommand({
 			])
 		})
 
-		it('carries the applied scope’s prompt from a compaction rebuild (the scope-timing rule)', async () => {
-			const tools = createToolManager()
-			tools.add(['search', 'delete'].map((name) => createTool({ name, execute: () => name })))
-			const conversations = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-				keep: 0,
-			})
-			// An earlier exchange gives the between-turns fold a slice before the run's request.
-			conversations.add().add([
-				{ role: 'user', content: 'Earlier question.' },
-				{ role: 'assistant', content: 'Earlier answer.' },
-			])
-			const provider = createScriptedProvider(
-				[
-					{ content: 'x'.repeat(400), tools: [{ id: 'search-1', name: 'search', arguments: {} }] },
-					{ content: 'Three records are stale.' },
-				],
-				{ recorded: true, repeat: false },
-			)
-			const agent = createAgent(provider, {
-				tools,
-				authority: AGENT_AUTHORITY,
-				conversations,
-				strict: false,
-				// This case pins the between-turns rebuild by message arithmetic, so the window explicitly
-				// projects the request's messages and leaves the tool definitions out of the measure.
-				window: createBudget({
-					max: 60,
-					consumer: (request: ProviderRequest) => estimateMessages(request.messages),
-				}),
-				scope: createScope({ name: 'research', instructions: ['safety'], tools: ['search'] }),
-			})
-			agent.context.instructions.add([
-				{ name: 'safety', content: 'Refuse unsafe requests.' },
-				{ name: 'verbose', content: 'Explain every step.' },
-			])
-			agent.emitter.on('tool', () =>
-				agent.context.apply(
-					createScope({ name: 'cleanup', instructions: ['verbose'], tools: ['delete'] }),
-				),
-			)
-			agent.context.messages.add({ role: 'user', content: 'Find the stale records.' })
-			await agent.generate()
-
-			// The between-turns fold rebuilds the prompt, so turn 1 already reads the applied scope.
-			expect(conversations.active?.sections).toHaveLength(1)
-			expect(provider.calls.map((call) => call.messages[0]?.content)).toEqual([
-				'## Instructions\n\nRefuse unsafe requests.',
-				'## Instructions\n\nExplain every step.',
-			])
-		})
-
 		it('keeps every message under a scope that filters every category (the inclusion sentence)', () => {
 			const context = barrel.createAgentContext({
 				scope: createScope({ name: 'none', instructions: [], tools: [], files: [] }),
@@ -748,7 +693,7 @@ await new GuideCommand({
 				'Which invoice?',
 			])
 			expect(guideText).toContain(
-				"The scope's filters never touch messages; message inclusion is the conversation's through compaction and, when a handler is set, the selection's.",
+				"The scope's filters never touch messages; message inclusion is the conversation's and, when a handler is set, the selection's.",
 			)
 		})
 
@@ -950,32 +895,6 @@ await new GuideCommand({
 			expect(guideText).toContain('conversation.snapshot().judgments?.length // 1')
 		})
 
-		it('folds neither the newest user message nor half a call group (the compaction boundary rule)', async () => {
-			// The interjected user message puts the call and its result in two exchanges.
-			const conversation = createConversation({ summarize: createStubSummarizer().summarize })
-			conversation.add([
-				{ role: 'user', content: 'Is the depot open on Friday?' },
-				{ role: 'assistant', content: 'The depot is open on Friday.' },
-				{ role: 'user', content: 'Which order is late?' },
-				{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
-				{ role: 'user', content: 'The printer needs paper.' },
-				{ role: 'tool', content: 'LH-81660 is late', call: 'order' },
-				{ role: 'user', content: 'Who carries it?' },
-			])
-			const split = await conversation.compact({ keep: 2 })
-			const request = createConversation({ summarize: createStubSummarizer().summarize })
-			request.add({ role: 'user', content: 'Look up order LH-81660.' })
-
-			expect(split?.messages.map(({ content }) => content)).toEqual([
-				'Is the depot open on Friday?',
-				'The depot is open on Friday.',
-			])
-			expect(await request.compact()).toBeUndefined()
-			expect(guideText).toContain(
-				'A fold never takes the newest user message or any message after it, because that message is the request a run serves.',
-			)
-		})
-
 		it('keeps the push surface on the Agent, the managers, and each conversation (the observation clause)', () => {
 			const conversations = createConversationManager()
 			const context = barrel.createAgentContext({ conversations })
@@ -1013,18 +932,9 @@ await new GuideCommand({
 			)
 		})
 
-		it('carries each turn index and the rebuilt request after a compaction fold, as the request event claims', async () => {
+		it('carries each turn index and the request the provider receives, as the request event claims', async () => {
 			const tools = createToolManager()
 			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
-			const conversations = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-				keep: 0,
-			})
-			// An earlier exchange gives the fold a slice before the run's request.
-			conversations.add().add([
-				{ role: 'user', content: 'Earlier question.' },
-				{ role: 'assistant', content: 'Earlier answer.' },
-			])
 			const provider = createScriptedProvider(
 				[
 					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
@@ -1032,34 +942,19 @@ await new GuideCommand({
 				],
 				{ recorded: true, repeat: false },
 			)
-			// The window reads turn 1's first request as over its limit, and every other request as within it.
-			const readings = [0, 10, 0]
-			const measured: ProviderRequest[] = []
-			const agent = createAgent(provider, {
-				tools,
-				authority: AGENT_AUTHORITY,
-				conversations,
-				window: createBudget({
-					max: 10,
-					consumer: (request: ProviderRequest) => {
-						measured.push(request)
-						return readings.shift() ?? 0
-					},
-				}),
-			})
+			const agent = createAgent(provider, { tools, authority: AGENT_AUTHORITY })
 			const events: Array<readonly [index: number, request: ProviderRequest]> = []
 			agent.emitter.on('request', (index, request) => events.push([index, request]))
 			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
 			await agent.generate()
 
 			expect(events.map(([index]) => index)).toEqual([0, 1])
-			expect(measured).toHaveLength(3)
-			// Turn 1 dispatches the rebuilt request, which the event carries, and not the over-window one.
-			expect(events[1]?.[1]).toEqual(measured[2])
-			expect(events[1]?.[1].messages).toEqual(provider.calls[1]?.messages)
-			expect(events[1]?.[1].messages).not.toEqual(measured[1]?.messages)
+			// Each turn's event carries the very messages that turn's provider call received.
+			expect(events.map(([, request]) => request.messages)).toEqual(
+				provider.calls.map((call) => call.messages),
+			)
 			expect(guideText).toContain(
-				'The `request` event fires once a turn, after the loop admits the request and before the provider receives it, so after a compaction fold it carries the rebuilt request. Its listener receives the turn index, the request the provider receives, and the conversation the run is bound to,',
+				'The `request` event fires once a turn, before the provider receives the request. Its listener receives the turn index, the request the provider receives, and the conversation the run is bound to,',
 			)
 		})
 
@@ -1218,275 +1113,29 @@ await new GuideCommand({
 			expect(createConversation({ snapshot }).judgments.judgments()).toEqual([refund])
 		})
 
-		it('folds whole exchanges and a leading greeting only with the first (the compaction exchange rule)', async () => {
-			const stub = createStubSummarizer()
-			const conversation = createConversation({ summarize: stub.summarize })
-			conversation.add([
-				{ role: 'assistant', content: 'Enjoy the break.' },
-				{ role: 'user', content: 'Work out the refund for order LH-79215.' },
-				{ role: 'assistant', content: '', calls: [createToolCall({ id: 'order' })] },
-				{ role: 'tool', content: 'Order LH-79215 totals $289.00', call: 'order' },
-				{ role: 'assistant', content: 'The refund is $289.00.' },
-				{ role: 'user', content: 'Which card is on file?' },
-				{ role: 'assistant', content: 'Mastercard ending 7719.' },
-				{ role: 'user', content: 'Send the refund to that card.' },
-			])
-			const inside = await conversation.compact({ keep: 6 })
-			const section = await conversation.compact({ keep: 2 })
-
-			expect(inside).toBeUndefined()
-			expect(stub.calls).toHaveLength(1)
-			expect(section?.messages.map(({ content }) => content)).toEqual([
-				'Enjoy the break.',
-				'Work out the refund for order LH-79215.',
-				'',
-				'Order LH-79215 totals $289.00',
-				'The refund is $289.00.',
-			])
-			expect(guideText).toContain(
-				'An exchange is a user message and every message after it up to the next user message. The messages before the first user message form their own exchange, which folds only together with the first user exchange. A fold removes whole exchanges: a cut inside an exchange moves back to its start.',
-			)
-		})
-
-		it('folds the first exchange with one summarizer call (the compaction fence)', async () => {
-			// The fence's summarizer calls a provider; the transcription digests through the stub.
-			const stub = createStubSummarizer()
-			const conversation = createConversation({ summarize: stub.summarize, keep: 2 })
-			conversation.add([
-				{ role: 'user', content: 'My name is Ada.' },
-				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
-				{ role: 'user', content: 'Book a table for two at 19:00.' },
-				{ role: 'assistant', content: 'Booked for two at 19:00.' },
-				{ role: 'user', content: 'What did I say my name was?' },
-			])
-
-			const section = await conversation.compact()
-			const original = section && conversation.rehydrate(section.id)
-
-			expect(section?.messages.map(({ content }) => content)).toEqual([
-				'My name is Ada.',
-				'Nice to meet you, Ada.',
-			])
-			expect(conversation.view().map(({ content }) => content)).toEqual([
-				`${barrel.CONVERSATION_RECAP_PREFIX}recap of 2`,
-				'Book a table for two at 19:00.',
-				'Booked for two at 19:00.',
-				'What did I say my name was?',
-			])
-			expect(conversation.search('ada').map(({ content }) => content)).toEqual([
-				'My name is Ada.',
-				'Nice to meet you, Ada.',
-			])
-			expect(original).toEqual(section?.messages)
-			expect(stub.calls).toHaveLength(1)
-			expect(guideText).toContain(
-				'const section = await conversation.compact() // folds the first exchange → a summarized section',
-			)
-		})
-
-		it('runs compact() calls one at a time and commits nothing a remove dropped (the compaction concurrency sentences)', async () => {
-			const gate = Promise.withResolvers<string>()
-			const calls = createRecorder<readonly [readonly Message[]]>()
-			const conversation = createConversation({
-				async summarize(messages) {
-					calls.handler(messages)
-					return gate.promise
-				},
-			})
-			const [first] = conversation.add([
-				{ role: 'user', content: 'My name is Ada.' },
-				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
-				{ role: 'user', content: 'What did I say my name was?' },
-			])
-			const folding = conversation.compact()
-			const queued = conversation.compact()
-			await waitForCondition('the first summarizer call', () => calls.count === 1)
-			conversation.remove(requireValue(first, 'Missing message').id)
-			gate.resolve('recap')
-
-			expect(await folding).toBeUndefined()
-			expect(await queued).toBeUndefined()
-			expect(
-				calls.calls.map(([messages]) => messages.map(({ role, content }) => [role, content])),
-			).toEqual([
-				[
-					['user', 'My name is Ada.'],
-					['assistant', 'Nice to meet you, Ada.'],
-				],
-			])
-			expect(conversation.sections).toEqual([])
-			expect(guideText).toContain(
-				'Calls to `compact()` run one at a time: a call made while another is in flight waits for it, then folds from the live tail it finds. A fold commits only when every folded message is still the same live entry after the summarizer settles, so a `remove` or `clear` during the initial summarizer makes `compact()` resolve `undefined` and leaves no section.',
-			)
-		})
-
-		it('summarizes one slice twice and commits one section when a summarizer compacts its own conversation (the summarizer re-entry sentence)', async () => {
-			// The first summarizer call starts the conversation's own `compact()` without awaiting it.
-			const slices = createRecorder<readonly [readonly Message[]]>()
-			const reentries = [true].values()
-			const reentered = Promise.withResolvers<Section | undefined>()
-			const conversation = createConversation({
-				async summarize(messages) {
-					slices.handler(messages)
-					if (reentries.next().value === true) reentered.resolve(conversation.compact())
-					return 'recap'
-				},
-			})
-			conversation.add([
-				{ role: 'user', content: 'My name is Ada.' },
-				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
-				{ role: 'user', content: 'What did I say my name was?' },
-			])
-			const outer = await conversation.compact()
-			const inner = await reentered.promise
-			const folded = [
-				['user', 'My name is Ada.'],
-				['assistant', 'Nice to meet you, Ada.'],
-			]
-
-			expect(
-				slices.calls.map(([messages]) => messages.map(({ role, content }) => [role, content])),
-			).toEqual([folded, folded])
-			expect(outer).toBeUndefined()
-			expect(inner?.messages.map(({ role, content }) => [role, content])).toEqual(folded)
-			expect(conversation.sections).toEqual([inner])
-			expect(guideText).toContain(
-				"A summarizer must not call `compact()` on the conversation it serves. When no other fold is in flight, a fold counts as in flight only after its summarizer returns, so the summarizer's own call waits for nothing and summarizes the same slice again; the commit check keeps one section, because the later fold finds its slice already folded and resolves `undefined`.",
-			)
-		})
-
-		it('rejects a cancelled compact() with the reason and hands the summarizer the signal (the compaction cancel sentence)', async () => {
-			const gate = Promise.withResolvers<string>()
-			const signals = createRecorder<readonly [AbortSignal | undefined]>()
-			const conversation = createConversation({
-				async summarize(_messages, signal) {
-					signals.handler(signal)
-					return gate.promise
-				},
-			})
-			conversation.add([
-				{ role: 'user', content: 'My name is Ada.' },
-				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
-				{ role: 'user', content: 'What did I say my name was?' },
-			])
-			const controller = new AbortController()
-			const reason = new Error('cancelled')
-			const folding = conversation.compact({ signal: controller.signal })
-			await waitForCondition('the summarizer call', () => signals.count === 1)
-			controller.abort(reason)
-
-			expect(await folding.catch((cause: unknown) => cause)).toBe(reason)
-			expect(signals.calls).toEqual([[controller.signal]])
-			gate.resolve('late recap')
-			expect(conversation.sections).toEqual([])
-			expect(guideText).toContain(
-				"Pass `CompactOptions.signal` to cancel a fold: the summarizer receives the signal as its second argument, and an abort rejects `compact()` with the signal's reason at once, even when the summarizer ignores the signal, and commits nothing after the abort; a fold committed before an aborted overflow merge stays.",
-			)
-		})
-
-		it('refuses a keep that is not a nonnegative safe integer before any summarizer call (the KEEP sentence)', async () => {
-			const stub = createStubSummarizer()
-			const conversation = createConversation({ summarize: stub.summarize })
-			conversation.add({ role: 'assistant', content: 'Nice to meet you, Ada.' })
-			const refused = await Promise.all(
-				[Number.NaN, 1.5, -1, Number.POSITIVE_INFINITY].map(async (keep) => {
-					const error: unknown = await conversation
-						.compact({ keep })
-						.catch((cause: unknown) => cause)
-					return barrel.isConversationError(error) ? error.code : undefined
-				}),
-			)
-
-			expect(refused).toEqual(['KEEP', 'KEEP', 'KEEP', 'KEEP'])
-			expect(stub.calls).toHaveLength(0)
-			expect(guideText).toContain(
-				'`keep` must be a nonnegative safe integer: `NaN`, a fraction, a negative, or `Infinity` throws `ConversationError` with code `KEEP` before any summarizer call.',
-			)
-		})
-
 		it('forwards error through add and keeps a conversation registered during open (the manager sentences)', async () => {
 			const errors = createRecorder<readonly [error: unknown, event: string]>()
 			const boom = new Error('observer boom')
 			const store = createMemoryConversationStore()
-			await store.set({ id: 'ada', sections: [], messages: [] })
-			const conversations = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-				store,
-			})
+			await store.set({ id: 'ada', messages: [] })
+			const conversations = createConversationManager({ store })
 			const observed = conversations.add({
 				error: errors.handler,
 				on: {
-					compact() {
+					add() {
 						throw boom
 					},
 				},
 			})
 			observed.add({ role: 'assistant', content: 'Nice to meet you, Ada.' })
-			await observed.compact()
 			const opening = conversations.open('ada')
 			const live = conversations.add({ id: 'ada' })
 
-			expect(errors.calls).toEqual([[boom, 'compact']])
+			expect(errors.calls).toEqual([[boom, 'add']])
 			expect(await opening).toBe(live)
 			expect(conversations.active).toBe(live)
 			expect(guideText).toContain(
 				"`add` forwards the input's `on` hooks and `error` handler to the conversation's emitter, so a throwing listener reports to that handler. `open(id)` returns the conversation registered under `id` while its store read was pending rather than overwriting it, and rejects with `ConversationError` `'SNAPSHOT'` for a stored snapshot whose `id` is not `id`.",
-			)
-		})
-
-		it('folds nothing after an abort and folds on the next invocation (the no-fold-after-cancel bullet)', async () => {
-			const stub = createStubSummarizer()
-			const conversations = createConversationManager({ summarize: stub.summarize })
-			const conversation = conversations.add()
-			conversation.add([
-				{ role: 'user', content: 'q'.repeat(40) },
-				{ role: 'assistant', content: 'Noted.' },
-				{ role: 'user', content: 'Send the note.' },
-			])
-			const tools = createToolManager()
-			const agent = createAgent(
-				createScriptedProvider(
-					[
-						{ content: 'x'.repeat(40), tools: [createToolCall({ name: 'reply' })] },
-						{ content: 'Done.' },
-					],
-					{ recorded: true, repeat: false },
-				),
-				{
-					conversations,
-					tools,
-					authority: AGENT_AUTHORITY,
-					window: createBudget({
-						max: estimateMessages(conversation.view()) + 1,
-						// Message arithmetic is the claim, so the window projects the request's messages.
-						consumer: (request: ProviderRequest) => estimateMessages(request.messages),
-					}),
-				},
-			)
-			tools.add(
-				createTool({
-					name: 'reply',
-					execute: () => {
-						agent.abort('replied')
-						return 'sent'
-					},
-				}),
-			)
-			await agent.generate()
-			const folds = stub.calls.length
-			agent.context.messages.add({ role: 'user', content: 'Next.' })
-			await agent.generate()
-
-			expect(folds).toBe(0)
-			expect(conversation.sections[0]?.messages.map(({ role }) => role)).toEqual([
-				'user',
-				'assistant',
-				'user',
-				'assistant',
-				'tool',
-			])
-			expect(guideText).toContain(
-				"When the run's signal has aborted by the time tool dispatch ends, the loop records the tool messages and folds nothing",
 			)
 		})
 
@@ -1516,7 +1165,7 @@ await new GuideCommand({
 			]
 			const POLICIES: Readonly<Record<string, SelectionHandler>> = {
 				recent: recent.handler,
-				// No selection under the judging default: a pass-through handler returns view().
+				// No selection under the judging default: a pass-through handler returns messages().
 				none: selectGuideView,
 			}
 			const modes = new Map(
@@ -1567,16 +1216,16 @@ await new GuideCommand({
 				['lookup'],
 				undefined,
 			])
-			// The verbatim run's pass-through sends the whole view.
+			// The verbatim run's pass-through sends every stored message.
 			expect(provider.calls[4]?.messages).toEqual(
-				agent.context.conversations.active?.view().slice(0, -1),
+				agent.context.conversations.active?.messages().slice(0, -1),
 			)
 		})
 
 		it('carries the modes fence lines the transcription copies', () => {
 			expect(guideText).toContain("{ name: 'triage', tools: ['lookup'], policy: 'recent' },")
 			expect(guideText).toContain(
-				'none: async (conversation) => ({ messages: conversation.view(), judgments: [] }),',
+				'none: async (conversation) => ({ messages: conversation.messages(), judgments: [] }),',
 			)
 			expect(guideText).toContain('MODES.map(({ policy, ...data }): [string, ScopeInterface] => {')
 			expect(guideText).toContain(
@@ -1704,24 +1353,20 @@ await new GuideCommand({
 		})
 
 		it('runs the server fence per principal', async () => {
-			// The fence's `provider` and `summarize` come from the host application; the transcription
-			// records the provider's requests and digests through the stub.
+			// The fence's `provider` comes from the host application; the transcription records the
+			// provider's requests.
 			const provider = createScriptedProvider(
 				[{ content: 'Hello, Ada.' }, { content: '4' }, { content: 'You have not said.' }],
 				{ recorded: true, repeat: false },
 			)
-			const { summarize } = createStubSummarizer()
 
-			// `provider` and `summarize` come from the host application.
+			// `provider` comes from the host application.
 			// The session table: one entry per authenticated principal, held by the application.
 			const sessions = new Map<string, Session>()
 			for (const principal of ['ada', 'grace']) {
-				// Each entry owns its threads and its window; neither is shared across principals.
-				const threads = createConversationManager({ summarize, keep: 2 })
-				const agent = createAgent(provider, {
-					conversations: threads,
-					window: createBudget({ max: 8_000, consumer: estimateRequest }),
-				})
+				// Each entry owns its threads; none is shared across principals.
+				const threads = createConversationManager()
+				const agent = createAgent(provider, { conversations: threads })
 				sessions.set(principal, { agent, threads })
 			}
 
@@ -1730,7 +1375,7 @@ await new GuideCommand({
 			const ada = sessions.get('ada')
 			const grace = sessions.get('grace')
 			if (ada === undefined || grace === undefined) throw new Error('unknown principal')
-			// Ada's trip thread accumulates and compacts on its own.
+			// Ada's trip thread accumulates on its own.
 			await handle(ada, 'trip', 'Hi, I am Ada.')
 			// Ada's math thread is independent of her trip thread.
 			await handle(ada, 'math', 'What is 2 + 2?')
@@ -1782,18 +1427,14 @@ await new GuideCommand({
 				[{ content: 'Noted, Ada.' }, { content: 'Noted, Grace.' }],
 				{ recorded: true, repeat: false },
 			)
-			const { summarize } = createStubSummarizer()
 
-			// `provider` and `summarize` come from the host application.
+			// `provider` comes from the host application.
 			// The session table: one entry per authenticated principal, held by the application.
 			const sessions = new Map<string, Session>()
 			for (const principal of ['ada', 'grace']) {
-				// Each entry owns its threads and its window; neither is shared across principals.
-				const threads = createConversationManager({ summarize, keep: 2 })
-				const agent = createAgent(provider, {
-					conversations: threads,
-					window: createBudget({ max: 8_000, consumer: estimateRequest }),
-				})
+				// Each entry owns its threads; none is shared across principals.
+				const threads = createConversationManager()
+				const agent = createAgent(provider, { conversations: threads })
 				sessions.set(principal, { agent, threads })
 			}
 
@@ -1826,18 +1467,14 @@ await new GuideCommand({
 			const { createGatedProvider } = await import('./setup.js')
 			const gate = Promise.withResolvers<void>()
 			const provider = createGatedProvider(gate)
-			const { summarize } = createStubSummarizer()
 
-			// `provider` and `summarize` come from the host application.
+			// `provider` comes from the host application.
 			// The session table: one entry per authenticated principal, held by the application.
 			const sessions = new Map<string, Session>()
 			for (const principal of ['ada', 'grace']) {
-				// Each entry owns its threads and its window; neither is shared across principals.
-				const threads = createConversationManager({ summarize, keep: 2 })
-				const agent = createAgent(provider, {
-					conversations: threads,
-					window: createBudget({ max: 8_000, consumer: estimateRequest }),
-				})
+				// Each entry owns its threads; none is shared across principals.
+				const threads = createConversationManager()
+				const agent = createAgent(provider, { conversations: threads })
 				sessions.set(principal, { agent, threads })
 			}
 
@@ -1851,7 +1488,7 @@ await new GuideCommand({
 			)
 			const after = thread.count
 			gate.resolve()
-			// The window guard refuses the overlap first, so the code is asserted, never the context.
+			// The concurrency guard refuses the overlap; the code is asserted, never the context.
 			expect(barrel.isAgentError(refused)).toBe(true)
 			expect(refused).toMatchObject({ code: 'CONCURRENCY' })
 			expect(after).toBe(before)
@@ -1871,18 +1508,14 @@ await new GuideCommand({
 				[{ content: 'The hotel is booked.' }],
 				new Error('upstream unavailable'),
 			)
-			const { summarize } = createStubSummarizer()
 
-			// `provider` and `summarize` come from the host application.
+			// `provider` comes from the host application.
 			// The session table: one entry per authenticated principal, held by the application.
 			const sessions = new Map<string, Session>()
 			for (const principal of ['ada', 'grace']) {
-				// Each entry owns its threads and its window; neither is shared across principals.
-				const threads = createConversationManager({ summarize, keep: 2 })
-				const agent = createAgent(provider, {
-					conversations: threads,
-					window: createBudget({ max: 8_000, consumer: estimateRequest }),
-				})
+				// Each entry owns its threads; none is shared across principals.
+				const threads = createConversationManager()
+				const agent = createAgent(provider, { conversations: threads })
 				sessions.set(principal, { agent, threads })
 			}
 
@@ -3805,7 +3438,7 @@ await new GuideCommand({
 				role: 'user',
 				content: 'Does the refund need two managers?',
 			})
-			const viewed = ledger.conversation.view()
+			const viewed = ledger.conversation.messages()
 			const direct = requireValue(
 				await ledger.agent.context.select(
 					ledger.conversation,
@@ -3827,7 +3460,7 @@ await new GuideCommand({
 				'Missing foreign selection',
 			)
 			expect(foreign.fault).toMatchObject({ code: 'REQUEST' })
-			expect(foreign.messages).toEqual(thread.view())
+			expect(foreign.messages).toEqual(thread.messages())
 			expect(asks.calls).toEqual(asked)
 
 			const measuring = ledger.calibrate(AbortSignal.timeout(30_000))
@@ -3895,7 +3528,7 @@ await new GuideCommand({
 			)
 			await expect(ledger.respond('Review the desk.')).rejects.toThrow('exhausted at turn 1')
 			expect(provider.started).toBe(2)
-			expect(ledger.conversation.view().at(-1)?.content).toBe(LEDGER_NOTES.cue)
+			expect(ledger.conversation.messages().at(-1)?.content).toBe(LEDGER_NOTES.cue)
 			expect(guideText).toContain(
 				"A rejected first pass counts as unfinished. When the answer pass rejects as well, the `respond` method rejects with that pass's error, and the ledger stays free for a later request.",
 			)
@@ -4045,7 +3678,7 @@ await new GuideCommand({
 			expect((await served).content).toBe('Noted.')
 			const [faulted] = requireValue(loose.selections.calls[0], 'Missing faulted selection')
 			expect(faulted.fault?.message).toContain('changed during selection')
-			expect(faulted.messages).toEqual(loose.ledger.conversation.view().slice(0, before + 1))
+			expect(faulted.messages).toEqual(loose.ledger.conversation.messages().slice(0, before + 1))
 			expect(guideText).toContain(
 				"A selection reads the conversation it was asked about, so a host append or removal while a `respond` call's selection runs faults it with a `changed during selection` error. Under the default `strict`, `respond` rejects with that error before it reaches the provider,",
 			)
@@ -4331,7 +3964,7 @@ await new GuideCommand({
 				role: 'user',
 				content: 'Does the refund need a manager?',
 			})
-			const view = ledger.conversation.view()
+			const view = ledger.conversation.messages()
 			const faulted = requireValue(
 				await ledger.agent.context.select(
 					ledger.conversation,
@@ -4645,28 +4278,33 @@ await new GuideCommand({
 			for (const line of GUIDE_CLASSIFIER_LINES) expect(guideText).toContain(line)
 		})
 
-		it('empties the live tail and leaves the compacted sections (the conversation `clear` row)', async () => {
-			const conversation = createConversation({ summarize: createStubSummarizer().summarize })
-			conversation.add([
+		it('empties the conversation and drops every judgment that quotes it (the conversation `clear` row)', () => {
+			const conversation = createConversation()
+			const [name] = conversation.add([
 				{ role: 'user', content: 'My name is Ada.' },
 				{ role: 'assistant', content: 'Nice to meet you, Ada.' },
-				{ role: 'user', content: 'What did I say my name was?' },
 			])
-			await conversation.compact()
+			conversation.judgments.add({
+				id: 'named',
+				question: { form: 'noul', instructions: 'Did the user give a name?' },
+				answer: { form: 'noul', noul: 0.9 },
+				model: 'tev1:0.8b',
+				sources: [requireValue(name, 'Missing message').id],
+				state: 'My name is Ada.',
+			})
+			const cleared = createRecorder<readonly []>()
+			conversation.emitter.on('clear', cleared.handler)
 			conversation.clear()
 
 			expect(conversation.messages()).toEqual([])
-			expect(conversation.sections).toHaveLength(1)
-			expect(conversation.view().map(({ content }) => content)).toEqual([
-				`${barrel.CONVERSATION_RECAP_PREFIX}recap of 2`,
-			])
+			expect(conversation.judgments.judgments()).toEqual([])
+			expect(cleared.calls).toEqual([[]])
 			expect(guideText).toContain(
-				'Empties the live tail, leaving the compacted `sections` untouched.',
+				'Removes every stored message and every judgment that quotes one, then emits one `clear`.',
 			)
 		})
 
 		it('folds a reference block written to the active workspace into the next build (the provenance pattern)', () => {
-			// The fence passes `summarize: undefined` as a placeholder; the transcription omits the key.
 			const conversations = createConversationManager()
 			conversations.add({ id: 'auth' })
 			const b = conversations.add({ id: 'planning' })
@@ -4723,51 +4361,6 @@ await new GuideCommand({
 			)
 		})
 
-		it('measures the dispatched request against the window (the automatic-compaction clause)', async () => {
-			const measured: ProviderRequest[] = []
-			const tools = createToolManager()
-			tools.add(createTool({ name: 'lookup', execute: () => 'ticket 7' }))
-			const conversations = createConversationManager({
-				summarize: createStubSummarizer().summarize,
-			})
-			conversations.add()
-			const provider = createScriptedProvider(
-				[
-					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
-					{ content: '{"ticket":7}' },
-				],
-				{ recorded: true, repeat: false },
-			)
-			const agent = createAgent(provider, {
-				system: 'You triage tickets.',
-				tools,
-				authority: AGENT_AUTHORITY,
-				conversations,
-				window: createBudget({
-					max: 1_000_000,
-					consumer: (request: ProviderRequest) => {
-						measured.push(request)
-						return estimateRequest(request)
-					},
-				}),
-			})
-			agent.context.messages.add({ role: 'user', content: 'Look up ticket 7.' })
-			await agent.generate({ schema: { type: 'object' } })
-
-			// Each check reads the exact request the next provider call carries: the messages, the
-			// advertised definitions, and the per-call options.
-			expect(measured).toHaveLength(2)
-			expect(measured).toEqual(
-				provider.calls.map((call) => ({
-					messages: call.messages,
-					...(call.tools === undefined ? {} : { tools: call.tools }),
-					...(call.options === undefined ? {} : { options: call.options }),
-				})),
-			)
-			expect(provider.calls[0]?.tools?.map(({ name }) => name)).toEqual(['lookup'])
-			expect(provider.calls[0]?.options).toEqual({ schema: { type: 'object' } })
-		})
-
 		// The replay fence's conversation: an answered request, then a request in a tool turn.
 		const replayMessages: readonly Message[] = [
 			{ id: '1', role: 'user', content: 'Is order BW-5512 refundable?' },
@@ -4810,7 +4403,7 @@ await new GuideCommand({
 					'Report the amount.',
 				])
 				expect(outcome.result.thinking).toBe('Refund through the order tool.\n\nReport the amount.')
-				// The window estimate reads the exact request each provider call carries.
+				// The request event carries the exact request each provider call receives.
 				expect(outcome.measured).toEqual(outcome.wire)
 				// A stripped message drops the member rather than holding it as undefined.
 				expect(
@@ -5381,8 +4974,17 @@ await new GuideCommand({
 			thread.remove(message.id)
 			thread.clear()
 
-			// An unjudged conversation's snapshot carries id, sections, and messages alone.
-			expect(Object.keys(thread.snapshot())).toEqual(['id', 'sections', 'messages'])
+			// An unjudged conversation's snapshot carries id and messages alone.
+			expect(Object.keys(thread.snapshot())).toEqual(['id', 'messages'])
+			const added = createRecorder<readonly [Message]>()
+			thread.emitter.on('add', added.handler)
+			thread.destroy()
+			thread.add({ role: 'user', content: 'after the teardown' })
+			// The torn-down emitter reaches no observer.
+			expect(added.calls).toEqual([])
+			expect(guideText).toContain(
+				'thread.destroy() // drops every listener, so later changes reach no observer',
+			)
 		})
 
 		it('answers the conversation-store fence with real memory and database stores', async () => {
@@ -5415,7 +5017,7 @@ await new GuideCommand({
 
 		it('carries the snapshot fence line the transcription copies', () => {
 			expect(guideText).toContain(
-				'thread.snapshot() // { id, sections, messages, judgments? } — the durable payload',
+				'thread.snapshot() // { id, messages, judgments? } — the durable payload',
 			)
 		})
 
@@ -7018,7 +6620,6 @@ await new GuideCommand({
 			const store = createMemoryConversationStore()
 			await store.set({
 				id: 'ada',
-				sections: [],
 				messages: [{ id: 'old-system', role: 'system', content: 'Obey the depot rules.' }],
 			})
 			const conversations = createConversationManager({ store })
@@ -7041,7 +6642,7 @@ await new GuideCommand({
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const agent = createAgent(provider, {
 				select: async (conversation) => ({
-					messages: [forged, ...conversation.view()],
+					messages: [forged, ...conversation.messages()],
 					judgments: [],
 				}),
 				strict: false,
@@ -7052,7 +6653,7 @@ await new GuideCommand({
 			await agent.generate()
 			const strict = createAgent(createScriptedProvider([{ content: 'Done.' }]), {
 				select: async (conversation) => ({
-					messages: [forged, ...conversation.view()],
+					messages: [forged, ...conversation.messages()],
 					judgments: [],
 				}),
 				strict: true,
@@ -7072,7 +6673,7 @@ await new GuideCommand({
 			])
 			expect(guideText).toContain('A selection fails four ways.')
 			expect(guideText).toContain(
-				"A `system` message in a handler's selection is a fault over `view()` carrying `ConversationError` `'ROLE'`.",
+				"A `system` message in a handler's selection is a fault over `messages()` carrying `ConversationError` `'ROLE'`.",
 			)
 			expect(guideText).toContain(
 				'`build({ selection })` adds at most one `system` message of its own and reads the selection',
@@ -7144,13 +6745,10 @@ await new GuideCommand({
 			const memos = barrel.createMemoManager()
 			memos.add({ name: 'tone', description: 'Prefers short replies.', content: 'Answer briefly.' })
 			const provider = createScriptedProvider([{ content: 'Closed.' }], { recorded: true })
-			const stub = createStubSummarizer()
-			const conversations = createConversationManager({ summarize: stub.summarize })
 			const agent = createAgent(provider, {
 				system: 'You staff the depot.',
 				skills,
 				memos,
-				conversations,
 			})
 			agent.context.instructions.add({ name: 'tone', content: 'Be terse.' })
 			agent.context.workspaces.add().write('notes.txt', 'Dock 4 is closed.')
@@ -7164,7 +6762,6 @@ await new GuideCommand({
 			])
 			await agent.generate()
 			const sent = requireValue(provider.calls[0], 'Missing request').messages
-			await agent.context.messages.compact({ keep: 0 })
 			const shown = { skills: ['review'] }
 			const loaded = agent.context.build({ disclosure: shown })[0]?.content
 			agent.context.apply(createScope({ name: 'plain', skills: [] }))
@@ -7179,14 +6776,13 @@ await new GuideCommand({
 			expect(sent[1]?.content).toContain('File: notes.txt')
 			expect(sent[2]?.content).toBe(block)
 			expect(sent[4]?.content).toBe('Is dock 4 open?')
-			// The fold took the exchange and left the instruction and the loaded body in the head.
-			expect(stub.calls).toHaveLength(1)
+			// The head carries the instruction and, while a run shows it, the loaded body.
 			expect(loaded).toContain('Be terse.')
 			expect(loaded?.endsWith('## Loaded skills\n\n### review\n\nList each defect.')).toBe(true)
 			// A scope whose skills list admits none filters the body with the index.
 			const filtered = agent.context.build({ disclosure: shown })[0]?.content
 			expect(filtered).toBe('You staff the depot.\n\n## Instructions\n\nBe terse.')
-			expect(guideText).toContain('an instruction never folds')
+			expect(guideText).toContain("A run shows a loaded body from the conversation's record")
 			expect(guideText).toContain(
 				'a host scope with an explicit `skills` allow-list filters a loaded body as it filters the index',
 			)
@@ -7908,17 +7504,21 @@ await new GuideCommand({
 			const snapshot = conversation.snapshot()
 			await store.set(snapshot)
 			const stored = requireValue(await store.get(conversation.id), 'Missing snapshot')
-			Object.assign(requireValue(stored.messages[0], 'Missing message'), { content: 'Edited.' })
-			const again = requireValue(await store.get(conversation.id), 'Missing snapshot')
+			const message = requireValue(stored.messages[0], 'Missing message')
 			const judgment = requireValue(stored.judgments?.[0], 'Missing judgment')
 
 			expect(stored).toBe(snapshot)
-			expect(again.messages[0]?.content).toBe('Edited.')
+			// The snapshot's messages and judgments are the conversation's frozen records.
+			expect(captureError(() => Object.assign(message, { content: 'Edited.' }))).toBeInstanceOf(
+				TypeError,
+			)
 			expect(captureError(() => Object.assign(judgment, { model: 'x' }))).toBeInstanceOf(TypeError)
 			expect(guideText).toContain(
 				'`MemoryConversationStore.get` hands back the stored snapshot object itself',
 			)
-			expect(guideText).toContain('copy a judgment through `copyJSON` to migrate or redact it')
+			expect(guideText).toContain(
+				'copy a message or a judgment through `copyJSON` to migrate or redact it',
+			)
 		})
 
 		it('recovers a snapshot with a system row', async () => {
@@ -7934,21 +7534,6 @@ await new GuideCommand({
 			})
 			const written: ConversationSnapshot = {
 				id: 'thread-1',
-				sections: [
-					{
-						id: 'section-1',
-						summary: 'Earlier recap.',
-						messages: [
-							{ id: 'old-section', role: 'system', content: 'Old rule.' },
-							{ id: 'kept-user', role: 'user', content: 'Is the depot open?' },
-						],
-					},
-					{
-						id: 'section-2',
-						summary: 'Only the row.',
-						messages: [{ id: 'lone', role: 'system', content: 'Lone rule.' }],
-					},
-				],
 				messages: [
 					{ id: 'old-live', role: 'system', content: 'Old live rule.' },
 					{ id: 'kept-live', role: 'user', content: 'Book it.' },
@@ -7964,10 +7549,6 @@ await new GuideCommand({
 			if (!barrel.isConversationSnapshot(stored)) throw new Error('Not a conversation snapshot')
 			const cleaned: ConversationSnapshot = {
 				...stored,
-				sections: stored.sections.map((section) => ({
-					...section,
-					messages: section.messages.filter(({ role }) => role !== 'system'),
-				})),
 				messages: stored.messages.filter(({ role }) => role !== 'system'),
 			}
 			await store.set(cleaned)
@@ -7979,7 +7560,6 @@ await new GuideCommand({
 					'a conversation snapshot holds a system message; a snapshot written before 0.0.35 can hold a system row; remove it before loading',
 			})
 			expect(conversation.messages().map(({ id }) => id)).toEqual(['kept-live'])
-			expect(conversation.sections.map((section) => section.messages.length)).toEqual([1, 0])
 			// A judgment's source names no live row and still hydrates; a mark naming one refuses.
 			expect(conversation.judgments.judgment('refund')?.sources).toEqual(['old-live'])
 			expect(
@@ -7995,10 +7575,10 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain('if (!isConversationSnapshot(stored))')
 			expect(guideText).toContain(
-				"messages: section.messages.filter(({ role }) => role !== 'system'),",
+				"messages: stored.messages.filter(({ role }) => role !== 'system'),",
 			)
 			expect(guideText).toContain(
-				'A judgment whose `sources` name a removed row hydrates unchanged, and a section the filter empties hydrates with no messages.',
+				'A judgment whose `sources` name a removed row hydrates unchanged.',
 			)
 			expect(guideText).toContain(
 				'The `isLedgerSnapshot` guard refuses a mark that names a removed row',
@@ -8669,172 +8249,6 @@ await new GuideCommand({
 			)
 		})
 
-		it('sends an over-window request leniently', async () => {
-			const stub = createStubSummarizer()
-			const faults: unknown[] = []
-			const errors: unknown[] = []
-			const conversation = createConversation({ summarize: stub.summarize, keep: 2 })
-			conversation.add({ role: 'user', content: 'x'.repeat(4_000) })
-			const provider = createScriptedProvider([{ content: 'Answered.' }], { recorded: true })
-			const window = createBudget({ max: 100, consumer: estimateRequest })
-			const agent = createAgent(provider, { window, strict: false })
-			agent.emitter.on('fault', (error) => faults.push(error))
-			agent.emitter.on('error', (error) => errors.push(error))
-			const result = await agent.generate({ conversation })
-
-			expect(provider.calls).toHaveLength(1)
-			expect(result).toMatchObject({ content: 'Answered.', partial: false })
-			expect(stub.calls).toEqual([])
-			expect(faults).toEqual([])
-			expect(errors).toEqual([])
-			expect(window.exhausted).toBe(true)
-			expect(window.consumed).toBe(
-				estimateRequest({ messages: requireValue(provider.calls[0], 'Missing call').messages }),
-			)
-			expect(guideText).toContain(
-				'With `strict: false`, it proceeds to the provider, and the provider decides what happens past its window.',
-			)
-			expect(guideText).toContain(
-				"With `strict: false`, no error and no agent event marks that point: the loop sends the over-window request, and no reading covers the provider's behavior past its window,",
-			)
-			expect(guideText).toContain('`strict`, the default, refuses a request still over the window.')
-		})
-
-		it('reads the window of the last request', async () => {
-			const measured: number[] = []
-			const tools = createToolManager()
-			tools.add(
-				createTool({
-					name: 'lookup',
-					description: 'Reads one ticket. '.repeat(400),
-					execute: () => 'ticket 7',
-				}),
-			)
-			const provider = createScriptedProvider(
-				[
-					{ content: '', tools: [{ id: 'lookup-1', name: 'lookup', arguments: {} }] },
-					{ content: 'Ticket 7 is open.' },
-				],
-				{ recorded: true, repeat: false },
-			)
-			const conversation = createConversation({
-				summarize: createStubSummarizer().summarize,
-				keep: 2,
-			})
-			conversation.add({ role: 'user', content: 'Look up ticket 7.' })
-			const window = createBudget({
-				max: 200,
-				consumer: (request: ProviderRequest) => {
-					const estimate = estimateRequest(request)
-					measured.push(estimate)
-					return estimate
-				},
-			})
-			const agent = createAgent(provider, {
-				tools,
-				authority: AGENT_AUTHORITY,
-				window,
-				strict: false,
-			})
-			// The tool's description puts the first request over the window; the scope drops it next.
-			agent.emitter.on('tool', () =>
-				agent.context.apply(createScope({ name: 'answer', tools: [] })),
-			)
-			await agent.generate({ conversation })
-
-			expect(provider.calls).toHaveLength(2)
-			expect(measured[0]).toBeGreaterThanOrEqual(200)
-			expect(measured.at(-1)).toBeLessThan(200)
-			expect(window.consumed).toBe(measured.at(-1))
-			expect(window.exhausted).toBe(false)
-			expect(guideText).toContain(
-				'read the `consumed` and `exhausted` members of your `window` `Budget`, which hold the last request the loop measured, after a run.',
-			)
-		})
-
-		it('refuses an over-window request strictly', async () => {
-			const stub = createStubSummarizer()
-			const conversation = createConversation({ summarize: stub.summarize, keep: 2 })
-			conversation.add({ role: 'user', content: 'x'.repeat(4_000) })
-			const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
-			const window = createBudget({ max: 100, consumer: estimateRequest })
-			const agent = createAgent(provider, { window, strict: true })
-			const refused = await agent.generate({ conversation }).catch((error: unknown) => error)
-
-			expect(barrel.isAgentError(refused)).toBe(true)
-			expect(refused).toMatchObject({
-				code: 'WINDOW',
-				message: `the request measures ${window.consumed} against a window of 100 and this run folds no further`,
-			})
-			expect(provider.calls).toEqual([])
-			expect(stub.calls).toEqual([])
-			expect(guideText).toContain(
-				"the run refused it with `AgentError` `'WINDOW'` before any dispatch.",
-			)
-		})
-
-		it('folds nothing with no eligible slice', async () => {
-			const sections = Array.from({ length: 8 }, (_unused, at): Section => ({
-				id: `section-${at}`,
-				summary: `Recap ${at}.`,
-				messages: [
-					{ id: `user-${at}`, role: 'user', content: `Ticket ${at} opened.` },
-					{ id: `reply-${at}`, role: 'assistant', content: `Ticket ${at} noted.` },
-				],
-			}))
-			const snapshot: ConversationSnapshot = {
-				id: 'desk',
-				sections,
-				messages: [
-					{ id: 'tail-1', role: 'user', content: 'Is the depot open?' },
-					{ id: 'tail-2', role: 'assistant', content: 'It is open.' },
-					{ id: 'tail-3', role: 'user', content: 'Book a slot.' },
-				],
-			}
-			const stub = createStubSummarizer()
-			const cumulative = createConversation({
-				snapshot,
-				summarize: stub.summarize,
-				keep: 2,
-				cumulative: true,
-			})
-			const capped = createConversation({
-				snapshot,
-				summarize: stub.summarize,
-				keep: 2,
-				sections: 4,
-			})
-			const nothing = [await cumulative.compact(), await capped.compact()]
-			const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
-			const agent = createAgent(provider, {
-				window: createBudget({ max: 1, consumer: estimateRequest }),
-				strict: true,
-			})
-			const first = await agent
-				.generate({ conversation: cumulative })
-				.catch((error: unknown) => error)
-			const retry = await agent
-				.generate({ conversation: cumulative })
-				.catch((error: unknown) => error)
-			const asked = stub.calls.length
-			await cumulative.compact({ keep: 0 })
-			await capped.compact({ keep: 0 })
-
-			expect(nothing).toEqual([undefined, undefined])
-			expect(first).toMatchObject({ code: 'WINDOW' })
-			expect(retry).toMatchObject({ code: 'WINDOW' })
-			expect(asked).toBe(0)
-			expect(provider.calls).toEqual([])
-			expect(cumulative.sections).toHaveLength(1)
-			expect(cumulative.sections[0]?.messages).toHaveLength(18)
-			expect(cumulative.messages().map(({ id }) => id)).toEqual(['tail-3'])
-			expect(capped.sections).toHaveLength(4)
-			expect(guideText).toContain(
-				'and a hydrated snapshot with several sections folds them all at the next fold that has an eligible slice',
-			)
-			expect(guideText).toContain('so `compact()` folds nothing and a strict retry refuses again')
-		})
-
 		it('asks a replaced value only when unset', async () => {
 			const asks: Array<readonly string[]> = []
 			const stated = barrel.extractLiterals('the refund limit is 500')
@@ -8991,11 +8405,11 @@ await new GuideCommand({
 		it('keeps a restored message member order', () => {
 			const written: Message = { content: 'Is the depot open?', role: 'user', id: 'first' }
 			const restored = createConversation({
-				snapshot: { id: 'desk', sections: [], messages: [written] },
+				snapshot: { id: 'desk', messages: [written] },
 			})
-			const relayed = barrel.requestToRelay({ messages: restored.view() }).messages[0]
+			const relayed = barrel.requestToRelay({ messages: restored.messages() }).messages[0]
 
-			expect(Object.keys(requireValue(restored.view()[0], 'Missing message'))).toEqual([
+			expect(Object.keys(requireValue(restored.messages()[0], 'Missing message'))).toEqual([
 				'content',
 				'role',
 				'id',
@@ -9072,43 +8486,6 @@ await new GuideCommand({
 					"A memo written during a request's first pass enters the rebuilt answer context and consumes its fitting allowance.",
 				)
 			}
-		})
-
-		it('keeps a fold when its merge digest fails', async () => {
-			const replies = ['Recap one.', '   ', 'Recap two.', 'Merged recap.'].values()
-			const conversation = createConversation({
-				summarize: async () => replies.next().value ?? 'Recap.',
-				sections: 1,
-				snapshot: {
-					id: 'desk',
-					sections: [
-						{
-							id: 'section-0',
-							summary: 'Recap zero.',
-							messages: [{ id: 'old', role: 'user', content: 'Ticket 3 opened.' }],
-						},
-					],
-					messages: [
-						{ id: 'tail-1', role: 'user', content: 'Is the depot open?' },
-						{ id: 'tail-2', role: 'assistant', content: 'It is open.' },
-						{ id: 'tail-3', role: 'user', content: 'Book a slot.' },
-					],
-				},
-			})
-			const refused = await conversation.compact({ keep: 0 }).catch((error: unknown) => error)
-			const over = conversation.sections.length
-			conversation.add([
-				{ role: 'assistant', content: 'Booked.' },
-				{ role: 'user', content: 'Thanks.' },
-			])
-			await conversation.compact({ keep: 0 })
-
-			expect(refused).toMatchObject({ code: 'SUMMARY' })
-			expect(over).toBe(2)
-			expect(conversation.sections.map(({ summary }) => summary)).toEqual(['Merged recap.'])
-			expect(guideText).toContain(
-				'such a digest for a capped merge refuses the merge and keeps the fold already committed, one section over the cap, which the next sound merge collapses.',
-			)
 		})
 
 		it('denies a tool replaced after its allow', async () => {
@@ -9227,7 +8604,7 @@ await new GuideCommand({
 			expect(early).toBe(0)
 			expect(awaited.partial).toBe(true)
 			expect(guideText).toContain(
-				"The loop races a scheduler's yield, the approver's answer, and the summarizer against the run signal",
+				"The loop races a scheduler's yield and the approver's answer against the run signal",
 			)
 		})
 

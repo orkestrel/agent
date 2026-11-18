@@ -46,18 +46,11 @@ export const OWNED_CONTRACT_CASES = Object.freeze([
 		negative: { form: 'unknown' },
 	},
 	{
-		name: 'section',
-		wire: contractPairs.sectionContract,
-		guard: contractPairs.isSection,
-		positive: { id: 's', summary: 'Summary', messages: [] },
-		negative: { id: 's', messages: [] },
-	},
-	{
 		name: 'conversation snapshot',
 		wire: contractPairs.conversationSnapshotContract,
 		guard: contractPairs.isConversationSnapshot,
-		positive: { id: 'c', sections: [], messages: [] },
-		negative: { id: 'c', sections: 'invalid', messages: [] },
+		positive: { id: 'c', messages: [] },
+		negative: { id: 'c', messages: 'invalid' },
 	},
 	{
 		name: 'memo',
@@ -78,7 +71,7 @@ export const OWNED_CONTRACT_CASES = Object.freeze([
 		wire: contractPairs.ledgerSnapshotContract,
 		guard: contractPairs.isLedgerSnapshot,
 		positive: {
-			conversation: { id: 'c', sections: [], messages: [] },
+			conversation: { id: 'c', messages: [] },
 			requests: [],
 			notes: [],
 			failures: [],
@@ -133,7 +126,6 @@ export function createForeignConversationStore(): ConversationStoreInterface {
 	return {
 		get: async () => ({
 			id: 'b',
-			sections: [],
 			messages: [{ id: 'stored', role: 'user', content: 'stored turn' }],
 		}),
 		set: async () => undefined,
@@ -151,7 +143,7 @@ export function createEmptyLedgerLookup(): LedgerLookup {
 
 /** Supplies the documented guide scenario fixture. */
 export const selectGuideUserTurns: SelectionHandler = async (conversation) => ({
-	messages: conversation.view().filter((message) => message.role === 'user'),
+	messages: conversation.messages().filter((message) => message.role === 'user'),
 	judgments: [],
 })
 
@@ -163,7 +155,7 @@ export const selectGuideRequest: SelectionHandler = async (_conversation, reques
 
 /** Supplies the documented guide scenario fixture. */
 export const selectGuideView: SelectionHandler = async (conversation) => ({
-	messages: conversation.view(),
+	messages: conversation.messages(),
 	judgments: [],
 })
 
@@ -351,10 +343,8 @@ import type {
 	MemoSnapshot,
 	MemoSnapshotRow,
 	MemoStoreInterface,
-	Section,
 	SystemOneJudgeOptions,
 	ConversationStoreInterface,
-	ConversationSummaryHandler,
 	Message,
 	MessageInput,
 	MessageMeasure,
@@ -413,7 +403,6 @@ import {
 	memoToolShape,
 	rememberToolShape,
 	switchToolShape,
-	CONVERSATION_RECAP_PREFIX,
 	CONVERSATION_ROLES,
 	DEFAULT_AGENT_LIMIT,
 	createAgent,
@@ -514,25 +503,6 @@ export function createEchoProvider(): ProviderInterface {
 			return { content: `ok:${last?.content ?? ''}`, usage: AGENT_USAGE }
 		},
 	}
-}
-
-/** Supplies tool turns followed by a final answer for compaction. */
-export const COMPACT_SCRIPT: readonly ScriptedTurn[] = Object.freeze([
-	{ result: { content: 'x'.repeat(40), tools: [createToolCall()] } },
-	{ result: { content: 'y'.repeat(40), tools: [createToolCall({ id: 'c2' })] } },
-	{ result: { content: 'the answer is 42' } },
-])
-
-/**
- * Measures only the messages of a request, a custom window policy that ignores the advertised
- * tools and the per-call options. Tests that pin message-only arithmetic select it explicitly,
- * while the default window consumer is `estimateRequest`.
- *
- * @param request - The complete provider request a window measures
- * @returns The `estimateMessages` estimate of its messages
- */
-export function measureMessages(request: ProviderRequest): number {
-	return estimateMessages(request.messages)
 }
 
 /** Supplies the five-character user message the request estimate and measure cases share: content 2 and uniform 4. */
@@ -964,35 +934,6 @@ export function readCallRequest(call: ScriptedCall): ProviderRequest {
 	}
 }
 
-/** Seeds an agent and conversation for automatic compaction. */
-export function seedCompactionAgent(
-	window: ReturnType<typeof createBudget<ProviderRequest>> | undefined,
-): {
-	readonly agent: ReturnType<typeof createAgent>
-	readonly conversation: ReturnType<typeof createConversation>
-	readonly provider: ReturnType<typeof createScriptedProvider>
-} {
-	const conversations = createConversationManager({
-		summarize: createStubSummarizer().summarize,
-		keep: 0,
-	})
-	const conversation = conversations.add() // auto-activates — the agent's message source
-	const tools = createToolManager()
-	tools.add(createAddTool())
-	const provider = createScriptedProvider(COMPACT_SCRIPT, AGENT_SCRIPT_OPTIONS)
-	// The registry is injected through the AGENT (forwarded to its context), so
-	// `agent.context.messages` IS the active conversation's live tail — seed the user turn there.
-	const agent = createAgent(provider, {
-		conversations,
-		tools,
-		authority: AGENT_AUTHORITY,
-		...(window === undefined ? {} : { window }),
-		limit: 5,
-	})
-	agent.context.messages.add({ role: 'user', content: 'go' })
-	return { agent, conversation, provider }
-}
-
 /**
  * Seeds an agent over one recorded `lookup` tool whose first `turn` listener records the context
  * scope's `tools` list, the read a later listener or the scheduler yield can outdate, beside
@@ -1029,14 +970,6 @@ export function seedLookupAgent(
 	agent.emitter.on('turn', () => reads.handler(agent.context.scope?.tools))
 	return { agent, provider, executed, reads, requests, denied }
 }
-
-/** Creates the final-answer provider used by compaction cases. */
-export const createAnswerProvider = (): ReturnType<typeof createScriptedProvider> =>
-	createScriptedProvider([{ result: { content: 'final answer' } }], {
-		name: 'answer',
-		recorded: true,
-		repeat: true,
-	})
 
 /** Switches a conversation, appends the request, and generates its reply. */
 export const requestConversation = async (
@@ -1117,6 +1050,25 @@ export class ScriptedReads<T> {
 		const value = step.done === true ? this.#rest : step.value
 		this.#reported.push(value)
 		return value
+	}
+}
+
+/**
+ * Builds a stored message whose `content` accessor reads each value a script reports in turn, as an
+ * accessor that answers differently at each read can.
+ *
+ * @param reads - The script the `content` accessor reads
+ * @returns The message record, its `content` an accessor
+ */
+export function buildShiftingMessage(
+	reads: ScriptedReads<unknown>,
+): Readonly<Record<string, unknown>> {
+	return {
+		id: 'm1',
+		role: 'user',
+		get content() {
+			return reads.read()
+		},
 	}
 }
 
@@ -1918,7 +1870,6 @@ export const JUDGMENT_RECORD: Judgment = Object.freeze({ ...JUDGMENT_INPUT, time
 /** Supplies answered and refused records in one persisted snapshot. */
 export const JUDGMENT_SNAPSHOT: ConversationSnapshot = Object.freeze({
 	id: 'judged',
-	sections: [],
 	messages: [],
 	judgments: [
 		JUDGMENT_RECORD,
@@ -1934,60 +1885,15 @@ export const JUDGMENT_SNAPSHOT: ConversationSnapshot = Object.freeze({
 	],
 })
 
-/** Describes a snapshot in the 0.0.29 shape, which carries the conversation summary 0.0.30 no longer writes. */
-export interface SummarizedConversationSnapshot extends ConversationSnapshot {
-	readonly summary: string
-}
-
-/**
- * Supplies a snapshot in the 0.0.29 shape: one compacted section, a live tail, and the
- * conversation `summary` member that an exact snapshot guard refuses.
- */
-export const SUMMARIZED_CONVERSATION_SNAPSHOT: SummarizedConversationSnapshot =
-	Object.freeze<SummarizedConversationSnapshot>({
-		id: 'published',
-		summary: 'recap of 2',
-		sections: [
-			{
-				id: 'section-depot',
-				summary: 'recap of 2',
-				messages: [
-					{ id: 'user-depot', role: 'user', content: 'Is the depot open on Friday?' },
-					{ id: 'assistant-depot', role: 'assistant', content: 'The depot is open on Friday.' },
-				],
-			},
-		],
-		messages: [{ id: 'user-order', role: 'user', content: 'Which order is late?' }],
-	})
-
-/** Supplies {@link SUMMARIZED_CONVERSATION_SNAPSHOT} rewritten without the member it no longer holds. */
-export const REWRITTEN_CONVERSATION_SNAPSHOT: ConversationSnapshot =
-	Object.freeze<ConversationSnapshot>({
-		id: SUMMARIZED_CONVERSATION_SNAPSHOT.id,
-		sections: SUMMARIZED_CONVERSATION_SNAPSHOT.sections,
-		messages: SUMMARIZED_CONVERSATION_SNAPSHOT.messages,
-	})
-
 /**
  * Builds a snapshot that is valid in every member except the planted assistant `calls` value, so
  * a guard rejection isolates the per-call check rather than a sibling member.
  *
- * @param calls - The value planted as the `calls` member of the one live assistant message
+ * @param calls - The value planted as the `calls` member of the one assistant message
  * @returns The snapshot candidate, typed `unknown` because `calls` can be anything
  */
 export function buildCallsSnapshot(calls: unknown): unknown {
-	return { id: 'c', sections: [], messages: [{ id: 'a1', role: 'assistant', content: '', calls }] }
-}
-
-/**
- * Renders the content `view()` gives the recap message of a section with `summary`, built from
- * the exported prefix rather than a retyped literal.
- *
- * @param summary - The section summary the recap frames
- * @returns The framed recap text
- */
-export function renderRecap(summary: string): string {
-	return `${CONVERSATION_RECAP_PREFIX}${summary}`
+	return { id: 'c', messages: [{ id: 'a1', role: 'assistant', content: '', calls }] }
 }
 
 /** Lists independently malformed judgment members for storage guard tests. */
@@ -2013,34 +1919,29 @@ export const INVALID_JUDGMENTS: readonly unknown[] = Object.freeze([
 export const MALFORMED_CONVERSATION_SNAPSHOTS: ReadonlyArray<readonly [string, unknown]> =
 	Object.freeze([
 		['a non-record', 'stored'],
-		['a missing id', { sections: [], messages: [] }],
-		['non-array sections', { id: 'stored', sections: 'none', messages: [] }],
-		['array-like sections', { id: 'stored', sections: { length: 0 }, messages: [] }],
-		[
-			'a section without summary',
-			{ id: 'stored', sections: [{ id: 'section', messages: [] }], messages: [] },
-		],
-		['non-array messages', { id: 'stored', sections: [], messages: 'none' }],
-		['null messages', { id: 'stored', sections: [], messages: null }],
-		['null judgments', { id: 'stored', sections: [], messages: [], judgments: null }],
+		['a missing id', { messages: [] }],
+		['a sections member', { id: 'stored', sections: [], messages: [] }],
+		['non-array messages', { id: 'stored', messages: 'none' }],
+		['array-like messages', { id: 'stored', messages: { length: 0 } }],
+		['null messages', { id: 'stored', messages: null }],
+		['null judgments', { id: 'stored', messages: [], judgments: null }],
 		[
 			'an unknown role',
-			{ id: 'stored', sections: [], messages: [{ id: 'm1', role: 'other', content: 'Hello.' }] },
+			{ id: 'stored', messages: [{ id: 'm1', role: 'other', content: 'Hello.' }] },
 		],
 		[
 			'a numeric judgment id',
-			{ id: 'stored', sections: [], messages: [], judgments: [{ ...JUDGMENT_RECORD, id: 1 }] },
+			{ id: 'stored', messages: [], judgments: [{ ...JUDGMENT_RECORD, id: 1 }] },
 		],
 	])
 
-/** Names each well-formed conversation snapshot that repeats one id across its sections and messages. */
+/** Names each well-formed conversation snapshot that repeats one message id. */
 export const DUPLICATE_ID_SNAPSHOTS: ReadonlyArray<readonly [string, ConversationSnapshot]> =
 	Object.freeze([
 		[
-			'two live messages',
+			'two adjacent messages',
 			{
 				id: 'stored',
-				sections: [],
 				messages: [
 					{ id: 'm1', role: 'user', content: 'Is the depot open?' },
 					{ id: 'm1', role: 'assistant', content: 'The depot is open.' },
@@ -2048,50 +1949,14 @@ export const DUPLICATE_ID_SNAPSHOTS: ReadonlyArray<readonly [string, Conversatio
 			},
 		],
 		[
-			'a section message and a live message',
+			'the first and the last message',
 			{
 				id: 'stored',
-				sections: [
-					{
-						id: 's1',
-						summary: 'The depot is open.',
-						messages: [{ id: 'm1', role: 'user', content: 'Is the depot open?' }],
-					},
+				messages: [
+					{ id: 'm1', role: 'user', content: 'Is the depot open?' },
+					{ id: 'm2', role: 'assistant', content: 'The depot is open.' },
+					{ id: 'm1', role: 'user', content: 'Which order is late?' },
 				],
-				messages: [{ id: 'm1', role: 'user', content: 'Which order is late?' }],
-			},
-		],
-		[
-			'a section id and a live message id',
-			{
-				id: 'stored',
-				sections: [
-					{
-						id: 'm1',
-						summary: 'The depot is open.',
-						messages: [{ id: 'm0', role: 'user', content: 'Is the depot open?' }],
-					},
-				],
-				messages: [{ id: 'm1', role: 'user', content: 'Which order is late?' }],
-			},
-		],
-		[
-			'two section ids',
-			{
-				id: 'stored',
-				sections: [
-					{
-						id: 's1',
-						summary: 'The depot is open.',
-						messages: [{ id: 'm1', role: 'user', content: 'Is the depot open?' }],
-					},
-					{
-						id: 's1',
-						summary: 'The order is late.',
-						messages: [{ id: 'm2', role: 'user', content: 'Which order is late?' }],
-					},
-				],
-				messages: [{ id: 'm3', role: 'user', content: 'Refund it.' }],
 			},
 		],
 	])
@@ -2565,18 +2430,11 @@ export const MESSAGE_REFUSALS: readonly unknown[] = Object.freeze([
 
 /** Holds conversation snapshots a real conversation writes, the owned half of the snapshot lockstep. */
 export const CONVERSATION_SNAPSHOT_FIXTURES: readonly unknown[] = Object.freeze([
-	{ id: 'c1', sections: [], messages: [] },
-	{ id: 'c2', sections: [], messages: MESSAGE_FIXTURES },
+	{ id: 'c1', messages: [] },
+	{ id: 'c2', messages: MESSAGE_FIXTURES },
 	{
 		id: 'c3',
-		sections: [
-			{
-				id: 's1',
-				summary: 'recap',
-				messages: MESSAGE_FIXTURES.slice(0, 1),
-			},
-		],
-		messages: [],
+		messages: MESSAGE_FIXTURES.slice(0, 1),
 		judgments: [
 			{
 				id: 'q1',
@@ -3321,11 +3179,9 @@ export function createAgentTurn(overrides?: Partial<AgentTurn>): AgentTurn {
 		content: '',
 		thinking: undefined,
 		usage: undefined,
-		spent: undefined,
 		messages: [],
 		outcome: 'answer',
 		partial: false,
-		futile: false,
 		estimate: 0,
 		interrupted: false,
 		truncated: false,
@@ -3506,50 +3362,6 @@ export function createAgentJob(overrides?: Partial<AgentJobInput>): AgentJobInpu
 	return { provider: 'main', messages: [{ role: 'user', content: 'go' }], ...overrides }
 }
 
-/**
- * Creates a deterministic summarizer that returns the message count and records each slice.
- * Conversation tests use the count to distinguish section compaction from a cap merge.
- *
- * @returns The summarizer and its readonly recorded slices
- */
-export function createStubSummarizer(): {
-	readonly summarize: ConversationSummaryHandler
-	readonly calls: ReadonlyArray<readonly Message[]>
-} {
-	const recorder = createRecorder<readonly [readonly Message[]]>()
-	return {
-		get calls() {
-			return recorder.calls.map(([messages]) => messages)
-		},
-		async summarize(messages) {
-			recorder.handler(messages)
-			return `recap of ${messages.length}`
-		},
-	}
-}
-
-/**
- * Creates an inert summarizer that records each request and digests it as `recap(<contents>)`,
- * so a cumulative fold's input and output are both readable from the section summary.
- *
- * @returns The summarizer and the requests it received, oldest first
- */
-export function createRecapSummarizer(): {
-	readonly summarize: ConversationSummaryHandler
-	readonly calls: ReadonlyArray<readonly Message[]>
-} {
-	const recorder = createRecorder<readonly [readonly Message[]]>()
-	return {
-		get calls() {
-			return recorder.calls.map(([messages]) => messages)
-		},
-		async summarize(messages) {
-			recorder.handler(messages)
-			return `recap(${messages.map((message) => message.content).join('|')})`
-		},
-	}
-}
-
 /** Supplies the judge usage a selection fixture reports, distinct from every provider usage. */
 export const SELECTION_USAGE: TokenUsage = Object.freeze({ prompt: 30, completion: 2, total: 32 })
 
@@ -3583,8 +3395,8 @@ export interface RecordedSelectionInterface {
 }
 
 /**
- * Creates a recording {@link SelectionHandler} that selects the messages of the conversation's
- * `view()` passing `keep`, or the whole `view()` when `keep` is omitted.
+ * Creates a recording {@link SelectionHandler} that selects the conversation's messages passing
+ * `keep`, or every message when `keep` is omitted.
  *
  * @param options - The {@link RecordedSelectionOptions} (both optional; see its `@remarks`)
  * @returns The handler plus its live call and selection records
@@ -3610,10 +3422,10 @@ export function createRecordedSelection(
 		},
 		handler: async (conversation, request, signal) => {
 			recorder.handler(conversation, request, signal)
-			const view = conversation.view()
+			const stored = conversation.messages()
 			const keep = options?.keep
 			const selection: Selection = {
-				messages: keep === undefined ? view : view.filter((message) => keep(message, request)),
+				messages: keep === undefined ? stored : stored.filter((message) => keep(message, request)),
 				judgments: [],
 				...(options?.usage === undefined ? {} : { usage: options.usage }),
 			}
@@ -3638,10 +3450,10 @@ export function rejectSelection(): Promise<Selection> {
 }
 
 /**
- * Returns the selection a handler gives up on: `fault` set, `messages` as `view()`, and the judge
- * usage it spent ({@link SELECTION_USAGE}).
+ * Returns the selection a handler gives up on: `fault` set, `messages` as the conversation's
+ * `messages()`, and the judge usage it spent ({@link SELECTION_USAGE}).
  *
- * @param conversation - The conversation whose `view()` the selection carries
+ * @param conversation - The conversation whose `messages()` the selection carries
  * @returns A selection whose `fault` is `Error('the judge refused the needed question')`
  *
  * @example
@@ -3651,7 +3463,7 @@ export function rejectSelection(): Promise<Selection> {
  */
 export async function abandonSelection(conversation: ConversationInterface): Promise<Selection> {
 	return {
-		messages: conversation.view(),
+		messages: conversation.messages(),
 		judgments: [],
 		usage: SELECTION_USAGE,
 		fault: new Error('the judge refused the needed question'),
@@ -3686,7 +3498,7 @@ export const SELECTION_FAULT_CASES: readonly SelectionFaultCase[] = Object.freez
 		label: 'a changed tail',
 		select: async (conversation: ConversationInterface): Promise<Selection> => {
 			conversation.add({ role: 'assistant', content: 'A reply from an overlapping run.' })
-			return { messages: conversation.view(), judgments: [] }
+			return { messages: conversation.messages(), judgments: [] }
 		},
 		message: 'changed during selection',
 	}),
@@ -3821,46 +3633,40 @@ export function createDeafScheduler(gate: PromiseWithResolvers<void>): GatedSche
 // Store scenarios share this host-independent battery so each backend exercises the same snapshots.
 
 /**
- * Adds three turns (`first`, `second`, `third`) to a conversation and compacts it, so a
- * conversation configured with `keep: 1` folds the oldest two into one summarized section and
- * keeps the last live. {@link buildConversationSnapshot} and {@link seedConversation} share
- * this one copy of the turn data and the fold.
+ * Adds three turns (`first`, `second`, `third`) to a conversation. {@link buildConversationSnapshot}
+ * and {@link seedConversation} share this one copy of the turn data.
  *
- * @param conversation - The conversation to seed and compact
- * @returns A promise that settles after the compaction
+ * @param conversation - The conversation to seed
+ * @returns The three stored messages, in insertion order
  */
-export async function compactSeedTurns(conversation: ConversationInterface): Promise<void> {
-	conversation.add([
+export function addSeedTurns(conversation: ConversationInterface): readonly Message[] {
+	return conversation.add([
 		{ role: 'user', content: 'first' },
 		{ role: 'assistant', content: 'second' },
 		{ role: 'user', content: 'third' },
 	])
-	await conversation.compact()
 }
 
 /**
  * Builds a REAL {@link ConversationSnapshot} the way a conversation produces one — three turns
- * added, then a genuine `compact()` folds the oldest two into one summarized section, with the
- * last message kept live (`keep: 1`). So the snapshot is NON-VACUOUS in BOTH the compacted
- * sections AND the live tail. The
- * shared store-test fixture both `{Memory,Database}ConversationStore` twins drive (one
- * builder, not a per-file copy). The deterministic, provider-free summarizer is folded INSIDE
- * (digesting the slice into `recap(<contents>)` — NOT {@link createStubSummarizer}, whose `recap of
- * <n>` digest text differs), so a `compact()` produces a predictable section.
+ * added, then one judgment recorded about the first, so the snapshot is NON-VACUOUS in BOTH its
+ * messages AND its judgments. The shared store-test fixture both `{Memory,Database}ConversationStore`
+ * twins drive (one builder, not a per-file copy). It resolves a promise, as a store scenario's
+ * builder does.
  *
  * @param id - The conversation id (and snapshot key); Default: `'chat'`
- * @returns The settled conversation's snapshot (sections + live tail)
+ * @returns The conversation's snapshot (messages + judgments)
  */
-export async function buildConversationSnapshot(id = 'chat'): Promise<ConversationSnapshot> {
-	const conversation = createConversation({
-		id,
-		async summarize(messages) {
-			return `recap(${messages.map((message) => message.content).join('|')})`
-		},
-		keep: 1,
+export function buildConversationSnapshot(id = 'chat'): Promise<ConversationSnapshot> {
+	const conversation = createConversation({ id })
+	const [first] = addSeedTurns(conversation)
+	conversation.judgments.add({
+		...JUDGMENT_INPUT,
+		id: 'seed',
+		sources: first === undefined ? [] : [first.id],
+		state: 'user: first',
 	})
-	await compactSeedTurns(conversation)
-	return conversation.snapshot()
+	return Promise.resolve(conversation.snapshot())
 }
 
 /**
@@ -3869,33 +3675,25 @@ export async function buildConversationSnapshot(id = 'chat'): Promise<Conversati
  */
 export const TOOL_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSnapshot>({
 	id: 'weather',
-	sections: [
+	messages: [
+		{ id: 'user-paris', role: 'user', content: 'weather in Paris' },
 		{
-			id: 'section-paris',
-			summary: 'Paris is sunny',
-			messages: [
-				{ id: 'user-paris', role: 'user', content: 'weather in Paris' },
+			id: 'assistant-paris',
+			role: 'assistant',
+			content: '',
+			calls: [
 				{
-					id: 'assistant-paris',
-					role: 'assistant',
-					content: '',
-					calls: [
-						{
-							id: 'call-paris',
-							name: 'weather',
-							arguments: { city: 'Paris' },
-						},
-					],
-				},
-				{
-					id: 'tool-paris',
-					role: 'tool',
-					content: 'sunny in Paris',
+					id: 'call-paris',
+					name: 'weather',
+					arguments: { city: 'Paris' },
 				},
 			],
 		},
-	],
-	messages: [
+		{
+			id: 'tool-paris',
+			role: 'tool',
+			content: 'sunny in Paris',
+		},
 		{
 			id: 'assistant-oslo',
 			role: 'assistant',
@@ -3932,28 +3730,20 @@ export const NESTED_JSON: Readonly<Record<string, unknown>> = Object.freeze({
 })
 
 /**
- * Holds a conversation snapshot whose sectioned and live call arguments each carry
- * {@link NESTED_JSON}, so storage tests cover arbitrary JSON inside the snapshot column.
+ * Holds a conversation snapshot whose call arguments each carry {@link NESTED_JSON}, so storage
+ * tests cover arbitrary JSON inside the snapshot column.
  */
 export const NESTED_SNAPSHOT: ConversationSnapshot = Object.freeze<ConversationSnapshot>({
 	id: 'nested',
-	sections: [
-		{
-			id: 'section-nested',
-			summary: 'The nested call ran',
-			messages: [
-				{ id: 'user-nested', role: 'user', content: 'run the nested call' },
-				{
-					id: 'assistant-nested',
-					role: 'assistant',
-					content: '',
-					calls: [{ id: 'call-nested', name: 'nested', arguments: NESTED_JSON }],
-				},
-				{ id: 'tool-nested', role: 'tool', content: 'ran', call: 'call-nested' },
-			],
-		},
-	],
 	messages: [
+		{ id: 'user-nested', role: 'user', content: 'run the nested call' },
+		{
+			id: 'assistant-nested',
+			role: 'assistant',
+			content: '',
+			calls: [{ id: 'call-nested', name: 'nested', arguments: NESTED_JSON }],
+		},
+		{ id: 'tool-nested', role: 'tool', content: 'ran', call: 'call-nested' },
 		{
 			id: 'assistant-live',
 			role: 'assistant',
@@ -3976,31 +3766,25 @@ export type ConversationSnapshotFunction = (id?: string) => Promise<Conversation
 
 /** Names the literal values a {@link exerciseConversationStoreRoundTrip} result must carry, shared by every twin. */
 export interface ConversationStoreRoundTripExpectation {
-	readonly section: {
-		readonly summary: string
-		readonly messages: readonly string[]
-	}
-	readonly tail: readonly string[]
+	readonly messages: readonly string[]
+	readonly judgments: readonly string[]
 }
 
 /**
- * Holds the literal values a round trip of `buildConversationSnapshot()` must reproduce — the fold's section
- * summary + retained messages, and the live tail. Shared so both twin suites (and
- * the setup proof) assert the SAME literals rather than each retyping them.
+ * Holds the literal values a round trip of `buildConversationSnapshot()` must reproduce — the
+ * message contents and the judgment keys. Shared so both twin suites (and the setup proof) assert the
+ * SAME literals rather than each retyping them.
  */
 export const CONVERSATION_STORE_ROUND_TRIP_EXPECTATION: ConversationStoreRoundTripExpectation =
 	Object.freeze({
-		section: Object.freeze({
-			summary: 'recap(first|second)',
-			messages: Object.freeze(['first', 'second']),
-		}),
-		tail: Object.freeze(['third']),
+		messages: Object.freeze(['first', 'second', 'third']),
+		judgments: Object.freeze(['seed']),
 	})
 
 /**
  * Drives the round-trip scenario of the shared `ConversationStoreInterface` contract: set a real
  * {@link buildConversationSnapshot} snapshot, then get it back. Returns what was stored and what came
- * back, sections + live tail intact, so the caller's `it` block asserts the equality
+ * back, messages + judgments intact, so the caller's `it` block asserts the equality
  * (and the literals in {@link CONVERSATION_STORE_ROUND_TRIP_EXPECTATION}) itself.
  *
  * @param create - Builds a fresh, empty store (the twin's own factory)
@@ -4041,7 +3825,6 @@ export async function exerciseConversationStoreUpsert(
 	const first = await build('c')
 	const second: ConversationSnapshot = {
 		id: 'c',
-		sections: [],
 		messages: [{ id: 'm1', role: 'user', content: 'only' }],
 	}
 	await store.set(first)
@@ -4301,7 +4084,6 @@ export const CANARY_SENTINELS = Object.freeze({
 	workspace: 'canaryworkspace',
 	finding: 'canaryreading',
 	rule: 'canaryrule',
-	summary: 'canarysummary',
 	assistant: 'canaryassistant',
 	judge: 'canaryjudge',
 	add: 'canaryadd',
@@ -4326,7 +4108,6 @@ export const CANARY_BUILD_SOURCES = Object.freeze([
 	'user',
 	'tool',
 	'workspace',
-	'summary',
 	'assistant',
 ] as const)
 
@@ -4796,7 +4577,6 @@ export async function serveIngressCanary(
 						agent.context.conversations.add({
 							snapshot: {
 								id: 'stored',
-								sections: [],
 								messages: [
 									{ id: 'planted', role: 'system', content },
 									{ id: 'request', role: 'user', content: 'Reply now.' },
@@ -4813,7 +4593,7 @@ export async function serveIngressCanary(
 			createScope({
 				name: 'canary',
 				select: async (conversation) => ({
-					messages: [{ id: 'planted', role: 'system', content }, ...conversation.view()],
+					messages: [{ id: 'planted', role: 'system', content }, ...conversation.messages()],
 					judgments: [],
 				}),
 			}),
@@ -4925,23 +4705,6 @@ export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.
 	{ role: 'user', content: 'Check Brightwater Studio again.' },
 ])
 
-/**
- * Pins the messages a provider receives from the agent {@link seedCompactionArm} builds, every
- * field except the minted or stored `id`.
- *
- * @remarks
- * Written by hand from the 0.0.34 layout, which the compaction arm keeps: the `system` message
- * holds the `desk` instruction under `## Instructions`, the compacted section follows as one
- * `assistant` recap, and the live tail ends in the request.
- */
-export const RECORDED_COMPACTION_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freeze([
-	{ role: 'system', content: '## Instructions\n\nServe the desk.' },
-	{ role: 'assistant', content: '[Summary of earlier messages] recap of 2' },
-	{ role: 'user', content: 'Order 2 shipped.' },
-	{ role: 'assistant', content: 'Noted.' },
-	{ role: 'user', content: 'Which orders shipped?' },
-])
-
 /** Carries the manager-options `open` override that {@link resolveSectionOpen} reads, when one applies. */
 export interface SectionOpenOptions {
 	readonly manager?: { readonly open?: string }
@@ -5012,18 +4775,20 @@ export function resolveSectionRender(options?: SectionRenderOptions): string {
 }
 
 /**
- * Registers a conversation on a {@link ConversationManagerInterface} and compacts it, so the
- * registered conversation carries a real compacted section and a live tail — a durable `save` /
- * `open` round trip over it is then NON-VACUOUS in every field.
+ * Registers a conversation on a {@link ConversationManagerInterface} and seeds it with three turns,
+ * so a durable `save` / `open` round trip over it is NON-VACUOUS.
  *
- * @param manager - The manager to register the conversation on (it supplies the summarizer and `keep`)
+ * @param manager - The manager to register the conversation on
  * @param id - The conversation id to register
+ * @returns The registered conversation
  */
-export async function seedConversation(
+export function seedConversation(
 	manager: ConversationManagerInterface,
 	id: string,
-): Promise<void> {
-	await compactSeedTurns(manager.add({ id }))
+): ConversationInterface {
+	const conversation = manager.add({ id })
+	addSeedTurns(conversation)
+	return conversation
 }
 
 /** Holds signals recorded by a transport that rejects every request. */
@@ -5358,13 +5123,6 @@ export class RecordedTransport {
 		return this.#respond()
 	}
 }
-
-/** Supplies an empty section shared by summary and recap message cases. */
-export const CONVERSATION_SECTION: Section = Object.freeze({
-	id: 's1',
-	summary: 'recap of 2',
-	messages: Object.freeze([]),
-})
 
 /** Configures the response, real judge factory, and recorded transport for a judge fixture. */
 export interface RecordedJudgeOptions {
@@ -8571,7 +8329,7 @@ export async function classifyLedgerCorrection(
 /**
  * Executes a tool turn under a thinking replay policy.
  * @param replay - The provider replay policy; omission uses the agent default
- * @returns The result, retained thinking, measured prompts, and transmitted prompts
+ * @returns The result, retained thinking, the requests the `request` event reported, and transmitted prompts
  */
 export async function exerciseThinkingReplay(replay: ThinkingReplay | undefined): Promise<{
 	readonly result: AgentResult
@@ -8596,21 +8354,13 @@ export async function exerciseThinkingReplay(replay: ThinkingReplay | undefined)
 	})
 	const tools = createToolManager()
 	tools.add(createTool({ name: 'refund_order', execute: () => 'Refunded $148.50.' }))
-	const conversations = createConversationManager({
-		summarize: createStubSummarizer().summarize,
-	})
-	conversations.add()
 	const agent = createAgent(provider, {
 		tools,
 		authority: AGENT_AUTHORITY,
-		conversations,
-		window: createBudget({
-			max: 1_000_000,
-			consumer: (request: ProviderRequest) => {
-				measured.handler({ ...request, messages: [...request.messages] })
-				return estimateRequest(request)
-			},
-		}),
+		on: {
+			request: (_index, request) =>
+				measured.handler({ ...request, messages: [...request.messages] }),
+		},
 	})
 	agent.context.messages.add([
 		{ role: 'user', content: 'Is order BW-5512 refundable?' },
@@ -9461,7 +9211,7 @@ export const GUIDE_REPLAY_LINES = Object.freeze([
 /** Supplies the guide replay claims scenario inputs. */
 export const GUIDE_REPLAY_CLAIMS = Object.freeze([
 	"The agent loop records each call's non-empty thinking as the `thinking` member of the assistant message that call appends, on a tool-call turn and on the final answer alike.",
-	"`estimateRequest` counts a message's `thinking`, so the `window` budget counts the thinking the request carries and no other.",
+	"`estimateRequest` counts a message's `thinking`, so a budget it measures counts the thinking the request carries and no other.",
 	'It is the default. Under it, the agent loop and a relay send the same messages they would send if no thinking were recorded; a ledger still reads recorded thinking to measure what a call left.',
 ])
 
@@ -9522,9 +9272,6 @@ export const LEDGER_FAILURE_MESSAGES: readonly [string, string, string] = Object
 	'Keep the loading dock at warehouse 42 clear.',
 	'The Northgate courier arrives on Tuesday.',
 ])
-
-/** Supplies summarizer digests whose trimmed text is empty, which a compaction refuses. */
-export const BLANK_DIGESTS = Object.freeze(['', ' ', '  \n', '\t\n '])
 
 /**
  * Creates a phrase judge whose every returned string field carries the judge canary sentinel.
@@ -9606,21 +9353,15 @@ export function createCanaryMemos(): MemoManagerInterface {
  *
  * @remarks
  * The system text and the `desk` instruction carry their sentinels. The active workspace holds one
- * text file carrying the workspace sentinel and one image. The conversation's first exchange folds
- * into a section whose summary is the summary sentinel, and the live tail holds the user, assistant,
- * and tool sentinels and ends in a `user` message. {@link createCanarySkills} and
+ * text file carrying the workspace sentinel and one image. The conversation holds the user,
+ * assistant, and tool sentinels and ends in a `user` message. {@link createCanarySkills} and
  * {@link createCanaryMemos} supply the skill and memo sentinels.
  *
- * @returns The seeded context after its compaction
+ * @returns The seeded context
  */
 export async function seedCanaryContext(): Promise<AgentContextInterface> {
-	const conversations = createConversationManager({
-		summarize: async () => CANARY_SENTINELS.summary,
-		keep: 4,
-	})
 	const context = new AgentContext({
 		system: `Serve the ${CANARY_SENTINELS.system} desk.`,
-		conversations,
 		skills: createCanarySkills(),
 		memos: createCanaryMemos(),
 	})
@@ -9644,7 +9385,6 @@ export async function seedCanaryContext(): Promise<AgentContextInterface> {
 		{ role: 'tool', call: 'canary', content: `Found ${CANARY_SENTINELS.tool} only.` },
 		{ role: 'user', content: 'Reply now.' },
 	])
-	await requireValue(context.conversations.active, 'Missing active conversation').compact()
 	return context
 }
 
@@ -9807,37 +9547,6 @@ export async function serveRecordsDesk(): Promise<RecordsDesk> {
 		selections: selections.calls.map(([selection]) => selection),
 		messages: ledger.conversation.messages(),
 	}
-}
-
-/**
- * Builds an agent over `provider` wired as the Study's compaction arm, the fixture
- * {@link RECORDED_COMPACTION_REQUEST} records.
- *
- * @remarks
- * The agent carries no system text, a `desk` instruction, and a window; its conversation keeps 2
- * messages, summarizes through {@link createStubSummarizer}, and is compacted once, so its oldest
- * exchange folds into one section.
- *
- * @param provider - The provider the agent sends its request to
- * @returns The compacted agent, ready for one `generate` call
- */
-export async function seedCompactionArm(provider: ProviderInterface): Promise<AgentInterface> {
-	const conversations = createConversationManager()
-	const conversation = conversations.add({ keep: 2, summarize: createStubSummarizer().summarize })
-	const agent = createAgent(provider, {
-		conversations,
-		window: createBudget<ProviderRequest>({ max: 32_768, consumer: estimateRequest }),
-	})
-	agent.context.instructions.add({ name: 'desk', content: 'Serve the desk.' })
-	conversation.add([
-		{ role: 'user', content: 'Order 1 shipped.' },
-		{ role: 'assistant', content: 'Noted.' },
-		{ role: 'user', content: 'Order 2 shipped.' },
-		{ role: 'assistant', content: 'Noted.' },
-		{ role: 'user', content: 'Which orders shipped?' },
-	])
-	await conversation.compact()
-	return agent
 }
 
 /**
@@ -10021,7 +9730,6 @@ export function translateLedgerIds(
 export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	conversation: {
 		id: 'snapshot',
-		sections: [],
 		messages: [
 			{ id: 'request', role: 'user', content: 'Check order FX-111.' },
 			{
@@ -10064,22 +9772,10 @@ export function buildLedgerSnapshotRefusals(): ReadonlyArray<readonly [string, L
 	if (gauge === undefined) throw new Error('LEDGER_SNAPSHOT_SEED carries no gauge')
 	const sparse: string[] = []
 	sparse[1] = 'note'
-	const folded: Message = { id: 'folded', role: 'user', content: 'Check order FX-110.' }
 	return Object.freeze<ReadonlyArray<readonly [string, LedgerSnapshot]>>([
 		['an absent request id', { ...seed, requests: ['absent'] }],
 		['an absent note id', { ...seed, notes: ['absent'] }],
 		['an absent failure id', { ...seed, failures: ['absent'] }],
-		[
-			'a request id only a section original holds',
-			{
-				...seed,
-				conversation: {
-					...seed.conversation,
-					sections: [{ id: 'section', summary: 'An order check.', messages: [folded] }],
-				},
-				requests: ['folded'],
-			},
-		],
 		['a request id on a tool message', { ...seed, requests: ['failure'] }],
 		['a note id on an assistant message', { ...seed, notes: ['call'] }],
 		['a failure id on a user message', { ...seed, failures: ['request'] }],
@@ -10112,7 +9808,11 @@ export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [stri
 		['null', null],
 		['an array', [seed]],
 		['a missing conversation', { requests: [], notes: [], failures: [] }],
-		['a malformed conversation', { ...seed, conversation: { id: 1, sections: [], messages: [] } }],
+		['a malformed conversation', { ...seed, conversation: { id: 1, messages: [] } }],
+		[
+			'a conversation carrying sections',
+			{ ...seed, conversation: { ...seed.conversation, sections: [] } },
+		],
 		['a missing requests list', { conversation: seed.conversation, notes: [], failures: [] }],
 		['a notes list that is a string', { ...seed, notes: 'note' }],
 		['a failures list holding a number', { ...seed, failures: [1] }],
@@ -10127,18 +9827,15 @@ export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [stri
 
 /**
  * Builds values `isConversation` refuses, each varying one member a run reads: a primitive,
- * `null`, a missing `view`, a non-function `view`, `add`, `compact`, or `messages`, a non-string
- * `id`, a non-boolean `summarizable`, a throwing getter, and a revoked proxy.
+ * `null`, a missing `messages`, a non-function `add` or `messages`, a non-string `id`, a throwing
+ * getter, and a revoked proxy.
  *
  * @returns The titled values
  */
 export function createMalformedConversationCases(): ReadonlyArray<readonly [string, unknown]> {
 	const members = Object.freeze({
 		id: 'c1',
-		summarizable: false,
-		view: (): readonly Message[] => [],
 		add: (): undefined => undefined,
-		compact: (): undefined => undefined,
 		messages: (): readonly Message[] => [],
 	})
 	const revoked = Proxy.revocable({ ...members }, {})
@@ -10146,22 +9843,10 @@ export function createMalformedConversationCases(): ReadonlyArray<readonly [stri
 	return Object.freeze<ReadonlyArray<readonly [string, unknown]>>([
 		['a string', 'conversation'],
 		['null', null],
-		[
-			'a record missing view',
-			{
-				id: members.id,
-				summarizable: members.summarizable,
-				add: members.add,
-				compact: members.compact,
-				messages: members.messages,
-			},
-		],
-		['a view that is not a function', { ...members, view: [] }],
+		['a record missing messages', { id: members.id, add: members.add }],
 		['an add that is not a function', { ...members, add: 'add' }],
-		['a compact that is not a function', { ...members, compact: {} }],
 		['a messages member that is not a function', { ...members, messages: [] }],
 		['a numeric id', { ...members, id: 1 }],
-		['a string summarizable', { ...members, summarizable: 'false' }],
 		[
 			'a throwing id getter',
 			{
@@ -11309,27 +10994,6 @@ export interface DisclosureCase {
 	readonly expected: AgentDisclosure
 }
 
-/** Selects how a seeded conversation folds: one cumulative section, or a cap on its sections. */
-export interface DisclosureFoldOptions {
-	readonly cumulative?: boolean
-	readonly sections?: number
-}
-
-/** Pairs exchanges folded one by one, then a live tail, with the disclosure they record. */
-export interface DisclosureFoldCase {
-	readonly name: string
-	readonly exchanges: ReadonlyArray<readonly MessageInput[]>
-	readonly tail: readonly MessageInput[]
-	readonly options: DisclosureFoldOptions
-	readonly expected: AgentDisclosure
-}
-
-/** Holds a folded seeded conversation and the `collapse` events its folds emitted. */
-export interface DisclosureFoldResult {
-	readonly conversation: ConversationInterface
-	readonly collapsed: number
-}
-
 /**
  * Scripts a run whose host tools named `load`, `unload`, and `memo` stand in for the built-ins, so
  * the loop itself stores the messages: `scope` lists the run's tools, `verdict` is the authority's
@@ -11721,36 +11385,6 @@ export const DISCLOSURE_CASES = Object.freeze<readonly DisclosureCase[]>([
 	},
 ])
 
-/** Lists the folded conversations of the derivation table, each with the disclosure it records. */
-export const DISCLOSURE_FOLD_CASES = Object.freeze<readonly DisclosureFoldCase[]>([
-	{
-		name: 'a fold keeps a load in its section',
-		exchanges: [DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS],
-		tail: DISCLOSURE_UNLOAD_BILLING,
-		options: {},
-		expected: { skills: ['claims'] },
-	},
-	{
-		name: 'a cumulative fold keeps its originals',
-		exchanges: [DISCLOSURE_LOAD_BILLING, DISCLOSURE_LOAD_CLAIMS, DISCLOSURE_UNLOAD_CLAIMS],
-		tail: [],
-		options: { cumulative: true },
-		expected: { skills: ['billing'] },
-	},
-	{
-		name: 'a capped merge keeps its originals',
-		exchanges: [
-			DISCLOSURE_LOAD_BILLING,
-			DISCLOSURE_LOAD_CLAIMS,
-			DISCLOSURE_UNLOAD_BILLING,
-			DISCLOSURE_LOAD_BILLING,
-		],
-		tail: [],
-		options: { sections: 2 },
-		expected: { skills: ['claims', 'billing'] },
-	},
-])
-
 /** Declares the `skill` argument a host stand-in for `load` and `unload` takes, so its handler runs. */
 export const DISCLOSURE_SKILL_PARAMETERS = Object.freeze({
 	type: 'object',
@@ -11878,34 +11512,6 @@ export function createStoredConversation(messages: readonly MessageInput[]): Con
 }
 
 /**
- * Creates a conversation that stores each exchange and folds it with the stub summarizer, then
- * stores the tail unfolded.
- *
- * @param exchanges - The exchanges folded one by one
- * @param tail - The messages left in the live tail
- * @param options - The fold's options
- * @returns The conversation and the `collapse` events its folds emitted
- */
-export async function createFoldedConversation(
-	exchanges: ReadonlyArray<readonly MessageInput[]>,
-	tail: readonly MessageInput[],
-	options: DisclosureFoldOptions,
-): Promise<DisclosureFoldResult> {
-	const conversation = createConversation({
-		summarize: createStubSummarizer().summarize,
-		...options,
-	})
-	const collapsed = createRecorder<[unknown]>()
-	conversation.emitter.on('collapse', collapsed.handler)
-	for (const exchange of exchanges) {
-		conversation.add([...exchange, { role: 'user', content: 'next' }])
-		await conversation.compact({ keep: 0 })
-	}
-	conversation.add(tail)
-	return { conversation, collapsed: collapsed.count }
-}
-
-/**
  * Creates a conversation restored from another's snapshot after a JSON round trip, as a store
  * returns it.
  *
@@ -12005,19 +11611,15 @@ export async function executeDisclosureLoop(
 }
 
 /**
- * Creates a conversation of `size` stored messages for timing `collectDisclosure`: half folded
- * into sections and half in the live tail. Each exchange of six messages carries a request, one
- * turn of a built-in call, a `memo` call whose body equals a note, and a lookup, their results, and
- * an answer.
+ * Creates a conversation of `size` stored messages for timing `collectDisclosure`. Each exchange of
+ * six messages carries a request, one turn of a built-in call, a `memo` call whose body equals a
+ * note, and a lookup, their results, and an answer.
  *
- * @param size - The stored message count, a multiple of 8 so each half folds in four equal parts
+ * @param size - The stored message count
  * @param unique - If `true`, every call id is distinct; if `false`, each turn repeats its ids
  * @returns The conversation
  */
-export async function createDisclosureScale(
-	size: number,
-	unique: boolean,
-): Promise<ConversationInterface> {
+export function createDisclosureScale(size: number, unique: boolean): ConversationInterface {
 	const skills = ['billing', 'claims', 'policies', 'renewals', 'contacts', 'calendar']
 	const lookup = JSON.stringify({
 		account: 'Hartley',
@@ -12062,17 +11664,35 @@ export async function createDisclosureScale(
 	)
 		.flat()
 		.slice(0, size)
-	const conversation = createConversation({
-		summarize: createStubSummarizer().summarize,
-		sections: 8,
-	})
-	const part = size / 8
-	for (const at of [0, 1, 2, 3]) {
-		conversation.add(inputs.slice(at * part, (at + 1) * part))
-		await conversation.compact({ keep: 0 })
-	}
-	conversation.add(inputs.slice(size / 2))
+	const conversation = createConversation()
+	conversation.add(inputs)
 	return conversation
+}
+
+/** Holds the recorded conversation size ruling R2 reads: its message count and its total characters. */
+export const RECORDED_CONVERSATION_SIZE = Object.freeze({ count: 290, characters: 539_538 })
+
+/**
+ * Builds a conversation snapshot of the recorded size, alternating user and assistant messages of
+ * even length, the last one holding the remainder, for timing a hydrate against a stringify.
+ *
+ * @returns The snapshot, with no judgments
+ */
+export function buildRecordedConversationSnapshot(): ConversationSnapshot {
+	const { count, characters } = RECORDED_CONVERSATION_SIZE
+	const length = Math.floor(characters / count)
+	const text = 'Order LH-81660 ships on Friday from the north depot. '
+	return {
+		id: 'recorded',
+		messages: Array.from({ length: count }, (_unused, index): Message => {
+			const size = index === count - 1 ? characters - length * (count - 1) : length
+			return {
+				id: `message-${index}`,
+				role: index % 2 === 0 ? 'user' : 'assistant',
+				content: text.repeat(Math.ceil(size / text.length)).slice(0, size),
+			}
+		}),
+	}
 }
 
 /**
@@ -12144,10 +11764,6 @@ export interface BuiltinAgentOptions {
 	readonly authority?: AuthorityInterface
 	/** The messages stored in the active conversation before any run. Default: none. */
 	readonly seed?: readonly MessageInput[]
-	/** The context window, in `estimateRequest` units. Default: none. */
-	readonly window?: number
-	/** If `true`, the conversation folds with the stub summarizer; if `false`, it cannot fold. Default: `false`. */
-	readonly summarize?: boolean
 	/** Rewraps the declared options before `createAgent` reads them, past its types, as a restored record can carry members it does not declare. Default: none. */
 	readonly wrap?: (declared: AgentOptions) => object
 }
@@ -12176,9 +11792,7 @@ export function createBuiltinAgent(options: BuiltinAgentOptions): BuiltinAgent {
 		createRecordedTool('claim', executed, 'claimed'),
 		createRecordedTool('echo', executed, 'echoed'),
 	])
-	const conversations = createConversationManager(
-		options.summarize === true ? { summarize: createStubSummarizer().summarize, keep: 0 } : {},
-	)
+	const conversations = createConversationManager()
 	conversations.add()
 	const declared: AgentOptions = {
 		system: 'Desk.',
@@ -12188,11 +11802,6 @@ export function createBuiltinAgent(options: BuiltinAgentOptions): BuiltinAgent {
 		builtins: options.builtins ?? BUILTIN_NAMES,
 		...(options.scope === undefined ? {} : { scope: createScope(options.scope) }),
 		...(options.workspace === undefined ? {} : { workspace: options.workspace }),
-		...(options.window === undefined
-			? {}
-			: {
-					window: createBudget<ProviderRequest>({ max: options.window, consumer: estimateRequest }),
-				}),
 	}
 	const agent =
 		options.wrap === undefined
@@ -17083,9 +16692,8 @@ export function buildRequiredAgentOptions(): Required<AgentOptions> {
 		signal: new AbortController().signal,
 		authority: AGENT_AUTHORITY,
 		conversations: createConversationManager(),
-		window: createBudget<ProviderRequest>({ max: 1_000_000, consumer: estimateRequest }),
 		strict: true,
-		select: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+		select: async (conversation) => ({ messages: conversation.messages(), judgments: [] }),
 		builtins: ['memo'],
 		workspace: 'north',
 	}
@@ -17171,7 +16779,7 @@ export function buildRequiredLedgerOptions(): Required<LedgerOptions> {
 export function buildRequiredScopeInput(): Required<ScopeInput> {
 	return {
 		name: 'all',
-		select: async (conversation) => ({ messages: conversation.view(), judgments: [] }),
+		select: async (conversation) => ({ messages: conversation.messages(), judgments: [] }),
 		instructions: [],
 		skills: ['billing'],
 		memos: ['pref'],
@@ -17386,14 +16994,6 @@ export function buildOptionDoors(): readonly OptionDoor[] {
 			owner: 'Conversation',
 			shape: 'ConversationOptions',
 			open: (stray) => new Conversation(invokeUnchecked(undefined, Object.assign, [{}, stray])),
-		},
-		{
-			owner: 'Conversation',
-			shape: 'CompactOptions',
-			open: (stray) => {
-				const conversation = createConversation({ summarize: createStubSummarizer().summarize })
-				return invokeUnchecked(conversation, conversation.compact, [{ ...stray }])
-			},
 		},
 		{
 			owner: 'Conversation',

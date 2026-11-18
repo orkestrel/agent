@@ -274,24 +274,25 @@ export interface ScopeFilter {
  * @remarks
  * A {@link SelectionHandler} returns one per select site, and
  * {@link AgentContextInterface.build} folds its `messages` in place of the active conversation's
- * `view()`. It carries no tool member: what a turn advertises and dispatches stays the scope's
- * `tools` allow-list. What the selection omitted is `view()` minus `messages`; no second list is
- * stored. `messages` holds conversation parts only: {@link AgentContextInterface.select} turns a
- * selection holding a `system` message into a `'ROLE'` fault over `view()`.
+ * `messages()`. It carries no tool member: what a turn advertises and dispatches stays the scope's
+ * `tools` allow-list. What the selection omitted is the conversation's `messages()` minus
+ * `messages`; no second list is stored. `messages` holds conversation parts only:
+ * {@link AgentContextInterface.select} turns a selection holding a `system` message into a `'ROLE'`
+ * fault over the conversation's `messages()`.
  *
  * @example
  * ```ts
- * const selection: Selection = { messages: conversation.view(), judgments: [] }
+ * const selection: Selection = { messages: conversation.messages(), judgments: [] }
  * ```
  */
 export interface Selection {
-	/** Lists the messages `build` folds in place of `view()`, in prompt order: conversation parts only. */
+	/** Lists the messages `build` folds in place of the conversation's `messages()`, in prompt order: conversation parts only. */
 	readonly messages: readonly Message[]
 	/** Lists the keys of the judgments the selection rests on, reused or recorded. */
 	readonly judgments: readonly string[]
 	/** Holds the judge usage this selection spent, on success and on failure alike. */
 	readonly usage?: TokenUsage
-	/** Holds the error a handler gave up on, or the fault `select` raises over a handler's selection (a disallowed role or a changed view); `messages` is then `view()`. */
+	/** Holds the error a handler gave up on, or the fault `select` raises over a handler's selection (a disallowed role or a changed conversation); `messages` is then the conversation's `messages()`. */
 	readonly fault?: Error
 }
 
@@ -299,10 +300,10 @@ export interface Selection {
  * Chooses the conversation messages the next prompt carries for one user request.
  *
  * @remarks
- * Receives the run's conversation, the user message the run serves (passed by the loop, because
- * a compaction can fold it into a section), and the run's abort signal. A handler that spent judge
- * calls before giving up returns a {@link Selection} with `fault` set, `messages` as `view()`, and
- * the usage spent, rather than throwing. A handler that recovers from an error returns no `fault`.
+ * Receives the run's conversation, the user message the run serves (captured by the loop at run
+ * entry), and the run's abort signal. A handler that spent judge calls before giving up returns a
+ * {@link Selection} with `fault` set, `messages` as the conversation's `messages()`, and the usage
+ * spent, rather than throwing. A handler that recovers from an error returns no `fault`.
  *
  * @param conversation - The conversation whose messages the handler selects
  * @param request - The user message captured at run entry
@@ -312,7 +313,7 @@ export interface Selection {
  * @example
  * ```ts
  * const select: SelectionHandler = async (conversation) => ({
- * 	messages: conversation.view(),
+ * 	messages: conversation.messages(),
  * 	judgments: [],
  * })
  * ```
@@ -873,8 +874,8 @@ export interface SkillManagerInterface {
  * initial active filter applied at `build()` time (and at the loop's tool-advertise step); it
  * can be changed through the context's `apply` method afterwards. Default: `undefined`, no filtering.
  * `conversations` is the structural {@link ConversationManagerInterface} the
- * context's message source flows from: `messages` is the manager's active conversation's live tail
- * and `build()` folds that conversation's `view()` (section summaries + live). When omitted, a fresh
+ * context's message source flows from: `messages` is the manager's active conversation and
+ * `build()` folds that conversation's `messages()`. When omitted, a fresh
  * {@link ConversationManagerInterface} is created and a default conversation is added (so
  * `messages` is always defined). All default to a context with no system prompt, empty registries,
  * no scope, and a fresh conversation registry holding one default conversation. `select` is the
@@ -908,14 +909,13 @@ export interface AgentContextOptions {
 	/**
 	 * Reuses a pre-built {@link ConversationManagerInterface}; a fresh empty one is created when
 	 * omitted. The constructor adds a default conversation when the manager has no active one, so
-	 * `messages` — the manager's active conversation's live tail, which an agent run binds when it
-	 * names no conversation — is always defined. `build()` folds the active conversation's
-	 * `view()` (the per-section summaries + the live tail), or a passed selection's `messages`.
-	 * The scope's filters never touch messages; message inclusion is the conversation's through
-	 * compaction and, when a handler is set, the selection's. In an agent run, a scope change reaches
-	 * the tools and the head at the next turn's snapshot, where a changed list rebuilds the head, and
-	 * a `select` change waits for the next build or select site (run entry, the pre-first-turn
-	 * compaction fold, or a compaction rebuild). The registry is structural; change its
+	 * `messages` — the manager's active conversation, which an agent run binds when it names no
+	 * conversation — is always defined. `build()` folds the active conversation's `messages()`, or a
+	 * passed selection's `messages`. The scope's filters never touch messages; message inclusion is the
+	 * conversation's and, when a handler is set, the selection's. In an agent run, a scope change
+	 * reaches the tools and the head at the next turn's snapshot, where a changed list rebuilds the
+	 * head, and a `select` change waits for the next run, whose entry is the one select site. The
+	 * registry is structural; change its
 	 * active conversation through the manager's `switch(id)`, which sets the next run's default and
 	 * never moves a live run.
 	 */
@@ -923,7 +923,7 @@ export interface AgentContextOptions {
 	/**
 	 * Holds the agent's default selection handler; the active scope's `select` overrides it, and a
 	 * run scope's `select` overrides both. Omitted ⇒ with no scope handler either, `build()` folds the
-	 * active conversation's `view()`.
+	 * active conversation's `messages()`.
 	 */
 	readonly select?: SelectionHandler
 }
@@ -932,7 +932,7 @@ export interface AgentContextOptions {
  * Selects what one `build` call renders.
  *
  * @remarks
- * `selection` holds the conversation part in place of the active conversation's `view()`. `scope`
+ * `selection` holds the conversation part in place of the active conversation's `messages()`. `scope`
  * holds a run's scope: the build filters by the context scope intersected with it, list by list,
  * so a run scope narrows the context scope and never widens it. `disclosure` names the skills
  * whose bodies close the `system` message and the workspace to render in place of the active one,
@@ -942,11 +942,11 @@ export interface AgentContextOptions {
  *
  * @example
  * ```ts
- * context.build({ selection: { messages: conversation.view(), judgments: [] }, scope })
+ * context.build({ selection: { messages: conversation.messages(), judgments: [] }, scope })
  * ```
  */
 export interface ContextBuildOptions {
-	/** Holds the messages that replace `view()`; omitted ⇒ the active conversation's `view()`. */
+	/** Holds the messages that replace the conversation's; omitted ⇒ the active conversation's `messages()`. */
 	readonly selection?: Selection
 	/** Holds a run's scope; the build filters by the context scope intersected with it. */
 	readonly scope?: ScopeInterface
@@ -963,14 +963,14 @@ export interface ContextBuildOptions {
  * @remarks
  * The richer context — `system` (the optional system prompt), the prompt context managers
  * (`instructions` / `skills` / `memos` / `workspaces` / `conversations`), `messages` (the active
- * conversation's live tail, satisfying {@link import('../conversations/index.js').MessageManagerInterface}), and the current `scope`
+ * conversation, satisfying {@link import('../conversations/index.js').MessageManagerInterface}), and the current `scope`
  * (the active {@link ScopeInterface} filter, or `undefined` for no filtering). `build()` folds the
  * system prompt, the scoped instructions, the scoped skills index, and the bodies of the skills
  * its `disclosure` option shows into one leading `system` message (under each manager's `open`,
  * each item through its `render`, the bodies last), renders the scoped memos index, the admitted
  * workspace ids when `switchable` is `true`, and the rendered workspace's scope-filtered text files
  * (fenced reference blocks) into one `user` context message after it, and appends the active
- * conversation's `view()`, attaching the rendered workspace's scope-filtered image files' `base64`
+ * conversation's `messages()`, attaching the rendered workspace's scope-filtered image files' `base64`
  * payload to the last user message. The rendered workspace is the one `disclosure` names, else
  * the active one, and it is the sole document/image context. Tools are advertised to the provider
  * structurally (through `tools.definitions()`, scope-filtered by the loop), not serialized into
@@ -996,12 +996,12 @@ export interface AgentContextInterface {
 	 */
 	readonly workspaces: WorkspaceManagerInterface
 	/**
-	 * Holds the active conversation's live tail — the default conversation of the next agent run,
+	 * Holds the active conversation — the default conversation of the next agent run,
 	 * never a live run's target, and always defined (the {@link conversations} registry always has
 	 * an active conversation; a default is added at construction). It is the active
 	 * {@link ConversationInterface} itself (which satisfies
 	 * {@link import('../conversations/index.js').MessageManagerInterface} structurally), so appends through `messages` route to the
-	 * active conversation's tail and `build()` with no selection folds its `view()`. Computed
+	 * active conversation and `build()` with no selection folds its `messages()`. Computed
 	 * dynamically (it follows `conversations.switch(id)`), the same reference the active
 	 * conversation exposes — no duplication. A run binds its conversation at its call, so a later
 	 * switch can leave `messages` on another conversation than a live run's.
@@ -1009,7 +1009,7 @@ export interface AgentContextInterface {
 	readonly messages: ConversationInterface
 	/**
 	 * Holds the {@link ConversationManagerInterface} whose active conversation is `messages` —
-	 * `build()` with no selection folds that conversation's `view()`. Always holds an active
+	 * `build()` with no selection folds that conversation's `messages()`. Always holds an active
 	 * conversation (a default is added at construction when none was supplied), so `messages` is
 	 * always defined. `conversations.switch(id)` sets the conversation the next run binds when it
 	 * names none, at any moment, and never moves a live run; a run that names its own
@@ -1043,11 +1043,11 @@ export interface AgentContextInterface {
 	 * @remarks
 	 * Resolves the handler once per call. With no handler in either home it returns `undefined`
 	 * synchronously, so a caller awaits nothing. Otherwise it records the message ids of the
-	 * given conversation's `view()`, hands that conversation to the handler, and compares the ids
-	 * after it settles, reading no other conversation, the active one included: an
-	 * unchanged view returns the handler's {@link Selection}; a changed view returns a selection
-	 * whose `fault` names the change, whose `messages` are the current `view()`, and which carries
-	 * the handler's `judgments` and `usage`. An unchanged view whose selection holds a message whose
+	 * given conversation's `messages()`, hands that conversation to the handler, and compares the ids
+	 * after it settles, reading no other conversation, the active one included: an unchanged
+	 * conversation returns the handler's {@link Selection}; a changed one returns a selection whose
+	 * `fault` names the change, whose `messages` are the current `messages()`, and which carries the
+	 * handler's `judgments` and `usage`. An unchanged conversation whose selection holds a message whose
 	 * role is not a `ConversationRole`, such as a `system` message, returns the same shape with a
 	 * `ConversationError` coded `'ROLE'` as its `fault`, which names the message's index and role and
 	 * carries the handler's own `fault` as its `cause`. A handler throw rejects the returned promise
@@ -1080,7 +1080,7 @@ export interface AgentContextInterface {
 	 * the scope-filtered memos index, the admitted workspace ids under `## Workspaces` when
 	 * `switchable` is `true`, and the rendered workspace's scope-filtered (`scope.files`) text files
 	 * as fenced reference blocks in a `## Workspace` section, then the active conversation's
-	 * `view()`, or the selection's `messages` when a selection is passed, with the rendered
+	 * `messages()`, or the selection's `messages` when a selection is passed, with the rendered
 	 * workspace's image files' `base64` payload attached to the last user message. With no override
 	 * set, each section renders on its manager's built-in framing. The `system` message is prepended
 	 * only when some part of it exists, the context message only when one of its sections renders,
@@ -1126,15 +1126,16 @@ export interface AgentContextInterface {
 	 * instructions manager the agent receives. Scope filtering runs before formatting, and the
 	 * workspace image data attaches to the last user message.
 	 *
-	 * **A selection.** Given a {@link Selection}, the build folds `selection.messages` in place of
-	 * `view()` and attaches the image data to the last user message of that array; the system and
+	 * **A selection.** Given a {@link Selection}, the build folds `selection.messages` in place of the
+	 * conversation's `messages()` and attaches the image data to the last user message of that array; the system and
 	 * context messages are unchanged. The `system` message holds host-authored text alone, so a
 	 * handler that adds text for the model, such as a ledger's records, writes it into a message of
 	 * `selection.messages`.
 	 *
-	 * @param options - The selection whose `messages` replace `view()`, a run's scope intersected
-	 *   with the active one, what the build shows, and whether it lists the workspace ids; omitted ⇒
-	 *   `view()` under the active scope, with no body and the active workspace
+	 * @param options - The selection whose `messages` replace the conversation's, a run's scope
+	 *   intersected with the active one, what the build shows, and whether it lists the workspace ids;
+	 *   omitted ⇒ the active conversation's `messages()` under the active scope, with no body and the
+	 *   active workspace
 	 * @returns The scoped conversation, prefixed by the context message when the scoped memos, the
 	 *   listed workspace ids, or the rendered workspace's scoped text files are non-empty, and before
 	 *   it by the assembled `system` message when the prompt, the scoped instructions, the scoped

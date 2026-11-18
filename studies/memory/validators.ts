@@ -22,7 +22,7 @@ import {
 	isString,
 	recordOf,
 } from '@orkestrel/contract'
-import { isStudyAgentRuntime, isStudyAgentGauge } from '@orkestrel/study'
+import { isStudyAgentRuntime } from '@orkestrel/study'
 import { isStudyOllamaMetadata } from '@orkestrel/study/server'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
 
@@ -78,12 +78,11 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 		if (!isRecord(value)) return false
 		if (
 			Object.keys(value).some(
-				(key) =>
-					!['gauge', 'observe', 'checkpoints', 'metadata', 'correction', 'judge'].includes(key),
+				(key) => !['observe', 'checkpoints', 'metadata', 'correction', 'judge'].includes(key),
 			)
 		)
 			return false
-		const { gauge, observe, checkpoints, metadata, correction, judge } = value
+		const { observe, checkpoints, metadata, correction, judge } = value
 		if (
 			judge !== undefined &&
 			(!recordOf({ gpu: isFiniteNumber })(judge) ||
@@ -93,10 +92,6 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 			return false
 		if (metadata !== undefined && !isStudyOllamaMetadata(metadata)) return false
 		if (correction !== undefined && !recordOf({ narrow: isBoolean }, true)(correction)) return false
-		if (gauge !== undefined) {
-			if (!isRecord(gauge) || Object.keys(gauge).length !== 2 || !isStudyAgentGauge(gauge))
-				return false
-		}
 		if (observe !== undefined && !isBoolean(observe)) return false
 		if (checkpoints === undefined) return true
 		return (
@@ -156,7 +151,7 @@ export function isStudyMemoryClassifier(value: unknown): value is StudyMemoryCla
 
 /** Checks a supported memory arm. @param value - Trial arm. @returns Whether this driver implements the treatment. */
 export function isStudyMemoryArm(value: unknown): value is StudyMemoryArm {
-	return value === 'records' || value === 'compaction' || value === 'full'
+	return value === 'records' || value === 'full'
 }
 
 /** Checks bounded public goal input. @param value - Public JSON input. @returns Whether messages and references are valid. */
@@ -208,7 +203,7 @@ export function isStudyMemoryInput(value: unknown): value is StudyMemoryInput {
 export function isStudyMemoryAssertion(value: unknown): value is StudyMemoryAssertion {
 	return holds(() => {
 		if (!isRecord(value)) return false
-		if (value.observation === 'operational' || value.observation === 'summary') return true
+		if (value.observation === 'operational') return true
 		if (value.observation === 'result') return typeof value.partial === 'boolean'
 		return (
 			(value.observation === 'arrival' || value.observation === 'lookup') &&

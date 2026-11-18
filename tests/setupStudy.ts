@@ -63,11 +63,7 @@ import {
 	readStudyDeclaration,
 	readStudyResult,
 } from '@orkestrel/study/server'
-import {
-	STUDY_MEMORY_REPEAT,
-	StudyMemoryDriver,
-	StudyMemoryJudge,
-} from '../studies/memory/index.js'
+import { StudyMemoryDriver, StudyMemoryJudge } from '../studies/memory/index.js'
 import { STUDY_DESK_TOOLS } from '../studies/desk/constants.js'
 import { isStudyDeskAssertion, isStudyDeskInput } from '../studies/desk/validators.js'
 import * as agent from '../src/core/index.js'
@@ -85,21 +81,8 @@ import { createLedgerJudge } from './setup.js'
 /** Composes the selected built Agent as both runtime and tested subject with the installed public Ollama provider; a distinct subject replaces only `subject`. */
 export const STUDY_MEMORY_MODULES = Object.freeze({ agent, subject: agent, provider })
 
-/** Pins the identity gauge compaction fixtures declare explicitly; it prices a request at its raw estimate. */
-export const STUDY_MEMORY_SETTINGS = Object.freeze({
-	gauge: Object.freeze({ scale: 1, overhead: 0 }),
-})
-
-/** Pins a gauge whose projection is the same for every estimate between 0 and 1e9: ceil(100 + 1e-9 * estimate). */
-export const STUDY_MEMORY_FIXED_SETTINGS = Object.freeze({
-	gauge: Object.freeze({ scale: 1e-9, overhead: 100 }),
-})
-
-/** Pins the projection STUDY_MEMORY_FIXED_SETTINGS gives any realistic request, written as arithmetic rather than derived from the helper. */
-export const STUDY_MEMORY_FIXED_PROJECTION = 101
-
-/** Pins a short request whose admission depends on the declared gauge. */
-export const WINDOW_GOAL = Object.freeze({
+/** Pins a short goal that takes one request and no tool. */
+export const STUDY_MEMORY_SHORT_GOAL = Object.freeze({
 	id: 'first',
 	input: { prompt: 'State the order count', arrivals: [], records: [] },
 })
@@ -262,7 +245,6 @@ export function createStudyInstallFixture(
 		JSON.stringify({
 			...raw,
 			name: 'recordslocal',
-			settings: STUDY_MEMORY_SETTINGS,
 			agent: entry,
 			subject: entry,
 			roots: [scratch.path, ...packages.map((captured) => captured.target)],
@@ -1021,7 +1003,6 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 		...(options.triage === undefined ? {} : { triage: options.triage }),
 		...(options.settings === undefined ? {} : { settings: options.settings }),
 		...(options.duration === undefined ? {} : { duration: options.duration }),
-		...(options.room === undefined ? {} : { room: options.room }),
 	})
 	const fixture = createMemoryContext(profile)
 	// Construction and open sit inside the cleanup boundary so a refused treatment still releases the server and accounting.
@@ -1074,7 +1055,6 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 		...(options.triage === undefined ? {} : { triage: options.triage }),
 		...(options.settings === undefined ? {} : { settings: options.settings }),
 		...(options.duration === undefined ? {} : { duration: options.duration }),
-		...(options.room === undefined ? {} : { room: options.room }),
 	})
 	const fixture = createMemoryContext(profile)
 	try {
@@ -1252,144 +1232,6 @@ export function readMemoryOrigins(
 	})
 }
 
-/** Builds one goal whose eight long arrivals overflow STUDY_MEMORY_SUMMARY_ROOM before the Compaction fold.
- * @param detail - Repeated filler text; changing one byte changes every request that carries it.
- * @returns A single public goal.
- */
-export function buildMemoryFoldGoals(
-	detail = 'Maintain this source detail. ',
-): readonly StudyGoal[] {
-	return Object.freeze([
-		Object.freeze({
-			id: 'opening',
-			input: Object.freeze({
-				prompt: 'Retain obligations',
-				arrivals: Object.freeze(
-					Array.from({ length: 8 }, (_, index) => ({
-						id: `source-${index}`,
-						content: `Obligation ${index}. ${detail.repeat(40)}`,
-					})),
-				),
-				records: Object.freeze([]),
-			}),
-		}),
-	])
-}
-
-/** Pins a room whose summary admission room, context less recap less safety (4096 - 64 - 128 = 3904), is wider than the Agent window, context less output less safety (4096 - 2048 - 128 = 1920). */
-export const STUDY_MEMORY_SUMMARY_ROOM = Object.freeze({
-	context: 4096,
-	output: 2048,
-	safety: 128,
-	recap: 64,
-})
-
-/** Pins the summary admission room of STUDY_MEMORY_SUMMARY_ROOM. */
-export const STUDY_MEMORY_SUMMARY_LIMIT = 3904
-
-/**
- * Pins hand-counted summary request lengths, each the content length of one folded arrival message,
- * `[Source aN] ` (12 characters) plus its body. A message costs `length / 4 + 4` and the summary
- * instruction (113 characters) costs `ceil(113 / 4) + 4 = 33`, so a seven-message fold projects
- * `33 + 7 * (2196 / 4 + 4) = 3904` for EQUAL, `33 + 6 * 553 + (2192 / 4 + 4) = 3903` for BELOW and
- * `33 + 7 * (2400 / 4 + 4) = 4261` for OVER, under the identity gauge.
- */
-export const STUDY_MEMORY_SUMMARY_FOLDS = Object.freeze({
-	equal: Object.freeze([2196, 2196, 2196, 2196, 2196, 2196, 2196]),
-	below: Object.freeze([2196, 2196, 2196, 2196, 2196, 2196, 2192]),
-	over: Object.freeze([2400, 2400, 2400, 2400, 2400, 2400, 2400]),
-	small: Object.freeze([1200, 1200, 1200, 1200, 1200, 1200, 1200]),
-})
-
-/** Pins the identity-gauge projections the folds above are counted to: equal 3904, below 3903, over 4261, small 33 + 7 * (1200 / 4 + 4) = 2161. */
-export const STUDY_MEMORY_SUMMARY_PROJECTIONS = Object.freeze({
-	equal: 3904,
-	below: 3903,
-	over: 4261,
-	small: 2161,
-})
-
-/**
- * Builds one goal of exactly counted arrivals: the folded ones, then one live one, then the prompt.
- * @param folded - Message content lengths of the arrivals a Compaction fold summarizes; each is at least 12.
- * @param live - Message content length of the last arrival, which stays live beside the prompt.
- * @returns A single public goal whose arrival `aN` has `[Source aN] ` plus `x` repeated to that length.
- */
-export function buildMemorySummaryGoals(
-	folded: readonly number[],
-	live: number,
-): readonly StudyGoal[] {
-	return Object.freeze([
-		Object.freeze({
-			id: 'opening',
-			input: Object.freeze({
-				prompt: 'Retain obligations',
-				arrivals: Object.freeze(
-					[...folded, live].map((length, index) => {
-						if (length < 12 || index > 9) throw new Error('Invalid summary arrival length')
-						return { id: `a${index}`, content: 'x'.repeat(length - 12) }
-					}),
-				),
-				records: Object.freeze([]),
-			}),
-		}),
-	])
-}
-
-/**
- * Runs one Compaction goal over counted arrivals in STUDY_MEMORY_SUMMARY_ROOM under the identity gauge.
- * @param folded - Message content lengths a fold summarizes.
- * @param live - Message content length of the live arrival.
- * @param responses - Queued protocol replies; the first chat reply answers the summary.
- * @param observe - Whether passive evidence is captured; it must change evidence only.
- * @returns The trial result.
- */
-export function runMemorySummary(
-	folded: readonly number[],
-	live: number,
-	responses: readonly MemoryWireFixture[],
-	observe: boolean,
-): Promise<MemoryTrialResult> {
-	return runMemoryTrial({
-		arm: 'compaction',
-		responses,
-		goals: buildMemorySummaryGoals(folded, live),
-		settings: observe ? { ...STUDY_MEMORY_SETTINGS, observe: true } : STUDY_MEMORY_SETTINGS,
-		room: STUDY_MEMORY_SUMMARY_ROOM,
-	})
-}
-
-/** Pins a negative prompt count in a summary terminal row; it must stay a generic fault that keeps the summary role and its unknown usage. */
-export const STUDY_MEMORY_NATIVE_MALFORMED: readonly MemoryNativeFixture[] = Object.freeze([
-	{
-		name: 'a negative prompt count in an HTTP 200 terminal row of a summary request',
-		role: 'summary',
-		trial: Object.freeze({
-			arm: 'compaction' as const,
-			goals: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400),
-			settings: STUDY_MEMORY_SETTINGS,
-			room: STUDY_MEMORY_SUMMARY_ROOM,
-		}),
-		status: 200,
-		body: buildMemoryReply({ prompt: -1 }),
-		code: 'FAULT' as const,
-		message: 'Malformed Ollama usage',
-	},
-])
-
-/** Pins the actual summary reply that exceeds its reserved room and must stop before the next request, tool and goal. */
-export const STUDY_MEMORY_ACTUAL_REFUSALS = Object.freeze([
-	Object.freeze({
-		name: 'a summary prompt one over the summary room',
-		settings: STUDY_MEMORY_SETTINGS,
-		room: STUDY_MEMORY_SUMMARY_ROOM,
-		goal: buildMemorySummaryGoals(STUDY_MEMORY_SUMMARY_FOLDS.below, 400)[0],
-		body: buildMemoryReply({ content: 'Recap kept', prompt: STUDY_MEMORY_SUMMARY_LIMIT + 1 }),
-		message: 'reserved context capacity',
-		role: 'summary',
-	}),
-])
-
 /** Reads the top-level and option key sets of each recorded generation request from its exact wire bytes.
  * @param requests - Recorded HTTP requests.
  * @returns Sorted body and option keys for chat and generate requests in arrival order.
@@ -1443,7 +1285,8 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 		context: 32768,
 		output: 512,
 		safety: 128,
-		recap: 256,
+		// The memory driver reads no recap allowance, so the fixture declares none.
+		recap: undefined,
 		think: false,
 		...options.room,
 	}
@@ -1482,9 +1325,9 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 }
 
 /**
- * Removes the declared judge and recap from a profile, as a workflow that uses neither declares it.
+ * Removes the declared judge from a profile, as a workflow that uses none declares it.
  * @param profile - A profile that declares a provider
- * @returns The profile with no judge model, no judge digest and no recap allowance
+ * @returns The profile with no judge model and no judge digest
  * @throws Error - Thrown when the profile declares no provider
  */
 export function omitMemoryAuxiliaries(profile: StudyProfile): StudyProfile {
@@ -1497,7 +1340,6 @@ export function omitMemoryAuxiliaries(profile: StudyProfile): StudyProfile {
 			judge: undefined,
 			digest: { model: configured.digest.model, judge: undefined },
 		},
-		room: { ...profile.room, recap: undefined },
 	}
 }
 
@@ -1518,19 +1360,6 @@ export function buildMemoryCriterion(
 	return { id, scenario: 'desk', goal, method, critical: id === 'operational', assertion }
 }
 
-/** Builds a gauge that prices any request at `offset` units from the profile's window max.
- * @param profile - The profile whose room defines the window max: context less output and safety.
- * @param offset - Distance from the max; a request prices at the max plus this offset rounded up.
- * @returns Settings with an overhead at that distance and a scale small enough that any estimate adds less than one unit.
- */
-export function buildMemoryEdge(
-	profile: StudyProfile,
-	offset: number,
-): NonNullable<StudyProfile['settings']> {
-	const { context, output, safety } = profile.room
-	return { gauge: { scale: 1e-9, overhead: context - output - safety + offset } }
-}
-
 /** Loads an authored declaration and its shared memory scenario for generic admission proofs.
  * @param profile - The execution profile to compose with authored inputs.
  * @param name - The selected declaration. Default: recordscapacity.
@@ -1547,129 +1376,39 @@ export async function loadMemoryInputs(
 	return { definition, scenarios, rubric, profile }
 }
 
-/** Pins the declarations on the memory driver: one strategy each, named strategy first, in sorted order. */
+/** Pins the declarations on the memory driver: the four records declarations, in sorted order. */
 export const STUDY_MEMORY_DECLARATIONS = Object.freeze([
-	'compactioncapacity',
-	'compactionendurance',
-	'compactionmemory',
-	'compactionqualification',
 	'recordscapacity',
 	'recordsendurance',
 	'recordsmemory',
 	'recordsqualification',
 ])
 
-/** Pins each records declaration beside its compaction sibling, whose rubric is its byte copy. */
-export const STUDY_MEMORY_SIBLINGS = Object.freeze([
-	Object.freeze(['recordsmemory', 'compactionmemory'] as const),
-	Object.freeze(['recordscapacity', 'compactioncapacity'] as const),
-	Object.freeze(['recordsendurance', 'compactionendurance'] as const),
-	Object.freeze(['recordsqualification', 'compactionqualification'] as const),
-])
+/** Pins the SHA-256 of each records declaration's rubric bytes as committed at 2a7c4e9f, so any rubric change is caught. */
+export const STUDY_MEMORY_RUBRICS = Object.freeze({
+	recordscapacity: 'df1003c7c282b9dd7ea4b436c087ca0a3b8b3222903da664c1e0bde64a51cc2c',
+	recordsendurance: '1c192f973185dec7fba312dcb630a64416baf9a36a5d8c79752d25dc94320206',
+	recordsmemory: 'd77c7c45f819892ab1c48355839dd3a16c6aca0f342c00ece84f83068aa82140',
+	recordsqualification: 'b6f1a69d9d45096aff4878eae3cfead3c1e9beb2b5a264c665db5019a1d03ea8',
+})
 
-/** Pins each memory profile pair: one base's records and compaction profiles, with the capacity result each names as its qualification. */
+/** Pins each memory profile with the capacity result it names as its qualification. */
 export const STUDY_MEMORY_PROFILES = Object.freeze([
-	Object.freeze({
-		records: Object.freeze({
-			name: 'recordslocal',
-			qualification: 'tmp/studies/recordscapacity',
-		}),
-		compaction: Object.freeze({
-			name: 'compactionlocal',
-			qualification: 'tmp/studies/compactioncapacity',
-		}),
-	}),
-	Object.freeze({
-		records: Object.freeze({
-			name: 'recordsrecommended',
-			qualification: 'tmp/studies/recordsqualification',
-		}),
-		compaction: Object.freeze({
-			name: 'compactionrecommended',
-			qualification: 'tmp/studies/compactionqualification',
-		}),
-	}),
-	Object.freeze({
-		records: Object.freeze({
-			name: 'recordssmallest',
-			qualification: 'tmp/studies/recordsqualification',
-		}),
-		compaction: Object.freeze({
-			name: 'compactionsmallest',
-			qualification: 'tmp/studies/compactionqualification',
-		}),
-	}),
+	Object.freeze({ name: 'recordslocal', qualification: 'tmp/studies/recordscapacity' }),
+	Object.freeze({ name: 'recordsrecommended', qualification: 'tmp/studies/recordsqualification' }),
 ])
 
-/** Pins each capacity declaration beside the quality twin it qualifies, the one strategy both schedule, and the profiles each pair runs under. */
+/** Pins each capacity declaration beside the quality twin it qualifies and the profile the pair runs under. */
 export const STUDY_MEMORY_TWINS = Object.freeze([
 	Object.freeze({
 		capacity: 'recordscapacity',
 		quality: 'recordsmemory',
-		strategy: 'records',
 		profiles: Object.freeze(['recordslocal']),
-	}),
-	Object.freeze({
-		capacity: 'compactioncapacity',
-		quality: 'compactionmemory',
-		strategy: 'compaction',
-		profiles: Object.freeze(['compactionlocal']),
 	}),
 	Object.freeze({
 		capacity: 'recordsqualification',
 		quality: 'recordsendurance',
-		strategy: 'records',
-		profiles: Object.freeze(['recordsrecommended', 'recordssmallest']),
-	}),
-	Object.freeze({
-		capacity: 'compactionqualification',
-		quality: 'compactionendurance',
-		strategy: 'compaction',
-		profiles: Object.freeze(['compactionrecommended', 'compactionsmallest']),
-	}),
-])
-
-/** Pins the arm lists that schedule exactly one strategy, which a memory declaration admits. */
-export const STUDY_MEMORY_STRATEGY_ADMITTED = Object.freeze([
-	Object.freeze({ arms: Object.freeze(['records'] as const) }),
-	Object.freeze({ arms: Object.freeze(['records', 'full'] as const) }),
-	Object.freeze({ arms: Object.freeze(['full', 'records'] as const) }),
-	Object.freeze({ arms: Object.freeze(['compaction'] as const) }),
-	Object.freeze({ arms: Object.freeze(['compaction', 'full'] as const) }),
-	Object.freeze({ arms: Object.freeze(['full', 'compaction'] as const) }),
-])
-
-/** Pins the exact refusal each arm list that schedules both strategies or neither reads, for a declaration named `memory`. */
-export const STUDY_MEMORY_STRATEGY_REFUSALS = Object.freeze([
-	Object.freeze({
-		arms: Object.freeze(['records', 'compaction'] as const),
-		refusal:
-			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
-	}),
-	Object.freeze({
-		arms: Object.freeze(['compaction', 'records'] as const),
-		refusal:
-			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
-	}),
-	Object.freeze({
-		arms: Object.freeze(['records', 'compaction', 'full'] as const),
-		refusal:
-			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
-	}),
-	Object.freeze({
-		arms: Object.freeze(['full', 'compaction', 'records'] as const),
-		refusal:
-			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
-	}),
-	Object.freeze({
-		arms: Object.freeze(['full'] as const),
-		refusal:
-			'Memory declaration "memory" lists neither strategy in its arms; list one of records or compaction, with full as the only other arm',
-	}),
-	Object.freeze({
-		arms: Object.freeze([] as const),
-		refusal:
-			'Memory declaration "memory" lists neither strategy in its arms; list one of records or compaction, with full as the only other arm',
+		profiles: Object.freeze(['recordsrecommended']),
 	}),
 ])
 
@@ -1694,8 +1433,7 @@ export function collectMemoryDeclarations(): readonly string[] {
 }
 
 /**
- * Reads an authored memory profile as a host runs it: a template's `REQUIRED_` provider takes the CPU fixture provider at `url`, and its settings take {@link STUDY_MEMORY_SETTINGS}, as `createStudyInstallFixture` fills it.
- * @remarks The template declares no gauge, and the compaction arm requires an explicit one, so a host fills both.
+ * Reads an authored memory profile as a host runs it: a template's `REQUIRED_` provider takes the CPU fixture provider at `url`, as `createStudyInstallFixture` fills it.
  * @param name - The profile's file stem under `studies/memory/profiles/`.
  * @param url - The fixture origin a filled template names.
  * @returns The parsed profile.
@@ -1710,13 +1448,7 @@ export function readMemoryProfile(name: string, url: string): StudyProfile {
 	const template =
 		isString(authored.provider.entry) && authored.provider.entry.startsWith('REQUIRED_')
 	return parseStudyProfile(
-		template
-			? {
-					...authored,
-					provider: buildMemoryProfile({ url }).provider,
-					settings: STUDY_MEMORY_SETTINGS,
-				}
-			: authored,
+		template ? { ...authored, provider: buildMemoryProfile({ url }).provider } : authored,
 	)
 }
 
@@ -1906,7 +1638,7 @@ export function buildMemoryGradeFixture(): MemoryGradeFixture {
 			],
 		},
 		evidence: [
-			{ event: 'summary', goal: 'other', value: 'unrelated' },
+			{ event: 'note', goal: 'other', value: 'unrelated' },
 			{ event: 'arrival', goal: 'goal', value: { id: 'receipt' } },
 		],
 	}
@@ -2036,13 +1768,11 @@ export interface MemoryUsageFixture {
 /** Holds a real trial's inputs: queued protocol replies, ordered goals and optional driver settings. */
 export interface MemoryTrialFixture {
 	readonly triage?: MemoryProfileFixture['triage']
-	readonly arm: 'records' | 'compaction' | 'full'
+	readonly arm: StudyMemoryArm
 	readonly responses: readonly MemoryWireFixture[]
 	readonly goals: readonly StudyGoal[]
 	readonly settings?: Readonly<Record<string, JSONValue>>
 	readonly duration?: number
-	/** Overrides room allowances, such as a window small enough to fold. */
-	readonly room?: Partial<StudyProfile['room']>
 	/** Holds the checkpoint value the driver's `open` receives. */
 	readonly seed?: JSONValue
 }
@@ -2103,21 +1833,6 @@ export interface MemoryFailureResult {
 	readonly evidence: readonly StudyEvidence[]
 }
 
-/** Holds one reply the daemon could send to a role's first chat request and the failure it must become. */
-export interface MemoryNativeFixture {
-	readonly name: string
-	/** Holds the responsibility whose first chat request the reply answers. */
-	readonly role: 'agent' | 'summary'
-	/** Holds the treatment that makes that role's chat request the first one sent; replies are supplied separately. */
-	readonly trial: Omit<MemoryTrialFixture, 'responses'>
-	/** Holds the HTTP status the fixture answers with. */
-	readonly status: number
-	readonly body: string
-	readonly code: 'CAPACITY' | 'FAULT'
-	/** Holds a substring of the readable failure message. */
-	readonly message: string
-}
-
 /** Holds a two-trial mechanical grading population: one complete retained trial and one faulted trial, with one criterion per predicate family. */
 export interface MemoryGradeFixture {
 	readonly profile: StudyProfile
@@ -2163,26 +1878,11 @@ export interface StudyMeterFixture {
 /** Maps each memory instrument fixture text to the ids it carries; the cases read it through a callback. */
 export const MEMORY_LITERALS: ReadonlyMap<string, ReadonlySet<string>> = Object.freeze(
 	new Map<string, ReadonlySet<string>>([
-		['refund AA-101 approved', new Set(['AA-101'])],
-		['handoff BB-202 to Dana', new Set(['BB-202'])],
-		['closed CC-303', new Set(['CC-303'])],
-		['AA-101 asked again', new Set(['AA-101'])],
-		['status of BB-202', new Set(['BB-202'])],
-		['kept AA-101 BB-202 CC-303', new Set(['AA-101', 'BB-202', 'CC-303'])],
-		['recap of refunds and handoffs', new Set()],
 		['product cites AA-101 and BB-202', new Set(['AA-101', 'BB-202'])],
 		['prompt carries AA-101 and BB-202', new Set(['AA-101', 'BB-202'])],
 		['seed question only', new Set()],
 	]),
 )
-
-/** Holds the retention fixture: the folded slice and the later requests, with an anchored view and a recap-only control view. */
-export const MEMORY_RETENTION = Object.freeze({
-	history: Object.freeze(['refund AA-101 approved', 'handoff BB-202 to Dana', 'closed CC-303']),
-	later: Object.freeze(['AA-101 asked again', 'status of BB-202']),
-	anchored: Object.freeze(['kept AA-101 BB-202 CC-303']),
-	recap: Object.freeze(['recap of refunds and handoffs']),
-})
 
 /** Holds the carriage fixture: the referenced product with a prompt that carries it and a seed-only control prompt. */
 export const MEMORY_CARRIAGE = Object.freeze({
@@ -2243,25 +1943,16 @@ export const MEMORY_EVIDENCE: readonly StudyEvidence[] = Object.freeze([
 	{ event: 'arrival', goal: 'g2', value: { id: 'one' } },
 	{ event: 'result', goal: 'g2', value: { partial: false } },
 	{ event: 'wire', goal: 'g2', value: { role: 'agent' } },
-	{ event: 'summary', goal: 'g2', value: {} },
+	{ event: 'note', goal: 'g2', value: {} },
 ])
 
 /**
- * Pins each role's sampling keys apart from `STUDY_MEMORY_PARAMETERS`: agent and summary hold the 2B
+ * Pins each role's sampling keys apart from `STUDY_MEMORY_PARAMETERS`: the agent holds the 2B
  * digest's stored values under temperature 0 and seed 0, and the judge holds Ollama's v0.40.13
  * defaults under temperature 1 and seed 0, because the Mica digest stores no parameters.
  */
 export const STUDY_MEMORY_PARAMETER_PINS = Object.freeze({
 	agent: Object.freeze({
-		temperature: 0,
-		seed: 0,
-		top_k: 20,
-		top_p: 0.95,
-		min_p: 0,
-		presence_penalty: 1.5,
-		repeat_penalty: 1,
-	}),
-	summary: Object.freeze({
 		temperature: 0,
 		seed: 0,
 		top_k: 20,
@@ -2455,7 +2146,6 @@ export function writeStudyInstallRecord(
 			name,
 			record: STUDY_MEMORY_RECORD.record,
 			settings: {
-				...STUDY_MEMORY_SETTINGS,
 				...STUDY_MEMORY_RECORD.settings,
 				observe: true,
 				...(checkpoints.length === 0 ? {} : { checkpoints }),
@@ -2495,9 +2185,8 @@ export const STUDY_MEMORY_SEED_GOALS: readonly StudyGoal[] = Object.freeze([
 	}),
 ])
 
-/** Pins settings that list every goal of the seed trajectory; the gauge serves the compaction arm alone. */
+/** Pins settings that list every goal of the seed trajectory. */
 export const STUDY_MEMORY_SEED_SETTINGS = Object.freeze({
-	...STUDY_MEMORY_SETTINGS,
 	observe: true,
 	checkpoints: Object.freeze(STUDY_MEMORY_SEED_GOALS.map((goal) => goal.id)),
 })
@@ -2568,7 +2257,7 @@ export const STUDY_MEMORY_PROGRESS_ROWS: readonly StudyEvidence[] = Object.freez
 		{ event: 'result', value: { content: ' \n', partial: true, conversation: 'c' } },
 		{ event: 'lookup', value: { id: 'a', found: true } },
 		{ event: 'lookup', value: { id: 'b', found: false } },
-		{ event: 'denial', value: { id: '1', name: 'lookup', reason: STUDY_MEMORY_REPEAT } },
+		{ event: 'denial', value: { id: '1', name: 'lookup', reason: agent.LEDGER_NOTES.repeat } },
 		{ event: 'denial', value: { id: '2', name: 'lookup', reason: agent.LEDGER_NOTES.repeat } },
 		{
 			event: 'denial',
@@ -3069,20 +2758,12 @@ export function readMemoryReplayConversation(
 	return conversation
 }
 
-/** Reads every message in checkpoint conversation order, including folded originals. */
+/** Reads every message id in checkpoint conversation order. */
 export function readMemoryReplayMessages(checkpoint: JSONValue): readonly string[] {
 	const conversation = readMemoryReplayConversation(checkpoint)
-	if (!isRecord(conversation) || !isArray(conversation.messages) || !isArray(conversation.sections))
+	if (!isRecord(conversation) || !isArray(conversation.messages))
 		throw new Error('Missing checkpoint conversation')
-	const messages = [
-		...conversation.sections.flatMap((section) => {
-			if (!isRecord(section) || !isArray(section.messages))
-				throw new Error('Missing section messages')
-			return section.messages
-		}),
-		...conversation.messages,
-	]
-	const ids = messages.map((message) => {
+	const ids = conversation.messages.map((message) => {
 		if (!isRecord(message) || typeof message.id !== 'string') throw new Error('Missing message id')
 		return message.id
 	})
@@ -3116,7 +2797,7 @@ export function mapMemoryReplayIds(
 		}
 		if (judgment) return ids.get(value) ?? value
 		const reference =
-			/^(ledger\.)?conversation\.(id|(sections\.)?messages\.id|judgments\.sources)$/.test(member) ||
+			/^(ledger\.)?conversation\.(id|messages\.id|judgments\.sources)$/.test(member) ||
 			/^ledger\.(requests|notes|failures)$/.test(member) ||
 			/^ledger\.window\.(exchanges\.(request|reply|lines\.source)|amendments\.(earlier|later))$/.test(
 				member,
@@ -3320,7 +3001,6 @@ export function buildMemoryReplayEvidence(
 		ledger: {
 			conversation: {
 				id: conversation,
-				sections: [],
 				messages,
 				judgments: ids.map((id) => ({
 					id: JSON.stringify(['topic', id, 'fixture']),

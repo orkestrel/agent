@@ -11,19 +11,18 @@ import {
 	loadMemoryInputs,
 	omitMemoryAuxiliaries,
 	STUDY_MEMORY_PROGRESS_ROWS,
-	STUDY_MEMORY_SETTINGS,
 } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
 	it('checks the list against the horizon', async () => {
 		const adapter = createStudyAdapter()
 		const url = 'http://127.0.0.1:7'
-		const smallest = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recordssmallest.json', 'utf8')),
+		const recommended = parseStudyProfile(
+			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
 		)
 		const input = await loadMemoryInputs(buildMemoryProfile({ url }), 'recordsqualification')
 		const declared = input.scenarios[0]?.goals.map((goal) => goal.id) ?? []
-		const settings = { ...STUDY_MEMORY_SETTINGS, observe: true }
+		const settings = { observe: true }
 		expect(declared).toHaveLength(96)
 		// Goal k reads the zero-padded ceiling of k/4, then ((k-1) mod 4)+1; the declaration can disagree.
 		expect(declared).toEqual(
@@ -33,8 +32,8 @@ describe('memory declaration and mechanical evidence', () => {
 					`ev-${String(Math.ceil((index + 1) / 4)).padStart(2, '0')}-${(index % 4) + 1}`,
 			),
 		)
-		if (!isRecord(smallest.settings)) throw new Error('Missing smallest settings')
-		expect(smallest.settings.checkpoints).toEqual(declared)
+		if (!isRecord(recommended.settings)) throw new Error('Missing recommended settings')
+		expect(recommended.settings.checkpoints).toEqual(declared)
 		expect(() =>
 			adapter.validate({
 				...input,
@@ -100,45 +99,12 @@ describe('memory declaration and mechanical evidence', () => {
 		).toEqual({})
 	})
 
-	it('requires an explicit valid gauge for any compaction arm at declaration only', async () => {
-		const url = 'http://127.0.0.1:7'
+	it('admits a declaration without an unused judge and refuses the records arm without one', async () => {
 		const adapter = createStudyAdapter()
-		const input = await loadMemoryInputs(
-			buildMemoryProfile({ url, settings: STUDY_MEMORY_SETTINGS }),
-			'compactioncapacity',
-		)
-		expect(input.definition.arms).toContain('compaction')
-		expect(() => adapter.validate(input)).not.toThrow()
-		for (const settings of [undefined, {}, { observe: true }])
-			expect(() =>
-				adapter.validate({ ...input, profile: buildMemoryProfile({ url, settings }) }),
-			).toThrow('gauge')
-		expect(() =>
-			adapter.validate({
-				...input,
-				profile: buildMemoryProfile({ url, settings: { gauge: { scale: 0, overhead: 0 } } }),
-			}),
-		).toThrow('settings')
-		for (const arms of [['records'], ['records', 'full']])
-			expect(() =>
-				adapter.validate({
-					...input,
-					definition: { ...input.definition, arms, order: [arms] },
-					profile: buildMemoryProfile({ url }),
-				}),
-			).not.toThrow()
-	})
-
-	it('admits a declaration without an unused auxiliary role and refuses an arm whose role is missing', async () => {
-		const adapter = createStudyAdapter()
-		const base = buildMemoryProfile({
-			url: 'http://127.0.0.1:7',
-			settings: STUDY_MEMORY_SETTINGS,
-		})
+		const base = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
 		const bare = omitMemoryAuxiliaries(base)
 		const input = await loadMemoryInputs(bare)
 		const records = ['records']
-		const compaction = ['compaction']
 		const paired = ['records', 'full']
 		expect(() =>
 			adapter.validate({
@@ -149,22 +115,9 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(() =>
 			adapter.validate({
 				...input,
-				definition: { ...input.definition, arms: compaction, order: [compaction] },
-			}),
-		).toThrow('Memory compaction requires a declared recap allowance')
-		expect(() =>
-			adapter.validate({
-				...input,
 				definition: { ...input.definition, arms: paired, order: [paired] },
 			}),
 		).toThrow('judge model and digest')
-		expect(() =>
-			adapter.validate({
-				...input,
-				definition: { ...input.definition, arms: compaction, order: [compaction] },
-				profile: { ...bare, room: base.room },
-			}),
-		).not.toThrow()
 		expect(() =>
 			adapter.validate({
 				...input,
@@ -174,39 +127,36 @@ describe('memory declaration and mechanical evidence', () => {
 		).not.toThrow()
 	})
 
-	it('refuses the earlier both-strategy memory declaration before its profile and admits records beside full', async () => {
-		const adapter = createStudyAdapter()
-		// The gauge admits compaction, so the strategy check is the only refusal the control can meet.
+	it.each([[['compaction']], [['records', 'compaction']], [['compaction', 'full']]])(
+		'refuses a declaration whose arms are %j, which list a removed strategy (claim S-2)',
+		async (arms) => {
+			const input = await loadMemoryInputs(
+				buildMemoryProfile({ url: 'http://127.0.0.1:7' }),
+				'recordscapacity',
+			)
+
+			expect(() =>
+				createStudyAdapter().validate({
+					...input,
+					definition: { ...input.definition, arms, order: [arms] },
+				}),
+			).toThrow(
+				expect.objectContaining({
+					code: 'CONFIG',
+					message: 'Memory declaration requires the shared memory driver and supported arms',
+				}),
+			)
+		},
+	)
+
+	it('refuses a declaration that lists only full, which schedules no strategy (claim S-3)', async () => {
 		const input = await loadMemoryInputs(
-			buildMemoryProfile({ url: 'http://127.0.0.1:7', settings: STUDY_MEMORY_SETTINGS }),
+			buildMemoryProfile({ url: 'http://127.0.0.1:7' }),
 			'recordsmemory',
 		)
-		expect(input.definition.arms).toEqual(['records', 'full'])
+		const adapter = createStudyAdapter()
+
 		expect(() => adapter.validate(input)).not.toThrow()
-		// The earlier `memory` declaration, inline, as the control.
-		const memory = {
-			name: 'memory',
-			version: '1',
-			question:
-				'How do records, compaction and full conversation preserve corrections and unresolved obligations across the same prospective desk trajectory?',
-			purpose: 'quality',
-			driver: 'memory',
-			arms: ['records', 'compaction', 'full'],
-			scenarios: ['handoff'],
-			order: [
-				['records', 'compaction', 'full'],
-				['full', 'compaction', 'records'],
-			],
-			retries: 0,
-			rubric: 'rubric.json',
-		} as const
-		expect(() => adapter.validate({ ...input, definition: memory })).toThrow(
-			expect.objectContaining({
-				code: 'CONFIG',
-				message:
-					'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
-			}),
-		)
 		expect(() =>
 			adapter.validate({
 				...input,
@@ -216,7 +166,7 @@ describe('memory declaration and mechanical evidence', () => {
 			expect.objectContaining({
 				code: 'CONFIG',
 				message:
-					'Memory declaration "recordsmemory" lists neither strategy in its arms; list one of records or compaction, with full as the only other arm',
+					'Memory declaration "recordsmemory" lists no records arm; list records, with full as the only other arm',
 			}),
 		)
 	})

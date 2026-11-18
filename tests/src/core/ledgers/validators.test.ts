@@ -245,7 +245,7 @@ describe('isLedgerQuestion', () => {
 })
 
 describe('isLedgerSnapshot is exact, in lockstep with its shape', () => {
-	const conversation = { id: 'c1', sections: [], messages: [] }
+	const conversation = { id: 'c1', messages: [] }
 
 	it('holds both ways on an owned snapshot', () => {
 		const snapshot = {
