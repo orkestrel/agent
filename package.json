@@ -93,7 +93,7 @@
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.60.1",
 		"@orkestrel/guide": "^0.0.33",
-		"@orkestrel/ollama": "^0.0.42",
+		"@orkestrel/ollama": "^0.0.43",
 		"@orkestrel/probe": "^0.0.32",
 		"@orkestrel/router": "^0.0.24",
 		"@orkestrel/scaffold": "^0.0.140",
