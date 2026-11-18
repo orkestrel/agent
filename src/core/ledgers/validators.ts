@@ -99,7 +99,7 @@ export function isLedgerQuestion(value: unknown): value is LedgerQuestion {
  * @remarks
  * `conversation` must pass `isConversationSnapshot`, and `requests`, `notes`, and `failures` must be
  * dense arrays of strings. Each request and note id must name a `user` message of
- * `conversation.messages` and each failure id a `tool` message, so an id only a section original
+ * `conversation.messages` and each failure id a `tool` message, so an id the conversation no longer
  * holds is refused. A `gauge`, when present, must hold a finite `scale` greater than 0, a finite
  * `overhead` of at least 0, a string `digest`, and a non-empty string `model`. The guard is exact: an unknown member and an own `undefined` `gauge` return
  * false, at the snapshot and in its `gauge`. Unreadable members and untrusted inputs return false. The

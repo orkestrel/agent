@@ -214,7 +214,7 @@ export class Ledger implements LedgerInterface {
 	 * @param options - The filing policy, capacity, and request bounds
 	 * @throws {LedgerError} Thrown when a threshold, share, capacity, limit, topic, lookup, or gauge is invalid
 	 * @throws {LedgerError} Thrown when a write lacks the `consequential` annotation, writes come without `agent.authority`, or a write is named `recall` or shares a lookup's or another write's name (code `'WRITE'`)
-	 * @throws {LedgerError} Thrown when `predict` is not a nonnegative safe integer less than `capacity` (code `'CAPACITY'`)
+	 * @throws {LedgerError} Thrown when `predict` is not a positive safe integer less than `capacity` (code `'CAPACITY'`)
 	 * @throws {LedgerError} Thrown when `questions` fails `isLedgerQuestion` (code `'QUESTION'`)
 	 * @throws {LedgerError} Thrown when `snapshot` is malformed or marks an id its conversation does not hold (code `'SNAPSHOT'`, its faults under `context.faults`)
 	 * @throws {ConversationError} Thrown when `isLedgerSnapshot` admits `snapshot` but its conversation holds a `system` message (code `'ROLE'`) or repeats an id (code `'SNAPSHOT'`)
