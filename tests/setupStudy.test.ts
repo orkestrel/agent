@@ -1,5 +1,5 @@
 import { isRecord, isArray, parseJSON } from '@orkestrel/contract'
-import { isStudyCustodyManifest } from '@orkestrel/study/server'
+import { isStudyCustodyManifest, readStudyDeclaration } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { lstatSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -14,6 +14,7 @@ import {
 	buildCustodyManifest,
 	buildMemoryGradeFixture,
 	buildStudyAssessment,
+	buildStudyChatProfile,
 	captureStudyPackages,
 	createStudyMeterFixture,
 	buildMemoryEdge,
@@ -390,24 +391,20 @@ describe('study replay content comparison', () => {
 })
 
 describe('study declaration fixtures', () => {
-	it('builds independent declarations and a grading horizon from their actual schedule', async () => {
-		const first = (await loadStudyToolsFixture()).manifest
-		const second = (await loadStudyToolsFixture()).manifest
-		expect(first).not.toBe(second)
-		expect(first.bounds).not.toBe(second.bounds)
-		expect(isStudyCustodyManifest(first)).toBe(true)
-		expect(first.identity.agent).toMatch(/^[a-f0-9]{64}$/)
-		const rebuilt = buildCustodyManifest(
-			first.definition,
-			first.scenarios,
-			first.bounds,
-			'e'.repeat(64),
+	it('keeps an authored declaration schedule under a provider identity and grades each scheduled attempt', async () => {
+		const { definition, scenarios } = await readStudyDeclaration(resolve('.'), 'chat')
+		const { bounds } = buildStudyChatProfile('full', 'http://127.0.0.1:7')
+		const manifest = buildCustodyManifest(definition, scenarios, bounds)
+		expect(isStudyCustodyManifest(manifest)).toBe(true)
+		expect(new Set(manifest.schedule.map((item) => item.scenario))).toEqual(
+			new Set(definition.scenarios),
 		)
+		const rebuilt = buildCustodyManifest(definition, scenarios, bounds, 'e'.repeat(64))
 		expect(isStudyCustodyManifest(rebuilt)).toBe(true)
 		expect(rebuilt.identity.provider).toBe('e'.repeat(64))
-		expect(rebuilt.schedule).toEqual(first.schedule)
-		expect(buildStudyAssessment(first.schedule).attempts).toEqual(
-			first.schedule.map((item) => item.id),
+		expect(rebuilt.schedule).toEqual(manifest.schedule)
+		expect(buildStudyAssessment(manifest.schedule).attempts).toEqual(
+			manifest.schedule.map((item) => item.id),
 		)
 		const grade = buildMemoryGradeFixture()
 		expect(grade.failure).toEqual({
