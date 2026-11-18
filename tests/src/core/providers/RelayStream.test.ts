@@ -31,6 +31,7 @@ describe('RelayStream', () => {
 			provider: {
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				get replay(): ThinkingReplay {
 					return replays.read()
 				},

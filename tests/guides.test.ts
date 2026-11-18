@@ -272,6 +272,7 @@ await new GuideCommand({
 		buildLedgerWorkspaceShape,
 		chargeDensityPrompt,
 		LEDGER_DENSE_RATES,
+		SCRIPTED_MODEL,
 	} = await import('./setup.js')
 	const { createFixtureServer, stopTimed } = await import('./setupServer.js')
 	const { describe, expect, expectTypeOf, it } = await import('vitest')
@@ -299,7 +300,7 @@ await new GuideCommand({
 			return new TextFrame()
 		}
 		encode(request: ProviderRequest): object {
-			return { messages: request.messages }
+			return { model: this.model, messages: request.messages }
 		}
 		read(record: string): ProviderIncrement {
 			return { content: record, thinking: '', tools: [] }
@@ -500,6 +501,7 @@ await new GuideCommand({
 			const chunks = ['<think>Greet ', 'briefly.</think>Hello', ' there.']
 			const provider = new ConfiguredProvider({
 				url: 'https://text.test',
+				model: SCRIPTED_MODEL,
 				strict: false,
 				fetch: () =>
 					Promise.resolve(
@@ -899,7 +901,7 @@ await new GuideCommand({
 		it('keeps the push surface on the Agent, the managers, and each conversation (the observation clause)', () => {
 			const conversations = createConversationManager()
 			const context = barrel.createAgentContext({ conversations })
-			const provider = new TextProvider({ url: 'https://text.test' })
+			const provider = new TextProvider({ url: 'https://text.test', model: 'qwen3:4b' })
 
 			expect(['emitter' in context, 'emitter' in conversations, 'emitter' in provider]).toEqual([
 				false,
@@ -1939,6 +1941,13 @@ await new GuideCommand({
 				gauge: { scale: 1, overhead: 0 },
 				snapshot,
 			}).respond('Next.')
+			const remodeled = new MeteredLedgerProvider([{ content: 'Done.' }], {
+				recorded: true,
+				model: 'qwen3:4b',
+			})
+			const moved = createLedger(remodeled, { ...base, snapshot })
+			const unpriced = moved.gauge
+			await moved.respond('Next.')
 
 			expect(kept).toEqual({ scale: gauge.scale, overhead: gauge.overhead })
 			expect(same.calls).toHaveLength(1)
@@ -1947,9 +1956,18 @@ await new GuideCommand({
 			expect(changed.gauge?.overhead).toBeGreaterThan(gauge.overhead)
 			expect(changed.snapshot().gauge?.digest).not.toBe(gauge.digest)
 			expect(supplied.calls).toHaveLength(1)
+			expect(unpriced).toBeUndefined()
+			expect(remodeled.calls.map((call) => call.options?.think)).toEqual([false, false, undefined])
+			expect(moved.snapshot().gauge).toMatchObject({ digest: gauge.digest, model: 'qwen3:4b' })
 			expect(isLedgerSnapshot({ ...snapshot, gauge: { scale: 1, overhead: 0 } })).toBe(false)
+			expect(
+				isLedgerSnapshot({
+					...snapshot,
+					gauge: { scale: gauge.scale, overhead: gauge.overhead, digest: gauge.digest },
+				}),
+			).toBe(false)
 			expect(guideText).toContain(
-				'drops the stored gauge, reads `undefined` from its `gauge` member, and calibrates before its first pass, so a hydrated ledger never plans with an overhead priced on other definitions.',
+				"drops the stored gauge, reads `undefined` from its `gauge` member, and calibrates before its first pass, so a hydrated ledger never plans with an overhead priced on other definitions or a scale measured on another model's tokenizer.",
 			)
 			expect(guideText).toContain(
 				'With the same definitions, the hydrated ledger reuses the gauge and makes no calibration call.',
@@ -3349,6 +3367,7 @@ await new GuideCommand({
 				{
 					id: provider.id,
 					name: provider.name,
+					model: provider.model,
 					generate: async (...args) => {
 						entered.resolve()
 						await release.promise
@@ -3465,6 +3484,7 @@ await new GuideCommand({
 				{
 					id: provider.id,
 					name: provider.name,
+					model: provider.model,
 					generate: async (...args) => {
 						entered.resolve()
 						await release.promise
@@ -4997,6 +5017,7 @@ await new GuideCommand({
 			const bodies: unknown[] = []
 			const provider = new TextProvider({
 				url: 'https://text.test',
+				model: 'qwen3:4b',
 				fetch: async (input, init) => {
 					const request = new Request(input, init)
 					bodies.push(JSON.parse(await request.text()))
@@ -5015,14 +5036,19 @@ await new GuideCommand({
 			// body verbatim and `finish` contributes nothing.
 			expect(deltas).toEqual(['one two'])
 			expect(drained.result).toEqual({ content: 'one two' })
-			expect(bodies).toEqual([{ messages: [{ id: '1', role: 'user', content: 'Say something.' }] }])
+			// The fence's `encode` names the configured model from the base's `model` member.
+			expect(bodies).toEqual([
+				{ model: 'qwen3:4b', messages: [{ id: '1', role: 'user', content: 'Say something.' }] },
+			])
 			expect(provider.name).toBe('text')
+			expect(provider.model).toBe('qwen3:4b')
 		})
 
 		it('posts the subclass fence’s path onto its url', async () => {
 			const urls: string[] = []
 			const provider = new TextProvider({
 				url: 'https://text.test',
+				model: 'qwen3:4b',
 				fetch: (input, init) => {
 					urls.push(new Request(input, init).url)
 					return Promise.resolve(new Response('ok'))
@@ -5038,6 +5064,7 @@ await new GuideCommand({
 			expect(guideText).toContain('class TextProvider extends AgentProvider<string> {')
 			expect(guideText).toContain("readonly name = 'text'")
 			expect(guideText).toContain("super({ ...options, path: '/generate', strict: false })")
+			expect(guideText).toContain('return { model: this.model, messages: request.messages }')
 			expect(guideText).toContain('read(record: string): ProviderIncrement {')
 			expect(guideText).toContain("return { content: record, thinking: '', tools: [] }")
 		})
@@ -5050,6 +5077,7 @@ await new GuideCommand({
 			const caller = new AbortController()
 			const provider = new ConfiguredProvider({
 				url: 'https://api.example',
+				model: 'qwen3:4b',
 				path: '/generate',
 				timeout: 30_000,
 				headers: async (signal) => {
@@ -5088,9 +5116,24 @@ await new GuideCommand({
 			// `strict: false` assembles that result from a wire that carried no settled record.
 			expect(result).toEqual({ content: 'the answer', thinking: 'considering' })
 			expect(result.content).toBe('the answer')
+			// `model` is the model the provider serves, and an empty one refuses at both doors.
+			const { isContractError } = await import('@orkestrel/contract')
+			expect(provider.model).toBe('qwen3:4b')
+			const empty = new ConfiguredProvider({ url: 'https://api.example', model: '' })
+			const refusals = [
+				captureError(() => barrel.createAgent(empty)),
+				captureError(() => barrel.createLedger(empty, buildLedgerOptions())),
+			]
+			expect(refusals.map((error) => isContractError(error) && error.code)).toEqual([
+				'placement',
+				'placement',
+			])
 		})
 
 		it('carries the engine-configuration fence lines the transcription copies', () => {
+			expect(guideText).toContain(
+				"model: 'qwen3:4b', // the model the provider serves; createAgent and createLedger refuse an empty one",
+			)
 			expect(guideText).toContain("path: '/generate', // appended to `url` on every call")
 			expect(guideText).toContain(
 				"timeout: 30_000, // the base's own deadline; DEFAULT_PROVIDER_TIMEOUT when omitted",
@@ -5148,6 +5191,7 @@ await new GuideCommand({
 				// and that status, and it leaves the upstream provider unentered.
 				const refused = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
+					model: 'qwen3:4b',
 					headers: () => ({ authorization: 'Bearer wrong' }),
 				}).generate(messages, createAbort().signal)
 				await expect(refused).rejects.toBeInstanceOf(ProviderError)
@@ -5162,6 +5206,7 @@ await new GuideCommand({
 				// the same script driven directly in this process answers what the relayed call answers.
 				const browser = createRelayProvider({
 					url: `http://127.0.0.1:${port}/relay`,
+					model: 'qwen3:4b',
 					headers: () => ({ authorization: `Bearer ${bearer}` }),
 				})
 				const relayed = await browser.generate(messages, createAbort().signal)
@@ -5201,6 +5246,7 @@ await new GuideCommand({
 					const abort = createAbort()
 					const browser = createRelayProvider({
 						url: `http://127.0.0.1:${bound}/relay`,
+						model: 'qwen3:4b',
 						headers: () => ({ authorization: `Bearer ${bearer}` }),
 					})
 					const stream = browser.stream(messages, abort.signal)
@@ -5721,6 +5767,7 @@ await new GuideCommand({
 			const sent: Array<string | null> = []
 			const browser = createRelayProvider({
 				url: 'https://app.example/relay',
+				model: 'qwen3:4b',
 				headers: () => ({ authorization: `Bearer ${bearer}` }),
 				fetch: (input, init) => {
 					sent.push(new Request(input, init).headers.get('authorization'))
@@ -5737,6 +5784,7 @@ await new GuideCommand({
 			expect(sent).toEqual(['Bearer fixture'])
 			expect(deltas).toEqual(['thinking:considering ', 'content:relayed answer'])
 			expect(drained.result).toEqual({ content: 'relayed answer', thinking: 'considering ' })
+			expect(browser.model).toBe('qwen3:4b')
 		})
 
 		it('refuses a relay body at its byte limit and admits one below it', async () => {
@@ -5762,6 +5810,7 @@ await new GuideCommand({
 			const settled = RELAY_RESULT_FRAME.slice(0, -1)
 			const fragmented = createRelayProvider({
 				url: 'https://relay.test',
+				model: SCRIPTED_MODEL,
 				fetch: createStreamingTransport([
 					'{"channel":"content",',
 					'"text":"hello"}\r',
@@ -5773,7 +5822,7 @@ await new GuideCommand({
 				deltas: [{ channel: 'content', text: 'hello' }],
 				result: { content: 'answer' },
 			})
-			const parser = new RelayProvider({ url: 'https://relay.test' }).frame()
+			const parser = new RelayProvider({ url: 'https://relay.test', model: SCRIPTED_MODEL }).frame()
 			expect(parser.parse('{"kept":')).toEqual([])
 			expect(parser.parse('true}\n')).toEqual([{ kept: true }])
 			parser.parse('{"unfinished":')
@@ -5783,6 +5832,7 @@ await new GuideCommand({
 				const transport = new RecordedTransport(() => new Response(body))
 				const provider = createRelayProvider({
 					url: 'https://relay.test',
+					model: SCRIPTED_MODEL,
 					fetch: transport.fetch,
 				})
 				const refusal: unknown = await provider
@@ -5796,6 +5846,7 @@ await new GuideCommand({
 			// The decoder strips a byte-order mark at byte 0, so the trimmed line follows a complete line.
 			const trimmed = createRelayProvider({
 				url: 'https://relay.test',
+				model: SCRIPTED_MODEL,
 				fetch: createStreamingTransport([
 					'{"channel":"content","text":"hello"}\n',
 					`\u{FEFF}${settled}\u{A0}\n`,
@@ -5825,6 +5876,9 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain('const browser: ProviderInterface = createRelayProvider({')
 			expect(guideText).toContain("url: 'https://app.example/relay',")
+			expect(guideText).toContain(
+				"model: 'qwen3:4b', // the model the relay's upstream provider serves",
+			)
 		})
 
 		it('answers the wire-contract fence’s guard and projection readings', () => {
@@ -8173,6 +8227,7 @@ await new GuideCommand({
 					const page = createAgent(
 						createRelayProvider({
 							url: 'http://relay.test/',
+							model: upstream.model,
 							fetch: (input, init) => handler(new Request(input, init)),
 						}),
 						{

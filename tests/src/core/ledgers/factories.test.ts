@@ -7,6 +7,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
 	LEDGER_INVALID_LIMITS,
 	buildLedgerOptions,
+	buildProviderModelRefusals,
 	createEmptyLedgerLookup,
 	createScriptedProvider,
 } from '../../../setup.js'
@@ -180,6 +181,30 @@ describe('createLedger', () => {
 		expect(
 			captureError(() => createLedger(createScriptedProvider([]), { ...options, lookups })),
 		).toBeInstanceOf(TypeError)
+	})
+	it('refuses a provider whose model is missing, empty, or not a string with a placement ContractError', () => {
+		const options = buildLedgerOptions({ topics: [], lookups: [] })
+		const refusals = buildProviderModelRefusals()
+		expect(
+			refusals.map(([title, provider]) => {
+				const error = captureError(() =>
+					invokeUnchecked(undefined, createLedger, [provider, options]),
+				)
+				return [title, isContractError(error) ? [error.code, error.message, error.context] : error]
+			}),
+		).toEqual(
+			refusals.map(([title, , received]) => [
+				title,
+				[
+					'placement',
+					`Ledger: provider.model must be a non-empty string naming the model the provider serves; received ${received}`,
+					{ path: ['provider', 'model'], limit: 'non-empty string', received },
+				],
+			]),
+		)
+		expect(createLedger(createScriptedProvider([], { model: 'qwen3:4b' }), options).gauge).toEqual(
+			options.gauge,
+		)
 	})
 	it('refuses invalid supplied gauge values', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })

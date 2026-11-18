@@ -63,8 +63,15 @@ import {
 	createToolCall,
 	filterOutsideCeiling,
 	readDurableRendered,
+	buildProviderModelRefusals,
 } from '../../../setup.js'
-import { collect, roundTripJSON, waitForDelay } from '@orkestrel/test'
+import {
+	captureError,
+	collect,
+	invokeUnchecked,
+	roundTripJSON,
+	waitForDelay,
+} from '@orkestrel/test'
 
 // Exercises agent factory wiring and durable job orchestration.
 
@@ -155,6 +162,30 @@ describe('createAgent', () => {
 		agent.context.messages.add({ role: 'user', content: 'go' })
 		await agent.generate()
 		expect(provider.calls[0]?.tools).toBeUndefined() // no tools ADVERTISED to the provider
+	})
+
+	it('refuses a provider whose model is missing, empty, or not a string with a placement ContractError', () => {
+		const refusals = buildProviderModelRefusals()
+		expect(
+			refusals.map(([title, provider]) => {
+				const error = captureError(() => invokeUnchecked(undefined, createAgent, [provider]))
+				return [title, isContractError(error) ? [error.code, error.message, error.context] : error]
+			}),
+		).toEqual(
+			refusals.map(([title, , received]) => [
+				title,
+				[
+					'placement',
+					`Agent: provider.model must be a non-empty string naming the model the provider serves; received ${received}`,
+					{ path: ['provider', 'model'], limit: 'non-empty string', received },
+				],
+			]),
+		)
+	})
+
+	it('builds an agent over a provider that names its model', () => {
+		const agent = createAgent(createScriptedProvider([{ content: 'ok' }], { model: 'qwen3:4b' }))
+		expect(agent.status).toBe('idle')
 	})
 
 	it('omitted instructions/workspaces/scope still yield working empty managers (regression guard)', () => {

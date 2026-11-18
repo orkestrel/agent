@@ -2,6 +2,7 @@ import type {
 	AnswerMeasure,
 	FailureRead,
 	ProviderDelta,
+	ProviderInterface,
 	ProviderOptions,
 	ProviderRequest,
 	ProviderResult,
@@ -21,11 +22,13 @@ import {
 	attempt,
 	boundsOf,
 	canonicalStringify,
+	ContractError,
 	failure,
 	isArray,
 	isFunction,
 	isNumber,
 	isObject,
+	isString,
 	preview,
 	success,
 } from '@orkestrel/contract'
@@ -142,6 +145,44 @@ export function requireProviderResult(value: unknown): ProviderResult {
 		'PROTOCOL',
 		`provider error: a provider must return string content, with thinking, tools, usage, and truncated absent or of their published types, and usage counts finite and nonnegative; received ${preview(owned.success ? owned.value : value)}`,
 		owned.success ? undefined : { cause: owned.error },
+	)
+}
+
+/**
+ * Returns the model a provider serves, read once, or throws a coded error before the agent or ledger
+ * that would hold the provider is built.
+ *
+ * @remarks
+ * A provider is a foreign implementation, so the helper reads its `model` member once and never lets
+ * the read throw: a provider that is not an object, a throwing getter, a member that is not a string,
+ * and the empty string all refuse. The error's `context` carries the path `['provider', 'model']`,
+ * the limit `'non-empty string'`, and a preview of the value read.
+ *
+ * @param provider - The provider passed to `createAgent` or `createLedger`
+ * @param owner - The constructor the refusal names
+ * @returns The provider's `model`
+ * @throws {ContractError} Thrown when `model` is missing, not a string, or empty (code `'placement'`)
+ *
+ * @example
+ * ```ts
+ * const browser = createRelayProvider({ url: 'https://app.example/relay', model: 'qwen3:4b' })
+ * requireProviderModel(browser, 'Agent') // 'qwen3:4b'
+ * requireProviderModel({ ...browser, model: '' }, 'Agent') // throws ContractError ('placement')
+ * ```
+ */
+export function requireProviderModel(
+	provider: ProviderInterface,
+	owner: 'Agent' | 'Ledger',
+): string {
+	const read = attempt(() => Reflect.get(provider, 'model'))
+	const model: unknown = read.success ? read.value : undefined
+	if (isString(model) && model !== '') return model
+	throw new ContractError(
+		`${owner}: provider.model must be a non-empty string naming the model the provider serves; received ${preview(model)}`,
+		{
+			code: 'placement',
+			context: { path: ['provider', 'model'], limit: 'non-empty string', received: preview(model) },
+		},
 	)
 }
 

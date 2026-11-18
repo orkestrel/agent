@@ -8,6 +8,7 @@ import { Ledger } from './Ledger.js'
  * @param options - The judge, projection policy, capacity, and agent bounds
  * @returns The ledger and its owned conversation and agent
  * @throws {LedgerError} Thrown when an option lies outside its documented bounds
+ * @throws {ContractError} Thrown when the provider's `model` is missing, not a string, or empty (code `'placement'`)
  * @example
  * ```ts
  * const ledger = createLedger(provider, options)

@@ -236,6 +236,8 @@ import {
 	returnDomain,
 	ScriptedFrame,
 	ScriptedWire,
+	SCRIPTED_MODEL,
+	buildProviderModelRefusals,
 	seedConversation,
 	seedFramedAgent,
 	buildExchangeMessages,
@@ -794,6 +796,28 @@ describe('createScriptedProvider identity and recorders', () => {
 		expect([fallback.id, fallback.name]).toEqual(['scripted', 'scripted'])
 		const named = createScriptedProvider([{ content: 'x' }], { name: 'alpha' })
 		expect([named.id, named.name]).toEqual(['alpha', 'alpha'])
+	})
+
+	it('names the model each scripted provider and wire serves, defaulting to SCRIPTED_MODEL', () => {
+		expect([
+			createScriptedProvider([]).model,
+			createScriptedProvider([], { model: 'qwen3:4b' }).model,
+			new ScriptedWire({ url: 'https://wire.test' }).model,
+			new ScriptedWire({ url: 'https://wire.test', model: 'qwen3:4b' }).model,
+		]).toEqual([SCRIPTED_MODEL, 'qwen3:4b', SCRIPTED_MODEL, 'qwen3:4b'])
+		expect(SCRIPTED_MODEL).toBe('scripted')
+	})
+
+	it('builds the model refusal candidates under unique titles, the three brief cases among them', () => {
+		const titles = buildProviderModelRefusals().map(([title]) => title)
+		expect(new Set(titles).size).toBe(titles.length)
+		expect(titles).toEqual(
+			expect.arrayContaining([
+				'a provider without model',
+				'a provider with an empty model',
+				'a provider with a non-string model',
+			]),
+		)
 	})
 
 	it('records each call messages, tools, options and signal only under record', async () => {

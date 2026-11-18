@@ -20,11 +20,16 @@ import {
 	buildRelayRequest,
 	describeRelayRefusal,
 	readProviderDelta,
+	requireProviderModel,
 } from '@src/core'
 import { PREVIEW_LIMIT, isContractError, preview } from '@orkestrel/contract'
-import { captureError, createHostileValues, requireValue } from '@orkestrel/test'
+import { captureError, createHostileValues, invokeUnchecked, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
-import { createShiftingDelta } from '../../../setup.js'
+import {
+	buildProviderModelRefusals,
+	createScriptedProvider,
+	createShiftingDelta,
+} from '../../../setup.js'
 import {
 	createToolCall,
 	RecordedBody,
@@ -41,6 +46,35 @@ import {
 	RELAY_SYSTEM_CASES,
 	RELAY_TOOL_CASES,
 } from '../../../setup.js'
+
+describe('requireProviderModel — the model a provider serves', () => {
+	it('returns the model of a provider that names one', () => {
+		const provider = createScriptedProvider([], { model: 'qwen3:4b' })
+		expect(requireProviderModel(provider, 'Agent')).toBe('qwen3:4b')
+		expect(requireProviderModel(provider, 'Ledger')).toBe('qwen3:4b')
+	})
+
+	it('refuses each provider whose model it cannot read as a non-empty string, naming its owner', () => {
+		const refusals = buildProviderModelRefusals()
+		expect(
+			refusals.map(([title, provider]) => {
+				const error = captureError(() =>
+					invokeUnchecked(undefined, requireProviderModel, [provider, 'Ledger']),
+				)
+				return [title, isContractError(error) ? [error.code, error.message, error.context] : error]
+			}),
+		).toEqual(
+			refusals.map(([title, , received]) => [
+				title,
+				[
+					'placement',
+					`Ledger: provider.model must be a non-empty string naming the model the provider serves; received ${received}`,
+					{ path: ['provider', 'model'], limit: 'non-empty string', received },
+				],
+			]),
+		)
+	})
+})
 
 describe('readProviderDelta', () => {
 	it('returns an owned copy of the two members', () => {

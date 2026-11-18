@@ -36,6 +36,8 @@ import { joinThinking } from '../helpers.js'
  * `name`, `frame`, `encode`, `read`, and `finish`; the constructor takes the `split`
  * and `strict` switches to control reasoning separation and whether a stream must end with a settled
  * `result` or a `done` record, which it must by default.
+ * The `model` input names the model the provider serves and is exposed as `model`, so a subclass's
+ * `encode` names it on the wire from that one member.
  * The `replay` input names which stored thinking the agent and relay send back. Default: `'none'`.
  * A throw from the framing seam (`parse`, or `finish`) becomes a `ProviderError` with the
  * `PROTOCOL` code whose `cause` is the throw, unless it is already a `ProviderError` or
@@ -74,7 +76,7 @@ import { joinThinking } from '../helpers.js'
  * 		return new TextFrame()
  * 	}
  * 	encode(request: ProviderRequest): object {
- * 		return { messages: request.messages }
+ * 		return { model: this.model, messages: request.messages }
  * 	}
  * 	read(record: string): ProviderIncrement {
  * 		return { content: record, thinking: '', tools: [] }
@@ -89,6 +91,7 @@ export abstract class AgentProvider<
 	TRecord = Readonly<Record<string, unknown>>,
 > implements AgentProviderInterface<TRecord> {
 	readonly #id: string
+	readonly #model: string
 	readonly #replay: ThinkingReplay
 	readonly #url: string
 	readonly #path: string
@@ -101,6 +104,7 @@ export abstract class AgentProvider<
 	constructor(input: AgentProviderInput) {
 		refuseOptionKeys(input, PROVIDER_INPUT_KEYS, 'AgentProvider', 'AgentProviderInput')
 		this.#id = crypto.randomUUID()
+		this.#model = input.model
 		this.#replay = input.replay ?? 'none'
 		this.#url = input.url
 		this.#path = input.path ?? ''
@@ -117,6 +121,11 @@ export abstract class AgentProvider<
 	/** Exposes the instance's minted UUID. */
 	get id(): string {
 		return this.#id
+	}
+
+	/** Exposes the configured model identity. */
+	get model(): string {
+		return this.#model
 	}
 
 	/** Names which stored assistant thinking the agent and relay send back. */

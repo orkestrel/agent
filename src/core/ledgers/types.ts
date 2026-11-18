@@ -335,19 +335,23 @@ export interface LedgerGauge {
 }
 
 /**
- * Carries a stored gauge: its price and the digest of the tool definitions that price measured.
+ * Carries a stored gauge: its price, the digest of the tool definitions that price measured, and the
+ * provider model it was measured on.
  *
  * @remarks
  * `digest` is what the `digestLedgerTools` helper returns for the calibrated definitions: those the
  * calibration request carried, or, when the options supplied the gauge, the ledger's calibrated
  * definitions at construction. The calibrated set is every definition a turn can advertise but the
- * tools a registered skill holds back while `agent.builtins` enables `load`. A hydrate reuses the
- * price only when the hydrated ledger's calibrated definitions have the same digest, and each
- * `respond` call compares the digest again, so a calibrated definition added or removed since drops
- * the gauge.
+ * tools a registered skill holds back while `agent.builtins` enables `load`. `model` is the
+ * `model` of the ledger's provider, a non-empty string. A hydrate reuses the price only when the
+ * hydrated ledger's calibrated definitions have the same digest and its provider has the same
+ * `model`, and each `respond` call compares the digest again, so a calibrated definition added or
+ * removed since drops the gauge. A dropped gauge is reported by nothing but the hydrated ledger's
+ * `gauge` reading undefined, and its first `respond` calibrates before its first pass.
  */
 export interface LedgerGaugeSnapshot extends LedgerGauge {
 	readonly digest: string
+	readonly model: string
 }
 
 /**
@@ -405,7 +409,7 @@ export type LedgerAgentOptions = Pick<
  * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it, and the records go into a copy of each request turn. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
- * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
+ * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions under the same provider `model`, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
  * The `recall` tool takes at most `LEDGER_RECALL_LIMIT` calls in one request and then refuses with
  * the {@link LedgerNote} `closure` text; a recall's identity is its trimmed `topic` alone.
  * A judge rejection with a `JudgeError` coded `'QUESTION'` is deterministic: the ledger holds that
@@ -463,7 +467,7 @@ export interface LedgerOptions {
 	readonly writes?: readonly LedgerWrite[]
 	readonly share?: Partial<LedgerShare>
 	readonly agent?: LedgerAgentOptions
-	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none and the gauge priced the same tool definitions, because a `gauge` option wins over `snapshot.gauge`. */
+	/** Hydrates from a snapshot: its conversation, its marked ids, and its gauge when these options supply none and the gauge priced the same tool definitions under the same provider `model`, because a `gauge` option wins over `snapshot.gauge`. */
 	readonly snapshot?: LedgerSnapshot
 }
 
@@ -475,10 +479,11 @@ export interface LedgerOptions {
  * `respond` appended, `notes` the user messages carrying `LEDGER_NOTES` text, and `failures` the
  * tool messages whose call or reading failed, each in conversation order. Each id names a message
  * of `conversation.messages`: a request or note a `user` message and a failure a `tool` message.
- * `gauge` carries the scale, the overhead, and the required `digest` of the tool definitions they
- * priced. A hydrated ledger whose definitions have another digest drops the gauge and calibrates
- * before its first pass; a gauge with no `digest` refuses the snapshot, and `snapshot()` omits a gauge
- * whose definitions JSON cannot render. The gauge's observations of earlier requests are
+ * `gauge` carries the scale, the overhead, the required `digest` of the tool definitions they
+ * priced, and the required `model` of the provider they were measured on. A hydrated ledger whose
+ * definitions have another digest, or whose provider has another `model`, drops the gauge and
+ * calibrates before its first pass; a gauge with no `digest` or no non-empty `model` refuses the
+ * snapshot, and `snapshot()` omits a gauge whose definitions JSON cannot render. The gauge's observations of earlier requests are
  * not carried, so a hydrated ledger sizes and closes `recall` from its fallback reserve until it
  * completes a request. A held question is a refused judgment of `conversation`, so a hydrated
  * ledger under the same judge identity asks it no more. Hydrating a second ledger from one snapshot forks
@@ -790,7 +795,7 @@ export interface LedgerInterface {
 	readonly agent: LedgerAgentInterface
 	/** Holds the one conversation the ledger files and serves. */
 	readonly conversation: ConversationInterface
-	/** Holds the measured price of a prompt, or undefined until the ledger calibrates when neither the options nor a snapshot priced on the same tool definitions supplied one. */
+	/** Holds the measured price of a prompt, or undefined until the ledger calibrates when neither the options nor a snapshot priced on the same tool definitions under the same provider `model` supplied one. */
 	readonly gauge: LedgerGauge | undefined
 	/**
 	 * Appends `content` as a user message and serves it through to its reply.
@@ -892,7 +897,8 @@ export interface LedgerInterface {
 	 * The ledger first files every tool result whose message is appended; a result whose tool message
 	 * is not yet appended is not captured. A call while a `respond`, `stream`, or `calibrate` call is
 	 * in flight throws, because an entered, unanswered request would hydrate as a dangling request.
-	 * The `gauge` member carries the digest of the tool definitions the gauge priced. The snapshot
+	 * The `gauge` member carries the digest of the tool definitions the gauge priced and the provider
+	 * `model` it was measured on. The snapshot
 	 * holds no mark of a message removed from `conversation`, and no window that held one.
 	 *
 	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one whose definitions JSON renders

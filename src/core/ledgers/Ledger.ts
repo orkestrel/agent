@@ -88,6 +88,7 @@ import {
 	resolveWorkspace,
 } from '../contexts/helpers.js'
 import { createConversationManager } from '../conversations/factories.js'
+import { requireProviderModel } from '../providers/helpers.js'
 import {
 	collectExchanges,
 	collectToolGroups,
@@ -177,6 +178,8 @@ import { isFraction, isLedgerQuestion, isLedgerSnapshot } from './validators.js'
  */
 export class Ledger implements LedgerInterface {
 	readonly #provider: ProviderInterface
+	// The provider's model, read once at construction; a stored gauge holds only under it.
+	readonly #model: string
 	readonly #options: LedgerOptions
 	readonly #replay: ThinkingReplay
 	readonly #predict: number
@@ -215,10 +218,12 @@ export class Ledger implements LedgerInterface {
 	 * @throws {LedgerError} Thrown when `questions` fails `isLedgerQuestion` (code `'QUESTION'`)
 	 * @throws {LedgerError} Thrown when `snapshot` is malformed or marks an id its conversation does not hold (code `'SNAPSHOT'`, its faults under `context.faults`)
 	 * @throws {ConversationError} Thrown when `isLedgerSnapshot` admits `snapshot` but its conversation holds a `system` message (code `'ROLE'`) or repeats an id (code `'SNAPSHOT'`)
+	 * @throws {ContractError} Thrown when the provider's `model` is missing, not a string, or empty (code `'placement'`)
 	 */
 	constructor(provider: ProviderInterface, options: LedgerOptions) {
 		refuseOptionKeys(options, LEDGER_OPTION_KEYS, 'Ledger', 'LedgerOptions')
 		refuseOptionKeys(options.agent, LEDGER_AGENT_KEYS, 'Ledger agent', 'LedgerAgentOptions')
+		this.#model = requireProviderModel(provider, 'Ledger')
 		for (const key of ['category', 'topic', 'correction', 'amends', 'supersedes'] as const) {
 			const value = options.thresholds[key]
 			if (!isFraction(value))
@@ -365,12 +370,15 @@ export class Ledger implements LedgerInterface {
 			limit: options.agent?.limit ?? DEFAULT_LEDGER_LIMIT,
 			select: (conversation, request, signal) => this.#select(conversation, request, signal),
 		})
-		// A stored gauge holds only for the calibrated definitions its digest names, so a hydrate with
-		// others calibrates before its first pass. A supplied gauge prices the definitions it holds.
+		// A stored gauge holds only for the calibrated definitions its digest names and the model it was
+		// measured on, so a hydrate with other definitions or under another provider model calibrates
+		// before its first pass. A supplied gauge prices the definitions it holds.
 		const calibrated = this.#calibrated()
 		const digest = digestLedgerTools(calibrated)
+		const stored = snapshot?.gauge
 		const gauge =
-			options.gauge ?? (snapshot?.gauge?.digest === digest ? snapshot?.gauge : undefined)
+			options.gauge ??
+			(stored?.digest === digest && stored?.model === this.#model ? stored : undefined)
 		if (gauge !== undefined) {
 			this.#gauge = new Gauge({
 				scale: gauge.scale,
@@ -526,7 +534,7 @@ export class Ledger implements LedgerInterface {
 			failures: ids.filter((id) => this.#results.get(id)?.success === false),
 			...(gauge === undefined || priced === undefined
 				? {}
-				: { gauge: { ...gauge, digest: priced } }),
+				: { gauge: { ...gauge, digest: priced, model: this.#model } }),
 			...(window.exchanges.length === 0 || digest === undefined
 				? {}
 				: { window: { ...window, digest } }),

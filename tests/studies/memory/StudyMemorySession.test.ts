@@ -1215,6 +1215,7 @@ describe('passive observation of actual memory requests', () => {
 			scale: expect.any(Number),
 			overhead: expect.any(Number),
 			digest: expect.any(String),
+			model: 'model',
 		})
 		const trial: MemoryTrialFixture = {
 			arm: 'records',
@@ -1339,6 +1340,7 @@ describe('passive observation of actual memory requests', () => {
 			scale: expect.any(Number),
 			overhead: expect.any(Number),
 			digest: expect.any(String),
+			model: 'model',
 		})
 	})
 

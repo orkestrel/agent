@@ -167,6 +167,7 @@ export function createGuideScriptProvider(
 	return {
 		id: 'scripted',
 		name: 'scripted',
+		model: SCRIPTED_MODEL,
 		generate: async () => replies.next().value ?? { content: '' },
 		async *stream(messages) {
 			prompts.handler([...messages])
@@ -249,6 +250,7 @@ export function createMeasuredGuideProvider(
 	return {
 		id: 'scripted',
 		name: 'scripted',
+		model: SCRIPTED_MODEL,
 		generate: async () => ({ content: 'x'.repeat(40), usage }),
 		async *stream() {
 			for (const text of ['x'.repeat(20), 'x'.repeat(20)]) {
@@ -443,6 +445,9 @@ import {
 import { createTool, ToolError, ToolManager } from '@orkestrel/tool'
 import { createBinaryContent, createFile, createTextContent } from '@orkestrel/workspace'
 
+/** Names the model every scripted provider and wire serves unless a fixture names another. */
+export const SCRIPTED_MODEL = 'scripted'
+
 /** Supplies usage shared by agent runs. */
 export const AGENT_USAGE = Object.freeze(createTokenUsage())
 
@@ -491,6 +496,7 @@ export function createEchoProvider(): ProviderInterface {
 	return {
 		id: 'reuse',
 		name: 'reuse',
+		model: SCRIPTED_MODEL,
 		async *stream(messages): AsyncGenerator<ProviderDelta, ProviderResult> {
 			// Echo the last user message's content into the answer, so two runs with
 			// different conversations produce distinguishable results.
@@ -988,6 +994,7 @@ export const requestConversation = async (
 export const createGatedProvider = (gate: PromiseWithResolvers<void>): ProviderInterface => ({
 	id: 'gated',
 	name: 'gated',
+	model: SCRIPTED_MODEL,
 	async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 		yield { channel: 'content', text: 'part' }
 		await gate.promise
@@ -1006,6 +1013,7 @@ export function createAbortingResultProvider(
 	return {
 		id: 'empty-thinking',
 		name: 'empty-thinking',
+		model: SCRIPTED_MODEL,
 		async *stream() {
 			yield { channel: 'content', text: 'x' }
 			abort.abort()
@@ -1081,6 +1089,7 @@ export function createSharedGatedProvider(
 	return {
 		id: 'm',
 		name: 'm',
+		model: SCRIPTED_MODEL,
 		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
 			const gate = gates.read()
 			yield { channel: 'content', text: 'part' }
@@ -1106,6 +1115,7 @@ export function createIndependentGatedProvider(
 	return {
 		id: 'own',
 		name: 'own',
+		model: SCRIPTED_MODEL,
 		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
 			const { ordinal, gate } = turns.read()
 			yield { channel: 'content', text: 'part' }
@@ -1125,6 +1135,7 @@ export function createSecondTurnFailureProvider(): ProviderInterface {
 	return {
 		id: 'fault',
 		name: 'fault',
+		model: SCRIPTED_MODEL,
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			if (firstTurn.read()) {
 				yield { channel: 'content', text: '' }
@@ -1143,6 +1154,7 @@ export function createConversationEchoProvider(): ProviderInterface {
 	return {
 		id: 'echo',
 		name: 'echo',
+		model: SCRIPTED_MODEL,
 		async *stream(messages): AsyncGenerator<ProviderDelta, ProviderResult> {
 			const last = messages.at(-1)
 			yield { channel: 'content', text: 'ok' }
@@ -1173,6 +1185,7 @@ export function createAbortingGatedProvider(
 	return {
 		id: 'gated-abort',
 		name: 'gated-abort',
+		model: SCRIPTED_MODEL,
 		async *stream(_messages, signal) {
 			yield { channel: 'content', text: 'part' }
 			await gate.promise
@@ -1190,6 +1203,7 @@ export function createThrowingProvider(message: string, delta?: string): Provide
 	return {
 		id: 'throwing',
 		name: 'throwing',
+		model: SCRIPTED_MODEL,
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			if (delta !== undefined) yield { channel: 'content', text: delta }
 			throw new Error(message)
@@ -1793,6 +1807,7 @@ export function createObservedGatedProvider(
 	return {
 		id: 'observed-gate',
 		name: 'observed-gate',
+		model: SCRIPTED_MODEL,
 		async *stream(_messages, signal): AsyncGenerator<ProviderDelta, ProviderResult> {
 			yield { channel: 'content', text: 'part' }
 			await gate.promise
@@ -1811,6 +1826,7 @@ export function createInterleavedThinkingProvider(): ProviderInterface {
 	return {
 		id: 'thinking',
 		name: 'thinking',
+		model: SCRIPTED_MODEL,
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			yield { channel: 'thinking', text: 'plan ' }
 			yield { channel: 'content', text: 'answer' }
@@ -1828,6 +1844,7 @@ export function createPacedProvider(): ProviderInterface {
 	return {
 		id: 'w',
 		name: 'w',
+		model: SCRIPTED_MODEL,
 		async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 			yield { channel: 'content', text: 'a' }
 			await waitForDelay() // consumer drains 'a', then parks on the empty buffer
@@ -2120,6 +2137,7 @@ export type DeltaFunction = (content: string) => readonly string[]
  * @remarks
  * - `delay` - Milliseconds paused at the start of each call. Default: `0`.
  * - `name` - The provider id and name. Default: `'scripted'`.
+ * - `model` - The model the provider serves. Default: `SCRIPTED_MODEL`.
  * - `replay` - The supplied thinking policy; omission leaves the member absent.
  * - `chunk` - Content chunking. Default: one whole delta. A per-turn `deltas` list overrides it.
  * - `repeat` - Whether the last turn repeats after the script ends. Default: `true`.
@@ -2130,6 +2148,7 @@ export interface ScriptedProviderOptions {
 	readonly replay?: ThinkingReplay
 	readonly delay?: number
 	readonly name?: string
+	readonly model?: string
 	readonly chunk?: DeltaFunction
 	readonly repeat?: boolean
 	readonly recorded?: boolean
@@ -2202,6 +2221,38 @@ export function createScriptedProvider(
 }
 
 /**
+ * Builds the providers `createAgent` and `createLedger` refuse for their `model`: a scripted
+ * provider's members with `model` missing, empty, not a string, or behind a throwing getter, and a
+ * provider that is not an object, each beside the preview of the value the refusal reports.
+ *
+ * @returns The titled candidates and the preview each refusal reports
+ */
+export function buildProviderModelRefusals(): ReadonlyArray<
+	readonly [title: string, provider: unknown, received: string]
+> {
+	const scripted = createScriptedProvider([{ content: 'Done.' }])
+	const members = {
+		id: scripted.id,
+		name: scripted.name,
+		generate: scripted.generate.bind(scripted),
+		stream: scripted.stream.bind(scripted),
+	}
+	const unreadable = Object.defineProperty({ ...members }, 'model', {
+		enumerable: true,
+		get: () => {
+			throw new Error('model unreadable')
+		},
+	})
+	return Object.freeze<ReadonlyArray<readonly [string, unknown, string]>>([
+		['a provider without model', members, 'undefined'],
+		['a provider with an empty model', { ...members, model: '' }, '""'],
+		['a provider with a non-string model', { ...members, model: 7 }, '7'],
+		['a provider whose model getter throws', unreadable, 'undefined'],
+		['a provider that is not an object', undefined, 'undefined'],
+	])
+}
+
+/**
  * Creates an agent over a provider whose stream yields the given values and returns the given value,
  * the foreign implementation a run's provider door reads. The values are unchecked, so the construction
  * goes through Reflect.
@@ -2220,6 +2271,7 @@ export function createForeignAgent(
 		{
 			id: 'foreign',
 			name: 'foreign',
+			model: SCRIPTED_MODEL,
 			async *stream() {
 				yield* deltas
 				return result
@@ -2591,6 +2643,7 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 	readonly #recorded: boolean
 	readonly #delay: number
 	readonly #name: string
+	readonly #model: string
 	readonly #calls = createRecorder<readonly [ScriptedCall]>()
 	#index = 0
 	#inFlight = 0
@@ -2605,6 +2658,7 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 		this.#recorded = options?.recorded === true
 		this.#delay = options?.delay ?? 0
 		this.#name = options?.name ?? 'scripted'
+		this.#model = options?.model ?? SCRIPTED_MODEL
 	}
 
 	get id(): string {
@@ -2613,6 +2667,10 @@ export class ScriptedProvider implements ScriptedProviderInterface {
 
 	get name(): string {
 		return this.#name
+	}
+
+	get model(): string {
+		return this.#model
 	}
 
 	get peak(): number {
@@ -4867,8 +4925,12 @@ export class ScriptedFrame implements ProviderParserInterface<string> {
 /**
  * Holds scripted wire records, optional end-of-input buffering, and the controller a scripted
  * failure aborts in the turn it throws, so a decoder throw races the abort.
+ *
+ * @remarks
+ * `model` names the model the wire serves. Default: `SCRIPTED_MODEL`.
  */
-export interface ScriptedWireOptions extends AgentProviderInput {
+export interface ScriptedWireOptions extends Omit<AgentProviderInput, 'model'> {
+	readonly model?: string
 	readonly records?: ReadonlyMap<string, ProviderIncrement | Error>
 	readonly buffered?: boolean
 	readonly abort?: AbortController
@@ -4883,8 +4945,8 @@ export class ScriptedWire extends AgentProvider<string> {
 	readonly #decoded: string[] = []
 	readonly name = 'scripted'
 	constructor(options: ScriptedWireOptions) {
-		const { records: _records, buffered: _buffered, abort: _abort, ...input } = options
-		super(input)
+		const { records: _records, buffered: _buffered, abort: _abort, model, ...input } = options
+		super({ ...input, model: model ?? SCRIPTED_MODEL })
 		this.#records = options.records ?? new Map()
 		this.#buffered = options.buffered ?? false
 		this.#abort = options.abort
@@ -8487,6 +8549,7 @@ export function createRelayHop(options: RelayHopOptions): RelayProvider {
 	})
 	return new RelayProvider({
 		url: options.url ?? 'http://relay.test/',
+		model: options.provider.model,
 		...(options.headers === undefined ? {} : { headers: options.headers }),
 		fetch: async (input, init) => {
 			const request =
@@ -9805,7 +9868,7 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	notes: ['note'],
 	failures: ['failure'],
 	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-15.
-	gauge: { scale: 2, overhead: 10, digest: 'f8b9a438b4f24a32' },
+	gauge: { scale: 2, overhead: 10, digest: 'f8b9a438b4f24a32', model: SCRIPTED_MODEL },
 })
 
 /**
@@ -9833,6 +9896,7 @@ export function buildLedgerSnapshotRefusals(): ReadonlyArray<readonly [string, L
 		['an infinite gauge scale', { ...seed, gauge: { ...gauge, scale: Infinity } }],
 		['a negative gauge overhead', { ...seed, gauge: { ...gauge, overhead: -1 } }],
 		['an infinite gauge overhead', { ...seed, gauge: { ...gauge, overhead: Infinity } }],
+		['an empty gauge model', { ...seed, gauge: { ...gauge, model: '' } }],
 	])
 }
 
@@ -9866,8 +9930,19 @@ export function createInvalidLedgerSnapshotCases(): ReadonlyArray<readonly [stri
 		['a failures list holding a number', { ...seed, failures: [1] }],
 		['a gauge that is a number', { ...seed, gauge: 2 }],
 		['a gauge missing its overhead', { ...seed, gauge: { scale: 2 } }],
-		['a gauge missing its digest', { ...seed, gauge: { scale: 2, overhead: 10 } }],
-		['a gauge digest that is a number', { ...seed, gauge: { scale: 2, overhead: 10, digest: 1 } }],
+		[
+			'a gauge missing its digest',
+			{ ...seed, gauge: { scale: 2, overhead: 10, model: SCRIPTED_MODEL } },
+		],
+		[
+			'a gauge digest that is a number',
+			{ ...seed, gauge: { scale: 2, overhead: 10, digest: 1, model: SCRIPTED_MODEL } },
+		],
+		['a gauge missing its model', { ...seed, gauge: { scale: 2, overhead: 10, digest: 'f8b9' } }],
+		[
+			'a gauge model that is a number',
+			{ ...seed, gauge: { scale: 2, overhead: 10, digest: 'f8b9', model: 7 } },
+		],
 		['a throwing getter', thrown],
 		['a revoked proxy', revoked.proxy],
 	])
@@ -17183,14 +17258,20 @@ export function buildOptionDoors(): readonly OptionDoor[] {
 			owner: 'RelayProvider',
 			shape: 'RelayProviderOptions',
 			open: (stray) =>
-				invokeUnchecked(undefined, createRelayProvider, [{ url: wire.url, ...stray }]),
+				invokeUnchecked(undefined, createRelayProvider, [
+					{ url: wire.url, model: SCRIPTED_MODEL, ...stray },
+				]),
 		},
 		{
 			owner: 'RelayProvider',
 			shape: 'RelayProviderOptions',
 			open: (stray) =>
 				new RelayProvider(
-					invokeUnchecked(undefined, Object.assign, [{}, { url: wire.url }, stray]),
+					invokeUnchecked(undefined, Object.assign, [
+						{},
+						{ url: wire.url, model: SCRIPTED_MODEL },
+						stray,
+					]),
 				),
 		},
 		{

@@ -32,6 +32,7 @@ import {
 	drainProvider,
 	RecordedTransport,
 	RELAY_RESULT_FRAME,
+	SCRIPTED_MODEL,
 	buildOptionDoors,
 	readDoorRefusal,
 } from '../../../setup.js'
@@ -57,6 +58,7 @@ describe('RelayProvider', () => {
 		)
 		const provider = createRelayProvider({
 			url: 'http://relay.test',
+			model: SCRIPTED_MODEL,
 			fetch: transport.fetch,
 		})
 		await expect(provider.generate([], abort.signal)).rejects.toMatchObject({
@@ -67,16 +69,27 @@ describe('RelayProvider', () => {
 	it('exposes the configured replay policy and its default', () => {
 		const provider = new RelayProvider({
 			url: 'https://relay.test',
+			model: SCRIPTED_MODEL,
 			replay: 'turn',
 		})
 		expect(provider.replay).toBe('turn')
-		expect(new RelayProvider({ url: 'https://relay.test' }).replay).toBe('none')
+		expect(new RelayProvider({ url: 'https://relay.test', model: SCRIPTED_MODEL }).replay).toBe(
+			'none',
+		)
+	})
+	it('exposes the configured model and sends none on the wire', () => {
+		const provider = new RelayProvider({ url: 'https://relay.test', model: 'qwen3:4b' })
+		expect(provider.model).toBe('qwen3:4b')
+		expect(provider.encode({ messages: [{ id: 'a', role: 'user', content: 'ping' }] })).toEqual({
+			messages: [{ id: 'a', role: 'user', content: 'ping' }],
+		})
 	})
 
 	it('sends the snapshot of hostile parameters and never consults their serializer', async () => {
 		const transport = new RecordedTransport(() => new Response(RELAY_RESULT_FRAME))
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: transport.fetch,
 		})
 		const request: ProviderRequest = {
@@ -97,6 +110,7 @@ describe('RelayProvider', () => {
 		const transport = new RecordedTransport(() => new Response(RELAY_RESULT_FRAME))
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: transport.fetch,
 		})
 		const request: ProviderRequest = {
@@ -122,6 +136,7 @@ describe('RelayProvider', () => {
 		const transport = new RecordedTransport(() => new Response(RELAY_RESULT_FRAME))
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: transport.fetch,
 		})
 		const request: ProviderRequest = {
@@ -153,6 +168,7 @@ describe('RelayProvider', () => {
 		expectTypeOf(createRelayProvider).returns.toEqualTypeOf<ProviderInterface>()
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport([RELAY_RESULT_FRAME]),
 		})
 		expect(provider.name).toBe('relay')
@@ -164,7 +180,7 @@ describe('RelayProvider', () => {
 	it('refuses a request whose getter throws and carries the read failure as the cause', () => {
 		const failure = new Error('hostile read')
 		const refusal = captureError(() =>
-			new RelayProvider({ url: 'http://relay.test/' }).encode({
+			new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL }).encode({
 				messages: [
 					{
 						id: 'ask',
@@ -182,7 +198,7 @@ describe('RelayProvider', () => {
 		expect(refusal.cause).toBe(failure)
 	})
 	it('carries the projection failure as the refusal cause', () => {
-		const provider = new RelayProvider({ url: 'http://relay.test/' })
+		const provider = new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL })
 		const refusal = captureError(() =>
 			provider.encode({
 				messages: [],
@@ -195,7 +211,7 @@ describe('RelayProvider', () => {
 		expect(refusal.cause).toBeInstanceOf(ContractError)
 	})
 	it('owns a valid request snapshot without changing its JSON values', () => {
-		const provider = new RelayProvider({ url: 'http://relay.test/' })
+		const provider = new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL })
 		const parameters = { x: 1 }
 		const schema = { type: 'object' }
 		const request: ProviderRequest = {
@@ -219,14 +235,14 @@ describe('RelayProvider', () => {
 			readonly channel: 'error'
 			readonly message: string
 		}>()
-		const provider = new RelayProvider({ url: 'http://relay.test/' })
+		const provider = new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL })
 		const frame = { channel: 'error', code: 'PROVIDER', message: 'unavailable' }
 		expect(relayFrameContract.is(frame)).toBe(false)
 		expect(() => provider.read(frame)).toThrow('invalid relay frame')
 		expect(relayFrameContract.is({ channel: 'error', message: 'unavailable' })).toBe(true)
 	})
 	it('projects declared request fields and omits extra execution context before a JSON round trip', () => {
-		const provider = new RelayProvider({ url: 'http://relay.test/' })
+		const provider = new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL })
 		const call = {
 			...createToolCall({ arguments: { x: 1 } }),
 			context: { signal: new AbortController().signal, caller: { subject: 'local-only' } },
@@ -265,6 +281,7 @@ describe('RelayProvider', () => {
 	it('carries thinking in the relay body and exposes the replay policy', () => {
 		const provider = new RelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			replay: 'turn',
 		})
 		const wire = provider.encode({
@@ -280,12 +297,15 @@ describe('RelayProvider', () => {
 			],
 		})
 		expect(provider.replay).toBe('turn')
-		expect(new RelayProvider({ url: 'http://relay.test/' }).replay).toBe('none')
+		expect(new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL }).replay).toBe(
+			'none',
+		)
 	})
 	it('rejects non-JSON arguments before fetching', async () => {
 		const transport = createRefusingTransport()
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: transport.fetch,
 		})
 		await expect(
@@ -304,7 +324,7 @@ describe('RelayProvider', () => {
 		expect(transport.signals).toEqual([])
 	})
 	it('rejects non-JSON parameters and schema', () => {
-		const provider = new RelayProvider({ url: 'http://relay.test/' })
+		const provider = new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL })
 		expect(() =>
 			provider.encode({
 				messages: [],
@@ -326,6 +346,7 @@ describe('RelayProvider', () => {
 		for (const frame of frames) expect(relayFrameContract.is(roundTripJSON(frame))).toBe(true)
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(frames.map((frame) => `${JSON.stringify(frame)}\n`)),
 		})
 		expect(await drainProvider(provider.stream([], new AbortController().signal))).toEqual({
@@ -342,6 +363,7 @@ describe('RelayProvider', () => {
 		}
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport([JSON.stringify({ channel: 'abort', partial }) + '\n']),
 		})
 		const signal = new AbortController().signal
@@ -351,6 +373,7 @@ describe('RelayProvider', () => {
 	it('refuses malformed frames and missing terminal results', async () => {
 		const provider = new RelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['{"channel":"content","text":"prefix"}\n']),
 		})
 		expect(() => provider.read({ channel: 'content', text: 4 })).toThrow('invalid relay frame')
@@ -364,6 +387,7 @@ describe('RelayProvider', () => {
 	it('recovers a fragmented unterminated final result with fresh framing per call', async () => {
 		const provider = new RelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['{"channel":"res', 'ult","result":{"content":"answer"}}']),
 		})
 		expect(provider.name).toBe('relay')
@@ -377,7 +401,7 @@ describe('RelayProvider', () => {
 		expect(requireValue(provider.id)).toBeTypeOf('string')
 	})
 	it('refuses a non-object line by default', () => {
-		const provider = new RelayProvider({ url: 'http://relay.test/' })
+		const provider = new RelayProvider({ url: 'http://relay.test/', model: SCRIPTED_MODEL })
 		const record = captureError(() => provider.frame().parse('[]\n'))
 		if (!isNDJSONError(record)) throw new Error('the non-object line was not refused')
 		expect(record.code).toBe('RECORD')
@@ -389,6 +413,7 @@ describe('RelayProvider', () => {
 		const recorder = createRecorder()
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			parser: () => {
 				recorder.handler()
 				return createNDJSONParser({ strict: true })
@@ -402,6 +427,7 @@ describe('RelayProvider', () => {
 	it('skips a malformed line when lenient', async () => {
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			parser: () => createNDJSONParser({ strict: false }),
 			fetch: createStreamingTransport(['invalid\n', RELAY_RESULT_FRAME]),
 		})
@@ -410,6 +436,7 @@ describe('RelayProvider', () => {
 	it('rejects a refused line as PROTOCOL', async () => {
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['[]\n']),
 		})
 		const settled = await captureProduction(() =>
@@ -426,6 +453,7 @@ describe('RelayProvider', () => {
 	it('rejects a refused tail as PROTOCOL', async () => {
 		const provider = createRelayProvider({
 			url: 'http://relay.test/',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['{"channel":']),
 		})
 		const settled = await captureProduction(() =>

@@ -227,6 +227,7 @@ import {
 	omitMember,
 	readUndisclosed,
 	serveLedgerArm,
+	SCRIPTED_MODEL,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
@@ -1008,6 +1009,7 @@ describe('Ledger', () => {
 				{
 					id: underlying.id,
 					name: underlying.name,
+					model: underlying.model,
 					generate: async () => {
 						if (cancelled) abort.abort('stop')
 						throw new Error('send rejected')
@@ -1362,7 +1364,7 @@ describe('Ledger', () => {
 		)
 		const snapshot: LedgerSnapshot = {
 			...LEDGER_SNAPSHOT_SEED,
-			gauge: { scale: 2, overhead: 10, digest },
+			gauge: { scale: 2, overhead: 10, digest, model: SCRIPTED_MODEL },
 			conversation: {
 				...LEDGER_SNAPSHOT_SEED.conversation,
 				messages: [
@@ -3168,6 +3170,7 @@ describe('Ledger', () => {
 			{
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				generate: async (...args) => {
 					entered.resolve()
 					await release.promise
@@ -3669,6 +3672,7 @@ describe('Ledger', () => {
 			{
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				get replay(): ThinkingReplay {
 					return replays.read()
 				},
@@ -8165,6 +8169,83 @@ describe('Ledger — a gauge across a changed tool set', () => {
 	})
 })
 
+describe('Ledger — a gauge across a changed provider model', () => {
+	it('drops a snapshot gauge measured under another provider model and calibrates before its first pass', async () => {
+		const options = buildUncalibratedOptions(buildLedgerOptions())
+		const { snapshot } = await serveLedgerGauge(options)
+		const provider = new MeteredLedgerProvider([{ content: 'Noted.' }], {
+			recorded: true,
+			model: 'qwen3:4b',
+		})
+		const faults = createRecorder<readonly [error: unknown]>()
+		const ledger = createLedger(provider, {
+			...options,
+			snapshot,
+			agent: { ...options.agent, on: { fault: faults.handler } },
+		})
+		const before = ledger.gauge
+		await ledger.respond('Who works the Brightwater Studio account?')
+		const names = ledger.agent.context.tools.definitions().map((tool) => tool.name)
+		expect({
+			stored: snapshot.gauge?.model,
+			before,
+			faults: faults.count,
+			count: provider.calls.length,
+			calibration: provider.calls
+				.slice(0, 2)
+				.map((call) => [call.tools?.map((tool) => tool.name), call.options?.think]),
+			model: ledger.snapshot().gauge?.model,
+		}).toEqual({
+			stored: SCRIPTED_MODEL,
+			before: undefined,
+			faults: 0,
+			count: 3,
+			calibration: [
+				[names, false],
+				[undefined, false],
+			],
+			model: 'qwen3:4b',
+		})
+	})
+
+	it('keeps a snapshot gauge measured under the same provider model with no calibration call', async () => {
+		const options = buildUncalibratedOptions(buildLedgerOptions())
+		const { snapshot } = await serveLedgerGauge(options)
+		const stored = requireValue(snapshot.gauge)
+		const provider = new MeteredLedgerProvider([{ content: 'Noted.' }], {
+			recorded: true,
+			model: SCRIPTED_MODEL,
+		})
+		const ledger = createLedger(provider, { ...options, snapshot })
+		expect(ledger.gauge).toEqual({ scale: stored.scale, overhead: stored.overhead })
+		await ledger.respond('Who works the Brightwater Studio account?')
+		expect(provider.calls).toHaveLength(1)
+		expect(ledger.snapshot().gauge).toMatchObject({ digest: stored.digest, model: SCRIPTED_MODEL })
+	})
+
+	it('records the provider model with a supplied gauge in its snapshot', () => {
+		const options = buildLedgerOptions()
+		const ledger = createLedger(createScriptedProvider([], { model: 'qwen3:4b' }), options)
+		expect(ledger.snapshot().gauge).toMatchObject({ ...options.gauge, model: 'qwen3:4b' })
+	})
+
+	it('refuses a snapshot whose gauge carries no model with SNAPSHOT', async () => {
+		const options = buildUncalibratedOptions(buildLedgerOptions())
+		const { snapshot } = await serveLedgerGauge(options)
+		const { model, ...price } = requireValue(snapshot.gauge)
+		expect(model).toBe(SCRIPTED_MODEL)
+		const missing = { ...snapshot, gauge: price }
+		expect(isLedgerSnapshot(missing)).toBe(false)
+		const error = captureError(() =>
+			Reflect.construct(Ledger, [createScriptedProvider([]), { ...options, snapshot: missing }]),
+		)
+		expect(isLedgerError(error) && error.code).toBe('SNAPSHOT')
+		expect(isLedgerError(error) && error.context?.faults).toEqual([
+			expect.objectContaining({ path: ['gauge', 'model'] }),
+		])
+	})
+})
+
 describe('Ledger — head pricing', () => {
 	it('keeps a long head under the plan cap', async () => {
 		const fixture = LEDGER_TRIM_ORDER_FIXTURE
@@ -8726,6 +8807,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			{
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				generate: async (...args) => {
 					if (
 						mode === 'after-reject' &&
@@ -9564,6 +9646,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			scale: 1,
 			overhead: 0,
 			digest: expect.stringMatching(/^[0-9a-f]{16}$/),
+			model: SCRIPTED_MODEL,
 		})
 		expect(snapshot.conversation.messages).toEqual(messages)
 	})
@@ -9599,6 +9682,7 @@ describe('Ledger — snapshot and hydrate', () => {
 		expect(calibrating.snapshot().gauge).toEqual({
 			...gauge,
 			digest: expect.stringMatching(/^[0-9a-f]{16}$/),
+			model: SCRIPTED_MODEL,
 		})
 	})
 
@@ -9904,6 +9988,7 @@ describe('Ledger — run-bound conversation', () => {
 			{
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				generate: (...args) => provider.generate(...args),
 				stream: async function* (...args) {
 					const gate = gates.read()
@@ -9948,6 +10033,7 @@ describe('Ledger — run-bound conversation', () => {
 			{
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				generate: (...args) => provider.generate(...args),
 				stream: async function* (...args) {
 					const gate = gates.read()
@@ -10751,6 +10837,7 @@ describe('Ledger — its agent', () => {
 			{
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				generate: (...args) => provider.generate(...args),
 				stream: async function* (messages, signal, tools, options) {
 					entered.resolve()

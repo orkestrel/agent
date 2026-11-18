@@ -79,6 +79,7 @@ import {
 	isProviderAbortError,
 	ProviderError,
 	readProviderDelta,
+	requireProviderModel,
 	requireProviderResult,
 } from '../providers/index.js'
 
@@ -180,6 +181,7 @@ export class Agent implements AgentInterface {
 
 	constructor(provider: ProviderInterface, options?: AgentOptions) {
 		refuseOptionKeys(options, AGENT_OPTION_KEYS, 'Agent', 'AgentOptions')
+		requireProviderModel(provider, 'Agent')
 		if (options?.tools !== undefined && options.authority === undefined) {
 			throw new AgentError(
 				'AUTHORITY',

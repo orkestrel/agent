@@ -110,6 +110,7 @@ export const RELAY_OPTION_KEYS = Object.freeze([
 /** Lists the members `RelayProviderOptions` declares, frozen — the keys the `RelayProvider` constructor admits. */
 export const RELAY_PROVIDER_KEYS = Object.freeze([
 	'url',
+	'model',
 	'parser',
 	'timeout',
 	'replay',
@@ -127,6 +128,7 @@ export const RELAY_STREAM_KEYS = Object.freeze([
 /** Lists the members `AgentProviderInput` declares, frozen — the keys the `AgentProvider` constructor admits. */
 export const PROVIDER_INPUT_KEYS = Object.freeze([
 	'url',
+	'model',
 	'path',
 	'split',
 	'strict',

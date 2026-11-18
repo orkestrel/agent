@@ -45,7 +45,12 @@ export const ledgerSnapshotShape = objectShape({
 	notes: arrayShape(stringShape()),
 	failures: arrayShape(stringShape()),
 	gauge: optionalShape(
-		objectShape({ scale: numberShape(), overhead: numberShape(), digest: stringShape() }),
+		objectShape({
+			scale: numberShape(),
+			overhead: numberShape(),
+			digest: stringShape(),
+			model: stringShape({ min: 1 }),
+		}),
 	),
 	window: optionalShape(ledgerWindowShape),
 }) satisfies ContractShape

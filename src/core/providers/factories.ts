@@ -172,6 +172,7 @@ export function createRelay(options: RelayOptions): RelayHandler {
  *
  * const browser: ProviderInterface = createRelayProvider({
  * 	url: 'https://app.example/relay',
+ * 	model: 'qwen3:4b', // the model the relay's upstream provider serves
  * 	headers: () => ({ authorization: `Bearer ${bearer}` }),
  * })
  * const result = await browser.generate(messages, abort.signal) // a ProviderResult like a local provider's

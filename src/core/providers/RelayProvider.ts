@@ -32,6 +32,8 @@ import { providerRequestContract, relayFrameContract } from './contracts.js'
  * `PROTOCOL` code.
  * This is the browser end alone; {@link createRelay} mounts the server end.
  * The example of {@link createRelayProvider} is the browser half of that pair.
+ * `model` names the model the relay's upstream provider serves; the page states it, the wire never
+ * carries it, and the relay checks nothing against it.
  *
  * @example
  * ```ts
@@ -41,6 +43,7 @@ import { providerRequestContract, relayFrameContract } from './contracts.js'
  * export function ask(bearer: string, signal: AbortSignal): Promise<ProviderResult> {
  * 	const browser = new RelayProvider({
  * 		url: 'https://relay.example/relay',
+ * 		model: 'qwen3:4b',
  * 		headers: () => ({ authorization: `Bearer ${bearer}` }),
  * 	})
  * 	return browser.generate([{ id: 'ask', role: 'user', content: 'ping' }], signal)
@@ -52,9 +55,10 @@ export class RelayProvider extends AgentProvider {
 
 	constructor(options: RelayProviderOptions) {
 		refuseOptionKeys(options, RELAY_PROVIDER_KEYS, 'RelayProvider', 'RelayProviderOptions')
-		const { url, timeout, fetch, headers, replay } = options
+		const { url, model, timeout, fetch, headers, replay } = options
 		super({
 			url,
+			model,
 			split: false,
 			strict: true,
 			...(timeout === undefined ? {} : { timeout }),

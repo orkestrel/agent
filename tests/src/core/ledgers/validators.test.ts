@@ -253,7 +253,7 @@ describe('isLedgerSnapshot is exact, in lockstep with its shape', () => {
 			requests: [],
 			notes: [],
 			failures: [],
-			gauge: { scale: 1, overhead: 0, digest: 'checksum' },
+			gauge: { scale: 1, overhead: 0, digest: 'checksum', model: 'qwen3:4b' },
 		}
 		expect(isLedgerSnapshot(snapshot)).toBe(true)
 		expect(ledgerSnapshotContract.is(snapshot)).toBe(true)
@@ -278,7 +278,7 @@ describe('isLedgerSnapshot is exact, in lockstep with its shape', () => {
 				requests: [],
 				notes: [],
 				failures: [],
-				gauge: { scale: 1, overhead: 0, digest: 'checksum', at: 1 },
+				gauge: { scale: 1, overhead: 0, digest: 'checksum', model: 'qwen3:4b', at: 1 },
 			},
 		],
 		[
@@ -288,7 +288,27 @@ describe('isLedgerSnapshot is exact, in lockstep with its shape', () => {
 				requests: [],
 				notes: [],
 				failures: [],
-				gauge: { scale: 1, overhead: 0 },
+				gauge: { scale: 1, overhead: 0, model: 'qwen3:4b' },
+			},
+		],
+		[
+			'a gauge with no model',
+			{
+				conversation,
+				requests: [],
+				notes: [],
+				failures: [],
+				gauge: { scale: 1, overhead: 0, digest: 'checksum' },
+			},
+		],
+		[
+			'a gauge with an empty model',
+			{
+				conversation,
+				requests: [],
+				notes: [],
+				failures: [],
+				gauge: { scale: 1, overhead: 0, digest: 'checksum', model: '' },
 			},
 		],
 	])('refuses %s', (_title, snapshot) => {

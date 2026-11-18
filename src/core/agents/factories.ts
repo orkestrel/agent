@@ -52,6 +52,7 @@ import { builtinToolContracts } from './contracts.js'
  * @param options - Optional `system` / `tools` / `limit` / `timeout` / `budget` /
  *   `scheduler` / `signal` (see {@link AgentOptions})
  * @returns A working {@link AgentInterface}
+ * @throws {ContractError} Thrown when the provider's `model` is missing, not a string, or empty (code `'placement'`)
  *
  * @example
  * ```ts

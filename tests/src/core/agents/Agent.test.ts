@@ -161,6 +161,7 @@ import {
 	createInspectTool,
 	createNoteTool,
 	NOTE_TEXT,
+	SCRIPTED_MODEL,
 } from '../../../setup.js'
 import {
 	captureError,
@@ -212,6 +213,7 @@ describe('Agent — thinking replay', () => {
 			{
 				id: provider.id,
 				name: provider.name,
+				model: provider.model,
 				get replay(): ThinkingReplay {
 					return policies.next().value ?? 'none'
 				},
@@ -5645,6 +5647,7 @@ describe('Agent — three failure layers', () => {
 		const cancelled = createAgent({
 			id: 'gated',
 			name: 'gated',
+			model: SCRIPTED_MODEL,
 			async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 				yield { channel: 'content', text: 'Once upon' }
 				await gate.promise
@@ -5844,6 +5847,7 @@ describe('Agent — three failure layers', () => {
 			{
 				id: 'model',
 				name: 'model',
+				model: SCRIPTED_MODEL,
 				async *stream(): AsyncGenerator<ProviderDelta, ProviderResult> {
 					yield { channel: 'content', text: 'Once upon' }
 					throw failure
@@ -10383,6 +10387,7 @@ describe('Agent — built-ins and disclosure: a relay', () => {
 				const page = createAgent(
 					createRelayProvider({
 						url: 'http://relay.test/',
+						model: upstream.model,
 						fetch: (input, init) => handler(new Request(input, init)),
 					}),
 					{ authority: AGENT_AUTHORITY, builtins },

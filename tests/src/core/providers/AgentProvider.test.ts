@@ -31,6 +31,7 @@ import {
 	rejectTransportOnAbort,
 	recordGlobalTransport,
 	ScriptedWire,
+	SCRIPTED_MODEL,
 	buildOptionDoors,
 	readDoorRefusal,
 } from '../../../setup.js'
@@ -47,6 +48,19 @@ describe('AgentProvider — identity, transport, and request composition', () =>
 		expect(new ScriptedWire({ url: 'https://provider.test', replay: 'none' }).replay).toBe('none')
 		expect(new ScriptedWire({ url: 'https://provider.test', replay: 'turn' }).replay).toBe('turn')
 		expect(new ScriptedWire({ url: 'https://provider.test', replay: 'all' }).replay).toBe('all')
+	})
+
+	it('exposes the model input unchanged and sends none of it unless the wire encodes it', async () => {
+		const transport = new RecordedTransport(() => new Response('c:ok'))
+		const provider = new ScriptedWire({
+			url: 'https://provider.test',
+			model: 'qwen3:4b',
+			strict: false,
+			fetch: transport.fetch,
+		})
+		await provider.generate([], new AbortController().signal)
+		expect(provider.model).toBe('qwen3:4b')
+		expect(await requireValue(transport.requests[0]).json()).toEqual({ messages: [] })
 	})
 
 	it('mints a distinct instance UUID per provider beside the exported transport limits', () => {
@@ -983,6 +997,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 		const failure = new Error('clear failed')
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['answer']),
 			parser: () => ({
 				parse: (chunk) => [{ channel: 'content', text: chunk }],
@@ -1006,6 +1021,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 		const transport = createRefusingTransport()
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: transport.fetch,
 			parser: () => {
 				abort.abort()
@@ -1026,6 +1042,7 @@ describe('AgentProvider — cancellation and partial results', () => {
 		const transport = createRefusingTransport()
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: transport.fetch,
 			parser: () => {
 				throw failure
@@ -1262,6 +1279,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const failure = new Error('parse failed')
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['body']),
 			parser: () => ({
 				parse() {
@@ -1285,6 +1303,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const failure = new Error('finish failed')
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['body']),
 			parser: () => ({
 				parse(chunk: string) {
@@ -1309,6 +1328,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const failure = new ProviderError('PROVIDER', 'upstream refused')
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['body']),
 			parser: () => ({
 				parse() {
@@ -1324,6 +1344,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const failure = new ProviderAbortError({ content: 'partial' })
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['body']),
 			parser: () => ({
 				parse() {
@@ -1340,6 +1361,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const strict = createNDJSONParser({ strict: true })
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['[]\n']),
 			parser: () => ({
 				parse(chunk: string) {
@@ -1362,6 +1384,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const failure = new ProviderError('PROVIDER', 'upstream refused')
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['body']),
 			parser: () => ({
 				parse(chunk: string) {
@@ -1378,6 +1401,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const failure = new ProviderAbortError({ content: 'partial' })
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['body']),
 			parser: () => ({
 				parse(chunk: string) {
@@ -1395,6 +1419,7 @@ describe('AgentProvider — a throw from the framing seam', () => {
 		const failure = new Error('finish raced the cancel')
 		const provider = new RelayProvider({
 			url: 'https://provider.test',
+			model: SCRIPTED_MODEL,
 			fetch: createStreamingTransport(['body']),
 			parser: () => ({
 				parse(chunk: string) {

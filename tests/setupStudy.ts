@@ -195,7 +195,7 @@ export async function runStudyChatDirect(
 	const input = goals[0]?.input
 	if (!isStudyChatInput(input)) throw new Error('Missing chat input')
 	const ledger = agent.createLedger(
-		provider.createOllama({
+		new provider.OllamaProvider({
 			model: 'model',
 			url,
 			think: false,

@@ -95,7 +95,9 @@ export interface ProviderStreamOptions {
  *
  * @remarks
  * - `id` is a stable per-instance trace label; `name` identifies the backend
- *   (`'ollama'`).
+ *   (`'ollama'`); `model` names the model the provider serves, a non-empty string. `createAgent`
+ *   and `createLedger` refuse a provider whose `model` is missing, not a string, or empty, and a
+ *   ledger's gauge reuses a stored price only under the `model` it was measured on.
  * - Both calls take an `AbortSignal` so a caller bounds the request (cancel,
  *   deadline, or budget folded through `AbortSignal.any`); aborting a `stream` mid-flight
  *   surfaces a `ProviderAbortError` carrying the partial result.
@@ -106,6 +108,8 @@ export interface ProviderStreamOptions {
 export interface ProviderInterface {
 	readonly id: string
 	readonly name: string
+	/** Names the model the provider serves, a non-empty string. */
+	readonly model: string
 	/**
 	 * Names the policy the agent loop, a relay server, and a ledger apply before calling the
 	 * provider. Default: `'none'`. A direct `generate` or `stream` call sends messages as given.
@@ -235,9 +239,11 @@ export interface ProviderIncrement {
 }
 
 /**
- * Configures a provider's deadline, transport, and headers.
+ * Configures a provider's model, deadline, transport, and headers.
  *
  * @remarks
+ * `model` names the model the provider serves and configures the provider's `model`; it must be a
+ * non-empty string, which `createAgent` and `createLedger` check.
  * `timeout` is an integer duration in milliseconds. Default: 120_000.
  * `replay` is a {@link ThinkingReplay} that configures the provider's `replay`. Default: `'none'`.
  * `fetch` is the request transport. Default: the global `fetch` bound to `globalThis`.
@@ -246,6 +252,7 @@ export interface ProviderIncrement {
  * content type only when it returns that header.
  */
 export interface ProviderOptions {
+	readonly model: string
 	readonly timeout?: number
 	readonly replay?: ThinkingReplay
 	readonly fetch?: typeof globalThis.fetch
