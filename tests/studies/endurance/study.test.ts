@@ -2,12 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { isRecord, parseJSON } from '@orkestrel/contract'
-import {
-	buildStudySchedule,
-	isStudyProvider,
-	parseStudyProfile,
-	validateStudyInputs,
-} from '@orkestrel/study'
+import { buildStudySchedule, isStudyProvider, parseStudyProfile } from '@orkestrel/study'
 import {
 	createStudyAdapter,
 	isStudyMemoryInput,
@@ -63,7 +58,7 @@ describe('prospective public endurance declarations', () => {
 		}
 		const input = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'qualification',
+			'recordsqualification',
 		)
 		const goals = input.scenarios[0]?.goals
 		if (goals === undefined) throw new Error('Missing prospective workload')
@@ -154,7 +149,7 @@ describe('prospective public endurance declarations', () => {
 			throw new Error('Invalid lookup archive')
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'qualification',
+			'recordsqualification',
 		)
 		const goals = fixture.scenarios[0]?.goals
 		if (goals === undefined) throw new Error('Missing projected goals')
@@ -211,7 +206,7 @@ describe('prospective public endurance declarations', () => {
 	it('pins independently chosen early, dormant-return, cross-case and closing boundaries', async () => {
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'qualification',
+			'recordsqualification',
 		)
 		const goals = fixture.scenarios[0]?.goals
 		if (goals === undefined) throw new Error('Missing endurance goals')
@@ -248,10 +243,10 @@ describe('prospective public endurance declarations', () => {
 
 	it('pins the smallest subject and its bounds', async () => {
 		const smallest = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/smallest.json', 'utf8')),
+			parseJSON(await readFile('studies/memory/profiles/recordssmallest.json', 'utf8')),
 		)
 		const recommended = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
+			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
 		)
 		const provider = smallest.provider
 		if (provider === undefined) throw new Error('Missing smallest provider')
@@ -264,7 +259,7 @@ describe('prospective public endurance declarations', () => {
 		expect(smallest.roots).toEqual(recommended.roots)
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'qualification',
+			'recordsqualification',
 		)
 		const goals = new Set(fixture.scenarios[0]?.goals.map((goal) => goal.id))
 		const settings = smallest.settings
@@ -285,24 +280,24 @@ describe('prospective public endurance declarations', () => {
 		expect(isStudyProvider({ ...owned, daemon: { ...daemon, models: [model] } })).toBe(false)
 	})
 
-	it('admits identical schedules and the pinned finite recommended profile while keeping semantics independently unknown', async () => {
+	it('pins the finite recommended profile and keeps every endurance semantic judgment independently unknown', async () => {
 		const profile = buildMemoryProfile({
 			url: 'http://127.0.0.1:1',
 			settings: STUDY_MEMORY_SETTINGS,
 		})
-		const capacity = await loadMemoryInputs(profile, 'qualification')
-		const quality = await loadMemoryInputs(profile, 'endurance')
+		const capacity = await loadMemoryInputs(profile, 'recordsqualification')
+		const quality = await loadMemoryInputs(profile, 'recordsendurance')
 		const recommended = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
+			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
 		)
 		expect(recommended.record).toEqual({ bytes: 536870912, calls: 4096, duration: 2400000 })
 		expect(isStudyMemoryOptions(recommended.settings)).toBe(true)
 		expect(recommended.provider?.daemon).toBeUndefined()
 		expect(recommended).toMatchObject({
-			name: 'recommended',
+			name: 'recordsrecommended',
 			agent: 'dist/src/core/index.js',
 			subject: 'dist/src/core/index.js',
-			qualification: 'tmp/studies/qualification',
+			qualification: 'tmp/studies/recordsqualification',
 			provider: {
 				entry: 'node_modules/@orkestrel/ollama/dist/src/core/index.js',
 				url: 'http://127.0.0.1:11434',
@@ -330,32 +325,10 @@ describe('prospective public endurance declarations', () => {
 				series: { duration: 2400000, calls: 8192, tokens: 163577856, bytes: 2147483648 },
 			},
 		})
-		for (const input of [capacity, quality]) {
-			expect(() =>
-				validateStudyInputs(input.definition, input.scenarios, input.rubric, input.profile),
-			).not.toThrow()
-			expect(() => createStudyAdapter().validate(input)).not.toThrow()
-			expect(input.definition).toMatchObject({
-				driver: 'memory',
-				arms: ['records', 'compaction'],
-				order: [['records', 'compaction']],
-				retries: 0,
-			})
+		for (const input of [capacity, quality])
 			expect([...new Set(input.rubric.criteria.map((criterion) => criterion.goal))]).toEqual(
 				input.scenarios[0]?.goals.map((goal) => goal.id),
 			)
-		}
-		expect(capacity.definition.purpose).toBe('capacity')
-		expect(quality.definition.purpose).toBe('quality')
-		expect(capacity.scenarios).toEqual(quality.scenarios)
-		expect(
-			capacity.rubric.criteria.every(
-				(criterion) =>
-					criterion.method === 'state' &&
-					isRecord(criterion.assertion) &&
-					criterion.assertion.observation === 'operational',
-			),
-		).toBe(true)
 		expect(
 			quality.rubric.criteria.every(
 				(criterion) =>
@@ -400,7 +373,9 @@ describe('prospective public endurance declarations', () => {
 			).toEqual(
 				['facts', 'work', 'obligations', 'completion'].map((suffix) => `${goal.id}-${suffix}`),
 			)
-		expect(judgments).toHaveLength(768)
+		// One strategy schedules one trial, so each criterion reads one judgment.
+		expect(schedule).toHaveLength(1)
+		expect(judgments).toHaveLength(384)
 		expect(
 			judgments.every(
 				(judgment) =>

@@ -1,0 +1,59 @@
+{
+	"version": "1",
+	"criteria": [
+		{
+			"id": "opening-source",
+			"scenario": "handoff",
+			"goal": "opening",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "arrival", "id": "mp-opening" }
+		},
+		{
+			"id": "opening-lookup",
+			"scenario": "handoff",
+			"goal": "opening",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "lookup", "id": "MP-6101" }
+		},
+		{
+			"id": "correction-source",
+			"scenario": "handoff",
+			"goal": "correction",
+			"method": "trace",
+			"critical": false,
+			"assertion": { "observation": "arrival", "id": "mp-scan" }
+		},
+		{
+			"id": "opening-meaning",
+			"scenario": "handoff",
+			"goal": "opening",
+			"method": "semantic",
+			"critical": true,
+			"assertion": {
+				"criterion": "Distinguishes draft and collection from confirmed depot custody, retains statement obligation and cites relevant public references."
+			}
+		},
+		{
+			"id": "correction-meaning",
+			"scenario": "handoff",
+			"goal": "correction",
+			"method": "semantic",
+			"critical": true,
+			"assertion": {
+				"criterion": "Repairs the earlier three-pallet count to two, recognizes $60 authorized but not posted, preserves C/D deposits and Jun's statement obligation with source attribution."
+			}
+		},
+		{
+			"id": "closure-meaning",
+			"scenario": "handoff",
+			"goal": "closure",
+			"method": "semantic",
+			"critical": true,
+			"assertion": {
+				"criterion": "Reports the $60 posted refund separately from the two outstanding deposits, retains undelivered statement responsibility, and makes no invented external action claim."
+			}
+		}
+	]
+}

@@ -17,7 +17,6 @@ import type {
 	StudySessionInterface,
 } from '@orkestrel/study'
 import type {
-	StudyExchangeAttempt,
 	StudyExchangeRow,
 	StudyExchangeSinkInterface,
 	StudyDeclaration,
@@ -29,6 +28,7 @@ import type { RecorderInterface } from '@orkestrel/test'
 import type { StudyAttempt, StudyFailure, StudyRole, StudyRubric } from '@orkestrel/study'
 import type { JSONValue } from '@orkestrel/contract'
 import type { StudyDeskAssertion } from '../studies/desk/types.js'
+import type { StudyMemoryArm } from '../studies/memory/index.js'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import {
 	arrayOf,
@@ -40,12 +40,13 @@ import {
 	isString,
 	parseJSON,
 } from '@orkestrel/contract'
-import { createRecorder, decodeJSONLines, waitForCondition, waitForDelay } from '@orkestrel/test'
+import { createRecorder, waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
 import { STUDY_CHAT_SYSTEM } from '../studies/chat/constants.js'
 import { isStudyChatInput } from '../studies/chat/validators.js'
 import { StudyChatDriver } from '../studies/chat/drivers/StudyChatDriver.js'
 import {
+	parseStudyDefinition,
 	parseStudyProfile,
 	parseStudyScenario,
 	buildStudySchedule,
@@ -62,25 +63,23 @@ import {
 	buildStudyExchangeDeclaration,
 	collectStudyEvidence,
 	readStudyDeclaration,
-	readStudyExchanges,
 	readStudyResult,
 } from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_REPEAT,
 	StudyMemoryDriver,
 	StudyMemoryJudge,
-	isStudyMemoryArm,
 } from '../studies/memory/index.js'
 import { StudyToolsDriver } from '../studies/tools/index.js'
 import { STUDY_DESK_TOOLS } from '../studies/desk/constants.js'
 import { isStudyDeskAssertion, isStudyDeskInput } from '../studies/desk/validators.js'
 import * as agent from '../src/core/index.js'
 import * as provider from '@orkestrel/ollama'
-import { createLoopback, createScratch, destroyScratch, isRunning } from '@orkestrel/test/server'
+import { createLoopback, createScratch, destroyScratch } from '@orkestrel/test/server'
 import { createServer } from 'node:http'
 import { deepStrictEqual, strictEqual } from 'node:assert'
 import { execFile } from 'node:child_process'
-import { cpSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -109,13 +108,11 @@ export const WINDOW_GOAL = Object.freeze({
 	input: { prompt: 'State the order count', arrivals: [], records: [] },
 })
 
-/** Pins the authored trial order independently of native execution output. */
+/** Pins the authored `recordscapacity` and `recordsmemory` trial order independently of native execution output. */
 export const STUDY_MEMORY_SCHEDULE = Object.freeze([
 	Object.freeze(['records', 0]),
-	Object.freeze(['compaction', 0]),
 	Object.freeze(['full', 0]),
 	Object.freeze(['full', 1]),
-	Object.freeze(['compaction', 1]),
 	Object.freeze(['records', 1]),
 ])
 
@@ -246,9 +243,9 @@ export function createStudyInstallFixture(
 			['@orkestrel/ollama', resolve('node_modules/@orkestrel/ollama')],
 		]),
 	)
-	for (const target of ['memory', 'capacity', 'chat'])
+	for (const target of ['memory', 'recordscapacity', 'recordsmemory', 'chat'])
 		cpSync(resolve('studies', target), scratch.ensure(join('studies', target)), { recursive: true })
-	const raw = parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')
+	const raw = parseJSON(scratch.read('studies/memory/profiles/recordslocal.json') ?? '')
 	if (!isRecord(raw) || !isRecord(raw.bounds)) throw new Error('Missing authored memory profile')
 	const authored = raw.bounds
 	const bounds = Object.fromEntries(
@@ -265,10 +262,10 @@ export function createStudyInstallFixture(
 	cpSync(resolve('package.json'), join(scratch.path, 'package.json'))
 	const entry = join(scratch.path, 'dist/src/core/index.js')
 	scratch.write(
-		'studies/memory/profiles/local.json',
+		'studies/memory/profiles/recordslocal.json',
 		JSON.stringify({
 			...raw,
-			name: 'local',
+			name: 'recordslocal',
 			settings: STUDY_MEMORY_SETTINGS,
 			agent: entry,
 			subject: entry,
@@ -281,7 +278,7 @@ export function createStudyInstallFixture(
 				judge: 'judge',
 				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
 			},
-			qualification: 'tmp/studies/memory-capacity',
+			qualification: 'tmp/studies/recordscapacity',
 		}),
 	)
 	return Object.freeze({
@@ -605,7 +602,7 @@ import { isArray, isRecord, parseJSON } from ${JSON.stringify(pathToFileURL(reso
 import { parseStudyProfile } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/core/index.js')).href)}
 import { ArtifactLoader, hashStudyBytes } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
 
-const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')))
+const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')))
 const selection = parseJSON(readFileSync(${JSON.stringify(scratch.write('roots.json', JSON.stringify({ roots })))}, 'utf8'))
 if (!isRecord(selection) || (selection.roots !== undefined && (!isArray(selection.roots) || !selection.roots.every((root) => typeof root === 'string'))))
 	throw new Error('Invalid topology root selection')
@@ -1540,18 +1537,191 @@ export function buildMemoryEdge(
 
 /** Loads an authored declaration and its shared memory scenario for generic admission proofs.
  * @param profile - The execution profile to compose with authored inputs.
- * @param name - The selected declaration. Default: capacity.
+ * @param name - The selected declaration. Default: recordscapacity.
  * @returns Parsed authored inputs with the caller's profile.
  */
 export async function loadMemoryInputs(
 	profile: StudyProfile,
-	name = 'capacity',
+	name = 'recordscapacity',
 ): Promise<StudyValidation> {
 	const { definition, scenarios, rubric } = await readStudyDeclaration(
 		fileURLToPath(new URL('../', import.meta.url)),
 		name,
 	)
 	return { definition, scenarios, rubric, profile }
+}
+
+/** Pins the declarations on the memory driver: one strategy each, named strategy first, in sorted order. */
+export const STUDY_MEMORY_DECLARATIONS = Object.freeze([
+	'compactioncapacity',
+	'compactionendurance',
+	'compactionmemory',
+	'compactionqualification',
+	'recordscapacity',
+	'recordsendurance',
+	'recordsmemory',
+	'recordsqualification',
+])
+
+/** Pins each records declaration beside its compaction sibling, whose rubric is its byte copy. */
+export const STUDY_MEMORY_SIBLINGS = Object.freeze([
+	Object.freeze(['recordsmemory', 'compactionmemory'] as const),
+	Object.freeze(['recordscapacity', 'compactioncapacity'] as const),
+	Object.freeze(['recordsendurance', 'compactionendurance'] as const),
+	Object.freeze(['recordsqualification', 'compactionqualification'] as const),
+])
+
+/** Pins each memory profile pair: one base's records and compaction profiles, with the capacity result each names as its qualification. */
+export const STUDY_MEMORY_PROFILES = Object.freeze([
+	Object.freeze({
+		records: Object.freeze({
+			name: 'recordslocal',
+			qualification: 'tmp/studies/recordscapacity',
+		}),
+		compaction: Object.freeze({
+			name: 'compactionlocal',
+			qualification: 'tmp/studies/compactioncapacity',
+		}),
+	}),
+	Object.freeze({
+		records: Object.freeze({
+			name: 'recordsrecommended',
+			qualification: 'tmp/studies/recordsqualification',
+		}),
+		compaction: Object.freeze({
+			name: 'compactionrecommended',
+			qualification: 'tmp/studies/compactionqualification',
+		}),
+	}),
+	Object.freeze({
+		records: Object.freeze({
+			name: 'recordssmallest',
+			qualification: 'tmp/studies/recordsqualification',
+		}),
+		compaction: Object.freeze({
+			name: 'compactionsmallest',
+			qualification: 'tmp/studies/compactionqualification',
+		}),
+	}),
+])
+
+/** Pins each capacity declaration beside the quality twin it qualifies, the one strategy both schedule, and the profiles each pair runs under. */
+export const STUDY_MEMORY_TWINS = Object.freeze([
+	Object.freeze({
+		capacity: 'recordscapacity',
+		quality: 'recordsmemory',
+		strategy: 'records',
+		profiles: Object.freeze(['recordslocal']),
+	}),
+	Object.freeze({
+		capacity: 'compactioncapacity',
+		quality: 'compactionmemory',
+		strategy: 'compaction',
+		profiles: Object.freeze(['compactionlocal']),
+	}),
+	Object.freeze({
+		capacity: 'recordsqualification',
+		quality: 'recordsendurance',
+		strategy: 'records',
+		profiles: Object.freeze(['recordsrecommended', 'recordssmallest']),
+	}),
+	Object.freeze({
+		capacity: 'compactionqualification',
+		quality: 'compactionendurance',
+		strategy: 'compaction',
+		profiles: Object.freeze(['compactionrecommended', 'compactionsmallest']),
+	}),
+])
+
+/** Pins the arm lists that schedule exactly one strategy, which a memory declaration admits. */
+export const STUDY_MEMORY_STRATEGY_ADMITTED = Object.freeze([
+	Object.freeze({ arms: Object.freeze(['records'] as const) }),
+	Object.freeze({ arms: Object.freeze(['records', 'full'] as const) }),
+	Object.freeze({ arms: Object.freeze(['full', 'records'] as const) }),
+	Object.freeze({ arms: Object.freeze(['compaction'] as const) }),
+	Object.freeze({ arms: Object.freeze(['compaction', 'full'] as const) }),
+	Object.freeze({ arms: Object.freeze(['full', 'compaction'] as const) }),
+])
+
+/** Pins the exact refusal each arm list that schedules both strategies or neither reads, for a declaration named `memory`. */
+export const STUDY_MEMORY_STRATEGY_REFUSALS = Object.freeze([
+	Object.freeze({
+		arms: Object.freeze(['records', 'compaction'] as const),
+		refusal:
+			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
+	}),
+	Object.freeze({
+		arms: Object.freeze(['compaction', 'records'] as const),
+		refusal:
+			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
+	}),
+	Object.freeze({
+		arms: Object.freeze(['records', 'compaction', 'full'] as const),
+		refusal:
+			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
+	}),
+	Object.freeze({
+		arms: Object.freeze(['full', 'compaction', 'records'] as const),
+		refusal:
+			'Memory declaration "memory" lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study',
+	}),
+	Object.freeze({
+		arms: Object.freeze(['full'] as const),
+		refusal:
+			'Memory declaration "memory" lists neither strategy in its arms; list one of records or compaction, with full as the only other arm',
+	}),
+	Object.freeze({
+		arms: Object.freeze([] as const),
+		refusal:
+			'Memory declaration "memory" lists neither strategy in its arms; list one of records or compaction, with full as the only other arm',
+	}),
+])
+
+/**
+ * Lists the declarations under the root `studies/` folder that select the memory driver.
+ * @returns Each such declaration's name, in sorted order.
+ * @throws Error - Rethrows a declaration Study cannot parse.
+ */
+export function collectMemoryDeclarations(): readonly string[] {
+	return readdirSync(resolve('studies'), { withFileTypes: true })
+		.filter(
+			(entry) => entry.isDirectory() && existsSync(resolve('studies', entry.name, 'study.json')),
+		)
+		.map((entry) =>
+			parseStudyDefinition(
+				parseJSON(readFileSync(resolve('studies', entry.name, 'study.json'), 'utf8')),
+			),
+		)
+		.filter((definition) => definition.driver === 'memory')
+		.map((definition) => definition.name)
+		.toSorted()
+}
+
+/**
+ * Reads an authored memory profile as a host runs it: a template's `REQUIRED_` provider takes the CPU fixture provider at `url`, and its settings take {@link STUDY_MEMORY_SETTINGS}, as `createStudyInstallFixture` fills it.
+ * @remarks The template declares no gauge, and the compaction arm requires an explicit one, so a host fills both.
+ * @param name - The profile's file stem under `studies/memory/profiles/`.
+ * @param url - The fixture origin a filled template names.
+ * @returns The parsed profile.
+ * @throws Error - Thrown when the file holds no provider record; rethrows a profile Study refuses.
+ */
+export function readMemoryProfile(name: string, url: string): StudyProfile {
+	const authored = parseJSON(
+		readFileSync(resolve('studies/memory/profiles', `${name}.json`), 'utf8'),
+	)
+	if (!isRecord(authored) || !isRecord(authored.provider))
+		throw new Error(`Missing memory profile provider ${name}`)
+	const template =
+		isString(authored.provider.entry) && authored.provider.entry.startsWith('REQUIRED_')
+	return parseStudyProfile(
+		template
+			? {
+					...authored,
+					provider: buildMemoryProfile({ url }).provider,
+					settings: STUDY_MEMORY_SETTINGS,
+				}
+			: authored,
+	)
 }
 
 /** Reads actual tool-result strings from recorded Ollama chat request bytes.
@@ -1904,54 +2074,6 @@ export interface MemoryTrialFixture {
 export interface MemoryRequestFixture {
 	readonly path: string
 	readonly body: string
-}
-/** Holds what one seated session needs to run one goal against recorded replies. */
-export interface MemorySeedFixture {
-	readonly arm: 'records' | 'compaction' | 'full'
-	readonly profile: StudyProfile
-	readonly seed: JSONValue
-	readonly goal: StudyGoal
-	readonly replies: readonly MemoryWireFixture[]
-	/** Holds the body served for each metadata path, keyed by that path. */
-	readonly metadata: Readonly<Record<string, string>>
-}
-/** Holds one request of a seated goal that differs from its recording. */
-export interface MemorySeedDifference {
-	/** Names the seated goal. */
-	readonly goal: string
-	/** Holds the recorded exchange's ordinal; undefined when the seated run sent a request the recording does not hold. */
-	readonly ordinal: number | undefined
-	readonly role: StudyRole | undefined
-	/** Holds the first differing byte; 0 when one side holds no request at that position. */
-	readonly offset: number
-}
-/** Holds a sealed segment's comparison of its own recording with each seated checkpoint. */
-export interface MemorySeedResult {
-	/** Counts the checkpoints whose next goal the result holds. */
-	readonly compared: number
-	/** Counts those whose first agent request equals its recording, byte for byte. */
-	readonly equal: number
-	/** Counts those whose control run sent a chat and whose every chat differs from the first agent request, once the newest seated message that request renders is replaced. */
-	readonly control: number
-	/** Counts those whose every served request equals its recording. */
-	readonly whole: number
-	/** Lists each differing request, for reading a difference past the first agent request. */
-	readonly differences: readonly MemorySeedDifference[]
-}
-/** Holds what a seeded chain executed and where. */
-export interface MemorySeedChainFixture {
-	readonly trial: string
-	readonly profile: StudyProfile
-	readonly first: string
-	readonly second: string
-	/** Holds the first segment's command result. */
-	readonly opened: StudyInstallResult
-	/** Holds the seeded segment's command result. */
-	readonly seeded: StudyInstallResult
-	/** Counts the requests the fixture took once the first segment ended. */
-	readonly boundary: number
-	/** Counts the requests the fixture took once both segments ended. */
-	readonly sent: number
 }
 /** Holds the shared recording an install file's setup makes once, and what made it. */
 export interface MemoryRecordingFixture {
@@ -2580,19 +2702,19 @@ export function buildMemoryCapture(
 }
 
 /**
- * Writes a profile that declares recording beside a scratch workspace's local profile, keeping the local profile's other members and leaving it unchanged.
+ * Writes a profile that declares recording beside a scratch workspace's `recordslocal` profile, keeping that profile's other members and leaving it unchanged.
  * @param scratch - The workspace `createStudyInstallFixture` populated.
  * @param name - The written profile's name, which names its file.
  * @param checkpoints - The goal ids to list. Default: none.
  * @returns Nothing after the profile is written.
- * @throws Error - Thrown when the workspace holds no authored local profile.
+ * @throws Error - Thrown when the workspace holds no authored `recordslocal` profile.
  */
 export function writeStudyInstallRecord(
 	scratch: ScratchInterface,
 	name: string,
 	checkpoints: readonly string[] = [],
 ): void {
-	const raw = parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')
+	const raw = parseJSON(scratch.read('studies/memory/profiles/recordslocal.json') ?? '')
 	if (!isRecord(raw)) throw new Error('Missing authored memory profile')
 	scratch.write(
 		`studies/memory/profiles/${name}.json`,
@@ -2628,21 +2750,6 @@ export function countMemoryPairs(requests: MemoryTrialResult['requests']): numbe
 	).length
 }
 
-/**
- * Waits until this process holds no listening server.
- * @remarks
- * A closed server stays on the active list for a host-chosen number of loop turns after `close` resolves, so one read can see a closing handle.
- * @returns Completion once the active list holds none.
- * @throws Error - Thrown when a server still listens at the end of the budget.
- */
-export function waitForMemoryListeners(): Promise<void> {
-	return waitForCondition(
-		'no listening server',
-		() => !process.getActiveResourcesInfo().includes('TCPServerWrap'),
-		{ budget: 10000 },
-	)
-}
-
 /** Pins a four-goal trajectory, so a session seeded after the second goal has two goals to run. */
 export const STUDY_MEMORY_SEED_GOALS: readonly StudyGoal[] = Object.freeze([
 	...STUDY_MEMORY_OBSERVATION_GOALS,
@@ -2662,9 +2769,6 @@ export const STUDY_MEMORY_SEED_SETTINGS = Object.freeze({
 	observe: true,
 	checkpoints: Object.freeze(STUDY_MEMORY_SEED_GOALS.map((goal) => goal.id)),
 })
-
-/** Pins the text that replaces the newest seated message a comparand renders, so the comparison can fail. */
-export const STUDY_MEMORY_SEED_SENTINEL = 'A control sentence no goal holds.'
 
 /** Pins one goal's rows, so each progress cell has a hand count: metadata and judge dispatches ahead of the agent's, and a denial of another reason. */
 export const STUDY_MEMORY_PROGRESS_ROWS: readonly StudyEvidence[] = Object.freeze(
@@ -2746,9 +2850,7 @@ export const STUDY_MEMORY_PROGRESS_ROWS: readonly StudyEvidence[] = Object.freez
  * @param arm - The treatment.
  * @returns The script; the later goals take the fixture's default replies.
  */
-export function buildMemorySeedResponses(
-	arm: MemorySeedFixture['arm'],
-): readonly MemoryWireFixture[] {
+export function buildMemorySeedResponses(arm: StudyMemoryArm): readonly MemoryWireFixture[] {
 	return [
 		...(arm === 'records' ? STUDY_MEMORY_CALIBRATION : []),
 		buildMemoryCall('lookup', { id: 'order-1' }),
@@ -2790,26 +2892,6 @@ export function readMemorySealedCheckpoint(
 	const value = parseJSON(text)
 	if (!isJSONValue(value)) throw new Error(`The ${goal} checkpoint is not a JSON value`)
 	return value
-}
-
-/**
- * Reads the state text of each judge request, ignoring every other path.
- * @param requests - Requests in arrival order.
- * @returns The text between the state markers of each `/api/generate` prompt, in arrival order.
- * @throws Error - Thrown when a generate body holds no such text, so a negative read cannot pass on a skipped body.
- */
-export function readMemoryJudgeStates(
-	requests: readonly MemoryRequestFixture[],
-): readonly string[] {
-	return requests
-		.filter((request) => request.path === '/api/generate')
-		.map((request) => {
-			const body = parseJSON(request.body)
-			const prompt = isRecord(body) ? body.prompt : undefined
-			const state = isString(prompt) ? /<state>\n(.*?)\n<\/state>/su.exec(prompt)?.[1] : undefined
-			if (state === undefined) throw new Error(`A judge request holds no state: ${request.body}`)
-			return state
-		})
 }
 
 /**
@@ -2861,243 +2943,6 @@ export function buildMemorySeedLedger(
 }
 
 /**
- * Builds a checkpoint whose newest conversation message the comparand renders holds {@link STUDY_MEMORY_SEED_SENTINEL}, on either arm's state member.
- * @remarks
- * The comparand is JSON text, so a content renders when its JSON-escaped form occurs there. An empty
- * or non-string content never does, because an empty string occurs in every body and a tool-call
- * message holds empty content.
- * @param value - A checkpoint.
- * @param comparand - The decoded body of the request the seated session reproduces.
- * @returns The owned changed value.
- * @throws Error - Thrown when the value holds no conversation, or the comparand renders none of its messages.
- */
-export function buildMemorySeedControl(value: JSONValue, comparand: string): JSONValue {
-	if (!isRecord(value)) throw new Error('Missing checkpoint')
-	const state = isRecord(value.ledger) ? value.ledger : value
-	const conversation = state.conversation
-	if (!isRecord(conversation) || !isArray(conversation.messages))
-		throw new Error('Missing checkpoint conversation')
-	const index = conversation.messages.findLastIndex(
-		(message) =>
-			isRecord(message) &&
-			isString(message.content) &&
-			message.content !== '' &&
-			comparand.includes(JSON.stringify(message.content).slice(1, -1)),
-	)
-	const selected: unknown = conversation.messages[index]
-	if (!isRecord(selected)) throw new Error('The comparand renders no checkpoint message')
-	const replaced = {
-		...conversation,
-		messages: conversation.messages.with(index, {
-			...selected,
-			content: STUDY_MEMORY_SEED_SENTINEL,
-		}),
-	}
-	return cloneJSONValue(
-		parseJSON(
-			JSON.stringify(
-				isRecord(value.ledger)
-					? { ...value, ledger: { ...value.ledger, conversation: replaced } }
-					: { ...value, conversation: replaced },
-			),
-		),
-	)
-}
-
-/**
- * Finds the first byte two bodies differ at.
- * @param left - One body.
- * @param right - The other body.
- * @returns The offset, or `undefined` when they are equal.
- */
-export function findMemoryOffset(left: Uint8Array, right: Uint8Array): number | undefined {
-	const [longer, shorter] = left.byteLength >= right.byteLength ? [left, right] : [right, left]
-	const offset = longer.findIndex((byte, index) => byte !== shorter[index])
-	return offset === -1 ? undefined : offset
-}
-
-/**
- * Reports whether a control run's every chat request differs from the comparand.
- * @remarks
- * Changing a judged message re-asks its question, which moves only `/api/generate`, and a fold's
- * summary chat sits ahead of the agent's request, so no position is read. An absent chat reads false.
- * @param expected - The comparand's bytes.
- * @param requests - The control run's requests in arrival order.
- * @returns True if the run sent a chat and none equals the comparand; false otherwise.
- */
-export function readMemoryControl(
-	expected: Uint8Array,
-	requests: readonly MemoryRequestFixture[],
-): boolean {
-	const chats = requests.filter((request) => request.path === '/api/chat')
-	return (
-		chats.length > 0 &&
-		chats.every(
-			(request) => findMemoryOffset(expected, Buffer.from(request.body, 'utf8')) !== undefined,
-		)
-	)
-}
-
-/**
- * Lists each request of a seated goal that differs from its recording, position by position.
- * @param goal - The seated goal.
- * @param recorded - The goal's recorded attempts.
- * @param seated - The requests the seated session sent.
- * @returns One entry per differing position, with offset 0 where one side holds no request.
- */
-export function listMemorySeedDifferences(
-	goal: string,
-	recorded: readonly StudyExchangeAttempt[],
-	seated: readonly MemoryRequestFixture[],
-): readonly MemorySeedDifference[] {
-	return Array.from({ length: Math.max(recorded.length, seated.length) }).flatMap((_, at) => {
-		const attempt = recorded[at]
-		const request = seated[at]
-		const offset =
-			attempt === undefined || request === undefined
-				? 0
-				: findMemoryOffset(Buffer.from(attempt.body, 'base64'), Buffer.from(request.body, 'utf8'))
-		return offset === undefined
-			? []
-			: [{ goal, ordinal: attempt?.ordinal, role: attempt?.role, offset }]
-	})
-}
-
-/**
- * Opens a session on a checkpoint and runs one goal against a fresh loopback fixture.
- * @remarks
- * The fixture replaces the profile's provider URL, and neither `provider.daemon` nor `record` reaches
- * the driver, so no daemon starts and no recording opens.
- * @param options - The arm, profile, checkpoint value, goal, replies, and metadata bodies.
- * @returns The goal's `/api/chat` and `/api/generate` requests in arrival order.
- * @throws Error - Rethrows a refused seed or a goal failure, after closing the session and the fixture.
- */
-export async function readMemorySeedRequests(
-	options: MemorySeedFixture,
-): Promise<readonly MemoryRequestFixture[]> {
-	const declared = options.profile.provider
-	if (declared === undefined) throw new Error('Missing seed provider')
-	const server = await createMemoryServer(options.replies, options.metadata)
-	// A JSON copy drops both members, which `exactOptionalPropertyTypes` holds no undefined for.
-	const profile = parseStudyProfile(
-		parseJSON(
-			JSON.stringify({
-				...options.profile,
-				provider: { ...declared, url: server.url, daemon: undefined },
-				record: undefined,
-			}),
-		),
-	)
-	const fixture = createMemoryContext(profile)
-	try {
-		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
-			{ id: 'seed', scenario: 'public', arm: options.arm, repetition: 0 },
-			fixture.context.signal,
-			options.seed,
-		)
-		try {
-			await session.execute(options.goal, fixture.context)
-		} finally {
-			await session.close()
-		}
-		return server.requests.filter(
-			(request) => request.path === '/api/chat' || request.path === '/api/generate',
-		)
-	} finally {
-		fixture.close()
-		await server.close()
-	}
-}
-
-/**
- * Compares a sealed segment's own recording with each checkpoint it holds, seated and served the recorded replies.
- * @remarks
- * A records goal's first agent request depends on its judge replies, so the recorded replies are
- * served. The comparand is the next goal's first `agent` attempt at `execution`; a request of another
- * role is served and read only into `whole` and `differences`. The control seats the newest message
- * the comparand renders with the sentinel, and reads every chat of its run.
- * @param directory - The sealed result, which holds one trial.
- * @param profile - The profile the segment ran under.
- * @returns The counts and the differences.
- * @throws Error - Thrown when the result is not one sealed trial of a memory arm, a next goal holds no agent attempt, or its comparand renders no seated message.
- */
-export async function compareMemorySeed(
-	directory: string,
-	profile: StudyProfile,
-): Promise<MemorySeedResult> {
-	const result = await readStudyResult(directory)
-	if (result.status !== 'sealed') throw new Error('The seed comparison reads a sealed result')
-	const [trial, ...others] = result.manifest.schedule
-	if (trial === undefined || others.length > 0)
-		throw new Error('The seed comparison reads one trial')
-	const { arm } = trial
-	if (!isStudyMemoryArm(arm)) throw new Error(`Unsupported memory arm ${arm}`)
-	const goals = result.manifest.scenarios.find((scenario) => scenario.id === trial.scenario)?.goals
-	if (goals === undefined) throw new Error('The sealed trial names no scenario')
-	const evidence = (await collectStudyEvidence(result))[trial.id] ?? []
-	const { exchanges } = await readStudyExchanges(result, trial.id)
-	const metadata = new Map<string, string>()
-	for (const { attempt, response } of exchanges)
-		if (attempt.role === 'metadata' && !metadata.has(attempt.path))
-			metadata.set(attempt.path, Buffer.from(response.body, 'base64').toString('utf8'))
-	const readings: Array<{
-		readonly equal: boolean
-		readonly control: boolean
-		readonly differences: readonly MemorySeedDifference[]
-	}> = []
-	for (const [index, goal] of goals.entries()) {
-		const next = goals[index + 1]
-		const row = evidence.find(
-			(entry) => entry.event === STUDY_CHECKPOINT_EVENT && entry.goal === goal.id,
-		)
-		if (next === undefined || row === undefined) continue
-		const recorded = exchanges.filter(
-			({ attempt }) =>
-				attempt.goal === next.id &&
-				attempt.stage === 'execution' &&
-				(attempt.path === '/api/chat' || attempt.path === '/api/generate'),
-		)
-		const position = recorded.findIndex(({ attempt }) => attempt.role === 'agent')
-		const comparand = recorded[position]
-		if (comparand === undefined) throw new Error(`Goal ${next.id} recorded no agent attempt`)
-		const seat = {
-			arm,
-			profile,
-			goal: next,
-			replies: recorded.map(({ attempt, response }) => ({
-				path: attempt.path,
-				status: response.status,
-				body: Buffer.from(response.body, 'base64').toString('utf8'),
-			})),
-			metadata: Object.fromEntries(metadata),
-		}
-		const expected = Buffer.from(comparand.attempt.body, 'base64')
-		const seated = await readMemorySeedRequests({ ...seat, seed: row.value })
-		const control = await readMemorySeedRequests({
-			...seat,
-			seed: buildMemorySeedControl(row.value, expected.toString('utf8')),
-		})
-		readings.push({
-			equal:
-				findMemoryOffset(expected, Buffer.from(seated[position]?.body ?? '', 'utf8')) === undefined,
-			control: readMemoryControl(expected, control),
-			differences: listMemorySeedDifferences(
-				next.id,
-				recorded.map((exchange) => exchange.attempt),
-				seated,
-			),
-		})
-	}
-	return {
-		compared: readings.length,
-		equal: readings.filter((entry) => entry.equal).length,
-		control: readings.filter((entry) => entry.control).length,
-		whole: readings.filter((entry) => entry.differences.length === 0).length,
-		differences: readings.flatMap((entry) => entry.differences),
-	}
-}
-
-/**
  * Reads each listed goal's adapter reading from a `study progress` document.
  * @param stdout - The command's standard output.
  * @returns The readings of the document's first trial, by goal, in listed order.
@@ -3134,10 +2979,10 @@ export function readMemoryTrials(stdout: string): ReadonlyMap<string, string> {
 }
 
 /**
- * Records the shared segment of an install fixture's `capacity` target, as an operator does: the schedule's check, the selection's check, then the execution of the arguments that check returns.
+ * Records the shared segment of an install fixture's `recordscapacity` target, as an operator does: the schedule's check, the selection's check, then the execution of the arguments that check returns.
  * @remarks
  * The segment is the first `records` trial's `opening..correction`, under the `recorded` profile, which
- * declares recording and lists every goal in `checkpoints`. The local profile stays unchanged.
+ * declares recording and lists every goal in `checkpoints`. The `recordslocal` profile stays unchanged.
  * @param fixture - The installed command.
  * @param server - The loopback provider; only this call sends to it while it runs.
  * @param output - The result directory.
@@ -3156,7 +3001,7 @@ export async function executeMemoryRecording(
 	const start = server.requests.length
 	const scheduled = await executeStudyInstall(fixture, [
 		'check',
-		'capacity',
+		'recordscapacity',
 		'--profile',
 		profile.name,
 	])
@@ -3166,7 +3011,7 @@ export async function executeMemoryRecording(
 	if (trial === undefined) throw new Error('No records trial is scheduled')
 	const selected = await executeStudyInstall(fixture, [
 		'check',
-		'capacity',
+		'recordscapacity',
 		'--profile',
 		profile.name,
 		'--trial',
@@ -3193,70 +3038,9 @@ export async function executeMemoryRecording(
 }
 
 /**
- * Executes a seeded `closure..closure` segment of one arm's trial from the `correction` row of an `opening..correction` segment.
- * @remarks
- * The `records` arm seeds from the shared recording itself. Another arm first executes its own
- * `opening..correction` segment directly under the recording's profile. The seeded segment executes
- * directly too, since every execution checks first.
- * @param fixture - The installed command.
- * @param server - The loopback provider; only this call sends to it while it runs.
- * @param recording - The shared recording, whose profile and schedule the chain reads.
- * @param arm - The arm whose first scheduled trial runs.
- * @param directory - The folder that holds the chain's own results; it is created when absent.
- * @returns The trial, the profile, both segments, both commands, and the request counts at the boundary and at the end.
- * @throws Error - Thrown when the recording schedules no trial of the arm.
- */
-export async function executeMemorySeedChain(
-	fixture: StudyInstallFixture,
-	server: MemoryServerFixture,
-	recording: MemoryRecordingFixture,
-	arm: MemorySeedFixture['arm'],
-	directory: string,
-): Promise<MemorySeedChainFixture> {
-	const trial = recording.trials.get(arm)
-	if (trial === undefined) throw new Error(`No ${arm} trial is scheduled`)
-	mkdirSync(directory, { recursive: true })
-	const execute = ['execute', 'capacity', '--profile', recording.profile.name, '--trial', trial]
-	const first = arm === 'records' ? recording.path : join(directory, 'first')
-	const second = join(directory, 'second')
-	const opened =
-		arm === 'records'
-			? recording.executed
-			: await executeStudyInstall(
-					fixture,
-					[...execute, '--goals', 'opening..correction', '--out', first],
-					260000,
-				)
-	const boundary = server.requests.length
-	const seeded = await executeStudyInstall(
-		fixture,
-		[
-			...execute,
-			'--goals',
-			'closure..closure',
-			'--seed',
-			`${first}:${trial}:correction`,
-			'--out',
-			second,
-		],
-		260000,
-	)
-	return {
-		trial,
-		profile: recording.profile,
-		first,
-		second,
-		opened,
-		seeded,
-		boundary,
-		sent: server.requests.length,
-	}
-}
-
-/**
  * Builds a file's one install fixture against its own loopback provider, and makes its shared recording.
  * @remarks
- * Every case of the file reads this one install. The local profile stays as `createStudyInstallFixture`
+ * Every case of the file reads this one install. The `recordslocal` profile stays as `createStudyInstallFixture`
  * wrote it, and the recording writes its own `recorded` profile beside it.
  * @param prefix - The scratch directory's prefix.
  * @returns The scratch, the provider, the install, and the shared recording.
@@ -3520,7 +3304,7 @@ export async function createMemoryRouteServer(count = 1): Promise<MemoryServerFi
 	return server
 }
 
-/** Holds an append-only horizon for the installed triage continuation proof. */
+/** Holds a horizon of triage goals, each releasing one arrival, for proofs that span goals of one trial. */
 export const MEMORY_TRIAGE_GOALS: readonly StudyGoal[] = Object.freeze([
 	MEMORY_TRIAGE_GOAL,
 	{
@@ -3846,138 +3630,6 @@ export function buildMemoryReplayEvidence(
 			value: checkpoint,
 		},
 	]
-}
-
-/** Names the profile the triage writers declare beside the local one. */
-export const MEMORY_TRIAGE_PROFILE = 'triage'
-
-/** Writes a complete schedule and a recording profile with a provider-owned triage pin, without selecting a trial or goal range. */
-export function writeMemoryTriageInstall(fixture: StudyInstallFixture): void {
-	const { scratch } = fixture
-	writeStudyInstallRecord(
-		scratch,
-		MEMORY_TRIAGE_PROFILE,
-		MEMORY_TRIAGE_GOALS.slice(0, 2).map((goal) => goal.id),
-	)
-	const path = `studies/memory/profiles/${MEMORY_TRIAGE_PROFILE}.json`
-	const profile = parseStudyProfile(parseJSON(scratch.read(path) ?? ''))
-	if (profile.provider === undefined) throw new Error('Missing fixture provider')
-	scratch.write(
-		path,
-		JSON.stringify({
-			...profile,
-			provider: {
-				...profile.provider,
-				triage: 'model',
-				digest: { ...profile.provider.digest, triage: 'a'.repeat(64) },
-			},
-		}),
-	)
-	scratch.write(
-		'studies/capacity/study.json',
-		JSON.stringify({
-			name: 'capacity',
-			version: '1',
-			question: 'Does the triage transport retain a reused session?',
-			purpose: 'capacity',
-			driver: 'memory',
-			arms: ['records'],
-			scenarios: ['handoff'],
-			order: [['records']],
-			retries: 0,
-			rubric: 'rubric.json',
-		}),
-	)
-	writeMemoryTriageHorizon(scratch, 2)
-}
-
-/** Grows the fixture's declared horizon and its independent operational criteria together. */
-export function writeMemoryTriageHorizon(scratch: ScratchInterface, count: number): void {
-	const goals = MEMORY_TRIAGE_GOALS.slice(0, count)
-	scratch.write(
-		'studies/capacity/rubric.json',
-		JSON.stringify({
-			version: '1',
-			criteria: goals.map((goal) => ({
-				id: goal.id,
-				scenario: 'handoff',
-				goal: goal.id,
-				method: 'state',
-				critical: true,
-				assertion: { observation: 'operational' },
-			})),
-		}),
-	)
-	scratch.write('studies/memory/scenarios/handoff.json', JSON.stringify({ id: 'handoff', goals }))
-}
-
-/** Declares, on the triage profile, a pinned Node protocol daemon that Study owns, forwarding only to a scripted loopback server. */
-export async function writeMemoryTriageDaemon(
-	fixture: StudyInstallFixture,
-	upstream: string,
-): Promise<void> {
-	const reservation = await createMemoryServer()
-	const url = reservation.url
-	await reservation.close()
-	if (Number(new URL(url).port) <= 40000 || Number(new URL(upstream).port) <= 40000)
-		throw new Error('Dedicated fixture ports above 40000 are required')
-	fixture.scratch.write('daemon.ts', renderMemoryTriageDaemon())
-	const path = `studies/memory/profiles/${MEMORY_TRIAGE_PROFILE}.json`
-	const profile = parseStudyProfile(parseJSON(fixture.scratch.read(path) ?? ''))
-	if (profile.provider === undefined) throw new Error('Missing provider')
-	fixture.scratch.write(
-		path,
-		JSON.stringify({
-			...profile,
-			provider: {
-				...profile.provider,
-				url,
-				daemon: {
-					executable: realpathSync(process.execPath),
-					environment: {
-						NODE_OPTIONS: `--experimental-strip-types --import=${pathToFileURL(join(fixture.scratch.path, 'daemon.ts')).href}`,
-						STUDY_FIXTURE_UPSTREAM: upstream,
-						STUDY_FIXTURE_PIDS: join(fixture.scratch.path, 'daemon-pids.jsonl'),
-					},
-					models: [
-						{ name: 'model', digest: 'a'.repeat(64) },
-						{ name: 'judge', digest: 'b'.repeat(64) },
-					],
-				},
-			},
-		}),
-	)
-}
-
-/** Renders the node:-only preload for Study's owned daemon; the manager launches and stops it. */
-export function renderMemoryTriageDaemon(): string {
-	return `import { createServer, request } from 'node:http'
-import { appendFileSync } from 'node:fs'
-const origin = new URL('http://' + process.env.OLLAMA_HOST)
-const upstream = new URL(process.env.STUDY_FIXTURE_UPSTREAM)
-if ([origin, upstream].some((url) => url.hostname !== '127.0.0.1' || Number(url.port) <= 40000)) throw new Error('Dedicated loopback ports required')
-appendFileSync(process.env.STUDY_FIXTURE_PIDS, JSON.stringify(process.pid) + '\\n')
-const server = createServer((incoming, outgoing) => {
-	const forward = request(new URL(incoming.url, upstream), { method: incoming.method, headers: incoming.headers }, (response) => {
-		outgoing.writeHead(response.statusCode, response.headers)
-		response.pipe(outgoing)
-	})
-	forward.on('error', (error) => outgoing.destroy(error))
-	incoming.pipe(forward)
-})
-server.listen(Number(origin.port), '127.0.0.1', () => process.stderr.write('Listening on ' + origin.host + ' (version fixture-1)\\n'))
-await new Promise(() => {})
-`
-}
-
-/** Checks that every process started by the scripted daemon has already been reaped by Study. */
-export function assertMemoryDaemonClosed(scratch: ScratchInterface): void {
-	const pids = decodeJSONLines(scratch.read('daemon-pids.jsonl') ?? '')
-	if (pids.length === 0) throw new Error('The owned daemon never started')
-	for (const pid of pids) {
-		if (!agent.isPositiveSafeInteger(pid)) throw new Error('Invalid daemon pid')
-		if (isRunning(pid)) throw new Error(`Owned daemon ${pid} survived execution`)
-	}
 }
 
 /** Varies each fixed-policy member independently for identity proofs. */

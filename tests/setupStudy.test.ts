@@ -22,8 +22,6 @@ import {
 	buildMemoryCapture,
 	buildMemoryCriterion,
 	buildMemoryRecordProfile,
-	buildMemorySeedControl,
-	buildMemorySeedResponses,
 	buildMemoryVerdict,
 	countMemoryPairs,
 	omitMemoryAuxiliaries,
@@ -37,19 +35,14 @@ import {
 	listMemoryKeys,
 	loadStudyToolsFixture,
 	readMemoryAdmission,
-	readMemoryCheckpoint,
-	readMemoryControl,
 	readMemoryControls,
 	readMemoryEvents,
-	readMemoryFirstChat,
-	readMemoryJudgeStates,
 	readMemoryModel,
 	readMemoryModels,
 	readMemoryOrigins,
 	readMemoryParts,
 	readMemorySealedCheckpoint,
 	readMemoryShapes,
-	readMemorySeedRequests,
 	readMemorySnapshot,
 	readMemoryTimeline,
 	createStudyInstallFixture,
@@ -61,22 +54,18 @@ import {
 	runMemoryFailure,
 	runMemoryTrial,
 	totalMemoryUsage,
-	waitForMemoryListeners,
 	writeStudyInstallRecord,
 	STUDY_MEMORY_CONTEXT_KEYS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
 	STUDY_MEMORY_INERT_EXCHANGES,
 	STUDY_MEMORY_INERT_REPLAY,
 	STUDY_MEMORY_MODULES,
-	STUDY_MEMORY_OBSERVATION_GOALS,
 	STUDY_MEMORY_OBSERVED_EVENTS,
 	STUDY_MEMORY_OBSERVED_KEYS,
 	STUDY_MEMORY_OPTION_KEYS,
 	STUDY_MEMORY_RECORD,
 	STUDY_MEMORY_REFUSAL_KEYS,
 	STUDY_MEMORY_REPLAY_REFUSAL,
-	STUDY_MEMORY_SEED_SENTINEL,
-	STUDY_MEMORY_SEED_SETTINGS,
 	STUDY_MEMORY_SETTINGS,
 	STUDY_MEMORY_SUMMARY_ROOM,
 	STUDY_MEMORY_TIMING,
@@ -484,10 +473,13 @@ describe('study install fixtures', () => {
 			}
 			const entry = join(scratch.path, 'dist/src/core/index.js')
 			expect(readFileSync(entry)).toEqual(readFileSync(resolve('dist/src/core/index.js')))
-			expect(parseJSON(scratch.read('studies/memory/profiles/local.json') ?? '')).toMatchObject({
+			expect(
+				parseJSON(scratch.read('studies/memory/profiles/recordslocal.json') ?? ''),
+			).toMatchObject({
+				name: 'recordslocal',
 				agent: entry,
 				subject: entry,
-				qualification: 'tmp/studies/memory-capacity',
+				qualification: 'tmp/studies/recordscapacity',
 				settings: { gauge: { scale: 1, overhead: 0 } },
 				bounds: {
 					request: { duration: 3000 },
@@ -668,91 +660,6 @@ describe('study install fixtures', () => {
 		}
 	})
 
-	it('serves a seat past its recorded replies on two real model names', async () => {
-		const [, second] = STUDY_MEMORY_OBSERVATION_GOALS
-		if (second === undefined) throw new Error('Missing second goal')
-		const run = await runMemoryTrial({
-			arm: 'records',
-			responses: buildMemorySeedResponses('records'),
-			goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
-			settings: STUDY_MEMORY_SEED_SETTINGS,
-		})
-		expect(run.failure).toBeUndefined()
-		const base = buildMemoryRecordProfile('http://127.0.0.1:1')
-		if (base.provider === undefined) throw new Error('Missing recording provider')
-		// A judgment matches on its judge's model, so this seat re-asks every seated question: only the chat is scripted.
-		const requests = await readMemorySeedRequests({
-			arm: 'records',
-			profile: {
-				...base,
-				settings: STUDY_MEMORY_SEED_SETTINGS,
-				provider: { ...base.provider, model: 'org/agent:q4', judge: 'org/judge:q4' },
-			},
-			seed: readMemoryCheckpoint(run.evidence, 'opening'),
-			goal: second,
-			replies: [
-				{
-					path: '/api/chat',
-					body: buildMemoryReply({ model: 'org/agent:q4', content: 'Corrected handoff' }),
-				},
-			],
-			metadata: {
-				'/api/tags': JSON.stringify({
-					models: [
-						{ name: 'org/agent:q4', digest: 'a'.repeat(64) },
-						{ name: 'org/judge:q4', digest: 'b'.repeat(64) },
-					],
-				}),
-			},
-		})
-		const models = readMemoryModels(requests)
-		expect(models.filter((model) => model === 'org/judge:q4').length).toBeGreaterThan(1)
-		expect(models.at(-1)).toBe('org/agent:q4')
-		await waitForMemoryListeners()
-	}, 60000)
-
-	it('reads the seeded requests', async () => {
-		const [, second] = STUDY_MEMORY_OBSERVATION_GOALS
-		if (second === undefined) throw new Error('Missing second goal')
-		// A closed origin stands in for the declared one, because the helper replaces it.
-		const profile = {
-			...buildMemoryRecordProfile('http://127.0.0.1:1'),
-			settings: STUDY_MEMORY_SEED_SETTINGS,
-		}
-		for (const arm of ['records', 'compaction'] as const) {
-			const run = await runMemoryTrial({
-				arm,
-				responses: buildMemorySeedResponses(arm),
-				goals: STUDY_MEMORY_OBSERVATION_GOALS.slice(0, 2),
-				settings: STUDY_MEMORY_SEED_SETTINGS,
-			})
-			expect(run.failure).toBeUndefined()
-			const expected = readMemoryFirstChat(run, second.id)
-			expect(expected).toBeDefined()
-			const requests = await readMemorySeedRequests({
-				arm,
-				profile,
-				seed: readMemoryCheckpoint(run.evidence, 'opening'),
-				goal: second,
-				replies: [{ path: '/api/chat', body: buildMemoryReply({ content: 'Corrected handoff' }) }],
-				metadata: {},
-			})
-			expect(requests.find((request) => request.path === '/api/chat')?.body).toBe(expected)
-			await waitForMemoryListeners()
-			await expect(
-				readMemorySeedRequests({
-					arm,
-					profile,
-					seed: { records: [], arrivals: [] },
-					goal: second,
-					replies: [],
-					metadata: {},
-				}),
-			).rejects.toMatchObject({ code: 'CONFIG' })
-			await waitForMemoryListeners()
-		}
-	}, 60000)
-
 	it('sorts a checkpoint as a sealed row', () => {
 		const evidence = [
 			{ event: 'checkpoint', goal: 'opening', value: { zone: { later: 1, early: 2 }, area: 3 } },
@@ -762,67 +669,6 @@ describe('study install fixtures', () => {
 			'{"area":3,"zone":{"early":2,"later":1}}',
 		)
 		expect(() => readMemorySealedCheckpoint(evidence, 'absent')).toThrow('Expected one absent')
-	})
-
-	it('seats a control the comparand renders', () => {
-		const quoted = 'He said "go"\nnow'
-		const messages = [
-			{ role: 'user', content: 'Older text' },
-			{ role: 'user', content: quoted },
-			{ role: 'assistant', content: 'Never rendered' },
-			{ role: 'assistant', content: '' },
-		]
-		const comparand = JSON.stringify({ messages: messages.slice(0, 2) })
-		const seated = [
-			{ role: 'user', content: 'Older text' },
-			{ role: 'user', content: STUDY_MEMORY_SEED_SENTINEL },
-			{ role: 'assistant', content: 'Never rendered' },
-			{ role: 'assistant', content: '' },
-		]
-		const held = { records: [], arrivals: [] }
-		const conversation = { id: 'c', messages }
-		const replaced = { id: 'c', messages: seated }
-		const direct = { ...held, conversation }
-		const nested = { ...held, ledger: { conversation } }
-		expect(buildMemorySeedControl(direct, comparand)).toEqual({ ...held, conversation: replaced })
-		expect(buildMemorySeedControl(nested, comparand)).toEqual({
-			...held,
-			ledger: { conversation: replaced },
-		})
-		const none = '{"messages":[]}'
-		const refused = /renders no checkpoint message/u
-		expect(() => buildMemorySeedControl(direct, none)).toThrow(refused)
-		expect(() => buildMemorySeedControl(nested, none)).toThrow(refused)
-	})
-
-	it('reads a control from a chat request', () => {
-		const expected = Buffer.from('equal', 'utf8')
-		const generate = { path: '/api/generate', body: 'equal' }
-		const equal = { path: '/api/chat', body: 'equal' }
-		const different = { path: '/api/chat', body: 'different' }
-		const summary = { path: '/api/chat', body: 'summary' }
-		expect(readMemoryControl(expected, [generate, different])).toBe(true)
-		expect(readMemoryControl(expected, [])).toBe(false)
-		expect(readMemoryControl(expected, [generate])).toBe(false)
-		expect(readMemoryControl(expected, [equal])).toBe(false)
-		expect(readMemoryControl(expected, [different])).toBe(true)
-		expect(readMemoryControl(expected, [summary, equal])).toBe(false)
-	})
-
-	it('reads the judge states', () => {
-		const prompt = '<|im_start|>user\n<state>\nuser: [Source a] Line\nnext\n</state>\nQuestion: Q'
-		expect(
-			readMemoryJudgeStates([
-				{ path: '/api/show', body: 'not parsed' },
-				{ path: '/api/generate', body: JSON.stringify({ prompt }) },
-				{ path: '/api/chat', body: JSON.stringify({ prompt }) },
-			]),
-		).toEqual(['user: [Source a] Line\nnext'])
-		expect(() =>
-			readMemoryJudgeStates([
-				{ path: '/api/generate', body: JSON.stringify({ prompt: 'No markers' }) },
-			]),
-		).toThrow('holds no state')
 	})
 
 	it('executes goals in order and stops at the first refusal, keeping the earlier products and the error itself', async () => {
@@ -927,9 +773,11 @@ describe('study install fixtures', () => {
 		}
 	})
 
-	it('leaves the authored local profile without settings', () => {
-		const authored = parseJSON(readFileSync('studies/memory/profiles/local.json', 'utf8'))
-		expect(authored).not.toHaveProperty('settings')
+	it('leaves the authored local profiles without settings', () => {
+		for (const name of ['recordslocal', 'compactionlocal'])
+			expect(
+				parseJSON(readFileSync(`studies/memory/profiles/${name}.json`, 'utf8')),
+			).not.toHaveProperty('settings')
 	})
 
 	it('emits supplied profile settings verbatim, including an explicit absence', () => {
@@ -1253,7 +1101,7 @@ describe('study install fixtures', () => {
 		expect(body.logprobs[0].top_logprobs).toContainEqual({ token: 'A', logprob: -8 })
 	})
 
-	it('declares recording on a built profile and on a profile written beside a scratch local one, keeping its other members', () => {
+	it('declares recording on a built profile and on a profile written beside a scratch records local one, keeping its other members', () => {
 		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
 		expect(profile.record).toEqual({ bytes: 4194304, calls: 256, duration: 60000 })
 		expect(profile.settings).toEqual({
@@ -1264,8 +1112,8 @@ describe('study install fixtures', () => {
 			expect(() => writeStudyInstallRecord(scratch, 'recorded')).toThrow(
 				'Missing authored memory profile',
 			)
-			const local = '{"name":"local","settings":{"a":1}}'
-			scratch.write('studies/memory/profiles/local.json', local)
+			const local = '{"name":"recordslocal","settings":{"a":1}}'
+			scratch.write('studies/memory/profiles/recordslocal.json', local)
 			writeStudyInstallRecord(scratch, 'recorded', ['opening'])
 			expect(parseJSON(scratch.read('studies/memory/profiles/recorded.json') ?? '')).toEqual({
 				name: 'recorded',
@@ -1277,7 +1125,7 @@ describe('study install fixtures', () => {
 					checkpoints: ['opening'],
 				},
 			})
-			expect(scratch.read('studies/memory/profiles/local.json')).toBe(local)
+			expect(scratch.read('studies/memory/profiles/recordslocal.json')).toBe(local)
 		} finally {
 			destroyScratch(scratch)
 		}

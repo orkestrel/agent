@@ -22,6 +22,7 @@ import {
 	STUDY_MEMORY_LOOKUPS,
 	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
+	validateStudyMemoryStrategy,
 } from '../../../studies/memory/index.js'
 import {
 	buildMemoryCriterion,
@@ -44,6 +45,8 @@ import {
 	STUDY_MEMORY_RECORD,
 	STUDY_MEMORY_PARAMETER_PINS,
 	STUDY_MEMORY_SETTINGS,
+	STUDY_MEMORY_STRATEGY_ADMITTED,
+	STUDY_MEMORY_STRATEGY_REFUSALS,
 } from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
@@ -144,6 +147,28 @@ describe('memory declaration and mechanical evidence', () => {
 				every,
 			),
 		).toThrow('Memory provider declaration is invalid')
+	})
+
+	it.each(STUDY_MEMORY_STRATEGY_ADMITTED)('admits the one strategy of arms $arms', ({ arms }) => {
+		expect(() => validateStudyMemoryStrategy('memory', arms)).not.toThrow()
+	})
+
+	it.each(STUDY_MEMORY_STRATEGY_REFUSALS)(
+		'refuses arms $arms with its exact correction',
+		({ arms, refusal }) => {
+			expect(() => validateStudyMemoryStrategy('memory', arms)).toThrow(
+				expect.objectContaining({ code: 'CONFIG', message: refusal }),
+			)
+		},
+	)
+
+	it('encodes and caps the declaration name a strategy refusal names', () => {
+		expect(() => validateStudyMemoryStrategy('say "hi"\nnow', ['records', 'compaction'])).toThrow(
+			'Memory declaration "say \\"hi\\"\\nnow" lists both strategies',
+		)
+		expect(() => validateStudyMemoryStrategy('x'.repeat(200), ['full'])).toThrow(
+			`Memory declaration "${'x'.repeat(62)}… lists neither strategy`,
+		)
 	})
 
 	it('requires a judge only for the records arm and a recap only for the compaction arm', () => {

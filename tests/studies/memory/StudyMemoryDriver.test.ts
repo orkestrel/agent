@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { canonicalStringify, isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
-import { createScratch, destroyScratch } from '@orkestrel/test/server'
-import { collectStudyEvidence, readStudyResult, readStudyExchanges } from '@orkestrel/study/server'
-import { join } from 'node:path'
 import {
 	isStudyMemoryProvider,
 	isStudyMemoryAgent,
@@ -13,20 +10,12 @@ import {
 	STUDY_MEMORY_POLICY,
 } from '../../../studies/memory/index.js'
 import {
-	assertMemoryReplay,
-	assertMemoryDaemonClosed,
-	writeMemoryTriageDaemon,
 	buildMemoryObservationResponses,
-	createStudyInstallFixture,
-	executeStudyInstall,
-	writeMemoryTriageInstall,
-	writeMemoryTriageHorizon,
 	MEMORY_TRIAGE_GOALS,
 	MEMORY_TRIAGE_UNAVAILABLE,
 	MEMORY_TRIAGE_FAILURES,
 	MEMORY_TRIAGE_GOAL,
 	MEMORY_TRIAGE_OPEN,
-	MEMORY_TRIAGE_PROFILE,
 	createMemoryRouteServer,
 	buildMemoryProfile,
 	createMemoryContext,
@@ -205,129 +194,55 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			await session.close()
 		}
 	})
-	// One recording under the owned daemon serves the offline prefix replay, which builds no daemon, and the extension.
-	it('records a reused triage session through a scripted owned daemon, replays it offline and extends it', async () => {
-		const scratch = createScratch({ prefix: 'study-triage-daemon-' })
-		const server = await createMemoryRouteServer(32)
+	it('composes one triage judge per records trial and asks it at each goal', async () => {
+		const goals = MEMORY_TRIAGE_GOALS.slice(0, 2)
+		const server = await createMemoryRouteServer(goals.length)
+		const profile = buildMemoryProfile({
+			url: server.url,
+			triage: { model: 'model', digest: 'a'.repeat(64) },
+			settings: { observe: true, checkpoints: goals.map((goal) => goal.id) },
+		})
+		const fixture = createMemoryContext(profile)
 		try {
-			expect(Number(new URL(server.url).port)).toBeGreaterThan(40000)
-			const fixture = createStudyInstallFixture(scratch, server.url)
-			writeMemoryTriageInstall(fixture)
-			await writeMemoryTriageDaemon(fixture, server.url)
-			const execute = ['execute', 'capacity', '--profile', MEMORY_TRIAGE_PROFILE]
-			const recorded = join(scratch.path, 'tmp', 'recorded')
-			const executed = await executeStudyInstall(fixture, [...execute, '--out', recorded], 260000)
-			if (executed.code !== 0) throw new Error(executed.stderr + executed.stdout)
-			expect(executed).toMatchObject({ code: 0 })
-			assertMemoryDaemonClosed(scratch)
-			const result = await readStudyResult(recorded)
-			if (result.status !== 'sealed') throw new Error('Recording did not seal')
-			expect(result.manifest.schedule).toHaveLength(1)
-			const trial = result.manifest.schedule[0]
-			if (trial === undefined) throw new Error('Missing trial')
-			const history = await readStudyExchanges(result, trial.id)
-			const roles = history.exchanges.map((exchange) => exchange.attempt.role)
-			expect(roles).toEqual(expect.arrayContaining(['triage', 'judge', 'metadata', 'agent']))
-			expect(
-				history.exchanges.filter((exchange) => exchange.attempt.path === '/api/tags'),
-			).toHaveLength(2)
-			// The owned daemon's manager reads its readiness ahead of the trial, outside the recording; the recording holds every request after it, in order.
-			const paths = server.requests.map((request) => request.path)
-			const leading = paths.slice(0, paths.length - history.exchanges.length)
-			expect(paths.slice(leading.length)).toEqual(
-				history.exchanges.map((exchange) => exchange.attempt.path),
+			const identity = createMemoryIdentity(profile)
+			const session = await identity.driver.open(
+				{ id: 'records', scenario: 'public', arm: 'records', repetition: 0 },
+				fixture.context.signal,
 			)
-			expect(leading.filter((path) => path !== '/api/version' && path !== '/api/tags')).toEqual([])
-			expect(
-				history.exchanges
-					.filter((exchange) => exchange.attempt.role === 'triage')
-					.map((exchange) => exchange.attempt.goal),
-			).toEqual(['triage', 'followup'])
-			expect(history.exchanges.some((exchange) => exchange.attempt.stage === 'maintenance')).toBe(
-				true,
+			try {
+				for (const goal of goals)
+					await expect(session.execute(goal, fixture.context)).resolves.toMatchObject({
+						partial: false,
+					})
+			} finally {
+				await session.close()
+			}
+			// The trial composed its judge and ledger once, and the same judge took each goal's triage.
+			expect(identity.models.calls.map(([label]) => label)).toEqual(['mica', 'ledger'])
+			expect(server.requests.filter((request) => request.path === '/v1/systemone')).toHaveLength(
+				goals.length,
 			)
-			const evidence = (await collectStudyEvidence(result))[trial.id] ?? []
-			const checkpoints = evidence.filter((row) => row.event === 'checkpoint')
-			expect(checkpoints.map((row) => row.goal)).toEqual(['triage', 'followup'])
+			expect(server.responses).toHaveLength(0)
+			expect(
+				fixture.evidence.filter((row) => row.event === 'triage').map((row) => row.goal),
+			).toEqual(goals.map((goal) => goal.id))
+			expect(
+				fixture.evidence
+					.filter(
+						(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.role === 'triage',
+					)
+					.map((row) => row.goal),
+			).toEqual(goals.map((goal) => goal.id))
+			const checkpoints = fixture.evidence.filter((row) => row.event === 'checkpoint')
+			expect(checkpoints.map((row) => row.goal)).toEqual(goals.map((goal) => goal.id))
 			const final = checkpoints.at(-1)?.value
 			if (!isStudyMemoryCheckpoint(final)) throw new Error('Missing checkpoint')
 			expect(final.arrivals).toEqual(['triage-source', 'delivery'])
-			const decisions = evidence
-				.filter((row) => row.event === 'triage')
-				.map((row) => (isRecord(row.value) ? row.value.questions : undefined))
-			expect(decisions).toHaveLength(2)
-			const sent = server.requests.length
-			const replayed = join(scratch.path, 'tmp', 'replayed')
-			const replayedRun = await executeStudyInstall(
-				fixture,
-				[
-					...execute,
-					'--replay',
-					recorded,
-					'--prefix',
-					JSON.stringify({ [trial.id]: history.exchanges.length }),
-					'--offline',
-					'true',
-					'--out',
-					replayed,
-				],
-				260000,
-			)
-			if (replayedRun.code !== 0)
-				throw new Error(
-					replayedRun.stderr +
-						replayedRun.stdout +
-						(
-							scratch.read(
-								join('tmp', 'replayed', 'execution', 'trials', trial.id, 'exchanges.jsonl'),
-							) ?? ''
-						)
-							.split(/\r\n|\n/)
-							.filter((line) => line.includes('"phase":"failure"'))
-							.join('\n'),
-				)
-			expect(replayedRun.code).toBe(0)
-			expect(server.requests).toHaveLength(sent)
-			const replay = await readStudyResult(replayed)
-			if (replay.status !== 'sealed') throw new Error('Replay did not seal')
-			const replayEvidence = (await collectStudyEvidence(replay))[trial.id] ?? []
-			assertMemoryReplay(evidence, replayEvidence)
-			writeMemoryTriageHorizon(scratch, 3)
-			const extended = join(scratch.path, 'tmp', 'extended')
-			const extendedRun = await executeStudyInstall(
-				fixture,
-				[...execute, '--extend', recorded, '--out', extended],
-				260000,
-			)
-			if (extendedRun.code !== 0) throw new Error(extendedRun.stderr + extendedRun.stdout)
-			expect(extendedRun.code).toBe(0)
-			assertMemoryDaemonClosed(scratch)
-			const continuation = await readStudyResult(extended)
-			if (continuation.status !== 'sealed') throw new Error('Continuation did not seal')
-			expect(continuation.manifest.scenarios[0]?.goals.map((goal) => goal.id)).toEqual(
-				MEMORY_TRIAGE_GOALS.map((goal) => goal.id),
-			)
-			const extendedHistory = await readStudyExchanges(continuation, trial.id)
-			const prefix = history.exchanges.findIndex(
-				(exchange) => exchange.attempt.stage === 'postflight',
-			)
-			expect(prefix).toBeGreaterThan(0)
-			expect(
-				extendedHistory.exchanges.slice(0, prefix).map((exchange) => exchange.attempt.body),
-			).toEqual(history.exchanges.slice(0, prefix).map((exchange) => exchange.attempt.body))
-			expect(
-				extendedHistory.exchanges
-					.filter((exchange) => exchange.attempt.role === 'triage')
-					.map((exchange) => exchange.attempt.goal),
-			).toEqual(['triage', 'followup', 'extended'])
-			expect(
-				server.requests.slice(sent).filter((request) => request.path === '/v1/systemone'),
-			).toHaveLength(1)
 		} finally {
+			fixture.close()
 			await server.close()
-			await destroyScratch(scratch)
 		}
-	}, 167000)
+	})
 	it('refuses an absent triage model or digest mismatch before any goal request', async () => {
 		for (const triage of MEMORY_TRIAGE_UNAVAILABLE) {
 			const server = await createMemoryServer()

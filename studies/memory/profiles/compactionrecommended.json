@@ -1,5 +1,5 @@
 {
-	"name": "smallest",
+	"name": "compactionrecommended",
 	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [
@@ -25,14 +25,16 @@
 	"provider": {
 		"entry": "node_modules/@orkestrel/ollama/dist/src/core/index.js",
 		"url": "http://127.0.0.1:11434",
-		"model": "qwen3.5:2b-q4_K_M",
+		"model": "qwen3.5:4b-q4_K_M",
 		"judge": "hf.co/sky7350/Mica-v0.1-4B:Q4_K_M",
 		"digest": {
-			"model": "78a738cc751e89cba72bb1feabf70f30c31772eb81a89a66af94ecea90dc5d11",
-			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b"
-		}
+			"model": "d8b0f5e9760cd1682034f292d7ef72ec46f432149be0df7574bf2d6e92e38c04",
+			"judge": "ccc93a29870522845fccafeb24fbef6c7307995fd9db105cb5c0abff8da3ce9b",
+			"triage": "abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099"
+		},
+		"triage": "tev1:0.8b"
 	},
-	"qualification": "tmp/studies/qualification",
+	"qualification": "tmp/studies/compactionqualification",
 	"room": {
 		"context": 20480,
 		"output": 8192,
@@ -42,6 +44,9 @@
 	},
 	"settings": {
 		"observe": true,
+		"judge": {
+			"gpu": 0
+		},
 		"metadata": {
 			"calls": 8192,
 			"bytes": 67108864,
@@ -150,11 +155,6 @@
 			"ev-24-4"
 		]
 	},
-	"record": {
-		"bytes": 536870912,
-		"calls": 4096,
-		"duration": 1800000
-	},
 	"bounds": {
 		"request": {
 			"duration": 360000,
@@ -180,5 +180,10 @@
 			"tokens": 163577856,
 			"bytes": 2147483648
 		}
+	},
+	"record": {
+		"bytes": 536870912,
+		"calls": 4096,
+		"duration": 2400000
 	}
 }

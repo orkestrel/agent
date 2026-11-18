@@ -1,0 +1,12 @@
+{
+	"name": "compactionendurance",
+	"version": "1",
+	"question": "How well does compaction keep source-supported work, corrections, calculations and surviving obligations over the complete prospective public endurance workload?",
+	"purpose": "quality",
+	"driver": "memory",
+	"arms": ["compaction"],
+	"scenarios": ["endurance"],
+	"order": [["compaction"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

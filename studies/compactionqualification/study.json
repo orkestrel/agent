@@ -1,0 +1,12 @@
+{
+	"name": "compactionqualification",
+	"version": "1",
+	"question": "Can the selected profile complete the entire prospective public endurance workload for compaction within the declared finite bounds?",
+	"purpose": "capacity",
+	"driver": "memory",
+	"arms": ["compaction"],
+	"scenarios": ["endurance"],
+	"order": [["compaction"]],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

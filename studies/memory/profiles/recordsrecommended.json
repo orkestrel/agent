@@ -1,5 +1,5 @@
 {
-	"name": "recommended",
+	"name": "recordsrecommended",
 	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [
@@ -34,7 +34,7 @@
 		},
 		"triage": "tev1:0.8b"
 	},
-	"qualification": "tmp/studies/qualification",
+	"qualification": "tmp/studies/recordsqualification",
 	"room": {
 		"context": 20480,
 		"output": 8192,

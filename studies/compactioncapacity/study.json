@@ -1,0 +1,15 @@
+{
+	"name": "compactioncapacity",
+	"version": "1",
+	"question": "Can the declared serving profile complete every goal of the shared memory trajectory for compaction and full conversation within its finite operational bounds?",
+	"purpose": "capacity",
+	"driver": "memory",
+	"arms": ["compaction", "full"],
+	"scenarios": ["handoff"],
+	"order": [
+		["compaction", "full"],
+		["full", "compaction"]
+	],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

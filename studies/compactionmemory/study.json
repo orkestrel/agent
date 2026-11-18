@@ -1,0 +1,15 @@
+{
+	"name": "compactionmemory",
+	"version": "1",
+	"question": "How do compaction and full conversation preserve corrections and unresolved obligations across the same prospective desk trajectory?",
+	"purpose": "quality",
+	"driver": "memory",
+	"arms": ["compaction", "full"],
+	"scenarios": ["handoff"],
+	"order": [
+		["compaction", "full"],
+		["full", "compaction"]
+	],
+	"retries": 0,
+	"rubric": "rubric.json"
+}

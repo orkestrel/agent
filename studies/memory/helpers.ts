@@ -28,7 +28,7 @@ import type {
 	StudyMemoryRetentionInput,
 	StudyMemoryTally,
 } from './types.js'
-import { canonicalStringify, isArray, isRecord, parseJSON } from '@orkestrel/contract'
+import { canonicalStringify, isArray, isRecord, parseJSON, preview } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
 import {
 	STUDY_MEMORY_LEDGER_REPEAT,
@@ -211,6 +211,20 @@ export function validateStudyMemoryProfile(
 	if (!isStudyRoom(room)) throw new StudyError('CONFIG', 'Memory room declaration is invalid')
 	if (arms.includes('compaction') && room.recap === undefined)
 		throw new StudyError('CONFIG', 'Memory compaction requires a declared recap allowance')
+}
+
+/** Checks that a memory declaration schedules exactly one strategy, records or compaction, with `full` as the only other arm, so the two strategies run as separate studies. @param name - The declaration's name, JSON-encoded and capped by `preview` in a refusal. @param arms - The declaration's admitted arms. @returns Nothing when admitted. @throws StudyError - CONFIG when the arms list both strategies, or list neither. */
+export function validateStudyMemoryStrategy(name: string, arms: readonly StudyMemoryArm[]): void {
+	if (arms.includes('records') && arms.includes('compaction'))
+		throw new StudyError(
+			'CONFIG',
+			`Memory declaration ${preview(name)} lists both strategies in arms ["records","compaction"]; list one of records or compaction, with full as the only other arm, and run the other strategy as its own study`,
+		)
+	if (!arms.includes('records') && !arms.includes('compaction'))
+		throw new StudyError(
+			'CONFIG',
+			`Memory declaration ${preview(name)} lists neither strategy in its arms; list one of records or compaction, with full as the only other arm`,
+		)
 }
 
 /** Checks the checkpoint list against the scenarios a declaration holds, which only the adapter sees whole under a goal range. @param settings - Profile settings, already well formed. @param scenarios - The declaration's complete scenarios. @returns Nothing when admitted. @throws StudyError - CONFIG when the list is longer than the largest scenario's goal count or an id names no goal of a scenario. */

@@ -16,6 +16,7 @@ import {
 	readStudyMemoryProgress,
 	validateStudyMemoryCheckpoints,
 	validateStudyMemoryProfile,
+	validateStudyMemoryStrategy,
 } from './helpers.js'
 import { StudyMemoryDriver } from './StudyMemoryDriver.js'
 import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from './validators.js'
@@ -30,6 +31,7 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 				'CONFIG',
 				'Memory declaration requires the shared memory driver and supported arms',
 			)
+		validateStudyMemoryStrategy(input.definition.name, arms)
 		validateStudyMemoryProfile(input.profile, arms)
 		validateStudyMemoryCheckpoints(input.profile.settings, input.scenarios)
 		if (arms.includes('compaction')) readStudyMemoryCompaction(input.profile)
