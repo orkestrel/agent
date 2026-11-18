@@ -57,7 +57,7 @@ describe('prospective public endurance declarations', () => {
 		}
 		const input = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'recordsqualification',
+			'qualification',
 		)
 		const goals = input.scenarios[0]?.goals
 		if (goals === undefined) throw new Error('Missing prospective workload')
@@ -148,7 +148,7 @@ describe('prospective public endurance declarations', () => {
 			throw new Error('Invalid lookup archive')
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'recordsqualification',
+			'qualification',
 		)
 		const goals = fixture.scenarios[0]?.goals
 		if (goals === undefined) throw new Error('Missing projected goals')
@@ -205,7 +205,7 @@ describe('prospective public endurance declarations', () => {
 	it('pins independently chosen early, dormant-return, cross-case and closing boundaries', async () => {
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'recordsqualification',
+			'qualification',
 		)
 		const goals = fixture.scenarios[0]?.goals
 		if (goals === undefined) throw new Error('Missing endurance goals')
@@ -242,7 +242,7 @@ describe('prospective public endurance declarations', () => {
 
 	it('pins the recommended subject and its bounds', async () => {
 		const recommended = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		const provider = recommended.provider
 		if (provider === undefined) throw new Error('Missing recommended provider')
@@ -252,7 +252,7 @@ describe('prospective public endurance declarations', () => {
 		expect(provider.digest.model).toMatch(/^[0-9a-f]{64}$/)
 		const fixture = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:1' }),
-			'recordsqualification',
+			'qualification',
 		)
 		const goals = new Set(fixture.scenarios[0]?.goals.map((goal) => goal.id))
 		const settings = recommended.settings
@@ -276,19 +276,19 @@ describe('prospective public endurance declarations', () => {
 
 	it('pins the finite recommended profile and keeps every endurance semantic judgment independently unknown', async () => {
 		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:1' })
-		const capacity = await loadMemoryInputs(profile, 'recordsqualification')
-		const quality = await loadMemoryInputs(profile, 'recordsendurance')
+		const capacity = await loadMemoryInputs(profile, 'qualification')
+		const quality = await loadMemoryInputs(profile, 'endurance')
 		const recommended = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
 		)
-		expect(recommended.record).toEqual({ bytes: 536870912, calls: 4096, duration: 2400000 })
+		expect(recommended.record).toEqual({ bytes: 536870912, calls: 4096, duration: 9600000 })
 		expect(isStudyMemoryOptions(recommended.settings)).toBe(true)
 		expect(recommended.provider?.daemon).toBeUndefined()
 		expect(recommended).toMatchObject({
-			name: 'recordsrecommended',
+			name: 'recommended',
 			agent: 'dist/src/core/index.js',
 			subject: 'dist/src/core/index.js',
-			qualification: 'tmp/studies/recordsqualification',
+			qualification: 'tmp/studies/qualification',
 			provider: {
 				entry: 'node_modules/@orkestrel/ollama/dist/src/core/index.js',
 				url: 'http://127.0.0.1:11434',
@@ -301,7 +301,7 @@ describe('prospective public endurance declarations', () => {
 					triage: 'abc31fdb0bf52506cc47091145ac19c4cfb509b73a6841789324f9e32200c099',
 				},
 			},
-			record: { bytes: 536870912, calls: 4096, duration: 2400000 },
+			record: { bytes: 536870912, calls: 4096, duration: 9600000 },
 			room: { context: 20480, output: 8192, safety: 512, think: false },
 			settings: {
 				observe: true,
@@ -311,8 +311,8 @@ describe('prospective public endurance declarations', () => {
 			bounds: {
 				request: { duration: 360000, calls: 1, tokens: 19968, bytes: 2097152 },
 				goal: { duration: 900000, calls: 512, tokens: 10223616, bytes: 536870912 },
-				trial: { duration: 2400000, calls: 4096, tokens: 81788928, bytes: 1073741824 },
-				series: { duration: 2400000, calls: 8192, tokens: 163577856, bytes: 2147483648 },
+				trial: { duration: 9600000, calls: 4096, tokens: 81788928, bytes: 1073741824 },
+				series: { duration: 9600000, calls: 8192, tokens: 163577856, bytes: 2147483648 },
 			},
 		})
 		for (const input of [capacity, quality])

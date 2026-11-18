@@ -1,5 +1,5 @@
 {
-	"name": "recordsrecommended",
+	"name": "recommended",
 	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [
@@ -34,7 +34,7 @@
 		},
 		"triage": "tev1:0.8b"
 	},
-	"qualification": "tmp/studies/recordsqualification",
+	"qualification": "tmp/studies/qualification",
 	"room": {
 		"context": 20480,
 		"output": 8192,
@@ -164,13 +164,13 @@
 			"bytes": 536870912
 		},
 		"trial": {
-			"duration": 2400000,
+			"duration": 9600000,
 			"calls": 4096,
 			"tokens": 81788928,
 			"bytes": 1073741824
 		},
 		"series": {
-			"duration": 2400000,
+			"duration": 9600000,
 			"calls": 8192,
 			"tokens": 163577856,
 			"bytes": 2147483648
@@ -179,6 +179,6 @@
 	"record": {
 		"bytes": 536870912,
 		"calls": 4096,
-		"duration": 2400000
+		"duration": 9600000
 	}
 }

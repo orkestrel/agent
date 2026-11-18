@@ -1,21 +1,21 @@
 # Agent studies
 
-The current strategy is the records strategy as the `recordsrecommended` profile composes it. To build on it, read [The current strategy](#the-current-strategy), then [Using it in an application](#using-it-in-an-application).
+The current strategy is the records strategy as the `recommended` profile composes it. To build on it, read [The current strategy](#the-current-strategy), then [Using it in an application](#using-it-in-an-application).
 
 ## What's here
 
 The `@orkestrel/study` package fixes the shape: `studies/<name>/study.json` declares a study with its rubric, and `studies/<driver>/` holds a driver bundle with its scenarios, its profiles, and its `index.ts`. Several studies can share one bundle. The following table lists each study:
 
-| Study                  | Driver   | Purpose   | What it's for                                                                                                      |
-| ---------------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------ |
-| `chat`                 | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                 |
-| `disclosure`           | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.                |
-| `recordscapacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for records and the full conversation within its bounds. |
-| `recordsendurance`     | `memory` | quality   | How records keep work, corrections, and obligations over the whole public endurance workload.                      |
-| `recordsmemory`        | `memory` | quality   | How records and the full conversation keep corrections and obligations on the `handoff` trajectory.                |
-| `recordsqualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload for records. Every long records run goes through it. |
+| Study           | Driver   | Purpose   | What it's for                                                                                                      |
+| --------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `chat`          | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                 |
+| `disclosure`    | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.                |
+| `capacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for records and the full conversation within its bounds. |
+| `endurance`     | `memory` | quality   | How records keep work, corrections, and obligations over the whole public endurance workload.                      |
+| `memory`        | `memory` | quality   | How records and the full conversation keep corrections and obligations on the `handoff` trajectory.                |
+| `qualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload for records. Every long records run goes through it. |
 
-Each study on the `memory` driver schedules records, with `full`, the whole conversation, as its only other arm and its control. The adapter refuses a memory declaration that lists no records arm, or an arm the driver doesn't implement. Each quality study is qualified by its capacity study: `recordsmemory` by `recordscapacity`, and `recordsendurance` by `recordsqualification`.
+Each study on the `memory` driver schedules records, with `full`, the whole conversation, as its only other arm and its control. The adapter refuses a memory declaration that lists no records arm, or an arm the driver doesn't implement. Each quality study is qualified by its capacity study: `memory` by `capacity`, and `endurance` by `qualification`.
 
 The following table lists each driver bundle:
 
@@ -27,23 +27,23 @@ The following table lists each driver bundle:
 
 The following table lists the memory profiles under `studies/memory/profiles/`. Each names, as its `qualification`, the capacity result its quality study pairs with:
 
-| Profile              | What it is                                                                                                                                     | Its studies                                |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `recordsrecommended` | The current strategy, on the 4B agent model. It was formerly `recommended`, and `q4` before that, the name the plan's history uses.            | `recordsqualification`, `recordsendurance` |
-| `recordslocal`       | The unpinned default template, whose `REQUIRED_` values are placeholders a host fills. It was formerly `local`, and the test fixtures fill it. | `recordscapacity`, `recordsmemory`         |
+| Profile       | What it is                                                                                                        | Its studies                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `recommended` | The current strategy, on the 4B agent model.                                                                      | `qualification`, `endurance` |
+| `local`       | The unpinned default template, whose `REQUIRED_` values are placeholders a host fills. The test fixtures fill it. | `capacity`, `memory`         |
 
 ## The current strategy
 
-Use the records strategy, the `createLedger` function of `@orkestrel/agent`, composed as `recordsrecommended.json` and `StudyMemorySession.ts` compose it. The following table gives each piece and the file that shows it:
+Use the records strategy, the `createLedger` function of `@orkestrel/agent`, composed as `recommended.json` and `StudyMemorySession.ts` compose it. The following table gives each piece and the file that shows it:
 
-| Piece                              | What it does                                                                                                                                                                                                                                                                                                        | Where it shows                                                                                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Agent on the GPU, judge on the CPU | The agent model stays on the GPU and the judge runs with `num_gpu: 0`, because both don't fit one small GPU and a swap costs more than the CPU's slower asks.                                                                                                                                                       | `settings.judge` in `profiles/recordsrecommended.json`; `buildStudyMemoryRoles` in `memory/helpers.ts`                       |
-| Two-step judge                     | `tev1` answers category questions through Study's `triage` transport role, with verification, charging, and recorded custody. Its answer stands at a raw winning probability of 0.65 or more unless it says correction. Mica answers the other questions and semantic referrals. A transport fault fails the trial. | `memory/StudyMemoryJudge.ts`; `STUDY_MEMORY_POLICY` in `memory/constants.ts`; `provider.triage` and `provider.digest.triage` |
-| Window layout                      | Each prompt holds each completed exchange as it was sent, then a copy of the request with only the record lines those exchanges don't hold. This is the ledger's own behavior, with nothing to configure.                                                                                                           | `Ledger#plan` in `src/core/ledgers/Ledger.ts`                                                                                |
-| `recall` offer                     | A request is offered `recall` only when something it could return is out of the prompt. This is the ledger's own behavior too.                                                                                                                                                                                      | `hasHiddenRecall` in `src/core/ledgers/helpers.ts`                                                                           |
-| `capacity`, `predict`, and `share` | The session passes `capacity` as the context less its safety margin, 19968 here, `predict` as the output cap, 8192 here, thinking off, and `share` as `{ prompt: 1, tail: 0.35 }`.                                                                                                                                  | `room` in `profiles/recordsrecommended.json`; the `createLedger` call in `memory/StudyMemorySession.ts`                      |
-| Filing cutoffs                     | The session passes the cutoffs fitted on `LEDGER_QUESTIONS` and these judges.                                                                                                                                                                                                                                       | `STUDY_MEMORY_THRESHOLDS` in `memory/constants.ts`                                                                           |
+| Piece                              | What it does                                                                                                                                                                                                                                                                                                        | Where it shows                                                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Agent on the GPU, judge on the CPU | The agent model stays on the GPU and the judge runs with `num_gpu: 0`, because both don't fit one small GPU and a swap costs more than the CPU's slower asks.                                                                                                                                                       | `settings.judge` in `profiles/recommended.json`; `buildStudyMemoryRoles` in `memory/helpers.ts`                                     |
+| Two-step judge                     | `tev1` answers category questions through Study's `triage` transport role, with verification, charging, and recorded custody. Its answer stands at a raw winning probability of 0.65 or more unless it says correction. Mica answers the other questions and semantic referrals. A transport fault fails the trial. | `memory/judges/StudyMemoryJudge.ts`; `STUDY_MEMORY_POLICY` in `memory/constants.ts`; `provider.triage` and `provider.digest.triage` |
+| Window layout                      | Each prompt holds each completed exchange as it was sent, then a copy of the request with only the record lines those exchanges don't hold. This is the ledger's own behavior, with nothing to configure.                                                                                                           | `Ledger#plan` in `src/core/ledgers/Ledger.ts`                                                                                       |
+| `recall` offer                     | A request is offered `recall` only when something it could return is out of the prompt. This is the ledger's own behavior too.                                                                                                                                                                                      | `hasHiddenRecall` in `src/core/ledgers/helpers.ts`                                                                                  |
+| `capacity`, `predict`, and `share` | The session passes `capacity` as the context less its safety margin, 19968 here, `predict` as the output cap, 8192 here, thinking off, and `share` as `{ prompt: 1, tail: 0.35 }`.                                                                                                                                  | `room` in `profiles/recommended.json`; the `createLedger` call in `memory/sessions/StudyMemorySession.ts`                           |
+| Filing cutoffs                     | The session passes the cutoffs fitted on `LEDGER_QUESTIONS` and these judges.                                                                                                                                                                                                                                       | `STUDY_MEMORY_THRESHOLDS` in `memory/constants.ts`                                                                                  |
 
 ## Using it in an application
 
@@ -51,7 +51,7 @@ Use the records strategy, the `createLedger` function of `@orkestrel/agent`, com
 
 - The ledger's behavior comes with `@orkestrel/agent`: the records, the window, and the `recall` offer.
 - The judge on the CPU is one option on the `createOllamaJudge` function of `@orkestrel/ollama`.
-- The two-step judge is the application's to compose on the public `JudgeInterface` interface, with `studies/memory/StudyMemoryJudge.ts` as the worked example to adapt. Its mechanism moves to Agent core when the first application composes it, and its thresholds and model names stay in the application (ruling O193, in `.orkestrel/agent/plan.md` at commit `db86a3eb`).
+- The two-step judge is the application's to compose on the public `JudgeInterface` interface, with `studies/memory/judges/StudyMemoryJudge.ts` as the worked example to adapt. Its mechanism moves to Agent core when the first application composes it, and its thresholds and model names stay in the application (ruling O193, in `.orkestrel/agent/plan.md` at commit `db86a3eb`).
 
 - A judge choosing the tools, instructions, memos, or skills of a request is the application's to compose on the `narrow` method of its scope. The recipe's last paragraph states what that costs.
 
@@ -81,36 +81,36 @@ The `chat` study is that battery, tracked. On 2026-11-08, on the 0.0.38 build an
 
 ## Running it
 
-The `recordsrecommended` profile runs on the Ollama at its provider URL, `http://127.0.0.1:11434`, which is Ollama's default, and pins each model by digest, including `tev1`. It declares no `provider.daemon`, so Study starts no daemon. Its transport verifies the provider's agent, judge, and triage pins against inventory before and after the trial. A recorded run fetches the serving Ollama's version at preflight and postflight and keeps it as a `version` evidence row for debugging; Study compares it with nothing, so a version never refuses a run. The triage leg uses `/v1/systemone`; its metadata verification uses the same Ollama routes as the other roles. Build the package first with `npm run build`, because the profile runs `dist/src/core/index.js`.
+The `recommended` profile runs on the Ollama at its provider URL, `http://127.0.0.1:11434`, which is Ollama's default, and pins each model by digest, including `tev1`. It declares no `provider.daemon`, so Study starts no daemon. Its transport verifies the provider's agent, judge, and triage pins against inventory before and after the trial. A recorded run fetches the serving Ollama's version at preflight and postflight and keeps it as a `version` evidence row for debugging; Study compares it with nothing, so a version never refuses a run. The triage leg uses `/v1/systemone`; its metadata verification uses the same Ollama routes as the other roles. Build the package first with `npm run build`, because the profile runs `dist/src/core/index.js`.
 
 The following commands freeze, check, record, and grade one segment of the records arm, whose trial is `r1-s1-a1`. `ABSOLUTE_CLOSURE_PATH` is a canonical absolute path to a new directory under this repository's `tmp/`, with an existing parent. A freeze admits a destination inside a profile root but refuses one under `dist`, an existing destination, or a relative path. `STEM` names the result:
 
 ```sh
-npx study freeze recordsqualification --profile recordsrecommended --to ABSOLUTE_CLOSURE_PATH
-npx study check recordsqualification --profile recordsrecommended --closure ABSOLUTE_CLOSURE_PATH --trial r1-s1-a1 --goals ev-01-1..ev-04-4
-npx study execute recordsqualification --profile recordsrecommended --closure ABSOLUTE_CLOSURE_PATH --trial r1-s1-a1 --goals ev-01-1..ev-04-4 --out tmp/studies/STEM
+npx study freeze qualification --profile recommended --to ABSOLUTE_CLOSURE_PATH
+npx study check qualification --profile recommended --closure ABSOLUTE_CLOSURE_PATH --trial r1-s1-a1 --goals ev-01-1..ev-04-4
+npx study execute qualification --profile recommended --closure ABSOLUTE_CLOSURE_PATH --trial r1-s1-a1 --goals ev-01-1..ev-04-4 --out tmp/studies/STEM
 ```
 
 Grade a closure's result through the closure's own entry, from the closure's root, with absolute paths, because the repository's entry refuses a closure's roots. `ABSOLUTE_RESULT_PATH` is the `path` member `study execute` prints:
 
 ```sh
 cd ABSOLUTE_CLOSURE_PATH
-node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CLOSURE_PATH/studies/recordsqualification/rubric.json
+node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CLOSURE_PATH/studies/qualification/rubric.json
 ```
 
-The profile declares `record` allowances of 512 MiB, 4096 calls, and 2400000 ms per trial. Both judge legs and inventory verification enter custody. Offline replay checks the retained request bytes and makes no sends; message ids are local to each Agent run.
+The profile declares `record` allowances of 512 MiB, 4096 calls, and 9600000 ms per trial. Both judge legs and inventory verification enter custody. Offline replay checks the retained request bytes and makes no sends; message ids are local to each Agent run.
 
 A continuation needs an ancestor that completed its entire schedule. Record that ancestor separately, without `--trial`, `--goals`, or `--seed`:
 
 ```sh
-npx study execute recordsqualification --profile recordsrecommended --closure ABSOLUTE_CLOSURE_PATH --out tmp/studies/complete
+npx study execute qualification --profile recommended --closure ABSOLUTE_CLOSURE_PATH --out tmp/studies/complete
 ```
 
 After appending goals to the scenario horizon, freeze the grown declaration to a new `ABSOLUTE_GROWN_CLOSURE_PATH`. Keep the earlier goals, schedule, code, provider pins, and profile settings unchanged. Pass the absolute path printed for the complete ancestor as `ABSOLUTE_ANCESTOR_PATH`:
 
 ```sh
-npx study freeze recordsqualification --profile recordsrecommended --to ABSOLUTE_GROWN_CLOSURE_PATH
-npx study execute recordsqualification --profile recordsrecommended --closure ABSOLUTE_GROWN_CLOSURE_PATH --extend ABSOLUTE_ANCESTOR_PATH --out tmp/studies/continued
+npx study freeze qualification --profile recommended --to ABSOLUTE_GROWN_CLOSURE_PATH
+npx study execute qualification --profile recommended --closure ABSOLUTE_GROWN_CLOSURE_PATH --extend ABSOLUTE_ANCESTOR_PATH --out tmp/studies/continued
 ```
 
 Study replays the ancestor's retained prefix and sends only the appended goals to the Ollama at the provider URL. The profile declares no `provider.daemon`, so the continuation records no maintenance, and the serving Ollama's version can differ from the ancestor's. Segmented selectors cannot accompany `--extend`; an unchanged horizon is not an extension.

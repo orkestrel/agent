@@ -15,9 +15,9 @@ import {
 	readStudyMemoryProgress,
 	validateStudyMemoryCheckpoints,
 	validateStudyMemoryProfile,
-} from './helpers.js'
-import { StudyMemoryDriver } from './StudyMemoryDriver.js'
-import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from './validators.js'
+} from '../helpers.js'
+import { StudyMemoryDriver } from '../drivers/StudyMemoryDriver.js'
+import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from '../validators.js'
 
 /** Validates and grades the prospective memory study without exposing its rubric to execution. */
 export class StudyMemoryAdapter implements StudyAdapterInterface {

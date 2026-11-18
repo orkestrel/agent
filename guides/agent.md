@@ -4001,7 +4001,7 @@ const ledger = createLedger(provider, {
 await ledger.respond('Does the Brightwater Studio refund need a manager?')
 ```
 
-The `model` member holds both judges' identities and the cutoff, so changing any of them asks each question again. This class rejects when its first judge rejects. For a fuller worked example that refers a first judge's fault to the second and checks each distribution, read `studies/memory/StudyMemoryJudge.ts` in this repository and adapt it: it holds one study's policy, and no published entry exports it. The executed transcription runs the preceding class with a scripted provider and recording judges; see [the `tests/guides.test.ts` parity test](../tests/guides.test.ts).
+The `model` member holds both judges' identities and the cutoff, so changing any of them asks each question again. This class rejects when its first judge rejects. For a fuller worked example that refers a first judge's fault to the second and checks each distribution, read `studies/memory/judges/StudyMemoryJudge.ts` in this repository and adapt it: it holds one study's policy, and no published entry exports it. The executed transcription runs the preceding class with a scripted provider and recording judges; see [the `tests/guides.test.ts` parity test](../tests/guides.test.ts).
 
 The application decides which models to run, which thresholds to keep, and whether to run two judges at all. The package ships the mechanism and none of that policy.
 

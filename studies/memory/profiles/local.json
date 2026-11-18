@@ -1,5 +1,5 @@
 {
-	"name": "recordslocal",
+	"name": "local",
 	"agent": "dist/src/core/index.js",
 	"subject": "dist/src/core/index.js",
 	"roots": [
@@ -27,12 +27,14 @@
 		"judge": "REQUIRED_JUDGE_NAME",
 		"digest": { "model": "REQUIRED_ACTUAL_SHA256", "judge": "REQUIRED_ACTUAL_SHA256" }
 	},
-	"qualification": "tmp/studies/recordscapacity",
+	"qualification": "tmp/studies/capacity",
 	"room": { "context": 32768, "output": 2048, "safety": 1024, "think": false },
+	"settings": { "metadata": { "calls": 8192, "bytes": 67108864, "duration": 600000 } },
 	"bounds": {
 		"request": { "duration": 120000, "calls": 1, "tokens": 31744, "bytes": 1048576 },
 		"goal": { "duration": 600000, "calls": 256, "tokens": 8388608, "bytes": 268435456 },
 		"trial": { "duration": 1800000, "calls": 768, "tokens": 25165824, "bytes": 805306368 },
 		"series": { "duration": 10800000, "calls": 4608, "tokens": 150994944, "bytes": 4831838208 }
-	}
+	},
+	"record": { "bytes": 536870912, "calls": 4096, "duration": 2400000 }
 }

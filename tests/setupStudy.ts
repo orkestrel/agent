@@ -97,7 +97,7 @@ export const STUDY_MEMORY_SHORT_GOAL = Object.freeze({
 	input: { prompt: 'State the order count', arrivals: [], records: [] },
 })
 
-/** Pins the authored `recordscapacity` and `recordsmemory` trial order independently of native execution output. */
+/** Pins the authored `capacity` and `memory` trial order independently of native execution output. */
 export const STUDY_MEMORY_SCHEDULE = Object.freeze([
 	Object.freeze(['records', 0]),
 	Object.freeze(['full', 0]),
@@ -379,7 +379,7 @@ import { isArray, isRecord, parseJSON } from ${JSON.stringify(pathToFileURL(reso
 import { parseStudyProfile } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/core/index.js')).href)}
 import { ArtifactLoader, hashStudyBytes } from ${JSON.stringify(pathToFileURL(resolve('node_modules/@orkestrel/study/dist/src/server/index.js')).href)}
 
-const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')))
+const profile = parseStudyProfile(parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')))
 const selection = parseJSON(readFileSync(${JSON.stringify(scratch.write('roots.json', JSON.stringify({ roots })))}, 'utf8'))
 if (!isRecord(selection) || (selection.roots !== undefined && (!isArray(selection.roots) || !selection.roots.every((root) => typeof root === 'string'))))
 	throw new Error('Invalid topology root selection')
@@ -1177,12 +1177,12 @@ export function buildMemoryCriterion(
 
 /** Loads an authored declaration and its shared memory scenario for generic admission proofs.
  * @param profile - The execution profile to compose with authored inputs.
- * @param name - The selected declaration. Default: recordscapacity.
+ * @param name - The selected declaration. Default: capacity.
  * @returns Parsed authored inputs with the caller's profile.
  */
 export async function loadMemoryInputs(
 	profile: StudyProfile,
-	name = 'recordscapacity',
+	name = 'capacity',
 ): Promise<StudyValidation> {
 	const { definition, scenarios, rubric } = await readStudyDeclaration(
 		fileURLToPath(new URL('../', import.meta.url)),
@@ -1191,39 +1191,39 @@ export async function loadMemoryInputs(
 	return { definition, scenarios, rubric, profile }
 }
 
-/** Pins the declarations on the memory driver: the four records declarations, in sorted order. */
+/** Pins the declarations on the memory driver, in sorted order. */
 export const STUDY_MEMORY_DECLARATIONS = Object.freeze([
-	'recordscapacity',
-	'recordsendurance',
-	'recordsmemory',
-	'recordsqualification',
+	'capacity',
+	'endurance',
+	'memory',
+	'qualification',
 ])
 
-/** Pins the SHA-256 of each records declaration's rubric bytes as committed at 2a7c4e9f, so any rubric change is caught. */
+/** Pins the SHA-256 of each memory declaration's rubric bytes, which are those of its `records`-prefixed rubric as committed at 2a7c4e9f, so any rubric change is caught. */
 export const STUDY_MEMORY_RUBRICS = Object.freeze({
-	recordscapacity: 'df1003c7c282b9dd7ea4b436c087ca0a3b8b3222903da664c1e0bde64a51cc2c',
-	recordsendurance: '1c192f973185dec7fba312dcb630a64416baf9a36a5d8c79752d25dc94320206',
-	recordsmemory: 'd77c7c45f819892ab1c48355839dd3a16c6aca0f342c00ece84f83068aa82140',
-	recordsqualification: 'b6f1a69d9d45096aff4878eae3cfead3c1e9beb2b5a264c665db5019a1d03ea8',
+	capacity: 'df1003c7c282b9dd7ea4b436c087ca0a3b8b3222903da664c1e0bde64a51cc2c',
+	endurance: '1c192f973185dec7fba312dcb630a64416baf9a36a5d8c79752d25dc94320206',
+	memory: 'd77c7c45f819892ab1c48355839dd3a16c6aca0f342c00ece84f83068aa82140',
+	qualification: 'b6f1a69d9d45096aff4878eae3cfead3c1e9beb2b5a264c665db5019a1d03ea8',
 })
 
 /** Pins each memory profile with the capacity result it names as its qualification. */
 export const STUDY_MEMORY_PROFILES = Object.freeze([
-	Object.freeze({ name: 'recordslocal', qualification: 'tmp/studies/recordscapacity' }),
-	Object.freeze({ name: 'recordsrecommended', qualification: 'tmp/studies/recordsqualification' }),
+	Object.freeze({ name: 'local', qualification: 'tmp/studies/capacity' }),
+	Object.freeze({ name: 'recommended', qualification: 'tmp/studies/qualification' }),
 ])
 
 /** Pins each capacity declaration beside the quality twin it qualifies and the profile the pair runs under. */
 export const STUDY_MEMORY_TWINS = Object.freeze([
 	Object.freeze({
-		capacity: 'recordscapacity',
-		quality: 'recordsmemory',
-		profiles: Object.freeze(['recordslocal']),
+		capacity: 'capacity',
+		quality: 'memory',
+		profiles: Object.freeze(['local']),
 	}),
 	Object.freeze({
-		capacity: 'recordsqualification',
-		quality: 'recordsendurance',
-		profiles: Object.freeze(['recordsrecommended']),
+		capacity: 'qualification',
+		quality: 'endurance',
+		profiles: Object.freeze(['recommended']),
 	}),
 ])
 
@@ -1875,19 +1875,19 @@ export function buildMemoryCapture(
 }
 
 /**
- * Writes a profile that declares recording beside an install's `recordslocal` profile, keeping that profile's other members and leaving it unchanged.
- * @param root - The install root, whose `recordslocal` profile `writeMemoryLocalProfile` wrote.
+ * Writes a profile that declares recording beside an install's `local` profile, keeping that profile's other members and leaving it unchanged.
+ * @param root - The install root, whose `local` profile `writeMemoryLocalProfile` wrote.
  * @param name - The written profile's name, which names its file.
  * @param checkpoints - The goal ids to list. Default: none.
  * @returns Nothing after the profile is written.
- * @throws Error - Thrown when the install holds no `recordslocal` profile.
+ * @throws Error - Thrown when the install holds no `local` profile.
  */
 export function writeStudyInstallRecord(
 	root: string,
 	name: string,
 	checkpoints: readonly string[] = [],
 ): void {
-	const local = join(root, 'studies/memory/profiles/recordslocal.json')
+	const local = join(root, 'studies/memory/profiles/local.json')
 	const raw = existsSync(local) ? parseJSON(readFileSync(local, 'utf8')) : undefined
 	if (!isRecord(raw)) throw new Error('Missing authored memory profile')
 	writeFileSync(
@@ -2151,10 +2151,10 @@ export function readMemoryTrials(stdout: string): ReadonlyMap<string, string> {
 }
 
 /**
- * Records the shared segment of an install fixture's `recordscapacity` target, as an operator does: the schedule's check, the selection's check, then the execution of the arguments that check returns.
+ * Records the shared segment of an install fixture's `capacity` target, as an operator does: the schedule's check, the selection's check, then the execution of the arguments that check returns.
  * @remarks
  * The segment is the first `records` trial's `opening..correction`, under the `recorded` profile, which
- * declares recording and lists every goal in `checkpoints`. The `recordslocal` profile stays unchanged.
+ * declares recording and lists every goal in `checkpoints`. The `local` profile stays unchanged.
  * @param install - The installed command.
  * @param server - The loopback provider; only this call sends to it while it runs.
  * @param output - The result directory.
@@ -2171,14 +2171,14 @@ export async function executeMemoryRecording(
 		parseJSON(readFileSync(join(install.root, 'studies/memory/profiles/recorded.json'), 'utf8')),
 	)
 	const start = server.requests.length
-	const scheduled = await install.execute(['check', 'recordscapacity', '--profile', profile.name])
+	const scheduled = await install.execute(['check', 'capacity', '--profile', profile.name])
 	if (scheduled.code !== 0) throw new Error(`The schedule check refused: ${scheduled.stderr}`)
 	const trials = readMemoryTrials(scheduled.stdout)
 	const trial = trials.get('records')
 	if (trial === undefined) throw new Error('No records trial is scheduled')
 	const selected = await install.execute([
 		'check',
-		'recordscapacity',
+		'capacity',
 		'--profile',
 		profile.name,
 		...buildStudySelectors({ trial, goals: { first: 'opening', last: 'correction' } }),
@@ -2244,26 +2244,24 @@ export async function createStudyFixtureInstall(
 }
 
 /**
- * Writes the `recordslocal` profile into a memory install: the authored template, its provider and roots taken from the install's rebound `recordsrecommended` profile without triage, and short durations.
+ * Writes the `local` profile into a memory install: the authored template, its provider and roots taken from the install's rebound `recommended` profile without triage, and short durations.
  * @remarks The template leaves its provider to the caller, so Study's install neither parses nor rebinds it; this fills it as a host does.
- * @param root - The install root, which holds the rebound `recordsrecommended` profile.
+ * @param root - The install root, which holds the rebound `recommended` profile.
  * @returns Nothing after the profile is written.
  * @throws Error - Thrown when the template lacks a bound or the installed profile declares no provider.
  */
 export function writeMemoryLocalProfile(root: string): void {
-	const template = parseJSON(
-		readFileSync(resolve('studies/memory/profiles/recordslocal.json'), 'utf8'),
-	)
+	const template = parseJSON(readFileSync(resolve('studies/memory/profiles/local.json'), 'utf8'))
 	if (!isRecord(template) || !isRecord(template.bounds))
 		throw new Error('Missing authored memory profile')
 	const authored = template.bounds
 	const recommended = parseStudyProfile(
-		parseJSON(readFileSync(join(root, 'studies/memory/profiles/recordsrecommended.json'), 'utf8')),
+		parseJSON(readFileSync(join(root, 'studies/memory/profiles/recommended.json'), 'utf8')),
 	)
 	const selected = recommended.provider
 	if (selected === undefined) throw new Error('Missing installed recommended provider')
 	writeFileSync(
-		join(root, 'studies/memory/profiles/recordslocal.json'),
+		join(root, 'studies/memory/profiles/local.json'),
 		JSON.stringify({
 			...template,
 			roots: recommended.roots,
@@ -2290,9 +2288,9 @@ export function writeMemoryLocalProfile(root: string): void {
 /**
  * Builds a file's one memory install against its own loopback provider, and makes its shared recording.
  * @remarks
- * Every case of the file reads this one install. It installs `recordscapacity` and `recordsmemory`
- * under `recordsrecommended`, whose roots admit the selected Ollama entry, then writes the
- * `recordslocal` profile both run under, and the recording writes its own `recorded` profile beside it.
+ * Every case of the file reads this one install. It installs `capacity` and `memory`
+ * under `recommended`, whose roots admit the selected Ollama entry, then writes the
+ * `local` profile both run under, and the recording writes its own `recorded` profile beside it.
  * @param prefix - The scratch directory's prefix.
  * @returns The scratch, the provider, the install, and the shared recording.
  * @throws Error - Rethrows a failed setup after destroying the provider and removing the scratch.
@@ -2302,8 +2300,8 @@ export async function createMemoryInstall(prefix: string): Promise<MemoryInstall
 	try {
 		const { server, install } = await createStudyFixtureInstall(
 			scratch,
-			['recordscapacity', 'recordsmemory'],
-			'recordsrecommended',
+			['capacity', 'memory'],
+			'recommended',
 		)
 		try {
 			writeMemoryLocalProfile(install.root)

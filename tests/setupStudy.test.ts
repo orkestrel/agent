@@ -444,25 +444,25 @@ describe('study install fixtures', () => {
 	})
 	it('installs a study under its profile rebound to a fixture that lists the profile pins, and fills the local memory profile there', async () => {
 		const scratch = createScratch({ prefix: 'study-install-setup-' })
-		await expect(createStudyFixtureInstall(scratch, [], 'recordsrecommended')).rejects.toThrow(
+		await expect(createStudyFixtureInstall(scratch, [], 'recommended')).rejects.toThrow(
 			'Missing study to install',
 		)
 		const { server, install } = await createStudyFixtureInstall(
 			scratch,
-			['recordscapacity'],
-			'recordsrecommended',
+			['capacity'],
+			'recommended',
 		)
 		try {
 			const authored = parseStudyProfile(
-				parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+				parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 			)
 			const provider = authored.provider
 			if (provider === undefined) throw new Error('Missing authored provider')
 			expect(install.root).toBe(join(scratch.path, 'install'))
 			const profiles = join(install.root, 'studies/memory/profiles')
-			expect(
-				parseJSON(readFileSync(join(profiles, 'recordsrecommended.json'), 'utf8')),
-			).toMatchObject({ provider: { url: server.url, digest: provider.digest } })
+			expect(parseJSON(readFileSync(join(profiles, 'recommended.json'), 'utf8'))).toMatchObject({
+				provider: { url: server.url, digest: provider.digest },
+			})
 			const listed = parseJSON(await (await fetch(`${server.url}/api/tags`)).text())
 			if (!isRecord(listed) || !isArray(listed.models)) throw new Error('Missing model list')
 			expect(listed.models).toHaveLength(3)
@@ -474,11 +474,11 @@ describe('study install fixtures', () => {
 				]),
 			)
 			writeMemoryLocalProfile(install.root)
-			const local = parseJSON(readFileSync(join(profiles, 'recordslocal.json'), 'utf8'))
+			const local = parseJSON(readFileSync(join(profiles, 'local.json'), 'utf8'))
 			expect(local).toMatchObject({
-				name: 'recordslocal',
+				name: 'local',
 				roots: authored.roots,
-				qualification: 'tmp/studies/recordscapacity',
+				qualification: 'tmp/studies/capacity',
 				bounds: {
 					request: { duration: 3000 },
 					goal: { duration: 30000 },
@@ -811,10 +811,13 @@ describe('study install fixtures', () => {
 		}
 	})
 
-	it('leaves the authored local profile without settings', () => {
-		expect(
-			parseJSON(readFileSync('studies/memory/profiles/recordslocal.json', 'utf8')),
-		).not.toHaveProperty('settings')
+	it('declares recording on the authored local profile, with its metadata allowance as its one setting', () => {
+		const local = parseJSON(readFileSync('studies/memory/profiles/local.json', 'utf8'))
+		if (!isRecord(local)) throw new Error('Malformed local profile')
+		expect([local.settings, local.record]).toEqual([
+			{ metadata: { calls: 8192, bytes: 67108864, duration: 600000 } },
+			{ bytes: 536870912, calls: 4096, duration: 2400000 },
+		])
 	})
 
 	it('emits supplied profile settings verbatim, including an explicit absence', () => {
@@ -1089,7 +1092,7 @@ describe('study install fixtures', () => {
 		expect(body.logprobs[0].top_logprobs).toContainEqual({ token: 'A', logprob: -8 })
 	})
 
-	it('declares recording on a built profile and on a profile written beside an install records local one, keeping its other members', () => {
+	it('declares recording on a built profile and on a profile written beside the local profile of an install, keeping its other members', () => {
 		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
 		expect(profile.record).toEqual({ bytes: 4194304, calls: 256, duration: 60000 })
 		expect(profile.settings).toEqual({
@@ -1100,8 +1103,8 @@ describe('study install fixtures', () => {
 			expect(() => writeStudyInstallRecord(scratch.path, 'recorded')).toThrow(
 				'Missing authored memory profile',
 			)
-			const local = '{"name":"recordslocal","settings":{"a":1}}'
-			scratch.write('studies/memory/profiles/recordslocal.json', local)
+			const local = '{"name":"local","settings":{"a":1}}'
+			scratch.write('studies/memory/profiles/local.json', local)
 			writeStudyInstallRecord(scratch.path, 'recorded', ['opening'])
 			expect(parseJSON(scratch.read('studies/memory/profiles/recorded.json') ?? '')).toEqual({
 				name: 'recorded',
@@ -1112,7 +1115,7 @@ describe('study install fixtures', () => {
 					checkpoints: ['opening'],
 				},
 			})
-			expect(scratch.read('studies/memory/profiles/recordslocal.json')).toBe(local)
+			expect(scratch.read('studies/memory/profiles/local.json')).toBe(local)
 		} finally {
 			destroyScratch(scratch)
 		}

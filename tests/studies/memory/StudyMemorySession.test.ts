@@ -396,7 +396,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 
 	it('executes an agent reply cut at the output allowance under the recommended byte bound', async () => {
 		const recommended = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		// Each streamed row is 136 B, the chunk size goal 53's cut reply read.
 		const chunk = `${JSON.stringify({

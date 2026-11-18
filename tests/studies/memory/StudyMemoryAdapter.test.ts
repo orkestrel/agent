@@ -18,9 +18,9 @@ describe('memory declaration and mechanical evidence', () => {
 		const adapter = createStudyAdapter()
 		const url = 'http://127.0.0.1:7'
 		const recommended = parseStudyProfile(
-			parseJSON(await readFile('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			parseJSON(await readFile('studies/memory/profiles/recommended.json', 'utf8')),
 		)
-		const input = await loadMemoryInputs(buildMemoryProfile({ url }), 'recordsqualification')
+		const input = await loadMemoryInputs(buildMemoryProfile({ url }), 'qualification')
 		const declared = input.scenarios[0]?.goals.map((goal) => goal.id) ?? []
 		const settings = { observe: true }
 		expect(declared).toHaveLength(96)
@@ -132,7 +132,7 @@ describe('memory declaration and mechanical evidence', () => {
 		async (arms) => {
 			const input = await loadMemoryInputs(
 				buildMemoryProfile({ url: 'http://127.0.0.1:7' }),
-				'recordscapacity',
+				'capacity',
 			)
 
 			expect(() =>
@@ -152,7 +152,7 @@ describe('memory declaration and mechanical evidence', () => {
 	it('refuses a declaration that lists only full, which schedules no strategy (claim S-3)', async () => {
 		const input = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:7' }),
-			'recordsmemory',
+			'memory',
 		)
 		const adapter = createStudyAdapter()
 
@@ -166,7 +166,7 @@ describe('memory declaration and mechanical evidence', () => {
 			expect.objectContaining({
 				code: 'CONFIG',
 				message:
-					'Memory declaration "recordsmemory" lists no records arm; list records, with full as the only other arm',
+					'Memory declaration "memory" lists no records arm; list records, with full as the only other arm',
 			}),
 		)
 	})

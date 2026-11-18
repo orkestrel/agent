@@ -15,10 +15,10 @@ import type {
 	StudyMemoryLedger,
 	StudyMemoryProvider,
 	StudyMemoryAgent,
-} from './types.js'
+} from '../types.js'
 import { StudyError } from '@orkestrel/study'
-import { validateStudyMemoryProfile } from './helpers.js'
-import { StudyMemorySession } from './StudyMemorySession.js'
+import { validateStudyMemoryProfile } from '../helpers.js'
+import { StudyMemorySession } from '../sessions/StudyMemorySession.js'
 import {
 	isStudyMemoryArm,
 	isStudyMemoryCheckpoint,
@@ -26,7 +26,7 @@ import {
 	isStudyMemoryLedger,
 	isStudyMemoryProvider,
 	isStudyMemoryAgent,
-} from './validators.js'
+} from '../validators.js'
 
 /** Opens fresh real runtime state for every arm and repetition. */
 export class StudyMemoryDriver implements StudyDriverInterface {

@@ -1,11 +1,11 @@
 import type { JudgeInterface, JudgeRequest, JudgeResult } from '@orkestrel/agent'
-import type { StudyMemoryJudgeOptions } from './types.js'
+import type { StudyMemoryJudgeOptions } from '../types.js'
 import {
 	buildStudyMemoryJudgeModel,
 	buildStudyMemoryTriage,
 	filterStudyMemoryResult,
-} from './helpers.js'
-import { STUDY_MEMORY_POLICY } from './constants.js'
+} from '../helpers.js'
+import { STUDY_MEMORY_POLICY } from '../constants.js'
 
 /** Runs a two-step judge: one fast pass, then a second judge for what the fast pass doesn't keep. */
 export class StudyMemoryJudge implements JudgeInterface {

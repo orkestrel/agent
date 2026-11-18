@@ -20,12 +20,12 @@ import {
 } from '../../setupStudy.js'
 
 describe('the memory declarations', () => {
-	it('lists exactly the four records declarations on the memory driver (claim S-1)', () => {
+	it('lists exactly the four declarations on the memory driver (claim S-1)', () => {
 		expect(collectMemoryDeclarations()).toEqual([
-			'recordscapacity',
-			'recordsendurance',
-			'recordsmemory',
-			'recordsqualification',
+			'capacity',
+			'endurance',
+			'memory',
+			'qualification',
 		])
 	})
 
@@ -49,7 +49,7 @@ describe('the memory declarations', () => {
 					.filter((profile) => profile.qualification === `tmp/studies/${capacity}`)
 					.map((profile) => profile.name),
 			),
-		).toEqual([['recordslocal'], ['recordsrecommended']])
+		).toEqual([['local'], ['recommended']])
 		expect(
 			qualifications.every((profile) =>
 				capacities.some((capacity) => profile.qualification === `tmp/studies/${capacity}`),
@@ -57,7 +57,7 @@ describe('the memory declarations', () => {
 		).toBe(true)
 	})
 
-	it('pins each records rubric to the SHA-256 it held at 2a7c4e9f', () => {
+	it('pins each memory rubric to the SHA-256 its bytes held at 2a7c4e9f', () => {
 		expect(
 			Object.fromEntries(
 				collectMemoryDeclarations().map((name) => [
@@ -113,9 +113,9 @@ describe('the memory declarations', () => {
 	})
 
 	it('refuses the local template until a host fills its provider', () => {
-		const authored = parseJSON(readFileSync('studies/memory/profiles/recordslocal.json', 'utf8'))
+		const authored = parseJSON(readFileSync('studies/memory/profiles/local.json', 'utf8'))
 		expect(() => parseStudyProfile(authored)).toThrow('profile')
-		const profile = readMemoryProfile('recordslocal', 'http://127.0.0.1:7')
+		const profile = readMemoryProfile('local', 'http://127.0.0.1:7')
 		expect(profile.bounds.request.tokens).toBe(profile.room.context - profile.room.safety)
 		expect(profile.roots).toContain('node_modules/@orkestrel/study')
 	})

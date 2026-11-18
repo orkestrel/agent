@@ -9,7 +9,7 @@ import type {
 	StudyMemoryProvenanceSource,
 	StudyMemorySessionOptions,
 	StudyMemoryObservation,
-} from './types.js'
+} from '../types.js'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
@@ -28,14 +28,14 @@ import {
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
-} from './constants.js'
+} from '../constants.js'
 import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
 	resolveStudyMemoryObservation,
-} from './helpers.js'
-import { isStudyMemoryInput, isStudyMemoryOptions, isStudyMemoryRuntime } from './validators.js'
-import { StudyMemoryJudge } from './StudyMemoryJudge.js'
+} from '../helpers.js'
+import { isStudyMemoryInput, isStudyMemoryOptions, isStudyMemoryRuntime } from '../validators.js'
+import { StudyMemoryJudge } from '../judges/StudyMemoryJudge.js'
 
 /** Preserves actual Agent, Ledger and conversation state across a trial's goals. */
 export class StudyMemorySession implements StudySessionInterface {

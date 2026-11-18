@@ -40,7 +40,7 @@ it('loads the actual recommended native topology with two distinct captured Agen
 		if (!isRecord(selection) || !isArray(selection.identities))
 			throw new Error('Missing actual native selection evidence')
 		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		const subject = realpathSync('dist/src/core/index.js')
 		const dependency = realpathSync('node_modules/@orkestrel/agent/dist/src/core/index.js')
@@ -100,7 +100,7 @@ it('refuses a repeated canonical root in a fresh recommended native topology wor
 	const scratch = createScratch({ prefix: 'study-memory-repeated-root-' })
 	try {
 		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		const roots = profile.roots.filter((root) => root !== 'node_modules/@orkestrel/agent')
 		const result = await executeStudyTopology(scratch, [...roots, realpathSync('.')])
@@ -117,7 +117,7 @@ it('refuses Ollama import when its installed Agent root is omitted in a fresh re
 	const scratch = createScratch({ prefix: 'study-memory-omitted-root-' })
 	try {
 		const profile = parseStudyProfile(
-			parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 		)
 		const result = await executeStudyTopology(
 			scratch,
@@ -160,29 +160,22 @@ describe('the captured install', () => {
 		const { install, server } = await ready.promise
 		const start = server.requests.length
 		const denied = await install.execute(
-			[
-				'execute',
-				'recordsmemory',
-				'--profile',
-				'recordslocal',
-				'--out',
-				join(install.root, 'unqualified'),
-			],
+			['execute', 'memory', '--profile', 'local', '--out', join(install.root, 'unqualified')],
 			260000,
 		)
 		expect(denied.code).not.toBe(0)
-		expect(denied.stderr).toMatch(/qualification|recordscapacity|seal|missing|ENOENT/i)
+		expect(denied.stderr).toMatch(/qualification|capacity|seal|missing|ENOENT/i)
 		expect(server.requests).toHaveLength(start)
 		expect(existsSync(join(install.root, 'unqualified'))).toBe(false)
 		// Every target's seal id, appended once that target seals; the quality target is qualified by the capacity one.
 		const sealed: Array<{ readonly target: string; readonly seal: string }> = []
 		// Only a whole capacity result qualifies, so capacity runs whole and quality runs its first trial.
 		for (const { target, purpose, trials, goals } of [
-			{ target: 'recordscapacity', purpose: 'capacity', trials: 4, goals: 12 },
-			{ target: 'recordsmemory', purpose: 'quality', trials: 1, goals: 3 },
+			{ target: 'capacity', purpose: 'capacity', trials: 4, goals: 12 },
+			{ target: 'memory', purpose: 'quality', trials: 1, goals: 3 },
 		]) {
 			const beforeCheck = server.requests.length
-			const check = await install.execute(['check', target, '--profile', 'recordslocal'])
+			const check = await install.execute(['check', target, '--profile', 'local'])
 			expect(check).toMatchObject({ code: 0 })
 			const plan = parseJSON(check.stdout)
 			if (!isRecord(plan) || !isArray(plan.schedule)) throw new Error('Missing native check output')
@@ -191,7 +184,7 @@ describe('the captured install', () => {
 				'execute',
 				target,
 				'--profile',
-				'recordslocal',
+				'local',
 				'--expected',
 				plan.fingerprint,
 			])
@@ -204,14 +197,7 @@ describe('the captured install', () => {
 			const selected =
 				purpose === 'capacity'
 					? check
-					: await install.execute([
-							'check',
-							target,
-							'--profile',
-							'recordslocal',
-							'--trial',
-							first.id,
-						])
+					: await install.execute(['check', target, '--profile', 'local', '--trial', first.id])
 			expect(selected).toMatchObject({ code: 0 })
 			expect(server.requests.length).toBe(beforeCheck)
 			const selection = parseJSON(selected.stdout)
@@ -225,13 +211,13 @@ describe('the captured install', () => {
 				'execute',
 				target,
 				'--profile',
-				'recordslocal',
+				'local',
 				'--expected',
 				selection.fingerprint,
 				...(purpose === 'capacity' ? [] : ['--trial', first.id]),
 			])
 			const calls = server.requests.length
-			// The capacity result lands where `recordslocal` names its qualification.
+			// The capacity result lands where `local` names its qualification.
 			const output = join(install.root, 'tmp', 'studies', target)
 			const executed = await install.execute([...selection.next, '--out', output], 260000)
 			expect(executed).toMatchObject({ code: 0 })
@@ -264,7 +250,7 @@ describe('the captured install', () => {
 			)
 			expect(result.attempts.map((attempt) => attempt.trial)).toEqual(result.manifest.schedule)
 			expect(result.manifest.qualification).toBe(
-				sealed.find((one) => one.target === 'recordscapacity')?.seal,
+				sealed.find((one) => one.target === 'capacity')?.seal,
 			)
 			sealed.push({ target, seal: result.seal.id })
 			const retained = await collectStudyEvidence(result)
@@ -394,10 +380,10 @@ describe('the captured install', () => {
 		const sent = server.requests.length
 		const closures = join(install.root, 'tmp', 'studies', 'closures')
 		mkdirSync(closures, { recursive: true })
-		const closure = join(closures, 'recordscapacity')
+		const closure = join(closures, 'capacity')
 		for (const command of [
-			['freeze', 'recordscapacity', '--profile', 'recordslocal', '--to', closure],
-			['check', 'recordscapacity', '--profile', 'recordslocal', '--closure', closure],
+			['freeze', 'capacity', '--profile', 'local', '--to', closure],
+			['check', 'capacity', '--profile', 'local', '--closure', closure],
 		])
 			expect(await install.execute(command)).toMatchObject({ code: 0 })
 		expect(server.requests).toHaveLength(sent)
@@ -411,7 +397,7 @@ describe('the captured install', () => {
 		// The selection's check carries the selectors into the arguments the execution ran.
 		expect(selection.next).toEqual([
 			'execute',
-			'recordscapacity',
+			'capacity',
 			'--profile',
 			recording.profile.name,
 			'--expected',
@@ -459,7 +445,7 @@ describe('the captured install', () => {
 			'grade',
 			recording.path,
 			'--rubric',
-			join(install.root, 'studies', 'recordsmemory', 'rubric.json'),
+			join(install.root, 'studies', 'memory', 'rubric.json'),
 		])
 		expect(graded).toMatchObject({ code: 0 })
 		expect(server.requests).toHaveLength(sent)
@@ -472,9 +458,7 @@ describe('the captured install', () => {
 			),
 		)
 		const rubric = parseStudyRubric(
-			parseJSON(
-				readFileSync(join(install.root, 'studies', 'recordsmemory', 'rubric.json'), 'utf8'),
-			),
+			parseJSON(readFileSync(join(install.root, 'studies', 'memory', 'rubric.json'), 'utf8')),
 		)
 		const semantic = assessment.judgments.filter(
 			(judgment) =>
@@ -534,7 +518,7 @@ describe('the captured install', () => {
 		const replayed = await install.execute(
 			[
 				'execute',
-				'recordscapacity',
+				'capacity',
 				'--profile',
 				recording.profile.name,
 				'--trial',

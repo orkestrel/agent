@@ -30,7 +30,7 @@ it('keeps every treatment field equal except the named capacity', () => {
 		parseStudyProfile(parseJSON(readFileSync(`studies/chat/profiles/${name}.json`, 'utf8'))),
 	)
 	const pinned = parseStudyProfile(
-		parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+		parseJSON(readFileSync('studies/memory/profiles/recommended.json', 'utf8')),
 	)
 	expect(profiles.map((profile) => profile.settings?.capacity)).toEqual([19968, 2400, 1600])
 	for (const profile of profiles) {

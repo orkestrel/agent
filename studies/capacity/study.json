@@ -1,5 +1,5 @@
 {
-	"name": "recordscapacity",
+	"name": "capacity",
 	"version": "1",
 	"question": "Can the declared serving profile complete every goal of the shared memory trajectory for records and full conversation within its finite operational bounds?",
 	"purpose": "capacity",
