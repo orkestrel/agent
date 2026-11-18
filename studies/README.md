@@ -32,7 +32,6 @@ The following table lists the memory profiles under `studies/memory/profiles/`:
 | ------------- | ------------------------------------------------------------------------------------------------------ |
 | `recommended` | The current strategy, on the 4B agent model. It was formerly `q4`, the name the plan's history uses.   |
 | `smallest`    | The smallest model's gate, on the 2B agent model with the judge sharing the GPU. It was formerly `q2`. |
-| `narrow`      | `smallest` with correction narrowing.                                                                  |
 | `local`       | The unpinned default template, whose `REQUIRED_` values are placeholders a host fills.                 |
 
 ## The current strategy
