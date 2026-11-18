@@ -644,16 +644,19 @@ describe('study install fixtures', () => {
 			const question = { type: 'choice', criteria: { fact: 'f', correction: 'c', other: 'o' } }
 			const routed = await fetch(`${server.url}/v1/systemone`, {
 				method: 'POST',
-				body: JSON.stringify({ questions: { q1: question } }),
+				body: JSON.stringify({ model: 'tev1:0.8b', questions: { q1: question } }),
 			})
 			expect(parseJSON(await routed.text())).toEqual({
-				model: 'model',
+				model: 'tev1:0.8b',
 				answers: {
 					q1: { type: 'choice', probabilities: { fact: 0.9, correction: 0.05, other: 0.05 } },
 				},
 			})
-			expect(() => buildMemoryRouteAnswer({ questions: { q1: { type: 'noul' } } })).toThrow(
-				'Expected a choice question',
+			expect(() =>
+				buildMemoryRouteAnswer({ model: 'tev1:0.8b', questions: { q1: { type: 'noul' } } }),
+			).toThrow('Expected a choice question')
+			expect(() => buildMemoryRouteAnswer({ questions: { q1: question } })).toThrow(
+				'Missing System One model',
 			)
 			const unloaded = await fetch(`${server.url}/api/generate`, {
 				method: 'POST',

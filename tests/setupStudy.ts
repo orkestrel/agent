@@ -2513,15 +2513,16 @@ export const MEMORY_TRIAGE_GOAL: StudyGoal = Object.freeze({
 })
 
 /**
- * Builds a successful System One answer keyed by the request's own question ids, reading `fact` at 0.9 on each choice question; the policy for `/v1/systemone`.
+ * Builds a successful System One answer keyed by the request's own question ids, reading `fact` at 0.9 on each choice question and repeating the model the request names, as a System One server does; the policy for `/v1/systemone`.
  * @param body - The parsed `/v1/systemone` request body.
  * @returns The answer body.
- * @throws Error - Thrown when the body asks no questions or a question is not a choice.
+ * @throws Error - Thrown when the body names no model, asks no questions, or a question is not a choice.
  */
 export function buildMemoryRouteAnswer(body: unknown): string {
 	if (!isRecord(body) || !isRecord(body.questions)) throw new Error('Missing System One questions')
+	if (!isString(body.model)) throw new Error('Missing System One model')
 	return JSON.stringify({
-		model: 'model',
+		model: body.model,
 		answers: Object.fromEntries(
 			Object.entries(body.questions).map(([id, question]) => {
 				if (!isRecord(question) || question.type !== 'choice' || !isRecord(question.criteria))
