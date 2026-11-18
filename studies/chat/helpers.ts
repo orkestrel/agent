@@ -19,6 +19,7 @@ import {
 	STUDY_CHAT_DIGEST,
 	STUDY_CHAT_FORMATTED,
 	STUDY_CHAT_OPTIONS,
+	STUDY_CHAT_SYSTEM,
 } from './constants.js'
 import { isStudyChatAssertion, isStudyChatSeal, isStudyChatSettings } from './validators.js'
 
@@ -61,7 +62,7 @@ export function buildStudyChatCriteria(
 	)
 }
 /** Converts either pinned seal representation into ordered public scenarios and private criteria.
- * @throws StudyError - Thrown when the source digest, shape, or census differs.
+ * @throws StudyError - Thrown when the source digest, shape, system texts, or census differs.
  * @example buildStudyChatConversion(sealedText).scenarios.length // 38
  */
 export function buildStudyChatConversion(source: string): StudyChatConversion {
@@ -69,6 +70,8 @@ export function buildStudyChatConversion(source: string): StudyChatConversion {
 		throw new StudyError('CONFIG', 'Chat seal digest differs')
 	const seal = parseJSON(source)
 	if (!isStudyChatSeal(seal)) throw new StudyError('CONFIG', 'Chat seal shape differs')
+	if (seal.system !== STUDY_CHAT_SYSTEM.bookings || seal.desk !== STUDY_CHAT_SYSTEM.orders)
+		throw new StudyError('CONFIG', 'Chat seal system texts differ from STUDY_CHAT_SYSTEM')
 	const dialogues = [
 		...seal.picked.map((dialogue) => ({ dialogue, changed: false })),
 		...seal.changed.map((dialogue) => ({ dialogue, changed: true })),
@@ -79,7 +82,7 @@ export function buildStudyChatConversion(source: string): StudyChatConversion {
 			goals: [...dialogue.turns, ...dialogue.probes.map((probe) => probe.question)].map(
 				(prompt, index) => ({
 					id: `turn-${index + 1}`,
-					input: { prompt, system: seal.system, topic: 'bookings' },
+					input: { prompt, topic: 'bookings' },
 				}),
 			),
 		})),
@@ -89,7 +92,6 @@ export function buildStudyChatConversion(source: string): StudyChatConversion {
 				id: `turn-${index + 1}`,
 				input: {
 					prompt: step.request,
-					system: seal.desk,
 					topic: 'orders',
 					record: { ...script.record },
 				},

@@ -5,7 +5,6 @@
 			"id": "turn-1",
 			"input": {
 				"prompt": "I want to find a nightclub.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -13,7 +12,6 @@
 			"id": "turn-2",
 			"input": {
 				"prompt": "May I please have the postcode, and entrance fees for the nightclubs?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -21,7 +19,6 @@
 			"id": "turn-3",
 			"input": {
 				"prompt": "Actually, yes. I'm looking for a train from ely.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -29,7 +26,6 @@
 			"id": "turn-4",
 			"input": {
 				"prompt": "My destination is Cambridge and I would like to arrive by 11:30 on Thursday.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -37,7 +33,6 @@
 			"id": "turn-5",
 			"input": {
 				"prompt": "The one for 7:35 is fine. Can I get the ID # and price, too?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -45,7 +40,6 @@
 			"id": "turn-6",
 			"input": {
 				"prompt": "Thank you. Have a good day.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -53,7 +47,6 @@
 			"id": "turn-7",
 			"input": {
 				"prompt": "Where did I say the train was going to?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -61,7 +54,6 @@
 			"id": "turn-8",
 			"input": {
 				"prompt": "What type of attraction did I ask about?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		}

@@ -5,7 +5,6 @@
 			"id": "turn-1",
 			"input": {
 				"prompt": "I'm looking for a multiple sports location in the centre of town.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -13,7 +12,6 @@
 			"id": "turn-2",
 			"input": {
 				"prompt": "Actually, I really want something in the centre of town. How about nightclubs? Any good ones in the centre of town?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -21,7 +19,6 @@
 			"id": "turn-3",
 			"input": {
 				"prompt": "We would like to try that Club. Can you tell me the postcode and if they have an entrance fee? Thanks!",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -29,7 +26,6 @@
 			"id": "turn-4",
 			"input": {
 				"prompt": "What is the postcode for that? I am also looking for an indian restaurant near the nightclub, are there any?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -37,7 +33,6 @@
 			"id": "turn-5",
 			"input": {
 				"prompt": "Postcode please, than search for an indian restaurant if you are able to",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -45,7 +40,6 @@
 			"id": "turn-6",
 			"input": {
 				"prompt": "Great, as long as the restaurant is near the nightclub. Do you happen to know the postcode for the restaurant?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -53,7 +47,6 @@
 			"id": "turn-7",
 			"input": {
 				"prompt": "What kind of food did I ask for?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -61,7 +54,6 @@
 			"id": "turn-8",
 			"input": {
 				"prompt": "What type of attraction did I ask about?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		}

@@ -5,7 +5,6 @@
 			"id": "turn-1",
 			"input": {
 				"prompt": "Can you help me find a nice restaurant?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -13,7 +12,6 @@
 			"id": "turn-2",
 			"input": {
 				"prompt": "I was thinking some indian food would be great.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -21,7 +19,6 @@
 			"id": "turn-3",
 			"input": {
 				"prompt": "No, I don't care where it is. I'm thinking I'd like an expensive restaurant.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -29,7 +26,6 @@
 			"id": "turn-4",
 			"input": {
 				"prompt": "That is fine book me a table for 6 on Sat at 17:30. I also need a train for the same and should leave leicester for cambridge",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -37,7 +33,6 @@
 			"id": "turn-5",
 			"input": {
 				"prompt": "it doesn't matter as long as I am there by 13:45 leaving leicester going to cambridge, I'll need the reference number too  please",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -45,7 +40,6 @@
 			"id": "turn-6",
 			"input": {
 				"prompt": "That will be all for today. Thanks so much for all your help. Goodbye",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -53,7 +47,6 @@
 			"id": "turn-7",
 			"input": {
 				"prompt": "How many people did I say the table was for?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -61,7 +54,6 @@
 			"id": "turn-8",
 			"input": {
 				"prompt": "What kind of food did I ask for?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		}

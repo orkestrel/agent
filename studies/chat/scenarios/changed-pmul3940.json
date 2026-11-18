@@ -5,7 +5,6 @@
 			"id": "turn-1",
 			"input": {
 				"prompt": "I need some information on taking a train from Kings Lynn to Cambridge.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -13,7 +12,6 @@
 			"id": "turn-2",
 			"input": {
 				"prompt": "Wednesday, and can you please make sure I get there before 19:00.  I don't want to miss Wheel of fortune.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -21,7 +19,6 @@
 			"id": "turn-3",
 			"input": {
 				"prompt": "Thank you. What is the price for that train with ID TR3677?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -29,7 +26,6 @@
 			"id": "turn-4",
 			"input": {
 				"prompt": "Thank you. I am also looking for a multiple sports type attraction in the town centre. Can you tell me what is available?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -37,7 +33,6 @@
 			"id": "turn-5",
 			"input": {
 				"prompt": "what about the type of a museum?",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		},
@@ -45,7 +40,6 @@
 			"id": "turn-6",
 			"input": {
 				"prompt": "What type of attraction did I ask about? I mean the latest thing I told you.",
-				"system": "You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
 				"topic": "bookings"
 			}
 		}

@@ -14,6 +14,7 @@ import {
 import {
 	STUDY_CHAT_JUDGE,
 	STUDY_CHAT_OPTIONS,
+	STUDY_CHAT_SYSTEM,
 	STUDY_CHAT_THRESHOLDS,
 	STUDY_CHAT_TOPICS,
 } from '../constants.js'
@@ -82,7 +83,6 @@ export class StudyChatSession implements StudySessionInterface {
 		context: StudyContext,
 	): Promise<StudyProduct> {
 		const configuration = canonicalStringify({
-			system: input.system,
 			topic: input.topic,
 			...(input.record === undefined ? {} : { record: input.record }),
 		})
@@ -179,7 +179,7 @@ export class StudyChatSession implements StudySessionInterface {
 		)
 		return options.agent.createLedger(observer, {
 			judge,
-			system: input.system,
+			system: STUDY_CHAT_SYSTEM[input.topic],
 			topics: [{ name: input.topic, criterion: STUDY_CHAT_TOPICS[input.topic], requested: false }],
 			questions: options.agent.LEDGER_QUESTIONS,
 			thresholds: STUDY_CHAT_THRESHOLDS,

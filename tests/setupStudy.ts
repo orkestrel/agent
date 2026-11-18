@@ -59,6 +59,7 @@ import {
 } from '@orkestrel/contract'
 import { createRecorder, decodeJSONLines, waitForCondition, waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
+import { STUDY_CHAT_SYSTEM } from '../studies/chat/constants.js'
 import { isStudyChatInput } from '../studies/chat/validators.js'
 import { StudyChatDriver } from '../studies/chat/drivers/StudyChatDriver.js'
 import {
@@ -340,7 +341,7 @@ export async function runStudyChatDirect(
 				timeout: 180000,
 				options: { num_ctx: 8192, num_predict: 1, num_gpu: 0, temperature: 0, seed: 0 },
 			}),
-			system: input.system,
+			system: STUDY_CHAT_SYSTEM[input.topic],
 			topics: [
 				{
 					name: input.topic,

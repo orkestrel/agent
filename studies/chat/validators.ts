@@ -83,16 +83,15 @@ export function isStudyChatSeal(value: unknown): value is StudyChatSeal {
 		true,
 	)(value)
 }
-/** Checks public conversation input and refuses grading metadata or contradictory lookup data.
- * @example isStudyChatInput({ prompt: 'Hello.', system: 'Be brief.', topic: 'bookings' }) // true
+/** Checks public conversation input and refuses grading metadata, a system text, or contradictory lookup data.
+ * @example isStudyChatInput({ prompt: 'Hello.', topic: 'bookings' }) // true
  */
 export function isStudyChatInput(value: unknown): value is StudyChatInput {
 	return holds(
 		() =>
 			isRecord(value) &&
-			Object.keys(value).every((key) => ['prompt', 'system', 'topic', 'record'].includes(key)) &&
+			Object.keys(value).every((key) => ['prompt', 'topic', 'record'].includes(key)) &&
 			typeof value.prompt === 'string' &&
-			typeof value.system === 'string' &&
 			((value.topic === 'bookings' && value.record === undefined) ||
 				(value.topic === 'orders' && isStudyChatRecord(value.record))),
 	)

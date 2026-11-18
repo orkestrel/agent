@@ -39,6 +39,15 @@ export const STUDY_CHAT_TOPICS = Object.freeze({
 	bookings: 'Travel, hotel, restaurant, and taxi requirements a person stated',
 	orders: 'Orders, delivery, refunds, ownership and follow-up obligations',
 })
+/** Holds each conversation class's system text, the seal's `system` and `desk` fields byte for byte, so a scenario names its topic and never repeats the text.
+ * @example STUDY_CHAT_SYSTEM.orders.startsWith('You operate a support desk.') // true
+ */
+export const STUDY_CHAT_SYSTEM = Object.freeze({
+	bookings:
+		"You help people with travel, hotel, and restaurant bookings in Cambridge. You have no booking system here, so you can't search or book. Reply in one or two short sentences, keep track of what the person asked for, and answer their questions from the conversation.",
+	orders:
+		'You operate a support desk. Answer the current request from the available conversation and references. Be brief.',
+})
 /** Detects the battery's denial diagnostic independently of primary matching.
  * @example STUDY_CHAT_DENIAL.test('No record.') // true
  */

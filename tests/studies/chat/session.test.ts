@@ -220,7 +220,7 @@ it('keeps absent first content unknown and refuses a transport fault', async () 
 			try {
 				const goal = {
 					id: 'turn-1',
-					input: { prompt: 'Hello', system: 'Be brief.', topic: 'bookings' },
+					input: { prompt: 'Hello', topic: 'bookings' },
 				}
 				const outcome = await session.execute(goal, context.context).then(
 					(product) => ({ product, fault: undefined }),

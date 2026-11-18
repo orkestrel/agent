@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { parseStudyDefinition, parseStudyRubric, parseStudyScenario } from '@orkestrel/study'
-import { parseJSON } from '@orkestrel/contract'
+import { isRecord, parseJSON } from '@orkestrel/contract'
+import { STUDY_CHAT_SYSTEM } from '../../../studies/chat/constants.js'
 import { isStudyChatSeal } from '../../../studies/chat/validators.js'
 import { describe, expect, it } from 'vitest'
 import {
@@ -10,6 +11,19 @@ import {
 } from '../../../studies/chat/helpers.js'
 
 describe('sealed chat conversion', () => {
+	it('binds each conversation class system text to the seal byte for byte, and no scenario repeats it', () => {
+		const source = readFileSync('studies/chat/sources/sealed.json', 'utf8')
+		const seal = parseJSON(source)
+		if (!isStudyChatSeal(seal)) throw new Error('Malformed seal')
+		expect(STUDY_CHAT_SYSTEM).toEqual({ bookings: seal.system, orders: seal.desk })
+		const converted = buildStudyChatConversion(source)
+		expect(
+			converted.scenarios.flatMap((scenario) =>
+				scenario.goals.filter((goal) => isRecord(goal.input) && 'system' in goal.input),
+			),
+		).toEqual([])
+	})
+
 	it('pins the source bytes, membership, order, prompts and primary denominator', () => {
 		const source = readFileSync('studies/chat/sources/sealed.json', 'utf8')
 		const converted = buildStudyChatConversion(source)

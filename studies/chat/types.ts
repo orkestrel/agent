@@ -63,12 +63,11 @@ export interface StudyChatSeal {
 	readonly changed: readonly StudyChatDialogue[]
 	readonly scripted: readonly StudyChatScript[]
 }
-/** Carries only the request and public conversation configuration into the driver.
- * @example const input: StudyChatInput = { prompt: 'Hello.', system: 'Be brief.', topic: 'bookings' }
+/** Carries only the request and public conversation configuration into the driver; the topic selects the system text in `STUDY_CHAT_SYSTEM`.
+ * @example const input: StudyChatInput = { prompt: 'Hello.', topic: 'bookings' }
  */
 export interface StudyChatInput {
 	readonly prompt: string
-	readonly system: string
 	readonly topic: 'bookings' | 'orders'
 	readonly record?: StudyChatRecord
 }

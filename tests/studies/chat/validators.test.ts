@@ -8,11 +8,10 @@ import { validateStudyChatProfile } from '../../../studies/chat/helpers.js'
 it('rejects grading metadata at the public boundary and preserves stated facts', () => {
 	const input = {
 		prompt: 'I want a moderate hotel.',
-		system: 'Travel assistant.',
 		topic: 'bookings',
 	}
 	expect(isStudyChatInput(input)).toBe(true)
-	for (const key of ['accept', 'refuse', 'check', 'depth', 'slot'])
+	for (const key of ['system', 'accept', 'refuse', 'check', 'depth', 'slot'])
 		expect(isStudyChatInput({ ...input, [key]: 'moderate' })).toBe(false)
 	expect(isStudyChatInput(null)).toBe(false)
 	const revoked = Proxy.revocable({}, {})
