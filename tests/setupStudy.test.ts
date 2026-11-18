@@ -33,7 +33,6 @@ import {
 	createMemoryContext,
 	createMemoryServer,
 	listMemoryKeys,
-	loadStudyToolsFixture,
 	readMemoryAdmission,
 	readMemoryControls,
 	readMemoryEvents,
@@ -415,12 +414,6 @@ describe('study declaration fixtures', () => {
 			'lookup',
 			'result',
 		])
-	})
-
-	it('loads the context declaration', async () => {
-		const { manifest } = await loadStudyToolsFixture('context')
-		expect(manifest.definition.driver).toBe('tools')
-		expect(manifest.scenarios.map((scenario) => scenario.id)).toEqual(['libraries'])
 	})
 })
 
@@ -1168,11 +1161,5 @@ describe('study install fixtures', () => {
 			capture.replay.fetch('metadata', 'http://127.0.0.1:7/api/tags', {}),
 		).rejects.toThrow(STUDY_MEMORY_REPLAY_REFUSAL)
 		expect(capture.sent.calls).toEqual([['metadata', '/api/tags']])
-	})
-
-	it('loads actual tools declarations', async () => {
-		const fixture = await loadStudyToolsFixture()
-		expect(fixture.manifest.definition.driver).toBe('tools')
-		expect(fixture.subject).toHaveProperty('Agent')
 	})
 })

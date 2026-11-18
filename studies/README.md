@@ -13,13 +13,11 @@ The `@orkestrel/study` package fixes the shape: `studies/<name>/study.json` decl
 | `compactionendurance`     | `memory` | quality   | How compaction keeps work, corrections, and obligations over the whole public endurance workload.                        |
 | `compactionmemory`        | `memory` | quality   | How compaction and the full conversation keep corrections and obligations on the `handoff` trajectory.                   |
 | `compactionqualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload for compaction. Every long compaction run goes through it. |
-| `context`                 | `tools`  | mechanism | Whether the built Agent carries a memo set and a skill registry across conversations, loads, and scopes.                 |
 | `disclosure`              | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.                      |
 | `recordscapacity`         | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for records and the full conversation within its bounds.       |
 | `recordsendurance`        | `memory` | quality   | How records keep work, corrections, and obligations over the whole public endurance workload.                            |
 | `recordsmemory`           | `memory` | quality   | How records and the full conversation keep corrections and obligations on the `handoff` trajectory.                      |
 | `recordsqualification`    | `memory` | capacity  | Whether the selected profile completes the endurance workload for records. Every long records run goes through it.       |
-| `tools`                   | `tools`  | mechanism | Whether the built Agent dispatches and refuses real tools, aborts declared work, and isolates repeated trials.           |
 
 Each study on the `memory` driver schedules one strategy, records or compaction, with `full` as its only other arm, so the two strategies run as separate executions and never together. The adapter refuses a memory declaration that lists both strategies, or neither. Each quality study is qualified by the capacity study of its strategy: `recordsmemory` by `recordscapacity`, `compactionmemory` by `compactioncapacity`, `recordsendurance` by `recordsqualification`, and `compactionendurance` by `compactionqualification`.
 
@@ -30,7 +28,6 @@ The following table lists each driver bundle:
 | `studies/memory/` | The records, compaction, and full-conversation arms over a support desk, with their session and profiles. |
 | `studies/chat/`   | The sealed chat battery over fresh ledgers with one Mica judge and three ledger capacities.               |
 | `studies/desk/`   | The desk catalog's two disclosure arms over bare agents, with its one `screen` profile.                   |
-| `studies/tools/`  | One agent over real scratch tools, with its one `local` profile.                                          |
 
 The following table lists the memory profiles under `studies/memory/profiles/`. Each pair holds the same bytes except `name` and `qualification`, which names the capacity result its strategy's quality study pairs with:
 

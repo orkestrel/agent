@@ -50,7 +50,6 @@ import {
 	parseStudyProfile,
 	parseStudyScenario,
 	buildStudySchedule,
-	validateStudyInputs,
 	StudyControl,
 	StudyError,
 	StudyMeter,
@@ -61,7 +60,6 @@ import {
 	STUDY_CHECKPOINT_EVENT,
 	StudyResultStore,
 	buildStudyExchangeDeclaration,
-	collectStudyEvidence,
 	readStudyDeclaration,
 	readStudyResult,
 } from '@orkestrel/study/server'
@@ -70,7 +68,6 @@ import {
 	StudyMemoryDriver,
 	StudyMemoryJudge,
 } from '../studies/memory/index.js'
-import { StudyToolsDriver } from '../studies/tools/index.js'
 import { STUDY_DESK_TOOLS } from '../studies/desk/constants.js'
 import { isStudyDeskAssertion, isStudyDeskInput } from '../studies/desk/validators.js'
 import * as agent from '../src/core/index.js'
@@ -81,7 +78,6 @@ import { deepStrictEqual, strictEqual } from 'node:assert'
 import { execFile } from 'node:child_process'
 import { cpSync, existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { readFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createLedgerJudge } from './setup.js'
@@ -1763,26 +1759,6 @@ export function createMemoryContext(
 	}
 }
 
-/**
- * Loads actual CPU tool declarations and the built subject for mechanism proofs.
- * @param study - The declaration over the `tools` driver. Default: `tools`.
- * @returns Actual declarations and a built ESM namespace
- */
-export async function loadStudyToolsFixture(study = 'tools'): Promise<StudyToolsFixture> {
-	const { definition, rubric, scenarios } = await readStudyDeclaration(
-		fileURLToPath(new URL('../', import.meta.url)),
-		study,
-	)
-	const profile = parseStudyProfile(
-		parseJSON(
-			await readFile(new URL('../studies/tools/profiles/local.json', import.meta.url), 'utf8'),
-		),
-	)
-	validateStudyInputs(definition, scenarios, rubric, profile)
-	const manifest = buildCustodyManifest(definition, scenarios, profile.bounds)
-	return { manifest, rubric, profile, agent, subject: agent }
-}
-
 /** Returns an independently attributed assessment over the supplied scheduled attempts. */
 export function buildStudyAssessment(
 	schedule: readonly StudyTrial[],
@@ -2176,256 +2152,12 @@ export type MemoryAdmissionFixture = Pick<
 	'requests' | 'products' | 'failure' | 'usage'
 >
 
-/** Holds actual declarations and the existing built Agent used by CPU tool proofs, as both the runtime and the tested subject. */
-export interface StudyToolsFixture {
-	readonly manifest: StudyManifest
-	readonly rubric: StudyRubric
-	readonly profile: StudyProfile
-	readonly agent: unknown
-	readonly subject: unknown
-}
-
-/** Holds one sealed in-process series over a declaration of the `tools` driver. */
-export interface StudyToolsRun {
-	readonly fixture: StudyToolsFixture
-	readonly manifest: StudyManifest
-	readonly attempts: readonly StudyAttempt[]
-	/** Holds the sealed result's id. */
-	readonly seal: string
-	/** Holds the evidence rows keyed by trial id. */
-	readonly evidence: Readonly<Record<string, readonly StudyEvidence[]>>
-	/** Holds each scheduled trial's rows, in schedule order. */
-	readonly trials: ReadonlyArray<readonly StudyEvidence[]>
-}
-
-/** Holds one role and content of one retained request message. */
-export interface StudyToolsMessage {
-	readonly role: string
-	readonly content: string
-}
-
-/** Pins one well-formed goal input holding every library member. */
-export const STUDY_TOOLS_LIBRARY_INPUT = Object.freeze({
-	prompt: 'Answer under the scope.',
-	admitted: true,
-	files: Object.freeze([]),
-	responses: Object.freeze([Object.freeze({ content: 'Scoped.', calls: Object.freeze([]) })]),
-	conversation: 'second',
-	scope: Object.freeze({ skills: Object.freeze(['triage']), memos: Object.freeze(['reach']) }),
-	skills: Object.freeze([
-		Object.freeze({
-			name: 'triage',
-			description: 'Sorts a report by severity.',
-			content: 'Read the report, then name its severity.',
-		}),
-	]),
-	memos: Object.freeze(['tone', 'reach']),
-})
-
-/** Lists goal inputs that each break one library member of {@link STUDY_TOOLS_LIBRARY_INPUT}. */
-export const STUDY_TOOLS_MALFORMED_LIBRARIES: readonly unknown[] = Object.freeze([
-	{ ...STUDY_TOOLS_LIBRARY_INPUT, extra: true },
-	{ ...STUDY_TOOLS_LIBRARY_INPUT, conversation: 'con' },
-	{ ...STUDY_TOOLS_LIBRARY_INPUT, scope: { tools: ['write'] } },
-	{
-		...STUDY_TOOLS_LIBRARY_INPUT,
-		skills: [{ name: 'triage', description: 'Sorts a report by severity.' }],
-	},
-	{
-		...STUDY_TOOLS_LIBRARY_INPUT,
-		skills: ['one', 'two', 'three', 'four', 'five'].map((name) => ({
-			name,
-			description: 'Sorts a report by severity.',
-			content: 'Read the report, then name its severity.',
-		})),
-	},
-	{ ...STUDY_TOOLS_LIBRARY_INPUT, memos: ['one', 'two', 'three', 'four', 'five'] },
-	{ ...STUDY_TOOLS_LIBRARY_INPUT, scope: { skills: ['one', 'two', 'three', 'four', 'five'] } },
-	{ ...STUDY_TOOLS_LIBRARY_INPUT, scope: { memos: ['one', 'two', 'three', 'four', 'five'] } },
-	{ ...STUDY_TOOLS_LIBRARY_INPUT, memos: ['tone', 'tone'] },
-])
-
-/** Pins the well-formed request, memo, and counted tool assertions the malformed rows break. */
-export const STUDY_TOOLS_LIBRARY_ASSERTIONS = Object.freeze({
-	request: Object.freeze({
-		observation: 'request',
-		at: 0,
-		role: 'system',
-		text: '- review:',
-		present: true,
-	}),
-	memo: Object.freeze({
-		observation: 'memo',
-		name: 'tone',
-		revisions: 2,
-		description: 'Prefers bullet lists.',
-	}),
-	tool: Object.freeze({ observation: 'tool', name: 'skill', success: true, count: 1 }),
-})
-
-/** Lists assertions that each break one member of {@link STUDY_TOOLS_LIBRARY_ASSERTIONS}. */
-export const STUDY_TOOLS_MALFORMED_ASSERTIONS: readonly unknown[] = Object.freeze([
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.request, at: -1 },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.request, at: 0.5 },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.request, role: 'assistant' },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.request, text: '' },
-	{ observation: 'request', at: 0, role: 'system', text: '- review:' },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.memo, revisions: -1 },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.memo, name: 'con' },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.tool, count: 0 },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.tool, count: 1.5 },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.tool, name: 'erase' },
-	{ ...STUDY_TOOLS_LIBRARY_ASSERTIONS.request, extra: true },
-])
-
-/**
- * Executes and seals a declaration of the `tools` driver through `StudySeries`, then removes its scratch.
- * @param study - The declaration. Default: `tools`.
- * @returns The sealed attempts and their collected evidence.
- * @throws Error - Thrown when the result does not seal.
- */
-export async function executeStudyToolsFixture(study = 'tools'): Promise<StudyToolsRun> {
-	const fixture = await loadStudyToolsFixture(study)
-	const scratch = createScratch()
-	try {
-		const directory = join(scratch.path, 'result')
-		const store = new StudyResultStore({ directory, manifest: fixture.manifest })
-		await store.create()
-		await new StudySeries({
-			manifest: fixture.manifest,
-			driver: new StudyToolsDriver({
-				agent: fixture.agent,
-				subject: fixture.subject,
-				directory: scratch.ensure('work'),
-			}),
-			store,
-			signal: new AbortController().signal,
-		}).execute()
-		await store.seal()
-		const result = await readStudyResult(directory)
-		if (result.status !== 'sealed') throw new Error('The tools series did not seal')
-		const evidence = await collectStudyEvidence(result)
-		return {
-			fixture,
-			manifest: result.manifest,
-			attempts: result.attempts,
-			seal: result.seal.id,
-			evidence,
-			trials: result.manifest.schedule.map((trial) => evidence[trial.id] ?? []),
-		}
-	} finally {
-		scratch.destroy()
-	}
-}
-
-/**
- * Reads each request one goal sent, as the roles and contents its retained `provider` rows hold.
- * @param rows - One trial's retained rows.
- * @param goal - The goal to read.
- * @returns One message list per request, in request order.
- * @throws Error - Thrown when a `provider` row holds no list of role and content strings.
- */
-export function readStudyToolsRequests(
-	rows: readonly StudyEvidence[],
-	goal: string,
-): ReadonlyArray<readonly StudyToolsMessage[]> {
-	return rows
-		.filter((row) => row.goal === goal && row.event === 'provider')
-		.map((row) => {
-			const request: unknown = isRecord(row.value) ? row.value.request : undefined
-			if (!arrayOf(isRecord)(request)) throw new Error(`Malformed ${goal} provider row`)
-			return request.map(({ role, content }) => {
-				if (!isString(role) || !isString(content)) throw new Error(`Malformed ${goal} message`)
-				return { role, content }
-			})
-		})
-}
-
-/**
- * Reads the text one role holds in one request of one goal.
- * @param rows - One trial's retained rows.
- * @param goal - The goal to read.
- * @param at - The request's position within the goal.
- * @param role - The role to read.
- * @returns The role's contents joined by line breaks, empty when the request holds no such message.
- * @throws Error - Thrown when the goal sent no such request, so a negative read cannot pass on an absent request.
- */
-export function readStudyToolsText(
-	rows: readonly StudyEvidence[],
-	goal: string,
-	at: number,
-	role: string,
-): string {
-	const request = readStudyToolsRequests(rows, goal)[at]
-	if (request === undefined) throw new Error(`The ${goal} goal sent no request ${at}`)
-	return request
-		.filter((message) => message.role === role)
-		.map((message) => message.content)
-		.join('\n')
-}
-
-/**
- * Collects the record values of one event's rows, each beside the goal it names.
- * @param rows - One trial's retained rows.
- * @param event - The event to read.
- * @returns One record per matching row, in row order.
- */
-export function collectStudyToolsRows(
-	rows: readonly StudyEvidence[],
-	event: string,
-): ReadonlyArray<Readonly<Record<string, unknown>>> {
-	return rows.flatMap((row) =>
-		row.event === event && isRecord(row.value) ? [{ goal: row.goal, ...row.value }] : [],
-	)
-}
-
 /** Holds real request admission and its single cleanup owner. */
 export interface StudyMeterFixture {
 	readonly control: StudyControl
 	readonly meter: StudyMeter
 	readonly scopes: readonly StudyScope[]
 	close(): void
-}
-
-/** Creates a study context whose evidence is captured by a call recorder. */
-export function createRecordedStudyContext(
-	fixture: StudyMeterFixture,
-	rows: RecorderInterface<readonly [StudyEvidence]>,
-): StudyContext {
-	return {
-		signal: fixture.control.signal,
-		meter: fixture.meter,
-		evidence: {
-			append: async (row) => {
-				rows.handler(row)
-			},
-		},
-	}
-}
-
-/** Creates a study context that appends evidence to the supplied trace. */
-export function createTraceStudyContext(
-	fixture: StudyMeterFixture,
-	rows: StudyEvidence[],
-): StudyContext {
-	return {
-		signal: fixture.control.signal,
-		meter: fixture.meter,
-		evidence: {
-			append: async (row) => {
-				rows.push(row)
-			},
-		},
-	}
-}
-
-/** Creates a study context with an inert evidence sink. */
-export function createQuietStudyContext(fixture: StudyMeterFixture): StudyContext {
-	return {
-		signal: fixture.control.signal,
-		meter: fixture.meter,
-		evidence: { append: async () => undefined },
-	}
 }
 
 /** Maps each memory instrument fixture text to the ids it carries; the cases read it through a callback. */
