@@ -96,7 +96,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			roles,
 			signal: options.signal,
 			observe: this.#observation.observe,
-			timing: options.provider.extractTiming,
+			extract: options.provider.extractTiming,
 			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),
 			...(options.replay === undefined ? {} : { replay: options.replay }),
 		})

@@ -96,7 +96,7 @@ it('routes a lone Mica question through the judge custody role with its exact ef
 			roles: buildStudyChatRoles(fixture),
 			signal: new AbortController().signal,
 			observe: true,
-			timing: extractTiming,
+			extract: extractTiming,
 		})
 		try {
 			transport.prepare({ goal: 'turn-1', context: context.context, checkpoint: undefined })

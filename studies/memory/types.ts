@@ -249,13 +249,13 @@ export interface StudyMemoryCarriageInput {
 	readonly literals: StudyMemoryLiteralHandler
 }
 
-/** Holds the counts and durations of a Study `wire` timing the instruments read; `null` mirrors `buildStudyOllamaTiming`, which reports an unreported value as `null`. */
+/** Holds the counts and durations of a Study `wire` timing the instruments read; `null` mirrors `buildStudyOllamaTelemetry`, which reports an unreported value as `null`. */
 export interface StudyMemoryTiming {
 	readonly counts: { readonly prompt: number | null; readonly cached: number | null }
 	readonly durations?: { readonly total: number | null } | undefined
 }
 
-/** Holds the members of a Study `wire` value the instruments read; `timing` is `null` when `buildStudyOllamaTiming` observed no terminal timing, and `prompt` and `completion` are `null` when the terminal reported none. */
+/** Holds the members of a Study `wire` value the instruments read; `timing` is `null` when `buildStudyOllamaTelemetry` observed no terminal timing, and `prompt` and `completion` are `null` when the terminal reported none. */
 export interface StudyMemoryWire {
 	readonly role: string
 	readonly prompt?: number | null | undefined

@@ -6,7 +6,7 @@ import type {
 } from '@orkestrel/ollama/server'
 import type {
 	StudyAssessment,
-	StudyBounds,
+	StudyAllowance,
 	StudyContext,
 	StudyCriterion,
 	StudyDefinition,
@@ -1328,7 +1328,7 @@ export function buildStudyAssessment(
  * @returns Owned control, scopes, and meter with cleanup.
  */
 export function createStudyMeterFixture(
-	bounds: Partial<StudyBounds> = {},
+	bounds: Partial<StudyAllowance> = {},
 	signal?: AbortSignal,
 ): StudyMeterFixture {
 	const limit = { duration: 1000, calls: 4, tokens: 100, bytes: 100 }
@@ -1366,7 +1366,7 @@ export function createStudyMeterFixture(
 export function buildCustodyManifest(
 	definition: StudyDefinition,
 	scenarios: readonly StudyScenario[],
-	bounds: StudyBounds,
+	bounds: StudyAllowance,
 	identity: string | undefined = undefined,
 ): StudyManifest {
 	return {

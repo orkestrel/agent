@@ -67,7 +67,7 @@ export class StudyDeskSession implements StudySessionInterface {
 			roles: buildStudyDeskRoles(options.profile),
 			signal: linkSignal(options.signal, this.#abort.signal),
 			observe: true,
-			timing: options.provider.extractTiming,
+			extract: options.provider.extractTiming,
 			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),
 			...(options.replay === undefined ? {} : { replay: options.replay }),
 		})

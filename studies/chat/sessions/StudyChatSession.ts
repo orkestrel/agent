@@ -50,7 +50,7 @@ export class StudyChatSession implements StudySessionInterface {
 			roles: buildStudyChatRoles(options.profile),
 			signal: linkSignal(options.signal, this.#abort.signal),
 			observe: true,
-			timing: options.provider.extractTiming,
+			extract: options.provider.extractTiming,
 			...(options.exchanges === undefined ? {} : { exchanges: options.exchanges }),
 			...(options.replay === undefined ? {} : { replay: options.replay }),
 		})
