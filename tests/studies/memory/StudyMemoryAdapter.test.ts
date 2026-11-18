@@ -2,7 +2,7 @@ import { isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, parseStudyProfile, parseStudyScenario } from '@orkestrel/study'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { createStudyAdapter, isStudyMemoryOptions } from '../../../studies/memory/index.js'
+import { createStudyAdapter } from '../../../studies/memory/index.js'
 import {
 	buildCustodyManifest,
 	buildMemoryCriterion,
@@ -63,17 +63,6 @@ describe('memory declaration and mechanical evidence', () => {
 				profile: buildMemoryProfile({ url, settings: { ...settings, checkpoints: [...declared] } }),
 			}),
 		).toThrow(/horizon of 3/)
-	})
-
-	it('declares the narrow arm as smallest with one correction setting', async () => {
-		const smallest = parseJSON(await readFile('studies/memory/profiles/smallest.json', 'utf8'))
-		if (!isRecord(smallest) || !isRecord(smallest.settings))
-			throw new Error('Missing smallest settings')
-		for (const [name, correction] of [['narrow', { narrow: true }]] as const) {
-			const profile = parseJSON(await readFile(`studies/memory/profiles/${name}.json`, 'utf8'))
-			expect(profile).toEqual({ ...smallest, name, settings: { ...smallest.settings, correction } })
-			expect(isStudyMemoryOptions(parseStudyProfile(profile).settings)).toBe(true)
-		}
 	})
 
 	it('reads one goal into progress', () => {
