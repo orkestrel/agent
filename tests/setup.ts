@@ -17688,3 +17688,131 @@ export function buildAgentCallerCases(workspace: WorkspaceInterface): readonly A
 		{ name: 'a revoked proxy', value: revocable.proxy, admitted: false },
 	]
 }
+
+import type { AgentChunk } from '@src/core'
+
+/**
+ * Lists the provider turns of a ledger request that takes two passes: a lookup call with two
+ * reasoning deltas, then an empty reply, so the ledger runs its answer pass, then the answer as two
+ * content deltas.
+ */
+export const LEDGER_STREAM_TURNS: readonly ScriptedTurn[] = Object.freeze([
+	{
+		result: {
+			content: '',
+			tools: [{ id: 'l1', name: 'lookup', arguments: { id: 'BW-20931' } }],
+			usage: { prompt: 40, completion: 3, total: 43 },
+		},
+		thoughts: ['check ', 'the account'],
+	},
+	{ content: '', usage: { prompt: 60, completion: 1, total: 61 } },
+	{
+		result: { content: 'The refund is $148.50.', usage: { prompt: 70, completion: 6, total: 76 } },
+		deltas: ['The refund ', 'is $148.50.'],
+	},
+])
+
+/**
+ * Lists the provider turns of a ledger request whose first pass streams text in its call turn and
+ * then ends empty, so the answer pass replaces that pass.
+ */
+export const LEDGER_STREAM_REPLACED_TURNS: readonly ScriptedTurn[] = Object.freeze([
+	{
+		content: 'Checking the account.',
+		tools: [{ id: 'l1', name: 'lookup', arguments: { id: 'BW-20931' } }],
+	},
+	{ content: '' },
+	{ content: 'The refund is $148.50.' },
+])
+
+/**
+ * Renders one streamed chunk as its category and the detail a test compares: a delta's text, a
+ * tool call's name and outcome, a usage's prompt and completion, or an asked call's name.
+ *
+ * @param chunk - The chunk a stream yielded
+ * @returns The rendered chunk
+ */
+export function renderAgentChunk(chunk: AgentChunk): string {
+	if (chunk.category === 'token' || chunk.category === 'think')
+		return `${chunk.category}:${chunk.content}`
+	if (chunk.category === 'tool')
+		return `tool:${chunk.call.name}:${chunk.result.success ? 'ok' : 'failed'}`
+	if (chunk.category === 'usage')
+		return `usage:${String(chunk.usage.prompt)}/${String(chunk.usage.completion)}`
+	return `ask:${chunk.call.name}`
+}
+
+/**
+ * Renders a ledger's result and conversation as JSON with every attempt summarized and each message
+ * id written as its conversation position, so two ledgers that served the same request compare byte
+ * for byte.
+ *
+ * @param result - The result the ledger settled
+ * @param ledger - The ledger that settled it
+ * @returns The JSON text of the result and the conversation's messages
+ */
+export function renderLedgerOutcome(result: LedgerResult, ledger: LedgerInterface): string {
+	const messages = ledger.conversation.messages()
+	return renderLedgerPositions(
+		{ result: { ...result, attempts: summarizeAttempts(result.attempts) }, messages },
+		messages,
+	)
+}
+
+/**
+ * Builds ledger options with no topics whose lookup names each looked-up id as its own owner:
+ * Brightwater Studio for `BW-20931` and Odile Marlow for any other id.
+ *
+ * @returns The ledger options
+ */
+export function buildLedgerTwoOwnerOptions(): LedgerOptions {
+	return buildLedgerOptions({
+		topics: [],
+		capacity: 32768,
+		lookups: [
+			{
+				tool: createTool({ name: 'lookup', execute: () => '' }),
+				read: (values) => ({
+					ids: [String(values.id)],
+					owners: [
+						{
+							id: String(values.id),
+							names: [values.id === 'BW-20931' ? 'Brightwater Studio' : 'Odile Marlow'],
+						},
+					],
+				}),
+			},
+		],
+	})
+}
+
+/**
+ * Seeds a ledger built from {@link buildLedgerTwoOwnerOptions} with each owner's lookup exchange and
+ * a later statement under Odile Marlow that amends the Brightwater Studio finding without
+ * superseding it, so a request for Brightwater Studio shows the finding with a note that a later
+ * change is not shown.
+ *
+ * @param ledger - The ledger whose conversation takes the seed
+ * @returns The amended finding and its amender
+ */
+export function seedLedgerOmission(ledger: LedgerInterface): {
+	readonly earlier: Message
+	readonly later: Message
+} {
+	const first = ledger.conversation.add(
+		buildLedgerExchange('Brightwater Studio delivery costs $10.', 'first-owner', {
+			id: 'BW-20931',
+		}),
+	)
+	ledger.conversation.add(
+		buildLedgerExchange('Odile Marlow has an account.', 'second-owner', { id: 'OM-30418' }),
+	)
+	const earlier = requireValue(first.find((message) => message.role === 'tool'))
+	const later = ledger.conversation.add({
+		role: 'user',
+		content: 'Odile Marlow corrects the $10 delivery price to $12.',
+	})
+	ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
+	ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+	return { earlier, later }
+}

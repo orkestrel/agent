@@ -60,6 +60,7 @@ import {
 } from '@orkestrel/workspace'
 import {
 	captureError,
+	collect,
 	createRecorder,
 	invokeUnchecked,
 	requireValue,
@@ -150,8 +151,14 @@ import {
 	createOnceFailingJudge,
 	createPhraseJudge,
 	createRefusingJudge,
+	buildLedgerTwoOwnerOptions,
+	renderAgentChunk,
+	renderLedgerOutcome,
+	seedLedgerOmission,
 	LEDGER_HOLD_FIXTURE,
 	LEDGER_ONCE_FAILURES,
+	LEDGER_STREAM_REPLACED_TURNS,
+	LEDGER_STREAM_TURNS,
 	createScriptedProvider,
 	extractLedgerRecords,
 	readCallRequest,
@@ -1862,42 +1869,8 @@ describe('Ledger', () => {
 			const provider = createScriptedProvider([{ content: 'First reply.' }, { content: 'Done.' }], {
 				recorded: true,
 			})
-			const ledger = createLedger(
-				provider,
-				buildLedgerOptions({
-					topics: [],
-					capacity: 32768,
-					lookups: [
-						{
-							tool: createTool({ name: 'lookup', execute: () => '' }),
-							read: (values) => ({
-								ids: [String(values.id)],
-								owners: [
-									{
-										id: String(values.id),
-										names: [values.id === 'BW-20931' ? 'Brightwater Studio' : 'Odile Marlow'],
-									},
-								],
-							}),
-						},
-					],
-				}),
-			)
-			const first = ledger.conversation.add(
-				buildLedgerExchange('Brightwater Studio delivery costs $10.', 'first-owner', {
-					id: 'BW-20931',
-				}),
-			)
-			ledger.conversation.add(
-				buildLedgerExchange('Odile Marlow has an account.', 'second-owner', { id: 'OM-30418' }),
-			)
-			const earlier = requireValue(first.find((message) => message.role === 'tool'))
-			const later = ledger.conversation.add({
-				role: 'user',
-				content: 'Odile Marlow corrects the $10 delivery price to $12.',
-			})
-			ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
-			ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
+			const ledger = createLedger(provider, buildLedgerTwoOwnerOptions())
+			const { later } = seedLedgerOmission(ledger)
 			const request = reverse ? 'Check Odile Marlow.' : 'Check Brightwater Studio.'
 			await ledger.respond(request)
 			const copy = requireValue(requireValue(provider.calls[0]).messages.at(-1))
@@ -13150,4 +13123,419 @@ describe('Ledger — the option doors refuse a member their type does not declar
 			})
 		},
 	)
+})
+
+describe('Ledger — the stream', () => {
+	it('yields the first pass and then the answer pass, each chunk in the order its provider streamed it', async () => {
+		const ledger = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const handle = ledger.stream('What is the Brightwater refund?')
+		const chunks = await collect(handle.events)
+		const result = await handle.result
+
+		expect(chunks.map(renderAgentChunk)).toEqual([
+			'think:check ',
+			'think:the account',
+			'usage:40/3',
+			'tool:lookup:ok',
+			'usage:60/1',
+			'token:The refund ',
+			'token:is $148.50.',
+			'usage:70/6',
+		])
+		expect(result.passes.map((pass) => pass.content)).toEqual(['', 'The refund is $148.50.'])
+		expect(result.content).toBe('The refund is $148.50.')
+	})
+
+	it("streams the tokens of a first pass the answer pass replaces, while the result's content is the answer pass alone", async () => {
+		const ledger = createLedger(
+			createScriptedProvider(LEDGER_STREAM_REPLACED_TURNS),
+			buildLedgerOptions(),
+		)
+		const handle = ledger.stream('What is the Brightwater refund?')
+		const chunks = await collect(handle.events)
+
+		expect(chunks.flatMap((chunk) => (chunk.category === 'token' ? [chunk.content] : []))).toEqual([
+			'Checking the account.',
+			'The refund is $148.50.',
+		])
+		expect((await handle.result).content).toBe('The refund is $148.50.')
+	})
+
+	it('settles the result and the conversation respond settles for the same scripted request', async () => {
+		const responded = createLedger(
+			createScriptedProvider(LEDGER_STREAM_TURNS),
+			buildLedgerOptions(),
+		)
+		const streamed = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const reply = await responded.respond('What is the Brightwater refund?')
+		const handle = streamed.stream('What is the Brightwater refund?')
+		await collect(handle.events)
+
+		expect(renderLedgerOutcome(await handle.result, streamed)).toBe(
+			renderLedgerOutcome(reply, responded),
+		)
+	})
+
+	it('rejects a transient judge failure through its result and its events, as respond rejects it', async () => {
+		const failure = new Error('judge error: connection reset')
+		const responded = createLedger(
+			createScriptedProvider(LEDGER_STREAM_TURNS),
+			buildLedgerOptions({ judge: createOnceFailingJudge(failure, createPhraseJudge([])) }),
+		)
+		const streamed = createLedger(
+			createScriptedProvider(LEDGER_STREAM_TURNS),
+			buildLedgerOptions({ judge: createOnceFailingJudge(failure, createPhraseJudge([])) }),
+		)
+		for (const ledger of [responded, streamed])
+			ledger.conversation.add({ role: 'user', content: 'The depot opens at nine.' })
+		const handle = streamed.stream('When does it open?')
+
+		await expect(responded.respond('When does it open?')).rejects.toBe(failure)
+		await expect(collect(handle.events)).rejects.toBe(failure)
+		await expect(handle.result).rejects.toBe(failure)
+		expect(
+			renderLedgerPositions(streamed.conversation.messages(), streamed.conversation.messages()),
+		).toBe(
+			renderLedgerPositions(responded.conversation.messages(), responded.conversation.messages()),
+		)
+	})
+
+	it('refuses a request while a stream is live, and a stream while a request is live, with CONCURRENCY', async () => {
+		const ledger = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const live = ledger.stream('What is the Brightwater refund?')
+		const during = await Promise.allSettled([
+			ledger.respond('Again?'),
+			ledger.stream('Again?').result,
+		])
+		await live.result
+		const pending = ledger.respond('What is the Brightwater refund?')
+		const beside = await Promise.allSettled([ledger.stream('Again?').result])
+		await pending
+
+		expect(
+			[...during, ...beside].map((settled) =>
+				settled.status === 'rejected' && isAgentError(settled.reason)
+					? settled.reason.code
+					: settled.status,
+			),
+		).toEqual(['CONCURRENCY', 'CONCURRENCY', 'CONCURRENCY'])
+	})
+
+	it('rejects a signal that is not a native AbortSignal through its result, as respond does, and stays free', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const handle = ledger.stream('First.', createForeignSignal())
+
+		await expect(handle.result).rejects.toThrow(/AbortSignal/)
+		await expect(collect(handle.events)).rejects.toThrow(/AbortSignal/)
+		expect(ledger.conversation.count).toBe(0)
+		expect(provider.calls).toHaveLength(0)
+		expect((await ledger.stream('Second.').result).content).toBe('Done.')
+	})
+
+	it('ends a caller abort and a handle abort after the first pass lookup as respond ends a caller abort', async () => {
+		const responded = createLedger(
+			createScriptedProvider(LEDGER_STREAM_TURNS),
+			buildLedgerOptions(),
+		)
+		const streamed = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const held = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const first = new AbortController()
+		responded.agent.emitter.on('tool', () => first.abort('stop after the lookup'))
+		const reply = await responded.respond('What is the Brightwater refund?', first.signal)
+		const second = new AbortController()
+		streamed.agent.emitter.on('tool', () => second.abort('stop after the lookup'))
+		const handle = streamed.stream('What is the Brightwater refund?', second.signal)
+		const chunks = await collect(handle.events)
+		const own = held.stream('What is the Brightwater refund?')
+		held.agent.emitter.on('tool', () => own.abort('stop after the lookup'))
+		await collect(own.events)
+
+		expect([reply.partial, reply.passes.length]).toEqual([true, 1])
+		expect(chunks.map(renderAgentChunk)).toEqual([
+			'think:check ',
+			'think:the account',
+			'usage:40/3',
+			'tool:lookup:ok',
+		])
+		expect(renderLedgerOutcome(await handle.result, streamed)).toBe(
+			renderLedgerOutcome(reply, responded),
+		)
+		expect(renderLedgerOutcome(await own.result, held)).toBe(renderLedgerOutcome(reply, responded))
+	})
+
+	it('ends a caller abort and a handle abort at the answer pass start as respond ends a caller abort', async () => {
+		const responded = createLedger(
+			createScriptedProvider(LEDGER_STREAM_TURNS),
+			buildLedgerOptions(),
+		)
+		const streamed = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const held = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const first = new AbortController()
+		responded.conversation.emitter.on('add', (message) => {
+			if (message.content === LEDGER_NOTES.cue) first.abort('stop at the answer pass')
+		})
+		const reply = await responded.respond('What is the Brightwater refund?', first.signal)
+		const second = new AbortController()
+		streamed.conversation.emitter.on('add', (message) => {
+			if (message.content === LEDGER_NOTES.cue) second.abort('stop at the answer pass')
+		})
+		const handle = streamed.stream('What is the Brightwater refund?', second.signal)
+		await collect(handle.events)
+		const own = held.stream('What is the Brightwater refund?')
+		held.conversation.emitter.on('add', (message) => {
+			if (message.content === LEDGER_NOTES.cue) own.abort('stop at the answer pass')
+		})
+		await collect(own.events)
+
+		expect([reply.partial, reply.passes.map((pass) => pass.partial)]).toEqual([true, [false, true]])
+		expect(renderLedgerOutcome(await handle.result, streamed)).toBe(
+			renderLedgerOutcome(reply, responded),
+		)
+		expect(renderLedgerOutcome(await own.result, held)).toBe(renderLedgerOutcome(reply, responded))
+	})
+
+	it('aborts the request when its consumer breaks out of the events, so no answer pass runs', async () => {
+		const provider = createScriptedProvider(LEDGER_STREAM_TURNS, { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const handle = ledger.stream('What is the Brightwater refund?')
+		const iterator = handle.events[Symbol.asyncIterator]()
+		const first = await iterator.next()
+		await iterator.return?.()
+		const result = await handle.result
+
+		expect(first).toEqual({ done: false, value: { category: 'think', content: 'check ' } })
+		expect([result.partial, result.passes.length, provider.calls.length]).toEqual([true, 1, 1])
+		expect(ledger.conversation.messages().map((message) => message.content)).not.toContain(
+			LEDGER_NOTES.cue,
+		)
+	})
+})
+
+describe('Ledger — teardown', () => {
+	it('ends every subscription on its agent and conversation, and refuses each later call with DESTROYED', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Done.' }]),
+			buildLedgerOptions(),
+		)
+		await ledger.respond('First.')
+		const added = createRecorder<readonly [message: unknown]>()
+		ledger.conversation.emitter.on('add', added.handler)
+		const listening = [ledger.agent.emitter.count(), ledger.conversation.emitter.count()]
+		ledger.destroy()
+		ledger.destroy()
+		ledger.conversation.add({ role: 'user', content: 'Added after teardown.' })
+		const handle = ledger.stream('Second.')
+		const settled = await Promise.allSettled([
+			ledger.respond('Second.'),
+			handle.result,
+			collect(handle.events),
+			ledger.calibrate(new AbortController().signal),
+		])
+		const refusals = [
+			...settled.map((one) => (one.status === 'rejected' ? one.reason : one.status)),
+			captureError(() => ledger.snapshot()),
+		]
+
+		expect(listening.every((count) => count > 0)).toBe(true)
+		expect([
+			ledger.agent.emitter.count(),
+			ledger.conversation.emitter.count(),
+			added.count,
+		]).toEqual([0, 0, 0])
+		expect(refusals.map((error) => (isLedgerError(error) ? error.code : error))).toEqual([
+			'DESTROYED',
+			'DESTROYED',
+			'DESTROYED',
+			'DESTROYED',
+			'DESTROYED',
+		])
+		expect([ledger.conversation.count, ledger.agent.status, ledger.gauge]).toEqual([
+			3,
+			'done',
+			{ scale: 1, overhead: 0 },
+		])
+	})
+
+	it('refuses destroy with CONCURRENCY while a request is live, and the request completes', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Done.' }]),
+			buildLedgerOptions(),
+		)
+		const refused = createRecorder<readonly [error: unknown]>()
+		ledger.agent.emitter.on('start', () => refused.handler(captureError(() => ledger.destroy())))
+		const reply = await ledger.respond('First.')
+
+		expect(refused.calls.map(([error]) => (isAgentError(error) ? error.code : error))).toEqual([
+			'CONCURRENCY',
+		])
+		expect([
+			reply.content,
+			ledger.agent.emitter.destroyed,
+			ledger.snapshot().requests.length,
+		]).toEqual(['Done.', false, 1])
+	})
+
+	it.each(['agent', 'conversation'])(
+		'refuses a call with DESTROYED once its host destroys the %s emitter the ledger listens on',
+		async (owner) => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(provider, buildLedgerOptions())
+			const emitter = owner === 'agent' ? ledger.agent.emitter : ledger.conversation.emitter
+			emitter.destroy()
+			const refused = await ledger.respond('First.').then(
+				() => undefined,
+				(error: unknown) => error,
+			)
+
+			expect(isLedgerError(refused) ? refused.code : refused).toBe('DESTROYED')
+			expect([provider.calls.length, ledger.conversation.count]).toEqual([0, 0])
+		},
+	)
+})
+
+describe('Ledger — a removed message', () => {
+	it('drops the window whose edge named a removed amender, so neither snapshot() nor the next request carries it', async () => {
+		const provider = createScriptedProvider([{ content: 'First reply.' }, { content: 'Done.' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, buildLedgerTwoOwnerOptions())
+		const { earlier, later } = seedLedgerOmission(ledger)
+		await ledger.respond('Check Brightwater Studio.')
+		const marked = ledger.snapshot().window?.amendments
+		ledger.conversation.remove(later.id)
+		const snapshot = JSON.stringify(ledger.snapshot())
+		await ledger.respond('Check Brightwater Studio again.')
+		const sent = requireValue(provider.calls[1])
+			.messages.map((message) => message.content)
+			.join('\n')
+
+		expect(marked).toContainEqual({ earlier: earlier.id, later: later.id })
+		expect(snapshot).not.toContain(later.id)
+		expect(snapshot).not.toContain('A later change is not shown.')
+		expect(sent).not.toContain('A later change is not shown.')
+	})
+
+	it('drops a window that held a removed source, so the next request plans as a ledger hydrated from its snapshot', async () => {
+		const provider = createScriptedProvider([{ content: 'First reply.' }, { content: 'Done.' }], {
+			recorded: true,
+		})
+		const options = buildLedgerOptions({ topics: [], capacity: 32768 })
+		const parent = createLedger(provider, options)
+		const seed = parent.conversation.add(
+			buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+		)
+		const source = requireValue(seed.find((message) => message.role === 'tool'))
+		await parent.respond('Check Brightwater Studio.')
+		const held = parent
+			.snapshot()
+			.window?.exchanges.flatMap((entry) => entry.lines.map((line) => line.source))
+		const refused = await parent.respond('Unanswered. '.repeat(12000)).then(
+			() => undefined,
+			(error: unknown) => error,
+		)
+		parent.conversation.remove(source.id)
+		const snapshot = parent.snapshot()
+		const boundary = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const child = createLedger(boundary, { ...options, snapshot })
+		await parent.respond('Check Brightwater Studio again.')
+		await child.respond('Check Brightwater Studio again.')
+
+		expect(held).toContain(source.id)
+		expect(isLedgerError(refused) ? refused.code : refused).toBe('OVERFLOW')
+		expect(snapshot).not.toHaveProperty('window')
+		expect(requireValue(provider.calls.at(-1)).messages.map((message) => message.content)).toEqual(
+			requireValue(boundary.calls[0]).messages.map((message) => message.content),
+		)
+	})
+
+	it('commits no window that names a message removed during the request, so neither snapshot() nor the next request carries it', async () => {
+		const provider = createScriptedProvider([{ content: 'First reply.' }, { content: 'Done.' }], {
+			recorded: true,
+		})
+		const ledger = createLedger(provider, buildLedgerTwoOwnerOptions())
+		const { later } = seedLedgerOmission(ledger)
+		// The draft this request sends is adopted before the provider receives it; the amender leaves after.
+		ledger.agent.emitter.on('request', () => ledger.conversation.remove(later.id))
+		await ledger.respond('Check Brightwater Studio.')
+		const copy = requireValue(requireValue(provider.calls[0]).messages.at(-1)).content
+		const snapshot = JSON.stringify(ledger.snapshot())
+		await ledger.respond('Check Brightwater Studio again.')
+		const sent = requireValue(provider.calls[1])
+			.messages.map((message) => message.content)
+			.join('\n')
+
+		expect(copy).toContain('A later change is not shown.')
+		expect(ledger.conversation.message(later.id)).toBeUndefined()
+		expect(snapshot).not.toContain(later.id)
+		expect(snapshot).not.toContain('A later change is not shown.')
+		expect(sent).not.toContain('A later change is not shown.')
+	})
+
+	it('files no result of a tool message removed during the request onto a message added after it', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'removed', name: 'lookup', arguments: { id: 'missing' } },
+						{ id: 'kept', name: 'lookup', arguments: { id: 'BW-20931' } },
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				lookups: [
+					{
+						tool: createTool({
+							name: 'lookup',
+							parameters: { type: 'object' },
+							execute: (values) => {
+								if (values.id === 'missing') throw new Error('The removed lookup failed.')
+								return 'Account BW-20931: Brightwater Studio.'
+							},
+						}),
+						read: () => ({
+							ids: ['BW-20931'],
+							owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+						}),
+					},
+				],
+			}),
+		)
+		ledger.conversation.emitter.on('add', (message) => {
+			if (message.call === 'removed') ledger.conversation.remove(message.id)
+		})
+		const reply = await ledger.respond('Check Brightwater Studio.')
+		const answer = requireValue(ledger.conversation.messages().at(-1))
+		ledger.conversation.remove(answer.id)
+		const added = ledger.conversation.add({ role: 'tool', content: 'A host note.' })
+		const snapshot = ledger.snapshot()
+
+		expect([reply.content, answer.content]).toEqual(['Done.', 'Done.'])
+		expect(snapshot.conversation.messages.map((message) => message.call ?? message.role)).toEqual([
+			'user',
+			'kept',
+			'tool',
+		])
+		expect(snapshot.failures).not.toContain(added.id)
+		expect(snapshot.failures).toEqual([])
+	})
+
+	it.each(['request', 'note', 'failure'])('leaves no mark of a removed %s in snapshot()', (id) => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Done.' }]),
+			buildLedgerOptions({ snapshot: LEDGER_SNAPSHOT_SEED }),
+		)
+		ledger.conversation.remove(id)
+		const snapshot = ledger.snapshot()
+
+		expect([...snapshot.requests, ...snapshot.notes, ...snapshot.failures]).not.toContain(id)
+		expect(JSON.stringify(snapshot)).not.toContain(JSON.stringify(id))
+		expect(isLedgerSnapshot(snapshot)).toBe(true)
+	})
 })

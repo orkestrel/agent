@@ -3432,7 +3432,7 @@ await new GuideCommand({
 			expect(measured.fault).toMatchObject({ code: 'REQUEST' })
 			expect(asks.calls).toEqual(asked)
 			expect(provider.calls).toHaveLength(3)
-			// The agent record starts no run of its own: `respond` is the only caller that runs the agent.
+			// The agent record starts no run of its own: `respond` and `stream` are the only callers that run the agent.
 			expect(Object.isFrozen(ledger.agent)).toBe(true)
 			expect(['generate' in ledger.agent, 'stream' in ledger.agent]).toEqual([false, false])
 			expect(Object.keys(ledger.agent).toSorted()).toEqual([
@@ -3443,10 +3443,10 @@ await new GuideCommand({
 				'status',
 			])
 			expect(guideText).toContain(
-				"Run the ledger's agent only through the `respond` method: the ledger's agent serves only the ledger's `conversation`. The `agent` member is a `LedgerAgentInterface` value, a frozen record of the agent's `emitter`, `id`, `status`, `context`, and `abort` members with no `generate` or `stream` method, so every run on that agent is a pass of the active `respond` call, on the ledger's `conversation`.",
+				"Run the ledger's agent only through the `respond` and `stream` methods: the ledger's agent serves only the ledger's `conversation`. The `agent` member is a `LedgerAgentInterface` value, a frozen record of the agent's `emitter`, `id`, `status`, `context`, and `abort` members with no `generate` or `stream` method, so every run on that agent is a pass of the active `respond` or `stream` call, on the ledger's `conversation`.",
 			)
 			expect(guideText).toContain(
-				"To serve another conversation, build another ledger or another agent for it. A direct call to the `context.select` method for a message no active `respond` call owns returns a selection whose `fault` is a `LedgerError` with code `'REQUEST'`, on the ledger's conversation or another one, and asks the judge nothing;",
+				"To serve another conversation, build another ledger or another agent for it. A direct call to the `context.select` method for a message no active `respond` or `stream` call owns returns a selection whose `fault` is a `LedgerError` with code `'REQUEST'`, on the ledger's conversation or another one, and asks the judge nothing;",
 			)
 			expect(guideText).toContain(
 				"Host code that calls a ledger tool by hand through `agent.context.tools` while a request runs reaches that request's state: a lookup or a write meets that request's repeat stop, and a `recall` call spends that request's recall limit.",

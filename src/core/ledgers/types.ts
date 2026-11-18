@@ -1,4 +1,10 @@
-import type { AgentInterface, AgentOptions, AgentResult } from '../agents/index.js'
+import type {
+	AgentChunk,
+	AgentInterface,
+	AgentOptions,
+	AgentResult,
+	StreamInterface,
+} from '../agents/index.js'
 import type { ScopeInterface, Selection } from '../contexts/index.js'
 import type { ConversationInterface, ConversationSnapshot } from '../conversations/index.js'
 import type { ThinkingReplay } from '../types.js'
@@ -739,8 +745,9 @@ export interface LedgerRequestInterface {
  *
  * @remarks
  * It is one frozen record the ledger builds at construction, and it holds no `generate` or `stream`
- * member, own or inherited, so the ledger's `respond` method is the only caller that starts a run on
- * the agent: every run is a pass of the active `respond` call, on the ledger's `conversation`. The
+ * member, own or inherited, so the ledger's `respond` and `stream` methods are the only callers that
+ * start a run on the agent: every run is a pass of the active `respond` or `stream` call, on the
+ * ledger's `conversation`. The
  * `emitter`, `id`, and `context` members are the agent's own. The `status` member reads the agent's
  * live status, and `abort` ends the active pass partial with the reason it takes; because the caller
  * did not abort, the ledger then runs the answer pass. To serve another conversation, build another
@@ -769,12 +776,16 @@ export type LedgerAgentInterface = Pick<
  * The ledger files every message of its conversation through the injected judge, projects the
  * owner records and the rules record from that filing, and sends a tail and a copy of the request turn carrying the records that fit
  * its capacity. It owns its agent: applying a scope that carries `select` displaces the ledger's
- * selection handler.
+ * selection handler. A message removed from `conversation`, one by one or by `clear`, takes the
+ * ledger's marks of it at the removal, and the exchange window with them when the window held the
+ * message or one of its accepted amendment edges named it. A request in flight at the removal
+ * commits no window that names the message, and files no tool result onto another message, so
+ * neither the next request nor a snapshot carries the message's state.
  */
 export interface LedgerInterface {
 	/**
 	 * Holds the record of the agent the ledger drives, with the ledger's tools and selection handler;
-	 * it starts no run, so the `respond` method runs every pass.
+	 * it starts no run, so the `respond` and `stream` methods run every pass.
 	 */
 	readonly agent: LedgerAgentInterface
 	/** Holds the one conversation the ledger files and serves. */
@@ -797,14 +808,15 @@ export interface LedgerInterface {
 	 * answer pass rejects as well, `respond` rejects with that pass's error. A transient judge failure,
 	 * or another selection failure, rejects `respond` after the agent's `fault` event; a question the
 	 * judge refuses is held and reported through `fault` as {@link LedgerOptions} states, and the
-	 * request goes on. A `respond` or `calibrate` call while either is in flight
-	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
+	 * request goes on. A `respond`, `stream`, or `calibrate` call while any of them is in flight
+	 * rejects with an `AgentError` whose `code` is `'CONCURRENCY'`, and a call after `destroy` rejects
+	 * with `LedgerError` code `'DESTROYED'`. A calibration call that reports no prompt usage, or a prompt usage of 0 or less, rejects with
 	 * `LedgerError` code `'GAUGE'`; a provider error during calibration rejects with that error. A calibration call, with the
 	 * tool definitions, without them, or with the workspace text, that reports a prompt over `capacity`, the head included,
 	 * rejects with the same code and stores no request.
-	 * Every run on the ledger's agent is a pass of this method, because `agent` holds no `generate` or
-	 * `stream` member. A direct call to `agent.context.select` for a message no active `respond` call
-	 * owns returns a selection whose `fault` is a `LedgerError` with code `'REQUEST'`, on
+	 * Every run on the ledger's agent is a pass of this method or of `stream`, because `agent` holds no
+	 * `generate` or `stream` member. A direct call to `agent.context.select` for a message no active
+	 * `respond` or `stream` call owns returns a selection whose `fault` is a `LedgerError` with code `'REQUEST'`, on
 	 * `conversation` or another one, and asks the judge nothing; over another conversation, that
 	 * selection carries that conversation's view alone. Calibration owns no message, so a direct
 	 * selection during it faults the same way. Host code that calls a ledger tool by hand through
@@ -819,9 +831,33 @@ export interface LedgerInterface {
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 * @throws {LedgerError} Thrown after `destroy`, or after the host destroyed the emitter of `agent` or of `conversation` (code `'DESTROYED'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
 	 */
 	respond(content: string, signal?: AbortSignal): Promise<LedgerResult>
+	/**
+	 * Appends `content` as a user message and serves it as `respond` does, yielding each pass's chunks as they arrive.
+	 *
+	 * @remarks
+	 * The ledger serves the request as `respond` serves it, and drives each pass through its
+	 * agent's stream: `events` yields the first pass's {@link AgentChunk} values, then the answer
+	 * pass's when the ledger runs one, each in the order its provider streamed it, and `result`
+	 * settles the {@link LedgerResult} `respond` would settle. A chunk carries no pass boundary, so
+	 * the tokens of a first pass the answer pass replaces still reach the consumer, while
+	 * `result.content` holds the last pass's content alone; read `result.content` as the reply.
+	 * Breaking out of `events` early aborts the request as a caller abort does: the pass in flight
+	 * ends partial and the ledger runs no answer pass. The handle's `abort` method ends the request
+	 * the same way. Every refusal `respond` rejects with reaches the caller through `result`, and
+	 * `events` throws it after the chunks before it, so the call itself never throws:
+	 * `'CONCURRENCY'` while a request or calibration is in flight, `'DESTROYED'` after `destroy`, and
+	 * a `ContractError` for a `signal` that is not a native `AbortSignal`. A handle whose `result` is
+	 * never awaited raises no unhandled rejection.
+	 *
+	 * @param content - The request text
+	 * @param signal - An optional caller signal, read as `respond` reads it
+	 * @returns A live handle: `events` yields every pass's chunks, `result` settles the request, and `abort` ends it as a caller abort does
+	 */
+	stream(content: string, signal?: AbortSignal): StreamInterface<AgentChunk, LedgerResult>
 	/**
 	 * Measures the gauge, holds it as `gauge`, and returns it.
 	 *
@@ -838,14 +874,15 @@ export interface LedgerInterface {
 	 * rejects with `LedgerError` code `'GAUGE'`, whose `context` holds `capacity` and `prompt`; the
 	 * call without them and the call with the workspace text refuse the same way. The ledger records the digest of the
 	 * definitions the call with tools carried, and its snapshot stores that digest with the gauge.
-	 * An abort during calibration rejects with the abort reason. A call during `respond` or `calibrate` rejects
-	 * with `AgentError` code `'CONCURRENCY'`.
+	 * An abort during calibration rejects with the abort reason. A call during `respond`, `stream`, or
+	 * `calibrate` rejects with `AgentError` code `'CONCURRENCY'`.
 	 *
 	 * @param signal - The signal that aborts every calibration call
 	 * @returns The measured gauge
 	 * @throws {LedgerError} Thrown when a call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 * @throws {LedgerError} Thrown after `destroy`, or after the host destroyed the emitter of `agent` or of `conversation` (code `'DESTROYED'`)
 	 */
 	calibrate(signal: AbortSignal): Promise<LedgerGauge>
 	/**
@@ -853,14 +890,30 @@ export interface LedgerInterface {
 	 *
 	 * @remarks
 	 * The ledger first files every tool result whose message is appended; a result whose tool message
-	 * is not yet appended is not captured. A call while a `respond` or `calibrate` call is in flight
-	 * throws, because an entered, unanswered request would hydrate as a dangling request. The `gauge`
-	 * member carries the digest of the tool definitions the gauge priced.
+	 * is not yet appended is not captured. A call while a `respond`, `stream`, or `calibrate` call is
+	 * in flight throws, because an entered, unanswered request would hydrate as a dangling request.
+	 * The `gauge` member carries the digest of the tool definitions the gauge priced. The snapshot
+	 * holds no mark of a message removed from `conversation`, and no window that held one.
 	 *
 	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one whose definitions JSON renders
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 * @throws {LedgerError} Thrown after `destroy`, or after the host destroyed the emitter of `agent` or of `conversation` (code `'DESTROYED'`)
 	 */
 	snapshot(): LedgerSnapshot
+	/**
+	 * Tears the ledger down: destroys its conversation's emitter and its agent's emitter, which ends every subscription on them, and refuses every later call.
+	 *
+	 * @remarks
+	 * The ledger's capacity gate, filing, and marks run on listeners of those two emitters, so after
+	 * `destroy` the `respond`, `stream`, `calibrate`, and `snapshot` methods refuse with `LedgerError`
+	 * code `'DESTROYED'`, as they do once a host destroys either emitter by hand. The `agent`,
+	 * `conversation`, and `gauge` members still read, and a second `destroy` call changes nothing. A
+	 * call while a request or calibration is in flight throws and changes nothing: abort the request
+	 * and await it first.
+	 *
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 */
+	destroy(): void
 }
 
 /**
@@ -1306,6 +1359,8 @@ export type LedgerErrorCode =
 	| 'WRITE'
 	/** Reports a request no pass can carry, because the context the thread shows and the request price over `capacity - predict` with every cut made, or a host act after the answer pass's note grew its request past that limit. */
 	| 'OVERFLOW'
+	/** Reports a call to a ledger after its `destroy` method ran, or after its host destroyed the emitter of its agent or of its conversation. */
+	| 'DESTROYED'
 
 /** Carries the lowercase words and non-opening capitalized names of a message. */
 export interface LedgerWordSet {

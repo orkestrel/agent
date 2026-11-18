@@ -308,7 +308,13 @@ import {
 	NOTE_TEXT,
 	readRenderedWorkspaces,
 	renderWorkspaceMarker,
+	buildLedgerTwoOwnerOptions,
+	LEDGER_STREAM_TURNS,
+	renderAgentChunk,
+	renderLedgerOutcome,
+	seedLedgerOmission,
 } from './setup.js'
+import type { AgentChunk } from '@src/core'
 import type { ToolContext } from '@orkestrel/tool'
 import type { TokenUsage } from '@orkestrel/budget'
 import { createDatabase, createMemoryDriver } from '@orkestrel/database'
@@ -4013,5 +4019,86 @@ describe('tool caller fixtures', () => {
 		expect(() => Reflect.get(named.get('a throwing files accessor'), 'files')).toThrow(
 			'The files cannot be read.',
 		)
+	})
+})
+
+describe('ledger stream and removal fixtures', () => {
+	it('renders each chunk category with the detail a stream case compares', () => {
+		const call = { id: 'l1', name: 'lookup', arguments: { id: 'BW-20931' } }
+		const chunks: readonly AgentChunk[] = [
+			{ category: 'token', content: 'The refund ' },
+			{ category: 'think', content: 'check ' },
+			{ category: 'tool', call, result: { success: true, id: 'l1', name: 'lookup', value: 'ok' } },
+			{
+				category: 'tool',
+				call,
+				result: { success: false, id: 'l1', name: 'lookup', error: 'No record' },
+			},
+			{ category: 'usage', usage: { prompt: 40, completion: 3, total: 43 }, estimate: 3 },
+			{ category: 'ask', call, decision: { zone: 'desk', verdict: 'ask' } },
+		]
+
+		expect(chunks.map(renderAgentChunk)).toEqual([
+			'token:The refund ',
+			'think:check ',
+			'tool:lookup:ok',
+			'tool:lookup:failed',
+			'usage:40/3',
+			'ask:lookup',
+		])
+	})
+
+	it('renders two ledgers that served one request alike, with ids as positions and attempts summarized', async () => {
+		const first = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const second = createLedger(createScriptedProvider(LEDGER_STREAM_TURNS), buildLedgerOptions())
+		const other = createLedger(createScriptedProvider([{ content: 'Done.' }]), buildLedgerOptions())
+		const rendered = renderLedgerOutcome(
+			await first.respond('What is the Brightwater refund?'),
+			first,
+		)
+
+		expect(rendered).toBe(
+			renderLedgerOutcome(await second.respond('What is the Brightwater refund?'), second),
+		)
+		expect(rendered).not.toBe(
+			renderLedgerOutcome(await other.respond('What is the Brightwater refund?'), other),
+		)
+		expect(rendered).not.toContain(requireValue(first.conversation.messages()[0]).id)
+		expect(rendered).toContain('"#0"')
+		expect(rendered).toContain('"duration":"valid"')
+	})
+
+	it('seeds two owners and an amender of the first finding filed under the second owner', () => {
+		const options = buildLedgerTwoOwnerOptions()
+		const lookup = requireValue(options.lookups?.[0])
+		const ledger = createLedger(createScriptedProvider([]), options)
+		const { earlier, later } = seedLedgerOmission(ledger)
+
+		expect([lookup.read({ id: 'BW-20931' }, ''), lookup.read({ id: 'OM-30418' }, '')]).toEqual([
+			{ ids: ['BW-20931'], owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }] },
+			{ ids: ['OM-30418'], owners: [{ id: 'OM-30418', names: ['Odile Marlow'] }] },
+		])
+		expect(ledger.conversation.messages().map((message) => message.content)).toEqual([
+			'',
+			'Brightwater Studio delivery costs $10.',
+			'',
+			'Odile Marlow has an account.',
+			'Odile Marlow corrects the $10 delivery price to $12.',
+		])
+		expect([earlier.role, later.role]).toEqual(['tool', 'user'])
+		expect(
+			ledger.conversation.judgments.judgments().map((one) => [one.id, one.answer, one.sources]),
+		).toEqual([
+			[
+				JSON.stringify(['amends', earlier.id, later.id]),
+				{ form: 'noul', noul: 1 },
+				[earlier.id, later.id],
+			],
+			[
+				JSON.stringify(['supersedes', earlier.id, later.id]),
+				{ form: 'noul', noul: 0 },
+				[earlier.id, later.id],
+			],
+		])
 	})
 })

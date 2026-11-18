@@ -1,10 +1,14 @@
 import type {
 	AgentBuiltin,
+	AgentChunk,
 	AgentInterface,
 	AgentResult,
+	AgentRunOptions,
 	AuthorityContext,
 	AuthorityDecision,
 	AuthorityInterface,
+	ChannelInterface,
+	StreamInterface,
 } from '../agents/types.js'
 import type {
 	AgentDisclosure,
@@ -42,6 +46,7 @@ import type {
 	LedgerShare,
 	LedgerSnapshot,
 } from './types.js'
+import type { AbortInterface } from '@orkestrel/abort'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolCall, ToolContext, ToolDefinition, ToolResult } from '@orkestrel/tool'
 import { createAbort, linkSignal } from '@orkestrel/abort'
@@ -62,7 +67,7 @@ import { createTool, createToolManager, isToolError } from '@orkestrel/tool'
 import { isTextContent } from '@orkestrel/workspace'
 import { Authority } from '../agents/Authority.js'
 import { builtinToolContracts } from '../agents/contracts.js'
-import { createAgent } from '../agents/factories.js'
+import { createAgent, createChannel } from '../agents/factories.js'
 import { AgentError } from '../agents/errors.js'
 import {
 	collectBuiltinDefinitions,
@@ -419,8 +424,11 @@ export class Ledger implements LedgerInterface {
 			if (this.#gate(index, sent)) this.#observeRequest(sent)
 		})
 		this.#agent.emitter.on('usage', (usage) => this.#current()?.spend(usage))
-		// The host reads the agent through a record with no run member, so the `respond` method starts
-		// every run.
+		// A removed message takes its marks, and the window that held it, at the removal.
+		this.#conversation.emitter.on('remove', (id) => this.#dropMarks(id))
+		this.#conversation.emitter.on('clear', () => this.#clearMarks())
+		// The host reads the agent through a record with no run member, so the `respond` and `stream`
+		// methods start every run.
 		const agent = this.#agent
 		this.#record = Object.freeze({
 			emitter: agent.emitter,
@@ -464,9 +472,11 @@ export class Ledger implements LedgerInterface {
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 * @throws {LedgerError} Thrown after `destroy`, or after the host destroyed the emitter of the agent or the conversation (code `'DESTROYED'`)
 	 */
 	async calibrate(signal: AbortSignal): Promise<LedgerGauge> {
-		if (this.#busy()) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
+		this.#refuseDestroyed()
+		this.#refuseBusy()
 		this.#calibrations.add(signal)
 		try {
 			return await this.#measureGauge(signal)
@@ -479,9 +489,11 @@ export class Ledger implements LedgerInterface {
 	 * Serializes the conversation, marked ids, gauge, and completed exchange window for a later ledger.
 	 * @returns The snapshot, each id list in conversation order, with a gauge and window only when held
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 * @throws {LedgerError} Thrown after `destroy`, or after the host destroyed the emitter of the agent or the conversation (code `'DESTROYED'`)
 	 */
 	snapshot(): LedgerSnapshot {
-		if (this.#busy()) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
+		this.#refuseDestroyed()
+		this.#refuseBusy()
 		this.#flush()
 		const conversation = this.#conversation.snapshot()
 		const ids = conversation.messages.map((message) => message.id)
@@ -533,12 +545,65 @@ export class Ledger implements LedgerInterface {
 	 * @throws {LedgerError} Thrown when a calibration call reports no prompt usage, or a prompt usage of 0 or less (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when a calibration call, with the tool definitions, without them, or with the workspace text, reports a prompt over `capacity`, the head included (code `'GAUGE'`)
 	 * @throws {LedgerError} Thrown when the answer pass prices over `capacity - predict` with its note left out, or a host act after the note grows its request past that limit (code `'OVERFLOW'`)
+	 * @throws {LedgerError} Thrown after `destroy`, or after the host destroyed the emitter of the agent or the conversation (code `'DESTROYED'`)
 	 * @throws {ContractError} Thrown when `signal` is defined and is not a native `AbortSignal`
 	 */
-	async respond(content: string, signal?: AbortSignal): Promise<LedgerResult> {
-		if (this.#busy()) throw new AgentError('CONCURRENCY', 'a ledger request is already active')
+	respond(content: string, signal?: AbortSignal): Promise<LedgerResult> {
+		return this.#serve(content, signal, undefined)
+	}
+
+	/**
+	 * Appends a request and serves it as `respond` does, yielding each pass's chunks in pass order.
+	 * Tokens of a first pass the answer pass replaces still reach the consumer, while the result's `content` is the last pass's alone. Breaking out of the events early, or the handle's `abort`, ends the request as a caller abort does. Every refusal `respond` rejects with rejects the result and throws from the events instead of throwing from this call.
+	 * @param content - The request text
+	 * @param signal - The caller's cancellation signal, read as `respond` reads it
+	 * @returns The live handle: every pass's chunks, the settled result, and the abort that ends the request
+	 */
+	stream(content: string, signal?: AbortSignal): StreamInterface<AgentChunk, LedgerResult> {
+		const handle = createAbort()
+		const channel = createChannel<AgentChunk>()
+		const result = this.#serve(content, signal, { channel, signal: handle.signal }).then(
+			(settled) => {
+				channel.close()
+				return settled
+			},
+			(error: unknown) => {
+				channel.fail(error)
+				throw error
+			},
+		)
+		// A handle whose result nobody awaits raises no unhandled rejection; an awaited one still rejects.
+		result.catch(() => {})
+		return {
+			events: this.#drainEvents(channel, handle),
+			result,
+			abort: (reason?: unknown) => handle.abort(reason),
+		}
+	}
+
+	/**
+	 * Destroys the conversation's emitter and the agent's emitter, ending every subscription on them, and refuses each later call with `LedgerError` code `'DESTROYED'`; a second call changes nothing.
+	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
+	 */
+	destroy(): void {
+		this.#refuseBusy()
+		this.#conversation.destroy()
+		this.#agent.emitter.destroy()
+	}
+
+	// Serves one request through its passes. `respond` runs it with no sink; `stream` runs it with the
+	// channel each pass's chunks reach and the signal its handle aborts, which joins the caller's.
+	async #serve(
+		content: string,
+		signal: AbortSignal | undefined,
+		sink:
+			| { readonly channel: ChannelInterface<AgentChunk>; readonly signal: AbortSignal }
+			| undefined,
+	): Promise<LedgerResult> {
+		this.#refuseDestroyed()
+		this.#refuseBusy()
 		const abort = createAbort({ ...(signal === undefined ? {} : { signal }) })
-		const caller = abort.signal
+		const caller = sink === undefined ? abort.signal : linkSignal(abort.signal, sink.signal)
 		const request = new LedgerRequest(content)
 		// Each pass binds the scope the request entered with, so a scope widened during the request
 		// adds nothing before the next one, and a narrowing still reaches the next turn.
@@ -557,7 +622,7 @@ export class Ledger implements LedgerInterface {
 			// its cause. A selection failure that reached here rejected the strict run, and it stands.
 			const first = this.#dropStrayCalls(
 				request,
-				await this.#generatePass(request, caller, this.#options.think, scope).catch(
+				await this.#generatePass(request, caller, this.#options.think, scope, sink?.channel).catch(
 					(error: unknown): AgentResult => {
 						if (request.faulted(error)) throw error
 						return {
@@ -595,7 +660,10 @@ export class Ledger implements LedgerInterface {
 					},
 				})
 				passes.push(
-					this.#dropStrayCalls(request, await this.#generatePass(request, caller, false, answer)),
+					this.#dropStrayCalls(
+						request,
+						await this.#generatePass(request, caller, false, answer, sink?.channel),
+					),
 				)
 				// An answer pass the gate stopped at its request rejects, unless the caller aborted.
 				const refusal = this.#refusal
@@ -631,6 +699,20 @@ export class Ledger implements LedgerInterface {
 			this.#flush()
 			this.#commitExchange(request)
 			this.#live.delete(request)
+		}
+	}
+
+	// The live events of a `stream` call. Its `return()`, which a consumer's early `break` fires, aborts
+	// the request as its caller would; a natural end comes after the request settled, where the abort
+	// changes nothing.
+	async *#drainEvents(
+		channel: ChannelInterface<AgentChunk>,
+		handle: AbortInterface,
+	): AsyncGenerator<AgentChunk, void> {
+		try {
+			yield* channel.drain()
+		} finally {
+			handle.abort()
 		}
 	}
 
@@ -732,16 +814,22 @@ export class Ledger implements LedgerInterface {
 		signal: AbortSignal,
 		think: boolean | undefined,
 		scope: ScopeInterface | undefined,
+		sink: ChannelInterface<AgentChunk> | undefined,
 	): Promise<AgentResult> {
 		this.#refusal = undefined
 		request.open(this.#conversation.messages().length)
 		const stop = request.signal
-		return await this.#agent.generate({
+		const options: AgentRunOptions = {
 			signal: stop === undefined ? signal : linkSignal(signal, stop),
 			conversation: this.#conversation,
 			...(think === undefined ? {} : { think }),
 			...(scope === undefined ? {} : { scope }),
-		})
+		}
+		if (sink === undefined) return await this.#agent.generate(options)
+		// A pass with a sink reads the run's chunks as they arrive; the run settles the same result.
+		const run = this.#agent.stream(options)
+		for await (const chunk of run.events) sink.push(chunk)
+		return await run.result
 	}
 
 	// An aborted pass's last turn advertised no tools and still made a call, which the agent stored with
@@ -764,8 +852,8 @@ export class Ledger implements LedgerInterface {
 			)
 		)
 			return pass
+		// The removal drops the replies' failure marks through the conversation's `remove` event.
 		this.#conversation.remove([reply.id, ...replies.map((message) => message.id)])
-		for (const message of replies) this.#results.delete(message.id)
 		this.#conversation.add({
 			role: 'assistant',
 			content: reply.content,
@@ -781,8 +869,63 @@ export class Ledger implements LedgerInterface {
 		return request?.message === undefined ? undefined : request
 	}
 
-	#busy(): boolean {
-		return this.#live.size > 0 || this.#calibrations.size > 0
+	// Refuses a call while a request or calibration is active.
+	#refuseBusy(): void {
+		if (this.#live.size > 0 || this.#calibrations.size > 0)
+			throw new AgentError('CONCURRENCY', 'a ledger request is already active')
+	}
+
+	// Refuses a call once the emitter of the agent or of the conversation is destroyed, because the
+	// capacity gate, the filing, and the marks run on their listeners.
+	#refuseDestroyed(): void {
+		if (this.#agent.emitter.destroyed || this.#conversation.emitter.destroyed)
+			throw new LedgerError(
+				'DESTROYED',
+				'the ledger is destroyed, or its host destroyed the emitter of its agent or its conversation; build another ledger, hydrated from a snapshot taken before, to serve this conversation',
+			)
+	}
+
+	// A removed message takes its marks, and the window with its evidence when the window held the
+	// message or one of its accepted edges named it, as the next plan would drain that window and as
+	// a snapshot omits it.
+	#dropMarks(id: string): void {
+		this.#requests.delete(id)
+		this.#annotations.delete(id)
+		this.#results.delete(id)
+		if (this.#named().has(id)) this.#dropWindow()
+	}
+
+	// A cleared conversation holds no message a mark or the window can name.
+	#clearMarks(): void {
+		this.#requests.clear()
+		this.#annotations.clear()
+		this.#results.clear()
+		this.#dropWindow()
+	}
+
+	#dropWindow(): void {
+		this.#window = []
+		this.#evidence = collectLedgerEvidence([], new Set(), [])
+	}
+
+	// The message ids the window holds: each exchange's request and reply, and every line's source.
+	#held(): ReadonlySet<string> {
+		return new Set(
+			this.#window.flatMap((entry) => [
+				entry.request.id,
+				entry.reply.id,
+				...entry.lines.map((line) => line.source),
+			]),
+		)
+	}
+
+	// The message ids the window and its evidence name: every id the window holds, and both ends of
+	// each accepted edge the evidence carries.
+	#named(): ReadonlySet<string> {
+		return new Set([
+			...this.#held(),
+			...[...this.#evidence.amendments.values()].flatMap((edge) => [edge.earlier, edge.later]),
+		])
 	}
 
 	// Decides one call before the host's authority reads it. In one request, the identical retry of a
@@ -950,7 +1093,9 @@ export class Ledger implements LedgerInterface {
 			if (message?.role === 'tool') {
 				this.#results.set(message.id, result)
 				this.#pending.delete(at)
-			}
+				// A result waits only at the end of the conversation, where its tool message lands next. One
+				// elsewhere lost its message to a removal or a shift, so it files onto no other message.
+			} else if (at !== messages.length) this.#pending.delete(at)
 		}
 	}
 
@@ -988,17 +1133,7 @@ export class Ledger implements LedgerInterface {
 				}
 			})
 			this.#window = window
-			this.#evidence = collectLedgerEvidence(
-				messages,
-				new Set(
-					this.#window.flatMap((entry) => [
-						entry.request.id,
-						entry.reply.id,
-						...entry.lines.map((line) => line.source),
-					]),
-				),
-				snapshot.window.amendments,
-			)
+			this.#evidence = collectLedgerEvidence(messages, this.#held(), snapshot.window.amendments)
 		}
 		const groups = collectToolGroups(messages)
 		for (const message of messages) {
@@ -1456,14 +1591,7 @@ export class Ledger implements LedgerInterface {
 			scan,
 		)
 		const replies = collectLedgerReplies(scan.messages, this.#requests, this.#annotations)
-		const sources = new Set(
-			this.#window.flatMap((entry) => [
-				entry.request.id,
-				entry.reply.id,
-				...entry.lines.map((line) => line.source),
-			]),
-		)
-		const evidence = collectLedgerEvidence(scan.messages, sources, projection.amendments)
+		const evidence = collectLedgerEvidence(scan.messages, this.#held(), projection.amendments)
 		const prefix = this.#window.flatMap((entry) => entry.lines)
 		const prior = buildLedgerRenderContext(scan.messages, prefix, projection.amendments)
 		const combined = buildLedgerRenderContext(
@@ -1902,6 +2030,10 @@ export class Ledger implements LedgerInterface {
 			]),
 			amendments: evidence.amendments,
 		}
+		// The draft predates any removal the request saw, so a window that names a message the
+		// conversation no longer holds drops whole, as the removal dropped the window that held it.
+		const present = new Set(this.#conversation.messages().map((one) => one.id))
+		if ([...this.#named()].some((id) => !present.has(id))) this.#dropWindow()
 	}
 
 	#renderTailStub(

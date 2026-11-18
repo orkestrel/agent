@@ -17,7 +17,9 @@ import { INTRINSICS, holds, isFunction, isObject } from '@orkestrel/contract'
  * than the ledger's, or for a request other than that call's request or a ledger note, reports
  * `'REQUEST'` through the selection's fault. A question the judge refused reports `'HOLD'` through
  * the agent's `fault` event, never thrown: its `cause` is the judge's rejection and its `context`
- * holds the question's `key`, `phase`, and `sources`.
+ * holds the question's `key`, `phase`, and `sources`. A call to a ledger after its `destroy` method
+ * ran, or after its host destroyed the emitter of its agent or of its conversation, throws this with
+ * `'DESTROYED'`.
  */
 export class LedgerError extends Error {
 	/** Names the machine-readable condition; the {@link LedgerErrorCode} union describes each code. */
@@ -79,7 +81,8 @@ export function isLedgerError(value: unknown): value is LedgerError {
 				code === 'SNAPSHOT' ||
 				code === 'QUESTION' ||
 				code === 'WRITE' ||
-				code === 'OVERFLOW'
+				code === 'OVERFLOW' ||
+				code === 'DESTROYED'
 			)
 		)
 			return false
