@@ -16,11 +16,12 @@ import {
 	MEMORY_TRIAGE_FAILURES,
 	MEMORY_TRIAGE_GOAL,
 	MEMORY_TRIAGE_OPEN,
-	createMemoryRouteServer,
+	buildMemoryRouteAnswer,
 	buildMemoryProfile,
 	createMemoryContext,
 	createMemoryIdentity,
-	createMemoryServer,
+	createMemoryFixture,
+	MemoryScript,
 	readMemoryCheckpoint,
 	runMemoryTrial,
 	STUDY_MEMORY_INERT_EXCHANGES,
@@ -33,7 +34,9 @@ import {
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	it('keeps a real System One answer and stores its judgment under the composite model', async () => {
-		const server = await createMemoryRouteServer()
+		const server = await createMemoryFixture(
+			new MemoryScript([], { '/v1/systemone': buildMemoryRouteAnswer }),
+		)
 		const profile = buildMemoryProfile({
 			url: server.url,
 			triage: { model: 'model', digest: 'a'.repeat(64) },
@@ -62,7 +65,6 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				expect(server.requests.filter((request) => request.path === '/v1/systemone')).toHaveLength(
 					1,
 				)
-				expect(server.responses).toHaveLength(0)
 				expect(
 					fixture.evidence.filter(
 						(row) => row.event === 'dispatch' && isRecord(row.value) && row.value.role === 'triage',
@@ -107,11 +109,11 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			}
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 	it('rejects execute when its context aborts an open triage inventory request', async () => {
-		const server = await createMemoryServer(MEMORY_TRIAGE_OPEN)
+		const server = await createMemoryFixture(new MemoryScript(MEMORY_TRIAGE_OPEN))
 		const profile = buildMemoryProfile({
 			url: server.url,
 			triage: { model: 'model', digest: 'a'.repeat(64) },
@@ -141,7 +143,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			}
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 	it('refuses a triage session whose admitted namespace lacks the System One runtime', async () => {
@@ -195,7 +197,9 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	})
 	it('composes one triage judge per records trial and asks it at each goal', async () => {
 		const goals = MEMORY_TRIAGE_GOALS.slice(0, 2)
-		const server = await createMemoryRouteServer(goals.length)
+		const server = await createMemoryFixture(
+			new MemoryScript([], { '/v1/systemone': buildMemoryRouteAnswer }),
+		)
 		const profile = buildMemoryProfile({
 			url: server.url,
 			triage: { model: 'model', digest: 'a'.repeat(64) },
@@ -221,7 +225,6 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(server.requests.filter((request) => request.path === '/v1/systemone')).toHaveLength(
 				goals.length,
 			)
-			expect(server.responses).toHaveLength(0)
 			expect(
 				fixture.evidence.filter((row) => row.event === 'triage').map((row) => row.goal),
 			).toEqual(goals.map((goal) => goal.id))
@@ -239,12 +242,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(final.arrivals).toEqual(['triage-source', 'delivery'])
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 	it('refuses an absent triage model or digest mismatch before any goal request', async () => {
 		for (const triage of MEMORY_TRIAGE_UNAVAILABLE) {
-			const server = await createMemoryServer()
+			const server = await createMemoryFixture()
 			const profile = buildMemoryProfile({ url: server.url, triage })
 			const fixture = createMemoryContext(profile)
 			try {
@@ -268,12 +271,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				}
 			} finally {
 				fixture.close()
-				await server.close()
+				await server.destroy()
 			}
 		}
 	})
 	it('refuses a malformed seed', async () => {
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
@@ -313,12 +316,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(server.requests).toEqual([])
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('constructs from the selected runtime without reading the subject and needs Ledger and judge factories only for records', async () => {
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const { agent, provider } = STUDY_MEMORY_MODULES
@@ -380,14 +383,14 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(server.requests).toEqual([])
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it.each([undefined, {}, { observe: true }])(
 		'refuses the removed compaction arm and opens records and full under settings %j before any model request',
 		async (settings) => {
-			const server = await createMemoryServer()
+			const server = await createMemoryFixture()
 			const profile = buildMemoryProfile({ url: server.url, settings })
 			const fixture = createMemoryContext(profile)
 			const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
@@ -410,13 +413,13 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				expect(server.requests).toEqual([])
 			} finally {
 				fixture.close()
-				await server.close()
+				await server.destroy()
 			}
 		},
 	)
 
 	it('forwards the sink and the replay to the session', async () => {
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const trial = { id: 'forward', scenario: 'public', arm: 'full', repetition: 0 }
@@ -444,7 +447,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			expect(server.requests).toEqual([])
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 

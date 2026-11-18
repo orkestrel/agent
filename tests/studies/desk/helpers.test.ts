@@ -5,7 +5,6 @@ import {
 	buildStudyDeskDefinition,
 	buildStudyDeskSummary,
 	collectStudyDeskTools,
-	computeStudyDeskMedian,
 	computeStudyDeskTally,
 	inferStudyDeskOutcome,
 	readStudyDeskEvidence,
@@ -202,13 +201,6 @@ describe('the phase 0 grader, promoted', () => {
 			prompt: undefined,
 			first: undefined,
 		})
-	})
-
-	it('computes the median, averaging an even list', () => {
-		expect(computeStudyDeskMedian([])).toBeUndefined()
-		expect(computeStudyDeskMedian([3])).toBe(3)
-		expect(computeStudyDeskMedian([4, 1, 3, 2])).toBe(2.5)
-		expect(computeStudyDeskMedian([9, 1, 5])).toBe(5)
 	})
 })
 

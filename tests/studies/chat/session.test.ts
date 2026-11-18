@@ -9,52 +9,55 @@ import {
 	buildMemoryCall,
 	buildMemoryReply,
 	createMemoryContext,
-	createMemoryServer,
+	createMemoryFixture,
+	MemoryScript,
 	STUDY_MEMORY_CALIBRATION,
 	STUDY_MEMORY_MODULES,
 } from '../../setupStudy.js'
 
 it('retains the previous reply and lookup, measures first text across calls, and isolates the next conversation', async () => {
-	const server = await createMemoryServer([
-		...STUDY_MEMORY_CALIBRATION,
-		{
-			path: '/api/chat',
-			body: buildMemoryReply({
-				content: 'Original customer update with refund $12.50, Friday shipping and Tacoma depot.',
-			}),
-		},
-		{ ...buildMemoryCall('lookup', { id: 'OR-7' }), chunks: [{ delay: 120, body: '' }] },
-		{
-			path: '/api/chat',
-			body: '',
-			chunks: [
-				{
-					delay: 40,
-					body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'Refund $12.50.' } })}\n`,
-				},
-				{ delay: 200, body: buildMemoryReply({ content: '' }) },
-			],
-		},
-		{
-			...buildMemoryCall('lookup', { id: 'OR-7' }),
-			chunks: [
-				{
-					delay: 30,
-					body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'Checking OR-7.' } })}\n`,
-				},
-			],
-		},
-		{
-			path: '/api/chat',
-			body: buildMemoryReply({ content: '' }),
-			chunks: [
-				{
-					delay: 250,
-					body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'Friendly: refund $12.50 ships Friday.' } })}\n`,
-				},
-			],
-		},
-	])
+	const server = await createMemoryFixture(
+		new MemoryScript([
+			...STUDY_MEMORY_CALIBRATION,
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({
+					content: 'Original customer update with refund $12.50, Friday shipping and Tacoma depot.',
+				}),
+			},
+			{ ...buildMemoryCall('lookup', { id: 'OR-7' }), chunks: [{ delay: 120, body: '' }] },
+			{
+				path: '/api/chat',
+				body: '',
+				chunks: [
+					{
+						delay: 40,
+						body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'Refund $12.50.' } })}\n`,
+					},
+					{ delay: 200, body: buildMemoryReply({ content: '' }) },
+				],
+			},
+			{
+				...buildMemoryCall('lookup', { id: 'OR-7' }),
+				chunks: [
+					{
+						delay: 30,
+						body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'Checking OR-7.' } })}\n`,
+					},
+				],
+			},
+			{
+				path: '/api/chat',
+				body: buildMemoryReply({ content: '' }),
+				chunks: [
+					{
+						delay: 250,
+						body: `${JSON.stringify({ model: 'model', done: false, message: { role: 'assistant', content: 'Friendly: refund $12.50 ships Friday.' } })}\n`,
+					},
+				],
+			},
+		]),
+	)
 	try {
 		const declared = parseStudyProfile(
 			parseJSON(readFileSync('studies/chat/profiles/full.json', 'utf8')),
@@ -143,7 +146,7 @@ it('retains the previous reply and lookup, measures first text across calls, and
 			next.close()
 		}
 	} finally {
-		await server.close()
+		await server.destroy()
 	}
 })
 
@@ -181,17 +184,19 @@ it('refuses malformed input, absent runtime and an already aborted trial', async
 
 it('keeps absent first content unknown and refuses a transport fault', async () => {
 	for (const status of [200, 503]) {
-		const server = await createMemoryServer([
-			...STUDY_MEMORY_CALIBRATION.map((reply) => ({
-				...reply,
-				body: buildMemoryReply({ content: '' }),
-			})),
-			...[status, status].map((code) => ({
-				path: '/api/chat',
-				status: code,
-				body: code === 200 ? buildMemoryReply({ content: '' }) : 'unavailable',
-			})),
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				...STUDY_MEMORY_CALIBRATION.map((reply) => ({
+					...reply,
+					body: buildMemoryReply({ content: '' }),
+				})),
+				...[status, status].map((code) => ({
+					path: '/api/chat',
+					status: code,
+					body: code === 200 ? buildMemoryReply({ content: '' }) : 'unavailable',
+				})),
+			]),
+		)
 		try {
 			const declared = parseStudyProfile(
 				parseJSON(readFileSync('studies/chat/profiles/full.json', 'utf8')),
@@ -237,7 +242,7 @@ it('keeps absent first content unknown and refuses a transport fault', async () 
 				context.close()
 			}
 		} finally {
-			await server.close()
+			await server.destroy()
 		}
 	}
 })

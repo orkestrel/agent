@@ -18,7 +18,8 @@ import type {
 	StudyDeskTool,
 } from './types.js'
 import { isString } from '@orkestrel/contract'
-import { StudyError } from '@orkestrel/study'
+import { StudyError, computeStudyQuantile } from '@orkestrel/study'
+import { collectStudyRows } from '@orkestrel/study/server'
 import { STUDY_DESK_OPTIONS, STUDY_DESK_TOOLS } from './constants.js'
 import {
 	isStudyDeskAssertion,
@@ -128,9 +129,7 @@ export function readStudyDeskGrade(target: StudyGradeTarget): StudyGradeVerdict 
 			reason: 'Missing retained request',
 			references: [],
 		}
-	const trace = readStudyDeskEvidence(
-		target.evidence.filter((row) => row.goal === target.criterion.goal),
-	)
+	const trace = readStudyDeskEvidence(collectStudyRows(target).map((row) => row.evidence))
 	const outcome = inferStudyDeskOutcome(
 		assertion.tool,
 		trace.calls,
@@ -197,22 +196,14 @@ export function buildStudyDeskRoles(profile: StudyProfile): StudyOllamaTransport
 	}
 }
 
-/** Computes the median of a list, averaging the two middle values of an even list, or undefined for none.
- * @example computeStudyDeskMedian([4, 1, 3, 2]) // 2.5
- */
-export function computeStudyDeskMedian(values: readonly number[]): number | undefined {
-	const sorted = [...values].sort((left, right) => left - right)
-	const upper = sorted[Math.floor(sorted.length / 2)]
-	const lower = sorted[Math.floor(sorted.length / 2) - 1]
-	if (upper === undefined) return undefined
-	return sorted.length % 2 === 1 || lower === undefined ? upper : (lower + upper) / 2
-}
-
 /** Computes the median first text of the rows that read one, or undefined when none does.
  * @example computeStudyDeskFirst([]) // undefined
  */
 export function computeStudyDeskFirst(rows: readonly StudyDeskRow[]): number | undefined {
-	return computeStudyDeskMedian(rows.flatMap((row) => (row.first === undefined ? [] : [row.first])))
+	return computeStudyQuantile(
+		rows.flatMap((row) => (row.first === undefined ? [] : [row.first])),
+		0.5,
+	)
 }
 
 /** Computes one arm's counts from its rows.
@@ -231,8 +222,9 @@ export function computeStudyDeskTally(rows: readonly StudyDeskRow[]): StudyDeskT
 		opened: loaded.filter((row) => row.loads[0] === row.area).length,
 		misopened: loaded.filter((row) => row.loads[0] !== row.area).length,
 		turns: rows.reduce((total, row) => total + row.turns, 0),
-		prompt: computeStudyDeskMedian(
+		prompt: computeStudyQuantile(
 			rows.flatMap((row) => (row.prompt === undefined ? [] : [row.prompt])),
+			0.5,
 		),
 		first: {
 			initial: computeStudyDeskFirst(rows.filter((row) => row.initial)),
@@ -258,7 +250,9 @@ export function buildStudyDeskSummary(input: StudyDeskSummaryInput): StudyDeskSu
 			if (!scenario?.goals.some((goal) => goal.id === criterion.goal))
 				throw new StudyError('CONFIG', 'Desk summary scenario join differs')
 			const observation = attempt?.observations.find((entry) => entry.goal === criterion.goal)
-			const trace = readStudyDeskEvidence(evidence.filter((row) => row.goal === criterion.goal))
+			const trace = readStudyDeskEvidence(
+				collectStudyRows({ trial, criterion, attempt, evidence }).map((row) => row.evidence),
+			)
 			return [
 				{
 					trial: trial.id,

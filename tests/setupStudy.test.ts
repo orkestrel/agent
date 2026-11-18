@@ -1,7 +1,8 @@
 import { isRecord, isArray, parseJSON } from '@orkestrel/contract'
+import { parseStudyProfile } from '@orkestrel/study'
 import { isStudyCustodyManifest, readStudyDeclaration } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
-import { lstatSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { StudyMemoryDriver } from '../studies/memory/index.js'
@@ -10,12 +11,12 @@ import {
 	buildMemoryReplayEvidence,
 	mapMemoryReplayIds,
 	readMemoryReplayMessages,
-	MemoryServer,
+	MemoryScript,
 	buildCustodyManifest,
 	buildMemoryGradeFixture,
+	buildMemoryRouteAnswer,
 	buildStudyAssessment,
 	buildStudyChatProfile,
-	captureStudyPackages,
 	createStudyMeterFixture,
 	buildMemoryCall,
 	buildMemoryCapture,
@@ -29,8 +30,10 @@ import {
 	buildMemoryProfile,
 	buildMemoryReply,
 	createMemoryContext,
-	createMemoryServer,
+	createMemoryFixture,
+	createStudyFixtureInstall,
 	listMemoryKeys,
+	matchesMemoryUnload,
 	readMemoryAdmission,
 	readMemoryControls,
 	readMemoryEvents,
@@ -38,19 +41,19 @@ import {
 	readMemoryModels,
 	readMemoryOrigins,
 	readMemoryParts,
+	readMemoryRequests,
 	readMemorySealedCheckpoint,
 	readMemoryShapes,
 	readMemorySnapshot,
 	readMemoryTimeline,
-	createStudyInstallFixture,
 	executeMemoryGoals,
-	executeStudyInstall,
 	executeStudyProcess,
 	executeStudyTopology,
 	readMemoryToolResults,
 	runMemoryFailure,
 	runMemoryTrial,
 	totalMemoryUsage,
+	writeMemoryLocalProfile,
 	writeStudyInstallRecord,
 	STUDY_MEMORY_CONTEXT_KEYS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
@@ -439,31 +442,42 @@ describe('study install fixtures', () => {
 			'Invalid tool receipt',
 		)
 	})
-	it('copies actual package closure with one selected Agent and retains exact native command diagnostics', async () => {
-		const scratch = createScratch()
+	it('installs a study under its profile rebound to a fixture that lists the profile pins, and fills the local memory profile there', async () => {
+		const scratch = createScratch({ prefix: 'study-install-setup-' })
+		await expect(createStudyFixtureInstall(scratch, [], 'recordsrecommended')).rejects.toThrow(
+			'Missing study to install',
+		)
+		const { server, install } = await createStudyFixtureInstall(
+			scratch,
+			['recordscapacity'],
+			'recordsrecommended',
+		)
 		try {
-			const fixture = createStudyInstallFixture(scratch, 'http://127.0.0.1:7')
-			expect(fixture.packages.filter((entry) => entry.name === '@orkestrel/agent')).toEqual([
-				{
-					name: '@orkestrel/agent',
-					source: resolve('.'),
-					target: join(scratch.path, 'node_modules', '@orkestrel/agent'),
-				},
-			])
-			for (const entry of fixture.packages) {
-				expect(lstatSync(entry.target).isSymbolicLink()).toBe(false)
-				expect(readFileSync(join(entry.target, 'package.json'))).toEqual(
-					readFileSync(join(entry.source, 'package.json')),
-				)
-			}
-			const entry = join(scratch.path, 'dist/src/core/index.js')
-			expect(readFileSync(entry)).toEqual(readFileSync(resolve('dist/src/core/index.js')))
+			const authored = parseStudyProfile(
+				parseJSON(readFileSync('studies/memory/profiles/recordsrecommended.json', 'utf8')),
+			)
+			const provider = authored.provider
+			if (provider === undefined) throw new Error('Missing authored provider')
+			expect(install.root).toBe(join(scratch.path, 'install'))
+			const profiles = join(install.root, 'studies/memory/profiles')
 			expect(
-				parseJSON(scratch.read('studies/memory/profiles/recordslocal.json') ?? ''),
-			).toMatchObject({
+				parseJSON(readFileSync(join(profiles, 'recordsrecommended.json'), 'utf8')),
+			).toMatchObject({ provider: { url: server.url, digest: provider.digest } })
+			const listed = parseJSON(await (await fetch(`${server.url}/api/tags`)).text())
+			if (!isRecord(listed) || !isArray(listed.models)) throw new Error('Missing model list')
+			expect(listed.models).toHaveLength(3)
+			expect(listed.models).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ name: provider.model, digest: provider.digest.model }),
+					expect.objectContaining({ name: provider.judge, digest: provider.digest.judge }),
+					expect.objectContaining({ name: provider.triage, digest: provider.digest.triage }),
+				]),
+			)
+			writeMemoryLocalProfile(install.root)
+			const local = parseJSON(readFileSync(join(profiles, 'recordslocal.json'), 'utf8'))
+			expect(local).toMatchObject({
 				name: 'recordslocal',
-				agent: entry,
-				subject: entry,
+				roots: authored.roots,
 				qualification: 'tmp/studies/recordscapacity',
 				bounds: {
 					request: { duration: 3000 },
@@ -471,35 +485,40 @@ describe('study install fixtures', () => {
 					trial: { duration: 90000 },
 					series: { duration: 240000 },
 				},
-				provider: { url: 'http://127.0.0.1:7', model: 'model', judge: 'judge' },
-				roots: [scratch.path, ...fixture.packages.map((captured) => captured.target)],
+				provider: {
+					entry: provider.entry,
+					url: server.url,
+					model: provider.model,
+					judge: provider.judge,
+					digest: { model: provider.digest.model, judge: provider.digest.judge },
+				},
 			})
-			const help = await executeStudyInstall(fixture, ['--help'])
+			expect(isRecord(local) && isRecord(local.provider) && 'triage' in local.provider).toBe(false)
+			const help = await install.execute(['--help'])
 			expect(help).toMatchObject({ code: 0 })
 			expect(help.stdout).toContain('study execute')
-			const refused = await executeStudyInstall(fixture, ['unsupported'])
-			expect(refused.code).toBe(64)
-			expect(refused.stderr).not.toBe('')
-			expect(() =>
-				captureStudyPackages(scratch, new Map([['wrong-package', resolve('.')]])),
-			).toThrow('Malformed selected package')
+			expect(readMemoryRequests(server)).toEqual([{ path: '/api/tags', body: '' }])
 		} finally {
+			await server.destroy()
 			await destroyScratch(scratch)
 		}
-	})
+	}, 60000)
 
 	it('serves queued protocol responses and owns real request accounting and cleanup', async () => {
-		const server = await createMemoryServer([
-			{ path: '/api/chat', status: 503, body: 'unavailable' },
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([{ path: '/api/chat', status: 503, body: 'unavailable' }]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		try {
 			const refused = await fetch(`${server.url}/api/chat`, { method: 'POST', body: '{}' })
 			expect(refused.status).toBe(503)
 			expect(await refused.text()).toBe('unavailable')
-			expect(server.requests[0]).toEqual({ path: '/api/chat', body: '{}' })
-			const metadata = await fetch(`${server.url}/api/show`, { method: 'POST' })
+			expect(readMemoryRequests(server)[0]).toEqual({ path: '/api/chat', body: '{}' })
+			const metadata = await fetch(`${server.url}/api/show`, {
+				method: 'POST',
+				body: '{"model":"model"}',
+			})
 			expect(parseJSON(await metadata.text())).toMatchObject({
 				model_info: { 'fixture.context_length': 32768 },
 			})
@@ -514,7 +533,7 @@ describe('study install fixtures', () => {
 			expect(fixture.evidence).toEqual([{ event: 'fixture', goal: 'first', value: 'saved' }])
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
@@ -524,14 +543,14 @@ describe('study install fixtures', () => {
 			{ path: '/api/chat', status: 503, body: 'second' },
 			{ path: '/api/generate', body: 'third' },
 		]
-		const server = new MemoryServer(script)
-		await server.start()
+		const replies = new MemoryScript(script)
+		const server = await createMemoryFixture(replies)
+		const named = '{"model":"model"}'
 		try {
-			expect(server.responses).toEqual(script)
-			// The getters hand out copies, so a caller cannot reorder what is still scripted.
-			server.responses.pop()
-			server.requests.pop()
-			expect(server.responses).toHaveLength(3)
+			expect(replies.responses).toEqual(script)
+			// The getter hands out a copy, so a caller cannot reorder what is still scripted.
+			replies.responses.pop()
+			expect(replies.responses).toHaveLength(3)
 			const observed: Array<readonly [string, number, string, number]> = []
 			for (const path of [
 				'/api/generate',
@@ -541,8 +560,8 @@ describe('study install fixtures', () => {
 				'/api/generate',
 				'/api/chat',
 			]) {
-				const reply = await fetch(`${server.url}${path}`, { method: 'POST', body: path })
-				observed.push([path, reply.status, await reply.text(), server.responses.length])
+				const reply = await fetch(`${server.url}${path}`, { method: 'POST', body: named })
+				observed.push([path, reply.status, await reply.text(), replies.responses.length])
 			}
 			// Only a reply scripted for the path at the head is consumed; every other request is answered by default.
 			expect(observed.map(([path, status, , remaining]) => [path, status, remaining])).toEqual([
@@ -563,17 +582,19 @@ describe('study install fixtures', () => {
 				model_info: { 'fixture.context_length': 32768 },
 			})
 			expect(observed[5]?.[2]).toBe(buildMemoryReply())
-			expect(server.requests).toEqual(observed.map(([path]) => ({ path, body: path })))
+			expect(readMemoryRequests(server)).toEqual(observed.map(([path]) => ({ path, body: named })))
 			expect(script).toHaveLength(3)
 		} finally {
-			await server.close()
+			await server.destroy()
 		}
 	})
 
-	it('answers a model list unless the script heads with one, and gives each server its own script', async () => {
+	it('answers a model list unless the script heads with one, and gives each script its own replies', async () => {
 		const script = [{ path: '/api/tags', status: 500, body: 'down' }]
-		const down = await createMemoryServer(script)
-		const other = await createMemoryServer(script)
+		const first = new MemoryScript(script)
+		const second = new MemoryScript(script)
+		const down = await createMemoryFixture(first)
+		const other = await createMemoryFixture(second)
 		try {
 			const refused = await fetch(`${down.url}/api/tags`)
 			expect([refused.status, await refused.text()]).toEqual([500, 'down'])
@@ -581,43 +602,75 @@ describe('study install fixtures', () => {
 			expect(parseJSON(await listed.text())).toMatchObject({
 				models: [{ name: 'model' }, { name: 'judge' }],
 			})
-			expect(down.responses).toEqual([])
-			expect(other.responses).toEqual(script)
+			expect(first.responses).toEqual([])
+			expect(second.responses).toEqual(script)
 			expect((await fetch(`${other.url}/api/tags`)).status).toBe(500)
 		} finally {
-			await Promise.all([down.close(), other.close()])
+			await Promise.all([down.destroy(), other.destroy()])
 		}
 	})
 
 	it('answers a version request unless the script heads with one', async () => {
-		const server = await createMemoryServer([{ path: '/api/version', status: 500, body: 'down' }])
+		const replies = new MemoryScript([{ path: '/api/version', status: 500, body: 'down' }])
+		const server = await createMemoryFixture(replies)
 		try {
 			const refused = await fetch(`${server.url}/api/version`)
 			expect([refused.status, await refused.text()]).toEqual([500, 'down'])
 			const answered = await fetch(`${server.url}/api/version`)
 			expect(parseJSON(await answered.text())).toEqual({ version: 'fixture-1' })
-			expect(server.responses).toEqual([])
+			expect(replies.responses).toEqual([])
 		} finally {
-			await server.close()
+			await server.destroy()
 		}
 	})
 
-	it('answers a metadata path from its given body, and the default stays when absent', async () => {
-		const server = await createMemoryServer([{ path: '/api/version', status: 500, body: 'down' }], {
-			'/api/version': '{"version":"given"}',
-			'/api/tags': '{"models":[]}',
-		})
-		const bare = await createMemoryServer()
+	it('answers a path from its policy, declines an unload and an unknown path, and streams delayed and held bodies', async () => {
+		const server = await createMemoryFixture(
+			new MemoryScript(
+				[
+					{ path: '/api/chat', body: 'last', chunks: [{ delay: 20, body: 'first ' }] },
+					{ path: '/api/tags', body: 'held', open: true },
+				],
+				{ '/v1/systemone': buildMemoryRouteAnswer },
+			),
+		)
 		try {
-			const scripted = await fetch(`${server.url}/api/version`)
-			expect([scripted.status, await scripted.text()]).toEqual([500, 'down'])
-			expect(await (await fetch(`${server.url}/api/version`)).text()).toBe('{"version":"given"}')
-			expect(await (await fetch(`${server.url}/api/tags`)).text()).toBe('{"models":[]}')
-			expect(parseJSON(await (await fetch(`${bare.url}/api/version`)).text())).toEqual({
-				version: 'fixture-1',
+			const streamed = await fetch(`${server.url}/api/chat`, { method: 'POST', body: '{}' })
+			expect(await streamed.text()).toBe('first last')
+			const held = (await fetch(`${server.url}/api/tags`)).body?.getReader()
+			const chunk = await held?.read()
+			expect(new TextDecoder().decode(chunk?.value)).toBe('held')
+			await held?.cancel()
+			const question = { type: 'choice', criteria: { fact: 'f', correction: 'c', other: 'o' } }
+			const routed = await fetch(`${server.url}/v1/systemone`, {
+				method: 'POST',
+				body: JSON.stringify({ questions: { q1: question } }),
 			})
+			expect(parseJSON(await routed.text())).toEqual({
+				model: 'model',
+				answers: {
+					q1: { type: 'choice', probabilities: { fact: 0.9, correction: 0.05, other: 0.05 } },
+				},
+			})
+			expect(() => buildMemoryRouteAnswer({ questions: { q1: { type: 'noul' } } })).toThrow(
+				'Expected a choice question',
+			)
+			const unloaded = await fetch(`${server.url}/api/generate`, {
+				method: 'POST',
+				body: JSON.stringify({ model: 'judge', keep_alive: 0, prompt: '' }),
+			})
+			expect(parseJSON(await unloaded.text())).toMatchObject({
+				model: 'judge',
+				done: true,
+				done_reason: 'unload',
+			})
+			expect((await fetch(`${server.url}/api/absent`, { method: 'POST' })).status).toBe(404)
+			for (const body of ['{"keep_alive":0}', '{"keep_alive":0,"prompt":""}'])
+				expect(matchesMemoryUnload(body)).toBe(true)
+			for (const body of ['{"keep_alive":0,"prompt":"Judge"}', '{"prompt":""}', 'not json'])
+				expect(matchesMemoryUnload(body)).toBe(false)
 		} finally {
-			await Promise.all([server.close(), bare.close()])
+			await server.destroy()
 		}
 	})
 
@@ -625,7 +678,7 @@ describe('study install fixtures', () => {
 		expect(readMemoryModel('{"model":"org/agent:q4"}', 'model')).toBe('org/agent:q4')
 		expect(readMemoryModel('{"model":1}', 'model')).toBe('model')
 		expect(readMemoryModel('', 'judge')).toBe('judge')
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		try {
 			for (const [path, fallback] of [
 				['/api/chat', 'model'],
@@ -640,7 +693,7 @@ describe('study install fixtures', () => {
 				expect(parseJSON(await bare.text())).toMatchObject({ model: fallback })
 			}
 		} finally {
-			await server.close()
+			await server.destroy()
 		}
 	})
 
@@ -662,10 +715,11 @@ describe('study install fixtures', () => {
 			{ id: 'two', input: { prompt: '', arrivals: [], records: [] } },
 			{ id: 'three', input: { prompt: 'Respond', arrivals: [], records: [] } },
 		]
-		const server = await createMemoryServer([
+		const replies = new MemoryScript([
 			{ path: '/api/chat', body: buildMemoryReply({ content: 'Retained one' }) },
 			{ path: '/api/chat', body: buildMemoryReply({ content: 'Never reached' }) },
 		])
+		const server = await createMemoryFixture(replies)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		try {
@@ -682,13 +736,13 @@ describe('study install fixtures', () => {
 					message: 'Malformed public memory input',
 				})
 				expect(server.requests.filter((request) => request.path === '/api/chat')).toHaveLength(1)
-				expect(server.responses).toHaveLength(1)
+				expect(replies.responses).toHaveLength(1)
 			} finally {
 				await session.close()
 			}
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
@@ -697,7 +751,7 @@ describe('study install fixtures', () => {
 			id,
 			input: { prompt: 'Respond', arrivals: [], records: [] },
 		}))
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		try {
@@ -721,7 +775,7 @@ describe('study install fixtures', () => {
 			}
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
@@ -1035,7 +1089,7 @@ describe('study install fixtures', () => {
 		expect(body.logprobs[0].top_logprobs).toContainEqual({ token: 'A', logprob: -8 })
 	})
 
-	it('declares recording on a built profile and on a profile written beside a scratch records local one, keeping its other members', () => {
+	it('declares recording on a built profile and on a profile written beside an install records local one, keeping its other members', () => {
 		const profile = buildMemoryRecordProfile('http://127.0.0.1:7')
 		expect(profile.record).toEqual({ bytes: 4194304, calls: 256, duration: 60000 })
 		expect(profile.settings).toEqual({
@@ -1043,12 +1097,12 @@ describe('study install fixtures', () => {
 		})
 		const scratch = createScratch({ prefix: 'study-recording-setup-' })
 		try {
-			expect(() => writeStudyInstallRecord(scratch, 'recorded')).toThrow(
+			expect(() => writeStudyInstallRecord(scratch.path, 'recorded')).toThrow(
 				'Missing authored memory profile',
 			)
 			const local = '{"name":"recordslocal","settings":{"a":1}}'
 			scratch.write('studies/memory/profiles/recordslocal.json', local)
-			writeStudyInstallRecord(scratch, 'recorded', ['opening'])
+			writeStudyInstallRecord(scratch.path, 'recorded', ['opening'])
 			expect(parseJSON(scratch.read('studies/memory/profiles/recorded.json') ?? '')).toEqual({
 				name: 'recorded',
 				record: STUDY_MEMORY_RECORD.record,

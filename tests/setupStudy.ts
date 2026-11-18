@@ -1,4 +1,9 @@
-import type { LoopbackInterface, ScratchInterface } from '@orkestrel/test/server'
+import type { ScratchInterface } from '@orkestrel/test/server'
+import type {
+	OllamaFixtureInterface,
+	OllamaFixtureRequest,
+	OllamaModel,
+} from '@orkestrel/ollama/server'
 import type {
 	StudyAssessment,
 	StudyBounds,
@@ -20,6 +25,9 @@ import type {
 	StudyExchangeRow,
 	StudyExchangeSinkInterface,
 	StudyDeclaration,
+	StudyInstall,
+	StudyInstallResult,
+	StudyLaunchResult,
 	StudyOllamaReplayInterface,
 	StudyResultView,
 	StudyValidation,
@@ -29,7 +37,6 @@ import type { StudyAttempt, StudyFailure, StudyRole, StudyRubric } from '@orkest
 import type { JSONValue } from '@orkestrel/contract'
 import type { StudyDeskAssertion } from '../studies/desk/types.js'
 import type { StudyMemoryArm } from '../studies/memory/index.js'
-import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import {
 	arrayOf,
 	canonicalStringify,
@@ -42,6 +49,7 @@ import {
 } from '@orkestrel/contract'
 import { createRecorder, waitForDelay } from '@orkestrel/test'
 import { createTool } from '@orkestrel/tool'
+import { buildOllamaReadout, createOllamaFixture } from '@orkestrel/ollama/server'
 import { STUDY_CHAT_SYSTEM } from '../studies/chat/constants.js'
 import { isStudyChatInput } from '../studies/chat/validators.js'
 import { StudyChatDriver } from '../studies/chat/drivers/StudyChatDriver.js'
@@ -60,6 +68,10 @@ import {
 	STUDY_CHECKPOINT_EVENT,
 	StudyResultStore,
 	buildStudyExchangeDeclaration,
+	buildStudyOllamaModels,
+	buildStudySelectors,
+	collectStudyOllamaModels,
+	createStudyInstall,
 	readStudyDeclaration,
 	readStudyResult,
 } from '@orkestrel/study/server'
@@ -68,13 +80,11 @@ import { STUDY_DESK_TOOLS } from '../studies/desk/constants.js'
 import { isStudyDeskAssertion, isStudyDeskInput } from '../studies/desk/validators.js'
 import * as agent from '../src/core/index.js'
 import * as provider from '@orkestrel/ollama'
-import { createLoopback, createScratch, destroyScratch } from '@orkestrel/test/server'
-import { createServer } from 'node:http'
+import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { deepStrictEqual, strictEqual } from 'node:assert'
 import { execFile } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { basename, dirname, join, resolve } from 'node:path'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createLedgerJudge } from './setup.js'
 
@@ -174,98 +184,6 @@ export const STUDY_ENDURANCE_BOUNDARIES = Object.freeze([
 	Object.freeze(['ev-24-4', Object.freeze([]), Object.freeze([])] as const),
 ])
 
-/** Copies manifest and dist bytes for a selected installed runtime dependency closure.
- * @param scratch - Exclusive owner of the copied tree.
- * @param selections - Initial package roots; an earlier selection wins throughout the graph.
- * @returns Every actual source and regular target package directory.
- */
-export function captureStudyPackages(
-	scratch: ScratchInterface,
-	selections: ReadonlyMap<string, string>,
-): readonly StudyInstallPackage[] {
-	const sources = new Map(selections)
-	const packages: StudyInstallPackage[] = []
-	for (const [name, source] of sources) {
-		const manifest = parseJSON(readFileSync(join(source, 'package.json'), 'utf8'))
-		if (!isRecord(manifest) || manifest.name !== name)
-			throw new Error(`Malformed selected package ${name}`)
-		const dependencies = manifest.dependencies
-		if (dependencies !== undefined && !isRecord(dependencies))
-			throw new Error(`Invalid dependencies for ${name}`)
-		const target = scratch.ensure(join('node_modules', name))
-		cpSync(join(source, 'package.json'), join(target, 'package.json'))
-		cpSync(join(source, 'dist'), join(target, 'dist'), { recursive: true, dereference: true })
-		if (lstatSync(target).isSymbolicLink()) throw new Error(`Linked fixture package ${name}`)
-		packages.push(Object.freeze({ name, source, target }))
-		const require = createRequire(join(source, 'package.json'))
-		for (const dependency of Object.keys(dependencies ?? {}))
-			if (!sources.has(dependency))
-				sources.set(dependency, dirname(require.resolve(`${dependency}/package.json`)))
-	}
-	return Object.freeze(packages)
-}
-
-/** Captures the actual Agent, installed Study and Ollama bytes with authored CPU workloads.
- * @param scratch - Exclusive workspace owner, cleaned by the caller in finally.
- * @param url - Ephemeral native Ollama protocol fixture origin.
- * @returns The installed command and complete copied runtime closure.
- */
-export function createStudyInstallFixture(
-	scratch: ScratchInterface,
-	url: string,
-): StudyInstallFixture {
-	const packages = captureStudyPackages(
-		scratch,
-		new Map([
-			['@orkestrel/agent', resolve('.')],
-			['@orkestrel/study', resolve('node_modules/@orkestrel/study')],
-			['@orkestrel/ollama', resolve('node_modules/@orkestrel/ollama')],
-		]),
-	)
-	for (const target of ['memory', 'recordscapacity', 'recordsmemory', 'chat'])
-		cpSync(resolve('studies', target), scratch.ensure(join('studies', target)), { recursive: true })
-	const raw = parseJSON(scratch.read('studies/memory/profiles/recordslocal.json') ?? '')
-	if (!isRecord(raw) || !isRecord(raw.bounds)) throw new Error('Missing authored memory profile')
-	const authored = raw.bounds
-	const bounds = Object.fromEntries(
-		Object.entries({ request: 3000, goal: 30000, trial: 90000, series: 240000 }).map(
-			([scope, duration]) => {
-				const limit = authored[scope]
-				if (!isRecord(limit)) throw new Error(`Missing ${scope} bound`)
-				return [scope, { ...limit, duration }]
-			},
-		),
-	)
-	// The selected subject is distinct from Study's installed Agent protocol dependency.
-	cpSync(resolve('dist'), scratch.ensure('dist'), { recursive: true, dereference: true })
-	cpSync(resolve('package.json'), join(scratch.path, 'package.json'))
-	const entry = join(scratch.path, 'dist/src/core/index.js')
-	scratch.write(
-		'studies/memory/profiles/recordslocal.json',
-		JSON.stringify({
-			...raw,
-			name: 'recordslocal',
-			agent: entry,
-			subject: entry,
-			roots: [scratch.path, ...packages.map((captured) => captured.target)],
-			bounds,
-			provider: {
-				entry: join(scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
-				url,
-				model: 'model',
-				judge: 'judge',
-				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
-			},
-			qualification: 'tmp/studies/recordscapacity',
-		}),
-	)
-	return Object.freeze({
-		scratch,
-		packages,
-		entry: join(scratch.path, 'node_modules/@orkestrel/study/dist/bin/main.js'),
-	})
-}
-
 /** Runs the battery's direct composition independently of the Study session.
  * @example await runStudyChatDirect(server.url, goals, 19968)
  */
@@ -339,35 +257,6 @@ export async function runStudyChatDirect(
 	}
 }
 
-/** Rebinds a copied chat profile to the protocol fixture without changing treatment or allowances.
- * @remarks Writes the profile alone; the copied declarations keep their authored bytes, and a run selects a segment with `--trial` and `--goals`.
- * @example writeStudyChatFixture(fixture, server.url, 'full')
- */
-export function writeStudyChatFixture(
-	fixture: StudyInstallFixture,
-	url: string,
-	name: string,
-): void {
-	const raw = parseJSON(readFileSync(resolve('studies/chat/profiles', `${name}.json`), 'utf8'))
-	if (!isRecord(raw) || !isRecord(raw.settings)) throw new Error('Missing chat profile')
-	fixture.scratch.write(
-		`studies/chat/profiles/${name}.json`,
-		JSON.stringify({
-			...raw,
-			agent: join(fixture.scratch.path, 'dist/src/core/index.js'),
-			subject: join(fixture.scratch.path, 'dist/src/core/index.js'),
-			roots: [fixture.scratch.path, ...fixture.packages.map((entry) => entry.target)],
-			provider: {
-				entry: join(fixture.scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
-				url,
-				model: 'model',
-				judge: 'judge',
-				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
-			},
-		}),
-	)
-}
-
 /** Reads an authored chat profile and rebinds its provider to the protocol fixture, unrecorded, for an in-process run.
  * @example buildStudyChatProfile('tight', server.url).settings // { capacity: 1600, ... }
  */
@@ -439,98 +328,8 @@ export async function executeStudySeries(
 	return await readStudyResult(directory)
 }
 
-/** Drives the actual installed Study executable through its public native command boundary.
- * @param fixture - Captured installed command and working directory.
- * @param arguments_ - Exact public command arguments, including emitted next hints.
- * @param duration - Outer bound; execution retains its own request, trial and series limits.
- * @returns Native exit, separate stdout/stderr bytes, and elapsed milliseconds.
- */
-export function executeStudyInstall(
-	fixture: StudyInstallFixture,
-	arguments_: readonly string[],
-	duration = 60000,
-): Promise<StudyInstallStep> {
-	return executeStudyCommand(fixture.entry, fixture.scratch.path, arguments_, duration)
-}
-
-/** Pins the Study executable's location under an install or a frozen closure. */
-export const STUDY_INSTALL_ENTRY = 'node_modules/@orkestrel/study/dist/bin/main.js'
-
-/** Runs one Study command through an entry from its consumer root and prints one progress line with its exit and elapsed seconds.
- * @param entry - The Study executable: an install's, or a frozen closure's under `STUDY_INSTALL_ENTRY`.
- * @param root - The consumer root the command reads its declarations from.
- * @param arguments_ - Exact public command arguments.
- * @param duration - Outer process deadline in milliseconds.
- * @example (await executeStudyCommand(join(closure, STUDY_INSTALL_ENTRY), closure, ['report', result, '--assessment', id])).code // 0
- */
-export async function executeStudyCommand(
-	entry: string,
-	root: string,
-	arguments_: readonly string[],
-	duration = 60000,
-): Promise<StudyInstallStep> {
-	const started = performance.now()
-	const result = await executeStudyProcess([entry, ...arguments_], root, duration)
-	const elapsed = performance.now() - started
-	console.info(
-		`[studies] ${arguments_
-			.slice(0, 2)
-			.map((value) => basename(value))
-			.join(' ')} exited ${result.code} in ${(elapsed / 1000).toFixed(1)} s`,
-	)
-	return { ...result, duration: elapsed }
-}
-
-/** Rehearses a study from a frozen closure through the installed command, with no model: freeze, closure check, closure execution, the result read, and a grade through the closure's own entry.
- * @remarks
- * The caller builds the install and writes the profile that names its fixture; the procedure holds no
- * assertion and runs every step whatever an earlier one returned. It freezes the whole declaration,
- * because a closure keeps a selection-free fingerprint, and forwards `selection` (`--trial`, `--goals`,
- * `--seed`) unchanged to check and execute. The closure is `closure` and the result `result` under the
- * install's scratch. `studies/README.md` § Full rehearsal holds the on-demand probe that runs it.
- * @returns Each step's exit and elapsed time, the closure, and the result as read, absent when execution exits nonzero
- * @example (await rehearseStudyInstall(fixture, { study: 'chat', profile: 'full' })).result?.status // 'sealed'
- */
-export async function rehearseStudyInstall(
-	fixture: StudyInstallFixture,
-	options: StudyRehearsalOptions,
-): Promise<StudyRehearsal> {
-	const closure = join(fixture.scratch.path, 'closure')
-	const directory = join(fixture.scratch.path, 'result')
-	const selection = options.selection ?? []
-	const profile = ['--profile', options.profile]
-	const { definition } = await readStudyDeclaration(fixture.scratch.path, options.study)
-	const freeze = await executeStudyInstall(fixture, [
-		'freeze',
-		options.study,
-		...profile,
-		'--to',
-		closure,
-	])
-	const check = await executeStudyInstall(fixture, [
-		'check',
-		options.study,
-		...profile,
-		'--closure',
-		closure,
-		...selection,
-	])
-	const execute = await executeStudyInstall(
-		fixture,
-		['execute', options.study, ...profile, '--closure', closure, ...selection, '--out', directory],
-		options.duration,
-	)
-	const result = execute.code === 0 ? await readStudyResult(directory) : undefined
-	const grade = await executeStudyCommand(join(closure, STUDY_INSTALL_ENTRY), closure, [
-		'grade',
-		directory,
-		'--rubric',
-		join(closure, 'studies', options.study, definition.rubric),
-	])
-	return { closure, freeze, check, execute, grade, result }
-}
-
 /** Executes a real Node entry with bounded output and preserves failure diagnostics.
+ * @remarks Study's `StudyInstall` runs only an installed Study executable, with no runtime flag; this runs any Node arguments, such as the topology probe's entry under `--experimental-import-meta-resolve`.
  * @param arguments_ - Exact Node arguments, including its JavaScript entry.
  * @param root - Native working directory.
  * @param duration - Outer process deadline in milliseconds.
@@ -540,7 +339,7 @@ export function executeStudyProcess(
 	arguments_: readonly string[],
 	root: string,
 	duration: number,
-): Promise<StudyInstallResult> {
+): Promise<StudyLaunchResult> {
 	return new Promise((done) =>
 		execFile(
 			process.execPath,
@@ -570,7 +369,7 @@ export function executeStudyProcess(
 export function executeStudyTopology(
 	scratch: ScratchInterface,
 	roots?: readonly string[],
-): Promise<StudyInstallResult> {
+): Promise<StudyLaunchResult> {
 	const entry = scratch.write(
 		'topology.ts',
 		`// Self-contained disposable entry: imported test setup would preload the measured modules.
@@ -623,44 +422,41 @@ console.log(JSON.stringify({
 	return executeStudyProcess(['--experimental-import-meta-resolve', entry], resolve('.'), 60000)
 }
 
-/**
- * Serves a native loopback Ollama protocol fixture on an ephemeral port.
- * @remarks
- * Create one per test. A scripted reply is consumed by the next request for its path while it heads
- * the script; `metadata` answers a metadata path ahead of its default; `policy` answers a chat
- * request the script does not, from the body it parsed; any other request is answered by default,
- * repeating the model it names as a daemon does. The script and the request log are replaced and
- * appended by this entity alone, and its getters return copies.
- */
-export class MemoryServer implements MemoryServerFixture {
-	readonly #server: Server
-	readonly #requests: Array<{ readonly path: string; readonly body: string }> = []
-	readonly #metadata: ReadonlyMap<string, string>
-	readonly #policy: MemoryPolicy | undefined
-	#pending: readonly MemoryWireFixture[]
-	#loopback: LoopbackInterface | undefined
+/** Pins the protocol fixture's listed models, the version it reports, and the context length its model metadata reports. */
+export const STUDY_MEMORY_FIXTURE = Object.freeze({
+	models: Object.freeze([
+		Object.freeze({ name: 'model', digest: 'a'.repeat(64) }),
+		Object.freeze({ name: 'judge', digest: 'b'.repeat(64) }),
+	]),
+	version: 'fixture-1',
+	context: 32768,
+})
 
-	/** Creates an unstarted fixture. @param responses - The scripted replies in the order their paths are requested. @param metadata - The body served for a metadata path ahead of its default. @param policy - The reply policy for an unscripted chat request. Default: none. */
+/** Pins the labels a scripted judge readout lists, in its top order. */
+export const STUDY_MEMORY_LABELS = Object.freeze(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Yes', 'No'])
+
+/**
+ * Answers an Ollama protocol fixture's requests from a script, a policy per path, and the replies a daemon gives a chat and a judge request.
+ * @remarks
+ * `createMemoryFixture` passes `reply` as the fixture's reply callback, which sees every request
+ * first. A scripted reply is consumed by the next request for its path while it heads the script;
+ * a policy answers a request for its path that the script does not; an unscripted chat request
+ * takes `buildMemoryReply` and an unscripted judge request a one-token readout, each repeating the
+ * model the body names, as a daemon does. Every other request is declined, so the fixture's
+ * built-in answer applies: its version, its model list, a listed model's metadata, an unload, or a
+ * 404. The script is replaced by this entity alone, and its getter returns a copy.
+ */
+export class MemoryScript {
+	readonly #policies: ReadonlyMap<string, MemoryPolicy>
+	#pending: readonly MemoryWireFixture[]
+
+	/** Creates a script. @param responses - The scripted replies in the order their paths are requested. Default: none. @param policies - The reply policy for each path, which answers a request the script does not. Default: none. */
 	constructor(
 		responses: readonly MemoryWireFixture[] = [],
-		metadata: Readonly<Record<string, string>> = {},
-		policy: MemoryPolicy | undefined = undefined,
+		policies: Readonly<Record<string, MemoryPolicy>> = {},
 	) {
 		this.#pending = responses
-		this.#metadata = new Map(Object.entries(metadata))
-		this.#policy = policy
-		this.#server = createServer((request, response) => this.#serve(request, response))
-	}
-
-	/** Holds the origin of the started fixture. @throws Error - Thrown when the fixture never started. */
-	get url(): string {
-		if (this.#loopback === undefined) throw new Error('Missing native fixture address')
-		return this.#loopback.url
-	}
-
-	/** Holds a copy of every request received, in arrival order. */
-	get requests(): Array<{ readonly path: string; readonly body: string }> {
-		return [...this.#requests]
+		this.#policies = new Map(Object.entries(policies))
 	}
 
 	/** Holds a copy of the scripted replies not yet consumed. */
@@ -668,123 +464,118 @@ export class MemoryServer implements MemoryServerFixture {
 		return [...this.#pending]
 	}
 
-	/** Begins listening on an ephemeral loopback port. @returns Completion once the fixture accepts connections. @throws Error - Thrown when the fixture already started. */
-	async start(): Promise<void> {
-		if (this.#loopback !== undefined) throw new Error('The native fixture already started')
-		this.#loopback = await createLoopback(this.#server)
-	}
-
-	/** Drops every connection and stops listening; a repeated call, or one before `start`, resolves at once. @returns Completion after the fixture is closed. */
-	close(): Promise<void> {
-		return this.#loopback?.destroy() ?? Promise.resolve()
-	}
-
-	async #serve(request: IncomingMessage, response: ServerResponse): Promise<void> {
-		const chunks: Buffer[] = []
-		for await (const chunk of request)
-			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-		const body = Buffer.concat(chunks).toString('utf8')
-		this.#requests.push({ path: request.url ?? '', body })
+	/** Answers one logged request, or declines it so the fixture's built-in answer applies.
+	 * @param request - The fixture's record of the request.
+	 * @returns The reply, or undefined to decline.
+	 */
+	reply(request: OllamaFixtureRequest): Response | undefined {
 		const [next, ...rest] = this.#pending
-		const metadata = this.#metadata.get(request.url ?? '')
-		if (metadata !== undefined && next?.path !== request.url) {
-			response.end(metadata)
-			return
-		}
-		if (request.url === '/api/tags' && next?.path !== '/api/tags') {
-			response.end(
-				JSON.stringify({
-					models: [
-						{ name: 'model', digest: 'a'.repeat(64) },
-						{ name: 'judge', digest: 'b'.repeat(64) },
-					],
-				}),
-			)
-			return
-		}
-		if (request.url === '/api/version' && next?.path !== '/api/version') {
-			response.end(JSON.stringify({ version: 'fixture-1' }))
-			return
-		}
-		if (next !== undefined && next.path === request.url) {
+		if (next !== undefined && next.path === request.path) {
 			this.#pending = rest
-			response.writeHead(next.status ?? 200)
-			if (next.chunks !== undefined) {
-				for (const chunk of next.chunks) {
-					await waitForDelay(chunk.delay)
-					response.write(chunk.body)
-				}
-				response.end(next.body)
-				return
-			}
-			if (next.open === true) response.write(next.body)
-			else response.end(next.body)
-			return
+			return buildMemoryResponse(next)
 		}
-		if (request.url === '/api/chat' && this.#policy !== undefined) {
-			response.end(this.#policy(parseJSON(body)))
-			return
-		}
-		if (request.url === '/api/show') {
-			response.end(
-				JSON.stringify({
-					model_info: { 'general.architecture': 'fixture', 'fixture.context_length': 32768 },
-				}),
+		const policy = this.#policies.get(request.path)
+		if (policy !== undefined) return new Response(policy(parseJSON(request.body)))
+		if (request.path === '/api/chat')
+			return new Response(buildMemoryReply({ model: readMemoryModel(request.body, 'model') }))
+		if (request.path === '/api/generate' && !matchesMemoryUnload(request.body))
+			return new Response(
+				buildMemoryReadout(readMemoryModel(request.body, 'judge'), 'A', ['A', 'Yes']),
 			)
-			return
-		}
-		if (request.url === '/api/generate') {
-			const value = parseJSON(body)
-			if (isRecord(value) && value.prompt === '' && value.keep_alive === 0) {
-				response.end(
-					JSON.stringify({
-						model: readMemoryModel(body, 'model'),
-						done: true,
-						done_reason: 'unload',
-					}),
-				)
-				return
-			}
-			response.end(
-				JSON.stringify({
-					model: readMemoryModel(body, 'judge'),
-					done: true,
-					done_reason: 'length',
-					response: 'A',
-					prompt_eval_count: 10,
-					eval_count: 1,
-					logprobs: [
-						{
-							token: 'A',
-							logprob: -0.01,
-							top_logprobs: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Yes', 'No'].map(
-								(token, index) => ({ token, logprob: index === 0 || token === 'Yes' ? -0.01 : -8 }),
-							),
-						},
-					],
-				}),
-			)
-			return
-		}
-		response.end(buildMemoryReply({ model: readMemoryModel(body, 'model') }))
+		return undefined
 	}
 }
 
 /**
- * Starts a native loopback Ollama protocol fixture on an ephemeral port.
- * @param responses - The scripted replies in the order their paths are requested. Default: none.
- * @param metadata - The body served for a metadata path ahead of its default. Default: none.
- * @param policy - The reply policy for an unscripted chat request. Default: none.
- * @returns A listening fixture the caller closes.
+ * Starts a loopback Ollama protocol fixture on an ephemeral port that answers through a script ahead of its built-in answers.
+ * @param script - The replies. Default: an empty script, which answers each chat and judge request by default.
+ * @param models - The models the fixture lists and holds metadata for. Default: `STUDY_MEMORY_FIXTURE.models`.
+ * @returns A listening fixture the caller destroys.
  */
-export async function createMemoryServer(
-	responses: readonly MemoryWireFixture[] = [],
-	metadata: Readonly<Record<string, string>> = {},
-	policy: MemoryPolicy | undefined = undefined,
-): Promise<MemoryServerFixture> {
-	const server = new MemoryServer(responses, metadata, policy)
-	await server.start()
-	return server
+export function createMemoryFixture(
+	script: MemoryScript = new MemoryScript(),
+	models: readonly OllamaModel[] = STUDY_MEMORY_FIXTURE.models,
+): Promise<OllamaFixtureInterface> {
+	return createOllamaFixture({
+		...STUDY_MEMORY_FIXTURE,
+		models,
+		reply: (request) => script.reply(request),
+	})
+}
+
+/**
+ * Builds the response a scripted reply describes: its status, then its body whole, held open, or after its delayed chunks.
+ * @param fixture - The scripted reply.
+ * @returns A response the fixture writes verbatim.
+ */
+export function buildMemoryResponse(fixture: MemoryWireFixture): Response {
+	const status = fixture.status ?? 200
+	const encoder = new TextEncoder()
+	if (fixture.open === true)
+		return new Response(
+			new ReadableStream({
+				start: (controller) => {
+					controller.enqueue(encoder.encode(fixture.body))
+				},
+			}),
+			{ status },
+		)
+	if (fixture.chunks === undefined) return new Response(fixture.body, { status })
+	const chunks = streamMemoryChunks(fixture.chunks, fixture.body)
+	return new Response(
+		new ReadableStream<Uint8Array>({
+			pull: async (controller) => {
+				const step = await chunks.next()
+				if (step.done === true) controller.close()
+				else controller.enqueue(step.value)
+			},
+			cancel: async () => {
+				await chunks.return(undefined)
+			},
+		}),
+		{ status },
+	)
+}
+
+/**
+ * Yields each chunk after its delay, then the final body, as encoded bytes.
+ * @param chunks - The chunks and the delay in milliseconds before each.
+ * @param body - The body written last.
+ * @returns The bytes in write order.
+ */
+export async function* streamMemoryChunks(
+	chunks: NonNullable<MemoryWireFixture['chunks']>,
+	body: string,
+): AsyncGenerator<Uint8Array> {
+	const encoder = new TextEncoder()
+	for (const chunk of chunks) {
+		await waitForDelay(chunk.delay)
+		yield encoder.encode(chunk.body)
+	}
+	yield encoder.encode(body)
+}
+
+/**
+ * Checks whether a generate body asks to unload its model: a zero `keep_alive` and an absent or empty prompt, as the fixture's built-in unload reads it.
+ * @param body - The request body.
+ * @returns True if the body asks for an unload; false otherwise.
+ */
+export function matchesMemoryUnload(body: string): boolean {
+	const value = parseJSON(body)
+	return (
+		isRecord(value) && value.keep_alive === 0 && (value.prompt === undefined || value.prompt === '')
+	)
+}
+
+/**
+ * Reads a fixture's request log as each request's path and exact body, in arrival order.
+ * @param fixture - The protocol fixture.
+ * @returns The requests without their method and headers.
+ */
+export function readMemoryRequests(
+	fixture: OllamaFixtureInterface,
+): readonly MemoryRequestFixture[] {
+	return fixture.requests.map((request) => ({ path: request.path, body: request.body }))
 }
 
 /**
@@ -798,9 +589,34 @@ export function readMemoryModel(body: string, fallback: string): string {
 	return isRecord(value) && isString(value.model) ? value.model : fallback
 }
 
-/** Builds inert protocol output consumed by the actual Ollama package. */
+/** Builds inert protocol output consumed by the actual Ollama package.
+ * @remarks Ollama's `buildOllamaReply` types each call as a `ToolCall`, whose `id` the wire then carries; this builder writes the calls as given, so a script can send the id-less call wire and raw or malformed timing fields.
+ */
 export function buildMemoryReply(options: MemoryReplyFixture = {}): string {
 	return `${JSON.stringify({ model: options.model ?? 'model', done: true, done_reason: options.reason ?? 'stop', message: { role: 'assistant', content: options.content ?? 'Receipt retained.', ...(options.calls === undefined ? {} : { tool_calls: options.calls }) }, ...(options.unknown === true ? {} : { prompt_eval_count: options.prompt ?? 10, eval_count: options.completion ?? 2 }), ...options.timing })}\n`
+}
+
+/**
+ * Builds a one-token judge readout over `STUDY_MEMORY_LABELS`, each likely label at nearly all the probability and the rest far below.
+ * @param model - The model the readout names.
+ * @param token - The token the readout chose.
+ * @param likely - The labels that read likely. Default: the chosen token alone.
+ * @returns One generate reply body.
+ */
+export function buildMemoryReadout(
+	model: string,
+	token: string,
+	likely: readonly string[] = [token],
+): string {
+	return buildOllamaReadout({
+		model,
+		token,
+		top: STUDY_MEMORY_LABELS.map((label) => ({
+			token: label,
+			logprob: likely.includes(label) ? -0.01 : -8,
+		})),
+		counts: { prompt: 10, decode: 1 },
+	})
 }
 
 /** Pins inert daemon timing wire fields: raw nanoseconds and one cached prompt count. */
@@ -997,7 +813,7 @@ export function executeMemoryGoals(
  * @returns Request bytes, products, the first failure, comparable usage and evidence rows.
  */
 export async function runMemoryTrial(options: MemoryTrialFixture): Promise<MemoryTrialResult> {
-	const server = await createMemoryServer(options.responses)
+	const server = await createMemoryFixture(new MemoryScript(options.responses))
 	const profile = buildMemoryProfile({
 		url: server.url,
 		...(options.triage === undefined ? {} : { triage: options.triage }),
@@ -1019,7 +835,7 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 			const run = await executeMemoryGoals(session, options.goals, fixture.context)
 			await session.close()
 			return {
-				requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
+				requests: readMemoryRequests(server),
 				products: run.products,
 				failure:
 					run.failure === undefined
@@ -1040,7 +856,7 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
 		}
 	} finally {
 		fixture.close()
-		await server.close()
+		await server.destroy()
 	}
 }
 
@@ -1049,7 +865,8 @@ export async function runMemoryTrial(options: MemoryTrialFixture): Promise<Memor
  * @returns What the failing and the following goal rejected with, plus the wire state before the following goal and after the run.
  */
 export async function runMemoryFailure(options: MemoryTrialFixture): Promise<MemoryFailureResult> {
-	const server = await createMemoryServer(options.responses)
+	const script = new MemoryScript(options.responses)
+	const server = await createMemoryFixture(script)
 	const profile = buildMemoryProfile({
 		url: server.url,
 		...(options.triage === undefined ? {} : { triage: options.triage }),
@@ -1081,9 +898,9 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 				first: run.failure?.error,
 				latched,
 				products: run.products,
-				requests: server.requests.map((request) => ({ path: request.path, body: request.body })),
+				requests: readMemoryRequests(server),
 				sent,
-				queued: server.responses.length,
+				queued: script.responses.length,
 				usage: fixture.context.meter.usage.map((row): MemoryUsageFixture => ({
 					role: row.role,
 					calls: row.calls,
@@ -1097,7 +914,7 @@ export async function runMemoryFailure(options: MemoryTrialFixture): Promise<Mem
 		}
 	} finally {
 		fixture.close()
-		await server.close()
+		await server.destroy()
 	}
 }
 
@@ -1433,7 +1250,7 @@ export function collectMemoryDeclarations(): readonly string[] {
 }
 
 /**
- * Reads an authored memory profile as a host runs it: a template's `REQUIRED_` provider takes the CPU fixture provider at `url`, as `createStudyInstallFixture` fills it.
+ * Reads an authored memory profile as a host runs it: a template's `REQUIRED_` provider takes the CPU fixture provider at `url`, as `writeMemoryLocalProfile` fills an install's.
  * @param name - The profile's file stem under `studies/memory/profiles/`.
  * @param url - The fixture origin a filled template names.
  * @returns The parsed profile.
@@ -1672,46 +1489,10 @@ export function buildMemoryGradeFixture(): MemoryGradeFixture {
 	}
 }
 
-/** Holds one copied package selection in the installed fixture closure. */
-export interface StudyInstallPackage {
-	readonly name: string
-	readonly source: string
-	readonly target: string
-}
-/** Holds an actual installed CLI and its exclusive scratch workspace. */
-export interface StudyInstallFixture {
-	readonly scratch: ScratchInterface
-	readonly entry: string
-	readonly packages: readonly StudyInstallPackage[]
-}
-/** Holds native command output without discarding failed-command diagnostics. */
-export interface StudyInstallResult {
-	readonly code: number
-	readonly stdout: string
-	readonly stderr: string
-}
-/** Holds one Study command's output with its elapsed milliseconds. */
-export interface StudyInstallStep extends StudyInstallResult {
-	readonly duration: number
-}
-/** Selects what a rehearsal freezes and runs. */
-export interface StudyRehearsalOptions {
-	readonly study: string
-	readonly profile: string
-	/** Holds the selectors forwarded to check and execute, such as `--trial` and `--goals`; absent runs the whole schedule. */
-	readonly selection?: readonly string[]
-	/** Holds the execution's outer deadline in milliseconds; absent takes the command default. */
-	readonly duration?: number
-}
-/** Holds every reading of a rehearsal through a frozen closure. */
-export interface StudyRehearsal {
-	readonly closure: string
-	readonly freeze: StudyInstallStep
-	readonly check: StudyInstallStep
-	readonly execute: StudyInstallStep
-	readonly grade: StudyInstallStep
-	/** Holds the result as read, with its attempts and their failures; absent when execution exits nonzero. */
-	readonly result: StudyResultView | undefined
+/** Holds a protocol fixture and the install whose rebound profile names it. */
+export interface StudyFixtureInstall {
+	readonly server: OllamaFixtureInterface
+	readonly install: StudyInstall
 }
 
 /** Holds one inert native HTTP fixture response. */
@@ -1722,15 +1503,8 @@ export interface MemoryWireFixture {
 	readonly open?: boolean
 	readonly chunks?: ReadonlyArray<{ readonly body: string; readonly delay: number }>
 }
-/** Decides a protocol fixture's chat reply body from the request body it parsed. */
+/** Decides a protocol fixture's reply body for one path from the request body it parsed. */
 export type MemoryPolicy = (body: unknown) => string
-/** Holds an actual protocol fixture and captured request bytes. */
-export interface MemoryServerFixture {
-	readonly url: string
-	readonly requests: Array<{ readonly path: string; readonly body: string }>
-	readonly responses: MemoryWireFixture[]
-	close(): Promise<void>
-}
 /** Holds real hierarchical accounting with append-only evidence. */
 export interface MemoryContextFixture {
 	readonly context: StudyContext
@@ -1801,11 +1575,9 @@ export interface MemoryRecordingFixture {
 	/** Counts the requests the fixture took once the execution ended. */
 	readonly sent: number
 }
-/** Holds a file's one install, its loopback provider, and its shared recording. */
-export interface MemoryInstallFixture {
+/** Holds a file's one install, its loopback provider, its owning scratch, and its shared recording. */
+export interface MemoryInstallFixture extends StudyFixtureInstall {
 	readonly scratch: ScratchInterface
-	readonly server: MemoryServerFixture
-	readonly fixture: StudyInstallFixture
 	readonly recording: MemoryRecordingFixture
 }
 /** Holds what a real trial sent, admitted, retained and returned. */
@@ -2050,27 +1822,7 @@ export function buildMemoryCall(
  * @returns One generate reply for a protocol fixture script.
  */
 export function buildMemoryVerdict(label: string): MemoryWireFixture {
-	return {
-		path: '/api/generate',
-		body: JSON.stringify({
-			model: 'judge',
-			done: true,
-			done_reason: 'length',
-			response: label,
-			prompt_eval_count: 10,
-			eval_count: 1,
-			logprobs: [
-				{
-					token: label,
-					logprob: -0.01,
-					top_logprobs: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Yes', 'No'].map((token) => ({
-						token,
-						logprob: token === label ? -0.01 : -8,
-					})),
-				},
-			],
-		}),
-	}
+	return { path: '/api/generate', body: buildMemoryReadout('judge', label) }
 }
 
 /**
@@ -2125,22 +1877,23 @@ export function buildMemoryCapture(
 }
 
 /**
- * Writes a profile that declares recording beside a scratch workspace's `recordslocal` profile, keeping that profile's other members and leaving it unchanged.
- * @param scratch - The workspace `createStudyInstallFixture` populated.
+ * Writes a profile that declares recording beside an install's `recordslocal` profile, keeping that profile's other members and leaving it unchanged.
+ * @param root - The install root, whose `recordslocal` profile `writeMemoryLocalProfile` wrote.
  * @param name - The written profile's name, which names its file.
  * @param checkpoints - The goal ids to list. Default: none.
  * @returns Nothing after the profile is written.
- * @throws Error - Thrown when the workspace holds no authored `recordslocal` profile.
+ * @throws Error - Thrown when the install holds no `recordslocal` profile.
  */
 export function writeStudyInstallRecord(
-	scratch: ScratchInterface,
+	root: string,
 	name: string,
 	checkpoints: readonly string[] = [],
 ): void {
-	const raw = parseJSON(scratch.read('studies/memory/profiles/recordslocal.json') ?? '')
+	const local = join(root, 'studies/memory/profiles/recordslocal.json')
+	const raw = existsSync(local) ? parseJSON(readFileSync(local, 'utf8')) : undefined
 	if (!isRecord(raw)) throw new Error('Missing authored memory profile')
-	scratch.write(
-		`studies/memory/profiles/${name}.json`,
+	writeFileSync(
+		join(root, 'studies/memory/profiles', `${name}.json`),
 		JSON.stringify({
 			...raw,
 			name,
@@ -2404,47 +2157,39 @@ export function readMemoryTrials(stdout: string): ReadonlyMap<string, string> {
  * @remarks
  * The segment is the first `records` trial's `opening..correction`, under the `recorded` profile, which
  * declares recording and lists every goal in `checkpoints`. The `recordslocal` profile stays unchanged.
- * @param fixture - The installed command.
+ * @param install - The installed command.
  * @param server - The loopback provider; only this call sends to it while it runs.
  * @param output - The result directory.
  * @returns The profile, the scheduled trials, both checks, the execution, and the request counts.
  * @throws Error - Thrown when a check refuses, schedules no `records` trial, or returns no arguments.
  */
 export async function executeMemoryRecording(
-	fixture: StudyInstallFixture,
-	server: MemoryServerFixture,
+	install: StudyInstall,
+	server: OllamaFixtureInterface,
 	output: string,
 ): Promise<MemoryRecordingFixture> {
-	writeStudyInstallRecord(fixture.scratch, 'recorded', STUDY_MEMORY_GOALS)
+	writeStudyInstallRecord(install.root, 'recorded', STUDY_MEMORY_GOALS)
 	const profile = parseStudyProfile(
-		parseJSON(fixture.scratch.read('studies/memory/profiles/recorded.json') ?? ''),
+		parseJSON(readFileSync(join(install.root, 'studies/memory/profiles/recorded.json'), 'utf8')),
 	)
 	const start = server.requests.length
-	const scheduled = await executeStudyInstall(fixture, [
-		'check',
-		'recordscapacity',
-		'--profile',
-		profile.name,
-	])
+	const scheduled = await install.execute(['check', 'recordscapacity', '--profile', profile.name])
 	if (scheduled.code !== 0) throw new Error(`The schedule check refused: ${scheduled.stderr}`)
 	const trials = readMemoryTrials(scheduled.stdout)
 	const trial = trials.get('records')
 	if (trial === undefined) throw new Error('No records trial is scheduled')
-	const selected = await executeStudyInstall(fixture, [
+	const selected = await install.execute([
 		'check',
 		'recordscapacity',
 		'--profile',
 		profile.name,
-		'--trial',
-		trial,
-		'--goals',
-		'opening..correction',
+		...buildStudySelectors({ trial, goals: { first: 'opening', last: 'correction' } }),
 	])
 	const plan: unknown = selected.code === 0 ? parseJSON(selected.stdout) : undefined
 	if (!isRecord(plan) || !arrayOf(isString)(plan.next))
 		throw new Error(`Missing selected execution arguments: ${selected.stderr}`)
 	const boundary = server.requests.length
-	const executed = await executeStudyInstall(fixture, [...plan.next, '--out', output], 260000)
+	const executed = await install.execute([...plan.next, '--out', output], 260000)
 	return Object.freeze({
 		profile,
 		trials,
@@ -2459,28 +2204,119 @@ export async function executeMemoryRecording(
 }
 
 /**
- * Builds a file's one install fixture against its own loopback provider, and makes its shared recording.
+ * Installs studies under one authored profile, rebound to a fresh protocol fixture that lists that profile's own model pins.
+ * @remarks Study's `createStudyInstall` copies what `study freeze` keeps for each study and profile into `install` under the scratch, and rebinds the copied profile's provider to the fixture's URL with its own digests.
+ * @param scratch - The owner of the install directory.
+ * @param studies - The declarations to install; each one's bundle holds the profile.
+ * @param profile - The profile to copy and rebind.
+ * @param script - The fixture's replies. Default: an empty script.
+ * @returns The listening fixture, which the caller destroys, and the install.
+ * @throws Error - Thrown when no study is named or the profile declares no provider; rethrows a refused install after destroying the fixture.
+ */
+export async function createStudyFixtureInstall(
+	scratch: ScratchInterface,
+	studies: readonly string[],
+	profile: string,
+	script: MemoryScript = new MemoryScript(),
+): Promise<StudyFixtureInstall> {
+	const [study] = studies
+	if (study === undefined) throw new Error('Missing study to install')
+	const { bundle } = await readStudyDeclaration(resolve('.'), study)
+	const declared = parseStudyProfile(
+		parseJSON(readFileSync(join(bundle, 'profiles', `${profile}.json`), 'utf8')),
+	).provider
+	if (declared === undefined) throw new Error(`Profile ${profile} declares no provider`)
+	const server = await createMemoryFixture(
+		script,
+		collectStudyOllamaModels(buildStudyOllamaModels(declared)),
+	)
+	try {
+		const install = await createStudyInstall({
+			root: resolve('.'),
+			directory: join(scratch.path, 'install'),
+			studies,
+			profiles: [profile],
+			provider: { url: server.url, digest: declared.digest },
+		})
+		return Object.freeze({ server, install })
+	} catch (error) {
+		await server.destroy()
+		throw error
+	}
+}
+
+/**
+ * Writes the `recordslocal` profile into a memory install: the authored template, its provider and roots taken from the install's rebound `recordsrecommended` profile without triage, and short durations.
+ * @remarks The template leaves its provider to the caller, so Study's install neither parses nor rebinds it; this fills it as a host does.
+ * @param root - The install root, which holds the rebound `recordsrecommended` profile.
+ * @returns Nothing after the profile is written.
+ * @throws Error - Thrown when the template lacks a bound or the installed profile declares no provider.
+ */
+export function writeMemoryLocalProfile(root: string): void {
+	const template = parseJSON(
+		readFileSync(resolve('studies/memory/profiles/recordslocal.json'), 'utf8'),
+	)
+	if (!isRecord(template) || !isRecord(template.bounds))
+		throw new Error('Missing authored memory profile')
+	const authored = template.bounds
+	const recommended = parseStudyProfile(
+		parseJSON(readFileSync(join(root, 'studies/memory/profiles/recordsrecommended.json'), 'utf8')),
+	)
+	const selected = recommended.provider
+	if (selected === undefined) throw new Error('Missing installed recommended provider')
+	writeFileSync(
+		join(root, 'studies/memory/profiles/recordslocal.json'),
+		JSON.stringify({
+			...template,
+			roots: recommended.roots,
+			provider: {
+				entry: selected.entry,
+				url: selected.url,
+				model: selected.model,
+				judge: selected.judge,
+				digest: { model: selected.digest.model, judge: selected.digest.judge },
+			},
+			bounds: Object.fromEntries(
+				Object.entries({ request: 3000, goal: 30000, trial: 90000, series: 240000 }).map(
+					([scope, duration]) => {
+						const limit = authored[scope]
+						if (!isRecord(limit)) throw new Error(`Missing ${scope} bound`)
+						return [scope, { ...limit, duration }]
+					},
+				),
+			),
+		}),
+	)
+}
+
+/**
+ * Builds a file's one memory install against its own loopback provider, and makes its shared recording.
  * @remarks
- * Every case of the file reads this one install. The `recordslocal` profile stays as `createStudyInstallFixture`
- * wrote it, and the recording writes its own `recorded` profile beside it.
+ * Every case of the file reads this one install. It installs `recordscapacity` and `recordsmemory`
+ * under `recordsrecommended`, whose roots admit the selected Ollama entry, then writes the
+ * `recordslocal` profile both run under, and the recording writes its own `recorded` profile beside it.
  * @param prefix - The scratch directory's prefix.
  * @returns The scratch, the provider, the install, and the shared recording.
- * @throws Error - Rethrows a failed setup after closing the provider and removing the scratch.
+ * @throws Error - Rethrows a failed setup after destroying the provider and removing the scratch.
  */
 export async function createMemoryInstall(prefix: string): Promise<MemoryInstallFixture> {
 	const scratch = createScratch({ prefix })
 	try {
-		const server = await createMemoryServer()
+		const { server, install } = await createStudyFixtureInstall(
+			scratch,
+			['recordscapacity', 'recordsmemory'],
+			'recordsrecommended',
+		)
 		try {
-			const fixture = createStudyInstallFixture(scratch, server.url)
+			writeMemoryLocalProfile(install.root)
 			const recording = await executeMemoryRecording(
-				fixture,
+				install,
 				server,
-				join(scratch.path, 'tmp', 'studies', 'recorded'),
+				join(install.root, 'tmp', 'studies', 'recorded'),
 			)
-			return Object.freeze({ scratch, server, fixture, recording })
+			return Object.freeze({ scratch, server, install, recording })
 		} catch (error) {
-			await server.close()
+			await server.destroy()
 			throw error
 		}
 	} catch (error) {
@@ -2491,14 +2327,14 @@ export async function createMemoryInstall(prefix: string): Promise<MemoryInstall
 
 /**
  * Closes a file's install: its provider, then its scratch.
- * @param install - The install `createMemoryInstall` built.
+ * @param fixture - The install `createMemoryInstall` built.
  * @returns Completion once both are released.
  */
-export async function destroyMemoryInstall(install: MemoryInstallFixture): Promise<void> {
+export async function destroyMemoryInstall(fixture: MemoryInstallFixture): Promise<void> {
 	try {
-		await install.server.close()
+		await fixture.server.destroy()
 	} finally {
-		await destroyScratch(install.scratch)
+		await destroyScratch(fixture.scratch)
 	}
 }
 
@@ -2680,49 +2516,33 @@ export const MEMORY_TRIAGE_GOAL: StudyGoal = Object.freeze({
 	},
 })
 
-/** Builds a scripted System One answer keyed by the actual wire request's generated question ids. */
-export function buildMemoryRouteReply(
-	read: () => MemoryRequestFixture | undefined,
-): MemoryWireFixture {
-	return {
-		path: '/v1/systemone',
-		get body(): string {
-			const request = parseJSON(read()?.body ?? '')
-			if (!isRecord(request) || !isRecord(request.questions))
-				throw new Error('Missing System One questions')
-			return JSON.stringify({
-				model: 'model',
-				answers: Object.fromEntries(
-					Object.entries(request.questions).map(([id, question]) => {
-						if (!isRecord(question) || question.type !== 'choice' || !isRecord(question.criteria))
-							throw new Error('Expected a choice question')
-						const labels = Object.keys(question.criteria)
-						return [
-							id,
-							{
-								type: 'choice',
-								probabilities: Object.fromEntries(
-									labels.map((label) => [
-										label,
-										label === 'fact' ? 0.9 : 0.1 / (labels.length - 1),
-									]),
-								),
-							},
-						]
-					}),
-				),
-			})
-		},
-	}
-}
-
-/** Starts the existing native fixture with a successful direct-leg reply. */
-export async function createMemoryRouteServer(count = 1): Promise<MemoryServerFixture> {
-	const server: MemoryServer = new MemoryServer(
-		Array.from({ length: count }, () => buildMemoryRouteReply(() => server.requests.at(-1))),
-	)
-	await server.start()
-	return server
+/**
+ * Builds a successful System One answer keyed by the request's own question ids, reading `fact` at 0.9 on each choice question; the policy for `/v1/systemone`.
+ * @param body - The parsed `/v1/systemone` request body.
+ * @returns The answer body.
+ * @throws Error - Thrown when the body asks no questions or a question is not a choice.
+ */
+export function buildMemoryRouteAnswer(body: unknown): string {
+	if (!isRecord(body) || !isRecord(body.questions)) throw new Error('Missing System One questions')
+	return JSON.stringify({
+		model: 'model',
+		answers: Object.fromEntries(
+			Object.entries(body.questions).map(([id, question]) => {
+				if (!isRecord(question) || question.type !== 'choice' || !isRecord(question.criteria))
+					throw new Error('Expected a choice question')
+				const labels = Object.keys(question.criteria)
+				return [
+					id,
+					{
+						type: 'choice',
+						probabilities: Object.fromEntries(
+							labels.map((label) => [label, label === 'fact' ? 0.9 : 0.1 / (labels.length - 1)]),
+						),
+					},
+				]
+			}),
+		),
+	})
 }
 
 /** Holds a horizon of triage goals, each releasing one arrival, for proofs that span goals of one trial. */
@@ -3072,8 +2892,9 @@ export class MemoryRoutingJudge implements agent.JudgeInterface {
 	}
 }
 
-/** Holds what a desk reply policy reads from one chat request body: each message's role, text, and called names, and each advertised tool's name and parameter types. */
+/** Holds what a desk reply policy reads from one chat request body: the model it names, which a reply repeats, each message's role, text, and called names, and each advertised tool's name and parameter types. */
 export interface StudyDeskBody {
+	readonly model: string
 	readonly messages: ReadonlyArray<{
 		readonly role: string
 		readonly content: string
@@ -3088,12 +2909,13 @@ export interface StudyDeskBody {
 /**
  * Reads a chat request body the desk policies answer.
  * @param value - The parsed `/api/chat` body.
- * @returns Its messages and its advertised tools, in wire order.
+ * @returns The model it names, `model` when it names none, and its messages and advertised tools, in wire order.
  * @throws Error - Thrown when the body carries no message list or a message lacks its role.
  */
 export function readStudyDeskBody(value: unknown): StudyDeskBody {
 	if (!isRecord(value) || !isArray(value.messages)) throw new Error('Desk body lacks messages')
 	return {
+		model: isString(value.model) ? value.model : 'model',
 		messages: value.messages.map((message) => {
 			if (!isRecord(message) || !isString(message.role)) throw new Error('Desk message lacks role')
 			return {
@@ -3187,6 +3009,7 @@ export function readStudyDeskTail(body: StudyDeskBody): StudyDeskBody['messages'
 export function buildStudyDeskCall(body: StudyDeskBody, name: string): string {
 	const fields = body.tools.find((tool) => tool.name === name)?.fields ?? []
 	return buildMemoryReply({
+		model: body.model,
 		content: '',
 		calls: [
 			{
@@ -3204,18 +3027,20 @@ export function buildStudyDeskCall(body: StudyDeskBody, name: string): string {
 /**
  * Creates the oracle reply policy: it loads the request's area when the tool is held back, then calls the tool, then answers.
  * @param prompts - The declared prompts, each mapped to its assertion.
- * @returns A policy for `createMemoryServer`.
+ * @returns A `MemoryScript` policy for `/api/chat`.
  */
 export function createStudyDeskOracle(
 	prompts: ReadonlyMap<string, StudyDeskAssertion>,
 ): MemoryPolicy {
 	return (value) => {
 		const body = readStudyDeskBody(value)
+		const { model } = body
 		const answer = findStudyDeskAnswer(prompts, body)
 		const tail = readStudyDeskTail(body)
-		if (answer === undefined) return buildMemoryReply({ content: 'I cannot help with that.' })
+		if (answer === undefined)
+			return buildMemoryReply({ model, content: 'I cannot help with that.' })
 		if (tail.some((message) => message.calls.includes(answer.tool)))
-			return buildMemoryReply({ content: 'Done.' })
+			return buildMemoryReply({ model, content: 'Done.' })
 		if (body.tools.some((tool) => tool.name === answer.tool))
 			return buildStudyDeskCall(body, answer.tool)
 		if (
@@ -3223,17 +3048,18 @@ export function createStudyDeskOracle(
 			!tail.some((message) => message.calls.includes('load'))
 		)
 			return buildMemoryReply({
+				model,
 				content: '',
 				calls: [{ function: { name: 'load', arguments: { skill: answer.area } } }],
 			})
-		return buildMemoryReply({ content: 'I cannot reach a tool for that.' })
+		return buildMemoryReply({ model, content: 'I cannot reach a tool for that.' })
 	}
 }
 
 /**
  * Creates the control reply policy: on a declared request it never loads and calls the first advertised desk tool with no arguments, then answers.
  * @param prompts - The declared prompts; the control reads only which bodies a request opened, never the tool.
- * @returns A policy for `createMemoryServer`.
+ * @returns A `MemoryScript` policy for `/api/chat`.
  */
 export function createStudyDeskControl(
 	prompts: ReadonlyMap<string, StudyDeskAssertion>,
@@ -3248,8 +3074,9 @@ export function createStudyDeskControl(
 			first === undefined ||
 			readStudyDeskTail(body).some((message) => message.role === 'tool')
 		)
-			return buildMemoryReply({ content: 'Here is what I know.' })
+			return buildMemoryReply({ model: body.model, content: 'Here is what I know.' })
 		return buildMemoryReply({
+			model: body.model,
 			content: '',
 			calls: [{ function: { name: first.name, arguments: {} } }],
 		})
@@ -3257,64 +3084,24 @@ export function createStudyDeskControl(
 }
 
 /**
- * Reads the authored `screen` profile with its provider rebound to the protocol fixture, with no owned daemon.
+ * Reads the authored `screen` profile with its provider rebound to the protocol fixture's `model`, unrecorded, for an in-process run.
  * @param url - The fixture origin.
- * @param entry - The Ollama entry the profile names.
- * @returns The raw profile record, ready to parse or write.
+ * @returns The parsed profile.
+ * @throws Error - Thrown when the authored profile holds no settings.
  */
-export function buildStudyDeskRecord(
-	url: string,
-	entry: string,
-): Readonly<Record<string, unknown>> {
+export function buildStudyDeskProfile(url: string): StudyProfile {
 	const raw = parseJSON(readFileSync(resolve('studies/desk/profiles/screen.json'), 'utf8'))
 	if (!isRecord(raw) || !isRecord(raw.settings)) throw new Error('Missing desk profile')
 	return {
-		...raw,
-		provider: {
-			entry,
-			url,
-			model: 'model',
-			digest: { model: 'a'.repeat(64) },
-		},
-	}
-}
-
-/**
- * Reads the authored `screen` profile rebound to the protocol fixture, unrecorded, for an in-process run.
- * @param url - The fixture origin.
- * @returns The parsed profile.
- */
-export function buildStudyDeskProfile(url: string): StudyProfile {
-	return {
-		...parseStudyProfile(
-			buildStudyDeskRecord(url, resolve('node_modules/@orkestrel/ollama/dist/src/core/index.js')),
-		),
+		...parseStudyProfile({
+			...raw,
+			provider: {
+				entry: resolve('node_modules/@orkestrel/ollama/dist/src/core/index.js'),
+				url,
+				model: 'model',
+				digest: { model: 'a'.repeat(64) },
+			},
+		}),
 		record: undefined,
 	}
-}
-
-/**
- * Copies the desk bundle and the disclosure declaration into an install and rebinds its `screen` profile to the protocol fixture.
- * @remarks Writes the profile alone over the copied bundle; the declarations keep their authored bytes, and the profile keeps its recording.
- * @param fixture - The install `createStudyInstallFixture` built.
- * @param url - The fixture origin.
- */
-export function writeStudyDeskFixture(fixture: StudyInstallFixture, url: string): void {
-	for (const target of ['desk', 'disclosure'])
-		cpSync(resolve('studies', target), fixture.scratch.ensure(join('studies', target)), {
-			recursive: true,
-		})
-	const entry = join(fixture.scratch.path, 'dist/src/core/index.js')
-	fixture.scratch.write(
-		'studies/desk/profiles/screen.json',
-		JSON.stringify({
-			...buildStudyDeskRecord(
-				url,
-				join(fixture.scratch.path, 'node_modules/@orkestrel/ollama/dist/src/core/index.js'),
-			),
-			agent: entry,
-			subject: entry,
-			roots: [fixture.scratch.path, ...fixture.packages.map((captured) => captured.target)],
-		}),
-	)
 }

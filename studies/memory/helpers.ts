@@ -27,6 +27,7 @@ import type {
 } from './types.js'
 import { canonicalStringify, isArray, isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
+import { collectStudyRows } from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_PARAMETERS,
@@ -253,7 +254,7 @@ export function buildStudyMemoryRoles(
 
 /** Reads one declared target against the memory mechanism predicates while leaving meaning for blind labels. @param target - The declared pair with its retained attempt and evidence rows. @returns The attributable mechanical reading citing the retained attempt and zero-based evidence rows. */
 export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeVerdict {
-	const { criterion, attempt, evidence } = target
+	const { criterion, attempt } = target
 	const observation = attempt?.observations.find((entry) => entry.goal === criterion.goal)
 	const assertion = criterion.assertion
 	const eligible =
@@ -264,17 +265,13 @@ export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeVerdic
 	const complete =
 		eligible && observation.failure === undefined && observation.product !== undefined
 	// Only a trace assertion looks for an evidence row; the other two read the attempt alone.
-	const index =
+	const row =
 		eligible && assertion.observation !== 'operational' && assertion.observation !== 'result'
-			? evidence.findIndex(
-					(row) =>
-						row.goal === criterion.goal &&
-						row.event === assertion.observation &&
-						isRecord(row.value) &&
-						'id' in assertion &&
-						row.value.id === assertion.id,
-				)
-			: -1
+			? collectStudyRows(target, assertion.observation).find(
+					({ evidence }) =>
+						isRecord(evidence.value) && 'id' in assertion && evidence.value.id === assertion.id,
+				)?.row
+			: undefined
 	const unread: { verdict: StudyJudgment['verdict']; references: readonly StudyReference[] } = {
 		verdict: 'unknown',
 		references: [],
@@ -294,8 +291,8 @@ export function readStudyMemoryGrade(target: StudyGradeTarget): StudyGradeVerdic
 								observation.product.partial === assertion.partial ? 'achieved' : 'unsuccessful',
 							references: [{ file: 'attempt' }],
 						}
-				: index >= 0
-					? { verdict: 'achieved', references: [{ file: 'evidence', row: index }] }
+				: row !== undefined
+					? { verdict: 'achieved', references: [{ file: 'evidence', row }] }
 					: complete
 						? {
 								verdict: 'unsuccessful',

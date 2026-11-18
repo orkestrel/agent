@@ -2,7 +2,6 @@ import { expect, it } from 'vitest'
 import {
 	buildStudyChatCriteria,
 	buildStudyChatSummary,
-	computeStudyChatQuantile,
 	readStudyChatGrade,
 } from '../../../studies/chat/helpers.js'
 import { buildMemoryGradeFixture, buildStudyAssessment } from '../../setupStudy.js'
@@ -189,7 +188,6 @@ it('joins original ids and turns, excludes diagnostics from parity and excludes 
 	])
 	expect(summary.parity.near).toEqual({ right: 1, total: 1, unknown: 0 })
 	expect(summary.right).toBe(1)
-	expect(summary.first).toEqual({ count: 3, median: 2, p90: 2 })
-	expect(computeStudyChatQuantile([], 0.9)).toBeUndefined()
-	expect(computeStudyChatQuantile([9, 1, 5, 3], 0.9)).toBe(5)
+	// The follow-up readings are 1, 2, and 3 seconds: the first turn and a row with no reading stay out, and p90 interpolates.
+	expect(summary.first).toEqual({ count: 3, median: 2, p90: expect.closeTo(2.8, 10) })
 })

@@ -1,5 +1,6 @@
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import {
+	buildStudySelectors,
 	collectStudyEvidence,
 	readStudyDeclaration,
 	readStudyResult,
@@ -15,19 +16,15 @@ import {
 	isStudyDeskInput,
 } from '../../../studies/desk/index.js'
 import {
-	STUDY_INSTALL_ENTRY,
+	MemoryScript,
 	STUDY_MEMORY_MODULES,
 	buildStudyDeskProfile,
 	collectStudyDeskAnswers,
-	createMemoryServer,
+	createMemoryFixture,
 	createStudyDeskControl,
 	createStudyDeskOracle,
-	createStudyInstallFixture,
-	executeStudyCommand,
-	executeStudyInstall,
+	createStudyFixtureInstall,
 	executeStudySeries,
-	rehearseStudyInstall,
-	writeStudyDeskFixture,
 } from '../../setupStudy.js'
 
 const declaration = await readStudyDeclaration(resolve('.'), 'disclosure')
@@ -35,7 +32,9 @@ const answers = collectStudyDeskAnswers(declaration)
 
 it('reads every request right on both arms under the oracle, each load opening its own area', async () => {
 	const scratch = createScratch({ prefix: 'study-desk-oracle-' })
-	const server = await createMemoryServer([], {}, createStudyDeskOracle(answers))
+	const server = await createMemoryFixture(
+		new MemoryScript([], { '/api/chat': createStudyDeskOracle(answers) }),
+	)
 	try {
 		const profile = buildStudyDeskProfile(server.url)
 		const sealed = await executeStudySeries(
@@ -82,14 +81,16 @@ it('reads every request right on both arms under the oracle, each load opening i
 				.map((entry) => entry.rows.filter((row) => row.tools.join() === 'load').length),
 		).toEqual([1, 1, 1, 1, 1, 1, 1])
 	} finally {
-		await server.close()
+		await server.destroy()
 		await destroyScratch(scratch)
 	}
 }, 30000)
 
 it('marks the control down on both arms, reproducing phase 0 on arm index', async () => {
 	const scratch = createScratch({ prefix: 'study-desk-control-' })
-	const server = await createMemoryServer([], {}, createStudyDeskControl(answers))
+	const server = await createMemoryFixture(
+		new MemoryScript([], { '/api/chat': createStudyDeskControl(answers) }),
+	)
 	try {
 		const profile = buildStudyDeskProfile(server.url)
 		const sealed = await executeStudySeries(
@@ -117,28 +118,38 @@ it('marks the control down on both arms, reproducing phase 0 on arm index', asyn
 				.filter((row) => row.outcome === 'right'),
 		).toEqual([])
 	} finally {
-		await server.close()
+		await server.destroy()
 		await destroyScratch(scratch)
 	}
 }, 30000)
 
 it('rehearses one index conversation from a frozen closure, lists its progress, and replays it keyed and offline with no request', async () => {
 	const scratch = createScratch({ prefix: 'study-desk-cli-' })
-	const server = await createMemoryServer([], {}, createStudyDeskOracle(answers))
+	const { server, install } = await createStudyFixtureInstall(
+		scratch,
+		['disclosure'],
+		'screen',
+		new MemoryScript([], { '/api/chat': createStudyDeskOracle(answers) }),
+	)
 	try {
-		const fixture = createStudyInstallFixture(scratch, server.url)
-		writeStudyDeskFixture(fixture, server.url)
-		const selection = ['--trial', 'r1-s1-a2']
-		const rehearsal = await rehearseStudyInstall(fixture, {
+		const selection = { trial: 'r1-s1-a2' }
+		const rehearsal = await install.rehearse({
 			study: 'disclosure',
 			profile: 'screen',
+			directory: join(scratch.path, 'rehearsal'),
 			selection,
-			duration: 120000,
 		})
-		for (const step of [rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade])
-			assert.equal(step.code, 0, step.stderr)
+		for (const step of [
+			rehearsal.freeze,
+			rehearsal.check,
+			rehearsal.execute,
+			rehearsal.grade,
+			rehearsal.report,
+		])
+			assert.equal(step?.code, 0, step?.stderr)
 		const sealed = rehearsal.result
-		if (sealed?.status !== 'sealed') throw new Error('Execution did not seal')
+		if (sealed?.status !== 'sealed' || rehearsal.closure === undefined)
+			throw new Error('Execution did not seal')
 		expect(sealed.manifest.schedule.map((trial) => [trial.id, trial.arm])).toEqual([
 			['r1-s1-a2', 'index'],
 		])
@@ -148,23 +159,23 @@ it('rehearses one index conversation from a frozen closure, lists its progress, 
 				.flatMap((attempt) => attempt.observations)
 				.map((observation) => [observation.failure, observation.product?.partial]),
 		).toEqual(Array.from({ length: 6 }, () => [undefined, false]))
-		const progress = await executeStudyCommand(
-			join(rehearsal.closure, STUDY_INSTALL_ENTRY),
-			rehearsal.closure,
-			['progress', sealed.directory, '--from', 'turn-1'],
-		)
+		const progress = await rehearsal.closure.execute([
+			'progress',
+			sealed.directory,
+			'--from',
+			'turn-1',
+		])
 		assert.equal(progress.code, 0, progress.stderr)
 		expect(progress.stdout).toContain('"loads"')
 		expect(parseJSON(progress.stdout)).toBeDefined()
 		const count = server.requests.length
-		const replay = await executeStudyInstall(
-			fixture,
+		const replay = await install.execute(
 			[
 				'execute',
 				'disclosure',
 				'--profile',
 				'screen',
-				...selection,
+				...buildStudySelectors(selection),
 				'--replay',
 				sealed.directory,
 				'--roles',
@@ -182,7 +193,7 @@ it('rehearses one index conversation from a frozen closure, lists its progress, 
 		if (replayed.status !== 'sealed') throw new Error('Replay did not seal')
 		expect(replayed.attempts.map((attempt) => attempt.failure)).toEqual([undefined])
 	} finally {
-		await server.close()
+		await server.destroy()
 		await destroyScratch(scratch)
 	}
 }, 180000)

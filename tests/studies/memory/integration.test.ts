@@ -10,14 +10,13 @@ import { collectStudyEvidence, readStudyExchanges, readStudyResult } from '@orke
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
-import { readFileSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
 	assertMemoryReplay,
 	createMemoryInstall,
 	destroyMemoryInstall,
-	executeStudyInstall,
 	executeStudyTopology,
 	readMemoryControls,
 	readMemoryEvents,
@@ -158,26 +157,23 @@ describe('the captured install', () => {
 	afterAll(async () => destroyMemoryInstall(await ready.promise))
 
 	it('drives captured installed Agent and Ollama through qualification, complete execution, grading and reports', async () => {
-		const install = await ready.promise
-		const { fixture, server } = install
-		const { scratch } = fixture
+		const { install, server } = await ready.promise
 		const start = server.requests.length
-		const denied = await executeStudyInstall(
-			fixture,
+		const denied = await install.execute(
 			[
 				'execute',
 				'recordsmemory',
 				'--profile',
 				'recordslocal',
 				'--out',
-				join(scratch.path, 'unqualified'),
+				join(install.root, 'unqualified'),
 			],
 			260000,
 		)
 		expect(denied.code).not.toBe(0)
 		expect(denied.stderr).toMatch(/qualification|recordscapacity|seal|missing|ENOENT/i)
 		expect(server.requests).toHaveLength(start)
-		expect(scratch.has('unqualified')).toBe(false)
+		expect(existsSync(join(install.root, 'unqualified'))).toBe(false)
 		// Every target's seal id, appended once that target seals; the quality target is qualified by the capacity one.
 		const sealed: Array<{ readonly target: string; readonly seal: string }> = []
 		// Only a whole capacity result qualifies, so capacity runs whole and quality runs its first trial.
@@ -186,12 +182,7 @@ describe('the captured install', () => {
 			{ target: 'recordsmemory', purpose: 'quality', trials: 1, goals: 3 },
 		]) {
 			const beforeCheck = server.requests.length
-			const check = await executeStudyInstall(fixture, [
-				'check',
-				target,
-				'--profile',
-				'recordslocal',
-			])
+			const check = await install.execute(['check', target, '--profile', 'recordslocal'])
 			expect(check).toMatchObject({ code: 0 })
 			const plan = parseJSON(check.stdout)
 			if (!isRecord(plan) || !isArray(plan.schedule)) throw new Error('Missing native check output')
@@ -213,7 +204,7 @@ describe('the captured install', () => {
 			const selected =
 				purpose === 'capacity'
 					? check
-					: await executeStudyInstall(fixture, [
+					: await install.execute([
 							'check',
 							target,
 							'--profile',
@@ -241,12 +232,8 @@ describe('the captured install', () => {
 			])
 			const calls = server.requests.length
 			// The capacity result lands where `recordslocal` names its qualification.
-			const output = join(scratch.path, 'tmp', 'studies', target)
-			const executed = await executeStudyInstall(
-				fixture,
-				[...selection.next, '--out', output],
-				260000,
-			)
+			const output = join(install.root, 'tmp', 'studies', target)
+			const executed = await install.execute([...selection.next, '--out', output], 260000)
 			expect(executed).toMatchObject({ code: 0 })
 			const execution = parseJSON(executed.stdout)
 			if (
@@ -266,7 +253,7 @@ describe('the captured install', () => {
 				'grade',
 				output,
 				'--rubric',
-				join(scratch.path, 'studies', target, 'rubric.json'),
+				join(install.root, 'studies', target, 'rubric.json'),
 			])
 			expect(server.requests.length).toBeGreaterThan(calls)
 			const result = await readStudyResult(execution.path)
@@ -299,7 +286,7 @@ describe('the captured install', () => {
 				expect(evidence.some((row) => row.event === 'wire')).toBe(true)
 			}
 			const beforeGrade = server.requests.length
-			const graded = await executeStudyInstall(fixture, execution.next)
+			const graded = await install.execute(execution.next)
 			expect(graded).toMatchObject({ code: 0 })
 			const grade = parseJSON(graded.stdout)
 			if (
@@ -314,7 +301,7 @@ describe('the captured install', () => {
 				parseJSON(await readFile(join(output, 'grades', grade.assessment, 'grading.json'), 'utf8')),
 			)
 			const rubric = parseStudyRubric(
-				parseJSON(scratch.read(`studies/${target}/rubric.json`) ?? ''),
+				parseJSON(readFileSync(join(install.root, 'studies', target, 'rubric.json'), 'utf8')),
 			)
 			const denominator = result.manifest.schedule.flatMap((trial) =>
 				rubric.criteria
@@ -356,7 +343,9 @@ describe('the captured install', () => {
 				for (const reference of judgment.references) {
 					const [file, row] = reference.split('#')
 					if (file === undefined) throw new Error('Missing judgment evidence file')
-					expect(scratch.has(join('tmp', 'studies', target, 'execution', file))).toBe(true)
+					expect(existsSync(join(install.root, 'tmp', 'studies', target, 'execution', file))).toBe(
+						true,
+					)
 					const cited = retained[judgment.trial]?.[Number(row) - 1]
 					expect(
 						criterion?.method !== 'trace' || judgment.verdict !== 'achieved' || row !== undefined,
@@ -371,7 +360,7 @@ describe('the captured install', () => {
 					).toBe(true)
 				}
 			}
-			const reported = await executeStudyInstall(fixture, grade.next)
+			const reported = await install.execute(grade.next)
 			expect(reported).toMatchObject({ code: 0 })
 			const report = parseJSON(reported.stdout)
 			if (!isRecord(report) || !isRecord(report.report) || !isArray(report.report.scores))
@@ -401,25 +390,21 @@ describe('the captured install', () => {
 	}, 281000)
 
 	it('freezes and checks without a request', async () => {
-		const install = await ready.promise
-		const { fixture, server } = install
+		const { install, server } = await ready.promise
 		const sent = server.requests.length
-		const closure = join(
-			fixture.scratch.ensure(join('tmp', 'studies', 'closures')),
-			'recordscapacity',
-		)
+		const closures = join(install.root, 'tmp', 'studies', 'closures')
+		mkdirSync(closures, { recursive: true })
+		const closure = join(closures, 'recordscapacity')
 		for (const command of [
 			['freeze', 'recordscapacity', '--profile', 'recordslocal', '--to', closure],
 			['check', 'recordscapacity', '--profile', 'recordslocal', '--closure', closure],
 		])
-			expect(await executeStudyInstall(fixture, command)).toMatchObject({ code: 0 })
+			expect(await install.execute(command)).toMatchObject({ code: 0 })
 		expect(server.requests).toHaveLength(sent)
 	}, 83000)
 
 	it('seals a recorded segment and grades it', async () => {
-		const install = await ready.promise
-		const { fixture, server, recording } = install
-		const { scratch } = fixture
+		const { install, server, recording } = await ready.promise
 		expect(recording.selected).toMatchObject({ code: 0 })
 		const selection = parseJSON(recording.selected.stdout)
 		if (!isRecord(selection)) throw new Error('Missing selected execution arguments')
@@ -446,8 +431,9 @@ describe('the captured install', () => {
 		const result = await readStudyResult(recording.path)
 		if (result.status !== 'sealed') throw new Error('The recorded segment did not seal')
 		expect(
-			scratch.has(
+			existsSync(
 				join(
+					install.root,
 					'tmp',
 					'studies',
 					'recorded',
@@ -469,11 +455,11 @@ describe('the captured install', () => {
 		expect(paths.indexOf('/api/version')).toBeLessThan(models[0] ?? -1)
 		expect(paths.lastIndexOf('/api/version')).toBeGreaterThan(models.at(-1) ?? paths.length)
 		const sent = server.requests.length
-		const graded = await executeStudyInstall(fixture, [
+		const graded = await install.execute([
 			'grade',
 			recording.path,
 			'--rubric',
-			join(scratch.path, 'studies', 'recordsmemory', 'rubric.json'),
+			join(install.root, 'studies', 'recordsmemory', 'rubric.json'),
 		])
 		expect(graded).toMatchObject({ code: 0 })
 		expect(server.requests).toHaveLength(sent)
@@ -486,7 +472,9 @@ describe('the captured install', () => {
 			),
 		)
 		const rubric = parseStudyRubric(
-			parseJSON(scratch.read('studies/recordsmemory/rubric.json') ?? ''),
+			parseJSON(
+				readFileSync(join(install.root, 'studies', 'recordsmemory', 'rubric.json'), 'utf8'),
+			),
 		)
 		const semantic = assessment.judgments.filter(
 			(judgment) =>
@@ -497,17 +485,11 @@ describe('the captured install', () => {
 	})
 
 	it('lists the adapter reading per goal', async () => {
-		const install = await ready.promise
-		const { fixture, server, recording } = install
+		const { install, server, recording } = await ready.promise
 		const chats = server.requests
 			.slice(recording.boundary, recording.sent)
 			.filter((request) => request.path === '/api/chat')
-		const read = await executeStudyInstall(fixture, [
-			'progress',
-			recording.path,
-			'--from',
-			'opening',
-		])
+		const read = await install.execute(['progress', recording.path, '--from', 'opening'])
 		expect(read).toMatchObject({ code: 0 })
 		const progress = readMemoryProgressRows(read.stdout)
 		expect([...progress.keys()]).toEqual(['opening', 'correction'])
@@ -543,15 +525,13 @@ describe('the captured install', () => {
 	})
 
 	it('replays the recorded segment offline and reproduces its memory evidence', async () => {
-		const install = await ready.promise
-		const { fixture, server, recording } = install
+		const { install, server, recording } = await ready.promise
 		const source = await readStudyResult(recording.path)
 		if (source.status !== 'sealed') throw new Error('The recorded segment did not seal')
 		const history = await readStudyExchanges(source, recording.trial)
-		const output = join(fixture.scratch.path, 'tmp', 'studies', 'replayed')
+		const output = join(install.root, 'tmp', 'studies', 'replayed')
 		const sent = server.requests.length
-		const replayed = await executeStudyInstall(
-			fixture,
+		const replayed = await install.execute(
 			[
 				'execute',
 				'recordscapacity',

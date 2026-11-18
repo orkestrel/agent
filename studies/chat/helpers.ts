@@ -11,7 +11,7 @@ import type {
 	StudyChatSummaryInput,
 } from './types.js'
 import { canonicalStringify, isRecord, parseJSON } from '@orkestrel/contract'
-import { StudyError } from '@orkestrel/study'
+import { StudyError, computeStudyQuantile } from '@orkestrel/study'
 import { hashStudyBytes } from '@orkestrel/study/server'
 import {
 	STUDY_CHAT_CAPACITIES,
@@ -280,17 +280,6 @@ export function readStudyChatGrade(target: StudyGradeTarget): StudyGradeVerdict 
 		references: [{ file: 'attempt' }],
 	}
 }
-/** Selects the sorted value at floor(proportion * (count - 1)), or undefined for no values.
- * @example computeStudyChatQuantile([3, 1, 2], 0.5) // 2
- */
-export function computeStudyChatQuantile(
-	values: readonly number[],
-	proportion: number,
-): number | undefined {
-	return [...values].sort((left, right) => left - right)[
-		Math.floor(proportion * (values.length - 1))
-	]
-}
 /** Joins primary assessments and sealed evidence into battery rows and follow-up readings.
  * @remarks Pass evidence verified by Study's collectStudyEvidence and its matching assessment.
  * @example buildStudyChatSummary(input).parity.last
@@ -367,8 +356,8 @@ export function buildStudyChatSummary(input: StudyChatSummaryInput): StudyChatSu
 		right: rows.filter((row) => row.primary === true && row.denial === false).length,
 		first: {
 			count: times.length,
-			median: computeStudyChatQuantile(times, 0.5),
-			p90: computeStudyChatQuantile(times, 0.9),
+			median: computeStudyQuantile(times, 0.5),
+			p90: computeStudyQuantile(times, 0.9),
 		},
 	}
 }

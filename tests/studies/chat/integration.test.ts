@@ -5,6 +5,7 @@ import {
 	readStudyDeclaration,
 	StudyOllamaTransport,
 	buildStudyOllamaModels,
+	buildStudySelectors,
 	readStudyResult,
 	collectStudyEvidence,
 	encodeStudyJSON,
@@ -20,31 +21,26 @@ import { expect, it } from 'vitest'
 import { StudyChatDriver } from '../../../studies/chat/drivers/StudyChatDriver.js'
 import { buildStudyChatRoles, buildStudyChatSummary } from '../../../studies/chat/helpers.js'
 import {
-	STUDY_INSTALL_ENTRY,
 	buildStudyChatProfile,
 	createMemoryContext,
-	createMemoryServer,
-	createStudyInstallFixture,
+	createMemoryFixture,
+	MemoryScript,
+	createStudyFixtureInstall,
 	executeStudyChatSeries,
-	executeStudyCommand,
-	executeStudyInstall,
+	readMemoryRequests,
 	STUDY_MEMORY_MODULES,
-	rehearseStudyInstall,
 	runStudyChatDirect,
-	writeStudyChatFixture,
 	STUDY_MEMORY_CALIBRATION,
 	buildMemoryCall,
 } from '../../setupStudy.js'
 
 it('preserves the battery effective agent and lone judge wires through Study', async () => {
-	const direct = await createMemoryServer([
-		...STUDY_MEMORY_CALIBRATION,
-		buildMemoryCall('lookup', { id: 'OR-7' }),
-	])
-	const captured = await createMemoryServer([
-		...STUDY_MEMORY_CALIBRATION,
-		buildMemoryCall('lookup', { id: 'OR-7' }),
-	])
+	const direct = await createMemoryFixture(
+		new MemoryScript([...STUDY_MEMORY_CALIBRATION, buildMemoryCall('lookup', { id: 'OR-7' })]),
+	)
+	const captured = await createMemoryFixture(
+		new MemoryScript([...STUDY_MEMORY_CALIBRATION, buildMemoryCall('lookup', { id: 'OR-7' })]),
+	)
 	try {
 		const fixture = buildStudyChatProfile('full', captured.url)
 		const { scenarios } = await readStudyDeclaration(resolve('.'), 'chat')
@@ -80,14 +76,14 @@ it('preserves the battery effective agent and lone judge wires through Study', a
 			context.close()
 		}
 	} finally {
-		await direct.close()
-		await captured.close()
+		await direct.destroy()
+		await captured.destroy()
 	}
 })
 
 it('routes a lone Mica question through the judge custody role with its exact effective body', async () => {
-	const direct = await createMemoryServer()
-	const captured = await createMemoryServer()
+	const direct = await createMemoryFixture()
+	const captured = await createMemoryFixture()
 	try {
 		const fixture = buildStudyChatProfile('full', captured.url)
 		const context = createMemoryContext(fixture)
@@ -126,7 +122,7 @@ it('routes a lone Mica question through the judge custody role with its exact ef
 				options: STUDY_CHAT_OPTIONS,
 				fetch: (url, init) => transport.fetch('judge', url, init),
 			}).ask(request, new AbortController().signal)
-			expect(captured.requests).toEqual(direct.requests)
+			expect(readMemoryRequests(captured)).toEqual(readMemoryRequests(direct))
 			expect(captured.requests).toHaveLength(1)
 			expect(
 				context.evidence.some(
@@ -138,36 +134,41 @@ it('routes a lone Mica question through the judge custody role with its exact ef
 			context.close()
 		}
 	} finally {
-		await direct.close()
-		await captured.close()
+		await direct.destroy()
+		await captured.destroy()
 	}
 })
 
 it('rehearses one captured conversation from a frozen closure, then reports, summarizes and replays it offline', async () => {
 	const scratch = createScratch({ prefix: 'study-chat-cli-' })
-	const server = await createMemoryServer()
+	const { server, install } = await createStudyFixtureInstall(scratch, ['chat'], 'full')
 	try {
-		const fixture = createStudyInstallFixture(scratch, server.url)
-		writeStudyChatFixture(fixture, server.url, 'full')
-		const declaration = await readStudyDeclaration(scratch.path, 'chat')
+		const declaration = await readStudyDeclaration(install.root, 'chat')
 		const [scenario] = declaration.scenarios
 		const first = scenario?.goals[0]
 		const last = scenario?.goals.at(-1)
 		if (scenario === undefined || first === undefined || last === undefined)
 			throw new Error('Missing conversation')
-		const selection = ['--trial', 'r1-s1-a1', '--goals', `${first.id}..${last.id}`]
-		const rehearsal = await rehearseStudyInstall(fixture, {
+		const selection = { trial: 'r1-s1-a1', goals: { first: first.id, last: last.id } }
+		const rehearsal = await install.rehearse({
 			study: 'chat',
 			profile: 'full',
+			directory: join(scratch.path, 'rehearsal'),
 			selection,
-			duration: 120000,
 		})
-		for (const step of [rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade])
-			assert.equal(step.code, 0, step.stderr)
+		for (const step of [
+			rehearsal.freeze,
+			rehearsal.check,
+			rehearsal.execute,
+			rehearsal.grade,
+			rehearsal.report,
+		])
+			assert.equal(step?.code, 0, step?.stderr)
 		const sealed = rehearsal.result
-		if (sealed?.status !== 'sealed') throw new Error('Execution did not seal')
+		if (sealed?.status !== 'sealed' || rehearsal.closure === undefined)
+			throw new Error('Execution did not seal')
 		expect(sealed.manifest.schedule.map((trial) => trial.scenario)).toEqual([scenario.id])
-		const copied = join(scratch.path, 'studies/chat')
+		const copied = join(install.root, 'studies/chat')
 		expect(
 			readdirSync(copied, { recursive: true, encoding: 'utf8' })
 				.filter(
@@ -177,15 +178,9 @@ it('rehearses one captured conversation from a frozen closure, then reports, sum
 				)
 				.map((name) => name.replaceAll('\\', '/')),
 		).toEqual(['profiles/full.json'])
-		const assessment = parseJSON(rehearsal.grade.stdout)
+		const assessment = parseJSON(rehearsal.grade?.stdout ?? '')
 		if (!isRecord(assessment) || typeof assessment.assessment !== 'string')
 			throw new Error('Missing assessment')
-		const report = await executeStudyCommand(
-			join(rehearsal.closure, STUDY_INSTALL_ENTRY),
-			rehearsal.closure,
-			['report', sealed.directory, '--assessment', assessment.assessment],
-		)
-		assert.equal(report.code, 0, report.stderr)
 		const retained = await new StudyAssessmentStore({
 			result: sealed,
 			rubric: encodeStudyJSON({
@@ -211,14 +206,13 @@ it('rehearses one captured conversation from a frozen closure, then reports, sum
 			),
 		).toBe(true)
 		const count = server.requests.length
-		const replay = await executeStudyInstall(
-			fixture,
+		const replay = await install.execute(
 			[
 				'execute',
 				'chat',
 				'--profile',
 				'full',
-				...selection,
+				...buildStudySelectors(selection),
 				'--replay',
 				sealed.directory,
 				'--roles',
@@ -241,28 +235,28 @@ it('rehearses one captured conversation from a frozen closure, then reports, sum
 				.every((row) => isRecord(row.value) && row.value.first === undefined),
 		).toBe(true)
 		appendFileSync(
-			join(rehearsal.closure, 'studies/chat/helpers.ts'),
+			join(rehearsal.closure.root, 'studies/chat/helpers.ts'),
 			'\n// changed captured member\n',
 		)
-		const changed = await executeStudyInstall(fixture, [
+		const changed = await install.execute([
 			'check',
 			'chat',
 			'--profile',
 			'full',
 			'--closure',
-			rehearsal.closure,
+			rehearsal.closure.root,
 		])
 		expect(changed.code).not.toBe(0)
 		expect(server.requests).toHaveLength(count)
 	} finally {
-		await server.close()
+		await server.destroy()
 		await destroyScratch(scratch)
 	}
 }, 233000)
 
 it('seals the whole schedule in process under every capacity and fails a conversation one call short of its allowance', async () => {
 	const scratch = createScratch({ prefix: 'study-chat-schedule-' })
-	const server = await createMemoryServer()
+	const server = await createMemoryFixture()
 	try {
 		const declaration = await readStudyDeclaration(resolve('.'), 'chat')
 		const results = new Map<string, StudyResultView>()
@@ -322,7 +316,7 @@ it('seals the whole schedule in process under every capacity and fails a convers
 		expect(causes.every((cause) => cause === 'capacity')).toBe(true)
 		expect(observations.some((observation) => observation.product !== undefined)).toBe(true)
 	} finally {
-		await server.close()
+		await server.destroy()
 		await destroyScratch(scratch)
 	}
 }, 48000)

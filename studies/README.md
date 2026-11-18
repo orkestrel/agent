@@ -143,38 +143,32 @@ Study's generic report includes the separate diagnostic and completion criteria.
 
 ## Full rehearsal
 
-The full rehearsal executes one chat profile's whole schedule from a frozen closure against a protocol fixture, with no model, and grades the result through the closure's own entry. Run it one time before each sealed run, after the last change to the bundle, the profile, the build, an installed package, or the runner, and only for the profile about to run. No routine suite runs it.
+The full rehearsal executes one chat profile's whole schedule from a frozen closure against a protocol fixture, with no model, and grades and reports the result through the closure's own entry. Run it one time before each sealed run, after the last change to the bundle, the profile, the build, an installed package, or the runner, and only for the profile about to run. No routine suite runs it.
 
-Its procedure is `rehearseStudyInstall` in `tests/setupStudy.ts`, which the routine `chat` proof runs on one conversation. The procedure needs the test harness for its fixture, and a Node script can't load that harness, so the rehearsal runs through the `probe` project. Write this probe to `tmp/probes/studies/rehearsal.test.ts`, with `profile` set to the profile about to run. Its 38 attempts and 294 observations are the chat schedule's population:
+Its procedure is Study's `StudyInstall.rehearse`, over the install that `createStudyFixtureInstall` in `tests/setupStudy.ts` builds with the profile rebound to a protocol fixture, which the routine `chat` proof runs on one conversation. The fixture answers through the test harness, and a Node script can't load that harness, so the rehearsal runs through the `probe` project. Write this probe to `tmp/probes/studies/rehearsal.test.ts`, with `profile` set to the profile about to run. Its 38 attempts and 294 observations are the chat schedule's population:
 
 ```ts
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
+import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import {
-	createMemoryServer,
-	createStudyInstallFixture,
-	rehearseStudyInstall,
-	writeStudyChatFixture,
-} from '../../../tests/setupStudy.js'
+import { createStudyFixtureInstall } from '../../../tests/setupStudy.js'
 
 const profile = 'full'
 
 it(`rehearses chat under ${profile}`, async () => {
 	const scratch = createScratch({ prefix: 'study-rehearsal-' })
-	const server = await createMemoryServer()
+	const { server, install } = await createStudyFixtureInstall(scratch, ['chat'], profile)
 	try {
-		const fixture = createStudyInstallFixture(scratch, server.url)
-		writeStudyChatFixture(fixture, server.url, profile)
-		const rehearsal = await rehearseStudyInstall(fixture, {
+		const rehearsal = await install.rehearse({
 			study: 'chat',
 			profile,
-			duration: 900000,
+			directory: join(scratch.path, 'rehearsal'),
 		})
 		expect(
-			[rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade].map(
-				(step) => step.code,
+			[rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade, rehearsal.report].map(
+				(step) => step?.code,
 			),
-		).toEqual([0, 0, 0, 0])
+		).toEqual([0, 0, 0, 0, 0])
 		const result = rehearsal.result
 		if (result?.status !== 'sealed') throw new Error('The rehearsal did not seal')
 		const observations = result.attempts.flatMap((attempt) => attempt.observations)
@@ -187,7 +181,7 @@ it(`rehearses chat under ${profile}`, async () => {
 			),
 		).toEqual([])
 	} finally {
-		await server.close()
+		await server.destroy()
 		await destroyScratch(scratch)
 	}
 }, 1200000)
@@ -200,7 +194,7 @@ npm run build
 npm run test:probe -- tmp/probes/studies/rehearsal.test.ts
 ```
 
-Each command prints one progress line with its exit and elapsed seconds. On this host on 2026-11-11, the rehearsal of `full` took 471 s, 437 s of it in the execution.
+Each step's result holds its elapsed milliseconds as `duration`. On this host on 2026-11-11, the rehearsal of `full` took 471 s, 437 s of it in the execution.
 
 ## Running the disclosure reading
 
@@ -259,43 +253,42 @@ Run the reading in the following order. Each arm runs one sealed trial a convers
 
 ### Disclosure rehearsal
 
-The disclosure rehearsal executes the whole schedule from a frozen closure against a protocol fixture that answers as an oracle, with no model, and grades the result through the closure's own entry. Run it on the same occasions as the [full rehearsal](#full-rehearsal). The routine `desk` proof runs the same procedure on one conversation of arm `index`. Write this probe to `tmp/probes/studies/disclosure.test.ts`. Its 14 attempts and 84 observations are the disclosure schedule's population:
+The disclosure rehearsal executes the whole schedule from a frozen closure against a protocol fixture that answers as an oracle, with no model, and grades and reports the result through the closure's own entry. Run it on the same occasions as the [full rehearsal](#full-rehearsal). The routine `desk` proof runs the same procedure on one conversation of arm `index`. Write this probe to `tmp/probes/studies/disclosure.test.ts`. Its 14 attempts and 84 observations are the disclosure schedule's population:
 
 ```ts
 import { readStudyDeclaration } from '@orkestrel/study/server'
 import { createScratch, destroyScratch } from '@orkestrel/test/server'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import {
+	MemoryScript,
 	collectStudyDeskAnswers,
-	createMemoryServer,
 	createStudyDeskOracle,
-	createStudyInstallFixture,
-	rehearseStudyInstall,
-	writeStudyDeskFixture,
+	createStudyFixtureInstall,
 } from '../../../tests/setupStudy.js'
 
 it('rehearses disclosure under screen', async () => {
 	const scratch = createScratch({ prefix: 'study-rehearsal-' })
 	const declaration = await readStudyDeclaration(resolve('.'), 'disclosure')
-	const server = await createMemoryServer(
-		[],
-		{},
-		createStudyDeskOracle(collectStudyDeskAnswers(declaration)),
+	const { server, install } = await createStudyFixtureInstall(
+		scratch,
+		['disclosure'],
+		'screen',
+		new MemoryScript([], {
+			'/api/chat': createStudyDeskOracle(collectStudyDeskAnswers(declaration)),
+		}),
 	)
 	try {
-		const fixture = createStudyInstallFixture(scratch, server.url)
-		writeStudyDeskFixture(fixture, server.url)
-		const rehearsal = await rehearseStudyInstall(fixture, {
+		const rehearsal = await install.rehearse({
 			study: 'disclosure',
 			profile: 'screen',
-			duration: 900000,
+			directory: join(scratch.path, 'rehearsal'),
 		})
 		expect(
-			[rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade].map(
-				(step) => step.code,
+			[rehearsal.freeze, rehearsal.check, rehearsal.execute, rehearsal.grade, rehearsal.report].map(
+				(step) => step?.code,
 			),
-		).toEqual([0, 0, 0, 0])
+		).toEqual([0, 0, 0, 0, 0])
 		const result = rehearsal.result
 		if (result?.status !== 'sealed') throw new Error('The rehearsal did not seal')
 		const observations = result.attempts.flatMap((attempt) => attempt.observations)
@@ -308,7 +301,7 @@ it('rehearses disclosure under screen', async () => {
 			),
 		).toEqual([])
 	} finally {
-		await server.close()
+		await server.destroy()
 		await destroyScratch(scratch)
 	}
 }, 1200000)

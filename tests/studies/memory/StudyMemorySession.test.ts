@@ -24,7 +24,8 @@ import {
 	buildMemoryVerdict,
 	countMemoryPairs,
 	createMemoryContext,
-	createMemoryServer,
+	createMemoryFixture,
+	MemoryScript,
 	executeMemoryGoals,
 	listMemoryKeys,
 	loadMemoryInputs,
@@ -64,17 +65,19 @@ import {
 
 describe('actual Agent/Ledger/Ollama memory consumer', () => {
 	it('releases and replaces snapshots while preserving earlier wire receipts and fresh trial isolation', async () => {
-		const server = await createMemoryServer(
-			Array.from({ length: 5 }, () => [
-				{
-					path: '/api/chat',
-					body: buildMemoryReply({
-						content: '',
-						calls: [{ function: { name: 'lookup', arguments: { id: 'order:BC-7301' } } }],
-					}),
-				},
-				{ path: '/api/chat', body: buildMemoryReply() },
-			]).flat(),
+		const server = await createMemoryFixture(
+			new MemoryScript(
+				Array.from({ length: 5 }, () => [
+					{
+						path: '/api/chat',
+						body: buildMemoryReply({
+							content: '',
+							calls: [{ function: { name: 'lookup', arguments: { id: 'order:BC-7301' } } }],
+						}),
+					},
+					{ path: '/api/chat', body: buildMemoryReply() },
+				]).flat(),
+			),
 		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
@@ -164,7 +167,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			}
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
@@ -176,12 +179,14 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				calls: [{ function: { name: 'lookup', arguments: { id: 'order:BC-7301' } } }],
 			}),
 		}
-		const server = await createMemoryServer([
-			lookup,
-			{ path: '/api/chat', body: buildMemoryReply() },
-			lookup,
-			{ path: '/api/chat', body: buildMemoryReply() },
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				lookup,
+				{ path: '/api/chat', body: buildMemoryReply() },
+				lookup,
+				{ path: '/api/chat', body: buildMemoryReply() },
+			]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const earlier = createMemoryContext(profile)
 		const later = createMemoryContext(profile)
@@ -202,12 +207,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			earlier.close()
 			later.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('dispatches actual memory work after generic validation and rejects invalid room controls', async () => {
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		try {
@@ -245,12 +250,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			}
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('runs the full arm with no declared judge and pins only the served model', async () => {
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const base = buildMemoryProfile({ url: server.url })
 		const declared = base.provider
 		if (declared === undefined) throw new Error('Missing fixture provider')
@@ -285,20 +290,22 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('refuses lookup before record access or evidence when the goal call allowance is exhausted', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/chat',
-				body: buildMemoryReply({
-					content: '',
-					calls: [{ function: { name: 'lookup', arguments: { id: 'record' } } }],
-				}),
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'lookup', arguments: { id: 'record' } } }],
+					}),
+				},
+			]),
+		)
 		const base = buildMemoryProfile({ url: server.url })
 		const profile = { ...base, bounds: { ...base.bounds, goal: { ...base.bounds.goal, calls: 1 } } }
 		const fixture = createMemoryContext(profile)
@@ -328,20 +335,22 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('retains actual lookup bytes once when the result exceeds its reservation', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/chat',
-				body: buildMemoryReply({
-					content: '',
-					calls: [{ function: { name: 'lookup', arguments: { id: 'record' } } }],
-				}),
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'lookup', arguments: { id: 'record' } } }],
+					}),
+				},
+			]),
+		)
 		const base = buildMemoryProfile({ url: server.url })
 		const profile = {
 			...base,
@@ -381,7 +390,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
@@ -396,17 +405,19 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 			message: { role: 'assistant', content: 'a'.repeat(17) },
 			done: false,
 		})}\n`
-		const server = await createMemoryServer([
-			...STUDY_MEMORY_CALIBRATION,
-			{
-				path: '/api/chat',
-				body: `${chunk.repeat(recommended.room.output - 1)}${buildMemoryReply({
-					content: '',
-					reason: 'length',
-					completion: recommended.room.output,
-				})}`,
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				...STUDY_MEMORY_CALIBRATION,
+				{
+					path: '/api/chat',
+					body: `${chunk.repeat(recommended.room.output - 1)}${buildMemoryReply({
+						content: '',
+						reason: 'length',
+						completion: recommended.room.output,
+					})}`,
+				},
+			]),
+		)
 		const base = buildMemoryProfile({ url: server.url, room: recommended.room, duration: 15000 })
 		const profile = {
 			...base,
@@ -446,20 +457,22 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('settles malformed lookup arguments with their known cost and stops subsequent work', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/chat',
-				body: buildMemoryReply({
-					content: '',
-					calls: [{ function: { name: 'lookup', arguments: { id: 42 } } }],
-				}),
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'lookup', arguments: { id: 42 } } }],
+					}),
+				},
+			]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
@@ -487,20 +500,22 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('admits and settles absent record lookups with the encoded response cost', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/chat',
-				body: buildMemoryReply({
-					content: '',
-					calls: [{ function: { name: 'lookup', arguments: { id: 'absent' } } }],
-				}),
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'lookup', arguments: { id: 'absent' } } }],
+					}),
+				},
+			]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
@@ -530,22 +545,24 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('preserves corrections and lookup traces across goals and starts repetitions fresh', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/chat',
-				body: buildMemoryReply({
-					content: '',
-					calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
-				}),
-			},
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'Initial handoff' }) },
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'Corrected handoff' }) },
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{
+					path: '/api/chat',
+					body: buildMemoryReply({
+						content: '',
+						calls: [{ function: { name: 'lookup', arguments: { id: 'order-1' } } }],
+					}),
+				},
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Initial handoff' }) },
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Corrected handoff' }) },
+			]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const driver = new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile })
@@ -623,12 +640,12 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('runs actual Ledger classification and accepts its one-token judge readouts', async () => {
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
@@ -666,14 +683,14 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('latches http failures before subsequent dispatch', async () => {
-		const server = await createMemoryServer([
-			{ path: '/api/chat', body: 'Unavailable', status: 503 },
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([{ path: '/api/chat', body: 'Unavailable', status: 503 }]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
@@ -701,23 +718,25 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('retains product evidence but refuses completion after a serving digest changes', async () => {
-		const server = await createMemoryServer([
-			{ path: '/api/chat', body: buildMemoryReply({ content: 'Actual product' }) },
-			{
-				path: '/api/tags',
-				body: JSON.stringify({
-					models: [
-						{ name: 'model', digest: 'c'.repeat(64) },
-						{ name: 'judge', digest: 'b'.repeat(64) },
-					],
-				}),
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{ path: '/api/chat', body: buildMemoryReply({ content: 'Actual product' }) },
+				{
+					path: '/api/tags',
+					body: JSON.stringify({
+						models: [
+							{ name: 'model', digest: 'c'.repeat(64) },
+							{ name: 'judge', digest: 'b'.repeat(64) },
+						],
+					}),
+				},
+			]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
@@ -748,24 +767,26 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('latches real judge decoding errors caught by Ledger classification', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/generate',
-				body: JSON.stringify({
-					model: 'judge',
-					done: true,
-					done_reason: 'length',
-					prompt_eval_count: 10,
-					eval_count: 1,
-					logprobs: [],
-				}),
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{
+					path: '/api/generate',
+					body: JSON.stringify({
+						model: 'judge',
+						done: true,
+						done_reason: 'length',
+						prompt_eval_count: 10,
+						eval_count: 1,
+						logprobs: [],
+					}),
+				},
+			]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const fixture = createMemoryContext(profile)
 		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
@@ -798,18 +819,20 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 
 	it('keeps parent cancellation distinct from capacity', async () => {
-		const server = await createMemoryServer([
-			{
-				path: '/api/chat',
-				body: `${JSON.stringify({ model: 'model', done: false, message: { content: 'partial' } })}\n`,
-				open: true,
-			},
-		])
+		const server = await createMemoryFixture(
+			new MemoryScript([
+				{
+					path: '/api/chat',
+					body: `${JSON.stringify({ model: 'model', done: false, message: { content: 'partial' } })}\n`,
+					open: true,
+				},
+			]),
+		)
 		const profile = buildMemoryProfile({ url: server.url })
 		const controller = new AbortController()
 		const fixture = createMemoryContext(profile, controller.signal)
@@ -835,7 +858,7 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		} finally {
 			await session.close()
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 })
@@ -1577,7 +1600,7 @@ describe('recording declarations of a memory session', () => {
 	})
 
 	it('sends a recording through its sink and its replay and not to the daemon', async () => {
-		const server = await createMemoryServer()
+		const server = await createMemoryFixture()
 		const profile = buildMemoryRecordProfile(server.url)
 		const fixture = createMemoryContext(profile)
 		const trial = { id: 'captured', scenario: 'public', arm: 'full', repetition: 0 }
@@ -1604,7 +1627,7 @@ describe('recording declarations of a memory session', () => {
 			expect(server.requests).toEqual([])
 		} finally {
 			fixture.close()
-			await server.close()
+			await server.destroy()
 		}
 	})
 })
