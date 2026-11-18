@@ -113,14 +113,13 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(isStudyMemoryLedger(agent)).toBe(true)
 		expect(isStudyMemoryProvider(provider)).toBe(true)
 		expect(isStudyMemoryClassifier(provider)).toBe(true)
-		// A runtime without Ledger capabilities serves the Full and Compaction arms.
+		// A runtime without Ledger capabilities serves the Full arm.
 		const surface = {
 			Agent: agent.Agent,
 			createConversationManager: agent.createConversationManager,
 			createAuthority: agent.createAuthority,
 			estimateRequest: agent.estimateRequest,
 			measureRequest: agent.measureRequest,
-			isAgentError: agent.isAgentError,
 		}
 		expect(isStudyMemoryAgent(surface)).toBe(true)
 		expect(isStudyMemoryLedger(surface)).toBe(false)
@@ -128,7 +127,7 @@ describe('memory declaration and mechanical evidence', () => {
 			const remaining = Object.entries(surface).filter(([key]) => key !== missing)
 			expect([missing, isStudyMemoryAgent(Object.fromEntries(remaining))]).toEqual([missing, false])
 		}
-		expect(isStudyMemoryAgent({ ...surface, isAgentError: 'guard' })).toBe(false)
+		expect(isStudyMemoryAgent({ ...surface, estimateRequest: 'guard' })).toBe(false)
 		expect(isStudyMemoryAgent({ ...surface, Agent: {} })).toBe(false)
 		expect(isStudyMemoryAgent({ ...surface, createAuthority: {} })).toBe(false)
 		const ledger = {

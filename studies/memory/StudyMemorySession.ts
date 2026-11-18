@@ -102,7 +102,6 @@ export class StudyMemorySession implements StudySessionInterface {
 		})
 		this.#trace = new StudyAgentTrace({
 			runtime: options.agent,
-			latch: this.#transport,
 			observe: this.#observation.observe,
 			origins: (messages) => buildStudyMemoryOrigins(messages, this.#provenance()),
 		})
@@ -196,7 +195,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					limit: 8,
 					timeout: options.profile.bounds.goal.duration,
 					on: {
-						fault: (error) => this.#trace.translate(error),
+						fault: (error) => this.#transport.fail(error),
 						deny: (call, reason) =>
 							this.#trace.append('denial', buildStudyAgentToolDenial(call, reason)),
 						// A ledger repeat fails inside the tool and is no denial, so `deny` never reads it.
@@ -227,11 +226,11 @@ export class StudyMemorySession implements StudySessionInterface {
 					fallback: { zone: 'study', verdict: 'allow' },
 				}),
 				on: {
-					fault: (error) => this.#trace.translate(error),
+					fault: (error) => this.#transport.fail(error),
 					deny: (call, reason) =>
 						this.#trace.append('denial', buildStudyAgentToolDenial(call, reason)),
 				},
-				error: (error) => this.#trace.translate(error),
+				error: (error) => this.#transport.fail(error),
 			})
 			this.#agent.context.instructions.add({ name: 'desk', content: STUDY_MEMORY_SYSTEM })
 		}
@@ -337,7 +336,8 @@ export class StudyMemorySession implements StudySessionInterface {
 				})
 			return product
 		} catch (error) {
-			throw this.#trace.translate(error)
+			this.#transport.fail(error)
+			throw error
 		} finally {
 			try {
 				await this.#trace.flush(context.evidence)

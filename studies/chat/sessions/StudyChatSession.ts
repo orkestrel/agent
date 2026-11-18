@@ -56,7 +56,6 @@ export class StudyChatSession implements StudySessionInterface {
 		})
 		this.#trace = new StudyAgentTrace({
 			runtime: options.agent,
-			latch: this.#transport,
 			observe: true,
 			origins: (messages) => messages.map((message) => ({ id: message.id, origin: 'unknown' })),
 		})
@@ -124,7 +123,8 @@ export class StudyChatSession implements StudySessionInterface {
 				this.#active.delete(request)
 			}
 		} catch (error) {
-			throw this.#trace.translate(error)
+			this.#transport.fail(error)
+			throw error
 		} finally {
 			try {
 				await this.#trace.flush(context.evidence)

@@ -1102,8 +1102,6 @@ export function buildMemoryProfile(options: MemoryProfileFixture): StudyProfile 
 		context: 32768,
 		output: 512,
 		safety: 128,
-		// The memory driver reads no recap allowance, so the fixture declares none.
-		recap: undefined,
 		think: false,
 		...options.room,
 	}
