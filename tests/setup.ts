@@ -2900,7 +2900,7 @@ export async function serveLedgerFit(options: {
 			{ content: warm },
 			...topics.map((topic, index) => ({
 				content: '',
-				tools: [{ id: `fit-${index}`, name: 'recall', arguments: { topic } }],
+				tools: [{ id: `fit-${index}`, name: 'recall', arguments: { key: topic } }],
 			})),
 			{ content: partial },
 			{ content: 'Finished.' },
@@ -2942,7 +2942,7 @@ export async function serveLedgerBoundary(options: {
 	readonly prompt: number
 	readonly thinking?: number
 }) {
-	const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'vault' } }]
+	const calls = [{ id: 'recall', name: 'recall', arguments: { key: 'vault' } }]
 	const completion = JSON.stringify(calls).length + (options.thinking ?? 0)
 	const provider = createScriptedProvider(
 		[
@@ -3030,7 +3030,7 @@ export async function serveLedgerAdmission(size: number, notes: number, blank: b
 			},
 			{
 				content: '',
-				tools: [{ id: 'admission-recall', name: 'recall', arguments: { topic: 'note' } }],
+				tools: [{ id: 'admission-recall', name: 'recall', arguments: { key: 'note' } }],
 			},
 			{ content: 'Done.' },
 		],
@@ -6024,6 +6024,85 @@ export function buildLedgerFinding(
 	return { id, name, arguments: values, text, result }
 }
 
+/** Holds the desk topic the recall key scenario files its refund statement under. */
+export const LEDGER_KEY_TOPICS: readonly LedgerTopic[] = Object.freeze([
+	Object.freeze({ name: 'refunds', criterion: 'Refund amounts and approvals' }),
+])
+
+/** Carries the recall key scenario: its projection input and the request and note marks a ledger keeps. */
+export interface LedgerKeyScenario {
+	readonly input: LedgerProjectionInput
+	readonly requests: ReadonlySet<string>
+	readonly notes: ReadonlySet<string>
+}
+
+/**
+ * Builds the recall key scenario: a rule, an order with a date and a one-off crate id, a ticket, a
+ * lookup of an owner, an earlier request with a recall in its loop, a note, then the current
+ * statements `quiet` and `refund` and the current request `request`.
+ *
+ * @remarks
+ * `quiet` is filed quiet and names the looked-up owner; `refund` is filed under the `refunds`
+ * topic. The recall result repeats the order's text, so the crate id counts twice only when a recall
+ * result counts, which no key does.
+ *
+ * @param replied - If `true`, the earlier request keeps its reply; if `false`, the reply is left out
+ * @returns The scenario
+ */
+export function buildLedgerKeyScenario(replied: boolean): LedgerKeyScenario {
+	const shipped = 'Order OR-7 shipped on 2026-11-02 in crate ZX-9.'
+	const account = 'Account BW-20931: Brightwater Studio.'
+	const messages: readonly Message[] = [
+		buildLedgerMessage('rule', 'user', 'Refunds over $200 need a manager.'),
+		buildLedgerMessage('order', 'user', shipped),
+		buildLedgerMessage('ticket', 'user', 'Ticket TK-1 is open.'),
+		{
+			...buildLedgerMessage('caller', 'assistant', ''),
+			calls: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }],
+		},
+		{ ...buildLedgerMessage('lookup', 'tool', account), call: 'read' },
+		buildLedgerMessage('first', 'user', 'Check OR-7 and BW-5512.'),
+		{
+			...buildLedgerMessage('recaller', 'assistant', ''),
+			calls: [{ id: 'recall', name: 'recall', arguments: { key: 'OR-7' } }],
+		},
+		{ ...buildLedgerMessage('recalled', 'tool', shipped), call: 'recall' },
+		buildLedgerMessage('note', 'user', 'Answer now.'),
+		...(replied
+			? [
+					buildLedgerMessage(
+						'reply',
+						'assistant',
+						'OR-7 is late since 2026-11-02; BW-5512 was refunded.',
+					),
+				]
+			: []),
+		buildLedgerMessage('quiet', 'user', 'Thanks for BW-20931.'),
+		buildLedgerMessage('refund', 'user', 'BW-5512 was refunded $148.50.'),
+		buildLedgerMessage('request', 'user', 'What about TK-1?'),
+	]
+	return {
+		input: buildLedgerInput({
+			exclusions: ['first', 'request', 'note'],
+			owners: { 'BW-20931': ['Brightwater Studio'] },
+			messages,
+			findings: [
+				buildLedgerFinding('lookup', 'lookup', { id: 'BW-20931' }, account, {
+					ids: ['BW-20931'],
+					owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }],
+				}),
+			],
+			classification: {
+				quiet: ['quiet'],
+				categories: { rule: 'rule' },
+				topics: { refund: ['refunds'] },
+			},
+		}),
+		requests: new Set(['first', 'request']),
+		notes: new Set(['note']),
+	}
+}
+
 /**
  * Builds the fictional desk scenario: two owners, a rule with an accepted correction, a replaced lookup, a quiet message, and an excluded request.
  *
@@ -8102,7 +8181,7 @@ export async function serveLedgerOfferRate(options: {
 
 /** Holds follow-up turns for {@link serveLedgerAnswer}: a `recall` call for the receipt, then a reply. */
 export const LEDGER_ANSWER_FOLLOWUP: readonly ScriptedTurn[] = Object.freeze([
-	{ content: '', tools: [{ id: 'recall-1', name: 'recall', arguments: { topic: 'receipt' } }] },
+	{ content: '', tools: [{ id: 'recall-1', name: 'recall', arguments: { key: 'receipt' } }] },
 	{ content: 'Next.' },
 ])
 
@@ -8333,7 +8412,7 @@ export async function serveAmendedDesk(): Promise<{
 					{
 						id: 'desk',
 						name: 'recall',
-						arguments: { topic: 'refunds' },
+						arguments: { key: 'refunds' },
 					},
 				],
 			},
@@ -8343,7 +8422,7 @@ export async function serveAmendedDesk(): Promise<{
 					{
 						id: 'owner',
 						name: 'recall',
-						arguments: { topic: 'Brightwater' },
+						arguments: { key: 'Brightwater' },
 					},
 				],
 			},
@@ -9305,8 +9384,8 @@ export const GUIDE_CLASSIFIER_LINES = Object.freeze([
 	"classifier.classification().categories.get(rule.id) // 'rule'",
 	'gauge.rate(calls) // 1.25 — the scale, because no two calls with one tool count are observed',
 	"gauge.remainder(calls) // 32098 — the capacity less the last call's prompt and completion",
-	"gauge.reserve(calls, '') // 36.25 — an empty reply and one recall call, priced at the rate",
-	"gauge.room(calls, '') // 9547.9 — half of what is left beyond the generation cap and the reserve, in estimate units",
+	"gauge.reserve(calls, '') // 35 — an empty reply and one recall call, priced at the rate",
+	"gauge.room(calls, '') // 9548.4 — half of what is left beyond the generation cap and the reserve, in estimate units",
 	"gauge.scale // 1.3 — the first call's prompt less the overhead cost, over its estimate",
 ])
 
@@ -9867,8 +9946,8 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	requests: ['request'],
 	notes: ['note'],
 	failures: ['failure'],
-	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-15.
-	gauge: { scale: 2, overhead: 10, digest: 'f8b9a438b4f24a32', model: SCRIPTED_MODEL },
+	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-19.
+	gauge: { scale: 2, overhead: 10, digest: '27bbbddced4effd2', model: SCRIPTED_MODEL },
 })
 
 /**
@@ -14563,7 +14642,7 @@ export function drawLedgerRoomCall(
 			name: 'memo',
 			arguments: { name: Math.floor(random() * 2) === 0 ? 'pref' : 'notes' },
 		}
-	if (named === 'recall') return { id: call, name: 'recall', arguments: { topic: 'zephyr' } }
+	if (named === 'recall') return { id: call, name: 'recall', arguments: { key: 'zephyr' } }
 	if (named === 'tool')
 		return {
 			id: call,
@@ -15240,7 +15319,7 @@ export async function serveLedgerWideRecall(
 			},
 			{
 				content: '',
-				tools: [createToolCall({ id: 'q', name: 'recall', arguments: { topic: 'zephyr' } })],
+				tools: [createToolCall({ id: 'q', name: 'recall', arguments: { key: 'zephyr' } })],
 			},
 			{ content: 'Done.' },
 		],

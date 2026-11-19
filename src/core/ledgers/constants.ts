@@ -36,8 +36,14 @@ export const DECISIVE_CATEGORIES: readonly LedgerCategory[] = Object.freeze([
 /** Lists the categories that place a message no owner claims on the rules record. */
 export const PLACED_CATEGORIES: readonly LedgerCategory[] = Object.freeze(['rule', 'correction'])
 
-/** Names the key of the record that holds the rules no owner claims. */
+/**
+ * Names the key of the record that holds the rules no owner claims, which is also the recall key
+ * that lists that record's lines.
+ */
 export const LEDGER_RULES_KEY = 'rules'
+
+/** Names the recall key that lists the last request before the current one and the reply to it. */
+export const LEDGER_PREVIOUS_KEY = 'previous'
 
 /** Prefixes the key of an owner's record, which the owner's id follows. */
 export const LEDGER_OWNER_PREFIX = 'owner:'
@@ -128,9 +134,12 @@ export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
 export const DEFAULT_LEDGER_LIMIT = 8
 
 /**
- * Caps the `recall` calls of one request at 2 calls.
+ * Caps the `recall` calls of one request at 4 calls.
  */
-export const LEDGER_RECALL_LIMIT = 2
+export const LEDGER_RECALL_LIMIT = 4
+
+/** Caps at 8 the recall keys a `recall` call that lists nothing names back. */
+export const LEDGER_MISS_LIMIT = 8
 
 /**
  * Sets the 5 milliseconds a paced classifier files between host turns.

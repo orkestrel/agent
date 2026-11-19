@@ -237,9 +237,11 @@ describe('LedgerRequest', () => {
 		expect(request.denied('update', cycle)).toBe(false)
 	})
 
-	it('counts recalls up to the fixed limit of 2 and closes on the third', () => {
+	it('counts recalls up to the fixed limit of 4 and closes on the fifth', () => {
 		const request = new LedgerRequest('Check.')
-		expect(LEDGER_RECALL_LIMIT).toBe(2)
+		expect(LEDGER_RECALL_LIMIT).toBe(4)
+		request.recall()
+		request.recall()
 		request.recall()
 		request.recall()
 		expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)
@@ -262,7 +264,7 @@ describe('LedgerRequest', () => {
 		expect(request.lines('other result')).toBeUndefined()
 		expect(request.listings.at(-1)?.groups).toEqual(['first result'])
 		request.list(
-			'second group\n1 older item not shown; name a narrower topic to narrow the recall',
+			'second group\n1 older item not shown; name a narrower key to narrow the recall',
 			new Map(),
 			['first oversized group', 'second group'],
 		)

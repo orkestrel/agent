@@ -266,18 +266,18 @@ describe('Gauge.reserve', () => {
 		for (const replay of ['none', 'turn', 'all'] as const) {
 			const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 1000, predict: 1, replay })
 			gauge.observe([], { estimate: 10, completion: 900, thinking: 850, tools: 0 })
-			expect(gauge.reserve([], '')).toBe(75)
+			expect(gauge.reserve([], '')).toBe(74)
 		}
 	})
 
 	it('prices the longest text and one recall call at the rate before any reply is observed', () => {
-		// Rate 2. Longest 40 characters: 10 + 4 = 14 units. Recall call 25 units. (14 + 25) * 2 = 78.
+		// Rate 2. Longest 40 characters: 10 + 4 = 14 units. Recall call 24 units. (14 + 24) * 2 = 76.
 		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000, predict: 1 })
-		expect(gauge.reserve([], 'a'.repeat(40))).toBe(78)
+		expect(gauge.reserve([], 'a'.repeat(40))).toBe(76)
 	})
 
 	it('uses the final answer completion instead of a larger tool completion', () => {
-		// Observing (100, 300) sets scale 3 and rate 3. Reply 70, recall 25 * 3 = 75.
+		// Observing (100, 300) sets scale 3 and rate 3. Reply 70, recall 24 * 3 = 72.
 		const gauge = new Gauge({ scale: 2, overhead: 0, capacity: 10000, predict: 1 })
 		gauge.observe(
 			[
@@ -286,7 +286,7 @@ describe('Gauge.reserve', () => {
 			],
 			{ estimate: 100, prompt: 300, completion: 70, tools: 0 },
 		)
-		expect(gauge.reserve([], 'a'.repeat(4000))).toBe(145)
+		expect(gauge.reserve([], 'a'.repeat(4000))).toBe(142)
 	})
 
 	it('keeps the longest completion across requests', () => {
@@ -301,12 +301,12 @@ describe('Gauge.reserve', () => {
 			completion: 40,
 			tools: 0,
 		})
-		expect(gauge.reserve([], '')).toBe(145)
+		expect(gauge.reserve([], '')).toBe(142)
 	})
 	it('keeps the text fallback when a request delivered no final answer', () => {
 		const gauge = new Gauge({ scale: 1, overhead: 0, capacity: 10000, predict: 1 })
 		gauge.observe([{ estimate: 100, prompt: 100, completion: 900, tools: 1 }])
-		expect(gauge.reserve([], '')).toBe(29)
+		expect(gauge.reserve([], '')).toBe(28)
 	})
 })
 
@@ -322,7 +322,7 @@ describe('Gauge.room', () => {
 		})
 		plain.observe([], { estimate: 100, completion: 100, tools: 0 })
 		thinking.observe([], { estimate: 100, completion: 500, thinking: 400, tools: 0 })
-		for (const prompt of [1000, 2600, 2822, 2823, 2900]) {
+		for (const prompt of [1000, 2600, 2824, 2825, 2900]) {
 			const plainCalls = [{ estimate: 100, prompt, completion: 0, tools: 0 }]
 			const thinkingCalls = [{ estimate: 100, prompt, completion: 700, thinking: 700, tools: 0 }]
 			expect(thinking.remainder(thinkingCalls) - 1024).toBe(plain.remainder(plainCalls) - 1)
@@ -330,17 +330,17 @@ describe('Gauge.room', () => {
 			expect(thinking.room(thinkingCalls, '')).toBe(plain.room(plainCalls, ''))
 			expect(
 				thinking.remainder(thinkingCalls) - 1024 < 2 * thinking.reserve(thinkingCalls, ''),
-			).toBe(prompt > 2822)
+			).toBe(prompt > 2824)
 			expect(plain.remainder(plainCalls) - 1 < 2 * plain.reserve(plainCalls, '')).toBe(
-				prompt > 2822,
+				prompt > 2824,
 			)
 		}
 	})
 
 	it('halves what the call left beyond the reserve and divides by the rate', () => {
-		// Left 10000 - 2100 = 7900. Generation cap 1. Reserve 78 at rate 2. (7900 - 1 - 78) / 2 / 2 = 1955.25.
+		// Left 10000 - 2100 = 7900. Generation cap 1. Reserve 76 at rate 2. (7900 - 1 - 76) / 2 / 2 = 1955.75.
 		const gauge = new Gauge({ scale: 2, overhead: 100, capacity: 10000, predict: 1 })
-		expect(gauge.room([{ estimate: 1000, tools: 0 }], 'a'.repeat(40))).toBe(1955.25)
+		expect(gauge.room([{ estimate: 1000, tools: 0 }], 'a'.repeat(40))).toBe(1955.75)
 	})
 
 	it('floors at 0 when the reserve exceeds what is left', () => {

@@ -30,8 +30,7 @@ import { LedgerPass } from './LedgerPass.js'
  * request.enter(conversation) // the appended user message
  * request.admit('lookup', { id: 'BW-20931' })
  * request.admit('lookup', { id: 'BW-20931' }) // throws Error(LEDGER_NOTES.repeat)
- * request.recall()
- * request.recall()
+ * for (let call = 0; call < LEDGER_RECALL_LIMIT; call++) request.recall()
  * request.recall() // throws Error(LEDGER_NOTES.closure): the limit of LEDGER_RECALL_LIMIT is spent
  * ```
  */

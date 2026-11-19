@@ -3174,7 +3174,7 @@ await new GuideCommand({
 					{ content: 'Done.' },
 					{
 						content: '',
-						tools: [{ id: 'call-2', name: 'recall', arguments: { topic: 'BW-5512' } }],
+						tools: [{ id: 'call-2', name: 'recall', arguments: { key: 'BW-5512' } }],
 					},
 					{ content: 'Done.' },
 				],
@@ -3232,7 +3232,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('lists recall matches newest first, each source followed by the amenders the topic does not match, as the `recall` tool claims', async () => {
+		it('lists recall matches newest first, each source followed by the amenders the key does not match, as the `recall` tool claims', async () => {
 			const { result, prompts } = await serveAmendedDesk()
 			expect(result.passes).toHaveLength(2)
 
@@ -3254,7 +3254,7 @@ await new GuideCommand({
 				].join('\n'),
 			)
 			expect(guideText).toContain(
-				"It lists matching statements and lookup findings first, newest first, each source followed by the amenders the topic doesn't match itself; an amender the topic matches lists as its own newer item.",
+				"It lists matching statements and lookup findings first, newest first, each source followed by the amenders the key doesn't match itself; an amender the key matches lists as its own newer item.",
 			)
 		})
 
@@ -3285,7 +3285,7 @@ await new GuideCommand({
 				[
 					{
 						content: '',
-						tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }],
+						tools: [{ id: 'recall', name: 'recall', arguments: { key: 'refunds' } }],
 					},
 					{ content: 'Done.' },
 				],
@@ -3317,7 +3317,7 @@ await new GuideCommand({
 			expect(kept.length).toBeGreaterThan(0)
 			expect(kept).toEqual(seeds.slice(-kept.length).reverse())
 			expect(lines.at(-1)).toBe(
-				`${seeds.length - kept.length} older items not shown; name a narrower topic to narrow the recall`,
+				`${seeds.length - kept.length} older items not shown; name a narrower key to narrow the recall`,
 			)
 			expect(guideText).toContain(
 				"The tool fits whole items, including each source's amenders, into what the measured request leaves below capacity less predict, and names how many items it left out.",
@@ -4171,6 +4171,8 @@ await new GuideCommand({
 			expect(request.denied('refund_order', { id: 'BW-5513' })).toBe(false)
 			request.recall()
 			request.recall()
+			request.recall()
+			request.recall()
 			expect(() => request.recall()).toThrow(LEDGER_NOTES.closure)
 
 			const listed = 'lookup_order {"id":"BW-5512"}: Refund due $148.50.'
@@ -4205,7 +4207,7 @@ await new GuideCommand({
 				"request.denied('refund_order', { id: 'BW-5513' }) // false — other arguments are another call",
 			)
 			expect(guideText).toContain(
-				'request.recall() // throws Error(LEDGER_NOTES.closure) — the 2 recall calls are spent',
+				'request.recall() // throws Error(LEDGER_NOTES.closure) — the 4 recall calls are spent',
 			)
 		})
 
@@ -4262,8 +4264,8 @@ await new GuideCommand({
 			expect(estimateMessages([rule])).toBe(13)
 			expect(gauge.rate(calls)).toBe(1.25)
 			expect(gauge.remainder(calls)).toBe(32_098)
-			expect(gauge.reserve(calls, '')).toBe(36.25)
-			expect(gauge.room(calls, '')).toBeCloseTo(9_547.9, 9)
+			expect(gauge.reserve(calls, '')).toBe(35)
+			expect(gauge.room(calls, '')).toBeCloseTo(9_548.4, 9)
 			gauge.observe(calls)
 			expect(gauge.scale).toBe(1.3)
 			// A fence comment that drifts from the value asserted earlier fails here, because each line must appear verbatim.
@@ -4425,7 +4427,7 @@ await new GuideCommand({
 						{
 							content: '',
 							...(thinking === undefined ? {} : { thinking }),
-							tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'code' } }],
+							tools: [{ id: 'recall', name: 'recall', arguments: { key: 'code' } }],
 							usage: { prompt: 2700, completion: 865, total: 3565 },
 						},
 						{ content: 'Done.' },

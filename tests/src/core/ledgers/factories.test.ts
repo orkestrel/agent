@@ -46,7 +46,7 @@ describe('createLedger', () => {
 				'resolvePredict',
 			].filter((name) => Object.hasOwn(core, name)),
 		).toEqual([])
-		expect(core.LEDGER_RECALL_LIMIT).toBe(2)
+		expect(core.LEDGER_RECALL_LIMIT).toBe(4)
 	})
 	it('checks missing threshold keys on both construction routes', () => {
 		const options = buildLedgerOptions({ topics: [], lookups: [] })

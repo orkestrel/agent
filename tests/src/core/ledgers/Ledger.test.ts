@@ -234,7 +234,7 @@ describe('Ledger', () => {
 	it('holds the drift margin for an estimated prefix when usage is absent', async () => {
 		const provider = createScriptedProvider(
 			[
-				{ content: '', tools: [{ id: 'r', name: 'recall', arguments: { topic: 'vault' } }] },
+				{ content: '', tools: [{ id: 'r', name: 'recall', arguments: { key: 'vault' } }] },
 				{ content: 'Finished.' },
 			],
 			{ recorded: true },
@@ -276,8 +276,8 @@ describe('Ledger', () => {
 				{
 					content: '',
 					tools: [
-						{ id: 'a', name: 'recall', arguments: { topic: 'vault' } },
-						{ id: 'b', name: 'recall', arguments: { topic: 'parcel' } },
+						{ id: 'a', name: 'recall', arguments: { key: 'vault' } },
+						{ id: 'b', name: 'recall', arguments: { key: 'parcel' } },
 					],
 				},
 				{ content: 'Finished.' },
@@ -533,7 +533,7 @@ describe('Ledger', () => {
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
 		).toBe(
-			'The old vault code is 7391.\n1 more item not shown; name a narrower topic to narrow the recall',
+			'The old vault code is 7391.\n1 more item not shown; name a narrower key to narrow the recall',
 		)
 	})
 
@@ -541,7 +541,7 @@ describe('Ledger', () => {
 		for (const hydrated of [false, true]) {
 			const provider = new PricedLedgerProvider(
 				[
-					{ content: '', tools: [{ id: 'vault', name: 'recall', arguments: { topic: 'vault' } }] },
+					{ content: '', tools: [{ id: 'vault', name: 'recall', arguments: { key: 'vault' } }] },
 					{ content: '' },
 					{ content: 'Finished.' },
 				],
@@ -593,7 +593,7 @@ describe('Ledger', () => {
 		const source = 'The vault code is 7391. ' + 'v'.repeat(16000)
 		const provider = new PricedLedgerProvider(
 			[
-				{ content: '', tools: [{ id: 'r1', name: 'recall', arguments: { topic: 'vault' } }] },
+				{ content: '', tools: [{ id: 'r1', name: 'recall', arguments: { key: 'vault' } }] },
 				{ content: 'Finished.' },
 			],
 			{ recorded: true },
@@ -747,7 +747,7 @@ describe('Ledger', () => {
 				[
 					{
 						content: '',
-						tools: [{ id: 'quiet', name: 'recall', arguments: { topic: 'Rex' } }],
+						tools: [{ id: 'quiet', name: 'recall', arguments: { key: 'Rex' } }],
 					},
 					{ content: 'Done.' },
 				],
@@ -891,7 +891,7 @@ describe('Ledger', () => {
 	it('omits empty recall results from the final answer digest', async () => {
 		const provider = createScriptedProvider(
 			[
-				{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { topic: 'absent' } }] },
+				{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { key: 'absent' } }] },
 				{ content: '' },
 				{ content: 'Done.' },
 			],
@@ -902,7 +902,7 @@ describe('Ledger', () => {
 		await ledger.respond('Check.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'empty')?.content,
-		).toBe('nothing earlier on "absent"; answer from the messages you can see')
+		).toBe('nothing earlier matches "absent"; answer from the messages you can see')
 		expect(provider.calls).toHaveLength(3)
 		expect(
 			provider.calls
@@ -951,7 +951,7 @@ describe('Ledger', () => {
 			[
 				{
 					content: '',
-					tools: [{ id: 'recall-denied', name: 'recall', arguments: { topic: 'parcel' } }],
+					tools: [{ id: 'recall-denied', name: 'recall', arguments: { key: 'parcel' } }],
 				},
 				{ content: 'Done.' },
 			],
@@ -1264,7 +1264,7 @@ describe('Ledger', () => {
 					[
 						{
 							content: '',
-							tools: [{ id: 'labels', name: 'recall', arguments: { topic: 'parcel' } }],
+							tools: [{ id: 'labels', name: 'recall', arguments: { key: 'parcel' } }],
 						},
 						{ content: '' },
 						{ content: 'Final answer.' },
@@ -1296,7 +1296,7 @@ describe('Ledger', () => {
 				[
 					{
 						content: '',
-						tools: [{ id: 'labels', name: 'recall', arguments: { topic: 'parcel' } }],
+						tools: [{ id: 'labels', name: 'recall', arguments: { key: 'parcel' } }],
 					},
 					{ content: '' },
 					{ content: 'Final answer.' },
@@ -1334,7 +1334,7 @@ describe('Ledger', () => {
 		const provider = createScriptedProvider(
 			[
 				{ content: 'First reply.', usage: { prompt: 0, completion: 1000, total: 1000 } },
-				{ content: '', tools: [{ id: 'closed', name: 'recall', arguments: { topic: 'parcel' } }] },
+				{ content: '', tools: [{ id: 'closed', name: 'recall', arguments: { key: 'parcel' } }] },
 				{ content: 'Done.' },
 			],
 			{ recorded: true },
@@ -1351,7 +1351,9 @@ describe('Ledger', () => {
 		])
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'closed')?.content,
-		).toBe('nothing earlier on "parcel"; answer from the messages you can see')
+		).toBe(
+			'nothing earlier matches "parcel"; stored keys: previous; or answer from the messages you can see',
+		)
 	})
 
 	it('hydrates a legacy-shaped snapshot without adding a stored byte and carries its final reply', async () => {
@@ -2367,7 +2369,7 @@ describe('Ledger', () => {
 		const provider = createScriptedProvider(
 			[
 				{ content: reply },
-				{ content: '', tools: [{ id: 'history', name: 'recall', arguments: { topic: 'crate' } }] },
+				{ content: '', tools: [{ id: 'history', name: 'recall', arguments: { key: 'crate' } }] },
 				{ content: 'Answered.' },
 				{ content: 'Finished.' },
 				{ content: 'Finished.' },
@@ -2405,7 +2407,7 @@ describe('Ledger', () => {
 		const ledger = createLedger(
 			createScriptedProvider([
 				{ content: 'Done with the parcel.' },
-				{ content: '', tools: [{ id: 'history', name: 'recall', arguments: { topic: 'parcel' } }] },
+				{ content: '', tools: [{ id: 'history', name: 'recall', arguments: { key: 'parcel' } }] },
 				{ content: 'Answered.' },
 			]),
 			buildLedgerOptions({ judge: new SilentJudge(), topics: [] }),
@@ -2439,7 +2441,7 @@ describe('Ledger', () => {
 						{
 							id: 'history',
 							name: 'recall',
-							arguments: { topic: 'refund OR-7 and delivery code' },
+							arguments: { key: 'refund OR-7 and delivery code' },
 						},
 					],
 				},
@@ -2472,7 +2474,7 @@ describe('Ledger', () => {
 						{
 							id: 'restored',
 							name: 'recall',
-							arguments: { topic: 'refund OR-7 and delivery code' },
+							arguments: { key: 'refund OR-7 and delivery code' },
 						},
 					],
 				},
@@ -2498,7 +2500,7 @@ describe('Ledger', () => {
 				{ content: 'Noted.', usage: { prompt: 200, completion: 1, total: 201 } },
 				{
 					content: '',
-					tools: [{ id: 'oversized', name: 'recall', arguments: { topic: 'parcel code' } }],
+					tools: [{ id: 'oversized', name: 'recall', arguments: { key: 'parcel code' } }],
 				},
 				{ content: 'Answered.' },
 			]),
@@ -2517,7 +2519,7 @@ describe('Ledger', () => {
 			{ content: reply, usage: { prompt: 10, completion: 2, total: 12 } },
 			{
 				content: '',
-				tools: [{ id: 'partial', name: 'recall', arguments: { topic: 'parcel code' } }],
+				tools: [{ id: 'partial', name: 'recall', arguments: { key: 'parcel code' } }],
 			},
 			{ content: 'Answered.' },
 		])
@@ -2538,11 +2540,11 @@ describe('Ledger', () => {
 			{ content: '   ' },
 			{
 				content: 'parcel code beside a call',
-				tools: [{ id: 'current', name: 'recall', arguments: { topic: 'parcel code' } }],
+				tools: [{ id: 'current', name: 'recall', arguments: { key: 'parcel code' } }],
 			},
 			{
 				content: '',
-				tools: [{ id: 'repeat', name: 'recall', arguments: { topic: 'parcel code' } }],
+				tools: [{ id: 'repeat', name: 'recall', arguments: { key: 'parcel code' } }],
 			},
 			{ content: 'Answered.' },
 		])
@@ -2551,7 +2553,7 @@ describe('Ledger', () => {
 		await ledger.respond('Find the parcel code.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'current')?.content,
-		).toBe('nothing earlier on "parcel code"; answer from the messages you can see')
+		).toBe('nothing earlier matches "parcel code"; answer from the messages you can see')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'repeat')?.content,
 		).toBe(LEDGER_NOTES.repeat)
@@ -2563,12 +2565,12 @@ describe('Ledger', () => {
 				{ content: 'Brightwater Studio delivery code is 4471.' },
 				{
 					content: '',
-					tools: [{ id: 'owner', name: 'recall', arguments: { topic: 'Brightwater' } }],
+					tools: [{ id: 'owner', name: 'recall', arguments: { key: 'Brightwater' } }],
 				},
 				{ content: 'Answered.' },
 				{
 					content: '',
-					tools: [{ id: 'removed', name: 'recall', arguments: { topic: 'delivery code' } }],
+					tools: [{ id: 'removed', name: 'recall', arguments: { key: 'delivery code' } }],
 				},
 				{ content: 'Answered.' },
 			],
@@ -2600,7 +2602,9 @@ describe('Ledger', () => {
 		await ledger.respond('Find the delivery code.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'removed')?.content,
-		).toBe('nothing earlier on "delivery code"; answer from the messages you can see')
+		).toBe(
+			'nothing earlier matches "delivery code"; stored keys: previous, BW-20931; or answer from the messages you can see',
+		)
 	})
 
 	it.each(LEDGER_OWNER_RENDER_CASES)('$title', async (row) => {
@@ -2812,7 +2816,7 @@ describe('Ledger', () => {
 						{
 							id: 'recall',
 							name: 'recall',
-							arguments: { topic: 'BW-20931' },
+							arguments: { key: 'BW-20931' },
 						},
 					],
 				},
@@ -2890,7 +2894,7 @@ describe('Ledger', () => {
 		const options = buildLedgerOptions()
 		const calls = [
 			{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } },
-			{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } },
+			{ id: 'recall', name: 'recall', arguments: { key: 'refunds' } },
 		]
 		const provider = createScriptedProvider(
 			[
@@ -2909,14 +2913,16 @@ describe('Ledger', () => {
 			partial: false,
 		})
 		const read = 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
-		const recalled = 'nothing earlier on "refunds"; answer from the messages you can see'
+		const recalled = 'nothing earlier matches "refunds"; answer from the messages you can see'
+		const keyed =
+			'nothing earlier matches "refunds"; stored keys: previous, BW-20931; or answer from the messages you can see'
 		// The later request's calls repeat the settled request's, and neither returns the repeat note.
 		expect(
 			ledger.conversation
 				.messages()
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
-		).toEqual([read, recalled, read, recalled])
+		).toEqual([read, recalled, read, keyed])
 	})
 
 	// The exchange carries more messages than one call took as spread arguments in this project's
@@ -3273,11 +3279,11 @@ describe('Ledger', () => {
 						{ content: 'Refunds from a later assistant.' },
 						{
 							content: '',
-							tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }],
+							tools: [{ id: 'recall', name: 'recall', arguments: { key: 'refunds' } }],
 						},
 						{
 							content: '',
-							tools: [{ id: 'repeat', name: 'recall', arguments: { topic: 'refunds' } }],
+							tools: [{ id: 'repeat', name: 'recall', arguments: { key: 'refunds' } }],
 						},
 						{ content: 'Done.' },
 					],
@@ -3336,7 +3342,7 @@ describe('Ledger', () => {
 				const omitted = padding === 300 && capacity === 800
 				expect(recalled).toBe(
 					omitted
-						? `${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}\n1 more item not shown; name a narrower topic to narrow the recall`
+						? `${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}\n1 more item not shown; name a narrower key to narrow the recall`
 						: `${source.content}\n${first.content}\n${second.content}\n${last.content}\n${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}`,
 				)
 				expect(
@@ -3361,9 +3367,7 @@ describe('Ledger', () => {
 			[
 				{
 					content: '',
-					tools: [
-						{ id: 'recall', name: 'recall', arguments: { topic: 'Brightwater and BW-20931' } },
-					],
+					tools: [{ id: 'recall', name: 'recall', arguments: { key: 'Brightwater and BW-20931' } }],
 				},
 				{ content: '' },
 				{ content: 'Done.' },
@@ -3424,7 +3428,7 @@ describe('Ledger', () => {
 						{
 							id: 'recall',
 							name: 'recall',
-							arguments: { topic: 'Brightwater' },
+							arguments: { key: 'Brightwater' },
 						},
 					],
 				},
@@ -3461,12 +3465,12 @@ describe('Ledger', () => {
 				{ content: 'First answer.' },
 				{
 					content: '',
-					tools: [{ id: 'words', name: 'recall', arguments: { topic: 'Brightwater refund' } }],
+					tools: [{ id: 'words', name: 'recall', arguments: { key: 'Brightwater refund' } }],
 				},
 				{ content: 'Second answer.' },
 				{
 					content: '',
-					tools: [{ id: 'topic', name: 'recall', arguments: { topic: 'Brightwater' } }],
+					tools: [{ id: 'topic', name: 'recall', arguments: { key: 'Brightwater' } }],
 				},
 				{ content: 'Third answer.' },
 			],
@@ -3507,12 +3511,12 @@ describe('Ledger', () => {
 			[
 				{
 					content: '',
-					tools: [{ id: 'owner', name: 'recall', arguments: { topic: 'Halvorsen' } }],
+					tools: [{ id: 'owner', name: 'recall', arguments: { key: 'Halvorsen' } }],
 				},
 				{ content: 'First answer.' },
 				{
 					content: '',
-					tools: [{ id: 'shipment', name: 'recall', arguments: { topic: 'Halvorsen shipment' } }],
+					tools: [{ id: 'shipment', name: 'recall', arguments: { key: 'Halvorsen shipment' } }],
 				},
 				{ content: 'Second answer.' },
 			],
@@ -3661,7 +3665,7 @@ describe('Ledger', () => {
 				{
 					content: '',
 					thinking: 'Recall the account.',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+					tools: [{ id: 'recall', name: 'recall', arguments: { key: 'absent' } }],
 				},
 				{ content: 'Done.' },
 			],
@@ -3866,7 +3870,7 @@ describe('Ledger', () => {
 		const options = buildLedgerOptions()
 		const results: string[] = []
 		for (const thinking of [undefined, 'a'.repeat(800)]) {
-			const calls = [{ id: 'recall', name: 'recall', arguments: { topic: 'delivery' } }]
+			const calls = [{ id: 'recall', name: 'recall', arguments: { key: 'delivery' } }]
 			const completion = JSON.stringify(calls).length + (thinking?.length ?? 0)
 			const provider = createScriptedProvider(
 				[
@@ -3934,7 +3938,7 @@ describe('Ledger', () => {
 				},
 				{
 					content: '',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+					tools: [{ id: 'recall', name: 'recall', arguments: { key: 'absent' } }],
 					usage: { prompt: 2000, completion: 20, total: 2020 },
 				},
 				{ content: 'Done.' },
@@ -3952,7 +3956,9 @@ describe('Ledger', () => {
 		await ledger.respond('Second.')
 		expect(
 			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing earlier on "absent"; answer from the messages you can see')
+		).toBe(
+			'nothing earlier matches "absent"; stored keys: previous; or answer from the messages you can see',
+		)
 	})
 
 	it('passes predict to a calibrated gauge while recall remains open', async () => {
@@ -3974,7 +3980,7 @@ describe('Ledger', () => {
 							{
 								id: 'recall',
 								name: 'recall',
-								arguments: { topic: 'delivery' },
+								arguments: { key: 'delivery' },
 							},
 						],
 						usage: { prompt: 2700, completion: 72, total: 2772 },
@@ -4733,10 +4739,10 @@ describe('Ledger', () => {
 		).toBe(false)
 	})
 
-	it('refuses an empty recall topic at the door, as a failure the model reads', async () => {
+	it('refuses an empty recall key at the door, as a failure the model reads', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([
-			{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { topic: '' } }] },
+			{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { key: '' } }] },
 			{ content: 'Done.' },
 		])
 		const ledger = createLedger(provider, options)
@@ -4744,7 +4750,7 @@ describe('Ledger', () => {
 		await ledger.respond('Request.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'empty')?.content,
-		).toContain('topic: constraint')
+		).toContain('key: constraint')
 	})
 
 	it('refuses a recall argument it does not declare', async () => {
@@ -4752,9 +4758,7 @@ describe('Ledger', () => {
 		const provider = createScriptedProvider([
 			{
 				content: '',
-				tools: [
-					{ id: 'extra', name: 'recall', arguments: { topic: 'delivery', category: 'fact' } },
-				],
+				tools: [{ id: 'extra', name: 'recall', arguments: { key: 'delivery', category: 'fact' } }],
 			},
 			{ content: 'Done.' },
 		])
@@ -4769,31 +4773,36 @@ describe('Ledger', () => {
 	it('counts a blank recall against its limit and permits a short nonclosed result', async () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider([
-			{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { topic: '   ' } }] },
-			{ content: '', tools: [{ id: 'next', name: 'recall', arguments: { topic: 'delivery' } }] },
-			{ content: '', tools: [{ id: 'last', name: 'recall', arguments: { topic: 'refunds' } }] },
+			{ content: '', tools: [{ id: 'empty', name: 'recall', arguments: { key: '   ' } }] },
+			{ content: '', tools: [{ id: 'next', name: 'recall', arguments: { key: 'delivery' } }] },
+			{ content: '', tools: [{ id: 'third', name: 'recall', arguments: { key: 'refunds' } }] },
+			{ content: '', tools: [{ id: 'fourth', name: 'recall', arguments: { key: 'parcel' } }] },
+			{ content: '', tools: [{ id: 'last', name: 'recall', arguments: { key: 'vault' } }] },
 			{ content: 'Done.' },
 		])
 		const ledger = createLedger(provider, options)
 		seedLedgerRecall(ledger)
 		await ledger.respond('Request.')
+		// The blank call and three misses spend the limit of 4, so the fifth call is closed.
 		expect(
 			ledger.conversation
 				.messages()
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual([
-			'recall needs a topic: an owner name, an id, or one of refunds',
-			'nothing earlier on "delivery"; answer from the messages you can see',
+			'recall needs a key: previous, rules, an owner name, an id, or one of refunds',
+			'nothing earlier matches "delivery"; answer from the messages you can see',
+			'nothing earlier matches "refunds"; answer from the messages you can see',
+			'nothing earlier matches "parcel"; answer from the messages you can see',
 			LEDGER_NOTES.closure,
 		])
 		const short = createLedger(createScriptedProvider([]), { ...options, capacity: 2 })
 		const result = await short.agent.context.tools.execute([
-			{ id: 'short', name: 'recall', arguments: { topic: 'absent' } },
+			{ id: 'short', name: 'recall', arguments: { key: 'absent' } },
 		])
 		expect(result[0]).toMatchObject({
 			success: true,
-			value: 'nothing earlier on "absent"; answer from the messages you can see',
+			value: 'nothing earlier matches "absent"; answer from the messages you can see',
 		})
 	})
 
@@ -4814,7 +4823,7 @@ describe('Ledger', () => {
 						{
 							id: 'recall',
 							name: 'recall',
-							arguments: { topic: 'Brightwater Studio and delivery' },
+							arguments: { key: 'Brightwater Studio and delivery' },
 						},
 					],
 				},
@@ -4824,7 +4833,7 @@ describe('Ledger', () => {
 						{
 							id: 'recall',
 							name: 'recall',
-							arguments: { topic: '  Brightwater Studio and delivery  ' },
+							arguments: { key: '  Brightwater Studio and delivery  ' },
 						},
 					],
 				},
@@ -4852,21 +4861,23 @@ describe('Ledger', () => {
 		expect(description).not.toMatch(/handle/)
 		expect(description?.match(LEDGER_HANDLE) ?? []).toEqual([])
 		expect(description).toBe(
-			'Find something said earlier that isn\'t in the messages you can see, by an owner name, an id, or one of the topics refunds. A number given as the topic reads as its digits, so {"topic":7} searches for "7". Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group.',
+			'Find something said earlier that isn\'t in the messages you can see. Pass one key: previous (your last request and your reply), rules (the standing rules and corrections), an id, an owner name, or one of the topics refunds. Example: {"key":"previous"} or {"key":"BW-5512"}. Words from the message you need also match. A number given as the key reads as its digits. Returns statements and lookup findings first, then earlier requests and replies labeled by origin; newest first within each group. A miss names keys you can use.',
 		)
 		const parameters = provider.calls[0]?.tools?.find((tool) => tool.name === 'recall')?.parameters
 		expect(JSON.stringify(parameters)).toBe(
-			'{"type":"object","properties":{"topic":{"type":"string","minLength":1,"description":"An owner name, an id, or a topic"}},"required":["topic"],"additionalProperties":false}',
+			'{"type":"object","properties":{"key":{"type":"string","minLength":1,"description":"previous, rules, an id, an owner name, a topic, or words to match"}},"required":["key"],"additionalProperties":false}',
 		)
 	})
 
-	it('closes recall on the third call of a request but not for insufficient room', async () => {
+	it('closes recall on the fifth call of a request but not for insufficient room', async () => {
 		const options = buildLedgerOptions()
 		const limited = createScriptedProvider(
 			[
-				{ content: '', tools: [{ id: 'one', name: 'recall', arguments: { topic: 'delivery' } }] },
-				{ content: '', tools: [{ id: 'two', name: 'recall', arguments: { topic: 'refunds' } }] },
-				{ content: '', tools: [{ id: 'three', name: 'recall', arguments: { topic: 'Tuesday' } }] },
+				{ content: '', tools: [{ id: 'one', name: 'recall', arguments: { key: 'delivery' } }] },
+				{ content: '', tools: [{ id: 'two', name: 'recall', arguments: { key: 'refunds' } }] },
+				{ content: '', tools: [{ id: 'three', name: 'recall', arguments: { key: 'Tuesday' } }] },
+				{ content: '', tools: [{ id: 'four', name: 'recall', arguments: { key: 'parcel' } }] },
+				{ content: '', tools: [{ id: 'five', name: 'recall', arguments: { key: 'vault' } }] },
 				{ content: 'Done.' },
 			],
 			{ recorded: true },
@@ -4879,13 +4890,15 @@ describe('Ledger', () => {
 		expect(recalls.map((message) => message.content === LEDGER_NOTES.closure)).toEqual([
 			false,
 			false,
+			false,
+			false,
 			true,
 		])
 		const crowded = createScriptedProvider(
 			[
 				{
 					content: '',
-					tools: [{ id: 'one', name: 'recall', arguments: { topic: 'refunds' } }],
+					tools: [{ id: 'one', name: 'recall', arguments: { key: 'refunds' } }],
 					usage: { prompt: 4090, completion: 5, total: 4095 },
 				},
 				{ content: 'Done.' },
@@ -4897,7 +4910,7 @@ describe('Ledger', () => {
 		seedLedgerRecall(tight)
 		await tight.respond('Check the desk.')
 		expect(tight.conversation.messages().find((message) => message.role === 'tool')?.content).toBe(
-			'nothing earlier on "refunds"; answer from the messages you can see',
+			'nothing earlier matches "refunds"; answer from the messages you can see',
 		)
 	})
 
@@ -4931,8 +4944,8 @@ describe('Ledger', () => {
 		const options = buildLedgerOptions()
 		const provider = createScriptedProvider(
 			[
-				{ content: '', tools: [{ id: 'read', name: 'recall', arguments: { topic: 'refunds' } }] },
-				{ content: '', tools: [{ id: 'read', name: 'recall', arguments: { topic: 'refunds' } }] },
+				{ content: '', tools: [{ id: 'read', name: 'recall', arguments: { key: 'refunds' } }] },
+				{ content: '', tools: [{ id: 'read', name: 'recall', arguments: { key: 'refunds' } }] },
 				{ content: 'Use the corrected code.' },
 			],
 			{ recorded: true },
@@ -5100,11 +5113,11 @@ describe('Ledger', () => {
 			[
 				{
 					content: '',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'Mira' } }],
+					tools: [{ id: 'recall', name: 'recall', arguments: { key: 'Mira' } }],
 				},
 				{
 					content: '',
-					tools: [{ id: 'joined', name: 'recall', arguments: { topic: 'Mira and AA-11' } }],
+					tools: [{ id: 'joined', name: 'recall', arguments: { key: 'Mira and AA-11' } }],
 				},
 				{ content: 'Done.' },
 			],
@@ -5276,18 +5289,18 @@ describe('Ledger', () => {
 			[
 				{
 					content: '',
-					tools: [{ id: 'partial', name: 'recall', arguments: { topic: 'Brightw' } }],
+					tools: [{ id: 'partial', name: 'recall', arguments: { key: 'Brightw' } }],
 				},
 				{
 					content: '',
 					tools: [
-						{ id: 'exact', name: 'recall', arguments: { topic: 'account BW-20931 unrelated' } },
+						{ id: 'exact', name: 'recall', arguments: { key: 'account BW-20931 unrelated' } },
 					],
 				},
 				{ content: 'Done.' },
 				{
 					content: '',
-					tools: [{ id: 'unmatched', name: 'recall', arguments: { topic: 'Brightwater unknown' } }],
+					tools: [{ id: 'unmatched', name: 'recall', arguments: { key: 'Brightwater unknown' } }],
 				},
 				{ content: 'Done.' },
 			],
@@ -5326,7 +5339,9 @@ describe('Ledger', () => {
 			).toContain('For Brightwater, keep receipt 42.')
 		expect(
 			provider.calls[4]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing earlier on "Brightwater unknown"; answer from the messages you can see')
+		).toBe(
+			'nothing earlier matches "Brightwater unknown"; stored keys: previous, BW-20931; or answer from the messages you can see',
+		)
 	})
 
 	it('keeps replaced user messages in an otherwise uncut seed tail', async () => {
@@ -5364,7 +5379,7 @@ describe('Ledger', () => {
 				{ content: 'Done.', usage: { prompt: 100, completion: 3, total: 103 } },
 				{
 					content: '',
-					tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'absent' } }],
+					tools: [{ id: 'recall', name: 'recall', arguments: { key: 'absent' } }],
 					usage: { prompt: 100, completion: 3, total: 103 },
 				},
 				{ content: 'Done.' },
@@ -5377,7 +5392,9 @@ describe('Ledger', () => {
 		await ledger.respond('Second request.')
 		expect(
 			provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing earlier on "absent"; answer from the messages you can see')
+		).toBe(
+			'nothing earlier matches "absent"; stored keys: previous; or answer from the messages you can see',
+		)
 	})
 
 	it('cuts off-topic rules before owner lines and keeps tail exchanges and call groups whole', async () => {
@@ -5609,9 +5626,11 @@ describe('Ledger', () => {
 		expect(provider.calls).toHaveLength(9)
 		expect(provider.calls[8]?.tools).toBeUndefined()
 		const recalls = createScriptedProvider([
-			{ content: '', tools: [{ id: 'one', name: 'recall', arguments: { topic: 'one' } }] },
-			{ content: '', tools: [{ id: 'two', name: 'recall', arguments: { topic: 'two' } }] },
-			{ content: '', tools: [{ id: 'three', name: 'recall', arguments: { topic: 'three' } }] },
+			{ content: '', tools: [{ id: 'one', name: 'recall', arguments: { key: 'one' } }] },
+			{ content: '', tools: [{ id: 'two', name: 'recall', arguments: { key: 'two' } }] },
+			{ content: '', tools: [{ id: 'three', name: 'recall', arguments: { key: 'three' } }] },
+			{ content: '', tools: [{ id: 'four', name: 'recall', arguments: { key: 'four' } }] },
+			{ content: '', tools: [{ id: 'five', name: 'recall', arguments: { key: 'five' } }] },
 			{ content: 'Done.' },
 		])
 		const limited = createLedger(recalls, options)
@@ -5623,8 +5642,10 @@ describe('Ledger', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual([
-			'nothing earlier on "one"; answer from the messages you can see',
-			'nothing earlier on "two"; answer from the messages you can see',
+			'nothing earlier matches "one"; answer from the messages you can see',
+			'nothing earlier matches "two"; answer from the messages you can see',
+			'nothing earlier matches "three"; answer from the messages you can see',
+			'nothing earlier matches "four"; answer from the messages you can see',
 			LEDGER_NOTES.closure,
 		])
 	})
@@ -5639,7 +5660,7 @@ describe('Ledger', () => {
 						{
 							id: 'one',
 							name: 'recall',
-							arguments: { topic: 'delivery' },
+							arguments: { key: 'delivery' },
 						},
 					],
 				},
@@ -5672,7 +5693,7 @@ describe('Ledger', () => {
 						{
 							id: 'recall',
 							name: 'recall',
-							arguments: { topic: 'Brightwater Studio' },
+							arguments: { key: 'Brightwater Studio' },
 						},
 					],
 				},
@@ -6152,7 +6173,7 @@ describe('Ledger — its authority', () => {
 					content: '',
 					tools: [
 						{ id: 'lookup-1', name: 'lookup', arguments: { id: 'BW-20931' } },
-						{ id: 'recall-1', name: 'recall', arguments: { topic: 'refunds' } },
+						{ id: 'recall-1', name: 'recall', arguments: { key: 'refunds' } },
 					],
 				},
 				{ content: 'Done.' },
@@ -7404,8 +7425,8 @@ describe('Ledger — recall after a write', () => {
 				{
 					content: '',
 					tools: [
-						{ id: 'recall-1', name: 'recall', arguments: { topic: 'C-12' } },
-						{ id: 'recall-2', name: 'recall', arguments: { topic: 'C-14' } },
+						{ id: 'recall-1', name: 'recall', arguments: { key: 'C-12' } },
+						{ id: 'recall-2', name: 'recall', arguments: { key: 'C-14' } },
 					],
 				},
 				{ content: 'It is 555-0102.' },
@@ -7482,7 +7503,7 @@ describe('Ledger — recall after a replaced lookup', () => {
 			[
 				{
 					content: '',
-					tools: [{ id: 'recall-1', name: 'recall', arguments: { topic: 'Brightwater Studio' } }],
+					tools: [{ id: 'recall-1', name: 'recall', arguments: { key: 'Brightwater Studio' } }],
 				},
 				{ content: 'Done.' },
 			],
@@ -9181,7 +9202,7 @@ describe('Ledger — snapshot and hydrate', () => {
 					? [
 							{
 								content: '',
-								tools: [{ id: 'labels', name: 'recall', arguments: { topic: 'BW-20931' } }],
+								tools: [{ id: 'labels', name: 'recall', arguments: { key: 'BW-20931' } }],
 							},
 						]
 					: []),
@@ -10135,7 +10156,7 @@ describe('Ledger — host turns', () => {
 		const scheduler = createGatedScheduler(gate)
 		const recalled = {
 			content: '',
-			tools: [{ id: 'later', name: 'recall', arguments: { topic: 'OR-1000' } }],
+			tools: [{ id: 'later', name: 'recall', arguments: { key: 'OR-1000' } }],
 		}
 		const { ledger, selections } = createPacedLedger(
 			seed.snapshot,
@@ -10149,13 +10170,13 @@ describe('Ledger — host turns', () => {
 		plain.ledger.agent.emitter.on('tool', unspent.handler)
 		const pending = ledger.respond('What is the status of OR-1000?')
 		await scheduler.reached
-		// Host code calls the ledger's recall through the agent's tool manager twice while the gate
-		// that holds the selection is still shut, which spends the request's recall limit.
-		for (const topic of ['orders', 'refunds']) {
+		// Host code calls the ledger's recall through the agent's tool manager four times while the
+		// gate that holds the selection is still shut, which spends the request's recall limit.
+		for (const topic of ['orders', 'refunds', 'returns', 'billing']) {
 			const manual = await ledger.agent.context.tools.execute({
 				id: `manual ${topic}`,
 				name: 'recall',
-				arguments: { topic },
+				arguments: { key: topic },
 			})
 			expect(manual.success).toBe(true)
 		}
@@ -10300,7 +10321,7 @@ describe('Ledger — host turns', () => {
 		// A conversation of the request alone reaches no filing step, so only the agent yields.
 		const ledger = createLedger(
 			createScriptedProvider([
-				{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { topic: 'refunds' } }] },
+				{ content: '', tools: [{ id: 'recall', name: 'recall', arguments: { key: 'refunds' } }] },
 				{ content: 'Noted.' },
 			]),
 			buildLedgerOptions({ agent: { scheduler }, topics: [] }),
@@ -11051,7 +11072,7 @@ describe('Ledger — disclosure: filing and the answer pass', () => {
 				{
 					content: '',
 					tools: [
-						createToolCall({ id: 'q', name: 'recall', arguments: { topic: 'Brightwater Studio' } }),
+						createToolCall({ id: 'q', name: 'recall', arguments: { key: 'Brightwater Studio' } }),
 					],
 				},
 				{ content: 'Done.' },
@@ -12079,7 +12100,7 @@ describe('Ledger — disclosure: the shown set in every build', () => {
 				},
 				{
 					content: 'z'.repeat(1600),
-					tools: [createToolCall({ id: 'q', name: 'recall', arguments: { topic: 'zephyr' } })],
+					tools: [createToolCall({ id: 'q', name: 'recall', arguments: { key: 'zephyr' } })],
 				},
 				{ content: 'Done.' },
 			],
@@ -13624,5 +13645,163 @@ describe('Ledger — a removed message', () => {
 		expect([...snapshot.requests, ...snapshot.notes, ...snapshot.failures]).not.toContain(id)
 		expect(JSON.stringify(snapshot)).not.toContain(JSON.stringify(id))
 		expect(isLedgerSnapshot(snapshot)).toBe(true)
+	})
+})
+
+describe('Ledger — recall by key', () => {
+	it('lists the last request and its reply under previous, in any case and spacing', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: 'The parcel shipped Monday.' },
+				{
+					content: '',
+					tools: [{ id: 'previous', name: 'recall', arguments: { key: ' Previous ' } }],
+				},
+				{ content: 'Answered.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		// An oversized seed statement stays behind, so recall is offered.
+		seedLedgerRecall(ledger)
+		await ledger.respond('Check the parcel.')
+		await ledger.respond('What did I ask before?')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'previous')?.content,
+		).toBe('Earlier request: Check the parcel.\nEarlier reply: The parcel shipped Monday.')
+	})
+
+	it('lists nothing under previous until an earlier request has a reply', async () => {
+		const provider = createScriptedProvider(
+			[{ content: '' }, { content: '' }, { content: 'It shipped.' }],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		const call = { id: 'host', name: 'recall', arguments: { key: 'previous' } }
+		const miss = 'nothing earlier matches "previous"; answer from the messages you can see'
+		expect(await ledger.agent.context.tools.execute(call)).toMatchObject({
+			success: true,
+			value: miss,
+		})
+		await ledger.respond('Check the parcel.')
+		expect(await ledger.agent.context.tools.execute(call)).toMatchObject({
+			success: true,
+			value: miss,
+		})
+		await ledger.respond('Check it again.')
+		expect(await ledger.agent.context.tools.execute(call)).toMatchObject({
+			success: true,
+			value: 'Earlier request: Check it again.\nEarlier reply: It shipped.',
+		})
+	})
+
+	it('lists the rules record under rules, newest message first', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: 'Noted.' },
+				{ content: '', tools: [{ id: 'rules', name: 'recall', arguments: { key: 'RULES' } }] },
+				{ content: 'Answered.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		seedLedgerRecall(ledger)
+		for (const [content, category] of [
+			['Refunds over $200 need a manager.', 'rule'],
+			['The parcel shipped Monday.', 'fact'],
+			['Returns close after 30 days.', 'rule'],
+		] as const) {
+			const message = ledger.conversation.add({ role: 'user', content })
+			ledger.conversation.judgments.add(
+				buildLedgerJudgment(message, { answer: buildCategoryAnswer({ [category]: 1 }) }),
+			)
+		}
+		await ledger.respond('Note the desk rules.')
+		await ledger.respond('What are the rules?')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'rules')?.content,
+		).toBe('Returns close after 30 days.\nRefunds over $200 need a manager.')
+	})
+
+	it('names the stored keys back when a key matches nothing, the key JSON-encoded and capped', async () => {
+		const key = `"${'x'.repeat(100)}`
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				{ content: 'Read.' },
+				{ content: '', tools: [{ id: 'miss', name: 'recall', arguments: { key } }] },
+				{ content: 'Answered.' },
+			],
+			{ recorded: true },
+		)
+		const options = buildLedgerOptions()
+		const ledger = createLedger(provider, options)
+		const rule = ledger.conversation.add({
+			role: 'user',
+			content: 'Refunds over $200 need a manager.',
+		})
+		ledger.conversation.judgments.add(
+			buildLedgerJudgment(rule, { answer: buildCategoryAnswer({ rule: 1 }) }),
+		)
+		const refund = ledger.conversation.add({ role: 'user', content: 'BW-20931 is due a refund.' })
+		ledger.conversation.judgments.add(buildLedgerJudgment(refund))
+		ledger.conversation.judgments.add(
+			buildLedgerTopicJudgment(refund, requireValue(options.topics[0]), 1),
+		)
+		await ledger.respond('Check BW-20931.')
+		await ledger.respond('Anything else?')
+		expect(ledger.conversation.messages().find((message) => message.call === 'miss')?.content).toBe(
+			`nothing earlier matches "\\"${'x'.repeat(63)}"; stored keys: previous, rules, BW-20931, refunds; or answer from the messages you can see`,
+		)
+	})
+
+	it.each([' Previous ', 'RULES'])('refuses a desk topic named %j, a key recall reads', (name) => {
+		expect(() =>
+			createLedger(
+				createScriptedProvider([]),
+				buildLedgerOptions({ topics: [{ name, criterion: 'Reserved.' }] }),
+			),
+		).toThrow(expect.objectContaining({ code: 'TOPIC' }))
+	})
+
+	it('files a recall result as chatter, so a correction after it asks no pair question against it', async () => {
+		const asked = createRecorder<readonly [key: string]>()
+		const corrections = new Set<string>()
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				{ content: 'Read.' },
+				{
+					content: '',
+					tools: [{ id: 'recalled', name: 'recall', arguments: { key: 'BW-20931' } }],
+				},
+				{ content: 'Recalled.' },
+				{ content: 'Confirmed.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				judge: createCorrectionJudge(asked, corrections, { amends: 0, supersedes: 0 }),
+			}),
+		)
+		seedLedgerRecall(ledger)
+		const due = ledger.conversation.add({ role: 'user', content: 'BW-20931 is due a refund.' })
+		await ledger.respond('Check BW-20931.')
+		await ledger.respond('Recall BW-20931.')
+		const result = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'recalled'),
+		)
+		expect(result.content).toContain('BW-20931 is due a refund.')
+		const correction = ledger.conversation.add({
+			role: 'user',
+			content: 'Correction: BW-20931 is due $150.',
+		})
+		corrections.add(correction.id)
+		await ledger.respond('Confirm BW-20931.')
+		const pairs = asked.calls.map(([key]) => key).filter((key) => key.startsWith('["amends"'))
+		expect(pairs).toContain(JSON.stringify(['amends', due.id, correction.id]))
+		expect(pairs.filter((key) => key.includes(result.id))).toEqual([])
 	})
 })

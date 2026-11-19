@@ -330,7 +330,7 @@ export async function takeLedgerSample(
 			const start = performance.now()
 			recalls.handler(
 				ledger.agent.context.tools
-					.execute({ id: 'bench-recall', name: 'recall', arguments: { topic: 'orders' } })
+					.execute({ id: 'bench-recall', name: 'recall', arguments: { key: 'orders' } })
 					.then((result) => {
 						const wall = performance.now() - start
 						const cpu = process.cpuUsage(usage)

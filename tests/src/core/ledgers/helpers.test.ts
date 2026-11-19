@@ -9,6 +9,8 @@ import type { Message } from '@src/core'
 import { estimateTokens, LEDGER_QUESTIONS, LEDGER_SCALE_DRIFT } from '@src/core'
 import {
 	collectRecallMessages,
+	collectLedgerKeys,
+	collectLedgerStatements,
 	collectRetiredFindings,
 	matchesLookup,
 	hasHiddenRecall,
@@ -62,7 +64,7 @@ import {
 	selectRecords,
 	splitResultLines,
 	splitSentences,
-	splitTopic,
+	splitKey,
 } from '../../../../src/core/ledgers/helpers.js'
 import { captureError, createRecorder, invokeUnchecked, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
@@ -75,7 +77,9 @@ import {
 	buildLedgerInput,
 	buildLedgerMessage,
 	buildLedgerFinding,
+	buildLedgerKeyScenario,
 	buildLedgerWriteScenario,
+	LEDGER_KEY_TOPICS,
 	LEDGER_WRITE_SUPERSESSIONS,
 	checkLedgerProjection,
 	createLedgerDesk,
@@ -466,7 +470,7 @@ describe('extracted ledger leaves', () => {
 				id: 'call',
 				role: 'assistant',
 				content: '',
-				calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic } }],
+				calls: [{ id: 'call_00000000', name: 'recall', arguments: { key: topic } }],
 			})
 	})
 
@@ -2555,27 +2559,27 @@ describe('renderLedgerRecord and renderLedgerPinned', () => {
 	})
 })
 
-describe('splitTopic', () => {
+describe('splitKey', () => {
 	it('splits at a comma, a semicolon, a slash, and the word and', () => {
-		expect(splitTopic('BW-5512, Odile Marlow and refunds')).toEqual([
+		expect(splitKey('BW-5512, Odile Marlow and refunds')).toEqual([
 			'BW-5512',
 			'Odile Marlow',
 			'refunds',
 		])
-		expect(splitTopic('returns; shipping/refunds')).toEqual(['returns', 'shipping', 'refunds'])
-		expect(splitTopic('returns AND refunds')).toEqual(['returns', 'refunds'])
+		expect(splitKey('returns; shipping/refunds')).toEqual(['returns', 'shipping', 'refunds'])
+		expect(splitKey('returns AND refunds')).toEqual(['returns', 'refunds'])
 	})
 
-	it('returns a topic with no joint whole', () => {
-		expect(splitTopic('refund policy')).toEqual(['refund policy'])
-		expect(splitTopic('Brand and')).toEqual(['Brand and'])
-		expect(splitTopic('candy bar')).toEqual(['candy bar'])
+	it('returns a key with no joint whole', () => {
+		expect(splitKey('refund policy')).toEqual(['refund policy'])
+		expect(splitKey('Brand and')).toEqual(['Brand and'])
+		expect(splitKey('candy bar')).toEqual(['candy bar'])
 	})
 
-	it('returns a topic whole when its joints leave fewer than two parts', () => {
-		expect(splitTopic('')).toEqual([''])
-		expect(splitTopic(', ')).toEqual([', '])
-		expect(splitTopic('refunds,')).toEqual(['refunds,'])
+	it('returns a key whole when its joints leave fewer than two parts', () => {
+		expect(splitKey('')).toEqual([''])
+		expect(splitKey(', ')).toEqual([', '])
+		expect(splitKey('refunds,')).toEqual(['refunds,'])
 	})
 })
 
@@ -2583,7 +2587,7 @@ describe('cutListing and matchesCutLine', () => {
 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
 	it('omits an oversized first group and keeps a later fitting group with its marker', () => {
 		const short = 'The vault is closed.\nCorrection: the vault is open.'
-		const expected = `${short}\n1 more item not shown; name a narrower topic to narrow the recall`
+		const expected = `${short}\n1 more item not shown; name a narrower key to narrow the recall`
 		const room = measureRoom([expected])
 		expect(cutListing(['v'.repeat(4000), short], room, 'older', false)).toBe(expected)
 		expect(cutListing(['v'.repeat(4000), short], room - 1, 'older', false)).toBe(
@@ -2604,16 +2608,16 @@ describe('cutListing and matchesCutLine', () => {
 
 	it('cuts at the first item that overflows and names how many it left out', () => {
 		expect(cutListing(items, measureRoom(items.slice(0, 2)))).toBe(
-			'first recalled line\nsecond recalled line\n1 older item not shown; name a narrower topic to narrow the recall',
+			'first recalled line\nsecond recalled line\n1 older item not shown; name a narrower key to narrow the recall',
 		)
 		expect(cutListing(items, measureRoom(items.slice(0, 1)))).toBe(
-			'first recalled line\n2 older items not shown; name a narrower topic to narrow the recall',
+			'first recalled line\n2 older items not shown; name a narrower key to narrow the recall',
 		)
 	})
 
 	it('keeps at least one item whatever the room', () => {
 		expect(cutListing(items, 0)).toBe(
-			'first recalled line\n2 older items not shown; name a narrower topic to narrow the recall',
+			'first recalled line\n2 older items not shown; name a narrower key to narrow the recall',
 		)
 		expect(cutListing(items, -5).startsWith('first recalled line\n')).toBe(true)
 	})
@@ -2629,7 +2633,7 @@ describe('cutListing and matchesCutLine', () => {
 
 	it('names an omitted item more when the entries are not in age order, and matches that line too', () => {
 		expect(cutListing(items, 0, 'more')).toBe(
-			'first recalled line\n2 more items not shown; name a narrower topic to narrow the recall',
+			'first recalled line\n2 more items not shown; name a narrower key to narrow the recall',
 		)
 		expect(cutListing(items, 0, 'more').split('\n').map(matchesCutLine)).toEqual([false, true])
 		expect(matchesCutLine('1 more item not shown; add a topic')).toBe(true)
@@ -2879,5 +2883,138 @@ describe('computeSkillPrice', () => {
 				gauge,
 			),
 		).toBe(300)
+	})
+})
+
+describe('collectLedgerStatements', () => {
+	it('collects the user statements after the last reply, or after the last request without one, leaving notes and requests out', () => {
+		for (const replied of [true, false]) {
+			const { input, requests, notes } = buildLedgerKeyScenario(replied)
+			const before = input.messages.slice(0, -1)
+			expect(collectLedgerStatements(before, requests, notes).map((message) => message.id)).toEqual(
+				['quiet', 'refund'],
+			)
+		}
+	})
+
+	it('collects every user statement of a seed before the first request', () => {
+		const { input, requests, notes } = buildLedgerKeyScenario(true)
+		const seed = input.messages.slice(
+			0,
+			input.messages.findIndex((message) => message.id === 'first'),
+		)
+		expect(collectLedgerStatements(seed, requests, notes).map((message) => message.id)).toEqual([
+			'rule',
+			'order',
+			'ticket',
+		])
+		expect(collectLedgerStatements([], requests, notes)).toEqual([])
+	})
+})
+
+describe('collectLedgerKeys', () => {
+	it('orders previous, rules, the ids of the statements left behind, the named, looked-up, and recurring ids, then the filed topics', () => {
+		const { input, requests, notes } = buildLedgerKeyScenario(true)
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				LEDGER_KEY_TOPICS,
+				'request',
+				requests,
+				notes,
+				new Set(['request']),
+			),
+		).toEqual([
+			{ name: 'previous', description: 'your last request and your reply to it' },
+			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
+			{ name: 'BW-5512', description: '3 earlier messages' },
+			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
+			{ name: 'TK-1', description: '1 earlier message' },
+			{ name: 'OR-7', description: '3 earlier messages' },
+			{ name: 'refunds', description: 'Refund amounts and approvals' },
+		])
+	})
+
+	it('counts only the earlier messages, keeps the rank the whole population gave, and lists no topic only a sent statement files', () => {
+		const { input, requests, notes } = buildLedgerKeyScenario(true)
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				LEDGER_KEY_TOPICS,
+				'request',
+				requests,
+				notes,
+				new Set(['quiet', 'refund', 'request']),
+			),
+		).toEqual([
+			{ name: 'previous', description: 'your last request and your reply to it' },
+			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
+			{ name: 'TK-1', description: '1 earlier message' },
+			{ name: 'BW-5512', description: '2 earlier messages' },
+			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
+			{ name: 'OR-7', description: '3 earlier messages' },
+		])
+	})
+
+	it('offers previous only while the last request has a reply, and ranks a recurring tie newest first', () => {
+		const { input, requests, notes } = buildLedgerKeyScenario(false)
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				LEDGER_KEY_TOPICS,
+				'request',
+				requests,
+				notes,
+				new Set(['request']),
+			),
+		).toEqual([
+			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
+			{ name: 'BW-5512', description: '2 earlier messages' },
+			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
+			{ name: 'TK-1', description: '1 earlier message' },
+			{ name: 'OR-7', description: '2 earlier messages' },
+			{ name: 'refunds', description: 'Refund amounts and approvals' },
+		])
+	})
+
+	it('counts every message as earlier for a request the messages do not hold', () => {
+		const { input, requests, notes } = buildLedgerKeyScenario(true)
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				LEDGER_KEY_TOPICS,
+				'absent',
+				requests,
+				notes,
+				new Set(),
+			),
+		).toEqual([
+			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
+			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
+			{ name: 'BW-5512', description: '3 earlier messages' },
+			{ name: 'OR-7', description: '3 earlier messages' },
+			{ name: 'TK-1', description: '2 earlier messages' },
+			{ name: 'refunds', description: 'Refund amounts and approvals' },
+		])
+	})
+
+	it('lists no key while nothing is left behind', () => {
+		const { input, requests, notes } = buildLedgerKeyScenario(true)
+		const before = input.messages.map((message) => message.id)
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				LEDGER_KEY_TOPICS,
+				'first',
+				requests,
+				notes,
+				new Set(before.slice(0, before.indexOf('first') + 1)),
+			),
+		).toEqual([])
 	})
 })

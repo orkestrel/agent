@@ -9,6 +9,7 @@ import type {
 	LedgerCategory,
 	LedgerClassification,
 	LedgerIndex,
+	LedgerKey,
 	LedgerLine,
 	LedgerOccurrence,
 	LedgerLookupFinding,
@@ -38,6 +39,7 @@ import {
 import { isPositiveSafeInteger } from '../validators.js'
 import {
 	LEDGER_OWNER_PREFIX,
+	LEDGER_PREVIOUS_KEY,
 	LEDGER_RULES_KEY,
 	LEDGER_WORD,
 	PLACED_CATEGORIES,
@@ -264,6 +266,205 @@ export function collectRecallMessages(
 }
 
 /**
+ * Collects the statements of the current exchange: the user messages after the last request's
+ * reply, or after the last request when it has no reply, that are neither requests nor notes.
+ *
+ * @remarks
+ * Pass the messages stored before a request. With no request among them, every user message that is
+ * not a note is a statement of the current exchange, as a seed's statements are before the first
+ * request. A reply is what {@link collectLedgerReplies} selects for the last request.
+ *
+ * @param messages - The messages stored before a request, in conversation order
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @returns The current statements in conversation order
+ * @example
+ * ```ts
+ * collectLedgerStatements(
+ * 	[{ id: 'seed', role: 'user', content: 'Refunds need a manager.' }],
+ * 	new Set(),
+ * 	new Set(),
+ * ).map((message) => message.id) // ['seed']
+ * ```
+ */
+export function collectLedgerStatements(
+	messages: readonly Message[],
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): readonly Message[] {
+	const previous = messages.findLast((message) => requests.has(message.id))
+	const reply =
+		previous === undefined
+			? undefined
+			: collectLedgerReplies(messages, requests, notes).get(previous.id)
+	const start = previous === undefined ? 0 : messages.indexOf(reply ?? previous) + 1
+	return messages
+		.slice(start)
+		.filter(
+			(message) => message.role === 'user' && !requests.has(message.id) && !notes.has(message.id),
+		)
+}
+
+/**
+ * Collects the recall keys of what a request leaves behind: the messages before it that `recall`
+ * can list and that `excluded` does not hold.
+ *
+ * @remarks
+ * The population is what {@link collectRecallMessages} returns before the request, and the earlier
+ * messages are the population less `excluded`. A request the messages don't hold counts every
+ * message as before it. Every key lists at least one earlier message. The keys come in this order:
+ *
+ * - `previous`, when the last request before this one has a reply;
+ * - `rules`, when a line of the rules record comes from an earlier message;
+ * - each id an earlier message carries, as `extractLiterals` reads it: first the ids of the current
+ *   statements that are earlier, newest statement first; then the ids the request and the current
+ *   statements name; then the ids a lookup named, newest finding first; then the ids that hold a
+ *   letter and that at least 2 messages of the population carry, the most carried first and a tie
+ *   going to the newest;
+ * - one key per desk topic, in topic order, that an earlier message other than a request files
+ *   under, unless an id key holds its name.
+ *
+ * An id's rank reads the population, so leaving a current statement out moves no other id; its
+ * count reads the earlier messages. A statement the judge filed quiet carries no id a lookup named,
+ * because `recall` lists it only by words. The current statements are what
+ * {@link collectLedgerStatements} returns for the messages before the request. An id key's
+ * description holds its owner's names, when the id is an owner's, and its count of earlier messages;
+ * a topic key's holds the topic's criterion.
+ *
+ * @param input - The messages, findings, owners, and classification
+ * @param projection - The records projected from `input`, whose rules record the `rules` key lists
+ * @param topics - The desk topics
+ * @param request - The request id; only messages before it count
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @param excluded - The ids of the messages the prompt carries, which `recall` does not list
+ * @returns The keys in order
+ * @example
+ * ```ts
+ * collectLedgerKeys(input, projection, [], 'request', new Set(['first', 'request']), new Set(), new Set(['request']))
+ * // [{ name: 'previous', description: 'your last request and your reply to it' }, …]
+ * ```
+ */
+export function collectLedgerKeys(
+	input: LedgerProjectionInput,
+	projection: LedgerProjection,
+	topics: readonly LedgerTopic[],
+	request: string,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+	excluded: ReadonlySet<string>,
+): readonly LedgerKey[] {
+	const at = input.messages.findIndex((message) => message.id === request)
+	const before = at < 0 ? input.messages : input.messages.slice(0, at)
+	const positions = new Map(before.map((message, index) => [message.id, index]))
+	const population = collectRecallMessages(input, requests, notes).filter((message) =>
+		positions.has(message.id),
+	)
+	const earlier = population.filter((message) => !excluded.has(message.id))
+	const registry = collectRegistry(input.findings)
+	const quiet = input.classification.quiet
+	const carried = new Map(
+		population.map((message) => [
+			message.id,
+			[...extractLiterals(message.content).ids].filter(
+				(id) =>
+					!registry.ids.has(id) ||
+					message.role !== 'user' ||
+					requests.has(message.id) ||
+					!quiet.has(message.id),
+			),
+		]),
+	)
+	const total = new Map(
+		[
+			...Map.groupBy(
+				population.flatMap((message) => carried.get(message.id) ?? []),
+				(id) => id,
+			),
+		].map(([id, all]) => [id, all.length]),
+	)
+	const listed = new Map(
+		[
+			...Map.groupBy(
+				earlier.flatMap((message) => carried.get(message.id) ?? []),
+				(id) => id,
+			),
+		].map(([id, all]) => [id, all.length]),
+	)
+	// A later message overwrites an earlier one, so each id maps to the newest message carrying it.
+	const newest = new Map(
+		population.flatMap((message) =>
+			(carried.get(message.id) ?? []).map((id) => [id, positions.get(message.id) ?? 0] as const),
+		),
+	)
+	const statements = collectLedgerStatements(before, requests, notes)
+	const cut = statements
+		.filter((message) => !excluded.has(message.id))
+		.toReversed()
+		.flatMap((message) => [...extractLiterals(message.content).ids])
+	const named = [
+		...extractLiterals(at < 0 ? '' : (input.messages[at]?.content ?? '')).ids,
+		...statements.toReversed().flatMap((message) => [...extractLiterals(message.content).ids]),
+	]
+	const looked = input.findings
+		.toReversed()
+		.flatMap((finding) =>
+			finding.result === undefined
+				? []
+				: [...finding.result.ids, ...finding.result.owners.map((owner) => owner.id)],
+		)
+	const recurring = [...total]
+		.filter(([id, count]) => count >= 2 && /\p{L}/u.test(id))
+		.toSorted(
+			([left, many], [right, more]) =>
+				more - many || (newest.get(right) ?? 0) - (newest.get(left) ?? 0),
+		)
+		.map(([id]) => id)
+	const ids = [...new Set([...cut, ...named, ...looked, ...recurring])].filter(
+		(id) => (listed.get(id) ?? 0) > 0,
+	)
+	const previous = before.findLast((message) => requests.has(message.id))
+	const replied =
+		previous !== undefined && collectLedgerReplies(before, requests, notes).has(previous.id)
+	const held = new Set(earlier.map((message) => message.id))
+	const ruled = projection.records.some(
+		(record) =>
+			record.key === LEDGER_RULES_KEY && record.lines.some((line) => held.has(line.source)),
+	)
+	const filed = new Set(
+		earlier
+			.filter((message) => !requests.has(message.id) && !quiet.has(message.id))
+			.flatMap((message) => input.classification.topics.get(message.id) ?? []),
+	)
+	const taken = new Set(ids)
+	return [
+		...(replied
+			? [{ name: LEDGER_PREVIOUS_KEY, description: 'your last request and your reply to it' }]
+			: []),
+		...(ruled
+			? [
+					{
+						name: LEDGER_RULES_KEY,
+						description: 'the standing rules and corrections stated earlier',
+					},
+				]
+			: []),
+		...ids.map((id) => {
+			const count = listed.get(id) ?? 0
+			const owners = input.owners.get(id) ?? []
+			const tally = `${count} earlier ${count === 1 ? 'message' : 'messages'}`
+			return {
+				name: id,
+				description: owners.length === 0 ? tally : `${owners.join(', ')}; ${tally}`,
+			}
+		}),
+		...topics
+			.filter((topic) => filed.has(topic.name) && !taken.has(topic.name))
+			.map((topic) => ({ name: topic.name, description: topic.criterion })),
+	]
+}
+
+/**
  * Checks whether an eligible earlier message is absent from the prompt or incompletely covered.
  * A successful finding is held when a finding with the same canonical identity and text is fully received.
  * @param input - The messages, findings, and classification
@@ -371,19 +572,19 @@ export function scanAmendments(
 
 /**
  * Builds the placeholder assistant recall call used to price recall framing.
- * @param topic - The recall topic to price
+ * @param key - The recall key to price
  * @returns The assistant message carrying the recall call
  * @example
  * ```ts
- * buildRecallMessage('refunds').calls?.[0]?.arguments // { topic: 'refunds' }
+ * buildRecallMessage('refunds').calls?.[0]?.arguments // { key: 'refunds' }
  * ```
  */
-export function buildRecallMessage(topic: string): Message {
+export function buildRecallMessage(key: string): Message {
 	return {
 		id: 'call',
 		role: 'assistant',
 		content: '',
-		calls: [{ id: 'call_00000000', name: 'recall', arguments: { topic } }],
+		calls: [{ id: 'call_00000000', name: 'recall', arguments: { key } }],
 	}
 }
 
@@ -1301,26 +1502,26 @@ export function renderLedgerAnnotation(line: LedgerLine, context: LedgerRenderCo
 }
 
 /**
- * Splits a recall topic at its joints.
+ * Splits a recall key at its joints.
  *
  * @remarks
- * The joints are a comma, a semicolon, a slash, and the word `and`. A topic with no joint is
+ * The joints are a comma, a semicolon, a slash, and the word `and`. A key with no joint is
  * returned whole, so a model that joins a name and an id recalls each part alone.
  *
- * @param topic - The topic the model asked for
- * @returns The trimmed, non-empty parts when there are at least 2; otherwise the topic itself
+ * @param key - The key the model asked for
+ * @returns The trimmed, non-empty parts when there are at least 2; otherwise the key itself
  *
  * @example
  * ```ts
- * splitTopic('BW-5512, Odile Marlow and refunds') // ['BW-5512', 'Odile Marlow', 'refunds']
+ * splitKey('BW-5512, Odile Marlow and refunds') // ['BW-5512', 'Odile Marlow', 'refunds']
  * ```
  */
-export function splitTopic(topic: string): readonly string[] {
-	const parts = topic
+export function splitKey(key: string): readonly string[] {
+	const parts = key
 		.split(/\s*[,;/]\s*|\s+and\s+/i)
 		.map((part) => part.trim())
 		.filter((part) => part !== '')
-	return parts.length > 1 ? parts : [topic]
+	return parts.length > 1 ? parts : [key]
 }
 
 /**
@@ -1330,7 +1531,7 @@ export function splitTopic(topic: string): readonly string[] {
  * By default the cut keeps at least one entry. With `first: false`, it keeps whole entries only
  * when the joined result, tool framing, and omission line fit, and considers later entries after
  * an oversized group. When it leaves some entries out, its last line reads
- * `N older items not shown; name a narrower topic to narrow the recall`, which
+ * `N older items not shown; name a narrower key to narrow the recall`, which
  * {@link matchesCutLine} recognizes. Pass `more` when the entries aren't in age order, so the line
  * doesn't claim an omitted entry is older than a kept one. A fitted cut also uses `more` when it
  * skips an entry before a kept one. With no kept entry it reads
@@ -1344,7 +1545,7 @@ export function splitTopic(topic: string): readonly string[] {
  *
  * @example
  * ```ts
- * cutListing(['first entry', 'second entry'], 1) // 'first entry\n1 older item not shown; name a narrower topic to narrow the recall'
+ * cutListing(['first entry', 'second entry'], 1) // 'first entry\n1 older item not shown; name a narrower key to narrow the recall'
  * ```
  */
 export function cutListing(
@@ -1364,7 +1565,7 @@ export function cutListing(
 				entry,
 				...(left > 0
 					? [
-							`${left} ${omitted} item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
+							`${left} ${omitted} item${left === 1 ? '' : 's'} not shown; name a narrower key to narrow the recall`,
 						]
 					: []),
 			].join('\n')
@@ -1378,7 +1579,7 @@ export function cutListing(
 			...kept.map((at) => entries[at]),
 			...(left > 0
 				? [
-						`${left} ${omitted} item${left === 1 ? '' : 's'} ${kept.length === 0 ? "didn't fit in this request; answer from the messages you can see" : 'not shown; name a narrower topic to narrow the recall'}`,
+						`${left} ${omitted} item${left === 1 ? '' : 's'} ${kept.length === 0 ? "didn't fit in this request; answer from the messages you can see" : 'not shown; name a narrower key to narrow the recall'}`,
 					]
 				: []),
 		].join('\n')
@@ -1401,7 +1602,7 @@ export function cutListing(
 		...kept,
 		...(left > 0
 			? [
-					`${left} ${kind} item${left === 1 ? '' : 's'} not shown; name a narrower topic to narrow the recall`,
+					`${left} ${kind} item${left === 1 ? '' : 's'} not shown; name a narrower key to narrow the recall`,
 				]
 			: []),
 	].join('\n')
@@ -1415,7 +1616,7 @@ export function cutListing(
  *
  * @example
  * ```ts
- * matchesCutLine('2 older items not shown; name a narrower topic to narrow the recall') // true
+ * matchesCutLine('2 older items not shown; name a narrower key to narrow the recall') // true
  * ```
  */
 export function matchesCutLine(line: string): boolean {

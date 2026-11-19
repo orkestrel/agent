@@ -70,8 +70,9 @@ export interface LedgerThreshold {
  * @remarks
  * The ledger asks the {@link LedgerQuestion} `topic` instructions with the criteria
  * `The message concerns NAME: CRITERION` for true and `The message does not concern NAME` for
- * false, where `NAME` is `name` and `CRITERION` is `criterion`. `name` must be non-empty and
- * unique among the ledger's topics.
+ * false, where `NAME` is `name` and `CRITERION` is `criterion`. `name` must be non-empty, unique
+ * among the ledger's topics, and, trimmed and lowercased, neither `previous` nor `rules`, the recall
+ * keys of the last exchange and of the rules record.
  */
 export interface LedgerTopic {
 	readonly name: string
@@ -411,7 +412,7 @@ export type LedgerAgentOptions = Pick<
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions under the same provider `model`, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
  * The `recall` tool takes at most `LEDGER_RECALL_LIMIT` calls in one request and then refuses with
- * the {@link LedgerNote} `closure` text; a recall's identity is its trimmed `topic` alone.
+ * the {@link LedgerNote} `closure` text; a recall's identity is its trimmed `key` alone.
  * A judge rejection with a `JudgeError` coded `'QUESTION'` is deterministic: the ledger holds that
  * question as a refused `Judgment` under its key, with a `missing` list naming every candidate,
  * reports a `LedgerError` coded `'HOLD'` through the agent's `fault` event once, and goes on with
@@ -1010,6 +1011,21 @@ export interface LedgerRecord {
 	readonly lines: readonly LedgerLine[]
 }
 
+/**
+ * Carries one recall key: the value a `recall` call passes as its `key`, and what `recall` lists under it.
+ *
+ * @remarks
+ * A recall key is neither a record key (`LedgerRecord.key`) nor a judgment key. `name` is
+ * `previous`, `rules`, an id, or a desk topic's name, as the `recall` tool reads it. `description`
+ * says what the key lists: the last exchange, the rules record, how many earlier messages carry the
+ * id and the names of its owner, or the topic's criterion. A `recall` call that lists nothing names
+ * up to `LEDGER_MISS_LIMIT` of these keys back.
+ */
+export interface LedgerKey {
+	readonly name: string
+	readonly description: string
+}
+
 /** Identifies an accepted direct message amendment whose sentence scope remains unresolved. */
 export interface LedgerAmendment {
 	readonly earlier: string
@@ -1349,7 +1365,7 @@ export type LedgerErrorCode =
 	| 'CAPACITY'
 	/** Reports an agent limit that is not a positive safe integer. */
 	| 'LIMIT'
-	/** Reports a topic with an empty name or a name another topic carries. */
+	/** Reports a topic with an empty name, a name another topic carries, or a name that, trimmed and lowercased, is `previous` or `rules`. */
 	| 'TOPIC'
 	/** Reports a lookup tool named `recall` or a name another lookup tool carries. */
 	| 'LOOKUP'
