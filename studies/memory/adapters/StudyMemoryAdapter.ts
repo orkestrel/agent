@@ -29,11 +29,11 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 				'CONFIG',
 				'Memory declaration requires the shared memory driver and supported arms',
 			)
-		// The full conversation is the control, so a declaration without records measures no strategy.
+		// `full` and `plain` are controls, so a declaration without records measures no strategy.
 		if (!arms.includes('records'))
 			throw new StudyError(
 				'CONFIG',
-				`Memory declaration ${preview(input.definition.name)} lists no records arm; list records, with full as the only other arm`,
+				`Memory declaration ${preview(input.definition.name)} lists no records arm; list records, with full or plain as its control`,
 			)
 		validateStudyMemoryProfile(input.profile, arms)
 		validateStudyMemoryCheckpoints(input.profile.settings, input.scenarios)

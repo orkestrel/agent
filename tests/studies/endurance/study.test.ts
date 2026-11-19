@@ -312,7 +312,7 @@ describe('prospective public endurance declarations', () => {
 				request: { duration: 360000, calls: 1, tokens: 19968, bytes: 2097152 },
 				goal: { duration: 900000, calls: 512, tokens: 10223616, bytes: 536870912 },
 				trial: { duration: 9600000, calls: 4096, tokens: 81788928, bytes: 1073741824 },
-				series: { duration: 9600000, calls: 8192, tokens: 163577856, bytes: 2147483648 },
+				series: { duration: 19200000, calls: 8192, tokens: 163577856, bytes: 2147483648 },
 			},
 		})
 		for (const input of [capacity, quality])
@@ -363,9 +363,9 @@ describe('prospective public endurance declarations', () => {
 			).toEqual(
 				['facts', 'work', 'obligations', 'completion'].map((suffix) => `${goal.id}-${suffix}`),
 			)
-		// One strategy schedules one trial, so each criterion reads one judgment.
-		expect(schedule).toHaveLength(1)
-		expect(judgments).toHaveLength(384)
+		// Records and its plain control schedule two trials, so each criterion reads two judgments.
+		expect(schedule.map((trial) => trial.arm)).toEqual(['records', 'plain'])
+		expect(judgments).toHaveLength(768)
 		expect(
 			judgments.every(
 				(judgment) =>

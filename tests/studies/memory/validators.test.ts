@@ -214,6 +214,7 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(isStudyMemoryProvider({})).toBe(false)
 		expect(isStudyMemoryArm('records')).toBe(true)
 		expect(isStudyMemoryArm('full')).toBe(true)
+		expect(isStudyMemoryArm('plain')).toBe(true)
 		expect(isStudyMemoryArm('compaction')).toBe(false)
 		expect(isStudyMemoryArm('unsupported')).toBe(false)
 		expect(isStudyMemoryAssertion({ observation: 'result', partial: false })).toBe(true)

@@ -6,16 +6,16 @@ The current strategy is the records strategy as the `recommended` profile compos
 
 The `@orkestrel/study` package fixes the shape: `studies/<name>/study.json` declares a study with its rubric, and `studies/<driver>/` holds a driver bundle with its scenarios, its profiles, and its `index.ts`. Several studies can share one bundle. The following table lists each study:
 
-| Study           | Driver   | Purpose   | What it's for                                                                                                      |
-| --------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------ |
-| `chat`          | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                 |
-| `disclosure`    | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.                |
-| `capacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for records and the full conversation within its bounds. |
-| `endurance`     | `memory` | quality   | How records keep work, corrections, and obligations over the whole public endurance workload.                      |
-| `memory`        | `memory` | quality   | How records and the full conversation keep corrections and obligations on the `handoff` trajectory.                |
-| `qualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload for records. Every long records run goes through it. |
+| Study           | Driver   | Purpose   | What it's for                                                                                                                                |
+| --------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chat`          | `chat`   | mechanism | Whether the sealed conversations retain stated values, corrections, lookups, and previous replies.                                           |
+| `disclosure`    | `desk`   | mechanism | Which way of showing a 36-tool desk catalog lets the model call the tool each of 42 requests needs.                                          |
+| `capacity`      | `memory` | capacity  | Whether a profile completes the `handoff` desk trajectory for records and the full conversation within its bounds.                           |
+| `endurance`     | `memory` | quality   | How records keep work, corrections, and obligations over the whole public endurance workload, against no memory.                             |
+| `memory`        | `memory` | quality   | How records and the full conversation keep corrections and obligations on the `handoff` trajectory.                                          |
+| `qualification` | `memory` | capacity  | Whether the selected profile completes the endurance workload for records and its no-memory control. Every long records run goes through it. |
 
-Each study on the `memory` driver schedules records, with `full`, the whole conversation, as its only other arm and its control. The adapter refuses a memory declaration that lists no records arm, or an arm the driver doesn't implement. Each quality study is qualified by its capacity study: `memory` by `capacity`, and `endurance` by `qualification`.
+Each study on the `memory` driver schedules records beside one control. `capacity` and `memory` use `full`, the whole conversation. `qualification` and `endurance` use `plain`, where each goal opens a fresh conversation holding only its own arrivals and prompt. Every arm reads the same released reference snapshots through `lookup`, so `plain` isolates conversational memory alone. The adapter refuses a memory declaration that lists no records arm, or an arm the driver doesn't implement. Each quality study is qualified by its capacity study: `memory` by `capacity`, and `endurance` by `qualification`.
 
 The following table lists each driver bundle:
 

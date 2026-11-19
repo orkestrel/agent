@@ -84,7 +84,10 @@ describe('the memory declarations', () => {
 						readMemoryProfile(profile, 'http://127.0.0.1:7'),
 						name,
 					)
-					expect(input.definition.arms.filter((arm) => arm !== 'full')).toEqual(['records'])
+					// Each declaration schedules records beside one control, `full` or `plain`.
+					expect(input.definition.arms.filter((arm) => arm !== 'full' && arm !== 'plain')).toEqual([
+						'records',
+					])
 					expect(() =>
 						validateStudyInputs(input.definition, input.scenarios, input.rubric, input.profile),
 					).not.toThrow()

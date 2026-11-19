@@ -294,6 +294,64 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 		}
 	})
 
+	it('runs the plain arm with no conversation memory, so each goal sends only its own arrivals and prompt', async () => {
+		const server = await createMemoryFixture()
+		const base = buildMemoryProfile({ url: server.url })
+		const declared = base.provider
+		if (declared === undefined) throw new Error('Missing fixture provider')
+		const profile = {
+			...base,
+			provider: {
+				...declared,
+				judge: undefined,
+				digest: { model: declared.digest.model, judge: undefined },
+			},
+		}
+		const fixture = createMemoryContext(profile)
+		const session = await new StudyMemoryDriver({ ...STUDY_MEMORY_MODULES, profile }).open(
+			{ id: 'plain', scenario: 'public', arm: 'plain', repetition: 0 },
+			fixture.context.signal,
+		)
+		const goals = [
+			{
+				id: 'first',
+				input: {
+					prompt: 'State the order count',
+					arrivals: [{ id: 'a1', content: 'Order 77 shipped.' }],
+					records: [],
+				},
+			},
+			{
+				id: 'second',
+				input: {
+					prompt: 'Name the courier',
+					arrivals: [{ id: 'a2', content: 'The courier is Vega.' }],
+					records: [],
+				},
+			},
+		]
+		try {
+			for (const goal of goals)
+				await expect(session.execute(goal, fixture.context)).resolves.toMatchObject({
+					partial: false,
+				})
+			const chats = server.requests.filter((request) => request.path === '/api/chat')
+			const first = chats[0]?.body ?? ''
+			const last = chats.at(-1)?.body ?? ''
+			expect(first).toContain('Order 77 shipped.')
+			expect(first).toContain('State the order count')
+			expect(last).toContain('The courier is Vega.')
+			expect(last).toContain('Name the courier')
+			expect(last).not.toContain('Order 77 shipped.')
+			expect(last).not.toContain('State the order count')
+			expect(server.requests.some((request) => request.body.includes('judge'))).toBe(false)
+		} finally {
+			await session.close()
+			fixture.close()
+			await server.destroy()
+		}
+	})
+
 	it('refuses lookup before record access or evidence when the goal call allowance is exhausted', async () => {
 		const server = await createMemoryFixture(
 			new MemoryScript([

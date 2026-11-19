@@ -170,7 +170,7 @@
 			"bytes": 1073741824
 		},
 		"series": {
-			"duration": 9600000,
+			"duration": 19200000,
 			"calls": 8192,
 			"tokens": 163577856,
 			"bytes": 2147483648

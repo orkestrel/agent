@@ -4,9 +4,9 @@
 	"question": "Can the selected profile complete the entire prospective public endurance workload for records within the declared finite bounds?",
 	"purpose": "capacity",
 	"driver": "memory",
-	"arms": ["records"],
+	"arms": ["records", "plain"],
 	"scenarios": ["endurance"],
-	"order": [["records"]],
+	"order": [["records", "plain"]],
 	"retries": 0,
 	"rubric": "rubric.json"
 }

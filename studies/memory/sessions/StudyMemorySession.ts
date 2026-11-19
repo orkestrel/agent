@@ -214,7 +214,7 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#conversation = conversations.add(
 				seed?.conversation === undefined ? {} : { snapshot: seed.conversation },
 			)
-			// The control sends the whole conversation, as a plain agent does.
+			// `full` sends the whole conversation, as a plain agent does; `plain` clears it at each goal.
 			this.#agent = new options.agent.Agent(observer, {
 				conversations,
 				tools: this.#tools,
@@ -268,6 +268,11 @@ export class StudyMemorySession implements StudySessionInterface {
 		// The previous goal's input is history now; membership names it from here on.
 		if (this.#input !== undefined) this.#explicit.delete(this.#input)
 		this.#input = undefined
+		// The no-memory control forgets every earlier goal, so this goal holds only its own arrivals and prompt.
+		if (this.#options.arm === 'plain') {
+			this.#conversation.clear()
+			this.#explicit.clear()
+		}
 		this.#live.add(activity)
 		try {
 			if (this.#goals === undefined || this.#goals[0] === goal) await this.#transport.verify()

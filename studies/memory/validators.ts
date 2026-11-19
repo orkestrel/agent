@@ -150,7 +150,7 @@ export function isStudyMemoryClassifier(value: unknown): value is StudyMemoryCla
 
 /** Checks a supported memory arm. @param value - Trial arm. @returns Whether this driver implements the treatment. */
 export function isStudyMemoryArm(value: unknown): value is StudyMemoryArm {
-	return value === 'records' || value === 'full'
+	return value === 'records' || value === 'full' || value === 'plain'
 }
 
 /** Checks bounded public goal input. @param value - Public JSON input. @returns Whether messages and references are valid. */

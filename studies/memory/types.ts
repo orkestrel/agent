@@ -66,7 +66,7 @@ export interface StudyMemoryInput {
 /**
  * Holds one goal's end state as the `checkpoint` evidence row.
  * @remarks
- * The arm names which state member is present: `ledger` on `records` and `conversation` on `full`. A session opened with this value hydrates that state, its released records, and the arrival ids it already took. Provenance is not carried, so an arrival from before the seed reads origin `history`.
+ * The arm names which state member is present: `ledger` on `records`, and `conversation` on `full` and `plain`, where the `plain` conversation holds only the last goal run. A session opened with this value hydrates that state, its released records, and the arrival ids it already took. Provenance is not carried, so an arrival from before the seed reads origin `history`.
  */
 export interface StudyMemoryCheckpoint {
 	readonly ledger?: LedgerSnapshot
@@ -235,8 +235,12 @@ export interface StudyMemoryDriverOptions {
 	readonly replay?: StudyOllamaReplayInterface
 }
 
-/** Holds the shared implementation's irreducible memory treatment: the ledger's records, or the full conversation as the control. */
-export type StudyMemoryArm = 'records' | 'full'
+/**
+ * Holds the shared implementation's irreducible memory treatment.
+ * @remarks
+ * `records` keeps the ledger's records. Each control drops the ledger: `full` keeps the whole conversation, and `plain` keeps no conversation, so each goal sees only its own arrivals and prompt. Every arm reads the same released reference snapshots through `lookup`.
+ */
+export type StudyMemoryArm = 'records' | 'full' | 'plain'
 
 /**
  * Holds a fresh session's admitted dependencies and parent cancellation.

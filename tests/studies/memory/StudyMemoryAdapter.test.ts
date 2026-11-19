@@ -149,6 +149,22 @@ describe('memory declaration and mechanical evidence', () => {
 		},
 	)
 
+	it('admits records beside the plain control and refuses plain alone, which schedules no strategy', async () => {
+		const input = await loadMemoryInputs(
+			buildMemoryProfile({ url: 'http://127.0.0.1:7' }),
+			'endurance',
+		)
+		const adapter = createStudyAdapter()
+		expect(input.definition.arms).toEqual(['records', 'plain'])
+		expect(() => adapter.validate(input)).not.toThrow()
+		expect(() =>
+			adapter.validate({
+				...input,
+				definition: { ...input.definition, arms: ['plain'], order: [['plain']] },
+			}),
+		).toThrow('lists no records arm')
+	})
+
 	it('refuses a declaration that lists only full, which schedules no strategy (claim S-3)', async () => {
 		const input = await loadMemoryInputs(
 			buildMemoryProfile({ url: 'http://127.0.0.1:7' }),
@@ -166,7 +182,7 @@ describe('memory declaration and mechanical evidence', () => {
 			expect.objectContaining({
 				code: 'CONFIG',
 				message:
-					'Memory declaration "memory" lists no records arm; list records, with full as the only other arm',
+					'Memory declaration "memory" lists no records arm; list records, with full or plain as its control',
 			}),
 		)
 	})
