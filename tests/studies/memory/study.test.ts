@@ -57,7 +57,7 @@ describe('the memory declarations', () => {
 		).toBe(true)
 	})
 
-	it('pins each memory rubric to the SHA-256 its bytes held at 2a7c4e9f', () => {
+	it('pins each memory rubric to the SHA-256 of its authored bytes', () => {
 		expect(
 			Object.fromEntries(
 				collectMemoryDeclarations().map((name) => [

@@ -54,6 +54,54 @@
 			"assertion": {
 				"criterion": "Reports the $60 posted refund separately from the two outstanding deposits, retains undelivered statement responsibility, and makes no invented external action claim."
 			}
+		},
+		{
+			"id": "opening-operational",
+			"scenario": "handoff",
+			"goal": "opening",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "operational" }
+		},
+		{
+			"id": "opening-complete",
+			"scenario": "handoff",
+			"goal": "opening",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": false }
+		},
+		{
+			"id": "correction-operational",
+			"scenario": "handoff",
+			"goal": "correction",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "operational" }
+		},
+		{
+			"id": "correction-complete",
+			"scenario": "handoff",
+			"goal": "correction",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": false }
+		},
+		{
+			"id": "closure-operational",
+			"scenario": "handoff",
+			"goal": "closure",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "operational" }
+		},
+		{
+			"id": "closure-complete",
+			"scenario": "handoff",
+			"goal": "closure",
+			"method": "state",
+			"critical": false,
+			"assertion": { "observation": "result", "partial": false }
 		}
 	]
 }

@@ -1193,11 +1193,11 @@ export const STUDY_MEMORY_DECLARATIONS = Object.freeze([
 	'qualification',
 ])
 
-/** Pins the SHA-256 of each memory declaration's rubric bytes, which are those of its `records`-prefixed rubric as committed at 2a7c4e9f, so any rubric change is caught. */
+/** Pins the SHA-256 of each memory declaration's rubric bytes, so any rubric change is caught; `memory` and `endurance` hold the mechanical criteria authored on 2026-11-19. */
 export const STUDY_MEMORY_RUBRICS = Object.freeze({
 	capacity: 'df1003c7c282b9dd7ea4b436c087ca0a3b8b3222903da664c1e0bde64a51cc2c',
-	endurance: '1c192f973185dec7fba312dcb630a64416baf9a36a5d8c79752d25dc94320206',
-	memory: 'd77c7c45f819892ab1c48355839dd3a16c6aca0f342c00ece84f83068aa82140',
+	endurance: 'bf40b20597572cebdcd5f9db5bcaa9eaf2de26a3c7e7812c367dd0ef54abb957',
+	memory: 'a1ae7b9db24267a43735a128d8f3757e05dd6e708a78b2ad9534a0898f4228af',
 	qualification: 'b6f1a69d9d45096aff4878eae3cfead3c1e9beb2b5a264c665db5019a1d03ea8',
 })
 

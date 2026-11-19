@@ -319,11 +319,18 @@ describe('prospective public endurance declarations', () => {
 			expect([...new Set(input.rubric.criteria.map((criterion) => criterion.goal))]).toEqual(
 				input.scenarios[0]?.goals.map((goal) => goal.id),
 			)
+		// The semantic criteria keep their shape; the authored mechanical ones are never critical.
+		const semantic = quality.rubric.criteria.filter((criterion) => criterion.method === 'semantic')
+		const mechanical = quality.rubric.criteria.filter(
+			(criterion) => criterion.method !== 'semantic',
+		)
 		expect(
-			quality.rubric.criteria.every(
+			semantic.every((criterion) => criterion.critical === criterion.id.endsWith('-completion')),
+		).toBe(true)
+		expect(
+			mechanical.every(
 				(criterion) =>
-					criterion.method === 'semantic' &&
-					criterion.critical === criterion.id.endsWith('-completion'),
+					!criterion.critical && (criterion.method === 'state' || criterion.method === 'trace'),
 			),
 		).toBe(true)
 		const schedule = buildStudySchedule(quality.definition, quality.scenarios)
@@ -353,26 +360,29 @@ describe('prospective public endurance declarations', () => {
 			})),
 			evidence: {},
 		})
-		expect(quality.rubric.criteria).toHaveLength(384)
+		expect(semantic).toHaveLength(384)
+		expect(mechanical).toHaveLength(230)
 		expect(quality.rubric.criteria.filter((criterion) => criterion.critical)).toHaveLength(96)
 		for (const goal of quality.scenarios[0]?.goals ?? [])
 			expect(
-				quality.rubric.criteria
-					.filter((criterion) => criterion.goal === goal.id)
-					.map((criterion) => criterion.id),
+				semantic.filter((criterion) => criterion.goal === goal.id).map((criterion) => criterion.id),
 			).toEqual(
 				['facts', 'work', 'obligations', 'completion'].map((suffix) => `${goal.id}-${suffix}`),
 			)
 		// Records and its plain control schedule two trials, so each criterion reads two judgments.
 		expect(schedule.map((trial) => trial.arm)).toEqual(['records', 'plain'])
-		expect(judgments).toHaveLength(768)
+		const ids = new Set(semantic.map((criterion) => criterion.id))
+		expect(judgments).toHaveLength(2 * (384 + 230))
+		expect(judgments.filter((judgment) => !ids.has(judgment.criterion))).toHaveLength(2 * 230)
 		expect(
-			judgments.every(
-				(judgment) =>
-					judgment.verdict === 'unknown' &&
-					judgment.method === 'human' &&
-					judgment.references.length === 0,
-			),
+			judgments
+				.filter((judgment) => ids.has(judgment.criterion))
+				.every(
+					(judgment) =>
+						judgment.verdict === 'unknown' &&
+						judgment.method === 'human' &&
+						judgment.references.length === 0,
+				),
 		).toBe(true)
 	})
 })
