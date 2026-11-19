@@ -1,6 +1,6 @@
 # Chat source and treatment
 
-The seal supplies 38 conversations, 294 requests, and 102 primary graded rows. The `chat` study preserves their membership, order, prompts, lookup records, and mechanical predicates. No model reading of this Study bundle is recorded yet.
+The seal supplies 38 conversations, 294 requests, and 102 primary graded rows. The `chat` study preserves their membership, order, prompts, lookup records, and mechanical predicates. Its baseline is under [What it measured](../../README.md#what-it-measured).
 
 ## Provenance
 

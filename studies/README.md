@@ -43,7 +43,7 @@ Use the records strategy, the `createLedger` function of `@orkestrel/agent`, com
 | Window layout                      | Each prompt holds each completed exchange as it was sent, then a copy of the request with only the record lines those exchanges don't hold. This is the ledger's own behavior, with nothing to configure.                                                                                                           | `Ledger#plan` in `src/core/ledgers/Ledger.ts`                                                                                       |
 | `recall` offer                     | A request is offered `recall` only when something it could return is out of the prompt. This is the ledger's own behavior too.                                                                                                                                                                                      | `hasHiddenRecall` in `src/core/ledgers/helpers.ts`                                                                                  |
 | `capacity`, `predict`, and `share` | The session passes `capacity` as the context less its safety margin, 19968 here, `predict` as the output cap, 8192 here, thinking off, and `share` as `{ prompt: 1, tail: 0.35 }`.                                                                                                                                  | `room` in `profiles/recommended.json`; the `createLedger` call in `memory/sessions/StudyMemorySession.ts`                           |
-| Filing cutoffs                     | The session passes the cutoffs fitted on `LEDGER_QUESTIONS` and these judges.                                                                                                                                                                                                                                       | `STUDY_MEMORY_THRESHOLDS` in `memory/constants.ts`                                                                                  |
+| Filing cutoffs                     | The session passes prospective filing cutoffs for `LEDGER_QUESTIONS` and these judges. They are not calibrated quality claims.                                                                                                                                                                                      | `STUDY_MEMORY_THRESHOLDS` in `memory/constants.ts`                                                                                  |
 
 ## Using it in an application
 
@@ -59,25 +59,39 @@ For the recipe and its tested fence, see [Composing a records desk for a small l
 
 ## What it measured
 
-The last row is the current strategy. Each cell is one read on one host, on the 4B agent model and runner 0.40.15, so it reports what that host read and nothing about another. Rulings O187 to O199, in `.orkestrel/agent/plan.md` at commit `db86a3eb`, hold each reading. First text and recall read a chat battery sealed before any arm ran, and first token and mechanical results read goals `ev-01-1` to `ev-04-4`:
+Each study holds one sealed baseline, recorded on this host on 2026-11-18 with Agent 0.0.47 and Ollama 0.40.16. The agent model is `qwen3.5:4b-q4_K_M` on the GPU. The memory studies also run the Mica judge on the CPU, with `tev1` as triage. Each figure is one read on one host, so it reports what that host read and nothing about another. Treat it as a baseline that tells drift from an outlier on a later run, not as a verdict. The readings before these, from 2026-11-06 to 2026-11-12 on Agent 0.0.36 to 0.0.38, are in `.orkestrel/agent/plan.md` at commit `db86a3eb`.
 
-| Arm                                                  | Read on                               | First text in a chat, median | Recall at the last turn, two or three back, and further back | First token on a long goal, median | Mechanical results |
-| ---------------------------------------------------- | ------------------------------------- | ---------------------------- | ------------------------------------------------------------ | ---------------------------------- | ------------------ |
-| Agent 0.0.36, as installed                           | 2026-11-07                            | 2.34 s                       | 0 of 58 in all                                               | not read                           | not read           |
-| Records, judge on the GPU                            | 2026-11-06                            | not read                     | not read                                                     | 23.9 s                             | 16 of 16           |
-| Records, judge on the CPU                            | chat 2026-11-07, long goal 2026-11-06 | 2.77 s                       | 7 of 11, 12 of 23, and 6 of 24                               | 14.5 s                             | 16 of 16           |
-| Adding the two-step judge                            | 2026-11-06                            | not read                     | not read                                                     | 10.2 s                             | 16 of 16           |
-| Adding the window (`c9a651b2`)                       | 2026-11-07                            | 1.24 s                       | 10 of 11, 21 of 23, and 20 of 24                             | 10.0 s                             | 16 of 16           |
-| Offering `recall` only when it can help (`513a9a31`) | 2026-11-07                            | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.5 s                             | 16 of 16           |
-| Fitting `recall` to the measured room (`c915224d`)   | 2026-11-07                            | 0.42 s                       | 10 of 11, 22 of 23, and 22 of 24                             | 10.4 s                             | 16 of 16           |
+| Study           | Profile         | Population                                 | Mechanical results                             | Time   | Model calls                      |
+| --------------- | --------------- | ------------------------------------------ | ---------------------------------------------- | ------ | -------------------------------- |
+| `disclosure`    | `screen`        | 2 arms, 7 conversations of 6 requests each | `area` right on 42 of 42, `index` on 40 of 42  | 417 s  | 184 agent                        |
+| `chat`          | `full`, 19968   | 38 conversations, 294 requests             | See the next table                             | 840 s  | 382 agent                        |
+| `chat`          | `compact`, 2400 | The same                                   | The same as `full`, call for call              | 838 s  | 382 agent                        |
+| `chat`          | `tight`, 1600   | The same                                   | See the next table                             | 1272 s | 535 agent                        |
+| `capacity`      | `local`, filled | 4 trials of 3 goals, in both arm orders    | Records 6 of 6, full 6 of 6                    | 337 s  | 22 agent, 24 judge, 12 triage    |
+| `memory`        | `local`, filled | The `capacity` result                      | 6 of 12 for each arm; the other 6 are semantic | —      | —                                |
+| `qualification` | `recommended`   | 1 trial of 96 goals                        | 96 of 96                                       | 7895 s | 106 agent, 525 judge, 128 triage |
+| `endurance`     | `recommended`   | The `qualification` recording              | None; its 384 criteria are all semantic        | —      | —                                |
 
-Offering `recall` only when it can help took answers both right and free of a denial from 30 to 47 of 58, and `recall` calls from 0.73 to 0.01 per follow-up, on 2026-11-07.
+Semantic criteria read `unknown` until blind labels are imported, and none are imported yet. The `memory` row grades the `capacity` result with the `memory` rubric. The `qualification` and `endurance` grades come from keyed offline replays of the recorded run. Such a replay seals only when every request matches the recording byte for byte, and the memory grader reads no timing or cost, so it grades what the live run produced.
 
-The last step changes nothing at this profile's capacity and is for a host with less room. `recall` used to close whenever the room under `predict` fell below twice the longest reply the ledger had seen; it now fits whole results into the room the request's own prompt leaves. At a capacity of 1600 with 1024 of it reserved for output, the battery read on 2026-11-07 7 of 11, 9 of 23, and 9 of 24, against 5 of 11, 2 of 23, and 1 of 24 before that step, and 3 of 11, 4 of 23, and 1 of 24 before the one ahead of it, while the follow-up `Make that shorter.` keeps its exchange in 6 of 6. A host with that little room still recalls less than one with room to spare.
+`buildStudyChatSummary` reads the chat recall and first text below. Right and not denying counts the 58 dialogue rows: the last turn, two or three back, and further back:
 
-Two readings of 2026-11-07 rule options out. A judge narrowing a request to its desk area's tools doesn't help the 4B model: with all 36 tools of a fictional catalog offered it chose right on 42 of 42 requests, and narrowed to the known area's 6 it chose right on 35 of 42, answering some requests in text with no call, though its prompt fell from 2416 to 699 tokens. Correction narrowing (`settings.correction.narrow`) read no change on these goals: 47 judge calls with it and without, with byte-identical results.
+| Profile   | Last turn | Two or three back | Further back | Changed in dialogue | Lookup, shorter, any, and changed in script | Right and not denying | Follow-up first text, median and p90 |
+| --------- | --------- | ----------------- | ------------ | ------------------- | ------------------------------------------- | --------------------- | ------------------------------------ |
+| `full`    | 10 of 11  | 22 of 23          | 22 of 24     | 7 of 8              | 6 of 6, 6 of 6, 18 of 18, and 6 of 6        | 47 of 58              | 0.43 s and 0.50 s                    |
+| `compact` | 10 of 11  | 22 of 23          | 22 of 24     | 7 of 8              | 6 of 6, 6 of 6, 18 of 18, and 6 of 6        | 47 of 58              | 0.43 s and 0.50 s                    |
+| `tight`   | 8 of 11   | 10 of 23          | 9 of 24      | 4 of 8              | 6 of 6, 6 of 6, 12 of 18, and 6 of 6        | 20 of 58              | 2.05 s and 2.98 s                    |
 
-The `chat` study is that battery, tracked. On 2026-11-08, on the 0.0.38 build and the same runner, its 102 graded rows matched the battery's last reading row for row at each of its three capacities, primary, denial, and older-value outcomes alike, with follow-up first text at a median of 0.42, 0.43, and 1.78 s against the battery's 0.42, 0.43, and 1.80 s.
+What the baseline shows against the readings before it:
+
+- **`full` and `compact` reproduce the 2026-11-08 reading.** Their recall and their 47 of 58 match it, and the two capacities still read the same.
+- **`tight` recalls slightly more and answers more slowly.** It reads 8, 10, and 9 against 7, 9, and 9 on 2026-11-07. Its follow-up first text takes 2.05 s against 1.78 s, because a `tight` request makes 1.82 agent calls against 1.30 at `full`, and first text spans every call of a request. A host with that little room still recalls less than one with room to spare.
+- **The chat ledger asks its judge nothing.** Its topic is `requested: false`, requests are excluded from category judging, and replies and tool results take mechanical categories.
+- **`disclosure` reproduces the 2026-11-12 reading:**
+  - `area` reads 42 of 42 at a median summed prompt of 1947.5 tokens.
+  - `index` reads 40 of 42 at 2841 against 2791, with 15 loads, each opening the right area.
+- **`qualification` used fewer agent calls but longer answers than October's records run, Candidate 3.** It made 106 agent calls against 209, and 16 lookups, 14 of them found, against 100 found. It produced 153,621 completion tokens against 92,688, so it ran 25% longer: 7895 s against 6304 s. The judge on the CPU takes 4.67 s a call.
+- **Whether the drop in lookups costs quality is open.** October's labeled reading achieved 78 (Sol) and 72 (Grok) of the same 384 endurance criteria. Comparing them needs a labeled `endurance` reading of this baseline.
 
 ## Running it
 
@@ -100,6 +114,18 @@ node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js g
 
 The profile declares `record` allowances of 512 MiB, 4096 calls, and 9600000 ms per trial. Both judge legs and inventory verification enter custody. Offline replay checks the retained request bytes and makes no sends; message ids are local to each Agent run.
 
+`endurance` runs behind `qualification`. It reads the sealed result at the profile's `qualification` path, `tmp/studies/qualification`, under the root it executes from. It refuses unless that result's identity, bounds, schedule, and scenarios equal its own and no goal failed.
+
+A closure binds identity to its own path and freezes one study, so run the pair from the repository root, without `--closure`. A recorded `qualification` run serves both through keyed offline replay, with no model. `ABSOLUTE_RESULT_PATH` is the recording, and `ABSOLUTE_ENDURANCE_PATH` is the path the second command prints:
+
+```sh
+npx study execute qualification --profile recommended --replay ABSOLUTE_RESULT_PATH --roles '["agent","triage","judge","metadata"]' --offline true --out tmp/studies/qualification
+npx study execute endurance --profile recommended --replay ABSOLUTE_RESULT_PATH --roles '["agent","triage","judge","metadata"]' --offline true --out tmp/studies/STEM-endurance
+npx study grade ABSOLUTE_ENDURANCE_PATH --rubric studies/endurance/rubric.json
+```
+
+Grade these root results through the repository's own entry. `memory` runs behind `capacity` the same way, at the `local` profile's `tmp/studies/capacity`.
+
 A continuation needs an ancestor that completed its entire schedule. Record that ancestor separately, without `--trial`, `--goals`, or `--seed`:
 
 ```sh
@@ -117,7 +143,7 @@ Study replays the ancestor's retained prefix and sends only the appended goals t
 
 ## Running the chat instrument
 
-The `chat` mechanism study preserves 38 conversations, 294 requests, and 102 primary mechanical checks. Its profiles are `full` (ledger capacity 19968), `compact` (2400), and `tight` (1600). The agent context remains 20480 and its output limit 1024 in all three. Each profile composes Mica alone and pins the same runner and model identities. See [Chat source and treatment](chat/sources/README.md) for provenance, the original-to-scenario mapping, effective wire policies, allowances, and grading semantics. No model reading of this Study bundle is recorded yet.
+The `chat` mechanism study preserves 38 conversations, 294 requests, and 102 primary mechanical checks. Its profiles are `full` (ledger capacity 19968), `compact` (2400), and `tight` (1600). The agent context remains 20480 and its output limit 1024 in all three. Each profile composes Mica alone and pins the same runner and model identities. See [Chat source and treatment](chat/sources/README.md) for provenance, the original-to-scenario mapping, effective wire policies, allowances, and grading semantics. Its baseline is under [What it measured](#what-it-measured).
 
 Run a sealed reading of one capacity profile in the following order. Replace `full` with the chosen capacity profile.
 
@@ -194,7 +220,7 @@ npm run build
 npm run test:probe -- tmp/probes/studies/rehearsal.test.ts
 ```
 
-Each step's result holds its elapsed milliseconds as `duration`. On this host on 2026-11-11, the rehearsal of `full` took 471 s, 437 s of it in the execution.
+Each step's result holds its elapsed milliseconds as `duration`. On this host on 2026-11-18, the rehearsal probe of `full` ran 530 s.
 
 ## Running the disclosure reading
 
@@ -207,7 +233,7 @@ The `disclosure` mechanism study is phase 3's 4B reading (`.orkestrel/agent/desi
 
 Each request's input holds its prompt and the area the host knows, and the rubric alone names its tool. A request reads `right` when its first call other than `load` names that tool and wasn't denied, `late` when a later call does, `wrong` when its calls never reach it, `text` when it makes no call, and `failed` when its run fails or ends partial. The tested `buildStudyDeskSummary` consumer in `desk/helpers.ts` tallies each arm: the outcomes, the loads with the areas they opened and misopened, the turns, the median summed prompt, and first text read apart for each conversation's first request, for later requests that loaded, and for later requests that didn't, because Study unloads the models before each trial. The adapter declares `progress`, so `study progress` lists each goal's calls, loads, and turns while a run is live.
 
-One run on 2026-11-12 read arm `area` right on 42 of 42 requests at a median summed prompt of 1947.5 tokens, and arm `index` right on 40 of 42 at a median of 2791 tokens, with 15 loads, each right. Treat both readings as baselines that tell drift from an outlier on a later run, not as verdicts.
+The run of 2026-11-18 read arm `area` right on 42 of 42 requests at a median summed prompt of 1947.5 tokens. It read arm `index` right on 40 of 42, with one late and one wrong, at a median of 2841 tokens, with 15 loads, each opening the right area. Treat both readings as baselines that tell drift from an outlier on a later run, not as verdicts.
 
 The `screen` profile pins `qwen3.5:4b-q4_K_M` by digest and declares no judge, on the Ollama at its provider URL, `http://127.0.0.1:11434`, with recording declared. It declares no `provider.daemon`. A recorded run keeps the serving Ollama's version as a `version` evidence row and compares it with nothing.
 
