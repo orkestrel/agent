@@ -814,11 +814,11 @@ describe('study install fixtures', () => {
 		}
 	})
 
-	it('declares recording on the authored local profile, with its metadata allowance as its one setting', () => {
+	it('declares recording and observation on the authored local profile, with its metadata allowance', () => {
 		const local = parseJSON(readFileSync('studies/memory/profiles/local.json', 'utf8'))
 		if (!isRecord(local)) throw new Error('Malformed local profile')
 		expect([local.settings, local.record]).toEqual([
-			{ metadata: { calls: 8192, bytes: 67108864, duration: 600000 } },
+			{ observe: true, metadata: { calls: 8192, bytes: 67108864, duration: 600000 } },
 			{ bytes: 536870912, calls: 4096, duration: 2400000 },
 		])
 	})

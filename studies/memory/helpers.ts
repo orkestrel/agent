@@ -24,6 +24,10 @@ import type {
 	StudyMemoryProgress,
 	StudyMemoryProvenanceSource,
 	StudyMemoryTally,
+	StudyMemoryGoalLookups,
+	StudyMemoryLookups,
+	StudyMemorySummary,
+	StudyMemorySummaryInput,
 } from './types.js'
 import { canonicalStringify, isArray, isRecord, parseJSON } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
@@ -428,6 +432,41 @@ export function readStudyMemoryProgress(evidence: readonly StudyEvidence[]): Stu
 		...(system === undefined ? {} : { system }),
 		...(cache.length === 0 ? {} : { cache }),
 	}
+}
+
+/**
+ * Reads a sealed memory result's lookups for every scheduled goal, and each arm's totals.
+ * @remarks Pass evidence verified by Study's `collectStudyEvidence`. Each goal's count is the one `readStudyMemoryProgress` reports for its rows.
+ * @param input - The result's schedule, its scenarios, and its evidence by trial id.
+ * @returns Every scheduled goal in schedule and scenario order, with each arm's sums.
+ * @throws StudyError - Thrown with code `CONFIG` when a scheduled trial names a scenario the input does not hold.
+ * @example buildStudyMemorySummary(input).arms.records?.missing // 2
+ */
+export function buildStudyMemorySummary(input: StudyMemorySummaryInput): StudyMemorySummary {
+	const goals = input.schedule.flatMap((trial): StudyMemoryGoalLookups[] => {
+		const scenario = input.scenarios.find((entry) => entry.id === trial.scenario)
+		if (scenario === undefined)
+			throw new StudyError('CONFIG', `Memory summary has no scenario ${trial.scenario}`)
+		const rows = input.evidence.get(trial.id) ?? []
+		return scenario.goals.map((goal) => ({
+			trial: trial.id,
+			arm: trial.arm,
+			goal: goal.id,
+			lookups: readStudyMemoryProgress(rows.filter((row) => row.goal === goal.id)).lookups ?? {
+				found: 0,
+				missing: 0,
+			},
+		}))
+	})
+	const arms = new Map<string, StudyMemoryLookups>()
+	for (const entry of goals) {
+		const held = arms.get(entry.arm) ?? { found: 0, missing: 0 }
+		arms.set(entry.arm, {
+			found: held.found + entry.lookups.found,
+			missing: held.missing + entry.lookups.missing,
+		})
+	}
+	return { goals, arms: Object.fromEntries(arms) }
 }
 
 /** Counts re-acquisitions per goal. @param evidence - Study evidence rows. @param events - Event names that count. @returns One entry per goal in first-seen row order with the count of its rows whose event is listed; a goal with none reads 0. */

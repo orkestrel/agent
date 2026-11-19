@@ -27,10 +27,10 @@ The following table lists each driver bundle:
 
 The following table lists the memory profiles under `studies/memory/profiles/`. Each names, as its `qualification`, the capacity result its quality study pairs with:
 
-| Profile       | What it is                                                                                                        | Its studies                  |
-| ------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `recommended` | The current strategy, on the 4B agent model.                                                                      | `qualification`, `endurance` |
-| `local`       | The unpinned default template, whose `REQUIRED_` values are placeholders a host fills. The test fixtures fill it. | `capacity`, `memory`         |
+| Profile       | What it is                                                                                                                                                                             | Its studies                  |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `recommended` | The current strategy, on the 4B agent model.                                                                                                                                           | `qualification`, `endurance` |
+| `local`       | The unpinned default template, whose `REQUIRED_` values are placeholders a host fills. The test fixtures fill it. It observes, as `recommended` does, so its `wire` rows carry timing. | `capacity`, `memory`         |
 
 ## The current strategy
 
@@ -111,6 +111,8 @@ Grade a closure's result through the closure's own entry, from the closure's roo
 cd ABSOLUTE_CLOSURE_PATH
 node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CLOSURE_PATH/studies/qualification/rubric.json
 ```
+
+For recall per goal, pass the verified result to `buildStudyMemorySummary` in `memory/helpers.ts`. It reports each scheduled goal's lookups, found and missing, and each arm's totals.
 
 The profile declares `record` allowances of 512 MiB, 4096 calls, and 9600000 ms per trial. Both judge legs and inventory verification enter custody. Offline replay checks the retained request bytes and makes no sends; message ids are local to each Agent run.
 

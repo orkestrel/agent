@@ -29,7 +29,10 @@
 	},
 	"qualification": "tmp/studies/capacity",
 	"room": { "context": 32768, "output": 2048, "safety": 1024, "think": false },
-	"settings": { "metadata": { "calls": 8192, "bytes": 67108864, "duration": 600000 } },
+	"settings": {
+		"observe": true,
+		"metadata": { "calls": 8192, "bytes": 67108864, "duration": 600000 }
+	},
 	"bounds": {
 		"request": { "duration": 120000, "calls": 1, "tokens": 31744, "bytes": 1048576 },
 		"goal": { "duration": 600000, "calls": 256, "tokens": 8388608, "bytes": 268435456 },

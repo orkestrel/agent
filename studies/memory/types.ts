@@ -15,7 +15,13 @@ import type {
 } from '@orkestrel/agent'
 import type { JSONValue } from '@orkestrel/contract'
 import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/ollama'
-import type { StudyAgentRuntime, StudyProfile } from '@orkestrel/study'
+import type {
+	StudyAgentRuntime,
+	StudyEvidence,
+	StudyProfile,
+	StudyScenario,
+	StudyTrial,
+} from '@orkestrel/study'
 import type {
 	StudyExchangeSinkInterface,
 	StudyOllamaMetadata,
@@ -83,13 +89,42 @@ export interface StudyMemoryProgress {
 	readonly partial?: boolean
 	/** Reports that the product's content holds nothing but whitespace. */
 	readonly empty?: boolean
-	readonly lookups?: { readonly found: number; readonly missing: number }
+	readonly lookups?: StudyMemoryLookups
 	/** Counts the `denial` rows whose reason is a repeat reason; absent when the goal denied nothing. */
 	readonly repeats?: number
 	/** Reads the `system` messages of the goal's first retained agent request, which a calibrating ledger's first goal spends on calibration. */
 	readonly system?: { readonly count: number; readonly bytes: number }
 	/** Lists the cache share of each agent request that reported both counts, in row order. */
 	readonly cache?: readonly number[]
+}
+
+/** Holds a count of `lookup` rows: the reads that found their record and the reads that missed. */
+export interface StudyMemoryLookups {
+	readonly found: number
+	readonly missing: number
+}
+
+/** Holds one scheduled goal's lookups, with the trial and arm that ran it. */
+export interface StudyMemoryGoalLookups {
+	readonly trial: string
+	readonly arm: string
+	readonly goal: string
+	readonly lookups: StudyMemoryLookups
+}
+
+/** Holds a sealed memory result's schedule, scenarios, and verified evidence by trial id. */
+export interface StudyMemorySummaryInput {
+	readonly schedule: readonly StudyTrial[]
+	readonly scenarios: readonly StudyScenario[]
+	readonly evidence: ReadonlyMap<string, readonly StudyEvidence[]>
+}
+
+/** Holds a memory result's lookups for every scheduled goal and each arm's totals. */
+export interface StudyMemorySummary {
+	/** Lists every scheduled goal in schedule and scenario order; a goal with no `lookup` row reads 0 and 0. */
+	readonly goals: readonly StudyMemoryGoalLookups[]
+	/** Sums each arm's goals. */
+	readonly arms: Readonly<Record<string, StudyMemoryLookups>>
 }
 
 /** Holds the admitted Agent runtime capabilities every memory arm invokes, beyond the shared instrumentation's own. */

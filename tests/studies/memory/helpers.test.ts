@@ -7,6 +7,7 @@ import {
 	buildStudyMemoryTriage,
 	filterStudyMemoryResult,
 	buildStudyMemoryRoles,
+	buildStudyMemorySummary,
 	computeStudyMemoryCacheShares,
 	computeStudyMemoryCarriage,
 	computeStudyMemoryReacquisition,
@@ -488,6 +489,50 @@ describe('memory measurement instruments', () => {
 		expect(counts.get('g1')).toBe(2)
 		expect(counts.get('g2')).toBe(0)
 		expect([...counts.keys()]).toEqual(['g1', 'g2'])
+	})
+
+	it('summarizes found and missing lookups for every scheduled goal and sums each arm', () => {
+		const scenarios = [
+			{
+				id: 's',
+				goals: [
+					{ id: 'g1', input: {} },
+					{ id: 'g2', input: {} },
+					{ id: 'g3', input: {} },
+				],
+			},
+		]
+		const schedule = [
+			{ id: 't1', scenario: 's', arm: 'records', repetition: 1 },
+			{ id: 't2', scenario: 's', arm: 'full', repetition: 1 },
+		]
+		const summary = buildStudyMemorySummary({
+			schedule,
+			scenarios,
+			evidence: new Map([
+				['t1', MEMORY_EVIDENCE],
+				['t2', [{ event: 'lookup', goal: 'g2', value: { id: 'x', found: false } }]],
+			]),
+		})
+		expect(summary.goals).toEqual([
+			{ trial: 't1', arm: 'records', goal: 'g1', lookups: { found: 1, missing: 1 } },
+			{ trial: 't1', arm: 'records', goal: 'g2', lookups: { found: 0, missing: 0 } },
+			{ trial: 't1', arm: 'records', goal: 'g3', lookups: { found: 0, missing: 0 } },
+			{ trial: 't2', arm: 'full', goal: 'g1', lookups: { found: 0, missing: 0 } },
+			{ trial: 't2', arm: 'full', goal: 'g2', lookups: { found: 0, missing: 1 } },
+			{ trial: 't2', arm: 'full', goal: 'g3', lookups: { found: 0, missing: 0 } },
+		])
+		expect(summary.arms).toEqual({
+			records: { found: 1, missing: 1 },
+			full: { found: 0, missing: 1 },
+		})
+		expect(() =>
+			buildStudyMemorySummary({
+				schedule: [{ id: 't1', scenario: 'absent', arm: 'records', repetition: 1 }],
+				scenarios,
+				evidence: new Map(),
+			}),
+		).toThrow(/absent/)
 	})
 
 	it('derives a share from a tally and reads undefined for an empty population', () => {
