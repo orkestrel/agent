@@ -3,32 +3,22 @@ import type { JudgeQuestion, Message } from '../types.js'
 import type {
 	GaugeCall,
 	LedgerAmendment,
-	LedgerEvidence,
-	LedgerExchangeSnapshot,
 	LedgerGauge,
-	LedgerCategory,
 	LedgerClassification,
 	LedgerIndex,
 	LedgerKey,
 	LedgerLine,
-	LedgerOccurrence,
 	LedgerLookupFinding,
-	LedgerLookupState,
-	LedgerPlanGroup,
 	LedgerProjection,
 	LedgerProjectionInput,
-	LedgerProjectionRequest,
 	LedgerRecord,
 	LedgerRegistry,
-	LedgerRenderContext,
 	LedgerTopic,
-	LedgerWordSet,
-	LedgerReceipt,
 } from './types.js'
 import type { ToolDefinition } from '@orkestrel/tool'
-import { attempt, canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contract'
+import { canonicalStringify, isFiniteNumber, isString } from '@orkestrel/contract'
 import { estimateMessages } from '../agents/helpers.js'
-import { renderSkillBody } from '../contexts/helpers.js'
+import { renderIndexEntry, renderSkillBody } from '../contexts/helpers.js'
 import {
 	collectToolGroups,
 	estimateTokens,
@@ -38,6 +28,7 @@ import {
 } from '../helpers.js'
 import { isPositiveSafeInteger } from '../validators.js'
 import {
+	LEDGER_KEY_LIMIT,
 	LEDGER_OWNER_PREFIX,
 	LEDGER_PREVIOUS_KEY,
 	LEDGER_RULES_KEY,
@@ -45,43 +36,6 @@ import {
 	PLACED_CATEGORIES,
 } from './constants.js'
 import { LedgerError } from './errors.js'
-
-/**
- * Digests held messages, lookup call context, stored copies, and sentence receipts using canonical text.
- * This non-cryptographic checksum detects host edits and makes no security claim.
- * @param exchanges - The stored exchange entries
- * @param messages - The conversation holding their messages
- * @returns The hexadecimal checksum, or undefined when a required message is absent or canonical encoding fails
- * @example
- * ```ts
- * digestLedgerWindow([], []) // a deterministic hexadecimal checksum
- * ```
- */
-export function digestLedgerWindow(
-	exchanges: readonly LedgerExchangeSnapshot[],
-	messages: readonly Message[],
-): string | undefined {
-	const byId = new Map(messages.map((message) => [message.id, message]))
-	const ids = new Set(
-		exchanges.flatMap((entry) => [
-			entry.request,
-			entry.reply,
-			...entry.lines.map((line) => line.source),
-		]),
-	)
-	const held = [...ids].map((id) => byId.get(id))
-	const callers = messages.filter(
-		(message) => message.role === 'tool' || message.calls !== undefined,
-	)
-	const encoded = attempt(() => {
-		const values = [...held, ...callers].map((message) => canonicalStringify(message))
-		return values.some((value) => value === undefined)
-			? undefined
-			: canonicalStringify([values, exchanges.map((entry) => [entry.copy ?? null, entry.lines])])
-	})
-	if (!encoded.success || encoded.value === undefined) return undefined
-	return computeLedgerChecksum(encoded.value)
-}
 
 /**
  * Digests tool definitions as the JSON a provider request carries them, in order.
@@ -316,11 +270,11 @@ export function collectLedgerStatements(
  *
  * - `previous`, when the last request before this one has a reply;
  * - `rules`, when a line of the rules record comes from an earlier message;
- * - each id an earlier message carries, as `extractLiterals` reads it: first the ids of the current
- *   statements that are earlier, newest statement first; then the ids the request and the current
- *   statements name; then the ids a lookup named, newest finding first; then the ids that hold a
- *   letter and that at least 2 messages of the population carry, the most carried first and a tie
- *   going to the newest;
+ * - at most `LEDGER_KEY_LIMIT` ids an earlier message carries, as `extractLiterals` reads them:
+ *   first the ids of the current statements that are earlier, newest statement first; then the
+ *   ids the request and the current statements name; then the ids a lookup named, newest finding
+ *   first; then the ids that hold a letter and that at least 2 messages of the population carry,
+ *   the most carried first and a tie going to the newest;
  * - one key per desk topic, in topic order, that an earlier message other than a request files
  *   under, unless an id key holds its name.
  *
@@ -420,9 +374,9 @@ export function collectLedgerKeys(
 				more - many || (newest.get(right) ?? 0) - (newest.get(left) ?? 0),
 		)
 		.map(([id]) => id)
-	const ids = [...new Set([...cut, ...named, ...looked, ...recurring])].filter(
-		(id) => (listed.get(id) ?? 0) > 0,
-	)
+	const ids = [...new Set([...cut, ...named, ...looked, ...recurring])]
+		.filter((id) => (listed.get(id) ?? 0) > 0)
+		.slice(0, LEDGER_KEY_LIMIT)
 	const previous = before.findLast((message) => requests.has(message.id))
 	const replied =
 		previous !== undefined && collectLedgerReplies(before, requests, notes).has(previous.id)
@@ -465,80 +419,29 @@ export function collectLedgerKeys(
 }
 
 /**
- * Checks whether an eligible earlier message is absent from the prompt or incompletely covered.
- * A successful finding is held when a finding with the same canonical identity and text is fully received.
- * @param input - The messages, findings, and classification
- * @param request - The current request id; only messages before it count
- * @param requests - The marked request ids
- * @param notes - The annotation ids to exclude
- * @param messages - The seed tail and held exchange messages; lookup stubs retain their rendered text
- * @param lines - The receipts held by the window and the request copy together
- * @returns True if an eligible earlier message is absent or only partly covered; false otherwise
+ * Renders the Earlier index a request copy carries: its heading, how to read it, one line per key,
+ * and a closing line, or empty text for no key.
+ *
+ * @remarks
+ * Each key renders through `renderIndexEntry`, as `- NAME: DESCRIPTION` on one line. The closing
+ * line states no count, so it never disagrees with the keys above it.
+ *
+ * @param keys - The keys in order, as {@link collectLedgerKeys} returns them
+ * @returns The index text, or `''` when `keys` is empty
  * @example
  * ```ts
- * hasHiddenRecall(input, request.id, requests, notes, tail, lines) // whether to offer recall
+ * renderLedgerKeys([{ name: 'previous', description: 'your last request and your reply to it' }])
+ * // '## Earlier\nEarlier messages are stored, not shown. Call recall with a key below.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too.'
  * ```
  */
-export function hasHiddenRecall(
-	input: LedgerProjectionInput,
-	request: string,
-	requests: ReadonlySet<string>,
-	notes: ReadonlySet<string>,
-	messages: readonly Message[],
-	lines: readonly LedgerReceipt[],
-): boolean {
-	const start = input.messages.findIndex((message) => message.id === request)
-	const before = new Set(input.messages.slice(0, Math.max(0, start)).map((message) => message.id))
-	const present = new Map(messages.map((message) => [message.id, message]))
-	const receipts = Map.groupBy(lines, (line) => line.source)
-	return collectRecallMessages(input, requests, notes).some((message) => {
-		if (!before.has(message.id)) return false
-		if (requests.has(message.id) || message.role === 'assistant') return !present.has(message.id)
-		if (present.get(message.id)?.content === message.content) return false
-		const finding = input.findings.find((one) => one.id === message.id)
-		const copies =
-			finding === undefined
-				? [message.id]
-				: input.findings
-						.filter((one) => before.has(one.id) && matchesLookup(finding, one))
-						.map((one) => one.id)
-		return !copies.some((id) => {
-			if (present.get(id)?.content === message.content) return true
-			const held = new Set((receipts.get(id) ?? []).map((line) => line.sentence))
-			return splitSentences(message.content).every((_, at) => held.has(at))
-		})
-	})
-}
-
-/**
- * Checks whether two successful findings carry the same text for the same canonical lookup.
- * @param left - The finding to compare
- * @param right - The candidate copy
- * @returns True for the same finding or equal canonical identities and text; unkeyable findings match only themselves
- * @example
- * ```ts
- * matchesLookup(finding, finding) // true when it has a result
- * ```
- */
-export function matchesLookup(left: LedgerLookupFinding, right: LedgerLookupFinding): boolean {
-	if (left.result === undefined || right.result === undefined || left.text !== right.text)
-		return false
-	if (left.id === right.id) return true
-	const identity = identifyLookup(left.name, left.arguments)
-	return identity !== undefined && identity === identifyLookup(right.name, right.arguments)
-}
-
-/**
- * Collects the live message ids placed in records or left without a record.
- * @param projection - The projected records and unplaced ids
- * @returns The distinct live message ids
- * @example
- * ```ts
- * collectProjectionIds({ records: [], amendments: [], orphans: ['message-1'] }) // Set { 'message-1' }
- * ```
- */
-export function collectProjectionIds(projection: LedgerProjection): ReadonlySet<string> {
-	return new Set([...projection.orphans, ...projection.records.flatMap((record) => record.members)])
+export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
+	if (keys.length === 0) return ''
+	return [
+		'## Earlier',
+		'Earlier messages are stored, not shown. Call recall with a key below.',
+		...keys.map((key) => renderIndexEntry(key)),
+		'Other ids, names, and words from a message work too.',
+	].join('\n')
 }
 
 /**
@@ -589,19 +492,19 @@ export function buildRecallMessage(key: string): Message {
 }
 
 /**
- * Builds the copy of a request turn that carries the rendered records ahead of the request.
+ * Builds the copy of a request turn that carries the Earlier index ahead of the request.
  * @param request - The stored request message
- * @param records - The rendered records, or empty text when nothing renders
- * @returns The request with its content set to the records, a `## Request` heading, and the request content, or the request itself when the records are empty
+ * @param index - The Earlier index {@link renderLedgerKeys} renders, or empty text when nothing renders
+ * @returns The request with its content set to the index, a `## Request` heading, and the request content, or the request itself when the index is empty
  * @example
  * ```ts
- * buildRequestMessage({ id: 'request', role: 'user', content: 'Check BW-5512.' }, '## Records\n- Refund issued.').content
- * // '## Records\n- Refund issued.\n\n## Request\nCheck BW-5512.'
+ * buildRequestMessage({ id: 'request', role: 'user', content: 'Check BW-5512.' }, '## Earlier\n- previous: your last request and your reply to it').content
+ * // '## Earlier\n- previous: your last request and your reply to it\n\n## Request\nCheck BW-5512.'
  * ```
  */
-export function buildRequestMessage(request: Message, records: string): Message {
-	if (records === '') return request
-	return { ...request, content: `${records}\n\n## Request\n${request.content}` }
+export function buildRequestMessage(request: Message, index: string): Message {
+	if (index === '') return request
+	return { ...request, content: `${index}\n\n## Request\n${request.content}` }
 }
 
 /**
@@ -639,29 +542,6 @@ export function collectQuestionKeys(question: JudgeQuestion): readonly string[] 
 }
 
 /**
- * Extracts lowercase words and capitalized names that do not open a sentence.
- * @param message - The message whose text supplies the words
- * @returns The distinct words and non-opening names
- * @example
- * ```ts
- * extractWords({ id: 'note', role: 'user', content: 'Ask Odile.' }).names // Set { 'odile' }
- * ```
- */
-export function extractWords(message: Message): LedgerWordSet {
-	return {
-		words: new Set(message.content.toLowerCase().match(LEDGER_WORD) ?? []),
-		names: new Set(
-			[...message.content.matchAll(/(?<![\p{L}\p{N}'-])\p{Lu}\p{Ll}+(?![\p{L}\p{N}-])/gu)]
-				.filter((match) => {
-					const before = message.content.slice(0, match.index).trimEnd()
-					return before !== '' && !/[.!?:;]$/.test(before)
-				})
-				.map((match) => match[0].toLowerCase()),
-		),
-	}
-}
-
-/**
  * Splits a topic part into lowercase words with surrounding punctuation removed.
  * @param part - The topic part to split
  * @returns The nonempty normalized words
@@ -675,29 +555,6 @@ export function splitWords(part: string): readonly string[] {
 		.split(/\s+/)
 		.map((word) => word.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '').toLowerCase())
 		.filter((word) => word !== '')
-}
-
-/**
- * Ranks a source the records render for removal before the next prompt.
- *
- * @param group - The planning group: 1 for a topic match, 2 for an off-topic rule or correction, or 3 for a name match
- * @param unsettled - If `true`, the source is a user message without a decisive category; if `false`, it is another source
- * @param category - The source's recorded category, or undefined when undecided
- * @returns The ascending removal rank: name matches, unsettled sources, off-topic corrections, off-topic rules, then topic matches
- * @remarks
- * The planner removes lower ranks first. Equal ranks 0, 1, and 4 remove lower scores first;
- * every equal rank then removes later conversation positions first.
- * @example
- * ```ts
- * rankLedgerCut(2, false, 'rule') // 3
- * ```
- */
-export function rankLedgerCut(
-	group: LedgerPlanGroup,
-	unsettled: boolean,
-	category: LedgerCategory | undefined,
-): number {
-	return group === 3 ? 0 : unsettled ? 1 : group === 2 ? (category === 'rule' ? 3 : 2) : 4
 }
 
 /**
@@ -729,33 +586,6 @@ export function findLedgerCut<T>(
 	return value === undefined
 		? findLedgerCut(middle + 1, high, probe, found)
 		: findLedgerCut(low, middle, probe, value)
-}
-
-/**
- * Builds the cut the given steps leave: each step drops the line it is, by identity, or the source it names.
- *
- * @param steps - The lines and source ids to drop
- * @param records - The records to drop lines from
- * @param included - The source ids to drop sources from
- * @returns The records without the dropped lines and the sources without the dropped ids
- * @example
- * ```ts
- * buildLedgerCut(['a'], [], new Set(['a', 'b'])).included // Set { 'b' }
- * ```
- */
-export function buildLedgerCut(
-	steps: ReadonlyArray<LedgerLine | string>,
-	records: readonly LedgerRecord[],
-	included: ReadonlySet<string>,
-): { readonly records: readonly LedgerRecord[]; readonly included: ReadonlySet<string> } {
-	const dropped = new Set(steps)
-	return {
-		records: records.map((record) => ({
-			...record,
-			lines: record.lines.filter((line) => !dropped.has(line)),
-		})),
-		included: new Set([...included].filter((source) => !dropped.has(source))),
-	}
 }
 
 /**
@@ -1319,189 +1149,6 @@ export function buildRecords(input: LedgerProjectionInput): LedgerProjection {
 }
 
 /**
- * Selects a request's records, collapsing owners with equal ordered member ids under titles joined with `; `.
- *
- * @remarks
- * The view holds the owner records the request names in the order it names them, then the rules
- * record with the lines whose topics meet the request's first, each group in position order. The
- * returned records and lines are copies. Owner records with the same member ids in the same order
- * collapse into the first requested record, keeping its key, members, and lines and joining their
- * titles with `; ` before trimming.
- *
- * @param projection - The output of {@link buildRecords}
- * @param request - The owners and the desk topics the request names
- * @returns The selected records; an owner with no record yields none
- *
- * @example
- * ```ts
- * selectRecords(projection, { owners: ['BW-20931'], topics: ['refunds'] }).map((record) => record.key)
- * // ['owner:BW-20931', 'rules']
- * ```
- */
-export function selectRecords(
-	projection: LedgerProjection,
-	request: LedgerProjectionRequest,
-): readonly LedgerRecord[] {
-	const topics = new Set(request.topics)
-	const rules = projection.records.find((one) => one.key === LEDGER_RULES_KEY)
-	// Lines that meet a request topic lead; each side keeps its position order. `groupBy` visits a
-	// hole in `lines` as an undefined line, as iteration does; `filter` skips it.
-	const sides = Map.groupBy(
-		(rules?.lines ?? []).filter(() => true),
-		(line) => line.topics.some((topic) => topics.has(topic)),
-	)
-	const owners = [...new Set(request.owners)].flatMap((owner) => {
-		const record = projection.records.find((one) => one.key === `${LEDGER_OWNER_PREFIX}${owner}`)
-		return record === undefined ? [] : [record]
-	})
-	const groups = Map.groupBy(owners, (record) => JSON.stringify(record.members))
-	return [
-		...[...groups.values()].flatMap(([record, ...rest]) =>
-			record === undefined
-				? []
-				: [
-						structuredClone({
-							...record,
-							title: [record.title, ...rest.map((one) => one.title)].join('; '),
-						}),
-					],
-		),
-		...(rules === undefined
-			? []
-			: [
-					structuredClone({
-						...rules,
-						lines: [...(sides.get(true) ?? []), ...(sides.get(false) ?? [])],
-					}),
-				]),
-	]
-}
-
-/**
- * Renders one record as a heading and one list item per line.
- *
- * @remarks
- * The ledger joins rendered records with one blank line.
- *
- * @param record - A record or view with a `title` and `lines`
- * @param context - Rendering facts for optional accepted amendment annotations
- * @returns `## TITLE` followed by `- LINE` for each line
- *
- * @example
- * ```ts
- * renderLedgerRecord({ title: 'Rules', lines: [{ text: 'Refunds need a manager.', source: 'user-1', sentence: 0, topics: [], role: 'user' }] })
- * // '## Rules\n- Refunds need a manager.'
- * ```
- */
-export function renderLedgerRecord(
-	record: Pick<LedgerRecord, 'title' | 'lines'>,
-	context?: LedgerRenderContext,
-): string {
-	return [
-		`## ${record.title}`,
-		...record.lines.flatMap((line) =>
-			[context === undefined ? '' : renderLedgerAnnotation(line, context), `- ${line.text}`].filter(
-				(text) => text !== '',
-			),
-		),
-	].join('\n')
-}
-
-/**
- * Renders one owner record under a `###` heading, which the records nest under their one `## Records` heading.
- *
- * @param record - An owner record or view with a `title` and `lines`
- * @param context - Rendering facts for optional accepted amendment annotations
- * @returns `### TITLE` followed by `- LINE` for each line
- *
- * @example
- * ```ts
- * renderLedgerPinned({ title: 'Odile Marlow (OM-30418)', lines: [] }) // '### Odile Marlow (OM-30418)'
- * ```
- */
-export function renderLedgerPinned(
-	record: Pick<LedgerRecord, 'title' | 'lines'>,
-	context?: LedgerRenderContext,
-): string {
-	return `#${renderLedgerRecord(record, context)}`
-}
-
-/**
- * Derives complete source identities, first occurrences, and local references from the actual lines of the records.
- * @param messages - Original messages whose indexed sentences establish completeness
- * @param lines - Retained lines in rendering order after deduplication and trimming
- * @param amendments - Accepted direct message amendment edges
- * @returns Immutable rendering facts for this retained population
- *
- * @example
- * ```ts
- * buildLedgerRenderContext([], [], []).complete.size // 0
- * ```
- */
-export function buildLedgerRenderContext(
-	messages: readonly Message[],
-	lines: readonly LedgerLine[],
-	amendments: readonly LedgerAmendment[],
-): LedgerRenderContext {
-	const identities = new Set(lines.map((line) => `${line.source} ${line.sentence}`))
-	return {
-		amendments,
-		complete: new Set(
-			messages
-				.filter((message) => {
-					const sentences = splitSentences(message.content)
-					return (
-						sentences.length > 0 &&
-						sentences.every((_, index) => identities.has(`${message.id} ${index}`))
-					)
-				})
-				.map((message) => message.id),
-		),
-		first: new Map(lines.toReversed().map((line) => [line.source, line])),
-		references: new Map(
-			[...new Set(lines.map((line) => line.source))].map((source, index) => [
-				source,
-				String(index + 1),
-			]),
-		),
-	}
-}
-
-/**
- * Renders a source's reference and its later changes at the source's first retained line.
- * @param line - The retained occurrence to annotate
- * @param context - Actual complete sources, first occurrences, local references, and accepted amendment edges
- * @returns The source's reference and its later-change notes, or empty text for an unrelated or repeated occurrence
- * @throws {LedgerError} Thrown when the context holds no reference for the annotated source or a fully included amender (code `'REFERENCE'`)
- *
- * @example
- * ```ts
- * renderLedgerAnnotation({ text: 'Unchanged.', source: 'user-1', sentence: 0, topics: [], role: 'user' }, buildLedgerRenderContext([], [], [])) // ''
- * ```
- */
-export function renderLedgerAnnotation(line: LedgerLine, context: LedgerRenderContext): string {
-	if (context.first.get(line.source) !== line) return ''
-	const amendments = context.amendments.filter((pair) => pair.earlier === line.source)
-	const endpoint =
-		context.complete.has(line.source) &&
-		context.amendments.some((pair) => pair.later === line.source && context.first.has(pair.earlier))
-	if (amendments.length === 0 && !endpoint) return ''
-	const included = amendments.filter((pair) => context.complete.has(pair.later))
-	if (
-		context.references.get(line.source) === undefined ||
-		included.some((pair) => context.references.get(pair.later) === undefined)
-	)
-		throw new LedgerError('REFERENCE', 'Ledger rendering requires retained source references')
-	return [
-		`[${context.references.get(line.source)}]`,
-		...included.map((pair) => ` Changed later by [${context.references.get(pair.later)}].`),
-		...(amendments.some((pair) => !context.complete.has(pair.later))
-			? [' A later change is not shown.']
-			: []),
-	].join('')
-}
-
-/**
  * Splits a recall key at its joints.
  *
  * @remarks
@@ -1623,47 +1270,6 @@ export function matchesCutLine(line: string): boolean {
 	return /^\d+ (?:older|more) items? (?:not shown; |didn't fit in this request; answer from the messages you can see$)/.test(
 		line,
 	)
-}
-
-/**
- * Renders the tail stub of a lookup result from an earlier request.
- *
- * @remarks
- * A `hidden` stub names the `recall` call that finds its result, with the first string argument,
- * trimmed, or `its id` when no argument is a string or that one is blank, only while `offered` is `true`. The ledger plans the
- * tail with every stub naming `recall`, then renders the tail's stubs again after it admits a window
- * rung, with `offered` set to whether that rung offers `recall` and the scope admits it, so the
- * second render can only shorten a stub and raises no price. `offered` changes no other state.
- *
- * @param name - The lookup tool name
- * @param args - The arguments the call carried; arguments JSON cannot carry leave the call as its bare tool name, per {@link renderLookupCall}
- * @param state - What became of the result: `failed`, `empty`, `shown` in the records, or `hidden` from them
- * @param write - If `true`, the call is a write's, whose `empty` state reads `changed nothing`; if `false`, a lookup's, whose `empty` state reads `no record`. Default: `false`
- * @param offered - If `true`, a `hidden` result names the `recall` route; if `false`, because the admitted rung offers no `recall` or the scope excludes it, it reads `result not shown`. Default: `true`
- * @returns The stub text, which carries the call and its state
- *
- * @example
- * ```ts
- * renderStub('lookup_order', { id: 'BW-5512' }, 'hidden')
- * // 'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512'
- * renderStub('lookup_order', { id: 'BW-5512' }, 'hidden', false, false)
- * // 'lookup_order {"id":"BW-5512"}: result not shown'
- * ```
- */
-export function renderStub(
-	name: string,
-	args: Readonly<Record<string, unknown>>,
-	state: LedgerLookupState,
-	write = false,
-	offered = true,
-): string {
-	const head = renderLookupCall(name, args)
-	if (state === 'failed') return `${head}: failed`
-	if (state === 'empty') return write ? `${head}: changed nothing` : `${head}: no record`
-	if (state === 'shown') return `${head}: result shown under Records below`
-	if (!offered) return `${head}: result not shown`
-	const id = Object.values(args).find(isString)
-	return `${head}: result not shown; call recall with ${(id ?? '').trim() || 'its id'}`
 }
 
 /**
@@ -2098,40 +1704,6 @@ export function buildLines(
 }
 
 /**
- * Encodes a sentence's record placement without comparing rendered text.
- * @param line - The record key, title, source, and zero-based sentence index
- * @returns The serialized placement identity
- * @example
- * ```ts
- * buildLedgerLineKey({ key: 'rules', title: 'Rules', source: 'one', sentence: 0 })
- * ```
- */
-export function buildLedgerLineKey(
-	line: Pick<LedgerOccurrence, 'key' | 'title' | 'source' | 'sentence'>,
-): string {
-	return JSON.stringify([line.key, line.title, line.source, line.sentence])
-}
-
-/**
- * Collects the record's sentence receipts not already held by a window.
- * @param record - The selected record with its original sentence identities
- * @param held - Placement identities already rendered in the window
- * @returns The remaining sentences with their record placement
- * @example
- * ```ts
- * collectLedgerLines({ key: 'rules', title: 'Rules', members: [], lines: [] }, new Set()) // []
- * ```
- */
-export function collectLedgerLines(
-	record: LedgerRecord,
-	held: ReadonlySet<string>,
-): readonly LedgerOccurrence[] {
-	return record.lines
-		.map((line) => ({ ...line, key: record.key, title: record.title }))
-		.filter((line) => !held.has(buildLedgerLineKey(line)))
-}
-
-/**
  * Selects each marked request's unambiguous final call-free reply.
  * @param messages - Stored conversation messages in order
  * @param requests - Marked request ids delimiting reply intervals
@@ -2168,36 +1740,6 @@ export function collectLedgerReplies(
 				: []
 		}),
 	)
-}
-
-/**
- * Captures source bytes and direct amendment edges for a held window.
- * @param messages - Current stored messages
- * @param sources - Requests, replies, and record sources the window holds
- * @param amendments - Accepted direct amendment edges from the current projection
- * @returns Source and edge identities for stale detection
- * @example
- * ```ts
- * collectLedgerEvidence([], new Set(), []).messages.size // 0
- * ```
- */
-export function collectLedgerEvidence(
-	messages: readonly Message[],
-	sources: ReadonlySet<string>,
-	amendments: readonly LedgerAmendment[],
-): LedgerEvidence {
-	return {
-		messages: new Set(
-			messages
-				.filter((message) => sources.has(message.id))
-				.map((message) => JSON.stringify(['message', message])),
-		),
-		amendments: new Map(
-			amendments
-				.filter((edge) => sources.has(edge.earlier) || sources.has(edge.later))
-				.map((edge) => [JSON.stringify(['edge', edge.earlier, edge.later]), { ...edge }]),
-		),
-	}
 }
 
 /**

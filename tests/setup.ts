@@ -278,7 +278,6 @@ import {
 	createRelay,
 	LEDGER_CATEGORIES,
 	RelayProvider,
-	renderStub,
 } from '@src/core'
 import { createBudget } from '@orkestrel/budget'
 import type {
@@ -314,7 +313,6 @@ import type {
 	LedgerOptions,
 	LedgerProjection,
 	LedgerProjectionInput,
-	LedgerProjectionRequest,
 	LedgerSnapshot,
 	LedgerThreshold,
 	AgentContextInterface,
@@ -2913,7 +2911,7 @@ export async function serveLedgerFit(options: {
 			capacity: options.capacity,
 			predict: options.predict,
 			lookups: [],
-			share: { prompt: 1, tail: 0.001 },
+			share: { prompt: 1 },
 			gauge: { scale: 1.16, overhead: 150 },
 		}),
 	)
@@ -2964,7 +2962,7 @@ export async function serveLedgerBoundary(options: {
 	)
 	const configured = buildLedgerOptions({
 		predict: options.predict,
-		share: { prompt: 1, tail: 0.001 },
+		share: { prompt: 1 },
 	})
 	const ledger = createLedger(
 		provider,
@@ -2996,9 +2994,6 @@ export class FailingProvider extends ScriptedProvider {
 	}
 }
 
-/** Supplies previous reply sizes for the records and recall admission differentials. */
-export const LEDGER_ADMISSION_SIZES = Object.freeze([120, 2048, 8192, 14336])
-
 /** Supplies line separators whose stored label continuations must be indented. */
 export const LEDGER_LABEL_BREAKS = Object.freeze([
 	'\n',
@@ -3010,73 +3005,6 @@ export const LEDGER_LABEL_BREAKS = Object.freeze([
 	'\u2028',
 	'\u2029',
 ])
-
-/**
- * Runs the C2 inputs with a reply or blank-reply control at the same observed completion reserve.
- * A zero prompt report leaves the configured gauge scale intact. Both ledgers observe the same
- * completion before the control blanks its stored reply, so only carry eligibility changes.
- * @param size - The previous reply's character count
- * @param notes - The seed's note count: 40 for C2a, 60 for C2b
- * @param blank - Whether to blank the previous reply after observing its completion
- * @returns The raw first-call messages, their records, the previous reply, and recall output
- */
-export async function serveLedgerAdmission(size: number, notes: number, blank: boolean) {
-	const reply = (notes === 40 ? 'word ' : 'warehouse ').repeat(size).slice(0, size)
-	const provider = createScriptedProvider(
-		[
-			{
-				content: reply,
-				usage: { prompt: 0, completion: Math.ceil(size / 4), total: Math.ceil(size / 4) },
-			},
-			{
-				content: '',
-				tools: [{ id: 'admission-recall', name: 'recall', arguments: { key: 'note' } }],
-			},
-			{ content: 'Done.' },
-		],
-		{ recorded: true },
-	)
-	const ledger = createLedger(
-		provider,
-		buildLedgerOptions({
-			topics: [],
-			capacity: 19968,
-			predict: 8192,
-			share: { prompt: 1, tail: 0.35 },
-			gauge: { scale: 0.978, overhead: 926.49 },
-		}),
-	)
-	ledger.conversation.add(
-		buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund due $148.50.'),
-	)
-	for (const index of Array.from({ length: notes }, (_unused, at) => at))
-		ledger.conversation.add({
-			role: 'user',
-			content:
-				`Brightwater Studio note ${index}: the desk logged a routine update for this account. `.repeat(
-					4,
-				),
-		})
-	await ledger.respond(notes === 40 ? 'Write the long report.' : 'Tell me about the warehouse.')
-	if (blank) {
-		ledger.conversation.remove(requireValue(ledger.conversation.messages().at(-1)).id)
-		ledger.conversation.add({ role: 'assistant', content: '' })
-	}
-	await ledger.respond(
-		notes === 40
-			? 'Find the notes.'
-			: 'What is the refund due on Brightwater Studio order BW-20931?',
-	)
-	const messages = requireValue(provider.calls[1]).messages
-	return {
-		messages,
-		reply,
-		records: extractLedgerRecords(messages),
-		recalled: requireValue(
-			ledger.conversation.messages().find((message) => message.call === 'admission-recall'),
-		).content,
-	}
-}
 
 /** Records iterator entry and return while forwarding a real scripted generator. */
 export class RecordedProvider extends ScriptedProvider {
@@ -4670,37 +4598,14 @@ export async function serveIngressCanary(
  * {@link serveRecordsDesk} serves, every field except the stored `id`.
  *
  * @remarks
- * Written by hand from the request layout: the `system` message holds the system text alone, the
- * seed lookups follow as tail stubs, and the last `user` message is the built copy of the request,
- * the records, then `## Request`, then the prompt.
+ * Written by hand from the opening layout: the `system` message holds the system text alone, and
+ * the request goes bare. The seed lookups are earlier messages, which the opening does not send,
+ * and their text carries no id, so the copy has no Earlier index; `recall` still finds them by the
+ * owner's name.
  */
 export const RECORDED_FIRST_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freeze([
 	{ role: 'system', content: 'Serve the desk.' },
-	{
-		role: 'assistant',
-		content: '',
-		calls: [{ id: 'owner-0', name: 'lookup', arguments: { id: 'order:BW-5512' } }],
-	},
-	{
-		role: 'tool',
-		call: 'owner-0',
-		content: 'lookup {"id":"order:BW-5512"}: result shown under Records below',
-	},
-	{
-		role: 'assistant',
-		content: '',
-		calls: [{ id: 'owner-1', name: 'lookup', arguments: { id: 'customer:BW-20931' } }],
-	},
-	{
-		role: 'tool',
-		call: 'owner-1',
-		content: 'lookup {"id":"customer:BW-20931"}: result shown under Records below',
-	},
-	{
-		role: 'user',
-		content:
-			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
-	},
+	{ role: 'user', content: 'Check Brightwater Studio.' },
 ])
 
 /**
@@ -4708,16 +4613,12 @@ export const RECORDED_FIRST_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object
  * {@link serveRecordsDesk} serves, every field except the stored `id`.
  *
  * @remarks
- * Written by hand from the request layout: the answer pass keeps the `system` message and the
- * request copy of the first pass, drops the tool stubs and the call messages, and ends in the cue.
+ * Written by hand from the opening layout: the answer pass keeps the `system` message and the
+ * request without an Earlier index, and ends in the cue.
  */
 export const RECORDED_ANSWER_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freeze([
 	{ role: 'system', content: 'Serve the desk.' },
-	{
-		role: 'user',
-		content:
-			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
-	},
+	{ role: 'user', content: 'Check Brightwater Studio.' },
 	{
 		role: 'user',
 		content: 'Give your complete answer to the request now, from what you already have.',
@@ -4729,38 +4630,16 @@ export const RECORDED_ANSWER_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Objec
  * {@link serveRecordsDesk} serves, every field except the stored `id`.
  *
  * @remarks
- * Written by hand from the request layout: a late request sends the seed tail, the previous
- * exchange with its sent copy, then the plain request when the window holds every record line.
+ * Written by hand from the opening layout: the first request and its reply are now earlier, so the
+ * request copy carries the Earlier index with the `previous` key, then `## Request` and the prompt.
  */
 export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freeze([
 	{ role: 'system', content: 'Serve the desk.' },
 	{
-		role: 'assistant',
-		content: '',
-		calls: [{ id: 'owner-0', name: 'lookup', arguments: { id: 'order:BW-5512' } }],
-	},
-	{
-		role: 'tool',
-		call: 'owner-0',
-		content: 'lookup {"id":"order:BW-5512"}: result shown under Records below',
-	},
-	{
-		role: 'assistant',
-		content: '',
-		calls: [{ id: 'owner-1', name: 'lookup', arguments: { id: 'customer:BW-20931' } }],
-	},
-	{
-		role: 'tool',
-		call: 'owner-1',
-		content: 'lookup {"id":"customer:BW-20931"}: result shown under Records below',
-	},
-	{
 		role: 'user',
 		content:
-			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.\n\n## Request\nCheck Brightwater Studio.',
+			'## Earlier\nEarlier messages are stored, not shown. Call recall with a key below.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too.\n\n## Request\nCheck Brightwater Studio again.',
 	},
-	{ role: 'assistant', content: 'Done.' },
-	{ role: 'user', content: 'Check Brightwater Studio again.' },
 ])
 
 /** Carries the manager-options `open` override that {@link resolveSectionOpen} reads, when one applies. */
@@ -6188,15 +6067,6 @@ export function createLedgerDesk(): LedgerProjectionInput {
 }
 
 /**
- * Builds the request that names the desk scenario's Brightwater Studio owner and its refunds topic.
- *
- * @returns The projection request
- */
-export function createLedgerRequest(): LedgerProjectionRequest {
-	return { owners: ['BW-20931'], topics: ['refunds'] }
-}
-
-/**
  * Reverses an iterable into a separate list.
  * @param members - The members to reverse
  * @returns The members in reverse order
@@ -6561,29 +6431,6 @@ export const LEDGER_PRESERVATION_FIXTURE = Object.freeze({
 	]),
 })
 
-/** Supplies equal-member owner records and a separate rules record for request views. */
-export const LEDGER_OWNER_PROJECTION: LedgerProjection = Object.freeze({
-	records: Object.freeze([
-		...['BW-5512', 'BW-20931'].map((id) => ({
-			key: `owner:${id}`,
-			title: `Brightwater Studio (${id})`,
-			members: ['shared-a', 'shared-b'],
-			lines: [
-				buildLedgerLine('shared-a', 0, 'Brightwater Studio ordered glazed lanterns.'),
-				buildLedgerLine('shared-b', 0, 'Collection is Friday.'),
-			],
-		})),
-		{
-			key: 'rules',
-			title: 'Rules',
-			members: ['rule'],
-			lines: [buildLedgerLine('rule', 0, 'Keep the receipt.')],
-		},
-	]),
-	amendments: [],
-	orphans: [],
-})
-
 /** Supplies distinct lookup subjects whose shared name places both findings on both owners. */
 export const LEDGER_OWNER_FIXTURE = Object.freeze({
 	owners: Object.freeze([
@@ -6597,22 +6444,6 @@ export const LEDGER_OWNER_FIXTURE = Object.freeze({
 	request: 'Check Brightwater Studio.',
 })
 
-/** Supplies the full and single-cut records of the equal-member owner view. */
-export const LEDGER_OWNER_RENDER_CASES = Object.freeze([
-	{
-		title: 'renders equal-member owners once under both titles',
-		capacity: 4096,
-		records:
-			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Brightwater Studio ordered glazed lanterns.\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
-	},
-	{
-		title: 'trims the merged owner record by its oldest line',
-		capacity: 74,
-		records:
-			'## Records\n### Brightwater Studio (order:BW-5512); Brightwater Studio (customer:BW-20931)\n- Collection is Friday.\n- Brightwater Studio paid in full.\n- Keep the receipt.',
-	},
-])
-
 /** Supplies the owner-record trim order: a seed finding, three user texts in conversation order, and whether each cut keeps the newer fact beside the correction. */
 export const LEDGER_TRIM_ORDER_FIXTURE = Object.freeze({
 	seed: 'Account BW-20931: Brightwater Studio.',
@@ -6623,77 +6454,6 @@ export const LEDGER_TRIM_ORDER_FIXTURE = Object.freeze({
 	cuts: Object.freeze([
 		{ title: 'keeps the correction and the newer fact', kept: true },
 		{ title: 'keeps the correction alone', kept: false },
-	]),
-})
-
-/** Supplies the ruled-line trim order: a seed finding, two corrections in one owner record in conversation order, and the request. */
-export const LEDGER_TRIM_RULED_FIXTURE = Object.freeze({
-	seed: 'Account BW-20931: Brightwater Studio.',
-	first: 'Brightwater Studio moved the pickup to Monday.',
-	second: 'Brightwater Studio moved the pickup to Tuesday.',
-	request: 'Check Brightwater Studio.',
-})
-
-/** Supplies the trim across an accepted amendment: a seed finding, a filed correction and the fact that amends it, three sentences each, then each cut of their owner record, whose second step removes the later source's first line and so turns the earlier source's note to the omission note. */
-export const LEDGER_TRIM_FLIP_FIXTURE = Object.freeze({
-	seed: 'Account BW-20931: Brightwater Studio.',
-	earlier:
-		'Code BW-20931 leaves from the north dock today. The north dock opens at nine on every weekday. The dock foreman signs each release sheet here.',
-	later:
-		'Code BW-20931 leaves from the south dock instead. The south dock opens at ten on every weekday. The yard clerk signs each release sheet there.',
-	request: 'Check Brightwater Studio.',
-	cuts: Object.freeze([
-		{
-			title: 'after the seed, with the later source whole',
-			lines: [
-				'[1] Changed later by [2].',
-				'- Code BW-20931 leaves from the north dock today.',
-				'- The north dock opens at nine on every weekday.',
-				'- The dock foreman signs each release sheet here.',
-				'[2]',
-				'- Code BW-20931 leaves from the south dock instead.',
-				'- The south dock opens at ten on every weekday.',
-				'- The yard clerk signs each release sheet there.',
-			],
-		},
-		{
-			title: 'at the flip, with the later source short one line',
-			lines: [
-				'[1] A later change is not shown.',
-				'- Code BW-20931 leaves from the north dock today.',
-				'- The north dock opens at nine on every weekday.',
-				'- The dock foreman signs each release sheet here.',
-				'- The south dock opens at ten on every weekday.',
-				'- The yard clerk signs each release sheet there.',
-			],
-		},
-		{
-			title: 'past the flip, with one line of the later source left',
-			lines: [
-				'[1] A later change is not shown.',
-				'- Code BW-20931 leaves from the north dock today.',
-				'- The north dock opens at nine on every weekday.',
-				'- The dock foreman signs each release sheet here.',
-				'- The yard clerk signs each release sheet there.',
-			],
-		},
-		{
-			title: 'with the later source gone',
-			lines: [
-				'[1] A later change is not shown.',
-				'- Code BW-20931 leaves from the north dock today.',
-				'- The north dock opens at nine on every weekday.',
-				'- The dock foreman signs each release sheet here.',
-			],
-		},
-		{
-			title: 'with the earlier source short one line',
-			lines: [
-				'[1] A later change is not shown.',
-				'- The north dock opens at nine on every weekday.',
-				'- The dock foreman signs each release sheet here.',
-			],
-		},
 	]),
 })
 
@@ -6820,16 +6580,16 @@ export function buildLedgerOptions(overrides: Partial<LedgerOptions> = {}): Ledg
 }
 
 /**
- * Seeds a filed fact too large for the seed tail and unrelated to the desk's selected topics.
- * It keeps recall reachable without matching the scenario's listing. Its size can also push later
- * lookup calls and stubs out of the seed tail when they share its exchange.
+ * Seeds a filed fact unrelated to the desk's selected topics and larger than any opening a test
+ * plans, at 115,000 estimate units, so every plan cuts it and leaves it behind.
+ * It keeps recall reachable without matching the scenario's listing.
  * @param ledger - The ledger before its scenario's seed messages are added
  * @returns The stored hidden statement
  */
 export function seedLedgerRecall(ledger: LedgerInterface): Message {
 	const message = ledger.conversation.add({
 		role: 'user',
-		content: 'archived zephyr detail '.repeat(4096),
+		content: 'archived zephyr detail '.repeat(20000),
 	})
 	ledger.conversation.judgments.add(buildLedgerJudgment(message))
 	return message
@@ -7232,16 +6992,74 @@ export const LEDGER_HIDDEN_LOOKUPS: readonly LedgerLookup[] = Object.freeze(
 	})),
 )
 
-/** Holds the user text of each seed exchange a plan-budget case fills its tail with. */
-export const LEDGER_PLAN_REMARK = 'Plain remark about the desk.'
+/** Holds the user text of each seed exchange a plan-budget case fills its opening with; it carries no id. */
+export const LEDGER_PLAN_REMARK =
+	'Plain remark about the desk: the counter opens at nine, the stock arrives on Tuesdays, and the staff wait at the back door.'
 
-/** Holds the seed exchanges of a plan-budget case: more remark and reply pairs than any case's tail keeps. */
+/**
+ * Holds the seed exchanges of a plan-budget case: remark and reply pairs before any request, so every
+ * remark is a current statement, and more than most cases' budgets keep. The replies are never sent,
+ * so they keep `recall` offered.
+ */
 export const LEDGER_PLAN_SEED: readonly MessageInput[] = Object.freeze(
 	Array.from({ length: 30 }, (): readonly MessageInput[] => [
 		{ role: 'user', content: LEDGER_PLAN_REMARK },
 		{ role: 'assistant', content: 'Noted.' },
 	]).flat(),
 )
+
+/** Holds how many {@link LEDGER_PLAN_REMARK} statements a call kept and how many a plan budget allows. */
+export interface LedgerPlanFit {
+	readonly kept: number
+	readonly fit: number
+}
+
+/**
+ * Counts the {@link LEDGER_PLAN_REMARK} statements a call kept, beside the newest count a plan budget
+ * allows: the largest count whose opening, the head of `sent`, those remarks, and then the request,
+ * prices within `total` at `scale`.
+ *
+ * @remarks
+ * No remark carries an id and no request came before them, so the request goes bare and the call
+ * carries the stored request. The head is what `sent` holds ahead of its remarks and the request. A
+ * first pass the gate refuses leaves the answer pass, which sends the plan's remarks and request too.
+ *
+ * @param sent - The messages of the call that carried the opening
+ * @param stored - The stored conversation, which holds the remarks and the request
+ * @param request - The request text
+ * @param scale - The gauge scale the plan prices at
+ * @param total - The plan budget
+ * @returns The kept count and the allowed count, 0 when not even the request fits
+ * @throws {Error} Thrown when `sent` carries no stored message with the request text
+ */
+export function countLedgerPlanFit(
+	sent: readonly Message[],
+	stored: readonly Message[],
+	request: string,
+	scale: number,
+	total: number,
+): LedgerPlanFit {
+	const entered = requireValue(stored.find((message) => message.content === request))
+	const remarks = stored.filter((message) => message.content === LEDGER_PLAN_REMARK)
+	const kept = sent.filter(
+		(message) => message.role === 'user' && message.content === LEDGER_PLAN_REMARK,
+	).length
+	const at = sent.findIndex((message) => message.id === entered.id)
+	if (at < 0) throw new Error('the call carries no stored request')
+	const head = sent.slice(0, at - kept)
+	const prices = Array.from(
+		{ length: remarks.length + 1 },
+		(_, count) =>
+			scale * estimateMessages([...head, ...remarks.slice(remarks.length - count), entered]),
+	)
+	return {
+		kept,
+		fit: Math.max(
+			0,
+			prices.findLastIndex((price) => price <= total),
+		),
+	}
+}
 
 /**
  * Holds plan-budget cases over `buildLedgerOptions` with {@link LEDGER_HIDDEN_LOOKUPS}: a calibrated
@@ -7349,38 +7167,6 @@ export function seedLedgerTrimOrder(ledger: LedgerInterface): void {
 				},
 			}),
 		)
-}
-
-/**
- * Seeds a ledger's conversation with {@link LEDGER_TRIM_FLIP_FIXTURE}: the seed exchange, the earlier
- * text filed as a `correction`, and the later text filed as a `fact` whose `amends` answer the
- * ledger accepts, so the later text's lines drop first.
- * @param ledger - The ledger whose conversation takes the fixture
- */
-export function seedLedgerTrimFlip(ledger: LedgerInterface): void {
-	const fixture = LEDGER_TRIM_FLIP_FIXTURE
-	ledger.conversation.add(buildLedgerExchange(fixture.seed))
-	const earlier = ledger.conversation.add({ role: 'user', content: fixture.earlier })
-	const later = ledger.conversation.add({ role: 'user', content: fixture.later })
-	for (const message of [earlier, later])
-		ledger.conversation.judgments.add(
-			buildLedgerJudgment(message, {
-				answer: {
-					form: 'choice',
-					probabilities: {
-						fact: message === later ? 1 : 0,
-						rule: 0,
-						correction: message === later ? 0 : 1,
-						request: 0,
-						opinion: 0,
-						chatter: 0,
-						distractor: 0,
-					},
-				},
-			}),
-		)
-	ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
-	ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
 }
 
 /**
@@ -8015,21 +7801,25 @@ export function buildLedgerContactOptions(
 
 /**
  * Serves two contact requests through a ledger: the first reads contact C-12 and then writes its
- * phone to 555-0102, and the second asks for the phone.
+ * phone to 555-0102, and the second asks for the phone. A host `recall` call for `C-12` follows.
  *
  * @remarks
  * With `abort`, the first request's signal aborts at the write's `ask` event, so the second request
  * takes the turn the first one left unread as its reply.
  *
  * @param options - The book, the host authority, the write replacing the book's, and whether the write's `ask` aborts the first request
- * @returns The ledger and its recorded provider
+ * @returns The ledger, its recorded provider, and what the host's recall of `C-12` listed
  */
 export async function serveLedgerContactWrite(options: {
 	readonly book: LedgerContactBook
 	readonly authority: AuthorityInterface
 	readonly write?: LedgerWrite
 	readonly abort?: boolean
-}): Promise<{ readonly ledger: LedgerInterface; readonly provider: ScriptedProviderInterface }> {
+}): Promise<{
+	readonly ledger: LedgerInterface
+	readonly provider: ScriptedProviderInterface
+	readonly listed: string
+}> {
 	const provider = createScriptedProvider(
 		[
 			{ content: '', tools: [{ id: 'read-1', name: 'lookup_contact', arguments: { id: 'C-12' } }] },
@@ -8056,7 +7846,16 @@ export async function serveLedgerContactWrite(options: {
 	if (options.abort === true) ledger.agent.emitter.on('ask', () => controller.abort('stop'))
 	await ledger.respond("Change Mara Quill's phone to 555-0102.", controller.signal)
 	await ledger.respond("What is Mara Quill's phone?")
-	return { ledger, provider }
+	const recalled = await ledger.agent.context.tools.execute({
+		id: 'host',
+		name: 'recall',
+		arguments: { key: 'C-12' },
+	})
+	return {
+		ledger,
+		provider,
+		listed: recalled.success ? String(recalled.value) : recalled.error,
+	}
 }
 
 /**
@@ -8244,22 +8043,19 @@ export async function serveLedgerAnswer(options: {
 
 /**
  * Projects a ledger snapshot to what two ledgers that served the same turns share, leaving out the
- * conversation id each one minted, the wall-clock time each judgment was recorded at, and the
- * window's digest, which covers the minted message ids.
+ * conversation id each one minted and the wall-clock time each judgment was recorded at.
  *
  * @param snapshot - The snapshot to project
  * @returns The snapshot without those fields
  */
 export function projectLedgerSnapshot(snapshot: LedgerSnapshot): unknown {
 	const { id: _id, judgments, ...conversation } = snapshot.conversation
-	const { digest: _digest, ...window } = snapshot.window ?? { digest: '' }
 	return {
 		...snapshot,
 		conversation: {
 			...conversation,
 			judgments: judgments?.map(({ time: _time, ...judgment }) => judgment),
 		},
-		...(snapshot.window === undefined ? {} : { window }),
 	}
 }
 
@@ -8339,53 +8135,6 @@ export async function planLedgerDelivery(
 		content,
 	])
 }
-/** Lists the record fragments of the {@link collectLedgerMarkers} desk in their removal order. */
-export const LEDGER_RECORD_MARKERS = Object.freeze([
-	'Keep the loading dock at warehouse 42 clear.',
-	'The Northgate courier brings refund forms on 2026-10-12.',
-	'Refunds over $100 need a manager.',
-	'Order BW-5512 for account BW-20931: Brightwater Studio.',
-	'Refund due $148.50.',
-])
-
-/**
- * Collects the record fragments a desk request copy retains at a supplied capacity.
- * @param capacity - The context capacity
- * @returns The retained record fragments in removal order
- */
-export async function collectLedgerMarkers(capacity: number): Promise<readonly string[]> {
-	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-	const ledger = createLedger(
-		provider,
-		buildGuideLedgerOptions({
-			judge: createPhraseJudge(['Keep the loading', 'Refunds over']),
-			capacity,
-			gauge: { scale: 1, overhead: 0 },
-			share: { prompt: 1, tail: 0.05 },
-			lookups: [LEDGER_ORDER_LOOKUP],
-		}),
-	)
-	ledger.conversation.add([
-		{ role: 'user', content: 'Keep the loading dock at warehouse 42 clear.' },
-		{ role: 'user', content: 'Refunds over $100 need a manager.' },
-		{ role: 'user', content: 'The Northgate courier brings refund forms on 2026-10-12.' },
-		{
-			role: 'assistant',
-			content: '',
-			calls: [{ id: 'seed', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
-		},
-		{
-			role: 'tool',
-			call: 'seed',
-			content: 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.',
-		},
-	])
-	await ledger.respond('Does the Brightwater Studio refund need a manager?')
-	const records = extractLedgerRecords(
-		requireValue(provider.calls[0], 'Missing first call').messages,
-	)
-	return LEDGER_RECORD_MARKERS.filter((marker) => records.includes(marker))
-}
 /** Supplies the original amended rule. */
 export const LEDGER_AMENDED_RULE = 'Refunds for Brightwater Studio need a manager. Use code AA-10.'
 /** Supplies the original desk statement. */
@@ -8397,8 +8146,9 @@ export const LEDGER_AMENDED_CORRECTION =
 export const LEDGER_AMENDED_TEXT =
 	'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'
 /**
- * Serves a request that recalls a desk topic and its amended owner record.
- * @returns The pass result and each recorded provider prompt
+ * Serves a request that recalls a desk topic and its amended owner record, after a first request
+ * that leaves the seed earlier, so `recall` lists it.
+ * @returns The second request's pass result and each provider prompt it recorded
  */
 export async function serveAmendedDesk(): Promise<{
 	readonly result: LedgerResult
@@ -8406,6 +8156,7 @@ export async function serveAmendedDesk(): Promise<{
 }> {
 	const provider = createScriptedProvider(
 		[
+			{ content: 'Noted.' },
 			{
 				content: '',
 				tools: [
@@ -8452,8 +8203,9 @@ export async function serveAmendedDesk(): Promise<{
 		{ role: 'assistant', content: LEDGER_AMENDED_STATEMENT },
 		{ role: 'user', content: LEDGER_AMENDED_CORRECTION },
 	])
+	await ledger.respond('Note the desk.')
 	const result = await ledger.respond('Review the Brightwater Studio refund.')
-	return { result, prompts: provider.calls.map(({ messages }) => messages) }
+	return { result, prompts: provider.calls.slice(1).map(({ messages }) => messages) }
 }
 
 /**
@@ -9350,9 +9102,6 @@ export const PAGE_REFUSED_BODIES: ReadonlyArray<
 	['{"category":', 'SYNTAX'],
 ])
 
-/** Supplies the ledger overhead cases scenario inputs. */
-export const LEDGER_OVERHEAD_CASES = Object.freeze([0, 200])
-
 /** Supplies the ledger thinking cases scenario inputs. */
 export const LEDGER_THINKING_CASES = Object.freeze([true, false, undefined])
 
@@ -9421,41 +9170,6 @@ export const SYSTEM_ONE_MODEL_CASES = Object.freeze([
 	SYSTEM_ONE_LLAMA,
 	SYSTEM_ONE_MICA,
 ])
-
-/** Carries the independent lookup stubs that straddle the tail allowance. */
-export interface LedgerTailScenario {
-	readonly request: Message
-	readonly seed: ReadonlyArray<Message & MessageInput>
-	readonly boundaries: readonly [Message & MessageInput, Message & MessageInput]
-}
-
-/**
- * Builds fresh hidden and shown lookup stubs with their request and seed call.
- * @returns The scenario's messages and ordered stub variants
- */
-export function buildLedgerTailScenario(): LedgerTailScenario {
-	const request: Message = { id: 'request', role: 'user', content: 'Check BW-5512.' }
-	const seed: ReadonlyArray<Message & MessageInput> = [
-		{ id: 'seed', role: 'user', content: 'Read the order.' },
-		{
-			id: 'leader',
-			role: 'assistant',
-			content: '',
-			calls: [{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
-		},
-	]
-	const hidden: Message & MessageInput = {
-		id: 'result',
-		role: 'tool',
-		call: 'c1',
-		content: renderStub('lookup_order', { id: 'BW-5512' }, 'hidden'),
-	}
-	const shown: Message & MessageInput = {
-		...hidden,
-		content: renderStub('lookup_order', { id: 'BW-5512' }, 'shown'),
-	}
-	return { request, seed, boundaries: [hidden, shown] }
-}
 
 /** Supplies the messages for refused, deterministic, and transient judge failures. */
 export const LEDGER_FAILURE_MESSAGES: readonly [string, string, string] = Object.freeze([
@@ -9597,8 +9311,10 @@ export interface CanaryDesk {
  * The seed holds a rule carrying the rule sentinel and a lookup finding, filed onto its owner,
  * carrying the finding sentinel; the system text carries the system sentinel and the judge is
  * {@link createCanaryJudge}. The first request carries the user sentinel, and its first pass calls
- * a note lookup whose result carries the tool sentinel, under content carrying the assistant
- * sentinel, then ends empty, so an answer pass runs. A late request follows, then a direct
+ * a note lookup whose result carries the tool sentinel and a `recall` of `BW-5512`, which lists the
+ * earlier finding, under content carrying the assistant sentinel, then ends empty, so an answer
+ * pass runs. The seed rule is a current statement the opening sends whole, and the finding reaches
+ * a prompt only through that recall. A late request follows, then a direct
  * `agent.context.select` for a user message no request owns, whose selection faults with code
  * `'REQUEST'`.
  * The `agent` option takes {@link createCanarySkills} and {@link createCanaryMemos}, which supply the
@@ -9611,7 +9327,10 @@ export async function serveCanaryDesk(): Promise<CanaryDesk> {
 		[
 			{
 				content: `Checking ${CANARY_SENTINELS.assistant}.`,
-				tools: [{ id: 'note', name: 'lookup_note', arguments: { topic: 'dock' } }],
+				tools: [
+					{ id: 'note', name: 'lookup_note', arguments: { topic: 'dock' } },
+					{ id: 'order', name: 'recall', arguments: { key: 'BW-5512' } },
+				],
 			},
 			{ content: '' },
 			{ content: 'Done.' },
@@ -9624,7 +9343,7 @@ export async function serveCanaryDesk(): Promise<CanaryDesk> {
 			judge: createCanaryJudge(['Keep the loading']),
 			system: `Serve the ${CANARY_SENTINELS.system} desk.`,
 			capacity: 4096,
-			share: { prompt: 1, tail: 0.001 },
+			share: { prompt: 1 },
 			agent: {
 				skills: createCanarySkills(),
 				memos: createCanaryMemos(),
@@ -9697,8 +9416,8 @@ export interface RecordsDesk {
  * record.
  *
  * @remarks
- * The seed lookups fit the tail. The first request's first pass ends empty, so an answer pass
- * runs, and the second request asks again for the same owner.
+ * The seed lookups are earlier messages the opening does not send. The first request's first pass
+ * ends empty, so an answer pass runs, and the second request asks again for the same owner.
  *
  * @returns The provider calls, the selections, and the stored messages
  */
@@ -9712,7 +9431,7 @@ export async function serveRecordsDesk(): Promise<RecordsDesk> {
 		buildLedgerOptions({
 			judge: createPhraseJudge([]),
 			topics: [],
-			share: { prompt: 1, tail: 0.35 },
+			share: { prompt: 1 },
 			lookups: [
 				{
 					tool: createTool({ name: 'lookup', execute: () => '' }),
@@ -9740,16 +9459,32 @@ export async function serveRecordsDesk(): Promise<RecordsDesk> {
 }
 
 /**
- * Extracts the records a ledger wrote into the request copy among `messages`.
+ * Calls a ledger's `recall` tool by hand between requests, as a host does, and reads its listing.
+ *
+ * @param ledger - The ledger whose `recall` tool to call
+ * @param key - The recall key
+ * @returns The listing, or the failure text when the call fails
+ */
+export async function recallLedger(ledger: LedgerInterface, key: string): Promise<string> {
+	const result = await ledger.agent.context.tools.execute({
+		id: 'host',
+		name: 'recall',
+		arguments: { key },
+	})
+	return result.success ? String(result.value) : result.error
+}
+
+/**
+ * Extracts the Earlier index a ledger wrote into the request copy among `messages`.
  *
  * @remarks
  * The request copy is the last `user` message whose content carries a `## Request` heading: the
- * records, a blank line, the heading, then the prompt. Messages without one carry no records.
+ * index, a blank line, the heading, then the prompt. A request sent bare carries no index.
  *
  * @param messages - The messages of one provider call or one selection
- * @returns The records ahead of the `## Request` heading, or empty text when no copy carries any
+ * @returns The index ahead of the `## Request` heading, or empty text when no copy carries one
  */
-export function extractLedgerRecords(messages: readonly Message[]): string {
+export function extractLedgerIndex(messages: readonly Message[]): string {
 	const copy = messages.findLast(
 		(message) => message.role === 'user' && message.content.includes('\n\n## Request\n'),
 	)
@@ -9947,8 +9682,108 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	notes: ['note'],
 	failures: ['failure'],
 	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-19.
-	gauge: { scale: 2, overhead: 10, digest: '27bbbddced4effd2', model: SCRIPTED_MODEL },
+	gauge: { scale: 2, overhead: 10, digest: 'aad7f66c7fd84356', model: SCRIPTED_MODEL },
 })
+
+/**
+ * Holds a hand-built ledger snapshot for the lean opening's cut order: three orders each stated in
+ * two earlier messages, an answered request, and then three current crate statements of 200
+ * characters, oldest first.
+ *
+ * @remarks
+ * The earlier orders give the Earlier index three recurring id rows, `AX-3`, `AX-2`, and `AX-1`,
+ * newest first, after `previous`. Each crate statement carries its own id, `CR-1` to `CR-3`, which
+ * gets a row only once its statement is cut.
+ */
+export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
+	conversation: {
+		id: 'cut',
+		messages: [
+			{ id: 'shipped-1', role: 'user', content: 'Order AX-1 shipped Monday.' },
+			{ id: 'shipped-2', role: 'user', content: 'Order AX-2 shipped Tuesday.' },
+			{ id: 'shipped-3', role: 'user', content: 'Order AX-3 shipped Wednesday.' },
+			{ id: 'late-1', role: 'user', content: 'Order AX-1 arrived late.' },
+			{ id: 'late-2', role: 'user', content: 'Order AX-2 arrived late.' },
+			{ id: 'late-3', role: 'user', content: 'Order AX-3 arrived late.' },
+			{ id: 'first', role: 'user', content: 'Note the orders.' },
+			{ id: 'noted', role: 'assistant', content: 'Noted.' },
+			...['lamps', 'glass', 'tiles'].map((goods, at) => ({
+				id: `crate-${at + 1}`,
+				role: 'user' as const,
+				content: `Crate CR-${at + 1} holds ${goods}. ${'c'.repeat(200 - 19 - goods.length)}`,
+			})),
+		],
+	},
+	requests: ['first'],
+	notes: [],
+	failures: [],
+})
+
+/** Carries what a lean opening sent: the ids of its statements and the names its Earlier index lists. */
+export interface LedgerOpening {
+	readonly statements: readonly string[]
+	readonly keys: readonly string[]
+}
+
+/**
+ * Reads the opening a ledger's first call sent: the ids of the messages between the system message
+ * and the request copy, and the key names of the copy's Earlier index, in order.
+ *
+ * @param messages - The messages of the first call, its system message first and its request copy last
+ * @returns The statement ids and the index's key names
+ */
+export function readLedgerOpening(messages: readonly Message[]): LedgerOpening {
+	const copy = messages.at(-1)?.content ?? ''
+	return {
+		statements: messages.slice(1, -1).map((message) => message.id),
+		keys: copy
+			.split('\n')
+			.filter((line) => line.startsWith('- '))
+			.map((line) => line.slice(2, line.indexOf(':'))),
+	}
+}
+
+/**
+ * Builds a ledger snapshot of many unrelated goals, each a statement naming its own order and
+ * account, a statement about its own day, a request, and a reply, so a plan reads a long history.
+ *
+ * @remarks
+ * Goal `N` names order `GL-N` and account `AC-M`, where `M` is `N` modulo 50, so account ids recur
+ * across goals and order ids do not. The last goal ends with its reply, so a following request has
+ * no current statement.
+ *
+ * @param count - The earlier messages the snapshot holds, rounded down to whole goals of 4
+ * @returns The snapshot, with every goal's request marked
+ */
+export function buildLedgerGoals(count: number): LedgerSnapshot {
+	const goals = Array.from({ length: Math.floor(count / 4) }, (_unused, at) => at)
+	return {
+		conversation: {
+			id: 'goals',
+			messages: goals.flatMap((at) => [
+				{
+					id: `order-${at}`,
+					role: 'user' as const,
+					content: `Order GL-${at} for account AC-${at % 50} needs a ${at % 2 === 0 ? 'refund' : 'reship'}.`,
+				},
+				{
+					id: `day-${at}`,
+					role: 'user' as const,
+					content: `The customer called on day ${at} about the ${at % 3 === 0 ? 'lamp' : 'vase'}.`,
+				},
+				{ id: `ask-${at}`, role: 'user' as const, content: `What do we do for GL-${at}?` },
+				{
+					id: `answer-${at}`,
+					role: 'assistant' as const,
+					content: `GL-${at} goes to the ${at % 2 === 0 ? 'refund' : 'reship'} queue.`,
+				},
+			]),
+		},
+		requests: goals.map((at) => `ask-${at}`),
+		notes: [],
+		failures: [],
+	}
+}
 
 /**
  * Builds typed snapshots a ledger refuses: an id absent from the conversation's messages, an id on a
@@ -10703,7 +10538,7 @@ export function buildLedgerBenchOptions(
 		thresholds: LEDGER_BENCH_DESK.thresholds,
 		capacity: 19968,
 		predict: 8192,
-		share: { prompt: 1, tail: 0.35 },
+		share: { prompt: 1 },
 		gauge: { scale: 0.978, overhead: 926.49 },
 		lookups: [
 			{
@@ -11012,6 +10847,7 @@ export const PARTICIPLE_KEPT = Object.freeze({
 		'mapping',
 		'timing',
 		'ceiling',
+		'opening',
 	],
 	// A name that mirrors an external field: Ollama `message.thinking`, the Node `encoding` option.
 	mirror: ['encoding', 'thinking'],
@@ -13323,8 +13159,8 @@ export interface LedgerRoomKept {
 
 /**
  * Serves one request under a scope on a ledger with `builtins: ['load']` at a capacity where the
- * holdback moves the seed tail, and reads the seed remarks its first call kept beside the counts
- * claim 3.4's formula gives with no holdback and with one.
+ * holdback moves the cut of the seed remarks, and reads the remarks its first call kept beside the
+ * counts claim 3.4's budget gives with no holdback and with one.
  *
  * @param scope - The scope the host applies
  * @returns The kept count and the two formula counts
@@ -13333,7 +13169,7 @@ export async function serveLedgerRoomKept(scope: ScopeInput): Promise<LedgerRoom
 	const gauge = { scale: 1.25, overhead: 120 }
 	const { options } = buildLedgerBuiltinOptions(
 		{ builtins: ['load'] },
-		{ capacity: 1600, predict: 1, share: { prompt: 1, tail: 0.25 }, gauge },
+		{ capacity: 1600, predict: 1, share: { prompt: 1 }, gauge },
 	)
 	const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 	const ledger = createLedger(provider, options)
@@ -13364,29 +13200,19 @@ export async function serveLedgerRoomKept(scope: ScopeInput): Promise<LedgerRoom
 			),
 		) + new Gauge({ ...gauge, capacity: 1600, predict: 1 }).reserve([], 'Noted.')
 	const stored = ledger.conversation.messages()
-	const request = requireValue(stored.find((message) => message.content === 'Check the desk.'))
-	const seed = stored.slice(0, LEDGER_PLAN_SEED.length)
-	const prices = Array.from(
-		{ length: seed.length / 2 + 1 },
-		(_, count) => gauge.scale * estimateMessages([...seed.slice(seed.length - 2 * count), request]),
-	)
 	const [free, held] = [0, holdback].map((hold) =>
-		Math.max(
-			0,
-			prices.findLastIndex(
-				(price) =>
-					price <=
-					(0.25 * Math.max(0, 1600 - (gauge.overhead - spared + added) - hold)) /
-						(1 + LEDGER_SCALE_DRIFT),
-			),
+		countLedgerPlanFit(
+			first.messages,
+			stored,
+			'Check the desk.',
+			gauge.scale,
+			Math.max(0, 1600 - 1 - (gauge.overhead - spared + added) - hold) / (1 + LEDGER_SCALE_DRIFT),
 		),
 	)
 	return {
-		kept: first.messages.filter(
-			(message) => message.role === 'user' && message.content === LEDGER_PLAN_REMARK,
-		).length,
-		free: requireValue(free),
-		held: requireValue(held),
+		kept: requireValue(free).kept,
+		free: requireValue(free).fit,
+		held: requireValue(held).fit,
 	}
 }
 
@@ -15285,7 +15111,8 @@ export async function bisectLedgerPadding(
 
 /**
  * Serves a `recall` on the turn after a load of the `wide` skill, whose ten tools carry long
- * descriptions, over a number of stored sources, and reads how many sources the listing names.
+ * descriptions, over a number of stored sources a first request left earlier, and reads how many
+ * sources the listing names.
  *
  * @param sources - The stored sources the recall can list
  * @returns The listed count, and whether the listing was cut
@@ -15313,6 +15140,7 @@ export async function serveLedgerWideRecall(
 		[
 			{ content: '' },
 			{ content: '' },
+			{ content: 'Noted.' },
 			{
 				content: '',
 				tools: [createToolCall({ id: 'l', name: 'load', arguments: { skill: 'wide' } })],
@@ -15331,7 +15159,7 @@ export async function serveLedgerWideRecall(
 			buildLedgerOptions({
 				capacity: 6000,
 				predict: 100,
-				share: { prompt: 1, tail: 0.001 },
+				share: { prompt: 1 },
 				lookups: [...(buildLedgerOptions().lookups ?? []), ...wide],
 				agent: { builtins: ['load', 'unload'], skills, authority: AGENT_AUTHORITY },
 			}),
@@ -15343,6 +15171,7 @@ export async function serveLedgerWideRecall(
 			content: `The zephyr drawer ${at} holds spare keys and the vault ledger. `.repeat(3),
 		})),
 	)
+	await ledger.respond('Note the drawers.')
 	await ledger.respond('Where are the spare keys?')
 	const listing =
 		ledger.conversation.messages().find((message) => message.call === 'q')?.content ?? ''
@@ -15482,7 +15311,7 @@ export function buildLedgerPageOptions(capacity: number, builtins = true): Ledge
 		capacity,
 		predict: 1,
 		gauge: { scale: 1, overhead: 0 },
-		share: { prompt: 1, tail: 0.001 },
+		share: { prompt: 1 },
 		lookups: [...(buildLedgerOptions().lookups ?? []), ...LEDGER_SKILL_LOOKUPS, LEDGER_PAGE_LOOKUP],
 	}
 	return builtins
@@ -17917,62 +17746,4 @@ export function renderLedgerOutcome(result: LedgerResult, ledger: LedgerInterfac
 		{ result: { ...result, attempts: summarizeAttempts(result.attempts) }, messages },
 		messages,
 	)
-}
-
-/**
- * Builds ledger options with no topics whose lookup names each looked-up id as its own owner:
- * Brightwater Studio for `BW-20931` and Odile Marlow for any other id.
- *
- * @returns The ledger options
- */
-export function buildLedgerTwoOwnerOptions(): LedgerOptions {
-	return buildLedgerOptions({
-		topics: [],
-		capacity: 32768,
-		lookups: [
-			{
-				tool: createTool({ name: 'lookup', execute: () => '' }),
-				read: (values) => ({
-					ids: [String(values.id)],
-					owners: [
-						{
-							id: String(values.id),
-							names: [values.id === 'BW-20931' ? 'Brightwater Studio' : 'Odile Marlow'],
-						},
-					],
-				}),
-			},
-		],
-	})
-}
-
-/**
- * Seeds a ledger built from {@link buildLedgerTwoOwnerOptions} with each owner's lookup exchange and
- * a later statement under Odile Marlow that amends the Brightwater Studio finding without
- * superseding it, so a request for Brightwater Studio shows the finding with a note that a later
- * change is not shown.
- *
- * @param ledger - The ledger whose conversation takes the seed
- * @returns The amended finding and its amender
- */
-export function seedLedgerOmission(ledger: LedgerInterface): {
-	readonly earlier: Message
-	readonly later: Message
-} {
-	const first = ledger.conversation.add(
-		buildLedgerExchange('Brightwater Studio delivery costs $10.', 'first-owner', {
-			id: 'BW-20931',
-		}),
-	)
-	ledger.conversation.add(
-		buildLedgerExchange('Odile Marlow has an account.', 'second-owner', { id: 'OM-30418' }),
-	)
-	const earlier = requireValue(first.find((message) => message.role === 'tool'))
-	const later = ledger.conversation.add({
-		role: 'user',
-		content: 'Odile Marlow corrects the $10 delivery price to $12.',
-	})
-	ledger.conversation.judgments.add(buildLedgerPairJudgment('amends', earlier, later, 1))
-	ledger.conversation.judgments.add(buildLedgerPairJudgment('supersedes', earlier, later, 0))
-	return { earlier, later }
 }

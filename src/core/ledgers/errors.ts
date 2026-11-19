@@ -77,7 +77,6 @@ export function isLedgerError(value: unknown): value is LedgerError {
 				code === 'TOPIC' ||
 				code === 'LOOKUP' ||
 				code === 'GAUGE' ||
-				code === 'REFERENCE' ||
 				code === 'SNAPSHOT' ||
 				code === 'QUESTION' ||
 				code === 'WRITE' ||

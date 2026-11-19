@@ -168,7 +168,7 @@ export class StudyChatSession implements StudySessionInterface {
 			capacity: settings.capacity,
 			predict: 1024,
 			think: false,
-			share: { prompt: 1, tail: 0.35 },
+			share: { prompt: 1 },
 			lookups: (input.record === undefined ? [] : [input.record]).map((record) => ({
 				tool: createTool({
 					name: 'lookup',

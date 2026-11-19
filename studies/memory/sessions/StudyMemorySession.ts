@@ -177,7 +177,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				capacity: room.context - room.safety,
 				predict: room.output,
 				think: room.think,
-				share: { prompt: 1, tail: 0.35 },
+				share: { prompt: 1 },
 				lookups: [
 					{
 						tool: lookup,
@@ -214,7 +214,8 @@ export class StudyMemorySession implements StudySessionInterface {
 			this.#conversation = conversations.add(
 				seed?.conversation === undefined ? {} : { snapshot: seed.conversation },
 			)
-			// `full` sends the whole conversation, as a plain agent does; `plain` clears it at each goal.
+			// Both controls are bare agents that run none of the records machinery: `full` sends the
+			// whole conversation, and `plain` clears it at each goal, a no-memory floor.
 			this.#agent = new options.agent.Agent(observer, {
 				conversations,
 				tools: this.#tools,

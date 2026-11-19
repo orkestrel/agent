@@ -116,17 +116,27 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 })
 
 /**
- * Supplies the default prompt, tail, and skills shares.
+ * Supplies the default prompt and skills shares.
  *
  * @remarks
- * The prompt and tail shares are the ones the chat and memory study sessions pass, at which every
- * records reading in `studies/README.md` ran.
+ * The prompt share is the one the chat and memory study sessions pass.
  */
 export const DEFAULT_LEDGER_SHARE: LedgerShare = Object.freeze({
 	prompt: 1,
-	tail: 0.35,
 	skills: 0.5,
 })
+
+/**
+ * Lists the members `LedgerShare` declares, frozen — the keys a ledger's `share` option admits.
+ *
+ * @remarks
+ * The `Ledger` constructor passes the list to `refuseOptionKeys` of `@orkestrel/contract`, so an
+ * own enumerable member outside it refuses with a `ContractError` coded `'structure'`.
+ */
+export const LEDGER_SHARE_KEYS = Object.freeze([
+	'prompt',
+	'skills',
+] as const) satisfies ReadonlyArray<keyof LedgerShare>
 
 /**
  * Caps the tool-iteration turns of a ledger's agent at 8 turns.
@@ -140,6 +150,9 @@ export const LEDGER_RECALL_LIMIT = 4
 
 /** Caps at 8 the recall keys a `recall` call that lists nothing names back. */
 export const LEDGER_MISS_LIMIT = 8
+
+/** Caps at 20 the id keys the Earlier index of a request copy lists. */
+export const LEDGER_KEY_LIMIT = 20
 
 /**
  * Sets the 5 milliseconds a paced classifier files between host turns.

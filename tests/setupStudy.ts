@@ -220,7 +220,7 @@ export async function runStudyChatDirect(
 			capacity,
 			predict: 1024,
 			think: false,
-			share: { prompt: 1, tail: 0.35 },
+			share: { prompt: 1 },
 			agent: { limit: 8 },
 			lookups: (input.record === undefined ? [] : [input.record]).map((record) => ({
 				tool: createTool({
@@ -2609,10 +2609,7 @@ export function mapMemoryReplayIds(
 		if (judgment) return ids.get(value) ?? value
 		const reference =
 			/^(ledger\.)?conversation\.(id|messages\.id|judgments\.sources)$/.test(member) ||
-			/^ledger\.(requests|notes|failures)$/.test(member) ||
-			/^ledger\.window\.(exchanges\.(request|reply|lines\.source)|amendments\.(earlier|later))$/.test(
-				member,
-			)
+			/^ledger\.(requests|notes|failures)$/.test(member)
 		if (!reference) return value
 		const mapped = ids.get(value)
 		if (mapped === undefined) throw new Error(`Unmapped ${member.split('.').at(-1)} message id`)
@@ -2622,17 +2619,6 @@ export function mapMemoryReplayIds(
 	if (isRecord(value)) {
 		return Object.fromEntries(
 			Object.entries(value).map(([key, part]) => {
-				// Untitled unit records use a source id as their key; the rules record keeps its literal key.
-				if (
-					member === 'ledger.window.exchanges.lines' &&
-					key === 'key' &&
-					value.title === '' &&
-					part !== agent.LEDGER_RULES_KEY
-				) {
-					const mapped = typeof part === 'string' ? ids.get(part) : undefined
-					if (mapped === undefined) throw new Error('Unmapped receipt key message id')
-					return [key, mapped]
-				}
 				return [
 					key,
 					key.includes('.')
@@ -2645,11 +2631,10 @@ export function mapMemoryReplayIds(
 	return value
 }
 
-/** Validates wall clocks and recomputes the mapped replay checksum against the recorded window. */
+/** Validates wall clocks and admits the mapped ledger checkpoint as a snapshot. */
 export function normalizeMemoryReplayCheckpoint(
 	value: JSONValue,
 	ids: ReadonlyMap<string, string>,
-	recorded: JSONValue = value,
 ): JSONValue {
 	const mapped = mapMemoryReplayIds(value, ids)
 	const conversation = readMemoryReplayConversation(mapped)
@@ -2675,8 +2660,7 @@ export function normalizeMemoryReplayCheckpoint(
 					}),
 				}),
 	}
-	if (!isRecord(mapped) || !isRecord(value) || !isRecord(recorded))
-		throw new Error('Invalid checkpoint')
+	if (!isRecord(mapped) || !isRecord(value)) throw new Error('Invalid checkpoint')
 	if (mapped.ledger === undefined) {
 		const result = { ...mapped, conversation: normalized }
 		if (!isJSONValue(result)) throw new Error('Invalid normalized checkpoint')
@@ -2685,31 +2669,7 @@ export function normalizeMemoryReplayCheckpoint(
 	const ledger: unknown = mapped.ledger
 	if (!agent.isLedgerSnapshot(value.ledger) || !agent.isLedgerSnapshot(ledger))
 		throw new Error('Invalid ledger checkpoint')
-	const window = ledger.window
-	if (value.ledger.window !== undefined)
-		strictEqual(
-			value.ledger.window.digest,
-			agent.digestLedgerWindow(value.ledger.window.exchanges, value.ledger.conversation.messages),
-			'Original window digest differs',
-		)
-	const digest =
-		window === undefined
-			? undefined
-			: agent.digestLedgerWindow(window.exchanges, ledger.conversation.messages)
-	if (window !== undefined) {
-		if (digest === undefined) throw new Error('Recomputed window digest is absent')
-		if (!isRecord(recorded.ledger) || !isRecord(recorded.ledger.window))
-			throw new Error('Missing recorded window digest')
-		strictEqual(digest, recorded.ledger.window.digest, 'Recomputed window digest differs')
-	}
-	const result = {
-		...mapped,
-		ledger: {
-			...ledger,
-			conversation: normalized,
-			...(window === undefined ? {} : { window: { ...window, digest } }),
-		},
-	}
+	const result = { ...mapped, ledger: { ...ledger, conversation: normalized } }
 	if (!isJSONValue(result)) throw new Error('Invalid normalized checkpoint')
 	return result
 }
@@ -2776,11 +2736,7 @@ export function assertMemoryReplay(
 	)
 	const identity = new Map([...ids.keys()].map((id) => [id, id]))
 	const expected = checkpoints.map((row) => normalizeMemoryReplayCheckpoint(row.value, identity))
-	const actual = replay.map((row, index) => {
-		const reference = checkpoints[index]
-		if (reference === undefined) throw new Error('Missing recorded checkpoint')
-		return normalizeMemoryReplayCheckpoint(row.value, inverse, reference.value)
-	})
+	const actual = replay.map((row) => normalizeMemoryReplayCheckpoint(row.value, inverse))
 	deepStrictEqual(actual, expected, 'Checkpoint members differ after message id mapping')
 }
 
@@ -2791,23 +2747,11 @@ export function buildMemoryReplayEvidence(
 	time = 0,
 	held = 'Message 0',
 ): readonly StudyEvidence[] {
-	const [request, reply] = ids
-	if (request === undefined || reply === undefined) throw new Error('Missing fixture exchange')
 	const messages: readonly agent.Message[] = ids.map((id, index) => ({
 		id,
 		role: 'user',
 		content: index === 0 ? held : `Message ${index}`,
 	}))
-	const exchanges: readonly agent.LedgerExchangeSnapshot[] = [
-		{
-			request,
-			reply,
-			copy: 'Held request copy',
-			lines: [{ key: 'fixture', title: 'Fixture', source: request, sentence: 0 }],
-		},
-	]
-	const digest = agent.digestLedgerWindow(exchanges, messages)
-	if (digest === undefined) throw new Error('Missing fixture digest')
 	const checkpoint: unknown = {
 		ledger: {
 			conversation: {
@@ -2826,7 +2770,6 @@ export function buildMemoryReplayEvidence(
 			requests: [],
 			notes: [...ids],
 			failures: [],
-			window: { exchanges, amendments: [], digest },
 		},
 		records: [],
 		arrivals: [],

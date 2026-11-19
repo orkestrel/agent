@@ -1,39 +1,27 @@
 import type {
 	GaugeCall,
-	LedgerLine,
 	LedgerLookupFinding,
 	LedgerOwner,
-	LedgerRecord,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
-import { estimateTokens, LEDGER_QUESTIONS, LEDGER_SCALE_DRIFT } from '@src/core'
+import { estimateTokens, LEDGER_KEY_LIMIT, LEDGER_QUESTIONS, LEDGER_SCALE_DRIFT } from '@src/core'
 import {
 	collectRecallMessages,
 	collectLedgerKeys,
 	collectLedgerStatements,
+	renderLedgerKeys,
 	collectRetiredFindings,
-	matchesLookup,
-	hasHiddenRecall,
 	computeLedgerChecksum,
 	digestLedgerTools,
-	digestLedgerWindow,
-	buildLedgerCut,
-	buildLedgerLineKey,
-	collectLedgerLines,
 	collectLedgerReplies,
-	collectLedgerEvidence,
 	buildLedgerIndex,
 	buildRecallMessage,
 	buildRequestMessage,
-	collectProjectionIds,
-	extractWords,
 	findLedgerCut,
 	renderTopicNames,
 	scanAmendments,
 	splitWords,
 	buildLines,
-	buildLedgerRenderContext,
-	renderLedgerAnnotation,
 	buildRecords,
 	collectLive,
 	collectNames,
@@ -46,7 +34,6 @@ import {
 	computeToolPrice,
 	requirePredict,
 	collectQuestionKeys,
-	rankLedgerCut,
 	cutListing,
 	fitSlope,
 	identifyLookup,
@@ -57,11 +44,7 @@ import {
 	normalizeArgument,
 	normalizeWord,
 	placeMember,
-	renderLedgerPinned,
-	renderLedgerRecord,
 	renderLookupCall,
-	renderStub,
-	selectRecords,
 	splitResultLines,
 	splitSentences,
 	splitKey,
@@ -69,7 +52,6 @@ import {
 import { captureError, createRecorder, invokeUnchecked, requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 import {
-	throwProxyRead,
 	buildGaugeCall,
 	measureRoom,
 	LEDGER_EMPTY_FOUND,
@@ -83,13 +65,9 @@ import {
 	LEDGER_WRITE_SUPERSESSIONS,
 	checkLedgerProjection,
 	createLedgerDesk,
-	createLedgerRequest,
 	LEDGER_DESK_OWNERS,
 	LEDGER_DESK_SYSTEM,
 	LEDGER_HANDLE,
-	LEDGER_OWNER_PROJECTION,
-	buildLedgerLine,
-	replaceLedgerRecord,
 	buildDensityDefinition,
 	LEDGER_DENSITY_CALIBRATION,
 	LEDGER_DENSITY_CORE,
@@ -101,28 +79,7 @@ import {
 } from '../../../setup.js'
 
 describe('extracted ledger leaves', () => {
-	it('matches successful canonical lookup copies but not changes empty results or unkeyable calls', () => {
-		const first = buildLedgerFinding(
-			'first',
-			'lookup',
-			{ id: 'BW-1' },
-			'One. Two.',
-			LEDGER_EMPTY_FOUND,
-		)
-		const copy = { ...first, id: 'copy' }
-		expect(matchesLookup(first, copy)).toBe(true)
-		for (const changed of [
-			{ ...copy, text: 'Other.' },
-			{ ...copy, arguments: { id: 'BW-2' } },
-			{ ...copy, result: undefined },
-			{ ...copy, name: 'other' },
-		])
-			expect(matchesLookup(first, changed)).toBe(false)
-		const unkeyable = { ...first, arguments: { id: 1n } }
-		expect(matchesLookup(unkeyable, unkeyable)).toBe(true)
-		expect(matchesLookup(unkeyable, { ...unkeyable, id: 'copy' })).toBe(false)
-	})
-	it('detects each eligible hidden origin including quiet statements but not current turns or notes', () => {
+	it('collects each recallable origin including quiet statements but not notes, calls, blanks, or unread tool results', () => {
 		const messages: readonly Message[] = [
 			buildLedgerMessage('fact', 'user', 'Parcel closed. Receipt sealed.'),
 			buildLedgerMessage('tool', 'tool', 'Found a parcel. Receipt signed.'),
@@ -163,36 +120,6 @@ describe('extracted ledger leaves', () => {
 			'current',
 			'turn',
 		])
-		expect(hasHiddenRecall(input, 'current', requests, notes, messages, [])).toBe(false)
-		for (const id of ['fact', 'tool', 'request', 'reply', 'quiet']) {
-			const present = messages.filter((message) => message.id !== id)
-			expect(hasHiddenRecall(input, 'current', requests, notes, present, [])).toBe(true)
-		}
-		for (const id of ['fact', 'tool']) {
-			const present = messages.filter((message) => message.id !== id)
-			const lines = [0, 1].map((sentence) => ({ key: '', title: '', source: id, sentence }))
-			expect(hasHiddenRecall(input, 'current', requests, notes, present, lines)).toBe(false)
-			expect(hasHiddenRecall(input, 'current', requests, notes, present, lines.slice(0, 1))).toBe(
-				true,
-			)
-		}
-		const stub = messages.map((message) =>
-			message.id === 'tool'
-				? { ...message, content: 'result not shown; call recall with parcel' }
-				: message,
-		)
-		expect(hasHiddenRecall(input, 'current', requests, notes, stub, [])).toBe(true)
-		expect(
-			hasHiddenRecall(
-				input,
-				'current',
-				requests,
-				notes,
-				messages.filter((message) => !['note', 'current', 'turn'].includes(message.id)),
-				[],
-			),
-		).toBe(false)
-		expect(hasHiddenRecall(input, 'absent', requests, notes, [], [])).toBe(false)
 	})
 
 	it('leaves findings a write retired or a later read replaced out of the recall offer', () => {
@@ -271,136 +198,6 @@ describe('extracted ledger leaves', () => {
 		expect(digestLedgerTools([{ ...lookup, description: 'Read an order by id.' }])).not.toBe(digest)
 		expect(digestLedgerTools([{ ...lookup, parameters: { limit: 10n } }])).toBeUndefined()
 	})
-	it('includes every receipt field in the window digest', () => {
-		const messages = [
-			buildLedgerMessage('request', 'user', 'Check.'),
-			buildLedgerMessage('reply', 'assistant', 'Done.'),
-			buildLedgerMessage('source', 'user', 'One. Two.'),
-		]
-		const line = { key: 'record', title: 'Record', source: 'source', sentence: 0 }
-		const entry = { request: 'request', reply: 'reply', copy: 'One.', lines: [line] }
-		const digest = requireValue(digestLedgerWindow([entry], messages))
-		for (const changed of [
-			{ ...line, key: 'other' },
-			{ ...line, title: 'Other' },
-			{ ...line, sentence: 1 },
-		])
-			expect(digestLedgerWindow([{ ...entry, lines: [changed] }], messages)).not.toBe(digest)
-	})
-
-	it('digests each held message and copy canonically and refuses unencodable messages', () => {
-		const exchanges = [
-			{
-				request: 'request',
-				reply: 'reply',
-				copy: 'copy',
-				lines: [{ key: '', title: '', source: 'source', sentence: 0 }],
-			},
-		]
-		const messages = ['request', 'reply', 'source'].map((id) => ({
-			id,
-			role: 'user' as const,
-			content: id,
-		}))
-		const digest = requireValue(digestLedgerWindow(exchanges, messages))
-		expect(digest).toBe('ed478e691ef87403')
-		expect(digest).toMatch(/^[0-9a-f]{16}$/)
-		for (const target of messages)
-			expect(
-				digestLedgerWindow(
-					exchanges,
-					messages.map((message) =>
-						message === target ? { ...message, content: 'changed' } : message,
-					),
-				),
-			).not.toBe(digest)
-		expect(
-			digestLedgerWindow([{ ...requireValue(exchanges[0]), copy: 'changed' }], messages),
-		).not.toBe(digest)
-		expect(
-			digestLedgerWindow(
-				exchanges,
-				messages.map(({ id, role, content }) => ({ content, role, id })),
-			),
-		).toBe(digest)
-		const called: Message[] = [
-			...messages,
-			{
-				id: 'caller',
-				role: 'assistant',
-				content: '',
-				calls: [{ id: 'call', name: 'lookup', arguments: { id: 'BW-1' } }],
-			},
-			{ id: 'result', role: 'tool', call: 'call', content: 'Found.' },
-		]
-		const lookedUp = [
-			{
-				request: 'request',
-				reply: 'reply',
-				lines: [{ key: '', title: '', source: 'result', sentence: 0 }],
-			},
-		]
-		expect(
-			digestLedgerWindow(
-				lookedUp,
-				called.map((message) =>
-					message.id === 'caller'
-						? { ...message, calls: [{ id: 'call', name: 'lookup', arguments: { id: 'REDACTED' } }] }
-						: message,
-				),
-			),
-		).not.toBe(digestLedgerWindow(lookedUp, called))
-		expect(digestLedgerWindow(exchanges, [])).toBeUndefined()
-		const unreadable = Object.defineProperty({}, 'value', { enumerable: true, get: throwProxyRead })
-		const cycle: Record<string, unknown> = {}
-		cycle.self = cycle
-		for (const value of [unreadable, cycle]) {
-			expect(
-				digestLedgerWindow(
-					exchanges,
-					messages.map((message) => ({
-						...message,
-						calls: [{ id: 'call', name: 'lookup', arguments: { value } }],
-					})),
-				),
-			).toBeUndefined()
-		}
-		expect(
-			digestLedgerWindow(
-				exchanges,
-				messages.map((message) => ({
-					...message,
-					calls: [{ id: 'call', name: 'lookup', arguments: { value: 1n } }],
-				})),
-			),
-		).toBeUndefined()
-	})
-	it('filters receipts by placement and sentence rather than text or source alone', () => {
-		const line: LedgerLine = {
-			text: 'Same words.',
-			source: 'one',
-			sentence: 0,
-			topics: [],
-			role: 'user',
-		}
-		const record: LedgerRecord = {
-			key: 'owner:one',
-			title: 'One',
-			members: ['one'],
-			lines: [line, { ...line, sentence: 1 }, { ...line, source: 'two' }],
-		}
-		const held = new Set([buildLedgerLineKey({ ...line, key: record.key, title: record.title })])
-		expect(collectLedgerLines(record, held).map((entry) => [entry.source, entry.sentence])).toEqual(
-			[
-				['one', 1],
-				['two', 0],
-			],
-		)
-		expect(collectLedgerLines({ ...record, title: 'Other' }, held)).toHaveLength(3)
-		expect(collectLedgerLines({ ...record, key: 'owner:two' }, held)).toHaveLength(3)
-		expect(record.lines).toHaveLength(3)
-	})
-
 	it('pairs replies only across ledger-note separation and rejects a blank final answer', () => {
 		const messages: readonly Message[] = [
 			{ id: 'request', role: 'user', content: 'Request.' },
@@ -419,32 +216,6 @@ describe('extracted ledger leaves', () => {
 				new Set(['note']),
 			).size,
 		).toBe(0)
-	})
-
-	it('captures changed and removed source bytes and added or removed touching edges', () => {
-		const message: Message = { id: 'one', role: 'user', content: 'Original.' }
-		const sources = new Set(['one'])
-		const original = collectLedgerEvidence([message], sources, [])
-		expect(collectLedgerEvidence([{ ...message, content: 'Changed.' }], sources, [])).not.toEqual(
-			original,
-		)
-		expect(collectLedgerEvidence([], sources, [])).not.toEqual(original)
-		expect(
-			collectLedgerEvidence([message], sources, [{ earlier: 'one', later: 'two' }]),
-		).not.toEqual(original)
-		expect(
-			collectLedgerEvidence([message], sources, [{ earlier: 'three', later: 'four' }]),
-		).toEqual(original)
-	})
-	it('collects placed and orphan ids without duplicates', () => {
-		expect([
-			...collectProjectionIds({
-				records: [{ key: 'rules', title: 'Rules', members: ['same', 'placed'], lines: [] }],
-				amendments: [],
-				orphans: ['same', 'orphan'],
-			}),
-		]).toEqual(['same', 'orphan', 'placed'])
-		expect([...collectProjectionIds({ records: [], amendments: [], orphans: [] })]).toEqual([])
 	})
 
 	it('walks amendments breadth first, cuts refused branches, and closes cycles', () => {
@@ -504,44 +275,9 @@ describe('extracted ledger leaves', () => {
 		expect(renderTopicNames([])).toBe('')
 	})
 
-	it('extracts Unicode words and excludes names at sentence boundaries', () => {
-		const result = extractWords({
-			id: 'note',
-			role: 'user',
-			content: 'Odile met Dana. Ask Élodie; Morgan called AA-10.',
-		})
-		expect([...result.words]).toEqual([
-			'odile',
-			'met',
-			'dana',
-			'ask',
-			'élodie',
-			'morgan',
-			'called',
-			'aa',
-			'10',
-		])
-		expect([...result.names]).toEqual(['dana', 'élodie'])
-		expect(extractWords({ id: 'empty', role: 'user', content: '' })).toEqual({
-			words: new Set(),
-			names: new Set(),
-		})
-	})
-
 	it('normalizes recall words without dropping internal punctuation', () => {
 		expect(splitWords('  “Refunds,” BW-5512! $148.50  ')).toEqual(['refunds', 'bw-5512', '148.50'])
 		expect(splitWords('... $ ')).toEqual([])
-	})
-})
-
-describe('rankLedgerCut', () => {
-	it('ranks name matches before unsettled sources, off-topic corrections, rules, and on-topic sources', () => {
-		expect(rankLedgerCut(3, true, 'rule')).toBe(0)
-		expect(rankLedgerCut(1, true, 'fact')).toBe(1)
-		expect(rankLedgerCut(2, false, 'correction')).toBe(2)
-		expect(rankLedgerCut(2, false, 'rule')).toBe(3)
-		expect(rankLedgerCut(1, false, 'rule')).toBe(4)
-		expect(rankLedgerCut(1, false, undefined)).toBe(4)
 	})
 })
 
@@ -591,36 +327,6 @@ describe('findLedgerCut', () => {
 			expect(cuts.length).toBeLessThanOrEqual(13)
 		},
 	)
-})
-
-describe('buildLedgerCut', () => {
-	const kept = { text: 'Kept.', source: 'a', sentence: 0, topics: [], role: 'user' } as const
-	const dropped = { text: 'Dropped.', source: 'a', sentence: 1, topics: [], role: 'user' } as const
-	const records = [{ key: 'owner', title: 'Owner', members: ['a'], lines: [kept, dropped] }]
-
-	it('leaves every line and source without a step', () => {
-		const cut = buildLedgerCut([], records, new Set(['b', 'c']))
-		expect(cut.records).toEqual(records)
-		expect([...cut.included]).toEqual(['b', 'c'])
-	})
-
-	it('drops a step by its line and a step by its source', () => {
-		const cut = buildLedgerCut([dropped, 'b'], records, new Set(['b', 'c']))
-		expect(cut.records[0]?.lines).toEqual([kept])
-		expect(cut.records[0]?.key).toBe('owner')
-		expect([...cut.included]).toEqual(['c'])
-	})
-
-	it('reads a line by identity, so an equal line in another record stays', () => {
-		const copy = structuredClone(dropped)
-		const cut = buildLedgerCut(
-			[dropped],
-			[...records, { key: 'other', title: 'Other', members: ['a'], lines: [copy] }],
-			new Set(),
-		)
-		expect(cut.records[1]?.lines).toEqual([copy])
-		expect(cut.records[0]?.lines).toEqual([kept])
-	})
 })
 
 describe('computeThinking', () => {
@@ -1786,185 +1492,6 @@ describe('collectAmendments', () => {
 	})
 })
 
-describe('amendment rendering', () => {
-	it.each([
-		{
-			form: 'included',
-			retained: ['earlier', 'second'],
-			amendments: [{ earlier: 'earlier', later: 'second' }],
-			annotated: 'earlier',
-			expected: '[1] Changed later by [2].',
-		},
-		{
-			form: 'not included',
-			retained: ['earlier'],
-			amendments: [{ earlier: 'earlier', later: 'second' }],
-			annotated: 'earlier',
-			expected: '[1] A later change is not shown.',
-		},
-		{
-			form: 'mixed',
-			retained: ['earlier', 'second'],
-			amendments: [
-				{ earlier: 'earlier', later: 'second' },
-				{ earlier: 'earlier', later: 'third' },
-			],
-			annotated: 'earlier',
-			expected: '[1] Changed later by [2]. A later change is not shown.',
-		},
-		{
-			form: 'endpoint',
-			retained: ['earlier', 'second'],
-			amendments: [{ earlier: 'earlier', later: 'second' }],
-			annotated: 'second',
-			expected: '[2]',
-		},
-		{
-			form: 'two included',
-			retained: ['earlier', 'second', 'third'],
-			amendments: [
-				{ earlier: 'earlier', later: 'second' },
-				{ earlier: 'earlier', later: 'third' },
-			],
-			annotated: 'earlier',
-			expected: '[1] Changed later by [2]. Changed later by [3].',
-		},
-	])('pins the bytes of the $form annotation', ({ retained, amendments, annotated, expected }) => {
-		const lines = retained.map((id) => buildLedgerLine(id, 0, `Text of ${id}.`))
-		const messages = ['earlier', 'second', 'third'].map((id) =>
-			buildLedgerMessage(id, 'user', `Text of ${id}.`),
-		)
-		const context = buildLedgerRenderContext(messages, lines, amendments)
-		const line = requireValue(lines.find((candidate) => candidate.source === annotated))
-		expect(renderLedgerAnnotation(line, context)).toBe(expected)
-	})
-
-	it('assigns distinct local references in first retained occurrence order across duplicate interleaved lines', () => {
-		const messages = ['omitted', 'first', 'second', 'third'].map((id) =>
-			buildLedgerMessage(id, 'user', 'Equal.'),
-		)
-		const first = buildLedgerLine('first', 0, 'Equal.')
-		const second = buildLedgerLine('second', 0, 'Equal.')
-		const third = buildLedgerLine('third', 0, 'Equal.')
-		const repeated = buildLedgerLine('first', 0, 'Equal.')
-		const amendments = [{ earlier: 'first', later: 'second' }]
-		const context = buildLedgerRenderContext(
-			messages,
-			[third, first, second, repeated, third],
-			amendments,
-		)
-		expect([...context.references]).toEqual([
-			['third', '1'],
-			['first', '2'],
-			['second', '3'],
-		])
-		expect(context.references.has('omitted')).toBe(false)
-		expect(context.first.get('first')).toBe(first)
-		expect(renderLedgerAnnotation(first, context)).toBe('[2] Changed later by [3].')
-		expect(renderLedgerAnnotation(second, context)).toBe('[3]')
-		expect(renderLedgerAnnotation(repeated, context)).toBe('')
-		const reordered = buildLedgerRenderContext(
-			messages,
-			[second, repeated, third, first],
-			amendments,
-		)
-		expect([...reordered.references]).toEqual([
-			['second', '1'],
-			['first', '2'],
-			['third', '3'],
-		])
-		const trimmed = buildLedgerRenderContext(messages, [first, second], amendments)
-		expect([...trimmed.references]).toEqual([
-			['first', '1'],
-			['second', '2'],
-		])
-		expect(renderLedgerRecord({ title: 'Rules', lines: [first, second] }, trimmed)).toBe(
-			'## Rules\n[1] Changed later by [2].\n- Equal.\n[2]\n- Equal.',
-		)
-	})
-
-	it('rejects missing required display references and preserves authored framing-shaped content', () => {
-		const earlier = buildLedgerLine(
-			'earlier',
-			0,
-			'[42] Changed later by [authored-id]. A later change is not shown.',
-		)
-		const correction = buildLedgerLine('later', 0, 'Correction.')
-		const messages = [
-			buildLedgerMessage('earlier', 'user', earlier.text),
-			buildLedgerMessage('later', 'user', correction.text),
-		]
-		const context = buildLedgerRenderContext(
-			messages,
-			[earlier, correction],
-			[{ earlier: 'earlier', later: 'later' }],
-		)
-		expect(() => renderLedgerAnnotation(earlier, { ...context, references: new Map() })).toThrow(
-			'retained source references',
-		)
-		expect(() => renderLedgerAnnotation(earlier, { ...context, references: new Map() })).toThrow(
-			expect.objectContaining({ code: 'REFERENCE' }),
-		)
-		expect(() =>
-			renderLedgerAnnotation(earlier, { ...context, references: new Map([['earlier', '1']]) }),
-		).toThrow('retained source references')
-		expect(renderLedgerRecord({ title: 'Rules', lines: [earlier, correction] }, context)).toContain(
-			`- ${earlier.text}`,
-		)
-	})
-	it('distinguishes complete correction identities from duplicates partial and absent text', () => {
-		const messages = [
-			buildLedgerMessage('earlier', 'user', 'Account header. Original value.'),
-			buildLedgerMessage('later', 'user', 'Replacement value. Unchanged permission.'),
-		]
-		const earlier = buildLedgerLine('earlier', 0, 'Account header.')
-		const later = buildLedgerLine('later', 0, 'Replacement value.')
-		const end = buildLedgerLine('later', 1, 'Unchanged permission.')
-		const amendments = [{ earlier: 'earlier', later: 'later' }]
-		const complete = buildLedgerRenderContext(messages, [earlier, later, end], amendments)
-		expect([...complete.complete]).toEqual(['later'])
-		expect(renderLedgerAnnotation(earlier, complete)).toBe('[1] Changed later by [2].')
-		expect(renderLedgerAnnotation(later, complete)).toBe('[2]')
-		expect(renderLedgerAnnotation(end, complete)).toBe('')
-		const partial = buildLedgerRenderContext(messages, [earlier, later, later], amendments)
-		expect([...partial.complete]).toEqual([])
-		expect(renderLedgerAnnotation(earlier, partial)).toBe('[1] A later change is not shown.')
-		expect(renderLedgerAnnotation(later, partial)).toBe('')
-		const absent = buildLedgerRenderContext(messages, [earlier], amendments)
-		expect(renderLedgerAnnotation(earlier, absent)).toBe(renderLedgerAnnotation(earlier, partial))
-		expect(renderLedgerAnnotation(earlier, absent)).not.toContain('[later]')
-	})
-
-	it('moves annotation to the first surviving earlier line and coexists with omitted corrections', () => {
-		const messages = [
-			buildLedgerMessage('earlier', 'user', 'Header. Original.'),
-			buildLedgerMessage('included', 'user', 'Correction.'),
-			buildLedgerMessage('hidden-owner-secret', 'user', 'Foreign owner secret.'),
-		]
-		const header = buildLedgerLine('earlier', 0, 'Header.')
-		const original = buildLedgerLine('earlier', 1, 'Original.')
-		const correction = buildLedgerLine('included', 0, 'Correction.')
-		const amendments = [
-			{ earlier: 'earlier', later: 'included' },
-			{ earlier: 'earlier', later: 'hidden-owner-secret' },
-		]
-		const full = buildLedgerRenderContext(messages, [header, original, correction], amendments)
-		expect(renderLedgerAnnotation(original, full)).toBe('')
-		const trimmed = buildLedgerRenderContext(messages, [original, correction], amendments)
-		const rendered = renderLedgerRecord({ title: 'Rules', lines: [original, correction] }, trimmed)
-		expect(rendered).toContain(
-			'[1] Changed later by [2]. A later change is not shown.\n- Original.',
-		)
-		expect(rendered).toContain('[2]\n- Correction.')
-		expect(rendered).not.toContain('hidden-owner-secret')
-		expect(rendered).not.toContain('Foreign owner secret')
-		const removed = buildLedgerRenderContext(messages, [correction], amendments)
-		expect(renderLedgerRecord({ title: 'Rules', lines: [correction] }, removed)).toBe(
-			'## Rules\n- Correction.',
-		)
-	})
-})
-
 describe('buildLines', () => {
 	it('turns each sentence into a line that carries its source, index, topics, and role', () => {
 		const input = buildLedgerInput({
@@ -2299,14 +1826,14 @@ describe('buildRecords', () => {
 		expect(record?.lines[1]?.party).toBe('Northgate Couriers')
 	})
 
-	it('writes no handle into a line, a title, or a render', () => {
+	it('writes no handle into a line or a title', () => {
 		const built = buildRecords(createLedgerDesk())
-		const rendered = built.records.flatMap((record) => [
-			renderLedgerRecord(record),
-			renderLedgerPinned(record),
+		const texts = built.records.flatMap((record) => [
+			record.title,
+			...record.lines.map((line) => line.text),
 		])
-		expect(rendered.length).toBeGreaterThan(0)
-		for (const text of rendered) expect(text.match(LEDGER_HANDLE)).toBeNull()
+		expect(texts.length).toBeGreaterThan(0)
+		for (const text of texts) expect(text.match(LEDGER_HANDLE)).toBeNull()
 	})
 
 	it('leaves its input as it found it and builds the same projection twice', () => {
@@ -2339,223 +1866,6 @@ describe('buildRecords', () => {
 			amendments: [],
 			orphans: [],
 		})
-	})
-})
-
-describe('selectRecords', () => {
-	const built = buildRecords(createLedgerDesk())
-
-	it('collapses equal-member owners under joined titles before the rules record', () => {
-		const projection = LEDGER_OWNER_PROJECTION
-		const before = JSON.stringify(projection)
-		const views = selectRecords(projection, { owners: ['BW-5512', 'BW-20931'], topics: [] })
-		expect(views).toEqual([
-			{
-				...projection.records[0],
-				title: 'Brightwater Studio (BW-5512); Brightwater Studio (BW-20931)',
-			},
-			projection.records[2],
-		])
-		expect(JSON.stringify(projection)).toBe(before)
-		expect(views[0]).not.toBe(projection.records[0])
-		expect(views[0]?.members).not.toBe(projection.records[0]?.members)
-		expect(views[0]?.lines[0]).not.toBe(projection.records[0]?.lines[0])
-	})
-
-	it('keeps same-name owners separate when one member or its order differs', () => {
-		const projection = replaceLedgerRecord(LEDGER_OWNER_PROJECTION, 'owner:BW-5512', (record) => ({
-			...record,
-			members: [...record.members, 'only-order'],
-			lines: [...record.lines, buildLedgerLine('only-order', 0, 'BW-5512 shipped.')],
-		}))
-		const request = { owners: ['BW-5512', 'BW-20931'], topics: [] }
-		expect(JSON.stringify(selectRecords(projection, request))).toBe(
-			JSON.stringify(projection.records),
-		)
-		const reversed = replaceLedgerRecord(LEDGER_OWNER_PROJECTION, 'owner:BW-20931', (record) => ({
-			...record,
-			members: record.members.toReversed(),
-		}))
-		expect(selectRecords(reversed, request)).toEqual(reversed.records)
-		expect(selectRecords(LEDGER_OWNER_PROJECTION, { owners: ['BW-20931'], topics: [] })).toEqual([
-			LEDGER_OWNER_PROJECTION.records[1],
-			LEDGER_OWNER_PROJECTION.records[2],
-		])
-	})
-
-	it('keeps the first requested owner key and joins titles in request order', () => {
-		const views = selectRecords(LEDGER_OWNER_PROJECTION, {
-			owners: ['BW-20931', 'missing', 'BW-5512', 'BW-20931'],
-			topics: [],
-		})
-		expect(views.map((record) => record.key)).toEqual(['owner:BW-20931', 'rules'])
-		expect(views[0]).toEqual({
-			...LEDGER_OWNER_PROJECTION.records[1],
-			title: 'Brightwater Studio (BW-20931); Brightwater Studio (BW-5512)',
-		})
-	})
-
-	it('lists the requested owner records in the order named, then the rules record', () => {
-		const views = selectRecords(built, {
-			owners: ['OM-30418', 'BW-20931'],
-			topics: [],
-		})
-		expect(views.map((view) => view.key)).toEqual(['owner:OM-30418', 'owner:BW-20931', 'rules'])
-		expect(
-			selectRecords(built, {
-				owners: ['BW-20931', 'OM-30418'],
-				topics: [],
-			}).map((view) => view.key),
-		).toEqual(['owner:BW-20931', 'owner:OM-30418', 'rules'])
-	})
-
-	it('names an owner once and skips an owner with no record', () => {
-		const views = selectRecords(built, {
-			owners: ['BW-20931', 'BW-20931', 'XX-1'],
-			topics: [],
-		})
-		expect(views.map((view) => view.key)).toEqual(['owner:BW-20931', 'rules'])
-		expect(selectRecords(built, createLedgerRequest()).map((view) => view.key)).toEqual([
-			'owner:BW-20931',
-			'rules',
-		])
-	})
-
-	it('puts the rules lines that meet the request topics first, each group in position order', () => {
-		const input = buildLedgerInput({
-			messages: [
-				buildLedgerMessage('user-a', 'user', 'Standing rule about returns.'),
-				buildLedgerMessage('user-b', 'user', 'Standing rule about refunds.'),
-				buildLedgerMessage('user-c', 'user', 'Standing rule about refunds and shipping.'),
-				buildLedgerMessage('user-d', 'user', 'Standing rule about holidays.'),
-			],
-			classification: {
-				categories: {
-					'user-a': 'rule',
-					'user-b': 'rule',
-					'user-c': 'rule',
-					'user-d': 'rule',
-				},
-				topics: {
-					'user-a': ['returns'],
-					'user-b': ['refunds'],
-					'user-c': ['refunds', 'shipping'],
-					'user-d': [],
-				},
-			},
-		})
-		const [rules] = selectRecords(buildRecords(input), {
-			owners: [],
-			topics: ['shipping', 'refunds'],
-		})
-		expect(rules?.lines.map((line) => line.source)).toEqual([
-			'user-b',
-			'user-c',
-			'user-a',
-			'user-d',
-		])
-	})
-
-	it('drops a hole in the rules lines and orders the lines around it', () => {
-		const input = buildLedgerInput({
-			messages: [
-				buildLedgerMessage('user-a', 'user', 'Standing rule about returns.'),
-				buildLedgerMessage('user-b', 'user', 'Standing rule about refunds.'),
-			],
-			classification: {
-				categories: { 'user-a': 'rule', 'user-b': 'rule' },
-				topics: { 'user-a': ['returns'], 'user-b': ['refunds'] },
-			},
-		})
-		const dense = buildRecords(input)
-		const rules = dense.records.find((record) => record.key === 'rules')
-		const [first, second] = rules?.lines ?? []
-		expect(first?.source).toBe('user-a')
-		expect(second?.source).toBe('user-b')
-		const sparse = replaceLedgerRecord(dense, 'rules', (record) => ({
-			...record,
-			lines: Object.assign(new Array<LedgerLine>(3), { 0: first, 2: second }),
-		}))
-		expect(1 in (sparse.records.find((record) => record.key === 'rules')?.lines ?? [])).toBe(false)
-		const [view] = selectRecords(sparse, { owners: [], topics: ['refunds'] })
-		expect(view?.lines.map((line) => line.source)).toEqual(['user-b', 'user-a'])
-		expect(view?.lines).toHaveLength(2)
-	})
-
-	it('selects only the rules record for a request that names no owner', () => {
-		expect(selectRecords(built, { owners: [], topics: [] }).map((view) => view.key)).toEqual([
-			'rules',
-		])
-		expect(
-			selectRecords({ records: [], amendments: [], orphans: [] }, createLedgerRequest()),
-		).toEqual([])
-	})
-
-	it('returns copies that share no record, line, or list with the projection', () => {
-		const [view] = selectRecords(built, {
-			owners: ['OM-30418'],
-			topics: [],
-		})
-		const record = built.records.find((one) => one.key === 'owner:OM-30418')
-		expect(view).toEqual(record)
-		expect(view).not.toBe(record)
-		expect(view?.lines).not.toBe(record?.lines)
-		expect(view?.lines[0]).not.toBe(record?.lines[0])
-		expect(view?.members).not.toBe(record?.members)
-		expect(view?.lines[0]?.topics).not.toBe(record?.lines[0]?.topics)
-	})
-})
-
-describe('renderLedgerRecord and renderLedgerPinned', () => {
-	const view: Pick<LedgerRecord, 'title' | 'lines'> = {
-		title: 'Odile Marlow (OM-30418)',
-		lines: [
-			{
-				text: 'The caller is Odile Marlow.',
-				source: 'user-a',
-				sentence: 0,
-				topics: [],
-				role: 'user',
-			},
-			{
-				text: 'Dana Whitcombe: She approved it.',
-				source: 'user-a',
-				sentence: 1,
-				topics: [],
-				role: 'user',
-			},
-		],
-	}
-
-	it('renders a heading and one list item per line', () => {
-		expect(renderLedgerRecord(view)).toBe(
-			'## Odile Marlow (OM-30418)\n- The caller is Odile Marlow.\n- Dana Whitcombe: She approved it.',
-		)
-		expect(renderLedgerPinned(view)).toBe(
-			'### Odile Marlow (OM-30418)\n- The caller is Odile Marlow.\n- Dana Whitcombe: She approved it.',
-		)
-	})
-
-	it('renders a record with no line as its heading alone', () => {
-		expect(renderLedgerRecord({ title: 'Rules', lines: [] })).toBe('## Rules')
-		expect(renderLedgerPinned({ title: 'Rules', lines: [] })).toBe('### Rules')
-	})
-
-	it('renders the desk scenario byte for byte', () => {
-		const views = selectRecords(buildRecords(createLedgerDesk()), createLedgerRequest())
-		expect(views.map((record) => renderLedgerRecord(record)).join('\n\n')).toBe(
-			[
-				'## Brightwater Studio (BW-20931)',
-				'- The shift lead is Dana Whitcombe.',
-				'- Dana Whitcombe: She approved the refund of $148.50 for order BW-5512.',
-				'- Order BW-5512 for account BW-20931 (Brightwater Studio): linen set, total $148.50.',
-				'',
-				'## Rules',
-				'- Standing rule: any refund over $200 needs a manager code.',
-				'- This week code is MX-4471.',
-				'- Correction: the manager code is MX-4486, not MX-4471.',
-			].join('\n'),
-		)
 	})
 })
 
@@ -2638,83 +1948,6 @@ describe('cutListing and matchesCutLine', () => {
 		expect(cutListing(items, 0, 'more').split('\n').map(matchesCutLine)).toEqual([false, true])
 		expect(matchesCutLine('1 more item not shown; add a topic')).toBe(true)
 		expect(matchesCutLine('The 2 more items not shown; ')).toBe(false)
-	})
-})
-
-describe('renderStub', () => {
-	const args = { id: ' BW-5512 ' }
-
-	it('renders the call and the state of each lookup result', () => {
-		expect(renderStub('lookup_order', args, 'failed')).toBe(
-			'lookup_order {"id":" BW-5512 "}: failed',
-		)
-		expect(renderStub('lookup_order', args, 'empty')).toBe(
-			'lookup_order {"id":" BW-5512 "}: no record',
-		)
-		expect(renderStub('lookup_order', args, 'shown')).toBe(
-			'lookup_order {"id":" BW-5512 "}: result shown under Records below',
-		)
-		expect(renderStub('lookup_order', args, 'hidden')).toBe(
-			'lookup_order {"id":" BW-5512 "}: result not shown; call recall with BW-5512',
-		)
-	})
-
-	it("reads a write's empty state as a call that changed nothing", () => {
-		expect(renderStub('update_contact', { id: 'C-12' }, 'empty', true)).toBe(
-			'update_contact {"id":"C-12"}: changed nothing',
-		)
-		expect(renderStub('update_contact', { id: 'C-12' }, 'empty', false)).toBe(
-			'update_contact {"id":"C-12"}: no record',
-		)
-		expect(renderStub('update_contact', { id: 'C-12' }, 'failed', true)).toBe(
-			'update_contact {"id":"C-12"}: failed',
-		)
-	})
-
-	it('names its id when a hidden call carries no string argument', () => {
-		expect(renderStub('lookup_order', {}, 'hidden')).toBe(
-			'lookup_order {}: result not shown; call recall with its id',
-		)
-		expect(renderStub('lookup_order', { id: '  ', n: 4 }, 'hidden')).toBe(
-			'lookup_order {"id":"  ","n":4}: result not shown; call recall with its id',
-		)
-	})
-
-	it('renders the bare tool name for arguments JSON cannot carry', () => {
-		const cyclic: Record<string, unknown> = { id: 'BW-5512' }
-		cyclic.self = cyclic
-		expect(renderStub('lookup_order', { id: 'BW-5512', count: 1n }, 'hidden')).toBe(
-			'lookup_order: result not shown; call recall with BW-5512',
-		)
-		expect(renderStub('lookup_order', cyclic, 'failed')).toBe('lookup_order: failed')
-	})
-
-	it('writes no handle', () => {
-		for (const state of ['failed', 'empty', 'shown', 'hidden'] as const) {
-			expect(renderStub('lookup_order', { id: 'BW-5512' }, state).match(LEDGER_HANDLE)).toBeNull()
-		}
-	})
-
-	it('names no recall route for a hidden result when recall is not offered', () => {
-		expect(renderStub('lookup_order', args, 'hidden', false, false)).toBe(
-			'lookup_order {"id":" BW-5512 "}: result not shown',
-		)
-		expect(renderStub('lookup_order', args, 'hidden', false, true)).toBe(
-			'lookup_order {"id":" BW-5512 "}: result not shown; call recall with BW-5512',
-		)
-		expect(renderStub('update_contact', { id: 'C-12' }, 'hidden', true, false)).toBe(
-			'update_contact {"id":"C-12"}: result not shown',
-		)
-	})
-
-	it('renders every other state alike whether recall is offered', () => {
-		for (const state of ['failed', 'empty', 'shown'] as const) {
-			for (const write of [false, true]) {
-				expect(renderStub('lookup_order', args, state, write, false)).toBe(
-					renderStub('lookup_order', args, state, write, true),
-				)
-			}
-		}
 	})
 })
 
@@ -3016,5 +2249,57 @@ describe('collectLedgerKeys', () => {
 				new Set(before.slice(0, before.indexOf('first') + 1)),
 			),
 		).toEqual([])
+	})
+	it('caps the id keys at the index limit, a recurring tie going to the newest', () => {
+		const orders = Array.from({ length: 25 }, (_unused, at) => `XA-${at}`)
+		const statements = [...orders, ...orders].map((id, at) =>
+			buildLedgerMessage(`order-${at}`, 'user', `Order ${id} shipped.`),
+		)
+		const input = buildLedgerInput({
+			exclusions: ['first', 'request'],
+			messages: [
+				...statements,
+				buildLedgerMessage('first', 'user', 'Which orders shipped?'),
+				buildLedgerMessage('reply', 'assistant', 'All of them.'),
+				buildLedgerMessage('request', 'user', 'Thanks, which are late?'),
+			],
+		})
+		const keys = collectLedgerKeys(
+			input,
+			buildRecords(input),
+			[],
+			'request',
+			new Set(['first', 'request']),
+			new Set(),
+			new Set(['request']),
+		)
+		expect(LEDGER_KEY_LIMIT).toBe(20)
+		expect(keys.map((key) => key.name)).toEqual(['previous', ...orders.toReversed().slice(0, 20)])
+		expect(new Set(keys.slice(1).map((key) => key.description))).toEqual(
+			new Set(['2 earlier messages']),
+		)
+	})
+})
+
+describe('renderLedgerKeys', () => {
+	it('renders the Earlier heading, how to read it, one line per key, and a closing line with no count', () => {
+		expect(
+			renderLedgerKeys([
+				{ name: 'previous', description: 'your last request and your reply to it' },
+				{ name: 'BW-20931', description: 'Brightwater\nStudio; 2 earlier messages' },
+			]),
+		).toBe(
+			[
+				'## Earlier',
+				'Earlier messages are stored, not shown. Call recall with a key below.',
+				'- previous: your last request and your reply to it',
+				'- BW-20931: Brightwater Studio; 2 earlier messages',
+				'Other ids, names, and words from a message work too.',
+			].join('\n'),
+		)
+	})
+
+	it('renders nothing for no key', () => {
+		expect(renderLedgerKeys([])).toBe('')
 	})
 })

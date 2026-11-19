@@ -1,4 +1,11 @@
+import { createLedger, LEDGER_KEY_LIMIT, LEDGER_PREVIOUS_KEY } from '@src/core'
 import { expect, it } from 'vitest'
+import {
+	buildLedgerGoals,
+	buildLedgerOptions,
+	createScriptedProvider,
+	readLedgerOpening,
+} from '../../../setup.js'
 import { runLedgerCell } from '../../../setupServer.js'
 
 // Each case runs one cell, chosen with `-t` by its title and read from the file `LEDGER_BENCH_CELL`
@@ -67,4 +74,25 @@ it('recalls real at correction 400', async ({ bench }) => {
 it('recalls real at control 400', async ({ bench }) => {
 	const record = await runLedgerCell(bench, 'control', 400, process.env, 'real', 'recall')
 	expect(record.digests).toHaveLength(1)
+}, 570_000)
+
+// The lean opening's plan over a long history: each sample hydrates 1,600 earlier messages of
+// unrelated goals and plans one request, whose index lists `previous` and at most the key limit of ids.
+it('plans at 1600 earlier messages of unrelated goals', async ({ bench }) => {
+	const snapshot = buildLedgerGoals(1600)
+	const keys: Array<readonly string[]> = []
+	await bench('goals 1600', {}, async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ snapshot, topics: [], gauge: { scale: 1, overhead: 0 } }),
+		)
+		await ledger.respond('What do we do for GL-399?')
+		keys.push(readLedgerOpening(provider.calls[0]?.messages ?? []).keys)
+	}).run({ time: 0, iterations: 3, warmup: false, throws: true })
+	expect(keys).toHaveLength(3)
+	for (const listed of keys) {
+		expect(listed[0]).toBe(LEDGER_PREVIOUS_KEY)
+		expect(listed.length).toBeLessThanOrEqual(1 + LEDGER_KEY_LIMIT)
+	}
 }, 570_000)

@@ -104,21 +104,24 @@ describe('study replay content comparison', () => {
 			),
 		).toThrow(/changed position|bijective/)
 	})
-	it('refuses a changed held message through the recomputed window digest', () => {
+	it('refuses a changed held message through the mapped checkpoint comparison', () => {
 		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])
-		// The changed replay has its own valid native checksum; only mapping and recomputing exposes it.
 		const replayed = buildMemoryReplayEvidence(
 			['replay-a', 'replay-b'],
 			'records',
 			0,
 			'Changed held message',
 		)
-		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Recomputed window digest differs/)
+		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(
+			/Checkpoint members differ after message id mapping/,
+		)
 	})
 	it('refuses changed held content that equals the corresponding message ids', () => {
 		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'], 'records', 0, 'record-a')
 		const replayed = buildMemoryReplayEvidence(['replay-a', 'replay-b'], 'records', 0, 'replay-a')
-		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Recomputed window digest differs/)
+		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(
+			/Checkpoint members differ after message id mapping/,
+		)
 		expect(() =>
 			assertMemoryReplay(
 				recorded,
@@ -139,7 +142,9 @@ describe('study replay content comparison', () => {
 			0,
 			JSON.stringify(['topic', 'replay-a', 'fixture']),
 		)
-		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(/Recomputed window digest differs/)
+		expect(() => assertMemoryReplay(recorded, replayed)).toThrow(
+			/Checkpoint members differ after message id mapping/,
+		)
 	})
 	it('preserves strings outside declared identity fields byte for byte', () => {
 		const ids = new Map([['record-a', 'replay-a']])
@@ -151,9 +156,6 @@ describe('study replay content comparison', () => {
 			'ledger.conversation.judgments.model',
 			'ledger.conversation.judgments.question.question',
 			'ledger.conversation.judgments.answer.choice',
-			'ledger.window.exchanges.copy',
-			'ledger.window.exchanges.lines.key',
-			'ledger.window.exchanges.lines.title',
 			'questions.winner',
 			'conversation.id\n',
 		]) {
@@ -179,11 +181,6 @@ describe('study replay content comparison', () => {
 			'ledger.requests',
 			'ledger.notes',
 			'ledger.failures',
-			'ledger.window.exchanges.request',
-			'ledger.window.exchanges.reply',
-			'ledger.window.exchanges.lines.source',
-			'ledger.window.amendments.earlier',
-			'ledger.window.amendments.later',
 		]) {
 			expect(mapMemoryReplayIds('record-a', ids, member)).toBe('replay-a')
 			expect(() => mapMemoryReplayIds('orphan', ids, member)).toThrow(/Unmapped/)
@@ -216,29 +213,6 @@ describe('study replay content comparison', () => {
 					JSON.stringify(replayed),
 				)
 		}
-	})
-	it('translates window unit-record keys while preserving named placements', () => {
-		const ids = new Map([['record-a', 'replay-a']])
-		for (const [key, title, expected] of [
-			['record-a', '', 'replay-a'],
-			['rules', '', 'rules'],
-			['record-a', 'Named placement', 'record-a'],
-			['owner:record-a', 'Owner', 'owner:record-a'],
-		] as const) {
-			const receipt = { key, title, source: 'record-a', sentence: 0 }
-			expect(mapMemoryReplayIds(receipt, ids, 'ledger.window.exchanges.lines')).toEqual({
-				...receipt,
-				key: expected,
-				source: 'replay-a',
-			})
-		}
-		expect(() =>
-			mapMemoryReplayIds(
-				{ key: 'orphan', title: '', source: 'record-a', sentence: 0 },
-				ids,
-				'ledger.window.exchanges.lines',
-			),
-		).toThrow(/Unmapped/)
 	})
 	it('refuses two judgments out of order even when their clocks are valid', () => {
 		const recorded = buildMemoryReplayEvidence(['record-a', 'record-b'])

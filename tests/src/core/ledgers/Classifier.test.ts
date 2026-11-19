@@ -40,7 +40,6 @@ import {
 	buildLedgerInput,
 	buildLedgerOptions,
 	createScriptedProvider,
-	extractLedgerRecords,
 	buildCorrectionSeed,
 	buildDeliverySeed,
 	buildLedgerPairJudgment,
@@ -101,7 +100,7 @@ describe('Classifier', () => {
 		expect(restoredJudge.requests).toHaveLength(1)
 	})
 
-	it('carries an owner-backed floor statement into the records on a fresh ledger and through two hydrates', async () => {
+	it('sends an owner-backed floor statement whole on a fresh and a hydrated ledger, and recalls it by owner after a second hydrate', async () => {
 		const text = 'Brightwater Studio moved to 555 Lincoln Avenue.'
 		const request = 'Where did BW-20931 move?'
 		const topics = [{ ...LEDGER_REFUNDS_TOPIC, requested: false }]
@@ -130,9 +129,15 @@ describe('Classifier', () => {
 		)
 		await fresh.respond(request)
 		await restored.respond(request)
-		const records = extractLedgerRecords(requireValue(restoredProvider.calls[0]).messages)
-		expect(records).toContain(text)
-		expect(records).toBe(extractLedgerRecords(requireValue(freshProvider.calls.at(-1)).messages))
+		// The statement follows the last reply, so each opening sends it whole before the request.
+		const sent = requireValue(restoredProvider.calls[0]).messages.map((message) => message.content)
+		expect(sent.slice(-2)).toEqual([
+			text,
+			expect.stringMatching(/\n## Request\nWhere did BW-20931 move\?$/),
+		])
+		expect(sent).toEqual(
+			requireValue(freshProvider.calls.at(-1)).messages.map((message) => message.content),
+		)
 		expect(
 			restored.conversation.judgments.judgment(JSON.stringify(['category', statement.id]))?.answer,
 		).toEqual(buildCategoryAnswer({ chatter: 0.98, fact: 0.02 }))
@@ -143,7 +148,17 @@ describe('Classifier', () => {
 			buildLedgerOptions({ judge: againJudge, topics, snapshot: restored.snapshot() }),
 		)
 		await again.respond(request)
-		expect(extractLedgerRecords(requireValue(againProvider.calls[0]).messages)).toContain(text)
+		// The statement is earlier now: recall by the owner's name lists it only while the floor keeps it
+		// from being quiet, since a matched owner leaves no word search.
+		const recalled = await again.agent.context.tools.execute({
+			id: 'host',
+			name: 'recall',
+			arguments: { key: 'Brightwater Studio' },
+		})
+		expect(
+			requireValue(againProvider.calls[0]).messages.map((message) => message.content),
+		).not.toContain(text)
+		expect(recalled.success ? String(recalled.value) : recalled.error).toContain(text)
 		expect(
 			againJudge.requests
 				.flatMap((one) => Object.keys(one.questions))

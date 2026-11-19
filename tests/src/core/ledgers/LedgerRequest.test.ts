@@ -4,33 +4,6 @@ import { requireValue } from '@orkestrel/test'
 import { describe, expect, it } from 'vitest'
 
 describe('LedgerRequest', () => {
-	it('replaces copy receipts with a successful plan and discards them on fallback', () => {
-		const request = new LedgerRequest('Check.')
-		const message = request.enter(createConversation())
-		const first = {
-			copy: { ...message, content: 'First copy.' },
-			lines: [],
-			evidence: { messages: new Set<string>(), amendments: new Map() },
-			window: [],
-		}
-		const second = { ...first, copy: { ...message, content: 'Second copy.' } }
-		const plan: Selection = { messages: [first.copy], judgments: [] }
-		request.file([], plan, first)
-		request.open(0)
-		request.adopt(plan, 1)
-		request.observe({ estimate: 1, tools: 0 }, 1)
-		expect(request.sent).toBe(first)
-		request.file([], { ...plan, messages: [second.copy] }, second)
-		expect(request.sent).toBe(first)
-		request.adopt({ ...plan, messages: [second.copy] }, 1)
-		request.observe({ estimate: 1, tools: 0 }, 1)
-		expect(request.sent).toBe(second)
-		request.file([])
-		expect(request.plan?.messages).toEqual([second.copy])
-		request.adopt({ messages: [message], judgments: [] }, 1)
-		request.observe({ estimate: 1, tools: 0 }, 1)
-		expect(request.sent).toBeUndefined()
-	})
 	it('appends its content once on enter and holds the message', () => {
 		const conversation = createConversation()
 		const request = new LedgerRequest('What approval is needed?')

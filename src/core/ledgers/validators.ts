@@ -1,49 +1,8 @@
-import type { LedgerQuestion, LedgerSnapshot, LedgerWindowSnapshot } from './types.js'
+import type { LedgerQuestion, LedgerSnapshot } from './types.js'
 import { arrayOf, holds, isFiniteNumber, isRecord, isString } from '@orkestrel/contract'
 import { LEDGER_CATEGORIES } from './constants.js'
 import { isConversationSnapshot } from '../conversations/validators.js'
-import { isJudgeEntry, isJudgeQuestion, isNonNegativeSafeInteger } from '../validators.js'
-
-/**
- * Checks whether a value has the exact shape of a nonempty exchange window.
- * @param value - The untrusted window
- * @returns True if the window and its members are well shaped; false otherwise
- * @example
- * ```ts
- * isLedgerWindowSnapshot({ digest: 'checksum', exchanges: [{ request: 'request', reply: 'reply', lines: [] }], amendments: [] }) // true
- * ```
- */
-export function isLedgerWindowSnapshot(value: unknown): value is LedgerWindowSnapshot {
-	return holds(() => {
-		if (!isRecord(value) || Object.keys(value).length !== 3 || !isString(value.digest)) return false
-		const { exchanges, amendments } = value
-		if (!arrayOf(isRecord)(exchanges) || exchanges.length === 0 || !arrayOf(isRecord)(amendments))
-			return false
-		return (
-			exchanges.every((entry) => {
-				const { request, reply, copy, lines } = entry
-				return (
-					Object.keys(entry).length === 3 + Number(copy !== undefined) &&
-					isString(request) &&
-					isString(reply) &&
-					(copy === undefined || isString(copy)) &&
-					arrayOf(isRecord)(lines) &&
-					lines.every(
-						(line) =>
-							Object.keys(line).length === 4 &&
-							isString(line.key) &&
-							isString(line.title) &&
-							isString(line.source) &&
-							isNonNegativeSafeInteger(line.sentence),
-					)
-				)
-			}) &&
-			amendments.every(
-				(edge) => Object.keys(edge).length === 2 && isString(edge.earlier) && isString(edge.later),
-			)
-		)
-	})
-}
+import { isJudgeEntry, isJudgeQuestion } from '../validators.js'
 
 /**
  * Checks whether a value is finite and lies in the interval (0, 1].
@@ -106,8 +65,6 @@ export function isLedgerQuestion(value: unknown): value is LedgerQuestion {
  * guard is structural: it admits a conversation holding a stored `system` role
  * or a repeated id, which `requireConversationSnapshot` and the `Conversation` constructor then
  * refuse as the stored-data check a ledger's hydrate runs.
- * A present `window` must be nonempty and exactly shaped. This guard does not audit its references
- * or sentence ranges. Hydration discards the window when its digest disagrees or cannot be computed.
  *
  * @param value - The value to inspect, such as a parsed checkpoint
  * @returns True if the value has the shape of a ledger snapshot whose marked ids name messages of its own conversation; false otherwise
@@ -121,12 +78,8 @@ export function isLedgerQuestion(value: unknown): value is LedgerQuestion {
 export function isLedgerSnapshot(value: unknown): value is LedgerSnapshot {
 	return holds(() => {
 		if (!isRecord(value)) return false
-		const { conversation, requests, notes, failures, gauge, window } = value
-		if (
-			Object.keys(value).length !==
-			4 + Number(gauge !== undefined) + Number(window !== undefined)
-		)
-			return false
+		const { conversation, requests, notes, failures, gauge } = value
+		if (Object.keys(value).length !== 4 + Number(gauge !== undefined)) return false
 		if (!isConversationSnapshot(conversation)) return false
 		const isIds = arrayOf(isString)
 		if (!isIds(requests) || !isIds(notes) || !isIds(failures)) return false
@@ -148,8 +101,7 @@ export function isLedgerSnapshot(value: unknown): value is LedgerSnapshot {
 		return (
 			requests.every((id) => roles.get(id) === 'user') &&
 			notes.every((id) => roles.get(id) === 'user') &&
-			failures.every((id) => roles.get(id) === 'tool') &&
-			(window === undefined || isLedgerWindowSnapshot(window))
+			failures.every((id) => roles.get(id) === 'tool')
 		)
 	})
 }

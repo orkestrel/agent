@@ -85,26 +85,22 @@ export interface LedgerTopic {
 }
 
 /**
- * Carries the share of the context capacity the prompt can take and the share of that budget the
- * tail can take.
+ * Carries the share of the context capacity the prompt can take and the share of that budget a
+ * thread's shown skills can take.
  *
  * @remarks
  * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
- * before the records and the tail take the rest. `tail` bounds only the seed tail. The seed and
- * records are planned before the completed-exchange window spends spare room. The full window
- * with a delta copy, then its newest plain exchange with a full copy, then no exchange are priced
- * in that order. Admission cannot close an otherwise open recall or displace a selected record
- * line or seed message. A seed stub reads visibility across the window and the copy together.
- * `skills` is the share of the prompt budget, `(capacity - predict) * prompt`, that a thread's shown
+ * before the opening takes the rest: the current statements and the request copy with its Earlier
+ * index. `skills` is the share of the prompt budget, `(capacity - predict) * prompt`, that a thread's shown
  * skills can take: their bodies and the definitions they add beyond the calibrated set. A `load`
  * that would take the shown skills, the loads its batch already admitted, and its own skill past it
  * is denied with the {@link LedgerNote} `overflow` text.
- * Each share must be finite, greater than 0, and at most 1. Default: the `DEFAULT_LEDGER_SHARE`
+ * Each share must be finite, greater than 0, and at most 1, and a member `LEDGER_SHARE_KEYS` does
+ * not list refuses with a `ContractError` coded `'structure'`. Default: the `DEFAULT_LEDGER_SHARE`
  * constant, leaf by leaf.
  */
 export interface LedgerShare {
 	readonly prompt: number
-	readonly tail: number
 	/** Holds the share of the prompt budget a thread's shown skills can take, bodies and tools together. */
 	readonly skills: number
 }
@@ -276,9 +272,6 @@ export interface LedgerLookupFinding {
 	readonly targets?: readonly string[]
 }
 
-/** Names what became of a lookup of an earlier request, as the tail stub of its result reports it. */
-export type LedgerLookupState = 'failed' | 'empty' | 'shown' | 'hidden'
-
 /**
  * Carries the ids the ledger's lookups named and the owners among them.
  *
@@ -407,7 +400,7 @@ export type LedgerAgentOptions = Pick<
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
- * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it, and the records go into a copy of each request turn. `topics` lists the desk
+ * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it. Each request sends the current statements whole and then a copy of the request turn, which carries the Earlier index of what `recall` can read. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions under the same provider `model`, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
@@ -435,9 +428,11 @@ export type LedgerAgentOptions = Pick<
  * does not fit ends with the agent's `abort` reason `overflow`, and the answer pass answers; an
  * answer pass that does not fit with its note left out rejects `respond` with `LedgerError` code
  * `'OVERFLOW'`.
- * The plan retains its `remainder - predict < 2 * reserve` admission rule. Runtime recall fits whole
- * results to measured remaining capacity at the larger of the gauge rate and the request's measured
- * rate, allowing `LEDGER_SCALE_DRIFT` for new text. Lack of room omits results without closing recall.
+ * While the plan cuts id rows from the Earlier index it keeps cutting until the first turn leaves
+ * `remainder - predict >= 2 * reserve`, and it never withdraws `recall` while something is left
+ * behind. Runtime recall fits whole results to measured remaining capacity at the larger of the
+ * gauge rate and the request's measured rate, allowing `LEDGER_SCALE_DRIFT` for new text. Lack of
+ * room omits results without closing recall.
  * `writes` lists the {@link LedgerWrite} entries the model can call; a ledger with writes requires
  * `agent.authority`. `snapshot` hydrates the conversation and
  * the marked ids a ledger's `snapshot()` returned; construction throws `LedgerError` with code
@@ -485,17 +480,11 @@ export interface LedgerOptions {
  * definitions have another digest, or whose provider has another `model`, drops the gauge and
  * calibrates before its first pass; a gauge with no `digest` or no non-empty `model` refuses the
  * snapshot, and `snapshot()` omits a gauge whose definitions JSON cannot render. The gauge's observations of earlier requests are
- * not carried, so a hydrated ledger sizes and closes `recall` from its fallback reserve until it
- * completes a request. A held question is a refused judgment of `conversation`, so a hydrated
+ * not carried, so a hydrated ledger sizes `recall` results and the plan's room for them from its
+ * fallback reserve until it completes a request. A held question is a refused judgment of `conversation`, so a hydrated
  * ledger under the same judge identity asks it no more. Hydrating a second ledger from one snapshot forks
- * it at the parent's frontier. `window`, when present, retains sent request copies, reply ids,
- * sentence receipts, and accepted amendment edges. The next plan keeps the same conversation
- * prefix when the live and hydrated reserves admit the same exchange rung. A rung between those
- * reserves can differ because hydration carries no gauge observations; this moves the prefix,
- * never the record coverage. A plain request omits `copy` because its content already lives in `conversation`.
- * The required window `digest` checks canonical held messages, lookup call context, copies, and receipts. A mismatch drains
- * the window and its evidence; a missing digest refuses the snapshot. An unencodable held message
- * makes `snapshot()` omit the window. The checksum detects edits, not authenticity. A write's
+ * it at the parent's frontier. The snapshot is exact: a member this type does not declare, such as
+ * `window`, refuses the hydrate. A write's
  * retirements carry no member: the hydrated ledger reads each write's targets again from the
  * conversation and its failures, so a changed `writes` list brings retired reads back live.
  */
@@ -505,22 +494,6 @@ export interface LedgerSnapshot {
 	readonly notes: readonly string[]
 	readonly failures: readonly string[]
 	readonly gauge?: LedgerGaugeSnapshot
-	readonly window?: LedgerWindowSnapshot
-}
-
-/** Carries the sent request text, stored pair ids, and sentence placements of one exchange. */
-export interface LedgerExchangeSnapshot {
-	readonly request: string
-	readonly copy?: string
-	readonly reply: string
-	readonly lines: readonly LedgerReceipt[]
-}
-
-/** Carries a nonempty exchange window, its message, copy, and receipt checksum, and its accepted edges. */
-export interface LedgerWindowSnapshot {
-	readonly digest: string
-	readonly exchanges: readonly LedgerExchangeSnapshot[]
-	readonly amendments: readonly LedgerAmendment[]
 }
 
 /**
@@ -579,8 +552,6 @@ export interface LedgerRequestInterface {
 	readonly scope: ScopeInterface | undefined
 	/** Records the scope applied by the ledger's plan for conditional restoration at settle. */
 	apply(scope: ScopeInterface): void
-	/** Holds the copy and receipts adopted by the last provider turn, or undefined for a view fallback. */
-	readonly sent: LedgerDraft | undefined
 	/** Records an error the request's run reported through its `fault` event. */
 	fault(error: unknown): void
 	/**
@@ -665,9 +636,8 @@ export interface LedgerRequestInterface {
 	 *
 	 * @param attempts - The selection's filing attempts, in asking order
 	 * @param plan - The planned selection, or undefined when planning failed
-	 * @param draft - The copy and receipts eligible for adoption; omission discards that eligibility
 	 */
-	file(attempts: readonly ClassifierAttempt[], plan?: Selection, draft?: LedgerDraft): void
+	file(attempts: readonly ClassifierAttempt[], plan?: Selection): void
 	/**
 	 * Admits one tool call of the request, compared by tool name and canonical arguments.
 	 *
@@ -780,13 +750,12 @@ export type LedgerAgentInterface = Pick<
  *
  * @remarks
  * The ledger files every message of its conversation through the injected judge, projects the
- * owner records and the rules record from that filing, and sends a tail and a copy of the request turn carrying the records that fit
- * its capacity. It owns its agent: applying a scope that carries `select` displaces the ledger's
- * selection handler. A message removed from `conversation`, one by one or by `clear`, takes the
- * ledger's marks of it at the removal, and the exchange window with them when the window held the
- * message or one of its accepted amendment edges named it. A request in flight at the removal
- * commits no window that names the message, and files no tool result onto another message, so
- * neither the next request nor a snapshot carries the message's state.
+ * owner records and the rules record from that filing, and sends the current statements whole and
+ * a copy of the request turn carrying the Earlier index of what `recall` reads. It owns its agent:
+ * applying a scope that carries `select` displaces the ledger's selection handler. A message
+ * removed from `conversation`, one by one or by `clear`, takes the ledger's marks of it at the
+ * removal. A request in flight at the removal files no tool result onto another message, so neither
+ * the next request nor a snapshot carries the message's state.
  */
 export interface LedgerInterface {
 	/**
@@ -899,8 +868,8 @@ export interface LedgerInterface {
 	 * is not yet appended is not captured. A call while a `respond`, `stream`, or `calibrate` call is
 	 * in flight throws, because an entered, unanswered request would hydrate as a dangling request.
 	 * The `gauge` member carries the digest of the tool definitions the gauge priced and the provider
-	 * `model` it was measured on. The snapshot
-	 * holds no mark of a message removed from `conversation`, and no window that held one.
+	 * `model` it was measured on. The snapshot holds no mark of a message removed from
+	 * `conversation`.
 	 *
 	 * @returns The snapshot, each id list in conversation order and `gauge` present after the ledger holds one whose definitions JSON renders
 	 * @throws {AgentError} Thrown when a request or calibration is active (code `'CONCURRENCY'`)
@@ -957,44 +926,6 @@ export interface LedgerLine {
 	readonly role: MessageRole
 }
 
-/** Identifies an original sentence at one record placement. */
-export interface LedgerReceipt {
-	readonly key: string
-	readonly title: string
-	readonly source: string
-	readonly sentence: number
-}
-
-/** Carries a rendered sentence with its record placement. */
-export interface LedgerOccurrence extends LedgerLine, LedgerReceipt {}
-
-/** Carries a completed request copy, its stored reply, and the sentences the copy rendered. */
-export interface LedgerExchange {
-	readonly request: Message
-	readonly reply: Message
-	readonly lines: readonly LedgerOccurrence[]
-}
-
-/** Carries a planned copy and its validity evidence to request settlement. */
-export interface LedgerDraft {
-	readonly copy: Message
-	readonly lines: readonly LedgerOccurrence[]
-	readonly evidence: LedgerEvidence
-	readonly window: readonly LedgerExchange[]
-}
-
-/** Captures held message identities and the accepted edges used to validate their copies. */
-export interface LedgerEvidence {
-	readonly messages: ReadonlySet<string>
-	readonly amendments: ReadonlyMap<string, LedgerAmendment>
-}
-
-/** Carries rendered record text and its sentences in emission order. */
-export interface LedgerRenderResult {
-	readonly text: string
-	readonly lines: readonly LedgerOccurrence[]
-}
-
 /**
  * Carries one record: the live messages placed on one owner or on the rules, as lines.
  *
@@ -1018,8 +949,9 @@ export interface LedgerRecord {
  * A recall key is neither a record key (`LedgerRecord.key`) nor a judgment key. `name` is
  * `previous`, `rules`, an id, or a desk topic's name, as the `recall` tool reads it. `description`
  * says what the key lists: the last exchange, the rules record, how many earlier messages carry the
- * id and the names of its owner, or the topic's criterion. A `recall` call that lists nothing names
- * up to `LEDGER_MISS_LIMIT` of these keys back.
+ * id and the names of its owner, or the topic's criterion. The Earlier index of a request copy
+ * lists these keys, and a `recall` call that lists nothing names up to `LEDGER_MISS_LIMIT` of them
+ * back.
  */
 export interface LedgerKey {
 	readonly name: string
@@ -1030,24 +962,6 @@ export interface LedgerKey {
 export interface LedgerAmendment {
 	readonly earlier: string
 	readonly later: string
-}
-
-/**
- * Supplies accepted amendments and completely included sources for one rendering of the records.
- *
- * @remarks
- * `first` identifies each source's first retained line object in actual emission order. Build this
- * context from the same line objects passed to the renderers after deduplication and trimming;
- * recompute it when the retained population changes. `references` assigns each distinct retained
- * source its decimal display reference in first-occurrence order, starting at 1. These
- * records-local references can change after trimming; the projection, recall, and storage retain
- * original source IDs.
- */
-export interface LedgerRenderContext {
-	readonly amendments: readonly LedgerAmendment[]
-	readonly complete: ReadonlySet<string>
-	readonly first: ReadonlyMap<string, LedgerLine>
-	readonly references: ReadonlyMap<string, string>
 }
 
 /**
@@ -1077,12 +991,6 @@ export interface LedgerProjectionInput {
 	readonly findings: readonly LedgerLookupFinding[]
 	readonly entities: ReadonlyMap<string, readonly string[]>
 	readonly classification: LedgerClassification
-}
-
-/** Carries the owners and the desk topics one request names, which select its records. */
-export interface LedgerProjectionRequest {
-	readonly owners: readonly string[]
-	readonly topics: readonly string[]
 }
 
 /**
@@ -1348,9 +1256,6 @@ export interface GaugeInterface extends LedgerGauge {
 	observe(calls: readonly GaugeCall[], reply?: GaugeCall): void
 }
 
-/** Names the planning group of a source the records render: a topic match, an off-topic rule or correction, or a name match. */
-export type LedgerPlanGroup = 1 | 2 | 3
-
 /** Names the machine-readable conditions a `LedgerError` error reports. */
 export type LedgerErrorCode =
 	/** Reports a selection whose request is neither an active `respond` call's request nor a ledger note. */
@@ -1371,8 +1276,6 @@ export type LedgerErrorCode =
 	| 'LOOKUP'
 	/** Reports a supplied gauge outside its bounds, a calibration call that reports no prompt usage or a prompt usage of 0 or less, or a calibration call, with the tool definitions, without them, or with the workspace text, that prices a prompt over `capacity`, the head included. */
 	| 'GAUGE'
-	/** Reports a render context that holds no reference for a source it annotates. */
-	| 'REFERENCE'
 	/** Reports a snapshot that is malformed or that marks an id its conversation does not hold. */
 	| 'SNAPSHOT'
 	/** Reports filing wording that `isLedgerQuestion` refuses. */
@@ -1383,9 +1286,3 @@ export type LedgerErrorCode =
 	| 'OVERFLOW'
 	/** Reports a call to a ledger after its `destroy` method ran, or after its host destroyed the emitter of its agent or of its conversation. */
 	| 'DESTROYED'
-
-/** Carries the lowercase words and non-opening capitalized names of a message. */
-export interface LedgerWordSet {
-	readonly words: ReadonlySet<string>
-	readonly names: ReadonlySet<string>
-}

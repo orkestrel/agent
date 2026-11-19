@@ -5,7 +5,6 @@ import type {
 	ClassifierAttempt,
 	GaugeCall,
 	LedgerCommit,
-	LedgerDraft,
 	LedgerListing,
 	LedgerRequestInterface,
 } from './types.js'
@@ -41,8 +40,6 @@ export class LedgerRequest implements LedgerRequestInterface {
 	#message: Message | undefined
 	#plan: Selection | undefined
 	#scope: ScopeInterface | undefined
-	#draft: LedgerDraft | undefined
-	#sent: LedgerDraft | undefined
 	#passes: readonly LedgerPass[] = []
 	#attempts: readonly ClassifierAttempt[] = []
 	#admitted: ReadonlySet<string> = new Set()
@@ -85,11 +82,6 @@ export class LedgerRequest implements LedgerRequestInterface {
 
 	apply(scope: ScopeInterface): void {
 		this.#scope = scope
-	}
-
-	/** Returns the copy and receipts adopted by the last provider turn. */
-	get sent(): LedgerDraft | undefined {
-		return this.#sent
 	}
 
 	/**
@@ -174,14 +166,6 @@ export class LedgerRequest implements LedgerRequestInterface {
 	}
 
 	observe(call: GaugeCall, position: number): void {
-		const draft = this.#draft
-		this.#sent =
-			draft !== undefined &&
-			this.selection?.messages.some(
-				(message) => message.id === draft.copy.id && message.content === draft.copy.content,
-			)
-				? draft
-				: undefined
 		this.#passes.at(-1)?.observe(call, position)
 	}
 
@@ -208,9 +192,8 @@ export class LedgerRequest implements LedgerRequestInterface {
 		return this.#faults.has(error)
 	}
 
-	file(attempts: readonly ClassifierAttempt[], plan?: Selection, draft?: LedgerDraft): void {
+	file(attempts: readonly ClassifierAttempt[], plan?: Selection): void {
 		this.#attempts = [...this.#attempts, ...attempts]
-		this.#draft = draft
 		if (plan !== undefined) {
 			this.#plan = plan
 		}

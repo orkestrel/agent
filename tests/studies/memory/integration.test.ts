@@ -540,7 +540,7 @@ describe('the captured install', () => {
 		expect(server.requests).toHaveLength(sent)
 		const result = await readStudyResult(output)
 		if (result.status !== 'sealed') throw new Error('The replay did not seal')
-		// The records session rebuilds its ledger state, windows and judgments from the served bytes alone.
+		// The records session rebuilds its ledger state and judgments from the served bytes alone.
 		assertMemoryReplay(
 			(await collectStudyEvidence(source))[recording.trial] ?? [],
 			(await collectStudyEvidence(result))[recording.trial] ?? [],

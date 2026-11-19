@@ -85,7 +85,7 @@ describe('createLedger', () => {
 				createLedger(createScriptedProvider([]), { ...options, share: { prompt: value } }),
 			).toThrow(expect.objectContaining({ code: 'SHARE' }))
 			expect(() =>
-				createLedger(createScriptedProvider([]), { ...options, share: { tail: value } }),
+				createLedger(createScriptedProvider([]), { ...options, share: { skills: value } }),
 			).toThrow(expect.objectContaining({ code: 'SHARE' }))
 		}
 		for (const value of [0, -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])

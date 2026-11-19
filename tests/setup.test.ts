@@ -20,7 +20,6 @@ import {
 import { checkLedgerSample, isLedgerCell, takeLedgerSample } from './setupServer.js'
 import {
 	admitsRelayCredential,
-	buildLedgerTailScenario,
 	MEASURE_CALLS,
 	MEASURE_CIRCULAR,
 	MESSAGE_MEASURE_CASES,
@@ -37,8 +36,6 @@ import {
 	LEDGER_ORDER_LOOKUP,
 	fileLedgerCorrection,
 	planLedgerDelivery,
-	LEDGER_RECORD_MARKERS,
-	collectLedgerMarkers,
 	serveAmendedDesk,
 	classifyLedgerCorrection,
 	exerciseThinkingReplay,
@@ -127,7 +124,13 @@ import {
 	createGuardAgent,
 	createWireDecision,
 	createWireHeaders,
-	extractLedgerRecords,
+	extractLedgerIndex,
+	buildLedgerGoals,
+	countLedgerPlanFit,
+	LEDGER_CUT_SNAPSHOT,
+	LEDGER_PLAN_REMARK,
+	readLedgerOpening,
+	recallLedger,
 	readWireFrames,
 	seedCanaryContext,
 	serveCanaryDesk,
@@ -157,6 +160,8 @@ import {
 	createMemoryConversationStore,
 	isConversationError,
 	isConversationSnapshot,
+	isLedgerSnapshot,
+	estimateMessages,
 	isMemoSnapshot,
 	isProviderAbortError,
 	MESSAGE_ROLES,
@@ -253,7 +258,6 @@ import {
 	buildLedgerFinding,
 	checkLedgerProjection,
 	createLedgerDesk,
-	createLedgerRequest,
 	LEDGER_DESK_OWNERS,
 	LEDGER_HANDLE,
 	reverseLedgerInput,
@@ -310,11 +314,9 @@ import {
 	NOTE_TEXT,
 	readRenderedWorkspaces,
 	renderWorkspaceMarker,
-	buildLedgerTwoOwnerOptions,
 	LEDGER_STREAM_TURNS,
 	renderAgentChunk,
 	renderLedgerOutcome,
-	seedLedgerOmission,
 } from './setup.js'
 import type { AgentChunk } from '@src/core'
 import type { ToolContext } from '@orkestrel/tool'
@@ -1448,32 +1450,110 @@ describe('system boundary canary fixtures', () => {
 			expect(recorded.at(-1)?.role).toBe('user')
 		}
 		expect(RECORDED_ANSWER_REQUEST[1]).toEqual(RECORDED_FIRST_REQUEST.at(-1))
-		// A late request keeps the first request's head and seed whole, then adds the previous exchange.
-		expect(RECORDED_LATE_REQUEST.slice(0, -3)).toEqual(RECORDED_FIRST_REQUEST.slice(0, -1))
-		expect(RECORDED_LATE_REQUEST.slice(-3, -1).map((message) => message.role)).toEqual([
-			'user',
-			'assistant',
-		])
+		// A late request keeps the first request's head and sends its copy with the Earlier index last.
+		expect(RECORDED_LATE_REQUEST.slice(0, -1)).toEqual(RECORDED_FIRST_REQUEST.slice(0, -1))
+		expect(RECORDED_LATE_REQUEST.at(-1)?.content).toMatch(
+			/^## Earlier\n[\s\S]*\n\n## Request\nCheck Brightwater Studio again\.$/,
+		)
 	})
 
-	it('reads the records of the last request copy and empty text when no copy carries any', () => {
+	it('reads the Earlier index of the last request copy and empty text when no copy carries one', () => {
 		const copy: Message = {
 			id: 'copy',
 			role: 'user',
-			content: '## Records\n- Refund issued.\n\n## Request\nCheck BW-5512.',
+			content:
+				'## Earlier\n- previous: your last request and your reply to it\n\n## Request\nCheck BW-5512.',
 		}
 		const cue: Message = { id: 'cue', role: 'user', content: 'Answer now.' }
 		const system: Message = { id: 'system', role: 'system', content: 'a\n\n## Request\nb' }
 
-		expect(extractLedgerRecords([system, copy, cue])).toBe('## Records\n- Refund issued.')
-		expect(extractLedgerRecords([system, cue])).toBe('')
-		expect(extractLedgerRecords([])).toBe('')
+		expect(extractLedgerIndex([system, copy, cue])).toBe(
+			'## Earlier\n- previous: your last request and your reply to it',
+		)
+		expect(extractLedgerIndex([system, cue])).toBe('')
+		expect(extractLedgerIndex([])).toBe('')
 		expect(
-			extractLedgerRecords([
-				copy,
-				{ ...copy, id: 'late', content: 'Later.\n\n## Request\nAgain.' },
-			]),
+			extractLedgerIndex([copy, { ...copy, id: 'late', content: 'Later.\n\n## Request\nAgain.' }]),
 		).toBe('Later.')
+	})
+
+	it('reads the statement ids and the index key names of an opening', () => {
+		const opening = readLedgerOpening([
+			{ id: 'system', role: 'system', content: 'Serve the desk.' },
+			{ id: 'statement', role: 'user', content: 'Crate CR-1 holds lamps.' },
+			{
+				id: 'copy',
+				role: 'user',
+				content:
+					'## Earlier\nEarlier messages are stored, not shown. Call recall with a key below.\n- previous: your last request and your reply to it\n- AX-1: 2 earlier messages\nOther ids, names, and words from a message work too.\n\n## Request\nNext?',
+			},
+		])
+
+		expect(opening).toEqual({ statements: ['statement'], keys: ['previous', 'AX-1'] })
+		expect(readLedgerOpening([{ id: 'copy', role: 'user', content: 'Next?' }])).toEqual({
+			statements: [],
+			keys: [],
+		})
+	})
+
+	it('holds a cut snapshot of one answered request and three current crate statements of 200 characters', () => {
+		const stored = LEDGER_CUT_SNAPSHOT.conversation.messages
+
+		expect(isLedgerSnapshot(LEDGER_CUT_SNAPSHOT)).toBe(true)
+		expect(LEDGER_CUT_SNAPSHOT.requests).toEqual(['first'])
+		expect(stored.slice(-3).map((message) => [message.id, message.content.length])).toEqual([
+			['crate-1', 200],
+			['crate-2', 200],
+			['crate-3', 200],
+		])
+	})
+
+	it('builds a snapshot of a goal for every four earlier messages, each a request answered', () => {
+		const goals = buildLedgerGoals(9)
+
+		expect(isLedgerSnapshot(goals)).toBe(true)
+		expect(goals.conversation.messages.map((message) => message.id)).toEqual([
+			'order-0',
+			'day-0',
+			'ask-0',
+			'answer-0',
+			'order-1',
+			'day-1',
+			'ask-1',
+			'answer-1',
+		])
+		expect(goals.requests).toEqual(['ask-0', 'ask-1'])
+	})
+
+	it('counts the plan remarks a call kept beside the newest count a budget allows', () => {
+		const system: Message = { id: 'system', role: 'system', content: 'Serve the desk.' }
+		const remarks: Message[] = ['older', 'newer'].map((id) => ({
+			id,
+			role: 'user',
+			content: LEDGER_PLAN_REMARK,
+		}))
+		const request: Message = { id: 'request', role: 'user', content: 'Check the desk.' }
+		const stored = [...remarks, request]
+		const sent = [system, remarks[1] ?? request, request]
+		const one = estimateMessages(sent)
+
+		expect(countLedgerPlanFit(sent, stored, 'Check the desk.', 1, one)).toEqual({ kept: 1, fit: 1 })
+		expect(countLedgerPlanFit(sent, stored, 'Check the desk.', 2, one)).toEqual({ kept: 1, fit: 0 })
+		expect(() => countLedgerPlanFit([system], stored, 'Check the desk.', 1, one)).toThrow(
+			'the call carries no stored request',
+		)
+	})
+
+	it('reads a recall a host calls between requests, and its failure text', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: 'Noted.' }]),
+			buildLedgerOptions(),
+		)
+		ledger.conversation.add({ role: 'user', content: 'Crate CR-7 holds the vault ledger.' })
+		await ledger.respond('Note it.')
+
+		expect(await recallLedger(ledger, 'vault')).toContain('Crate CR-7 holds the vault ledger.')
+		expect(await recallLedger(ledger, ' ')).toContain('recall needs a key')
 	})
 })
 
@@ -2262,12 +2342,8 @@ describe('ledger builders', () => {
 		expect(classification.amendments.size + classification.supersessions.size).toBe(0)
 	})
 
-	it('builds the desk request from the Brightwater Studio owner', () => {
+	it('builds the desk scenario with the Brightwater Studio and Odile Marlow owners', () => {
 		const input = createLedgerDesk()
-		expect(createLedgerRequest()).toEqual({
-			owners: ['BW-20931'],
-			topics: ['refunds'],
-		})
 		expect(input.owners.get('BW-20931')).toEqual(['Brightwater Studio'])
 		expect(input.owners.get('OM-30418')).toEqual(['Odile Marlow'])
 	})
@@ -2563,18 +2639,13 @@ describe('guide scenario fixtures', () => {
 			(await planLedgerDelivery(601, 1)).length,
 		)
 	})
-	it('returns the retained desk fragments at the supplied capacity', async () => {
-		expect(await collectLedgerMarkers(200)).toEqual(LEDGER_RECORD_MARKERS)
-		expect(await collectLedgerMarkers(59)).toEqual(LEDGER_RECORD_MARKERS.slice(4))
-	})
 	it('returns an amended desk result and its actual recorded prompts', async () => {
 		const served = await serveAmendedDesk()
 		expect(served.result.passes).toHaveLength(2)
 		expect(served.result.content).toBe('Use code AA-12.')
 		expect(served.prompts).toHaveLength(4)
-		expect(extractLedgerRecords(served.prompts[0] ?? [])).toContain(
-			'Refunds for Brightwater Studio need a manager.',
-		)
+		// The seed is earlier than the request, so its first prompt offers the desk topic by key.
+		expect(extractLedgerIndex(served.prompts[0] ?? [])).toContain('\n- refunds: ')
 	})
 	it('preserves distinct amendment and supersession inputs', async () => {
 		expect(
@@ -2629,34 +2700,6 @@ describe('guide scenario fixtures', () => {
 			createBoundedRelay(upstream, 65536).generate([], new AbortController().signal),
 		).resolves.toEqual({ content: 'admitted' })
 		expect(upstream.started).toBe(1)
-	})
-})
-
-describe('buildLedgerTailScenario', () => {
-	it('builds fresh paired stubs with the same tool-call identity and distinct contents', () => {
-		const first = buildLedgerTailScenario()
-		const second = buildLedgerTailScenario()
-		expect(first.request).toEqual({ id: 'request', role: 'user', content: 'Check BW-5512.' })
-		expect(first.seed[1]?.calls).toEqual([
-			{ id: 'c1', name: 'lookup_order', arguments: { id: 'BW-5512' } },
-		])
-		expect(first.boundaries).toEqual([
-			{
-				id: 'result',
-				role: 'tool',
-				call: 'c1',
-				content: 'lookup_order {"id":"BW-5512"}: result not shown; call recall with BW-5512',
-			},
-			{
-				id: 'result',
-				role: 'tool',
-				call: 'c1',
-				content: 'lookup_order {"id":"BW-5512"}: result shown under Records below',
-			},
-		])
-		expect(second).toEqual(first)
-		expect(second.seed).not.toBe(first.seed)
-		expect(second.boundaries[0]).not.toBe(first.boundaries[0])
 	})
 })
 
@@ -4090,39 +4133,5 @@ describe('ledger stream and removal fixtures', () => {
 		expect(rendered).not.toContain(requireValue(first.conversation.messages()[0]).id)
 		expect(rendered).toContain('"#0"')
 		expect(rendered).toContain('"duration":"valid"')
-	})
-
-	it('seeds two owners and an amender of the first finding filed under the second owner', () => {
-		const options = buildLedgerTwoOwnerOptions()
-		const lookup = requireValue(options.lookups?.[0])
-		const ledger = createLedger(createScriptedProvider([]), options)
-		const { earlier, later } = seedLedgerOmission(ledger)
-
-		expect([lookup.read({ id: 'BW-20931' }, ''), lookup.read({ id: 'OM-30418' }, '')]).toEqual([
-			{ ids: ['BW-20931'], owners: [{ id: 'BW-20931', names: ['Brightwater Studio'] }] },
-			{ ids: ['OM-30418'], owners: [{ id: 'OM-30418', names: ['Odile Marlow'] }] },
-		])
-		expect(ledger.conversation.messages().map((message) => message.content)).toEqual([
-			'',
-			'Brightwater Studio delivery costs $10.',
-			'',
-			'Odile Marlow has an account.',
-			'Odile Marlow corrects the $10 delivery price to $12.',
-		])
-		expect([earlier.role, later.role]).toEqual(['tool', 'user'])
-		expect(
-			ledger.conversation.judgments.judgments().map((one) => [one.id, one.answer, one.sources]),
-		).toEqual([
-			[
-				JSON.stringify(['amends', earlier.id, later.id]),
-				{ form: 'noul', noul: 1 },
-				[earlier.id, later.id],
-			],
-			[
-				JSON.stringify(['supersedes', earlier.id, later.id]),
-				{ form: 'noul', noul: 0 },
-				[earlier.id, later.id],
-			],
-		])
 	})
 })
