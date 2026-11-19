@@ -331,6 +331,25 @@ export function parseLedgerExchange(key: string): number | undefined {
 }
 
 /**
+ * Names the exchange key of a depth: `previous` for 1, and `previous-N` for N.
+ *
+ * @remarks
+ * It is the name {@link parseLedgerExchange} reads back to the same depth, and the one the Earlier
+ * index and a `recall` listing write.
+ *
+ * @param depth - The exchange's depth, 1 for the last exchange that has a reply
+ * @returns The exchange key
+ * @example
+ * ```ts
+ * nameLedgerExchange(1) // 'previous'
+ * nameLedgerExchange(3) // 'previous-3'
+ * ```
+ */
+export function nameLedgerExchange(depth: number): string {
+	return depth === 1 ? LEDGER_PREVIOUS_KEY : `${LEDGER_PREVIOUS_KEY}-${depth}`
+}
+
+/**
  * Collects the recall keys of what a request leaves behind: the messages before it that `recall`
  * can list and that `excluded` does not hold.
  *
@@ -369,7 +388,7 @@ export function parseLedgerExchange(key: string): number | undefined {
  * @example
  * ```ts
  * collectLedgerKeys(input, projection, [], 'request', new Set(['first', 'request']), new Set(), new Set(['request']))
- * // [{ name: 'previous', description: 'your last request and your reply to it' }, …]
+ * // [{ name: 'previous', description: 'your last answered request and your reply to it' }, …]
  * ```
  */
 export function collectLedgerKeys(
@@ -464,14 +483,13 @@ export function collectLedgerKeys(
 	const taken = new Set(ids)
 	return [
 		...exchanges
-			.map((_exchange, index) =>
-				index === 0
-					? { name: LEDGER_PREVIOUS_KEY, description: 'your last request and your reply to it' }
-					: {
-							name: `${LEDGER_PREVIOUS_KEY}-${index + 1}`,
-							description: `your request and reply ${index + 1} exchanges ago`,
-						},
-			)
+			.map((_exchange, index) => ({
+				name: nameLedgerExchange(index + 1),
+				description:
+					index === 0
+						? 'your last answered request and your reply to it'
+						: `your request and reply ${index + 1} exchanges ago`,
+			}))
 			.reverse(),
 		...(ruled
 			? [
@@ -510,15 +528,15 @@ export function collectLedgerKeys(
  * @returns The index text, or `''` when `keys` is empty
  * @example
  * ```ts
- * renderLedgerKeys([{ name: 'previous', description: 'your last request and your reply to it' }])
- * // "## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too."
+ * renderLedgerKeys([{ name: 'previous', description: 'your last answered request and your reply to it' }])
+ * // "## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous: your last answered request and your reply to it\nOther ids, names, and words from a message work too."
  * ```
  */
 export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
 	if (keys.length === 0) return ''
 	return [
 		'## Earlier',
-		"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.",
+		"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.",
 		...keys.map((key) => renderIndexEntry(key)),
 		'Other ids, names, and words from a message work too.',
 	].join('\n')
@@ -578,8 +596,8 @@ export function buildRecallMessage(key: string): Message {
  * @returns The request with its content set to the index, a `## Request` heading, and the request content, or the request itself when the index is empty
  * @example
  * ```ts
- * buildRequestMessage({ id: 'request', role: 'user', content: 'Check BW-5512.' }, '## Earlier\n- previous: your last request and your reply to it').content
- * // '## Earlier\n- previous: your last request and your reply to it\n\n## Request\nCheck BW-5512.'
+ * buildRequestMessage({ id: 'request', role: 'user', content: 'Check BW-5512.' }, '## Earlier\n- previous: your last answered request and your reply to it').content
+ * // '## Earlier\n- previous: your last answered request and your reply to it\n\n## Request\nCheck BW-5512.'
  * ```
  */
 export function buildRequestMessage(request: Message, index: string): Message {

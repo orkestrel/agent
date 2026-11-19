@@ -4638,7 +4638,7 @@ export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.
 	{
 		role: 'user',
 		content:
-			"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too.\n\n## Request\nCheck Brightwater Studio again.",
+			"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous: your last answered request and your reply to it\nOther ids, names, and words from a message work too.\n\n## Request\nCheck Brightwater Studio again.",
 	},
 ])
 
@@ -9682,7 +9682,7 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	notes: ['note'],
 	failures: ['failure'],
 	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-19.
-	gauge: { scale: 2, overhead: 10, digest: 'd6603f9a74262fb8', model: SCRIPTED_MODEL },
+	gauge: { scale: 2, overhead: 10, digest: '20115ba0b807c9c2', model: SCRIPTED_MODEL },
 })
 
 /**

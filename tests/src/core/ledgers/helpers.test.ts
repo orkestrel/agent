@@ -16,6 +16,7 @@ import {
 	collectLedgerExchanges,
 	collectLedgerKeys,
 	collectLedgerStatements,
+	nameLedgerExchange,
 	parseLedgerExchange,
 	renderLedgerKeys,
 	collectRetiredFindings,
@@ -2167,7 +2168,7 @@ describe('collectLedgerKeys', () => {
 				new Set(['request']),
 			),
 		).toEqual([
-			{ name: 'previous', description: 'your last request and your reply to it' },
+			{ name: 'previous', description: 'your last answered request and your reply to it' },
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'BW-5512', description: '3 earlier messages' },
 			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
@@ -2190,7 +2191,7 @@ describe('collectLedgerKeys', () => {
 				new Set(['quiet', 'refund', 'request']),
 			),
 		).toEqual([
-			{ name: 'previous', description: 'your last request and your reply to it' },
+			{ name: 'previous', description: 'your last answered request and your reply to it' },
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'TK-1', description: '1 earlier message' },
 			{ name: 'BW-5512', description: '2 earlier messages' },
@@ -2235,7 +2236,7 @@ describe('collectLedgerKeys', () => {
 			),
 		).toEqual([
 			// The last request has no reply, so `previous` reads the last exchange that has one.
-			{ name: 'previous', description: 'your last request and your reply to it' },
+			{ name: 'previous', description: 'your last answered request and your reply to it' },
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
 			{ name: 'BW-5512', description: '3 earlier messages' },
@@ -2332,7 +2333,7 @@ describe('collectLedgerKeys', () => {
 		])
 		expect(keys.slice(0, 8).map((key) => key.description)).toEqual([
 			...[8, 7, 6, 5, 4, 3, 2].map((depth) => `your request and reply ${depth} exchanges ago`),
-			'your last request and your reply to it',
+			'your last answered request and your reply to it',
 		])
 		// No row names request text: the rows are unlabeled.
 		expect(keys.filter((key) => key.description.includes('Question'))).toEqual([])
@@ -2386,6 +2387,19 @@ describe('collectLedgerExchanges', () => {
 	})
 })
 
+describe('nameLedgerExchange', () => {
+	it('names previous for depth 1 and previous-N past it, each read back to its depth', () => {
+		expect([1, 2, 8, 12].map((depth) => nameLedgerExchange(depth))).toEqual([
+			'previous',
+			'previous-2',
+			'previous-8',
+			'previous-12',
+		])
+		for (const depth of [1, 2, 8, 12])
+			expect(parseLedgerExchange(nameLedgerExchange(depth))).toBe(depth)
+	})
+})
+
 describe('parseLedgerExchange', () => {
 	it.each([
 		['previous', 1],
@@ -2416,14 +2430,14 @@ describe('renderLedgerKeys', () => {
 	it('renders the Earlier heading, how to read it, one line per key, and a closing line with no count', () => {
 		expect(
 			renderLedgerKeys([
-				{ name: 'previous', description: 'your last request and your reply to it' },
+				{ name: 'previous', description: 'your last answered request and your reply to it' },
 				{ name: 'BW-20931', description: 'Brightwater\nStudio; 2 earlier messages' },
 			]),
 		).toBe(
 			[
 				'## Earlier',
-				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.",
-				'- previous: your last request and your reply to it',
+				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.",
+				'- previous: your last answered request and your reply to it',
 				'- BW-20931: Brightwater Studio; 2 earlier messages',
 				'Other ids, names, and words from a message work too.',
 			].join('\n'),

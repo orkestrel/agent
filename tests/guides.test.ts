@@ -1624,7 +1624,7 @@ await new GuideCommand({
 			).toBe('Refunds over $100 need a manager.')
 			expect(copies).toEqual([
 				'Can Brightwater Studio get a refund on order BW-5512?',
-				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\n- previous: your last request and your reply to it\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 3 earlier messages\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\nDoes the Brightwater Studio refund need a manager?",
+				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous: your last answered request and your reply to it\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 3 earlier messages\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\nDoes the Brightwater Studio refund need a manager?",
 			])
 			// Every scripted reply was taken: two calibration calls and four turns.
 			expect(replies.next()).toEqual({ done: true, value: undefined })
@@ -1668,7 +1668,7 @@ await new GuideCommand({
 				"// 'Can Brightwater Studio get a refund on order BW-5512?' — the rule went whole before it, and nothing is stored behind it",
 			)
 			expect(guideText).toContain(
-				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\\n- previous: your last request and your reply to it\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 3 earlier messages\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?' — the rule, the lookup result, and the first exchange stay stored",
+				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- previous: your last answered request and your reply to it\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 3 earlier messages\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?' — the rule, the lookup result, and the first exchange stay stored",
 			)
 		})
 
@@ -1738,7 +1738,7 @@ await new GuideCommand({
 			expect(third.content).toBe(answer)
 			expect(replies.next()).toEqual({ done: true, value: undefined })
 			expect(copies).toEqual([
-				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\n- previous-2: your request and reply 2 exchanges ago\n- previous: your last request and your reply to it\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 3 earlier messages\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\n" +
+				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous-2: your request and reply 2 exchanges ago\n- previous: your last answered request and your reply to it\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 3 earlier messages\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\n" +
 					request,
 			])
 			expect(uninterrupted).toEqual(copies)
@@ -1772,7 +1772,7 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain("third.content // 'Not yet. A manager must approve it.'")
 			expect(guideText).toContain(
-				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\\n- previous-2: your request and reply 2 exchanges ago\\n- previous: your last request and your reply to it\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 3 earlier messages\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
+				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- previous-2: your request and reply 2 exchanges ago\\n- previous: your last answered request and your reply to it\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 3 earlier messages\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
 			)
 		})
 
@@ -3603,7 +3603,7 @@ await new GuideCommand({
 			expect(index).toContain('\n- rules: ')
 			expect(
 				ledger.conversation.messages().find((message) => message.call === 'previous')?.content,
-			).toBe('Earlier request: Review the desk.\nEarlier reply: Done.')
+			).toBe('previous: Earlier request: Review the desk.\nEarlier reply: Done.')
 			expect(guideText).toContain(
 				'A host statement added between requests goes whole into the next opening as a current statement, and neither that statement nor a host lookup after the reply changes what `previous` lists.',
 			)

@@ -1107,7 +1107,7 @@ describe('Ledger', () => {
 		expect(readLedgerOpening(requireValue(provider.calls[2]).messages).keys).toEqual(['previous'])
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'previous')?.content,
-		).toBe('Earlier request: First request.\nEarlier reply: First reply.')
+		).toBe('previous: Earlier request: First request.\nEarlier reply: First reply.')
 	})
 
 	it('omits an empty final reply after the answer pass', async () => {
@@ -3065,7 +3065,7 @@ describe('Ledger', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual([
-			'recall needs a key: previous, previous-2 and on, rules, an owner name, an id, or one of refunds',
+			'recall needs a key: previous, previous-2, previous-3, …, rules, an owner name, an id, or one of refunds',
 			'nothing earlier matches "delivery"; answer from the messages you can see',
 			'nothing earlier matches "refunds"; answer from the messages you can see',
 			'nothing earlier matches "parcel"; answer from the messages you can see',
@@ -3139,7 +3139,7 @@ describe('Ledger', () => {
 		expect(description).not.toMatch(/handle/)
 		expect(description?.match(LEDGER_HANDLE) ?? []).toEqual([])
 		expect(description).toBe(
-			`Read earlier exchanges and items that are stored, not shown. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list, or join keys with commas to read several in one call, for example {"key":"previous-3, previous-2"}. Keys: previous (your last request and your reply), previous-2, previous-3, and so on (the exchanges before it, counting back), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds). Words from the message you need also match. A number given as the key reads as its digits. Returns the stored text for each key, in the order given. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
+			`Read earlier exchanges and items that are stored, not shown. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"previous"} or {"key":"BW-5512"}; join keys with commas, like {"key":"previous-3, previous-2"}. Keys: previous (your last answered request and your reply), previous-2, previous-3, … (the exchanges before it, counting back), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds). Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
 		)
 		const parameters = provider.calls[1]?.tools?.find((tool) => tool.name === 'recall')?.parameters
 		expect(JSON.stringify(parameters)).toBe(
@@ -10559,7 +10559,9 @@ describe('Ledger — recall by key', () => {
 		await ledger.respond('What did I ask before?')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'previous')?.content,
-		).toBe('Earlier request: Check the parcel.\nEarlier reply: The parcel shipped Monday.')
+		).toBe(
+			'previous: Earlier request: Check the parcel.\nEarlier reply: The parcel shipped Monday.',
+		)
 	})
 
 	it('lists the last exchange that has a reply under previous, past a later request with none', async () => {
@@ -10574,7 +10576,7 @@ describe('Ledger — recall by key', () => {
 		await ledger.respond('Check it again.')
 		// The second request ended with no reply, so previous still reads the first exchange.
 		expect(await recallLedger(ledger, 'previous')).toBe(
-			'Earlier request: Check the parcel.\nEarlier reply: It shipped.',
+			'previous: Earlier request: Check the parcel.\nEarlier reply: It shipped.',
 		)
 		expect(await recallLedger(ledger, 'previous-2')).toBe(
 			'nothing earlier matches "previous-2"; stored keys: previous; or answer from the messages you can see',
@@ -10607,9 +10609,9 @@ describe('Ledger — recall by key', () => {
 					ledger.conversation.messages().find((message) => message.call === `depth ${at}`)?.content,
 			),
 		).toEqual([
-			'Earlier request: Note the crates next.\nEarlier reply: Ready for the crates.',
-			'Earlier request: Note the late arrivals.\nEarlier reply: Noted the late arrivals.',
-			'Earlier request: Note the orders.\nEarlier reply: Noted the orders.',
+			'previous: Earlier request: Note the crates next.\nEarlier reply: Ready for the crates.',
+			'previous-2: Earlier request: Note the late arrivals.\nEarlier reply: Noted the late arrivals.',
+			'previous-3: Earlier request: Note the orders.\nEarlier reply: Noted the orders.',
 		])
 	})
 
@@ -10644,7 +10646,7 @@ describe('Ledger — recall by key', () => {
 		)
 		// Thirteen exchanges are stored; the twelfth back is the second goal's.
 		expect(ledger.conversation.messages().find((message) => message.call === 'deep')?.content).toBe(
-			'Earlier request: What do we do for GL-1?\nEarlier reply: GL-1 goes to the reship queue.',
+			'previous-12: Earlier request: What do we do for GL-1?\nEarlier reply: GL-1 goes to the reship queue.',
 		)
 	})
 
@@ -10666,13 +10668,14 @@ describe('Ledger — recall by key', () => {
 		)
 	})
 
-	it('lists every part of a joined key by its family, in the order given, mixed families included', async () => {
+	it('lists exchange keys and rules in the order given and other keys together, newest first, mixed families included', async () => {
 		const provider = createScriptedProvider(
 			[
 				{
 					content: '',
 					tools: [
 						{ id: 'joined', name: 'recall', arguments: { key: 'previous-2 and AX-1, rules' } },
+						{ id: 'split', name: 'recall', arguments: { key: 'AX-1, previous-2, AX-2' } },
 					],
 				},
 				{ content: 'Done.' },
@@ -10692,12 +10695,88 @@ describe('Ledger — recall by key', () => {
 			ledger.conversation.messages().find((message) => message.call === 'joined')?.content,
 		).toBe(
 			[
-				'Earlier request: Note the late arrivals.',
+				'previous-2: Earlier request: Note the late arrivals.',
 				'Earlier reply: Noted the late arrivals.',
 				'Order AX-1 arrived late.',
 				'Order AX-1 shipped Monday.',
 				'Every shipment needs a signature.',
 			].join('\n'),
+		)
+		// The searched parts list together, newest first, where the first of them stands.
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'split')?.content,
+		).toBe(
+			[
+				'Order AX-2 arrived late.',
+				'Order AX-1 arrived late.',
+				'Order AX-2 shipped Tuesday.',
+				'Order AX-1 shipped Monday.',
+				'previous-2: Earlier request: Note the late arrivals.',
+				'Earlier reply: Noted the late arrivals.',
+			].join('\n'),
+		)
+		// With no gauge a host's recall keeps the first item, and an exchange in the join names the cut
+		// line as more items, not older ones.
+		const ungauged = createLedger(
+			createScriptedProvider([]),
+			buildUncalibratedOptions(buildLedgerOptions({ snapshot: LEDGER_CUT_SNAPSHOT, topics: [] })),
+		)
+		expect(await recallLedger(ungauged, 'AX-1, previous-2, AX-2')).toBe(
+			'Order AX-2 arrived late.\n5 more items not shown; name a narrower key to narrow the recall',
+		)
+	})
+
+	it('lists joined exchange keys oldest first as given, one copy of a repeated key, then rules, each exchange under its key', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{
+							id: 'joined',
+							name: 'recall',
+							arguments: { key: 'previous-3, previous-2, previous-2, rules' },
+						},
+						{ id: 'twice', name: 'recall', arguments: { key: 'rules and Rules' } },
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 4096,
+				snapshot: LEDGER_CUT_RULED_SNAPSHOT,
+				judge: createPhraseJudge(['needs a signature']),
+			}),
+		)
+		await ledger.respond('Which crates are ready?')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'joined')?.content,
+		).toBe(
+			[
+				'previous-3: Earlier request: Note the orders.',
+				'Earlier reply: Noted the orders.',
+				'previous-2: Earlier request: Note the late arrivals.',
+				'Earlier reply: Noted the late arrivals.',
+				'Every shipment needs a signature.',
+			].join('\n'),
+		)
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'twice')?.content,
+		).toBe('Every shipment needs a signature.')
+	})
+
+	it('misses previous after one request that has no reply', async () => {
+		const ledger = createLedger(
+			createScriptedProvider([{ content: '' }, { content: '' }]),
+			buildLedgerOptions({ topics: [] }),
+		)
+		await ledger.respond('Check the parcel.')
+		expect(await recallLedger(ledger, 'previous')).toBe(
+			'nothing earlier matches "previous"; answer from the messages you can see',
 		)
 	})
 
@@ -10886,10 +10965,10 @@ describe('Ledger — the lean opening', () => {
 		expect(sent.at(-1)?.content).toBe(
 			[
 				'## Earlier',
-				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.",
+				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.",
 				'- previous-3: your request and reply 3 exchanges ago',
 				'- previous-2: your request and reply 2 exchanges ago',
-				'- previous: your last request and your reply to it',
+				'- previous: your last answered request and your reply to it',
 				'- AX-3: 2 earlier messages',
 				'- AX-2: 2 earlier messages',
 				'- AX-1: 2 earlier messages',

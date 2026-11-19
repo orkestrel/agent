@@ -138,6 +138,7 @@ import {
 	cutListing,
 	cutWorkspaceSample,
 	matchEntities,
+	nameLedgerExchange,
 	parseLedgerExchange,
 	requirePredict,
 	renderLookupCall,
@@ -312,7 +313,7 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Read earlier exchanges and items that are stored, not shown. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list, or join keys with commas to read several in one call, for example {"key":"${LEDGER_PREVIOUS_KEY}-3, ${LEDGER_PREVIOUS_KEY}-2"}. Keys: ${LEDGER_PREVIOUS_KEY} (your last request and your reply), ${LEDGER_PREVIOUS_KEY}-2, ${LEDGER_PREVIOUS_KEY}-3, and so on (the exchanges before it, counting back), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message you need also match. A number given as the key reads as its digits. Returns the stored text for each key, in the order given. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
+				description: `Read earlier exchanges and items that are stored, not shown. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"${LEDGER_PREVIOUS_KEY}"} or {"key":"BW-5512"}; join keys with commas, like {"key":"${LEDGER_PREVIOUS_KEY}-3, ${LEDGER_PREVIOUS_KEY}-2"}. Keys: ${LEDGER_PREVIOUS_KEY} (your last answered request and your reply), ${LEDGER_PREVIOUS_KEY}-2, ${LEDGER_PREVIOUS_KEY}-3, … (the exchanges before it, counting back), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
 				contract: objectShape({
 					key: stringShape({
 						min: 1,
@@ -1786,7 +1787,7 @@ export class Ledger implements LedgerInterface {
 		const gauge = this.#gauge
 		const calls = request?.calls ?? []
 		request?.recall()
-		const guidance = `${LEDGER_PREVIOUS_KEY}, ${LEDGER_PREVIOUS_KEY}-2 and on, ${LEDGER_RULES_KEY}, an owner name, an id, or one of ${renderTopicNames(this.#options.topics)}`
+		const guidance = `${LEDGER_PREVIOUS_KEY}, ${LEDGER_PREVIOUS_KEY}-2, ${LEDGER_PREVIOUS_KEY}-3, …, ${LEDGER_RULES_KEY}, an owner name, an id, or one of ${renderTopicNames(this.#options.topics)}`
 		if (key === '') throw new Error(`recall needs a key: ${guidance}`)
 		const { rate, extra, slack: drift } = this.#carry(request, calls)
 		const siblings = estimateMessages(
@@ -1818,8 +1819,9 @@ export class Ledger implements LedgerInterface {
 				before.filter((message) => !excluded.has(message.id)).map((message) => message.id),
 			)
 			// Each part of the key resolves by its family: an exchange key to that exchange, `rules` to the
-			// rules record, and every other part to the search, which reads them together. A family
-			// resolves once, at its first part, and the results join in that order.
+			// rules record, and every other part to the search, which reads them together and lists newest
+			// first at the first searched part. Each exchange and `rules` resolve once, at their first
+			// part, and the results join in that order.
 			const parts = splitKey(key)
 			const searched = parts.filter(
 				(part) =>
@@ -1839,7 +1841,7 @@ export class Ledger implements LedgerInterface {
 						? []
 						: [
 								{
-									listed: this.#listExchange(exchanges[depth - 1]),
+									listed: this.#listExchange(exchanges[depth - 1], depth),
 									recalled: new Map<string, string>(),
 									kind: 'more' as const,
 								},
@@ -1872,11 +1874,14 @@ export class Ledger implements LedgerInterface {
 		}
 	}
 
-	// An exchange's request and its reply, each under its origin label, or nothing for no exchange.
-	#listExchange(exchange: LedgerExchange | undefined): readonly string[] {
+	// An exchange's request and its reply, each under its origin label, the request opening with the
+	// exchange key so a cut or joined listing still names it, or nothing for no exchange.
+	#listExchange(exchange: LedgerExchange | undefined, depth: number): readonly string[] {
 		return exchange === undefined
 			? []
-			: [exchange.request, exchange.reply].flatMap((message) => this.#labelEarlier(message) ?? [])
+			: [exchange.request, exchange.reply]
+					.flatMap((message) => this.#labelEarlier(message) ?? [])
+					.map((line, index) => (index === 0 ? `${nameLedgerExchange(depth)}: ${line}` : line))
 	}
 
 	// The rules record's lines from the messages a request left behind, one entry per message, newest first.
