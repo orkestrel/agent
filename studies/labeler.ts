@@ -24,7 +24,15 @@ import type {
 	StudyLabelRow,
 } from '@orkestrel/study/server'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -93,7 +101,8 @@ export type StudyLabelerCaller = (prompt: string) => Promise<unknown>
 /** Counts one lane's requests: asked, asked a second time, and dropped after the second malformed answer. */
 export interface StudyLabelerBatches {
 	readonly asked: number
-	readonly retried: number
+	/** Counts the requests asked twice; unknown when the lane was reused from an earlier run. */
+	readonly retried: number | undefined
 	readonly omitted: number
 }
 
@@ -549,6 +558,60 @@ export function planStudyLabelerPaths(
 }
 
 /**
+ * Reads a saved model lane, the whole `StudyLabelLane` the labeler writes, through Study's lane parser.
+ * @param bytes - The saved lane file's bytes
+ * @returns The lane, labeled by `STUDY_LABELER_MODEL` with method `model`
+ * @throws Error - Thrown when the file is not a lane or names another labeler or method
+ * @example readStudyLabelerLane(new TextEncoder().encode(JSON.stringify({ labeler: 'claude-haiku-5-5', method: 'model', rows: [] }))).rows // []
+ */
+export function readStudyLabelerLane(bytes: Uint8Array): StudyLabelLane {
+	const value = decodeStudyJSON(bytes)
+	if (typeof value !== 'object' || value === null || Array.isArray(value) || !('rows' in value))
+		throw new Error('The saved lane holds no rows')
+	if (
+		!('labeler' in value) ||
+		value.labeler !== STUDY_LABELER_MODEL ||
+		!('method' in value) ||
+		value.method !== 'model'
+	)
+		throw new Error('The saved lane names another labeler or method')
+	return parseStudyLabelLane(
+		{ rows: value.rows },
+		{ labeler: STUDY_LABELER_MODEL, method: 'model' },
+	)
+}
+
+/**
+ * Reads the model lane an earlier run saved for the same pool, so a failed import is retried without asking the model again.
+ * @remarks
+ * The saved pool must equal this pool byte for byte: the same packet, controls, and order. The request counts
+ * are derived from the lane, and `retried` is unknown, because an earlier run did not keep it.
+ * @param paths - The run's paths
+ * @param pool - The pool this run built
+ * @returns The saved lane and its request counts, or `undefined` when no lane is saved or the saved pool differs
+ * @example readStudyLabelerSaved(paths, pool) // undefined before a first run
+ */
+export function readStudyLabelerSaved(
+	paths: StudyLabelerPaths,
+	pool: StudyLabelPool,
+): StudyLabelerRun | undefined {
+	if (!existsSync(paths.pool) || !existsSync(paths.lane)) return undefined
+	if (!Buffer.from(readFileSync(paths.pool)).equals(Buffer.from(encodeStudyJSON(pool))))
+		return undefined
+	const lane = readStudyLabelerLane(readFileSync(paths.lane))
+	const answered = new Set(lane.rows.map((row) => row.row))
+	return {
+		lane,
+		batches: {
+			asked: pool.requests.length,
+			retried: undefined,
+			omitted: pool.requests.filter((batch) => batch.rows.every((row) => !answered.has(row.row)))
+				.length,
+		},
+	}
+}
+
+/**
  * Names a study's authored labeler inputs under the authored folder.
  * @param root - The repository root
  * @param study - The study the graded result declares
@@ -723,14 +786,13 @@ export async function labelStudyResult(
 			partition: resolveStudyLabelerPartition(goals),
 		},
 	)
+	// A lane saved for this exact pool is reused, so a run that failed after labeling asks the model nothing again.
+	const saved = options.human === undefined ? readStudyLabelerSaved(paths, pool) : undefined
 	mkdirSync(paths.sheets, { recursive: true })
 	writeFileSync(paths.pool, encodeStudyJSON(pool))
 	if (options.human !== undefined) {
 		const tally: unknown = decodeStudyJSON(readFileSync(paths.tally))
-		const model = parseStudyLabelLane(decodeStudyJSON(readFileSync(paths.lane)), {
-			labeler: STUDY_LABELER_MODEL,
-			method: 'model',
-		})
+		const model = readStudyLabelerLane(readFileSync(paths.lane))
 		const human = parseStudyLabelLane(decodeStudyJSON(readFileSync(options.human)), {
 			labeler: 'human',
 			method: 'human',
@@ -740,8 +802,8 @@ export async function labelStudyResult(
 		writeFileSync(paths.tally, compared)
 		return compared
 	}
-	const run = await labelStudyPool(pool, dependencies.call)
-	writeFileSync(paths.lane, encodeStudyJSON(run.lane))
+	const run = saved ?? (await labelStudyPool(pool, dependencies.call))
+	if (saved === undefined) writeFileSync(paths.lane, encodeStudyJSON(run.lane))
 	const sheet = createStudyLabelSheet(pool.map, [run.lane], {
 		created: dependencies.created,
 		version: STUDY_LABELER_VERSION,

@@ -1,4 +1,6 @@
 import type { StudyLabelControl, StudyLabelPool } from '@orkestrel/study/server'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
 	createStudyLabelPool,
@@ -19,6 +21,8 @@ import {
 	parseStudyLabelerArguments,
 	planStudyLabelerPaths,
 	planStudyLabelerSources,
+	readStudyLabelerLane,
+	readStudyLabelerSaved,
 	readStudyLabelerAnswers,
 	readStudyLabelerControls,
 	resolveStudyLabelerPartition,
@@ -47,7 +51,7 @@ const CONTROLS: readonly StudyLabelControl[] = Object.freeze([
 	},
 ])
 
-function buildPool(): StudyLabelPool {
+function buildPool(order = 'fictional-order'): StudyLabelPool {
 	const entries = TRIALS.flatMap(([neutral, , arm]) =>
 		GOALS.flatMap((goal) =>
 			CLASSES.map((name) => ({
@@ -86,7 +90,7 @@ function buildPool(): StudyLabelPool {
 			},
 		],
 		{
-			order: 'fictional-order',
+			order,
 			controls: CONTROLS,
 			partition: resolveStudyLabelerPartition(GOALS),
 		},
@@ -317,6 +321,57 @@ describe('labeler runner over a synthetic pool', () => {
 })
 
 describe('labeler leaves', () => {
+	it('reads the whole lane the labeler saves and refuses one from another labeler', async () => {
+		const pool = buildPool()
+		const run = await labelStudyPool(pool, (prompt) => Promise.resolve(answerAll(prompt)))
+		expect(readStudyLabelerLane(encodeStudyJSON(run.lane))).toEqual(run.lane)
+		expect(() =>
+			readStudyLabelerLane(encodeStudyJSON({ ...run.lane, labeler: 'claude-sonnet-5-5' })),
+		).toThrow(/another labeler/)
+		expect(() => readStudyLabelerLane(encodeStudyJSON({ labeler: STUDY_LABELER_MODEL }))).toThrow(
+			/no rows/,
+		)
+	})
+
+	it('reuses a lane saved for the same pool and reuses nothing for another pool', async () => {
+		const pool = buildPool()
+		const run = await labelStudyPool(pool, (prompt) => Promise.resolve(answerAll(prompt)))
+		const root = mkdtempSync(join(tmpdir(), 'labeler-saved-'))
+		try {
+			const paths = planStudyLabelerPaths(
+				join(root, 'tmp', 'studies', 'run'),
+				SEAL,
+				'a'.repeat(64),
+				root,
+			)
+			expect(readStudyLabelerSaved(paths, pool)).toBeUndefined()
+			mkdirSync(paths.labels, { recursive: true })
+			writeFileSync(paths.pool, encodeStudyJSON(pool))
+			// A saved pool with no lane holds nothing to reuse.
+			expect(readStudyLabelerSaved(paths, pool)).toBeUndefined()
+			// The lane leaves out the first request, which reads as one omitted request.
+			const [first] = pool.requests
+			if (first === undefined) throw new Error('The pool needs a request')
+			const skipped = new Set(first.rows.map((row) => row.row))
+			const lane = parseStudyLabelLane(
+				{ rows: run.lane.rows.filter((row) => !skipped.has(row.row)) },
+				{ labeler: STUDY_LABELER_MODEL, method: 'model' },
+			)
+			writeFileSync(paths.lane, encodeStudyJSON(lane))
+			const saved = readStudyLabelerSaved(paths, pool)
+			expect(saved?.lane).toEqual(lane)
+			expect(saved?.batches).toEqual({
+				asked: pool.requests.length,
+				retried: undefined,
+				omitted: 1,
+			})
+			// A pool in another order is another pool, so the saved lane is not reused for it.
+			expect(readStudyLabelerSaved(paths, buildPool('another-order'))).toBeUndefined()
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
+	})
+
 	it('names the authored instruction and controls of each study under the authored folder', () => {
 		const root = resolve('fictional-root')
 		expect(planStudyLabelerSources(root, 'endurance')).toEqual({
