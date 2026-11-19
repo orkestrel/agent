@@ -4,11 +4,19 @@ import type {
 	LedgerOwner,
 } from '../../../../src/core/ledgers/types.js'
 import type { Message } from '@src/core'
-import { estimateTokens, LEDGER_KEY_LIMIT, LEDGER_QUESTIONS, LEDGER_SCALE_DRIFT } from '@src/core'
+import {
+	estimateTokens,
+	LEDGER_EXCHANGE_LIMIT,
+	LEDGER_KEY_LIMIT,
+	LEDGER_QUESTIONS,
+	LEDGER_SCALE_DRIFT,
+} from '@src/core'
 import {
 	collectRecallMessages,
+	collectLedgerExchanges,
 	collectLedgerKeys,
 	collectLedgerStatements,
+	parseLedgerExchange,
 	renderLedgerKeys,
 	collectRetiredFindings,
 	computeLedgerChecksum,
@@ -2191,7 +2199,7 @@ describe('collectLedgerKeys', () => {
 		])
 	})
 
-	it('offers previous only while the last request has a reply, and ranks a recurring tie newest first', () => {
+	it('offers no exchange row while no earlier request has a reply, and ranks a recurring tie newest first', () => {
 		const { input, requests, notes } = buildLedgerKeyScenario(false)
 		expect(
 			collectLedgerKeys(
@@ -2226,6 +2234,8 @@ describe('collectLedgerKeys', () => {
 				new Set(),
 			),
 		).toEqual([
+			// The last request has no reply, so `previous` reads the last exchange that has one.
+			{ name: 'previous', description: 'your last request and your reply to it' },
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
 			{ name: 'BW-5512', description: '3 earlier messages' },
@@ -2279,6 +2289,127 @@ describe('collectLedgerKeys', () => {
 			new Set(['2 earlier messages']),
 		)
 	})
+
+	it('lists at most the exchange limit of unlabeled exchange rows, oldest first, skips an unreplied request, and leaves the id cap whole', () => {
+		const orders = Array.from({ length: 25 }, (_unused, at) => `XA-${at}`)
+		const statements = [...orders, ...orders].map((id, at) =>
+			buildLedgerMessage(`order-${at}`, 'user', `Order ${id} shipped.`),
+		)
+		const exchanges = Array.from({ length: 10 }, (_unused, at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', `Question ${at} about the desk?`),
+			buildLedgerMessage(`answer-${at}`, 'assistant', `Answer ${at}.`),
+		]).flat()
+		const asks = Array.from({ length: 10 }, (_unused, at) => `ask-${at}`)
+		const input = buildLedgerInput({
+			exclusions: [...asks, 'late', 'request'],
+			messages: [
+				...statements,
+				...exchanges,
+				buildLedgerMessage('late', 'user', 'A request with no reply?'),
+				buildLedgerMessage('request', 'user', 'Which are late?'),
+			],
+		})
+		const keys = collectLedgerKeys(
+			input,
+			buildRecords(input),
+			[],
+			'request',
+			new Set([...asks, 'late', 'request']),
+			new Set(),
+			new Set(['request']),
+		)
+		expect(LEDGER_EXCHANGE_LIMIT).toBe(8)
+		expect(keys.map((key) => key.name)).toEqual([
+			'previous-8',
+			'previous-7',
+			'previous-6',
+			'previous-5',
+			'previous-4',
+			'previous-3',
+			'previous-2',
+			'previous',
+			...orders.toReversed().slice(0, LEDGER_KEY_LIMIT),
+		])
+		expect(keys.slice(0, 8).map((key) => key.description)).toEqual([
+			...[8, 7, 6, 5, 4, 3, 2].map((depth) => `your request and reply ${depth} exchanges ago`),
+			'your last request and your reply to it',
+		])
+		// No row names request text: the rows are unlabeled.
+		expect(keys.filter((key) => key.description.includes('Question'))).toEqual([])
+	})
+
+	it('leaves an id that reads as an exchange key out of the id rows', () => {
+		const input = buildLedgerInput({
+			exclusions: ['first', 'request'],
+			messages: [
+				buildLedgerMessage('ticket', 'user', 'Ticket previous-2 is open.'),
+				buildLedgerMessage('again', 'user', 'Ticket previous-2 is still open.'),
+				buildLedgerMessage('order', 'user', 'Order XB-1 shipped.'),
+				buildLedgerMessage('late', 'user', 'Order XB-1 arrived late.'),
+				buildLedgerMessage('first', 'user', 'Which tickets are open?'),
+				buildLedgerMessage('reply', 'assistant', 'Ticket previous-2 is open.'),
+				buildLedgerMessage('request', 'user', 'And the orders?'),
+			],
+		})
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				[],
+				'request',
+				new Set(['first', 'request']),
+				new Set(),
+				new Set(['request']),
+			).map((key) => key.name),
+		).toEqual(['previous', 'XB-1'])
+	})
+})
+
+describe('collectLedgerExchanges', () => {
+	it('pairs each request with its final reply, newest first, and skips a request with none', () => {
+		const messages = [
+			buildLedgerMessage('first', 'user', 'Check OR-7.'),
+			buildLedgerMessage('reply', 'assistant', 'OR-7 ships Friday.'),
+			buildLedgerMessage('second', 'user', 'And OR-8?'),
+			buildLedgerMessage('third', 'user', 'And OR-9?'),
+			buildLedgerMessage('last', 'assistant', 'OR-9 ships Monday.'),
+		]
+		expect(
+			collectLedgerExchanges(messages, new Set(['first', 'second', 'third']), new Set()).map(
+				(exchange) => [exchange.request.id, exchange.reply.id],
+			),
+		).toEqual([
+			['third', 'last'],
+			['first', 'reply'],
+		])
+		expect(collectLedgerExchanges([], new Set(), new Set())).toEqual([])
+	})
+})
+
+describe('parseLedgerExchange', () => {
+	it.each([
+		['previous', 1],
+		[' PREVIOUS ', 1],
+		['previous-1', 1],
+		['Previous-3', 3],
+		['previous:4', 4],
+		['previous 12', 12],
+		['previous - 5', 5],
+	] as const)('reads %j as depth %i', (key, depth) => {
+		expect(parseLedgerExchange(key)).toBe(depth)
+	})
+
+	it.each([
+		'previous-0',
+		'previous-02',
+		'previous2',
+		'previously',
+		'rules',
+		'BW-5512',
+		`previous-${'9'.repeat(20)}`,
+	])('reads %j as no exchange key', (key) => {
+		expect(parseLedgerExchange(key)).toBeUndefined()
+	})
 })
 
 describe('renderLedgerKeys', () => {
@@ -2291,7 +2422,7 @@ describe('renderLedgerKeys', () => {
 		).toBe(
 			[
 				'## Earlier',
-				'Earlier messages are stored, not shown. Call recall with a key below.',
+				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.",
 				'- previous: your last request and your reply to it',
 				'- BW-20931: Brightwater Studio; 2 earlier messages',
 				'Other ids, names, and words from a message work too.',

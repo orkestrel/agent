@@ -43,6 +43,7 @@ import {
 	isLedgerSnapshot,
 	LEDGER_AGENT_KEYS,
 	LEDGER_CATEGORIES,
+	LEDGER_EXCHANGE_LIMIT,
 	LEDGER_KEY_LIMIT,
 	LEDGER_OPTION_KEYS,
 	SKILL_SECTION_HEADER,
@@ -123,7 +124,7 @@ import {
 	buildLedgerOptions,
 	buildLedgerResponse,
 	buildLedgerJudgment,
-	buildLedgerExchange,
+	buildLedgerLookupCall,
 	buildLedgerPairJudgment,
 	buildLedgerTopicJudgment,
 	buildUncalibratedOptions,
@@ -218,6 +219,7 @@ import {
 	LEDGER_CUT_SNAPSHOT,
 	LEDGER_CUT_RULED_SNAPSHOT,
 	buildLedgerGoals,
+	recallLedger,
 	readLedgerOpening,
 } from '../../../setup.js'
 
@@ -807,7 +809,7 @@ describe('Ledger', () => {
 	it('does not offer recall for an empty finding', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(provider, buildLedgerOptions())
-		ledger.conversation.add(buildLedgerExchange('No record'))
+		ledger.conversation.add(buildLedgerLookupCall('No record'))
 		await ledger.respond('Check BW-20931.')
 		// The seed's empty finding is all that sits before the first request, and it lists nothing.
 		expect(provider.calls[0]?.tools?.map((tool) => tool.name)).toEqual(['lookup'])
@@ -1008,7 +1010,7 @@ describe('Ledger', () => {
 				const ledger = createLedger(provider, buildLedgerOptions({ topics: [] }))
 				seedLedgerRecall(ledger)
 				ledger.conversation.add(
-					lookup ? buildLedgerExchange(planted) : [{ role: 'user', content: planted }],
+					lookup ? buildLedgerLookupCall(planted) : [{ role: 'user', content: planted }],
 				)
 				await ledger.respond('Note it.')
 				await ledger.respond('Find it.')
@@ -1047,7 +1049,7 @@ describe('Ledger', () => {
 			})
 			ledger.conversation.add(
 				lookup
-					? buildLedgerExchange('Earlier reply: parcel approved.')
+					? buildLedgerLookupCall('Earlier reply: parcel approved.')
 					: [{ role: 'user', content: 'Earlier reply: parcel approved.' }],
 			)
 			await ledger.respond('Note it.')
@@ -1083,9 +1085,17 @@ describe('Ledger', () => {
 		])
 	})
 
-	it('omits a removed final reply without falling back to an older exchange', async () => {
+	it('reads previous as the last exchange that still has a reply once a final reply is removed', async () => {
 		const provider = createScriptedProvider(
-			[{ content: 'First reply.' }, { content: 'Second reply.' }, { content: 'Done.' }],
+			[
+				{ content: 'First reply.' },
+				{ content: 'Second reply.' },
+				{
+					content: '',
+					tools: [{ id: 'previous', name: 'recall', arguments: { key: 'previous' } }],
+				},
+				{ content: 'Done.' },
+			],
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, buildLedgerOptions({ topics: [] }))
@@ -1093,10 +1103,11 @@ describe('Ledger', () => {
 		await ledger.respond('Second request.')
 		ledger.conversation.remove(requireValue(ledger.conversation.messages().at(-1)).id)
 		await ledger.respond('Next request.')
-		expect(requireValue(provider.calls[2]).messages.map((message) => message.content)).toEqual([
-			'Serve the desk.',
-			'Next request.',
-		])
+		// The second request lost its reply, so the one exchange left is the first.
+		expect(readLedgerOpening(requireValue(provider.calls[2]).messages).keys).toEqual(['previous'])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'previous')?.content,
+		).toBe('Earlier request: First request.\nEarlier reply: First reply.')
 	})
 
 	it('omits an empty final reply after the answer pass', async () => {
@@ -1661,7 +1672,7 @@ describe('Ledger', () => {
 					buildLedgerOptions({ capacity: 1000, share: { prompt: 1 } }),
 				)
 				const seed = ledger.conversation.add(
-					buildLedgerExchange(LEDGER_PRESERVATION_FIXTURE.earlier),
+					buildLedgerLookupCall(LEDGER_PRESERVATION_FIXTURE.earlier),
 				)
 				const earlier = requireValue(seed.find((message) => message.role === 'tool'))
 				const later = ledger.conversation.add({
@@ -2574,7 +2585,7 @@ describe('Ledger', () => {
 		const provider = createScriptedProvider([{ content: 'Never read.' }], { recorded: true })
 		const messages: readonly MessageInput[] = [
 			{ role: 'user', content: 'Brightwater Studio called.' },
-			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.', 'seed', {
+			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.', 'seed', {
 				id: 'BW-20931',
 				count: 1n,
 			}),
@@ -2952,7 +2963,7 @@ describe('Ledger', () => {
 		})
 		ledger.conversation.add([
 			{ role: 'user', content: 'Seed.' },
-			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
 			{
 				role: 'assistant',
 				content: '',
@@ -3054,7 +3065,7 @@ describe('Ledger', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual([
-			'recall needs a key: previous, rules, an owner name, an id, or one of refunds',
+			'recall needs a key: previous, previous-2 and on, rules, an owner name, an id, or one of refunds',
 			'nothing earlier matches "delivery"; answer from the messages you can see',
 			'nothing earlier matches "refunds"; answer from the messages you can see',
 			'nothing earlier matches "parcel"; answer from the messages you can see',
@@ -3109,7 +3120,7 @@ describe('Ledger', () => {
 		const ledger = createLedger(provider, options)
 		ledger.conversation.add([
 			{ role: 'user', content: 'The delivery arrived on Tuesday.' },
-			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
 		])
 		// An answered request leaves the statement earlier, where recall reads it.
 		await ledger.respond('Note the delivery.')
@@ -3128,11 +3139,11 @@ describe('Ledger', () => {
 		expect(description).not.toMatch(/handle/)
 		expect(description?.match(LEDGER_HANDLE) ?? []).toEqual([])
 		expect(description).toBe(
-			'Read messages stored earlier in this conversation that are not shown. Pass one key from the Earlier list: previous (your last request and your reply), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds). Example: {"key":"previous"} or {"key":"BW-5512"}. Words from the message you need also match. It finds what users said, lookup results, and your earlier requests and replies. It does not read a record a lookup tool serves, and it finds nothing this conversation never held. A number given as the key reads as its digits. Returns statements and lookup results first, then earlier requests and replies, newest first. A miss names keys you can use.',
+			`Read earlier exchanges and items that are stored, not shown. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list, or join keys with commas to read several in one call, for example {"key":"previous-3, previous-2"}. Keys: previous (your last request and your reply), previous-2, previous-3, and so on (the exchanges before it, counting back), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds). Words from the message you need also match. A number given as the key reads as its digits. Returns the stored text for each key, in the order given. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
 		)
 		const parameters = provider.calls[1]?.tools?.find((tool) => tool.name === 'recall')?.parameters
 		expect(JSON.stringify(parameters)).toBe(
-			'{"type":"object","properties":{"key":{"type":"string","minLength":1,"description":"A key from the Earlier list, or words to match"}},"required":["key"],"additionalProperties":false}',
+			'{"type":"object","properties":{"key":{"type":"string","minLength":1,"description":"One key from the Earlier list, keys joined with commas, or words to match"}},"required":["key"],"additionalProperties":false}',
 		)
 	})
 
@@ -3364,7 +3375,7 @@ describe('Ledger', () => {
 		expect(
 			provider.calls[5]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe(
-			'nothing earlier matches "Brightwater unknown"; stored keys: previous, BW-20931; or answer from the messages you can see',
+			'nothing earlier matches "Brightwater unknown"; stored keys: previous, BW-20931, previous-2; or answer from the messages you can see',
 		)
 	})
 
@@ -3526,7 +3537,7 @@ describe('Ledger', () => {
 		})
 		ledger.conversation.add([
 			{ role: 'user', content: 'The caller asked about the account.' },
-			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $140.'),
+			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $140.'),
 		])
 		await ledger.respond('Check the account.')
 		expect(
@@ -3736,7 +3747,7 @@ describe('Ledger — holds a question the judge refuses', () => {
 			}),
 		)
 		ledger.conversation.add([
-			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
 			{ role: 'user', content: fixture.rule },
 			{ role: 'user', content: fixture.statement },
 		])
@@ -5294,8 +5305,8 @@ describe('Ledger — recall after a replaced lookup', () => {
 		const ledger = createLedger(provider, buildLedgerOptions())
 		// The later read finds nothing, so neither finding lists and nothing earlier opens recall.
 		ledger.conversation.add([
-			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
-			...buildLedgerExchange('No record', 'replacement'),
+			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+			...buildLedgerLookupCall('No record', 'replacement'),
 		])
 		await ledger.respond('Check Brightwater Studio.')
 		expect(requireValue(provider.calls[0]).tools?.map((tool) => tool.name)).toEqual(['lookup'])
@@ -5315,8 +5326,8 @@ describe('Ledger — recall after a replaced lookup', () => {
 		const ledger = createLedger(provider, buildLedgerOptions())
 		seedLedgerRecall(ledger)
 		ledger.conversation.add([
-			...buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
-			...buildLedgerExchange(
+			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+			...buildLedgerLookupCall(
 				'Account BW-20931: Brightwater Studio. Delivery costs $12.',
 				'replacement',
 			),
@@ -6546,7 +6557,7 @@ describe('Ledger — snapshot and hydrate', () => {
 			{ recorded: true },
 		)
 		const parent = createLedger(provider, options)
-		const seed = buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.')
+		const seed = buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.')
 		parent.conversation.add(seed)
 		const snapshots: LedgerSnapshot[] = []
 		for (const step of script) {
@@ -10438,7 +10449,7 @@ describe('Ledger — a removed message', () => {
 		const options = buildLedgerOptions({ topics: [], capacity: 32768 })
 		const parent = createLedger(provider, options)
 		const seed = parent.conversation.add(
-			buildLedgerExchange('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
+			buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Delivery costs $10.'),
 		)
 		const source = requireValue(seed.find((message) => message.role === 'tool'))
 		await parent.respond('Check Brightwater Studio.')
@@ -10551,28 +10562,143 @@ describe('Ledger — recall by key', () => {
 		).toBe('Earlier request: Check the parcel.\nEarlier reply: The parcel shipped Monday.')
 	})
 
-	it('lists nothing under previous until an earlier request has a reply', async () => {
+	it('lists the last exchange that has a reply under previous, past a later request with none', async () => {
 		const provider = createScriptedProvider(
-			[{ content: '' }, { content: '' }, { content: 'It shipped.' }],
+			[{ content: 'It shipped.' }, { content: '' }, { content: '' }],
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, buildLedgerOptions())
-		const call = { id: 'host', name: 'recall', arguments: { key: 'previous' } }
 		const miss = 'nothing earlier matches "previous"; answer from the messages you can see'
-		expect(await ledger.agent.context.tools.execute(call)).toMatchObject({
-			success: true,
-			value: miss,
-		})
+		expect(await recallLedger(ledger, 'previous')).toBe(miss)
 		await ledger.respond('Check the parcel.')
-		expect(await ledger.agent.context.tools.execute(call)).toMatchObject({
-			success: true,
-			value: miss,
-		})
 		await ledger.respond('Check it again.')
-		expect(await ledger.agent.context.tools.execute(call)).toMatchObject({
-			success: true,
-			value: 'Earlier request: Check it again.\nEarlier reply: It shipped.',
-		})
+		// The second request ended with no reply, so previous still reads the first exchange.
+		expect(await recallLedger(ledger, 'previous')).toBe(
+			'Earlier request: Check the parcel.\nEarlier reply: It shipped.',
+		)
+		expect(await recallLedger(ledger, 'previous-2')).toBe(
+			'nothing earlier matches "previous-2"; stored keys: previous; or answer from the messages you can see',
+		)
+	})
+
+	it("resolves each exchange depth to that exchange's request and reply, in the request that planned the index", async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: ['previous', 'previous-2', 'Previous 3'].map((key, at) => ({
+						id: `depth ${at}`,
+						name: 'recall',
+						arguments: { key },
+					})),
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 4096, snapshot: LEDGER_CUT_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Which crates are ready?')
+		expect(
+			[0, 1, 2].map(
+				(at) =>
+					ledger.conversation.messages().find((message) => message.call === `depth ${at}`)?.content,
+			),
+		).toEqual([
+			'Earlier request: Note the crates next.\nEarlier reply: Ready for the crates.',
+			'Earlier request: Note the late arrivals.\nEarlier reply: Noted the late arrivals.',
+			'Earlier request: Note the orders.\nEarlier reply: Noted the orders.',
+		])
+	})
+
+	it('resolves previous-12 past the rows when that exchange exists, while the index lists 8 unlabeled exchange rows', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'deep', name: 'recall', arguments: { key: 'previous-12' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 32_768, snapshot: buildLedgerGoals(52), topics: [] }),
+		)
+		await ledger.respond('What is still open?')
+		const keys = readLedgerOpening(requireValue(provider.calls[0]).messages).keys
+		expect(keys.slice(0, 8)).toEqual([
+			'previous-8',
+			'previous-7',
+			'previous-6',
+			'previous-5',
+			'previous-4',
+			'previous-3',
+			'previous-2',
+			'previous',
+		])
+		expect(keys.filter((key) => key.startsWith('previous'))).toHaveLength(LEDGER_EXCHANGE_LIMIT)
+		// The rows carry no request text, so no request's words appear in the index.
+		expect(extractLedgerIndex(requireValue(provider.calls[0]).messages)).not.toContain(
+			'What do we do',
+		)
+		// Thirteen exchanges are stored; the twelfth back is the second goal's.
+		expect(ledger.conversation.messages().find((message) => message.call === 'deep')?.content).toBe(
+			'Earlier request: What do we do for GL-1?\nEarlier reply: GL-1 goes to the reship queue.',
+		)
+	})
+
+	it('misses a depth with no exchange and names the keys, previous, the ids, then the deeper exchanges', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'deep', name: 'recall', arguments: { key: 'previous-9' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 4096, snapshot: LEDGER_CUT_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Which crates are ready?')
+		expect(ledger.conversation.messages().find((message) => message.call === 'deep')?.content).toBe(
+			'nothing earlier matches "previous-9"; stored keys: previous, AX-3, AX-2, AX-1, previous-2, previous-3; or answer from the messages you can see',
+		)
+	})
+
+	it('lists every part of a joined key by its family, in the order given, mixed families included', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [
+						{ id: 'joined', name: 'recall', arguments: { key: 'previous-2 and AX-1, rules' } },
+					],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 4096,
+				snapshot: LEDGER_CUT_RULED_SNAPSHOT,
+				judge: createPhraseJudge(['needs a signature']),
+			}),
+		)
+		await ledger.respond('Which crates are ready?')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'joined')?.content,
+		).toBe(
+			[
+				'Earlier request: Note the late arrivals.',
+				'Earlier reply: Noted the late arrivals.',
+				'Order AX-1 arrived late.',
+				'Order AX-1 shipped Monday.',
+				'Every shipment needs a signature.',
+			].join('\n'),
+		)
 	})
 
 	it('lists the rules record under rules, newest message first', async () => {
@@ -10607,6 +10733,7 @@ describe('Ledger — recall by key', () => {
 		const key = `"${'x'.repeat(100)}`
 		const provider = createScriptedProvider(
 			[
+				{ content: 'Noted.' },
 				{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
 				{ content: 'Read.' },
 				{ content: '', tools: [{ id: 'miss', name: 'recall', arguments: { key } }] },
@@ -10628,21 +10755,26 @@ describe('Ledger — recall by key', () => {
 		ledger.conversation.judgments.add(
 			buildLedgerTopicJudgment(refund, requireValue(options.topics[0]), 1),
 		)
+		await ledger.respond('Note the desk.')
 		await ledger.respond('Check BW-20931.')
 		await ledger.respond('Anything else?')
+		// `previous`, `rules`, the ids, and the topics come first, then the deeper exchange keys.
 		expect(ledger.conversation.messages().find((message) => message.call === 'miss')?.content).toBe(
-			`nothing earlier matches "\\"${'x'.repeat(63)}"; stored keys: previous, rules, BW-20931, refunds; or answer from the messages you can see`,
+			`nothing earlier matches "\\"${'x'.repeat(63)}"; stored keys: previous, rules, BW-20931, refunds, previous-2; or answer from the messages you can see`,
 		)
 	})
 
-	it.each([' Previous ', 'RULES'])('refuses a desk topic named %j, a key recall reads', (name) => {
-		expect(() =>
-			createLedger(
-				createScriptedProvider([]),
-				buildLedgerOptions({ topics: [{ name, criterion: 'Reserved.' }] }),
-			),
-		).toThrow(expect.objectContaining({ code: 'TOPIC' }))
-	})
+	it.each([' Previous ', 'RULES', 'previous-2', 'Previous 3', 'previous:4'])(
+		'refuses a desk topic named %j, a key recall reads',
+		(name) => {
+			expect(() =>
+				createLedger(
+					createScriptedProvider([]),
+					buildLedgerOptions({ topics: [{ name, criterion: 'Reserved.' }] }),
+				),
+			).toThrow(expect.objectContaining({ code: 'TOPIC' }))
+		},
+	)
 
 	it('files a recall result as chatter, so a correction after it asks no pair question against it', async () => {
 		const asked = createRecorder<readonly [key: string]>()
@@ -10754,7 +10886,9 @@ describe('Ledger — the lean opening', () => {
 		expect(sent.at(-1)?.content).toBe(
 			[
 				'## Earlier',
-				'Earlier messages are stored, not shown. Call recall with a key below.',
+				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.",
+				'- previous-3: your request and reply 3 exchanges ago',
+				'- previous-2: your request and reply 2 exchanges ago',
 				'- previous: your last request and your reply to it',
 				'- AX-3: 2 earlier messages',
 				'- AX-2: 2 earlier messages',
@@ -10796,20 +10930,28 @@ describe('Ledger — the lean opening', () => {
 	})
 
 	it.each([
-		[280, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3', 'AX-2', 'AX-1']],
-		[260, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3', 'AX-2']],
-		[250, ['crate-1', 'crate-2', 'crate-3'], ['previous']],
-		[220, ['crate-2', 'crate-3'], ['previous', 'CR-1']],
-		[160, ['crate-3'], ['previous', 'CR-2', 'CR-1']],
-		[100, [], ['previous', 'CR-3', 'CR-2', 'CR-1']],
-		[85, [], ['CR-3', 'CR-2', 'CR-1']],
-		[70, [], []],
+		[
+			500,
+			['crate-1', 'crate-2', 'crate-3'],
+			['previous-3', 'previous-2', 'previous', 'AX-3', 'AX-2', 'AX-1'],
+		],
+		[335, ['crate-1', 'crate-2', 'crate-3'], ['previous-2', 'previous', 'AX-3', 'AX-2', 'AX-1']],
+		[320, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3', 'AX-2', 'AX-1']],
+		[305, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3', 'AX-2']],
+		[300, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3']],
+		[290, ['crate-1', 'crate-2', 'crate-3'], ['previous']],
+		[260, ['crate-2', 'crate-3'], ['previous', 'CR-1']],
+		[210, ['crate-3'], ['previous', 'CR-2', 'CR-1']],
+		[160, [], ['previous', 'CR-3', 'CR-2', 'CR-1']],
+		[130, [], ['CR-3', 'CR-2', 'CR-1']],
+		[100, [], []],
 	])(
 		'cuts at capacity %i to the statements %j and the index keys %j, keeping recall offered',
 		async (capacity, statements, keys) => {
-			// Past the budget the plan cuts the id rows last-ranked first, then the statements oldest
-			// first, each cut statement's id joining the index ahead of the rest, then `previous`, then
-			// the index. Something stays behind at every step, so recall stays offered.
+			// Past the budget the plan cuts the exchange rows from the oldest down to `previous-2`, then
+			// the id rows last-ranked first, then the statements oldest first, each cut statement's id
+			// joining the index ahead of the rest, then `previous`, then the index. Something stays
+			// behind at every step, so recall stays offered.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -10824,22 +10966,28 @@ describe('Ledger — the lean opening', () => {
 
 	it.each([
 		[
-			300,
+			500,
 			['crate-1', 'crate-2', 'crate-3'],
-			['previous', 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
+			['previous-3', 'previous-2', 'previous', 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
 		],
-		[270, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'rules', 'refunds']],
-		[240, ['crate-2', 'crate-3'], ['previous', 'rules', 'CR-1', 'refunds']],
-		[140, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1', 'refunds']],
-		[110, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1']],
-		[100, [], ['previous', 'CR-3', 'CR-2', 'CR-1']],
-		[80, [], ['CR-3', 'CR-2', 'CR-1']],
-		[60, [], []],
+		[
+			355,
+			['crate-1', 'crate-2', 'crate-3'],
+			['previous-2', 'previous', 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
+		],
+		[315, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'rules', 'refunds']],
+		[280, ['crate-2', 'crate-3'], ['previous', 'rules', 'CR-1', 'refunds']],
+		[180, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1', 'refunds']],
+		[155, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1']],
+		[150, [], ['previous', 'CR-3', 'CR-2', 'CR-1']],
+		[130, [], ['CR-3', 'CR-2', 'CR-1']],
+		[100, [], []],
 	])(
-		'keeps rules and the topic row fixed through the id-row and statement cuts, then cuts the topic row, rules, and previous: at capacity %i the statements %j and the keys %j',
+		'keeps rules and the topic row fixed through the exchange-row, id-row, and statement cuts, then cuts the topic row, rules, and previous: at capacity %i the statements %j and the keys %j',
 		async (capacity, statements, keys) => {
-			// The id rows and the statements go first while `rules` and `refunds` stay, so both are fixed
-			// rows; with every statement cut, the topic row goes, then `rules`, then `previous`.
+			// The exchange rows past `previous`, the id rows, and the statements go first while `rules`
+			// and `refunds` stay, so both are fixed rows; with every statement cut, the topic row goes,
+			// then `rules`, then `previous`.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -10856,9 +11004,9 @@ describe('Ledger — the lean opening', () => {
 		},
 	)
 
-	it('keeps cutting id rows until the first turn leaves recall its room, and else takes the first fit', async () => {
+	it('keeps cutting rows until the first turn leaves recall its room, and else takes the first fit', async () => {
 		const openings = await Promise.all(
-			[270, 290].map(async (capacity) => {
+			[335, 340].map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 				const ledger = createLedger(
 					provider,
@@ -10869,10 +11017,10 @@ describe('Ledger — the lean opening', () => {
 			}),
 		)
 		const statements = ['crate-1', 'crate-2', 'crate-3']
-		// At 270 no id-row step leaves twice the reply reserve, so the first step that fits wins; at 290
-		// cutting every id row does, and that step wins over the earlier ones that fit.
+		// At 335 no row step leaves twice the reply reserve, so the first step that fits wins; at 340
+		// cutting every exchange and id row does, and that step wins over the earlier ones that fit.
 		expect(openings).toEqual([
-			{ statements, keys: ['previous', 'AX-3', 'AX-2', 'AX-1'] },
+			{ statements, keys: ['previous-2', 'previous', 'AX-3', 'AX-2', 'AX-1'] },
 			{ statements, keys: ['previous'] },
 		])
 	})
@@ -10918,7 +11066,7 @@ describe('Ledger — the lean opening', () => {
 		)
 		await ledger.respond('Which crates are ready?')
 		expect(ledger.conversation.messages().find((message) => message.call === 'sent')?.content).toBe(
-			'nothing earlier matches "CR-2"; stored keys: previous, AX-3, AX-2, AX-1; or answer from the messages you can see',
+			'nothing earlier matches "CR-2"; stored keys: previous, AX-3, AX-2, AX-1, previous-2, previous-3; or answer from the messages you can see',
 		)
 	})
 
@@ -10973,11 +11121,17 @@ describe('Ledger — the lean opening', () => {
 		first.conversation.add({ role: 'user', content: statement })
 		await first.respond(request)
 		const keys = readLedgerOpening(requireValue(planned.calls[0]).messages).keys
-		expect(keys[0]).toBe('previous')
-		expect(keys.slice(1)).toHaveLength(LEDGER_KEY_LIMIT)
-		expect(keys.slice(1, 3)).toEqual(['GL-7', 'AC-7'])
+		// The exchange rows take their own 8 places, oldest first, and leave the id rows' cap whole.
+		expect(keys.slice(0, LEDGER_EXCHANGE_LIMIT).at(-1)).toBe('previous')
+		expect(keys.slice(LEDGER_EXCHANGE_LIMIT)).toHaveLength(LEDGER_KEY_LIMIT)
+		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-7', 'AC-7'])
 		// Four recalls, the request's limit, run inside the request that planned the index.
-		const recalled = [keys[0], keys[1], keys[2], keys.at(-1)].map((key) => requireValue(key))
+		const recalled = [
+			keys[LEDGER_EXCHANGE_LIMIT - 1],
+			keys[LEDGER_EXCHANGE_LIMIT],
+			keys[LEDGER_EXCHANGE_LIMIT + 1],
+			keys.at(-1),
+		].map((key) => requireValue(key))
 		const provider = createScriptedProvider(
 			[
 				{

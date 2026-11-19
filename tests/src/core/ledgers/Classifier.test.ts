@@ -31,7 +31,7 @@ import {
 import { isJudgeError, JudgeError } from '../../../../src/core/providers/errors.js'
 import {
 	buildCategoryAnswer,
-	buildLedgerExchange,
+	buildLedgerLookupCall,
 	createOnceFailingJudge,
 	LEDGER_ONCE_FAILURES,
 	buildLedgerMessage,
@@ -112,7 +112,7 @@ describe('Classifier', () => {
 			buildLedgerOptions({ judge: new SilentJudge(), topics }),
 		)
 		fresh.conversation.add(
-			buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+			buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
 		)
 		await fresh.respond('Check refunds.')
 		const statement = fresh.conversation.add({ role: 'user', content: text })

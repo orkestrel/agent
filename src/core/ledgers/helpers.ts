@@ -5,6 +5,7 @@ import type {
 	LedgerAmendment,
 	LedgerGauge,
 	LedgerClassification,
+	LedgerExchange,
 	LedgerIndex,
 	LedgerKey,
 	LedgerLine,
@@ -28,6 +29,7 @@ import {
 } from '../helpers.js'
 import { isPositiveSafeInteger } from '../validators.js'
 import {
+	LEDGER_EXCHANGE_LIMIT,
 	LEDGER_KEY_LIMIT,
 	LEDGER_OWNER_PREFIX,
 	LEDGER_PREVIOUS_KEY,
@@ -260,6 +262,75 @@ export function collectLedgerStatements(
 }
 
 /**
+ * Collects the exchanges among messages, newest first: each marked request with the final call-free
+ * reply {@link collectLedgerReplies} selects for it.
+ *
+ * @remarks
+ * A request with no such reply makes no exchange, so the first exchange is the last one that has a
+ * reply. The `recall` tool and {@link collectLedgerKeys} read the same list, so every exchange key
+ * the Earlier index lists resolves.
+ *
+ * @param messages - Stored conversation messages in order, those before the request a key serves
+ * @param requests - Marked request ids
+ * @param notes - Ledger notes that separate answer passes
+ * @returns The exchanges, newest first
+ * @example
+ * ```ts
+ * collectLedgerExchanges(
+ * 	[
+ * 		{ id: 'first', role: 'user', content: 'Check OR-7.' },
+ * 		{ id: 'reply', role: 'assistant', content: 'OR-7 ships Friday.' },
+ * 		{ id: 'second', role: 'user', content: 'And OR-8?' },
+ * 	],
+ * 	new Set(['first', 'second']),
+ * 	new Set(),
+ * ).map((exchange) => exchange.request.id) // ['first']
+ * ```
+ */
+export function collectLedgerExchanges(
+	messages: readonly Message[],
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): readonly LedgerExchange[] {
+	const replies = collectLedgerReplies(messages, requests, notes)
+	return messages
+		.filter((message) => requests.has(message.id))
+		.flatMap((request) => {
+			const reply = replies.get(request.id)
+			return reply === undefined ? [] : [{ request, reply }]
+		})
+		.reverse()
+}
+
+/**
+ * Parses an exchange key into its depth: 1 for `previous`, and N for `previous-N`.
+ *
+ * @remarks
+ * The key is read trimmed and in any case. A hyphen, a colon, or a space separates the depth, a
+ * positive safe integer written without a leading zero. Any other key, `rules` included, is no
+ * exchange key. An id that reads `PREVIOUS-2` parses as depth 2, so the exchange key wins and such
+ * an id never takes an id row.
+ *
+ * @param key - A recall key, or one part of a joined key
+ * @returns The depth, or `undefined` when the key is no exchange key
+ * @example
+ * ```ts
+ * parseLedgerExchange('previous') // 1
+ * parseLedgerExchange('Previous-3') // 3
+ * parseLedgerExchange('previous-0') // undefined
+ * ```
+ */
+export function parseLedgerExchange(key: string): number | undefined {
+	const lowered = key.trim().toLowerCase()
+	if (!lowered.startsWith(LEDGER_PREVIOUS_KEY)) return undefined
+	const rest = lowered.slice(LEDGER_PREVIOUS_KEY.length)
+	if (rest === '') return 1
+	const digits = /^(?:\s*[-:]\s*|\s+)([1-9]\d*)$/.exec(rest)?.[1]
+	const depth = digits === undefined ? undefined : Number(digits)
+	return depth !== undefined && Number.isSafeInteger(depth) ? depth : undefined
+}
+
+/**
  * Collects the recall keys of what a request leaves behind: the messages before it that `recall`
  * can list and that `excluded` does not hold.
  *
@@ -268,13 +339,15 @@ export function collectLedgerStatements(
  * messages are the population less `excluded`. A request the messages don't hold counts every
  * message as before it. Every key lists at least one earlier message. The keys come in this order:
  *
- * - `previous`, when the last request before this one has a reply;
+ * - at most `LEDGER_EXCHANGE_LIMIT` exchange keys, one per exchange {@link collectLedgerExchanges}
+ *   returns, oldest first: the deepest `previous-N` first and `previous`, the last exchange that has
+ *   a reply, last, each with a fixed description that names no request text;
  * - `rules`, when a line of the rules record comes from an earlier message;
- * - at most `LEDGER_KEY_LIMIT` ids an earlier message carries, as `extractLiterals` reads them:
- *   first the ids of the current statements that are earlier, newest statement first; then the
- *   ids the request and the current statements name; then the ids a lookup named, newest finding
- *   first; then the ids that hold a letter and that at least 2 messages of the population carry,
- *   the most carried first and a tie going to the newest;
+ * - at most `LEDGER_KEY_LIMIT` ids an earlier message carries, as `extractLiterals` reads them, but
+ *   none that reads as an exchange key: first the ids of the current statements that are earlier,
+ *   newest statement first; then the ids the request and the current statements name; then the ids
+ *   a lookup named, newest finding first; then the ids that hold a letter and that at least 2
+ *   messages of the population carry, the most carried first and a tie going to the newest;
  * - one key per desk topic, in topic order, that an earlier message other than a request files
  *   under, unless an id key holds its name.
  *
@@ -375,11 +448,9 @@ export function collectLedgerKeys(
 		)
 		.map(([id]) => id)
 	const ids = [...new Set([...cut, ...named, ...looked, ...recurring])]
-		.filter((id) => (listed.get(id) ?? 0) > 0)
+		.filter((id) => (listed.get(id) ?? 0) > 0 && parseLedgerExchange(id) === undefined)
 		.slice(0, LEDGER_KEY_LIMIT)
-	const previous = before.findLast((message) => requests.has(message.id))
-	const replied =
-		previous !== undefined && collectLedgerReplies(before, requests, notes).has(previous.id)
+	const exchanges = collectLedgerExchanges(before, requests, notes).slice(0, LEDGER_EXCHANGE_LIMIT)
 	const held = new Set(earlier.map((message) => message.id))
 	const ruled = projection.records.some(
 		(record) =>
@@ -392,9 +463,16 @@ export function collectLedgerKeys(
 	)
 	const taken = new Set(ids)
 	return [
-		...(replied
-			? [{ name: LEDGER_PREVIOUS_KEY, description: 'your last request and your reply to it' }]
-			: []),
+		...exchanges
+			.map((_exchange, index) =>
+				index === 0
+					? { name: LEDGER_PREVIOUS_KEY, description: 'your last request and your reply to it' }
+					: {
+							name: `${LEDGER_PREVIOUS_KEY}-${index + 1}`,
+							description: `your request and reply ${index + 1} exchanges ago`,
+						},
+			)
+			.reverse(),
 		...(ruled
 			? [
 					{
@@ -423,22 +501,24 @@ export function collectLedgerKeys(
  * and a closing line, or empty text for no key.
  *
  * @remarks
- * Each key renders through `renderIndexEntry`, as `- NAME: DESCRIPTION` on one line. The closing
- * line states no count, so it never disagrees with the keys above it.
+ * The instruction line says what the rows are, when to call `recall` with a key or with joined keys,
+ * and when to answer without it. Each key renders through `renderIndexEntry`, as
+ * `- NAME: DESCRIPTION` on one line. The instruction and closing lines state no count, so they never
+ * disagree with the keys between them.
  *
  * @param keys - The keys in order, as {@link collectLedgerKeys} returns them
  * @returns The index text, or `''` when `keys` is empty
  * @example
  * ```ts
  * renderLedgerKeys([{ name: 'previous', description: 'your last request and your reply to it' }])
- * // '## Earlier\nEarlier messages are stored, not shown. Call recall with a key below.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too.'
+ * // "## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too."
  * ```
  */
 export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
 	if (keys.length === 0) return ''
 	return [
 		'## Earlier',
-		'Earlier messages are stored, not shown. Call recall with a key below.',
+		"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.",
 		...keys.map((key) => renderIndexEntry(key)),
 		'Other ids, names, and words from a message work too.',
 	].join('\n')

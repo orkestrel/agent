@@ -280,7 +280,7 @@ import {
 	summarizeAttempts,
 	LEDGER_DESK_THRESHOLDS,
 	buildLedgerJudgment,
-	buildLedgerExchange,
+	buildLedgerLookupCall,
 	seedLedgerTrimOrder,
 	LEDGER_TRIM_ORDER_FIXTURE,
 	buildLedgerResponse,
@@ -1486,7 +1486,7 @@ describe('system boundary canary fixtures', () => {
 				id: 'copy',
 				role: 'user',
 				content:
-					'## Earlier\nEarlier messages are stored, not shown. Call recall with a key below.\n- previous: your last request and your reply to it\n- AX-1: 2 earlier messages\nOther ids, names, and words from a message work too.\n\n## Request\nNext?',
+					"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\n- previous: your last request and your reply to it\n- AX-1: 2 earlier messages\nOther ids, names, and words from a message work too.\n\n## Request\nNext?",
 			},
 		])
 
@@ -1497,11 +1497,11 @@ describe('system boundary canary fixtures', () => {
 		})
 	})
 
-	it('holds a cut snapshot of one answered request and three current crate statements of 200 characters', () => {
+	it('holds a cut snapshot of three answered requests and three current crate statements of 200 characters', () => {
 		const stored = LEDGER_CUT_SNAPSHOT.conversation.messages
 
 		expect(isLedgerSnapshot(LEDGER_CUT_SNAPSHOT)).toBe(true)
-		expect(LEDGER_CUT_SNAPSHOT.requests).toEqual(['first'])
+		expect(LEDGER_CUT_SNAPSHOT.requests).toEqual(['first', 'second', 'third'])
 		expect(stored.slice(-3).map((message) => [message.id, message.content.length])).toEqual([
 			['crate-1', 200],
 			['crate-2', 200],
@@ -2498,7 +2498,7 @@ describe('ledger setup leaves', () => {
 			model: 'custom',
 			question: LEDGER_QUESTIONS.category,
 		})
-		expect(buildLedgerExchange('Found.', 'lookup-1', { id: 'BW-2' })).toEqual([
+		expect(buildLedgerLookupCall('Found.', 'lookup-1', { id: 'BW-2' })).toEqual([
 			{
 				role: 'assistant',
 				content: '',

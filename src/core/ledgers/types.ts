@@ -71,8 +71,8 @@ export interface LedgerThreshold {
  * The ledger asks the {@link LedgerQuestion} `topic` instructions with the criteria
  * `The message concerns NAME: CRITERION` for true and `The message does not concern NAME` for
  * false, where `NAME` is `name` and `CRITERION` is `criterion`. `name` must be non-empty, unique
- * among the ledger's topics, and, trimmed and lowercased, neither `previous` nor `rules`, the recall
- * keys of the last exchange and of the rules record.
+ * among the ledger's topics, and, trimmed and lowercased, neither `rules` nor an exchange key such as
+ * `previous` or `previous-2`, the recall keys of the rules record and of an earlier exchange.
  */
 export interface LedgerTopic {
 	readonly name: string
@@ -931,9 +931,8 @@ export interface LedgerLine {
  *
  * @remarks
  * `key` is `rules` for the rules record and `owner:` followed by the owner id for an owner record.
- * `title` is `Rules`, or the owner's first name with its id. In a request view, owner records with
- * the same member ids in the same order render once, under their titles joined with `; `.
- * `members` lists the placed message ids in conversation order.
+ * `title` is `Rules`, or the owner's first name with its id. `members` lists the placed message ids
+ * in conversation order.
  */
 export interface LedgerRecord {
 	readonly key: string
@@ -946,16 +945,29 @@ export interface LedgerRecord {
  * Carries one recall key: the value a `recall` call passes as its `key`, and what `recall` lists under it.
  *
  * @remarks
- * A recall key is neither a record key (`LedgerRecord.key`) nor a judgment key. `name` is
- * `previous`, `rules`, an id, or a desk topic's name, as the `recall` tool reads it. `description`
- * says what the key lists: the last exchange, the rules record, how many earlier messages carry the
- * id and the names of its owner, or the topic's criterion. The Earlier index of a request copy
- * lists these keys, and a `recall` call that lists nothing names up to `LEDGER_MISS_LIMIT` of them
- * back.
+ * A recall key is neither a record key (`LedgerRecord.key`) nor a judgment key. `name` is an
+ * exchange key, `previous` for the last replied exchange and `previous-N` for the one N exchanges
+ * back, `rules`, an id, or a desk topic's name, as the `recall` tool reads it. `description` says
+ * what the key lists: how far back the exchange is, the rules record, how many earlier messages
+ * carry the id and the names of its owner, or the topic's criterion. The Earlier index of a request
+ * copy lists these keys, and a `recall` call that lists nothing names up to `LEDGER_MISS_LIMIT` of
+ * them back.
  */
 export interface LedgerKey {
 	readonly name: string
 	readonly description: string
+}
+
+/**
+ * Carries one exchange: a marked request and its final call-free reply.
+ *
+ * @remarks
+ * The exchange keys of the `recall` tool resolve to these, `previous` to the newest and
+ * `previous-N` to the one N exchanges back. A request with no such reply makes no exchange.
+ */
+export interface LedgerExchange {
+	readonly request: Message
+	readonly reply: Message
 }
 
 /** Identifies an accepted direct message amendment whose sentence scope remains unresolved. */
@@ -1270,7 +1282,7 @@ export type LedgerErrorCode =
 	| 'CAPACITY'
 	/** Reports an agent limit that is not a positive safe integer. */
 	| 'LIMIT'
-	/** Reports a topic with an empty name, a name another topic carries, or a name that, trimmed and lowercased, is `previous` or `rules`. */
+	/** Reports a topic with an empty name, a name another topic carries, or a name that, trimmed and lowercased, is `rules` or reads as an exchange key such as `previous` or `previous-2`. */
 	| 'TOPIC'
 	/** Reports a lookup tool named `recall` or a name another lookup tool carries. */
 	| 'LOOKUP'

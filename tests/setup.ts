@@ -4638,7 +4638,7 @@ export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.
 	{
 		role: 'user',
 		content:
-			'## Earlier\nEarlier messages are stored, not shown. Call recall with a key below.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too.\n\n## Request\nCheck Brightwater Studio again.',
+			"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join keys like previous-3, previous-2. If the messages you see are enough, answer without recall.\n- previous: your last request and your reply to it\nOther ids, names, and words from a message work too.\n\n## Request\nCheck Brightwater Studio again.",
 	},
 ])
 
@@ -6992,12 +6992,12 @@ export const LEDGER_HIDDEN_LOOKUPS: readonly LedgerLookup[] = Object.freeze(
 	})),
 )
 
-/** Holds the user text of each seed exchange a plan-budget case fills its opening with; it carries no id. */
+/** Holds the user text of each seed remark a plan-budget case fills its opening with; it carries no id. */
 export const LEDGER_PLAN_REMARK =
 	'Plain remark about the desk: the counter opens at nine, the stock arrives on Tuesdays, and the staff wait at the back door.'
 
 /**
- * Holds the seed exchanges of a plan-budget case: remark and reply pairs before any request, so every
+ * Holds the seed of a plan-budget case: remark and reply pairs before any request, so every
  * remark is a current statement, and more than most cases' budgets keep. The replies are never sent,
  * so they keep `recall` offered.
  */
@@ -7121,13 +7121,13 @@ export const LEDGER_INVALID_LIMITS = Object.freeze([
 ])
 
 /**
- * Builds the assistant call and tool result of a seeded lookup exchange.
+ * Builds the assistant call and tool result of a seeded lookup.
  * @param content - The result text
  * @param id - The call id
  * @param values - The call arguments
  * @returns The messages to append to a conversation
  */
-export function buildLedgerExchange(
+export function buildLedgerLookupCall(
 	content: string,
 	id = 'seed',
 	values: Readonly<Record<string, unknown>> = { id: 'BW-20931' },
@@ -7139,14 +7139,14 @@ export function buildLedgerExchange(
 }
 
 /**
- * Seeds a ledger's conversation with {@link LEDGER_TRIM_ORDER_FIXTURE}: the seed exchange, then the
+ * Seeds a ledger's conversation with {@link LEDGER_TRIM_ORDER_FIXTURE}: the seed lookup, then the
  * three user texts in conversation order, filing the correction as a `correction` and each other
  * text as a `fact`.
  * @param ledger - The ledger whose conversation takes the fixture
  */
 export function seedLedgerTrimOrder(ledger: LedgerInterface): void {
 	const fixture = LEDGER_TRIM_ORDER_FIXTURE
-	ledger.conversation.add(buildLedgerExchange(fixture.seed))
+	ledger.conversation.add(buildLedgerLookupCall(fixture.seed))
 	const older = ledger.conversation.add({ role: 'user', content: fixture.older })
 	const correction = ledger.conversation.add({ role: 'user', content: fixture.correction })
 	const newer = ledger.conversation.add({ role: 'user', content: fixture.newer })
@@ -9447,7 +9447,7 @@ export async function serveRecordsDesk(): Promise<RecordsDesk> {
 	ledger.agent.emitter.on('select', selections.handler)
 	for (const [at, content] of fixture.findings.entries())
 		ledger.conversation.add(
-			buildLedgerExchange(content, `owner-${at}`, { id: fixture.owners[at]?.id }),
+			buildLedgerLookupCall(content, `owner-${at}`, { id: fixture.owners[at]?.id }),
 		)
 	await ledger.respond(fixture.request)
 	await ledger.respond('Check Brightwater Studio again.')
@@ -9496,7 +9496,7 @@ export function extractLedgerIndex(messages: readonly Message[]): string {
  * served after it, and the provider turns of each side.
  *
  * @remarks
- * The seed holds a rule and a lookup exchange that renders as a tail stub. The first history
+ * The seed holds a rule and a lookup call with its result. The first history
  * request's first pass reads the owner and ends empty, so an answer pass adds the results and cue
  * notes. The second history request's lookup throws `failure`, so its tool message carries that text,
  * which names the owner's account: unless the ledger marks it failed, the lookup reader files it as
@@ -9508,7 +9508,7 @@ export const LEDGER_REPLAY_FIXTURE = Object.freeze({
 	rules: Object.freeze(['need a manager']),
 	seed: Object.freeze<readonly MessageInput[]>([
 		{ role: 'user', content: 'Refunds above $100 need a manager.' },
-		...buildLedgerExchange('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
+		...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
 	]),
 	history: Object.freeze(['Check account BW-20931.', 'Check order FX-111.']),
 	failure: 'FX-111 failed for BW-20931.',
@@ -9682,18 +9682,19 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	notes: ['note'],
 	failures: ['failure'],
 	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-19.
-	gauge: { scale: 2, overhead: 10, digest: 'aad7f66c7fd84356', model: SCRIPTED_MODEL },
+	gauge: { scale: 2, overhead: 10, digest: 'd6603f9a74262fb8', model: SCRIPTED_MODEL },
 })
 
 /**
  * Holds a hand-built ledger snapshot for the lean opening's cut order: three orders each stated in
- * two earlier messages, an answered request, and then three current crate statements of 200
+ * two earlier messages, three answered requests, and then three current crate statements of 200
  * characters, oldest first.
  *
  * @remarks
- * The earlier orders give the Earlier index three recurring id rows, `AX-3`, `AX-2`, and `AX-1`,
- * newest first, after `previous`. Each crate statement carries its own id, `CR-1` to `CR-3`, which
- * gets a row only once its statement is cut.
+ * The answered requests give the Earlier index the exchange rows `previous-3`, `previous-2`, and
+ * `previous`, oldest first, and the earlier orders three recurring id rows, `AX-3`, `AX-2`, and
+ * `AX-1`, after them. Each crate statement carries its own id, `CR-1` to `CR-3`, which gets a row
+ * only once its statement is cut.
  */
 export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 	conversation: {
@@ -9706,7 +9707,11 @@ export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 			{ id: 'late-2', role: 'user', content: 'Order AX-2 arrived late.' },
 			{ id: 'late-3', role: 'user', content: 'Order AX-3 arrived late.' },
 			{ id: 'first', role: 'user', content: 'Note the orders.' },
-			{ id: 'noted', role: 'assistant', content: 'Noted.' },
+			{ id: 'noted', role: 'assistant', content: 'Noted the orders.' },
+			{ id: 'second', role: 'user', content: 'Note the late arrivals.' },
+			{ id: 'noted-2', role: 'assistant', content: 'Noted the late arrivals.' },
+			{ id: 'third', role: 'user', content: 'Note the crates next.' },
+			{ id: 'noted-3', role: 'assistant', content: 'Ready for the crates.' },
 			...['lamps', 'glass', 'tiles'].map((goods, at) => ({
 				id: `crate-${at + 1}`,
 				role: 'user' as const,
@@ -9714,7 +9719,7 @@ export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 			})),
 		],
 	},
-	requests: ['first'],
+	requests: ['first', 'second', 'third'],
 	notes: [],
 	failures: [],
 })
@@ -10378,7 +10383,7 @@ export function measureLedgerText(messages: ReadonlyArray<Message | MessageInput
 
 /**
  * Builds one block of the ledger bench history: three attributed statements, a request, a lookup
- * exchange, an assistant reply, and a closing statement. In the correction arm, an odd block's
+ * call with its result, an assistant reply, and a closing statement. In the correction arm, an odd block's
  * third statement corrects the previous block's refund.
  *
  * @param index - The block index, which numbers the block's order `OR-<1000 + index>`
@@ -10405,7 +10410,7 @@ export function buildLedgerBlock(index: number, arm: LedgerBenchArm): readonly M
 					: `[Source ${index}-c] Order ${order} is packed.`,
 		},
 		{ role: 'user', content: `What is the status of ${order}?` },
-		...buildLedgerExchange(
+		...buildLedgerLookupCall(
 			`Order ${order}: Customer ${order}; refund $${index}.50.`,
 			`call-${index}`,
 			{ id: order },

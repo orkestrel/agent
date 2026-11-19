@@ -1,4 +1,9 @@
-import { createLedger, LEDGER_KEY_LIMIT, LEDGER_PREVIOUS_KEY } from '@src/core'
+import {
+	createLedger,
+	LEDGER_EXCHANGE_LIMIT,
+	LEDGER_KEY_LIMIT,
+	LEDGER_PREVIOUS_KEY,
+} from '@src/core'
 import { expect, it } from 'vitest'
 import {
 	buildLedgerGoals,
@@ -77,7 +82,8 @@ it('recalls real at control 400', async ({ bench }) => {
 }, 570_000)
 
 // The lean opening's plan over a long history: each sample hydrates 1,600 earlier messages of
-// unrelated goals and plans one request, whose index lists `previous` and at most the key limit of ids.
+// unrelated goals and plans one request, whose index lists the exchange rows, `previous` last, and at
+// most the key limit of ids.
 it('plans at 1600 earlier messages of unrelated goals', async ({ bench }) => {
 	const snapshot = buildLedgerGoals(1600)
 	const keys: Array<readonly string[]> = []
@@ -92,7 +98,7 @@ it('plans at 1600 earlier messages of unrelated goals', async ({ bench }) => {
 	}).run({ time: 0, iterations: 3, warmup: false, throws: true })
 	expect(keys).toHaveLength(3)
 	for (const listed of keys) {
-		expect(listed[0]).toBe(LEDGER_PREVIOUS_KEY)
-		expect(listed.length).toBeLessThanOrEqual(1 + LEDGER_KEY_LIMIT)
+		expect(listed[LEDGER_EXCHANGE_LIMIT - 1]).toBe(LEDGER_PREVIOUS_KEY)
+		expect(listed.length).toBeLessThanOrEqual(LEDGER_EXCHANGE_LIMIT + LEDGER_KEY_LIMIT)
 	}
 }, 570_000)

@@ -42,7 +42,13 @@ export const PLACED_CATEGORIES: readonly LedgerCategory[] = Object.freeze(['rule
  */
 export const LEDGER_RULES_KEY = 'rules'
 
-/** Names the recall key that lists the last request before the current one and the reply to it. */
+/**
+ * Names the recall key that lists the last exchange before the current request that has a reply:
+ * the request and its reply.
+ *
+ * @remarks
+ * It is the first exchange key; `previous-N` names the exchange N back, with `previous` as depth 1.
+ */
 export const LEDGER_PREVIOUS_KEY = 'previous'
 
 /** Prefixes the key of an owner's record, which the owner's id follows. */
@@ -153,6 +159,15 @@ export const LEDGER_MISS_LIMIT = 8
 
 /** Caps at 20 the id keys the Earlier index of a request copy lists. */
 export const LEDGER_KEY_LIMIT = 20
+
+/**
+ * Caps at 8 the exchange keys the Earlier index of a request copy lists, `previous` included.
+ *
+ * @remarks
+ * The cap is apart from `LEDGER_KEY_LIMIT`, so an exchange key never takes an id key's place. A
+ * deeper `previous-N` still resolves when that exchange exists.
+ */
+export const LEDGER_EXCHANGE_LIMIT = 8
 
 /**
  * Sets the 5 milliseconds a paced classifier files between host turns.
