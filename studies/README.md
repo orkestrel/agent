@@ -143,6 +143,19 @@ npx study execute qualification --profile recommended --closure ABSOLUTE_GROWN_C
 
 Study replays the ancestor's retained prefix and sends only the appended goals to the Ollama at the provider URL. The profile declares no `provider.daemon`, so the continuation records no maintenance, and the serving Ollama's version can differ from the ancestor's. Segmented selectors cannot accompany `--extend`; an unchanged horizon is not an extension.
 
+## Labeling semantic criteria
+
+`studies/labeler.ts` labels a graded result's semantic rows blind with Claude Haiku 5.5 and imports the labels. Run it yourself, outside every agent session, from the repository root. `ASSESSMENT_ID` is the grading to label, and `--closure` names the closure or install root whose entry executed the result:
+
+```sh
+node studies/labeler.ts ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID [--closure ABSOLUTE_CLOSURE_PATH] [--sample N]
+```
+
+- **Inputs.** It reads the grading's packet and mapping, and the study's authored controls and instruction, `controls.STUDY.json` and `instruction.STUDY.md` in `tmp/studies/authored`, chosen by the result's own study name.
+- **The model.** It asks Haiku through Claude Code headless (`claude -p`) under your own login: one call per request, from an empty directory, with no tools. It refuses an answer that reports any other model. A malformed answer is asked one more time, then counted as omitted, so it never reaches a sheet.
+- **Outputs.** The pool, the lane, the labels sheets, and any sample stay under `tmp/studies/labels`. It imports each sheet with `study label`, reports the labeled grading, and writes `ABSOLUTE_RESULT_PATH.tally.json` beside the result. The tally holds counts only: rows asked, answered, and omitted; verdicts per arm; controls and misses per authored verdict; lookups by verdict; and the labeled report's scores.
+- **Spot-check.** `--sample N` also writes a blind sheet of N drawn rows and an answers template under the labels folder. Fill the template and pass it with `--human PATH` to compare it with the saved model lane, per class and on the sampled controls. The human lane is compared only, never imported.
+
 ## Running the chat instrument
 
 The `chat` mechanism study preserves 38 conversations, 294 requests, and 102 primary mechanical checks. Its profiles are `full` (ledger capacity 19968), `compact` (2400), and `tight` (1600). The agent context remains 20480 and its output limit 1024 in all three. Each profile composes the agent model alone, declares no judge, and pins the same model identity. See [Chat source and treatment](chat/sources/README.md) for provenance, the original-to-scenario mapping, effective wire policies, allowances, and grading semantics. Its baseline is under [What it measured](#what-it-measured).
