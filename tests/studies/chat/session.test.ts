@@ -69,8 +69,8 @@ it('retains the previous reply and lookup, measures first text across calls, and
 				entry: '@orkestrel/ollama',
 				url: server.url,
 				model: 'model',
-				judge: 'judge',
-				digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+				judge: undefined,
+				digest: { model: 'a'.repeat(64), judge: undefined },
 			},
 		}
 		const driver = new StudyChatDriver({
@@ -208,8 +208,8 @@ it('keeps absent first content unknown and refuses a transport fault', async () 
 					entry: '@orkestrel/ollama',
 					url: server.url,
 					model: 'model',
-					judge: 'judge',
-					digest: { model: 'a'.repeat(64), judge: 'b'.repeat(64) },
+					judge: undefined,
+					digest: { model: 'a'.repeat(64), judge: undefined },
 				},
 			}
 			const driver = new StudyChatDriver({

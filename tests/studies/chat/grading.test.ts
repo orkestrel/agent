@@ -137,14 +137,25 @@ it('grades a shortening only when the matching reply is shorter than its retaine
 
 it('joins original ids and turns, excludes diagnostics from parity and excludes opening latency', () => {
 	const fixture = buildMemoryGradeFixture()
-	const criteria = buildStudyChatCriteria('desk', 'turn-2', {
-		observation: 'primary',
-		conversation: 'original.json',
-		turn: 2,
-		group: 'near',
-		accept: ['cambridge'],
-		refuse: ['norwich'],
-	})
+	const criteria = [
+		...buildStudyChatCriteria('desk', 'turn-2', {
+			observation: 'primary',
+			conversation: 'original.json',
+			turn: 2,
+			group: 'near',
+			accept: ['cambridge'],
+			refuse: ['norwich'],
+		}),
+		// A scripted row: right without denial in its own group, and outside the dialogue rows `right` reads.
+		...buildStudyChatCriteria('desk', 'turn-3', {
+			observation: 'primary',
+			conversation: 'original.json',
+			turn: 3,
+			group: 'lookup',
+			accept: ['12.50'],
+			refuse: [],
+		}),
+	]
 	const trial = fixture.complete.trial
 	const assessment = buildStudyAssessment(
 		[trial],
@@ -160,7 +171,15 @@ it('joins original ids and turns, excludes diagnostics from parity and excludes 
 	const summary = buildStudyChatSummary({
 		assessment,
 		rubric: { version: '1', criteria },
-		scenarios: [{ id: 'desk', goals: [{ id: 'turn-2', input: {} }] }],
+		scenarios: [
+			{
+				id: 'desk',
+				goals: [
+					{ id: 'turn-2', input: {} },
+					{ id: 'turn-3', input: {} },
+				],
+			},
+		],
 		evidence: new Map([
 			[
 				trial.id,
@@ -185,8 +204,19 @@ it('joins original ids and turns, excludes diagnostics from parity and excludes 
 			older: false,
 			first: 1,
 		},
+		{
+			trial: trial.id,
+			conversation: 'original.json',
+			turn: 3,
+			group: 'lookup',
+			primary: true,
+			denial: false,
+			older: undefined,
+			first: 2,
+		},
 	])
-	expect(summary.parity.near).toEqual({ right: 1, total: 1, unknown: 0 })
+	expect(summary.parity.near).toEqual({ right: 1, undenied: 1, total: 1, unknown: 0 })
+	expect(summary.parity.lookup).toEqual({ right: 1, undenied: 1, total: 1, unknown: 0 })
 	expect(summary.right).toBe(1)
 	// The follow-up readings are 1, 2, and 3 seconds: the first turn and a row with no reading stay out, and p90 interpolates.
 	expect(summary.first).toEqual({ count: 3, median: 2, p90: expect.closeTo(2.8, 10) })

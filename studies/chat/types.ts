@@ -1,5 +1,5 @@
 import type { createLedger, LEDGER_QUESTIONS } from '@orkestrel/agent'
-import type { createOllama, createOllamaJudge, extractTiming } from '@orkestrel/ollama'
+import type { createOllama, extractTiming } from '@orkestrel/ollama'
 import type {
 	StudyAgentRuntime,
 	StudyAssessment,
@@ -97,12 +97,11 @@ export interface StudyChatRuntime extends StudyAgentRuntime {
 	readonly createLedger: typeof createLedger
 	readonly LEDGER_QUESTIONS: typeof LEDGER_QUESTIONS
 }
-/** Requires the admitted provider factories and native timing reader.
+/** Requires the admitted provider factory and native timing reader.
  * @example const provider: StudyChatProvider = admittedOllama
  */
 export interface StudyChatProvider {
 	readonly createOllama: typeof createOllama
-	readonly createOllamaJudge: typeof createOllamaJudge
 	readonly extractTiming: typeof extractTiming
 }
 /** Adds narrowed capabilities and cancellation to the admitted driver options.
@@ -142,14 +141,25 @@ export interface StudyChatRow {
 	readonly older: boolean | undefined
 	readonly first: number | undefined
 }
-/** Holds primary parity groups, right without denial, and follow-up latency quantiles.
+/** Holds one parity group's primary outcomes.
+ * @example const parity: StudyChatParity = summary.parity.near
+ */
+export interface StudyChatParity {
+	/** Counts the group's rows whose primary predicate passed. */
+	readonly right: number
+	/** Counts the group's rows whose primary predicate passed with no denial. */
+	readonly undenied: number
+	readonly total: number
+	/** Counts the group's rows with no retained complete reply. */
+	readonly unknown: number
+}
+/** Holds primary parity groups, right without denial over the dialogue rows, and follow-up latency quantiles.
  * @example const summary: StudyChatSummary = buildStudyChatSummary(input)
  */
 export interface StudyChatSummary {
 	readonly rows: readonly StudyChatRow[]
-	readonly parity: Readonly<
-		Record<string, { readonly right: number; readonly total: number; readonly unknown: number }>
-	>
+	readonly parity: Readonly<Record<string, StudyChatParity>>
+	/** Counts the dialogue rows, the groups `STUDY_CHAT_DIALOGUE` names, that are right with no denial. */
 	readonly right: number
 	readonly first: {
 		readonly count: number

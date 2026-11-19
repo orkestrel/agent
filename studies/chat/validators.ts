@@ -128,7 +128,7 @@ export function isStudyChatRuntime(value: unknown): value is StudyChatRuntime {
 			isObject(value.LEDGER_QUESTIONS),
 	)
 }
-/** Checks the admitted provider factories and timing capability.
+/** Checks the admitted provider factory and timing capability.
  * @example isStudyChatProvider({}) // false
  */
 export function isStudyChatProvider(value: unknown): value is StudyChatProvider {
@@ -137,8 +137,6 @@ export function isStudyChatProvider(value: unknown): value is StudyChatProvider 
 			isObject(value) &&
 			'createOllama' in value &&
 			typeof value.createOllama === 'function' &&
-			'createOllamaJudge' in value &&
-			typeof value.createOllamaJudge === 'function' &&
 			'extractTiming' in value &&
 			typeof value.extractTiming === 'function',
 	)

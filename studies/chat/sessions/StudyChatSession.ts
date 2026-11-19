@@ -11,14 +11,9 @@ import {
 	buildStudyOllamaModels,
 	buildStudyOllamaOptions,
 } from '@orkestrel/study/server'
-import {
-	STUDY_CHAT_JUDGE,
-	STUDY_CHAT_OPTIONS,
-	STUDY_CHAT_SYSTEM,
-	STUDY_CHAT_THRESHOLDS,
-	STUDY_CHAT_TOPICS,
-} from '../constants.js'
+import { STUDY_CHAT_SYSTEM, STUDY_CHAT_THRESHOLDS, STUDY_CHAT_TOPICS } from '../constants.js'
 import { buildStudyChatRoles } from '../helpers.js'
+import { StudyChatJudge } from '../judges/StudyChatJudge.js'
 import { isStudyChatInput, isStudyChatSettings } from '../validators.js'
 import { StudyChatRequest } from './StudyChatRequest.js'
 
@@ -138,11 +133,7 @@ export class StudyChatSession implements StudySessionInterface {
 		const provider = options.profile.provider
 		const settings = options.profile.settings
 		const roles = buildStudyChatRoles(options.profile)
-		if (
-			provider?.judge === undefined ||
-			roles.agent === undefined ||
-			!isStudyChatSettings(settings)
-		)
+		if (provider === undefined || roles.agent === undefined || !isStudyChatSettings(settings))
 			throw new StudyError('CONFIG', 'Chat requires complete treatment')
 		const observer = new StudyAgentObserver({
 			provider: options.provider.createOllama({
@@ -166,17 +157,8 @@ export class StudyChatSession implements StudySessionInterface {
 			enforced: false,
 			record: (measurement, request) => this.#trace.record(measurement, request),
 		})
-		const judge = new StudyAgentJudge(
-			options.provider.createOllamaJudge({
-				model: provider.judge,
-				system: STUDY_CHAT_JUDGE,
-				url: provider.url,
-				timeout: 180000,
-				options: STUDY_CHAT_OPTIONS,
-				fetch: (url, init) => this.#transport.fetch('judge', url, init),
-			}),
-			this.#transport,
-		)
+		// The ledger requires a judge and this treatment asks none; a question reaching it fails the trial.
+		const judge = new StudyAgentJudge(new StudyChatJudge(), this.#transport)
 		return options.agent.createLedger(observer, {
 			judge,
 			system: STUDY_CHAT_SYSTEM[input.topic],

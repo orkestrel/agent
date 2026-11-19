@@ -7,6 +7,7 @@ import type {
 import type {
 	StudyChatAssertion,
 	StudyChatConversion,
+	StudyChatParity,
 	StudyChatSummary,
 	StudyChatSummaryInput,
 } from './types.js'
@@ -16,9 +17,10 @@ import { hashStudyBytes } from '@orkestrel/study/server'
 import {
 	STUDY_CHAT_CAPACITIES,
 	STUDY_CHAT_DENIAL,
+	STUDY_CHAT_DIALOGUE,
 	STUDY_CHAT_DIGEST,
 	STUDY_CHAT_FORMATTED,
-	STUDY_CHAT_OPTIONS,
+	STUDY_CHAT_GROUPS,
 	STUDY_CHAT_SYSTEM,
 } from './constants.js'
 import { isStudyChatAssertion, isStudyChatSeal, isStudyChatSettings } from './validators.js'
@@ -183,7 +185,8 @@ export function validateStudyChatConversion(source: string, value: StudyChatConv
 	if (canonicalStringify(buildStudyChatConversion(source)) !== canonicalStringify(value))
 		throw new StudyError('CONFIG', 'Chat conversion differs from seal')
 }
-/** Refuses a mismatched capacity, missing judge, triage role, or altered provider room.
+/** Refuses a mismatched capacity, a declared judge or triage role, or an altered provider room.
+ * @remarks The chat ledger asks no judge, so a profile composes the agent model alone.
  * @example validateStudyChatProfile(profile)
  */
 export function validateStudyChatProfile(profile: StudyProfile): void {
@@ -197,8 +200,9 @@ export function validateStudyChatProfile(profile: StudyProfile): void {
 	)
 		throw new StudyError('CONFIG', 'Chat capacity differs from profile')
 	if (
-		profile.provider?.judge === undefined ||
-		profile.provider.digest.judge === undefined ||
+		profile.provider === undefined ||
+		profile.provider.judge !== undefined ||
+		profile.provider.digest.judge !== undefined ||
 		profile.provider.triage !== undefined ||
 		profile.room.context !== 20480 ||
 		profile.room.output !== 1024 ||
@@ -207,24 +211,17 @@ export function validateStudyChatProfile(profile: StudyProfile): void {
 	)
 		throw new StudyError('CONFIG', 'Chat treatment differs from battery')
 }
-/** Declares the battery's effective provider wires without strict-policy additions.
- * @example buildStudyChatRoles(profile).judge?.options.temperature // 1
+/** Declares the battery's effective agent wire without strict-policy additions.
+ * @example buildStudyChatRoles(profile).agent?.options.num_predict // 1024
  */
 export function buildStudyChatRoles(profile: StudyProfile): StudyOllamaTransportOptions['roles'] {
 	validateStudyChatProfile(profile)
 	const provider = profile.provider
-	if (provider?.judge === undefined) throw new StudyError('CONFIG', 'Chat requires judge')
+	if (provider === undefined) throw new StudyError('CONFIG', 'Chat requires a provider')
 	return {
 		agent: {
 			model: provider.model,
 			options: { num_ctx: 20480, num_predict: 1024, temperature: 0, seed: 0 },
-			think: false,
-			strict: false,
-			length: true,
-		},
-		judge: {
-			model: provider.judge,
-			options: { ...STUDY_CHAT_OPTIONS, temperature: 1 },
 			think: false,
 			strict: false,
 			length: true,
@@ -339,21 +336,25 @@ export function buildStudyChatSummary(input: StudyChatSummaryInput): StudyChatSu
 	return {
 		rows,
 		parity: Object.fromEntries(
-			['last', 'near', 'far', 'changed dialogue', 'lookup', 'shorter', 'any', 'changed script'].map(
-				(group) => {
-					const selected = rows.filter((row) => row.group === group)
-					return [
-						group,
-						{
-							right: selected.filter((row) => row.primary === true).length,
-							total: selected.length,
-							unknown: selected.filter((row) => row.primary === undefined).length,
-						},
-					]
-				},
-			),
+			STUDY_CHAT_GROUPS.map((group): [string, StudyChatParity] => {
+				const selected = rows.filter((row) => row.group === group)
+				return [
+					group,
+					{
+						right: selected.filter((row) => row.primary === true).length,
+						undenied: selected.filter((row) => row.primary === true && row.denial === false).length,
+						total: selected.length,
+						unknown: selected.filter((row) => row.primary === undefined).length,
+					},
+				]
+			}),
 		),
-		right: rows.filter((row) => row.primary === true && row.denial === false).length,
+		right: rows.filter(
+			(row) =>
+				STUDY_CHAT_DIALOGUE.some((group) => group === row.group) &&
+				row.primary === true &&
+				row.denial === false,
+		).length,
 		first: {
 			count: times.length,
 			median: computeStudyQuantile(times, 0.5),

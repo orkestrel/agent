@@ -40,9 +40,9 @@ it('keeps every treatment field equal except the named capacity', () => {
 		expect(profile.roots).toEqual(pinned.roots)
 		expect(profile.provider?.url).toBe(pinned.provider?.url)
 		expect(profile.provider?.model).toBe(pinned.provider?.model)
-		expect(profile.provider?.judge).toBe(pinned.provider?.judge)
+		expect(profile.provider?.judge).toBeUndefined()
 		expect(profile.provider?.digest.model).toBe(pinned.provider?.digest.model)
-		expect(profile.provider?.digest.judge).toBe(pinned.provider?.digest.judge)
+		expect(profile.provider?.digest.judge).toBeUndefined()
 		expect(profile.provider?.url).toBe('http://127.0.0.1:11434')
 		expect(profile.provider?.daemon).toBeUndefined()
 		expect({ ...profile, name: '', settings: { ...profile.settings, capacity: 0 } }).toEqual({
@@ -62,5 +62,18 @@ it('keeps every treatment field equal except the named capacity', () => {
 				},
 			}),
 		).toThrow(/capacity/i)
+		const provider = profile.provider
+		if (provider === undefined) throw new Error('Missing chat provider')
+		// The chat ledger asks no judge, so a profile that declares one differs from the treatment.
+		expect(() =>
+			validateStudyChatProfile({
+				...profile,
+				provider: {
+					...provider,
+					judge: 'judge',
+					digest: { ...provider.digest, judge: 'b'.repeat(64) },
+				},
+			}),
+		).toThrow(/treatment/i)
 	}
 })

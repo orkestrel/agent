@@ -22,7 +22,7 @@ The following table lists each driver bundle:
 | Bundle            | What it's for                                                                                |
 | ----------------- | -------------------------------------------------------------------------------------------- |
 | `studies/memory/` | The records and full-conversation arms over a support desk, with their session and profiles. |
-| `studies/chat/`   | The sealed chat battery over fresh ledgers with one Mica judge and three ledger capacities.  |
+| `studies/chat/`   | The sealed chat battery over fresh ledgers at three ledger capacities, with no judge model.  |
 | `studies/desk/`   | The desk catalog's two disclosure arms over bare agents, with its one `screen` profile.      |
 
 The following table lists the memory profiles under `studies/memory/profiles/`. Each names, as its `qualification`, the capacity result its quality study pairs with:
@@ -74,7 +74,7 @@ Each study holds one sealed baseline, recorded on this host on 2026-11-18 with A
 
 Semantic criteria read `unknown` until blind labels are imported, and none are imported yet. The `memory` row grades the `capacity` result with the `memory` rubric. The `qualification` and `endurance` grades come from keyed offline replays of the recorded run. Such a replay seals only when every request matches the recording byte for byte, and the memory grader reads no timing or cost, so it grades what the live run produced.
 
-`buildStudyChatSummary` reads the chat recall and first text below. Right and not denying counts the 58 dialogue rows: the last turn, two or three back, and further back:
+`buildStudyChatSummary` reads the chat recall and first text below. Its `right` counts the 58 dialogue rows, the last turn, two or three back, and further back, that are right and not denying, and each group reports its own as `undenied`:
 
 | Profile   | Last turn | Two or three back | Further back | Changed in dialogue | Lookup, shorter, any, and changed in script | Right and not denying | Follow-up first text, median and p90 |
 | --------- | --------- | ----------------- | ------------ | ------------------- | ------------------------------------------- | --------------------- | ------------------------------------ |
@@ -86,7 +86,7 @@ What the baseline shows against the readings before it:
 
 - **`full` and `compact` reproduce the 2026-11-08 reading.** Their recall and their 47 of 58 match it, and the two capacities still read the same.
 - **`tight` recalls slightly more and answers more slowly.** It reads 8, 10, and 9 against 7, 9, and 9 on 2026-11-07. Its follow-up first text takes 2.05 s against 1.78 s, because a `tight` request makes 1.82 agent calls against 1.30 at `full`, and first text spans every call of a request. A host with that little room still recalls less than one with room to spare.
-- **The chat ledger asks its judge nothing.** Its topic is `requested: false`, requests are excluded from category judging, and replies and tool results take mechanical categories.
+- **The chat ledger asks no judge.** Its topic is `requested: false`, requests are excluded from category judging, and replies and tool results take mechanical categories, so its profiles compose no judge model.
 - **`disclosure` reproduces the 2026-11-12 reading:**
   - `area` reads 42 of 42 at a median summed prompt of 1947.5 tokens.
   - `index` reads 40 of 42 at 2841 against 2791, with 15 loads, each opening the right area.
@@ -143,7 +143,7 @@ Study replays the ancestor's retained prefix and sends only the appended goals t
 
 ## Running the chat instrument
 
-The `chat` mechanism study preserves 38 conversations, 294 requests, and 102 primary mechanical checks. Its profiles are `full` (ledger capacity 19968), `compact` (2400), and `tight` (1600). The agent context remains 20480 and its output limit 1024 in all three. Each profile composes Mica alone and pins the same runner and model identities. See [Chat source and treatment](chat/sources/README.md) for provenance, the original-to-scenario mapping, effective wire policies, allowances, and grading semantics. Its baseline is under [What it measured](#what-it-measured).
+The `chat` mechanism study preserves 38 conversations, 294 requests, and 102 primary mechanical checks. Its profiles are `full` (ledger capacity 19968), `compact` (2400), and `tight` (1600). The agent context remains 20480 and its output limit 1024 in all three. Each profile composes the agent model alone, declares no judge, and pins the same model identity. See [Chat source and treatment](chat/sources/README.md) for provenance, the original-to-scenario mapping, effective wire policies, allowances, and grading semantics. Its baseline is under [What it measured](#what-it-measured).
 
 Run a sealed reading of one capacity profile in the following order. Replace `full` with the chosen capacity profile.
 
