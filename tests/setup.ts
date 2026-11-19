@@ -9719,6 +9719,27 @@ export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 	failures: [],
 })
 
+/**
+ * Holds {@link LEDGER_CUT_SNAPSHOT} with a rule statement and a statement under the `refunds` desk
+ * topic first among its earlier messages, so the Earlier index carries the `rules` row and the topic
+ * row beside `previous`.
+ *
+ * @remarks
+ * A {@link createPhraseJudge} built on `needs a signature` files the rule as a rule, and its topic
+ * question files the refund statement under `refunds`; neither statement carries an id.
+ */
+export const LEDGER_CUT_RULED_SNAPSHOT = Object.freeze<LedgerSnapshot>({
+	...LEDGER_CUT_SNAPSHOT,
+	conversation: {
+		...LEDGER_CUT_SNAPSHOT.conversation,
+		messages: [
+			{ id: 'rule', role: 'user', content: 'Every shipment needs a signature.' },
+			{ id: 'refund', role: 'user', content: 'Refund requests go to the north desk.' },
+			...LEDGER_CUT_SNAPSHOT.conversation.messages,
+		],
+	},
+})
+
 /** Carries what a lean opening sent: the ids of its statements and the names its Earlier index lists. */
 export interface LedgerOpening {
 	readonly statements: readonly string[]

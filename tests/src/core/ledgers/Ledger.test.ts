@@ -216,6 +216,7 @@ import {
 	serveLedgerArm,
 	SCRIPTED_MODEL,
 	LEDGER_CUT_SNAPSHOT,
+	LEDGER_CUT_RULED_SNAPSHOT,
 	buildLedgerGoals,
 	readLedgerOpening,
 } from '../../../setup.js'
@@ -1171,10 +1172,12 @@ describe('Ledger', () => {
 			ledger.conversation.messages().find((message) => message.call === 'history')?.content,
 		).toBe(`Earlier reply: ${reply}\nEarlier request: ${request}`)
 		await ledger.respond('Check OR-7 again.')
-		expect(extractLedgerIndex(requireValue(provider.calls.at(-1)).messages)).not.toContain(reply)
+		// No message of the later call carries the reply: the opening sends no earlier reply, and the
+		// earlier recall result that listed it stays stored.
 		expect(
-			requireValue(provider.calls.at(-1)).messages.find((message) => message.role === 'system')
-				?.content,
+			requireValue(provider.calls.at(-1))
+				.messages.map((message) => message.content)
+				.join('\n'),
 		).not.toContain(reply)
 		expect(judge.requests).toHaveLength(0)
 		const restored = createLedger(
@@ -1799,9 +1802,12 @@ describe('Ledger', () => {
 						? `${LEDGER_NOTES.results}\n${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}`
 						: `${LEDGER_NOTES.results}\n${source.content}\n${first.content}\n${second.content}\n${last.content}\n${older.content}\nEarlier reply: Refunds from a later assistant.\nEarlier reply: ${quiet.content}`,
 				)
-				expect(extractLedgerIndex(requireValue(provider.calls[1]).messages)).not.toContain(
-					source.content,
-				)
+				// The second request's opening sends no seed assistant message, so no message carries the source.
+				expect(
+					requireValue(provider.calls[1])
+						.messages.map((message) => message.content)
+						.join('\n'),
+				).not.toContain(source.content)
 			}
 		}
 	})
@@ -1945,8 +1951,14 @@ describe('Ledger', () => {
 				.messages()
 				.find((message) => message.role === 'tool' && message.call === 'topic')?.content,
 		).not.toContain(LEDGER_NOTES.results)
-		for (const call of provider.calls)
-			expect(extractLedgerIndex(call.messages)).not.toContain(LEDGER_NOTES.results)
+		// Each request's first call is its opening: no earlier answer note reaches any of them.
+		expect(provider.calls).toHaveLength(6)
+		for (const index of [0, 2, 4])
+			expect(
+				requireValue(provider.calls[index]).messages.some((message) =>
+					message.content.includes(LEDGER_NOTES.results),
+				),
+			).toBe(false)
 	})
 
 	it('calibrates on the head alone under replay none, leaves the thread and its thinking out, and prices the same messages', async () => {
@@ -3528,9 +3540,12 @@ describe('Ledger', () => {
 			`${LEDGER_NOTES.results}\nAccount BW-20931: Brightwater Studio. Refund is $140.\nNo record`,
 		)
 		await ledger.respond('Check Brightwater Studio again.')
-		expect(extractLedgerIndex(requireValue(provider.calls[4]).messages)).not.toContain(
-			'Refund is $140.',
-		)
+		// The later opening sends neither the seed lookup result nor the answer note that copied it.
+		expect(
+			requireValue(provider.calls[4])
+				.messages.map((message) => message.content)
+				.join('\n'),
+		).not.toContain('Refund is $140.')
 	})
 })
 
@@ -10669,6 +10684,53 @@ describe('Ledger — recall by key', () => {
 		expect(pairs).toContain(JSON.stringify(['amends', due.id, correction.id]))
 		expect(pairs.filter((key) => key.includes(result.id))).toEqual([])
 	})
+
+	it('files a stored recall result as chatter on a hydrated ledger, which reads the call it answers from the conversation', async () => {
+		const asked = createRecorder<readonly [key: string]>()
+		const corrections = new Set<string>()
+		const options = buildLedgerOptions({
+			judge: createCorrectionJudge(asked, corrections, { amends: 0, supersedes: 0 }),
+		})
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'read', name: 'lookup', arguments: { id: 'BW-20931' } }] },
+				{ content: 'Read.' },
+				{
+					content: '',
+					tools: [{ id: 'recalled', name: 'recall', arguments: { key: 'BW-20931' } }],
+				},
+				{ content: 'Recalled.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, options)
+		seedLedgerRecall(ledger)
+		const due = ledger.conversation.add({ role: 'user', content: 'BW-20931 is due a refund.' })
+		await ledger.respond('Check BW-20931.')
+		await ledger.respond('Recall BW-20931.')
+		const result = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'recalled'),
+		)
+		expect(result.content).toContain('BW-20931 is due a refund.')
+		// The hydrated ledger stored no tool result, so it reads the recall's name from the conversation.
+		const hydrated = createLedger(createScriptedProvider([{ content: 'Confirmed.' }]), {
+			...options,
+			snapshot: requireValue(parseJSONAs(JSON.stringify(ledger.snapshot()), isLedgerSnapshot)),
+		})
+		const correction = hydrated.conversation.add({
+			role: 'user',
+			content: 'Correction: BW-20931 is due $150.',
+		})
+		corrections.add(correction.id)
+		const before = asked.count
+		await hydrated.respond('Confirm BW-20931.')
+		const pairs = asked.calls
+			.slice(before)
+			.map(([key]) => key)
+			.filter((key) => key.startsWith('["amends"'))
+		expect(pairs).toContain(JSON.stringify(['amends', due.id, correction.id]))
+		expect(pairs.filter((key) => key.includes(result.id))).toEqual([])
+	})
 })
 
 describe('Ledger — the lean opening', () => {
@@ -10752,6 +10814,40 @@ describe('Ledger — the lean opening', () => {
 			const ledger = createLedger(
 				provider,
 				buildLedgerOptions({ capacity, snapshot: LEDGER_CUT_SNAPSHOT, topics: [] }),
+			)
+			await ledger.respond('Which crates are ready?')
+			const sent = requireValue(provider.calls[0])
+			expect(readLedgerOpening(sent.messages)).toEqual({ statements, keys })
+			expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+		},
+	)
+
+	it.each([
+		[
+			300,
+			['crate-1', 'crate-2', 'crate-3'],
+			['previous', 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
+		],
+		[270, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'rules', 'refunds']],
+		[240, ['crate-2', 'crate-3'], ['previous', 'rules', 'CR-1', 'refunds']],
+		[140, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1', 'refunds']],
+		[110, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1']],
+		[100, [], ['previous', 'CR-3', 'CR-2', 'CR-1']],
+		[80, [], ['CR-3', 'CR-2', 'CR-1']],
+		[60, [], []],
+	])(
+		'keeps rules and the topic row fixed through the id-row and statement cuts, then cuts the topic row, rules, and previous: at capacity %i the statements %j and the keys %j',
+		async (capacity, statements, keys) => {
+			// The id rows and the statements go first while `rules` and `refunds` stay, so both are fixed
+			// rows; with every statement cut, the topic row goes, then `rules`, then `previous`.
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					capacity,
+					snapshot: LEDGER_CUT_RULED_SNAPSHOT,
+					judge: createPhraseJudge(['needs a signature']),
+				}),
 			)
 			await ledger.respond('Which crates are ready?')
 			const sent = requireValue(provider.calls[0])
@@ -10864,16 +10960,52 @@ describe('Ledger — the lean opening', () => {
 	})
 
 	it('lists at most the key limit of id rows over many unrelated goals, and every key lists a line', async () => {
-		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
-		const ledger = createLedger(
-			provider,
-			buildLedgerOptions({ capacity: 32_768, snapshot: buildLedgerGoals(400), topics: [] }),
-		)
-		await ledger.respond('What is still open for GL-7 and AC-7?')
-		const keys = readLedgerOpening(requireValue(provider.calls[0]).messages).keys
+		const statement = 'GL-7 still needs a shipping label.'
+		const request = 'What is still open for GL-7 and AC-7?'
+		const options = buildLedgerOptions({
+			capacity: 32_768,
+			snapshot: buildLedgerGoals(400),
+			topics: [],
+		})
+		// A first ledger reads the index the plan builds, so the second can recall its keys in the request.
+		const planned = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const first = createLedger(planned, options)
+		first.conversation.add({ role: 'user', content: statement })
+		await first.respond(request)
+		const keys = readLedgerOpening(requireValue(planned.calls[0]).messages).keys
 		expect(keys[0]).toBe('previous')
 		expect(keys.slice(1)).toHaveLength(LEDGER_KEY_LIMIT)
 		expect(keys.slice(1, 3)).toEqual(['GL-7', 'AC-7'])
+		// Four recalls, the request's limit, run inside the request that planned the index.
+		const recalled = [keys[0], keys[1], keys[2], keys.at(-1)].map((key) => requireValue(key))
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: recalled.map((key, at) => ({
+						id: `in ${at}`,
+						name: 'recall',
+						arguments: { key },
+					})),
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, options)
+		ledger.conversation.add({ role: 'user', content: statement })
+		await ledger.respond(request)
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).keys).toEqual(keys)
+		const listings = recalled.map((_key, at) =>
+			requireValue(
+				ledger.conversation.messages().find((message) => message.call === `in ${at}`)?.content,
+			),
+		)
+		expect(listings.filter((listing) => listing.startsWith('nothing earlier matches'))).toEqual([])
+		// The opening sent the statement, so the in-request recall of its id leaves it out.
+		expect(listings[1]).not.toContain(statement)
+		expect(listings[1]).toContain('Order GL-7 for account AC-7')
+		// Between requests nothing is left out, and every key the index named still lists a line.
 		const listed = await ledger.agent.context.tools.execute(
 			keys.map((key) => ({ id: `host ${key}`, name: 'recall', arguments: { key } })),
 		)

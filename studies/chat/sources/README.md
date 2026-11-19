@@ -16,7 +16,7 @@ The guarded conversion writes stable lowercase scenario ids and 1-based `turn-N`
 
 ## Composition and wire policy
 
-Each conversation opens a fresh ledger. Booking dialogues use the seal's booking system and `bookings` topic; scripts use its desk system, `orders` topic, and exact per-order `lookup` tool. Both topics set `requested: false`. The tool execution compares `String(args.id)` with the order id; its ownership reader compares `args.id` strictly. The ledger receives `LEDGER_QUESTIONS`, cutoffs category 0.7, topic 0.7, correction 0.5, amends 0.7, supersedes 0.7, prediction budget 1024, thinking off, prompt share 1, tail share 0.35, and agent limit 8.
+Each conversation opens a fresh ledger. Booking dialogues use the seal's booking system and `bookings` topic; scripts use its desk system, `orders` topic, and exact per-order `lookup` tool. Both topics set `requested: false`. The tool execution compares `String(args.id)` with the order id; its ownership reader compares `args.id` strictly. The ledger receives `LEDGER_QUESTIONS`, cutoffs category 0.7, topic 0.7, correction 0.5, amends 0.7, supersedes 0.7, prediction budget 1024, thinking off, prompt share 1, and agent limit 8.
 
 The agent role declares context 20480, prediction limit 1024, temperature 0, seed 0, and thinking off. The provider's defaults retain streaming and a 5-minute keep-alive. The role uses `strict: false` and permits length finishes; the observer records measurements with no gauge and `enforced: false`. Study therefore adds neither `truncate: false` nor `shift: false` to the agent's options. Length completion remains an operational outcome, and a partial product grades unknown.
 

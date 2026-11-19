@@ -128,6 +128,7 @@ import {
 	buildLedgerGoals,
 	countLedgerPlanFit,
 	LEDGER_CUT_SNAPSHOT,
+	LEDGER_CUT_RULED_SNAPSHOT,
 	LEDGER_PLAN_REMARK,
 	readLedgerOpening,
 	recallLedger,
@@ -1506,6 +1507,18 @@ describe('system boundary canary fixtures', () => {
 			['crate-2', 200],
 			['crate-3', 200],
 		])
+	})
+
+	it('holds the cut snapshot with a rule and a refund statement first among its earlier messages', () => {
+		const stored = LEDGER_CUT_RULED_SNAPSHOT.conversation.messages
+
+		expect(isLedgerSnapshot(LEDGER_CUT_RULED_SNAPSHOT)).toBe(true)
+		expect(LEDGER_CUT_RULED_SNAPSHOT.requests).toEqual(LEDGER_CUT_SNAPSHOT.requests)
+		expect(stored.slice(0, 2).map((message) => message.content)).toEqual([
+			'Every shipment needs a signature.',
+			'Refund requests go to the north desk.',
+		])
+		expect(stored.slice(2)).toEqual(LEDGER_CUT_SNAPSHOT.conversation.messages)
 	})
 
 	it('builds a snapshot of a goal for every four earlier messages, each a request answered', () => {
