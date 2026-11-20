@@ -27,6 +27,7 @@ import {
 	estimateTokens,
 	extractLiterals,
 	hasCalls,
+	maskLiterals,
 	renderJSON,
 } from '../helpers.js'
 import { isPositiveSafeInteger } from '../validators.js'
@@ -329,6 +330,56 @@ export function collectLedgerAmenders(
 				!notes.has(message.id) &&
 				laters.has(message.id),
 		)
+}
+
+/**
+ * Collects the newest member of each recurrence among the statements before a request: two or more
+ * statements whose texts {@link maskLiterals} masks alike.
+ *
+ * @remarks
+ * A statement is a user message with no calls that is neither a request, a note, nor quiet. The masked
+ * texts compare exactly, with no case, space, or punctuation folded, so statements recur only when
+ * they differ in their ids and numbers alone, as a day marker that names each day's date does. A lone
+ * statement is no recurrence, and an older member is never collected.
+ *
+ * @param messages - The messages stored before a request, in conversation order
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @param quiet - The ids the judge filed quiet
+ * @returns The newest member of each recurrence, newest first
+ * @example
+ * ```ts
+ * collectLedgerRecurrences(
+ * 	[
+ * 		{ id: 'monday', role: 'user', content: 'Current workday: 2031-02-03.' },
+ * 		{ id: 'ask', role: 'user', content: 'What is open?' },
+ * 		{ id: 'reply', role: 'assistant', content: 'Nothing.' },
+ * 		{ id: 'tuesday', role: 'user', content: 'Current workday: 2031-02-04.' },
+ * 	],
+ * 	new Set(['ask']),
+ * 	new Set(),
+ * 	new Set(),
+ * ).map((message) => message.id) // ['tuesday']
+ * ```
+ */
+export function collectLedgerRecurrences(
+	messages: readonly Message[],
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+	quiet: ReadonlySet<string>,
+): readonly Message[] {
+	const statements = messages.filter(
+		(message) =>
+			message.role === 'user' &&
+			!hasCalls(message) &&
+			!requests.has(message.id) &&
+			!notes.has(message.id) &&
+			!quiet.has(message.id),
+	)
+	const positions = new Map(statements.map((message, at) => [message, at]))
+	return [...Map.groupBy(statements, (message) => maskLiterals(message.content)).values()]
+		.flatMap((members) => (members.length < 2 ? [] : members.slice(-1)))
+		.toSorted((left, right) => (positions.get(right) ?? 0) - (positions.get(left) ?? 0))
 }
 
 /**

@@ -6,6 +6,7 @@ import {
 	CONVERSATION_ROLES,
 	copyJSON,
 	extractLiterals,
+	maskLiterals,
 	filterAllowList,
 	findToolCall,
 	hasCalls,
@@ -665,6 +666,33 @@ describe('extractLiterals', () => {
 	it('reads nothing from an empty text', () => {
 		const literals = extractLiterals('')
 		expect(literals.ids.size + literals.numbers.size).toBe(0)
+	})
+})
+
+describe('maskLiterals', () => {
+	it('masks each number where it occurs, so amounts that differ in their digits mask alike', () => {
+		expect(maskLiterals('The refund is 1,200.50 today.')).toBe('The refund is # today.')
+		expect(maskLiterals('The refund is 1,300.75 today.')).toBe(
+			maskLiterals('The refund is 1,200.50 today.'),
+		)
+	})
+
+	it('masks each id in the case it is written, and leaves a digit inside another token', () => {
+		expect(maskLiterals('Order bw-5512 and BW-7777 left bay A0 at x0y.')).toBe(
+			'Order # and # left bay A0 at x0y.',
+		)
+		expect(maskLiterals('The well-known endurance-day stays.')).toBe(
+			'The well-known endurance-day stays.',
+		)
+	})
+
+	it('masks a date as one id and keeps every other character, case included', () => {
+		expect(maskLiterals('[Source endurance-day:2031-02-03] Current workday: 2031-02-03.')).toBe(
+			'[Source endurance-day:#] Current workday: #.',
+		)
+		expect(maskLiterals('Current Workday: 2031-02-03.')).not.toBe(
+			maskLiterals('Current workday: 2031-02-04.'),
+		)
 	})
 })
 

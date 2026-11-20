@@ -124,6 +124,7 @@ import {
 	digestLedgerTools,
 	collectLedgerAmenders,
 	collectLedgerExchanges,
+	collectLedgerRecurrences,
 	collectLedgerStatements,
 	filterLedgerShown,
 	collectRecallMessages,
@@ -1331,18 +1332,19 @@ export class Ledger implements LedgerInterface {
 
 	// Plans a request's opening: the recent window, the newest exchanges that have a reply, each with
 	// its call turns and results but a group every result of which is retired, and the amenders inside
-	// its span, the earlier user messages retrieval ranks best, and the current statements whole, in
-	// conversation order and without a statement a shown successor supersedes, then the request copy,
-	// which carries the Earlier index of what the opening leaves behind while `recall` is advertised.
-	// Past the budget the steps cut the window's exchanges oldest first down to the newest one, then the
-	// retrieved messages lowest rank first, then the newest exchange, then the exchange rows from the
-	// deepest down to `previous-2`, then the id rows last-ranked first, then the statements oldest
-	// first, then the topic rows last first, `rules`, `previous`, and the rest of the index. Each step
-	// reads its own shown messages, its index, and whether it leaves anything behind; a statement it
-	// leaves out for a shown successor counts as shown. The first window or retrieval step that fits stays,
-	// so it never shrinks as the budget grows; then the first cut of its rows that leaves `recall` its
-	// room wins, else that step as it fits. With no such step that fits, the first bare row cut that
-	// leaves the room wins, else the first that fits, else the statement cuts.
+	// its span, the earlier user messages retrieval ranks best, the newest member of each recurrence,
+	// and the current statements whole, in conversation order and without a statement a shown successor
+	// supersedes, then the request copy, which carries the Earlier index of what the opening leaves
+	// behind while `recall` is advertised. Past the budget the steps cut the window's exchanges oldest
+	// first down to the newest one, then the retrieved messages lowest rank first, then the newest
+	// exchange, then the exchange rows from the deepest down to `previous-2`, then the id rows
+	// last-ranked first, then the recurrence, then the statements oldest first, then the topic rows last
+	// first, `rules`, `previous`, and the rest of the index. Each step reads its own shown messages, its
+	// index, and whether it leaves anything behind; a statement it leaves out for a shown successor
+	// counts as shown. The first window or retrieval step that fits stays, so it never shrinks as the
+	// budget grows; then the first cut of its rows that leaves `recall` its room wins, else that step as
+	// it fits. With no such step that fits, the first bare row cut that leaves the room wins, else the
+	// first that fits, else the recurrence and statement cuts.
 	#plan(
 		request: Message,
 		scan: LedgerScan,
@@ -1405,25 +1407,49 @@ export class Ledger implements LedgerInterface {
 		)
 		const size = over < 0 ? exchanges.length : over
 		const supersessions = input.classification.supersessions
+		const stated = new Set(current.map((message) => message.id))
+		// The recurrence: the newest member of each recurrence that is no current statement, newest first,
+		// as many as fit the retrieval's share of the budget; the retrieved matches fit in what they leave.
+		const recurring = collectLedgerRecurrences(
+			before,
+			this.#requests,
+			this.#annotations,
+			input.classification.quiet,
+		).filter((message) => !stated.has(message.id))
+		const recurrence = recurring.filter(
+			(_message, index) =>
+				this.#price(recurring.slice(0, index + 1)) <= total * LEDGER_RELEVANT_SHARE,
+		)
+		const statements = [...current, ...recurrence]
+		// The statements each bare stage keeps: every current statement with the recurrence, then the
+		// recurrence cut, then the current statements cut oldest first; with no recurrence, the cuts alone.
+		const stages = [
+			...(recurrence.length === 0 ? [] : [statements]),
+			...Array.from({ length: current.length + 1 }, (_unused, count) => current.slice(count)),
+		]
 		// Cutting a statement only lowers the price of an opening with no window and no index, and both
-		// only add to it, so no step before the first count that fits bare can fit, and no statement is
-		// cut while a window stays.
-		const floor = findLedgerCut(0, current.length + 1, (count) =>
+		// only add to it, so no step before the first stage that fits bare can fit, and nothing is cut
+		// while a window stays.
+		const floor = findLedgerCut(0, stages.length, (stage) =>
 			this.#price(
 				this.#buildOpening(
 					request,
 					built,
-					filterLedgerShown(current.slice(count), supersessions, this.#requests),
+					filterLedgerShown(
+						this.#collectShown(scan, [], stages[stage] ?? []),
+						supersessions,
+						this.#requests,
+					),
 					[],
 				).probe,
 			) <= total
-				? count
+				? stage
 				: undefined,
 		)
 		const newest = Math.min(size, 1)
 		// The retrieved messages, each match's in rank order, from none the whole window, the amenders
-		// of the newest exchange's span, which every layout with a match shows, or the current statements
-		// show, a statement a shown successor supersedes included.
+		// of the newest exchange's span, which every layout with a match shows, the current statements,
+		// a statement a shown successor supersedes included, or the recurrence show.
 		const retrieved =
 			floor === 0
 				? this.#collectRetrieved(
@@ -1436,9 +1462,9 @@ export class Ledger implements LedgerInterface {
 							...this.#collectRecent(scan, input, before, exchanges, newest, retired).map(
 								(message) => message.id,
 							),
-							...current.map((message) => message.id),
+							...statements.map((message) => message.id),
 						]),
-						total,
+						total * LEDGER_RELEVANT_SHARE - this.#price(recurrence),
 					)
 				: []
 		// Every statement kept: the window from the largest down to the newest exchange with every
@@ -1469,7 +1495,7 @@ export class Ledger implements LedgerInterface {
 									...this.#collectRecent(scan, input, before, exchanges, layout.window, retired),
 									...retrieved.slice(0, layout.matches).flat(),
 								],
-								current,
+								statements,
 							),
 						),
 					)
@@ -1506,27 +1532,34 @@ export class Ledger implements LedgerInterface {
 				(step) =>
 					this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <= total,
 			)
-		// Statements cut oldest first, each with the rows its cut leaves.
+		// The recurrence cut, then the statements cut oldest first, each with the rows its cut leaves.
 		const cut =
 			chosen !== undefined || floor === undefined
 				? undefined
-				: [...current.keys()]
-						.map((index) => index + 1)
-						.filter((count) => count >= floor)
+				: [...stages.keys()]
+						.filter((stage) => stage >= Math.max(floor, 1))
 						.find(
-							(count) =>
+							(stage) =>
 								this.#price(
 									this.#buildOpening(
 										request,
 										built,
-										filterLedgerShown(current.slice(count), supersessions, this.#requests),
-										admits ? this.#collectCutKeys(input, projection, request, current, count) : [],
+										filterLedgerShown(stages[stage] ?? [], supersessions, this.#requests),
+										admits
+											? this.#collectCutKeys(
+													input,
+													projection,
+													request,
+													stages[stage] ?? [],
+													statements,
+												)
+											: [],
 									).probe,
 								) <= total,
 						)
 		const last =
 			admits && chosen === undefined && cut === undefined
-				? this.#collectCutKeys(input, projection, request, current, current.length)
+				? this.#collectCutKeys(input, projection, request, [], statements)
 				: []
 		const topics = last.filter(
 			(row) =>
@@ -1548,13 +1581,13 @@ export class Ledger implements LedgerInterface {
 		]
 		// The statements a cut keeps, a superseded one included, count as shown, so one a shown successor
 		// supersedes leaves nothing behind.
-		const kept = current.slice(cut ?? current.length)
+		const kept = cut === undefined ? [] : (stages[cut] ?? [])
 		const shown = chosen?.shown ?? filterLedgerShown(kept, supersessions, this.#requests)
 		const keys =
 			chosen?.keys ??
 			(cut !== undefined
 				? admits
-					? this.#collectCutKeys(input, projection, request, current, cut)
+					? this.#collectCutKeys(input, projection, request, kept, statements)
 					: []
 				: (emptied.find(
 						(rows) => this.#price(this.#buildOpening(request, built, [], rows).probe) <= total,
@@ -1575,13 +1608,13 @@ export class Ledger implements LedgerInterface {
 
 	// The retrieved messages: each match's members as the opening sends them, a request turn as a copy
 	// under its label, in rank order within the count bound, up to the first match that would price
-	// the retrieval past its share of the budget.
+	// the retrieval past `room`, the share of the budget the recurrence leaves it.
 	#collectRetrieved(
 		input: LedgerProjectionInput,
 		scan: LedgerScan,
 		request: Message,
 		shown: ReadonlySet<string>,
-		total: number,
+		room: number,
 	): ReadonlyArray<readonly Message[]> {
 		const matches = collectLedgerMatches(
 			input,
@@ -1601,8 +1634,7 @@ export class Ledger implements LedgerInterface {
 				}),
 			)
 		const over = matches.findIndex(
-			(_match, index) =>
-				this.#price(matches.slice(0, index + 1).flat()) > total * LEDGER_RELEVANT_SHARE,
+			(_match, index) => this.#price(matches.slice(0, index + 1).flat()) > room,
 		)
 		return over < 0 ? matches : matches.slice(0, over)
 	}
@@ -1751,18 +1783,22 @@ export class Ledger implements LedgerInterface {
 		])
 	}
 
-	// The index rows once the first `count` current statements are cut: `previous`, `rules`, the topic
-	// rows, and the ids the cut statements carry, the earlier steps having cut every other id row.
+	// The index rows once a cut keeps only `kept` of the `statements` a bare opening shows, the current
+	// statements and the recurrence: `previous`, `rules`, the topic rows, and the ids the cut statements
+	// carry, the earlier steps having cut every other id row.
 	#collectCutKeys(
 		input: LedgerProjectionInput,
 		projection: LedgerProjection,
 		request: Message,
-		current: readonly Message[],
-		count: number,
+		kept: readonly Message[],
+		statements: readonly Message[],
 	): readonly LedgerKey[] {
 		const fixed = this.#readFixedKeys()
+		const ids = new Set(kept.map((message) => message.id))
 		const carried = new Set(
-			current.slice(0, count).flatMap((message) => [...extractLiterals(message.content).ids]),
+			statements
+				.filter((message) => !ids.has(message.id))
+				.flatMap((message) => [...extractLiterals(message.content).ids]),
 		)
 		return collectLedgerKeys(
 			input,
@@ -1771,7 +1807,7 @@ export class Ledger implements LedgerInterface {
 			request.id,
 			this.#requests,
 			this.#annotations,
-			new Set([request.id, ...current.slice(count).map((message) => message.id)]),
+			new Set([request.id, ...ids]),
 		).filter((row) => fixed.has(row.name) || carried.has(row.name))
 	}
 

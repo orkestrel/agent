@@ -1798,10 +1798,16 @@ await new GuideCommand({
 			})
 			const ledger = createLedger(parent, options)
 			seedLedgerRecall(ledger)
-			for (const id of ['AX-1', 'AX-2', 'AX-3', 'AX-4'])
+			// Each crate is worded apart, at one length, so no two statements recur.
+			for (const [id, state, move] of [
+				['AX-1', 'packed', 'ships soon'],
+				['AX-2', 'sealed', 'goes today'],
+				['AX-3', 'loaded', 'moves next'],
+				['AX-4', 'tagged', 'flies late'],
+			] as const)
 				ledger.conversation.add([
-					{ role: 'user', content: `Crate ${id} is packed.` },
-					{ role: 'user', content: `Crate ${id} ships soon.` },
+					{ role: 'user', content: `Crate ${id} is ${state}.` },
+					{ role: 'user', content: `Crate ${id} ${move}.` },
 				])
 			await ledger.respond('First request.')
 			await ledger.respond('Second request.')

@@ -17,6 +17,7 @@ import {
 	collectLedgerKeys,
 	collectLedgerAmenders,
 	collectLedgerMatches,
+	collectLedgerRecurrences,
 	collectLedgerStatements,
 	filterLedgerShown,
 	nameLedgerExchange,
@@ -2235,6 +2236,52 @@ describe('filterLedgerShown', () => {
 			),
 		).toEqual(['old', 'ask', 'reply'])
 		expect(filterLedgerShown(shown, new Map(), new Set(['ask']))).toEqual(shown)
+	})
+})
+
+describe('collectLedgerRecurrences', () => {
+	it('collects the newest member of each recurrence, newest first, and no lone statement', () => {
+		const messages = [
+			buildLedgerMessage('day-1', 'user', 'Current workday: 2031-02-03.'),
+			buildLedgerMessage('crate-1', 'user', 'Crate OR-1 is in bay 4.'),
+			buildLedgerMessage('lone', 'user', 'The van is blue.'),
+			buildLedgerMessage('ask', 'user', 'What is open?'),
+			buildLedgerMessage('reply', 'assistant', 'Nothing.'),
+			buildLedgerMessage('crate-2', 'user', 'Crate OR-2 is in bay 5.'),
+			buildLedgerMessage('day-2', 'user', 'Current workday: 2031-02-04.'),
+			buildLedgerMessage('day-3', 'user', 'Current workday: 2031-02-05.'),
+		]
+		expect(
+			collectLedgerRecurrences(messages, new Set(['ask']), new Set(), new Set()).map(
+				(message) => message.id,
+			),
+		).toEqual(['day-3', 'crate-2'])
+	})
+
+	it('leaves requests, notes, quiet statements, and messages with calls out of every recurrence', () => {
+		const messages: readonly Message[] = [
+			buildLedgerMessage('stated', 'user', 'Current workday: 2031-02-03.'),
+			buildLedgerMessage('asked', 'user', 'Current workday: 2031-02-04.'),
+			buildLedgerMessage('noted', 'user', 'Current workday: 2031-02-05.'),
+			buildLedgerMessage('quiet', 'user', 'Current workday: 2031-02-06.'),
+			{
+				...buildLedgerMessage('called', 'user', 'Current workday: 2031-02-07.'),
+				calls: [{ id: 'c1', name: 'lookup', arguments: { id: 'OR-1' } }],
+			},
+		]
+		expect(
+			collectLedgerRecurrences(
+				messages,
+				new Set(['asked']),
+				new Set(['noted']),
+				new Set(['quiet']),
+			),
+		).toEqual([])
+		expect(
+			collectLedgerRecurrences(messages, new Set(), new Set(), new Set()).map(
+				(message) => message.id,
+			),
+		).toEqual(['quiet'])
 	})
 })
 

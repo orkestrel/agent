@@ -47,6 +47,7 @@ import {
 	LEDGER_KEY_LIMIT,
 	LEDGER_OPTION_KEYS,
 	LEDGER_RECENT_LIMIT,
+	LEDGER_RELEVANT_LIMIT,
 	SKILL_SECTION_HEADER,
 } from '@src/core'
 import { createTokenBudget } from '@orkestrel/budget'
@@ -223,6 +224,7 @@ import {
 	LEDGER_CUT_RULED_SNAPSHOT,
 	LEDGER_STATEMENT_TOPICS,
 	buildLedgerAmended,
+	buildLedgerDays,
 	buildLedgerGoals,
 	buildLedgerHall,
 	buildLedgerPackets,
@@ -1762,7 +1764,7 @@ describe('Ledger', () => {
 					role: 'user',
 					content: 'Replace AA-10 with AA-12.',
 				})
-				const last = ledger.conversation.add({ role: 'user', content: 'Replace AA-11 with AA-13.' })
+				const last = ledger.conversation.add({ role: 'user', content: 'Swap AA-11 out for AA-13.' })
 				const quiet = ledger.conversation.add({
 					role: 'assistant',
 					content: 'Quiet refunds opinion.',
@@ -2255,13 +2257,14 @@ describe('Ledger', () => {
 					content: message.content + ' Completed handoff.',
 				})),
 			)
-			// An answered request leaves the deliveries earlier, where recall reads them.
+			// An answered request leaves the deliveries earlier, where recall reads them; they differ in
+			// their numbers alone, so the opening shows the newest and recall starts at the one before.
 			await ledger.respond('Note the deliveries.')
 			await ledger.respond('Review.' + 'q'.repeat(10600))
 			const recalled = requireValue(
 				provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
 			)
-			expect(recalled).toContain('Delivery 19')
+			expect(recalled).toContain('Delivery 18')
 			expect(recalled).toContain('older items not shown')
 			results.push(recalled)
 		}
@@ -2360,13 +2363,14 @@ describe('Ledger', () => {
 					content: message.content + ' Completed handoff.',
 				})),
 			)
-			// An answered request leaves the deliveries earlier, where recall reads them.
+			// An answered request leaves the deliveries earlier, where recall reads them; they differ in
+			// their numbers alone, so the opening shows the newest and recall starts at the one before.
 			await ledger.respond('Note the deliveries.')
 			await ledger.respond('Review.' + 'q'.repeat(10600))
 			const recalled = requireValue(
 				provider.calls[4]?.messages.findLast((message) => message.role === 'tool')?.content,
 			)
-			expect(recalled).toContain('Delivery 19 arrived Tuesday with a completed receipt.')
+			expect(recalled).toContain('Delivery 18 arrived Tuesday with a completed receipt.')
 			expect(recalled).not.toBe(LEDGER_NOTES.closure)
 			expect(recalled.includes('Delivery 0 arrived')).toBe(predict === 1)
 			expect(recalled.includes('older items not shown')).toBe(predict === 1024)
@@ -7201,7 +7205,9 @@ describe('Ledger — host turns', () => {
 	})
 
 	it('spends the request recall limit on a recall a host calls by hand during a turn', async () => {
-		const seed = await seedLedgerPrefix(18, 'correction')
+		// Three blocks: the newest block's statements recur and show, the first block's match the
+		// request, and the middle block's stay behind, so the opening offers recall.
+		const seed = await seedLedgerPrefix(26, 'correction')
 		const gate = Promise.withResolvers<void>()
 		const scheduler = createGatedScheduler(gate)
 		const recalled = {
@@ -9075,13 +9081,14 @@ describe('Ledger — disclosure: the shown set in every build', () => {
 				content: `The zephyr drawer ${at} holds spare keys and the vault ledger. `.repeat(3),
 			})),
 		)
-		// A first request leaves the drawers earlier, so the second's opening sends none of them.
+		// A first request leaves the drawers earlier; they differ in their numbers alone, so the second's
+		// opening sends only the newest, and recall lists from the one before.
 		await ledger.respond('Note the drawers.')
 		await ledger.respond('Where are the spare keys?')
 		const listing = requireValue(
 			ledger.conversation.messages().find((message) => message.call === 'q'),
 		)
-		expect(listing.content).toContain('zephyr drawer 59 ')
+		expect(listing.content).toContain('zephyr drawer 58 ')
 		expect(listing.content).not.toContain('zephyr drawer 0 ')
 		expect(estimateMessages(requireValue(provider.calls[3]).messages)).toBeLessThanOrEqual(
 			3000 - 100,
@@ -9546,7 +9553,8 @@ describe('Ledger — disclosure: the room repair', () => {
 	)
 
 	it('sizes a recall on the turn after a load at the rate the calls before the load measured', async () => {
-		expect(await serveLedgerWideRecall(20)).toEqual({ listed: 20, cut: false })
+		// The sources differ in their numbers alone, so the opening shows the newest and recall lists the rest.
+		expect(await serveLedgerWideRecall(20)).toEqual({ listed: 19, cut: false })
 	})
 
 	it.each([
@@ -10728,7 +10736,7 @@ describe('Ledger — recall by key', () => {
 			ledger.conversation.messages().find((message) => message.call === 'split')?.content,
 		).toBe(
 			[
-				'Order AX-2 arrived late.',
+				'Order AX-2 came in late.',
 				'Order AX-1 arrived late.',
 				'Order AX-2 shipped Tuesday.',
 				'Order AX-1 shipped Monday.',
@@ -10743,7 +10751,7 @@ describe('Ledger — recall by key', () => {
 			buildUncalibratedOptions(buildLedgerOptions({ snapshot: LEDGER_CUT_SNAPSHOT, topics: [] })),
 		)
 		expect(await recallLedger(ungauged, 'AX-1, previous-2, AX-2')).toBe(
-			'Order AX-2 arrived late.\n5 more items not shown; name a narrower key to narrow the recall',
+			'Order AX-2 came in late.\n5 more items not shown; name a narrower key to narrow the recall',
 		)
 	})
 
@@ -11387,9 +11395,11 @@ describe('Ledger — the lean opening', () => {
 			`${LEDGER_PREVIOUS_KEY}-${LEDGER_RECENT_LIMIT + 1}`,
 		)
 		expect(keys.slice(LEDGER_EXCHANGE_LIMIT)).toHaveLength(LEDGER_KEY_LIMIT)
-		// The request's own ids lead the id rows; AC-7 has none, since retrieval shows the 8 orders that
-		// carry it.
-		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-7', 'GL-94'])
+		// The request's own ids lead the id rows; AC-7 has none, since retrieval shows the orders that
+		// carry it. The orders recur in two wordings, so the opening shows the newest of each, GL-98's
+		// and GL-99's, and the recurring ids row from GL-97 down, newest first.
+		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-7', 'GL-97'])
+		expect(keys).not.toContain('AC-7')
 		// Four recalls, the request's limit, run inside the request that planned the index.
 		const recalled = [
 			keys[LEDGER_EXCHANGE_LIMIT - 1],
@@ -12199,5 +12209,242 @@ describe('Ledger — superseded values in the window', () => {
 			'res-1',
 			'reply-1',
 		])
+	})
+})
+
+describe('Ledger — the newest statement of each recurrence', () => {
+	it('shows the newest day marker on a later goal that shares no id or word with it, and no older one', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ topics: [], snapshot: buildLedgerDays(2, 1) }),
+		)
+		await ledger.respond('G2-2 Which van stops next?')
+		const shown = readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+		expect(shown.filter((id) => !id.startsWith('goal-') && !id.startsWith('reply-'))).toEqual([
+			'marker-2',
+		])
+	})
+
+	it("shows one marker at a day's first goal, that day's, as a current statement", async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ topics: [], snapshot: buildLedgerDays(2, 0) }),
+		)
+		await ledger.respond('G2-1 Which van stops next?')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(readLedgerOpening(sent).shown.filter((id) => id.startsWith('marker-'))).toEqual([
+			'marker-2',
+		])
+		expect(sent.filter((message) => message.content.startsWith('Current workday:'))).toHaveLength(1)
+	})
+
+	it.each([
+		['fits it, and three of the four matches in the share it leaves', 571, true, 3],
+		['leaves it out past the share, and every match fits', 2800, false, 4],
+	])(
+		'prices the newest marker inside the retrieval share: a marker that %s',
+		async (_case, padding, marked, matched) => {
+			const filler = ` ${'Q'.repeat(padding)}`
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					topics: [],
+					snapshot: {
+						conversation: {
+							id: 'priced',
+							messages: [
+								{ id: 'marker-1', role: 'user', content: `Current workday: 2031-03-11.${filler}` },
+								{ id: 'ask-1', role: 'user', content: 'Check the dock.' },
+								{ id: 'reply-1', role: 'assistant', content: 'Checked.' },
+								...[1, 2, 3, 4].map((at) => ({
+									id: `match-${at}`,
+									role: 'user' as const,
+									content: `Crate OR-9 shelf ${String.fromCharCode(96 + at)}: ${'w'.repeat(460)}`,
+								})),
+								{ id: 'marker-2', role: 'user', content: `Current workday: 2031-03-12.${filler}` },
+								{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+								{ id: 'reply-2', role: 'assistant', content: 'Checked.' },
+							],
+						},
+						requests: ['ask-1', 'ask-2'],
+						notes: [],
+						failures: [],
+					},
+				}),
+			)
+			await ledger.respond('Where is OR-9?')
+			const shown = readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+			expect(shown.includes('marker-2')).toBe(marked)
+			expect(shown.filter((id) => id.startsWith('match-'))).toHaveLength(matched)
+		},
+	)
+
+	it('shows a full set of matches beside the newest marker, which takes no place among them', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'full',
+						messages: [
+							{ id: 'marker-1', role: 'user', content: 'Current workday: 2031-03-11.' },
+							{ id: 'ask-1', role: 'user', content: 'Check the dock.' },
+							{ id: 'reply-1', role: 'assistant', content: 'Checked.' },
+							...Array.from({ length: LEDGER_RELEVANT_LIMIT + 1 }, (_unused, at) => ({
+								id: `match-${at + 1}`,
+								role: 'user' as const,
+								content: `Crate OR-9 shelf ${String.fromCharCode(97 + at)}.`,
+							})),
+							{ id: 'marker-2', role: 'user', content: 'Current workday: 2031-03-12.' },
+							{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-2', role: 'assistant', content: 'Checked.' },
+						],
+					},
+					requests: ['ask-1', 'ask-2'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Where is OR-9?')
+		const shown = readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+		expect(shown).toContain('marker-2')
+		expect(shown.filter((id) => id.startsWith('match-'))).toHaveLength(LEDGER_RELEVANT_LIMIT)
+	})
+
+	it('keeps the newest marker through the cut to the newest exchange', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'newest',
+						messages: [
+							{ id: 'marker-1', role: 'user', content: 'Current workday: 2031-03-11.' },
+							{ id: 'ask-1', role: 'user', content: 'Check the dock.' },
+							{ id: 'reply-1', role: 'assistant', content: `Checked. ${'d'.repeat(2000)}` },
+							{ id: 'marker-2', role: 'user', content: 'Current workday: 2031-03-12.' },
+							{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-2', role: 'assistant', content: `Checked. ${'v'.repeat(2000)}` },
+							{ id: 'big', role: 'user', content: `The manifest follows. ${'m'.repeat(11600)}` },
+						],
+					},
+					requests: ['ask-1', 'ask-2'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// Both exchanges fit the window's share, but the budget keeps the newest one beside the manifest.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'marker-2',
+			'ask-2',
+			'reply-2',
+			'big',
+		])
+	})
+
+	it('cuts the newest marker before any current statement when the bare opening fits the statements alone', async () => {
+		const filler = ` ${'Q'.repeat(1971)}`
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'order',
+						messages: [
+							{ id: 'marker-1', role: 'user', content: `Current workday: 2031-03-11.${filler}` },
+							{ id: 'ask-1', role: 'user', content: 'Check the dock.' },
+							{ id: 'reply-1', role: 'assistant', content: 'Checked.' },
+							{ id: 'marker-2', role: 'user', content: `Current workday: 2031-03-12.${filler}` },
+							{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-2', role: 'assistant', content: 'Checked.' },
+							{ id: 'big', role: 'user', content: `The manifest follows. ${'m'.repeat(13600)}` },
+						],
+					},
+					requests: ['ask-1', 'ask-2'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Anything else?')
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual(['big'])
+	})
+
+	it('counts the newest marker as shown, so an opening that also shows the older one narrows recall out', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'both',
+						messages: [
+							{ id: 'marker-1', role: 'user', content: 'Current workday: 2031-03-11.' },
+							{ id: 'ask-1', role: 'user', content: 'Check the dock.' },
+							{ id: 'reply-1', role: 'assistant', content: 'Checked.' },
+							{ id: 'marker-2', role: 'user', content: 'Current workday: 2031-03-12.' },
+							{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-2', role: 'assistant', content: 'Checked.' },
+						],
+					},
+					requests: ['ask-1', 'ask-2'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		// The request names the older marker's date, so retrieval shows it beside the newest.
+		await ledger.respond('What happened on 2031-03-11?')
+		const sent = requireValue(provider.calls[0])
+		expect(readLedgerOpening(sent.messages)).toEqual({
+			shown: ['marker-1', 'ask-1', 'reply-1', 'marker-2', 'ask-2', 'reply-2'],
+			keys: [],
+		})
+		expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+	})
+
+	it('lists an older marker to an in-request recall', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'older', name: 'recall', arguments: { key: 'workday' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ topics: [], snapshot: buildLedgerDays(2, 1) }),
+		)
+		await ledger.respond('G2-2 Which van stops next?')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'older')?.content,
+		).toContain('Current workday: 2031-03-11.')
+	})
+
+	it('keeps the opening of a conversation of requests alone, though the requests mask alike', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: buildLedgerWindow(['One.', 'Two.', `Three. ${'x'.repeat(6000)}`]),
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// The last reply takes the window past its share, so nothing shows; no request recurs.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([])
 	})
 })

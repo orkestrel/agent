@@ -18,6 +18,7 @@ import {
 	isString,
 	preview,
 } from '@orkestrel/contract'
+import { LITERAL_ID, LITERAL_NUMBER } from './constants.js'
 
 /**
  * Filters a list of members by a {@link import('./contexts/index.js').ScopeInterface} allow-list of keys —
@@ -739,18 +740,43 @@ export function matchesJudgment(
  * ```
  */
 export function extractLiterals(text: string): LiteralSet {
-	const idShape = /\b[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+\b/g
 	const ids = new Set(
-		[...text.matchAll(idShape)].flatMap(([token]) =>
+		(text.match(LITERAL_ID) ?? []).flatMap((token) =>
 			/\d/.test(token) ? [token.toUpperCase()] : [],
 		),
 	)
-	const rest = text.replace(idShape, (token) => (/\d/.test(token) ? ' ' : token))
+	const rest = text.replace(LITERAL_ID, (token) => (/\d/.test(token) ? ' ' : token))
 	const numbers = new Set(
-		[...rest.matchAll(/(?<![\w.])\d[\d,]*(?:\.\d+)?/g)].flatMap(([token]) => {
+		(rest.match(LITERAL_NUMBER) ?? []).flatMap((token) => {
 			const value = Number(token.replace(/,/g, ''))
 			return Number.isFinite(value) ? [value] : []
 		}),
 	)
 	return { ids, numbers }
+}
+
+/**
+ * Masks the ids and the numbers of a text where each occurs, as {@link extractLiterals} reads them.
+ *
+ * @remarks
+ * The two patterns run in the order `extractLiterals` runs them: each `LITERAL_ID` token that holds a
+ * digit becomes `#`, then each `LITERAL_NUMBER` match outside those tokens that reads as a finite
+ * number becomes `#`. A digit inside another token, such as the `0` of `A0`, stays, and every other
+ * character stays as written, so two texts mask alike only when they match outside their literals,
+ * case, spacing, and punctuation included.
+ *
+ * @param text - The text to mask
+ * @returns The text with each id and each number replaced by `#`
+ *
+ * @example
+ * ```ts
+ * maskLiterals('Order bw-5512 totals 1,200.50') // 'Order # totals #'
+ * ```
+ */
+export function maskLiterals(text: string): string {
+	return text
+		.replace(LITERAL_ID, (token) => (/\d/.test(token) ? '#' : token))
+		.replace(LITERAL_NUMBER, (token) =>
+			Number.isFinite(Number(token.replace(/,/g, ''))) ? '#' : token,
+		)
 }

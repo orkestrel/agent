@@ -9715,8 +9715,8 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 
 /**
  * Holds a hand-built ledger snapshot for the lean opening's cut order: three orders each stated in
- * two earlier messages, three answered requests, and then three current crate statements of 200
- * characters, oldest first.
+ * two earlier messages, worded apart so no two statements recur, three answered requests, and then
+ * three current crate statements of 200 characters, oldest first.
  *
  * @remarks
  * A roomy opening shows the answered requests in its recent window; each one the window cuts gets
@@ -9732,8 +9732,8 @@ export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 			{ id: 'shipped-2', role: 'user', content: 'Order AX-2 shipped Tuesday.' },
 			{ id: 'shipped-3', role: 'user', content: 'Order AX-3 shipped Wednesday.' },
 			{ id: 'late-1', role: 'user', content: 'Order AX-1 arrived late.' },
-			{ id: 'late-2', role: 'user', content: 'Order AX-2 arrived late.' },
-			{ id: 'late-3', role: 'user', content: 'Order AX-3 arrived late.' },
+			{ id: 'late-2', role: 'user', content: 'Order AX-2 came in late.' },
+			{ id: 'late-3', role: 'user', content: 'Order AX-3 was late too.' },
 			{ id: 'first', role: 'user', content: 'Note the orders.' },
 			{ id: 'noted', role: 'assistant', content: 'Noted the orders.' },
 			{ id: 'second', role: 'user', content: 'Note the late arrivals.' },
@@ -9901,6 +9901,62 @@ export function buildLedgerHall(stray: boolean): LedgerSnapshot {
 			],
 		},
 		requests: ['ask-1'],
+		notes: [],
+		failures: [],
+	}
+}
+
+/** Holds the word that opens each day's source statements, so no source of one day masks alike with another day's. */
+export const LEDGER_DAY_WORDS = Object.freeze(['Amber', 'Birch', 'Cedar'])
+
+/**
+ * Builds a ledger snapshot of workdays: each day's marker, its four source statements, and its goals
+ * as answered requests.
+ *
+ * @remarks
+ * Day `D` opens with the marker `marker-D`, `Current workday: 2031-03-1D.` followed by `padding`, so
+ * the markers differ in their date alone and recur. Its sources `source-D-1` to `source-D-4` open with
+ * that day's word of {@link LEDGER_DAY_WORDS} and state one fact of {@link LEDGER_PACKET_FACTS} each,
+ * so no source recurs. Its goals `goal-D-G`, `GD-G Which van stops next?`, each answered by
+ * `reply-D-G` with `Noted.`, share no id or word with a marker or a source. Every day but the last
+ * answers four goals, and the last answers `last`.
+ *
+ * @param days - The days, at least 1 and at most the words {@link LEDGER_DAY_WORDS} holds
+ * @param last - The goals the last day answers
+ * @param padding - The text each marker carries after its date; default none
+ * @returns The snapshot, with every goal's request marked
+ */
+export function buildLedgerDays(days: number, last: number, padding = ''): LedgerSnapshot {
+	const messages = LEDGER_DAY_WORDS.slice(0, days).flatMap((word, at): readonly Message[] => {
+		const day = at + 1
+		return [
+			{
+				id: `marker-${day}`,
+				role: 'user',
+				content: `Current workday: 2031-03-1${day}.${padding}`,
+			},
+			...LEDGER_PACKET_FACTS.map((fact, index): Message => ({
+				id: `source-${day}-${index + 1}`,
+				role: 'user',
+				content: `${word} crate: it ${fact}.`,
+			})),
+			...Array.from({ length: day === days ? last : 4 }, (_unused, index) => index + 1).flatMap(
+				(goal): readonly Message[] => [
+					{
+						id: `goal-${day}-${goal}`,
+						role: 'user',
+						content: `G${day}-${goal} Which van stops next?`,
+					},
+					{ id: `reply-${day}-${goal}`, role: 'assistant', content: 'Noted.' },
+				],
+			),
+		]
+	})
+	return {
+		conversation: { id: 'days', messages },
+		requests: messages
+			.filter((message) => message.id.startsWith('goal-'))
+			.map((message) => message.id),
 		notes: [],
 		failures: [],
 	}

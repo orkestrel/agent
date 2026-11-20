@@ -130,6 +130,7 @@ import {
 	buildLedgerPackets,
 	buildLedgerAmended,
 	buildLedgerHall,
+	buildLedgerDays,
 	buildLedgerWindow,
 	countLedgerPlanFit,
 	LEDGER_CUT_DEEP_SNAPSHOT,
@@ -1586,6 +1587,21 @@ describe('system boundary canary fixtures', () => {
 		expect(amended.conversation.messages.find((message) => message.id === 'fixed')?.content).toBe(
 			'Correction: OR-7 ships Monday.',
 		)
+	})
+
+	it('builds workdays of a marker, four sources, and the goals after them, the last day answering the goals asked', () => {
+		const days = buildLedgerDays(2, 1, ' Padded.')
+		expect(isLedgerSnapshot(days)).toBe(true)
+		expect(days.requests).toEqual(['goal-1-1', 'goal-1-2', 'goal-1-3', 'goal-1-4', 'goal-2-1'])
+		expect(days.conversation.messages.slice(0, 2).map((message) => message.content)).toEqual([
+			'Current workday: 2031-03-11. Padded.',
+			`Amber crate: it ${requireValue(LEDGER_PACKET_FACTS[0])}.`,
+		])
+		expect(days.conversation.messages.find((message) => message.id === 'marker-2')?.content).toBe(
+			'Current workday: 2031-03-12. Padded.',
+		)
+		expect(days.conversation.messages.at(-2)?.content).toBe('G2-1 Which van stops next?')
+		expect(days.conversation.messages).toHaveLength(2 * 5 + 5 * 2)
 	})
 
 	it('builds one answered request and two statements about the hall, opening with a stray one when asked', () => {
