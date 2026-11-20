@@ -464,6 +464,42 @@ export function collectLedgerExchanges(
 }
 
 /**
+ * Filters an exchange's call groups down to those whose leader holds a call other than `recall`.
+ *
+ * @remarks
+ * A `recall` result is the ledger's own copy of stored messages, so a group whose every call is
+ * `recall` is the first traffic a recent window drops from an exchange that would not fit whole. A
+ * group with any other call among its calls stays whole, and no group is split.
+ *
+ * @param groups - The call groups, each a leader and its results, as `collectToolGroups` returns them
+ * @returns The groups that hold a call other than `recall`, in order
+ * @example
+ * ```ts
+ * const recalled: Message = {
+ * 	id: 'recalled',
+ * 	role: 'assistant',
+ * 	content: '',
+ * 	calls: [{ id: 'one', name: 'recall', arguments: { key: 'previous' } }],
+ * }
+ * const looked: Message = {
+ * 	id: 'looked',
+ * 	role: 'assistant',
+ * 	content: '',
+ * 	calls: [{ id: 'two', name: 'lookup', arguments: { id: 'OR-7' } }],
+ * }
+ * filterRecallGroups([[recalled], [looked]]).map(([leader]) => leader?.id) // ['looked']
+ * ```
+ */
+export function filterRecallGroups(
+	groups: ReadonlyArray<readonly Message[]>,
+): ReadonlyArray<readonly Message[]> {
+	return groups.filter(([leader]) => {
+		const calls = leader?.calls ?? []
+		return calls.length === 0 || calls.some((call) => call.name !== 'recall')
+	})
+}
+
+/**
  * Parses an exchange key into its depth: 1 for `previous`, and N for `previous-N`.
  *
  * @remarks
@@ -780,17 +816,23 @@ export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
  * shares with the request. The matches rank by basis in `LEDGER_MATCH_BASES` order, then statements
  * before request turns, then newest first by the request each one precedes, so one turn's
  * statements are equally new, then rules and corrections first, then the higher score, then the
- * later message. Shared words rank last, so they fill only the places the other bases leave.
+ * later message. Shared words rank below the other id and topic bases, so they fill only the places
+ * those leave.
+ *
+ * A request turn in `recent`, the requests of the recent window's exchanges that its shares cut, is
+ * a candidate even when it is quiet. One with no basis above, or only a stale one, or a quiet one, is
+ * a `recent` match, which ranks last.
  *
  * @param input - The messages, owners, entities, and classification
  * @param request - The request id; only messages before it are candidates
  * @param requests - The marked request ids
  * @param notes - The ledger note ids
  * @param excluded - The ids of the messages the opening already shows, the request's among them
+ * @param recent - The request ids of the recent window's exchanges that its shares cut
  * @returns The matches, best first
  * @example
  * ```ts
- * collectLedgerMatches(input, 'request', new Set(['first', 'request']), new Set(), new Set(['request']))
+ * collectLedgerMatches(input, 'request', new Set(['first', 'request']), new Set(), new Set(['request']), new Set())
  * // [{ source: 'stated', members: ['stated'], basis: 'entity', score: 0 }, …]
  * ```
  */
@@ -800,6 +842,7 @@ export function collectLedgerMatches(
 	requests: ReadonlySet<string>,
 	notes: ReadonlySet<string>,
 	excluded: ReadonlySet<string>,
+	recent: ReadonlySet<string>,
 ): readonly LedgerMatch[] {
 	const at = input.messages.findIndex((message) => message.id === request)
 	const before = at < 0 ? input.messages : input.messages.slice(0, at)
@@ -817,7 +860,9 @@ export function collectLedgerMatches(
 	)
 	const own = carried.get(request) ?? new Set<string>()
 	const candidates = users.filter(
-		(message) => !excluded.has(message.id) && !classification.quiet.has(message.id),
+		(message) =>
+			!excluded.has(message.id) &&
+			(!classification.quiet.has(message.id) || recent.has(message.id)),
 	)
 	const eligible = new Set(candidates.map((message) => message.id))
 	// The last answered request's ids join the query only when no statement left out carries one the
@@ -866,7 +911,7 @@ export function collectLedgerMatches(
 			(sum, word) => sum + Math.log(words.size / (carriers.get(word) ?? 1)),
 			0,
 		)
-		const basis: LedgerMatchBasis | undefined = ids.some((id) => own.has(id))
+		const strong: LedgerMatchBasis | undefined = ids.some((id) => own.has(id))
 			? 'entity'
 			: ids.some((id) => inherited.has(id))
 				? 'inherited'
@@ -885,7 +930,13 @@ export function collectLedgerMatches(
 					(positions.get(newer.id) ?? 0) > position &&
 					counted.every((word) => words.get(newer.id)?.has(word) === true),
 			)
-		if (basis === undefined || stale) return []
+		const basis: LedgerMatchBasis | undefined =
+			strong !== undefined && !stale && !classification.quiet.has(source)
+				? strong
+				: recent.has(source)
+					? 'recent'
+					: undefined
+		if (basis === undefined) return []
 		const category = classification.categories.get(source)
 		return [
 			{

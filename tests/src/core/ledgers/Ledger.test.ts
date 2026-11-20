@@ -231,6 +231,14 @@ import {
 	buildLedgerWindow,
 	recallLedger,
 	readLedgerOpening,
+	readLedgerWindow,
+	LEDGER_LADDER_SNAPSHOT,
+	LEDGER_RETIRE_SNAPSHOT,
+	LEDGER_RUNG_SNAPSHOT,
+	LEDGER_STATED_SNAPSHOT,
+	LEDGER_SWEEP_SNAPSHOT,
+	LEDGER_TIGHT_GAUGE,
+	LEDGER_TIGHT_SNAPSHOT,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
@@ -391,7 +399,7 @@ describe('Ledger', () => {
 		expect(digest).toContain('1 more item not shown;')
 		expect(Math.round(estimateMessages(answer) * 1.16)).toBeLessThanOrEqual(3072)
 	})
-	it('fits a short recall after a long reply using the measured request', async () => {
+	it('withdraws recall after a long reply when the measured request leaves it no room, and fits every call', async () => {
 		const source = 'The vault code is 7391.'
 		const { ledger, provider } = await serveLedgerFit({
 			capacity: 19968,
@@ -400,9 +408,10 @@ describe('Ledger', () => {
 			fraction: 0.7,
 			sources: [source],
 		})
+		// No layout of the plan with `recall` leaves its room, so the plan without it serves the request.
 		expect(
-			ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
-		).toBe(source)
+			ledger.conversation.messages().find((message) => message.call === 'fit-0'),
+		).toBeUndefined()
 		expect(
 			provider.calls.every(
 				(call) =>
@@ -450,7 +459,6 @@ describe('Ledger', () => {
 			capacity,
 			predict,
 			reply: capacity === 4096 ? 614 : 2100,
-			fraction: capacity === 4096 ? 0.6 : 0.7,
 			sources: [source],
 		})
 		expect(
@@ -465,7 +473,7 @@ describe('Ledger', () => {
 			),
 		).toBe(true)
 	})
-	it('keeps the newest whole statements that fit a small prompt allowance', async () => {
+	it('withdraws recall from a small prompt allowance whose plan leaves it no room, and fits every call', async () => {
 		const sources = Array.from(
 			{ length: 12 },
 			(_, index) => `The vault code is ${7391 + index}. ` + 'vault detail '.repeat(35),
@@ -476,11 +484,10 @@ describe('Ledger', () => {
 			reply: 153.6,
 			sources,
 		})
-		const listing = requireValue(
+		// No layout of the plan with `recall` leaves its room, so the plan without it serves the request.
+		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-0'),
-		).content
-		expect(listing).toContain(requireValue(sources.at(-1)))
-		expect(listing).toContain('older items not shown;')
+		).toBeUndefined()
 		expect(
 			provider.calls.every(
 				(call) =>
@@ -587,7 +594,7 @@ describe('Ledger', () => {
 		}
 	})
 
-	it('prices recall at the request measured rate when its supplied gauge underprices', async () => {
+	it('withdraws recall when a long stored reply leaves it no room under a supplied gauge that underprices, and fits every call at the measured rate', async () => {
 		const source = 'The vault code is 7391. ' + 'v'.repeat(16000)
 		const provider = new PricedLedgerProvider(
 			[
@@ -624,9 +631,9 @@ describe('Ledger', () => {
 			}),
 		)
 		await ledger.respond('Find the vault code.')
-		expect(ledger.conversation.messages().find((message) => message.call === 'r1')?.content).toBe(
-			"1 older item didn't fit in this request; answer from the messages you can see",
-		)
+		// The long stored reply sizes the reply reserve, so no layout of the plan with `recall` leaves
+		// its room, and the plan without it serves the request.
+		expect(ledger.conversation.messages().find((message) => message.call === 'r1')).toBeUndefined()
 		expect(
 			provider.calls.every(
 				(call) =>
@@ -1208,7 +1215,7 @@ describe('Ledger', () => {
 		)
 	})
 
-	it('omits oversized earlier replies when a hydrated ledger has little recall room', async () => {
+	it('withdraws recall where a hydrated ledger leaves it little room, so a recall call names the listed tools', async () => {
 		const reply = `Parcel code 4471. ${'Keep the receipt. '.repeat(300)}`
 		const parent = createLedger(createScriptedProvider([{ content: reply }]), buildLedgerOptions())
 		await parent.respond('Tell me the parcel code.')
@@ -1225,11 +1232,12 @@ describe('Ledger', () => {
 		)
 		await ledger.respond('Warm the reply reserve.')
 		await ledger.respond('Find it again.')
-		// The oversized reply is left out, and the short request that fits is kept after it.
+		// The window cuts the oversized exchange and shows its request as a copy, and no layout of the
+		// plan with `recall` leaves its room, so the plan without it serves the request.
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'oversized')?.content,
 		).toBe(
-			'Earlier request: Tell me the parcel code.\n1 more item not shown; name a narrower key to narrow the recall',
+			'"recall" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.',
 		)
 	})
 
@@ -3156,7 +3164,7 @@ describe('Ledger', () => {
 		)
 	})
 
-	it('closes recall on the fifth call of a request but not for insufficient room', async () => {
+	it('closes recall on the fifth call of a request, and withdraws it from a request whose plan leaves it no room', async () => {
 		const options = buildLedgerOptions()
 		const limited = createScriptedProvider(
 			[
@@ -3192,12 +3200,13 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		// The provider charges 4090 for a call of 16 estimate units: 4074 for the definitions.
+		// The provider charges 4090 for a call of 16 estimate units: 4074 for the definitions. No layout
+		// of the plan with `recall` leaves its room, so the plan without it serves the request.
 		const tight = createLedger(crowded, { ...options, gauge: { scale: 1, overhead: 4074 } })
 		seedLedgerRecall(tight)
 		await tight.respond('Check the desk.')
 		expect(tight.conversation.messages().find((message) => message.role === 'tool')?.content).toBe(
-			'nothing earlier matches "refunds"; answer from the messages you can see',
+			'"recall" did not run: it is not one of the listed tools. Use a listed tool or answer with what you have.',
 		)
 	})
 
@@ -7732,16 +7741,20 @@ describe('Ledger — subset pricing', () => {
 			'stays where the request entered',
 			['lookup', 'recall', 'desk_east', 'desk_west', 'desk_north', 'desk_south'],
 			false,
+			5,
 		],
 		[
 			'narrows before the plan and widens back inside the entry scope at the turn',
 			['lookup', 'recall', 'desk_east', 'desk_west', 'desk_north', 'desk_south'],
 			true,
+			6,
 		],
-		['narrows before the plan and clears at the turn, with no entry scope', undefined, true],
+		['narrows before the plan and clears at the turn, with no entry scope', undefined, true, 6],
 	] as const)(
 		'keeps the dispatched request inside the capacity when the context scope %s',
-		async (_title, tools, moved) => {
+		async (_title, tools, moved, count) => {
+			// Where the scope stays, no layout of the plan with `recall` leaves its room, so the plan
+			// without it narrows `recall` out; a host that applies a scope at the turn advertises all six.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const options = buildLedgerOptions()
 			const ledger = createLedger(provider, {
@@ -7763,8 +7776,15 @@ describe('Ledger — subset pricing', () => {
 			ledger.conversation.add(LEDGER_PLAN_SEED)
 			await ledger.respond('Check the desk.')
 			const sent = requireValue(provider.calls[0])
-			expect(sent.tools).toHaveLength(6)
-			expect(900 + 1.25 * estimateMessages(sent.messages)).toBeLessThanOrEqual(1200)
+			expect(sent.tools).toHaveLength(count)
+			// The overhead the call carries is the price of the definitions it advertises.
+			const price = computeToolPrice(ledger.agent.context.tools.definitions(), sent.tools ?? [], {
+				scale: 1.25,
+				overhead: 900,
+			})
+			expect(
+				900 - price.spared + price.added + 1.25 * estimateMessages(sent.messages),
+			).toBeLessThanOrEqual(1200)
 		},
 	)
 
@@ -11088,28 +11108,10 @@ describe('Ledger — the lean opening', () => {
 			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
 			[],
 		],
-		[350, ['second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'], []],
-		[345, ['third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'], []],
-		[340, ['crate-1', 'crate-2', 'crate-3'], ['previous']],
-		[335, ['crate-1', 'crate-2', 'crate-3'], ['previous-2', 'previous', 'AX-3', 'AX-2', 'AX-1']],
-		[320, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3', 'AX-2', 'AX-1']],
-		[305, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3', 'AX-2']],
-		[300, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'AX-3']],
-		[290, ['crate-1', 'crate-2', 'crate-3'], ['previous']],
-		[260, ['crate-2', 'crate-3'], ['previous', 'CR-1']],
-		[210, ['crate-3'], ['previous', 'CR-2', 'CR-1']],
-		[160, [], ['previous', 'CR-3', 'CR-2', 'CR-1']],
-		[130, [], ['CR-3', 'CR-2', 'CR-1']],
-		[100, [], []],
 	])(
 		'cuts at capacity %i to the shown messages %j and the index keys %j, keeping recall offered',
 		async (capacity, shown, keys) => {
-			// The window is the largest that fits, and recall's room cuts its rows, never its exchanges;
-			// past the budget the window's exchanges go oldest first, each one's row joining the index.
-			// With no window, the exchange rows go from the oldest down to `previous-2`, then the id rows
-			// last-ranked first, then the statements oldest first, each cut statement's id joining the
-			// index ahead of the rest, then `previous`, then the index. Something stays behind at every
-			// step, so recall stays offered.
+			// The window is the largest that fits, and recall's room cuts its rows, never its exchanges.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -11123,47 +11125,94 @@ describe('Ledger — the lean opening', () => {
 	)
 
 	it.each([
+		...[350, 345, 340, 335, 320, 305, 300, 290, 260].map(
+			(capacity): readonly [number, readonly string[]] => [
+				capacity,
+				[
+					'first',
+					'noted',
+					'second',
+					'noted-2',
+					'third',
+					'noted-3',
+					'crate-1',
+					'crate-2',
+					'crate-3',
+				],
+			],
+		),
+		[210, ['third', 'crate-1', 'crate-2', 'crate-3']] as const,
+		[160, ['crate-2', 'crate-3']] as const,
+		[130, ['crate-3']] as const,
+		[100, ['crate-3']] as const,
+	])(
+		'cuts at capacity %i to the shown messages %j with no index, the plan without recall serving the request',
+		async (capacity, shown) => {
+			// Below 385 no layout of the plan with `recall` both leaves its room and shows the newest
+			// exchange and as many requests as the plan without it, which prices no index: that plan shows
+			// the window whole, then past the budget the newest exchange as a copy of its request, then the
+			// statements alone, cut oldest first.
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ capacity, snapshot: LEDGER_CUT_SNAPSHOT, topics: [] }),
+			)
+			await ledger.respond('Which crates are ready?')
+			const sent = requireValue(provider.calls[0])
+			expect(readLedgerOpening(sent.messages)).toEqual({ shown, keys: [] })
+			expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+		},
+	)
+
+	it.each([
 		[
 			500,
 			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
 			['rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
-		],
+			['lookup', 'recall'],
+		] as const,
 		[
 			420,
 			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
 			['rules', 'AX-3', 'AX-2', 'refunds'],
-		],
+			['lookup', 'recall'],
+		] as const,
 		[
 			405,
 			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
 			['rules', 'refunds'],
-		],
-		[
-			400,
-			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
-			['rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
-		],
-		[375, ['third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'], ['rules', 'AX-3', 'refunds']],
-		[370, ['third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'], ['rules', 'refunds']],
-		[360, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'rules', 'refunds']],
-		[
-			355,
-			['crate-1', 'crate-2', 'crate-3'],
-			['previous-2', 'previous', 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
-		],
-		[315, ['crate-1', 'crate-2', 'crate-3'], ['previous', 'rules', 'refunds']],
-		[280, ['crate-2', 'crate-3'], ['previous', 'rules', 'CR-1', 'refunds']],
-		[180, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1', 'refunds']],
-		[155, [], ['previous', 'rules', 'CR-3', 'CR-2', 'CR-1']],
-		[150, [], ['previous', 'CR-3', 'CR-2', 'CR-1']],
-		[130, [], ['CR-3', 'CR-2', 'CR-1']],
-		[100, [], []],
+			['lookup', 'recall'],
+		] as const,
+		...[400, 375, 370, 360, 355, 315, 280].map(
+			(capacity): readonly [number, readonly string[], readonly string[], readonly string[]] => [
+				capacity,
+				[
+					'first',
+					'noted',
+					'second',
+					'noted-2',
+					'third',
+					'noted-3',
+					'crate-1',
+					'crate-2',
+					'crate-3',
+				],
+				[],
+				['lookup'],
+			],
+		),
+		[180, ['crate-2', 'crate-3'], [], ['lookup']] as const,
+		[155, ['crate-2', 'crate-3'], [], ['lookup']] as const,
+		[150, ['crate-2', 'crate-3'], [], ['lookup']] as const,
+		[130, ['crate-3'], [], ['lookup']] as const,
+		[100, ['crate-3'], [], ['lookup']] as const,
 	])(
-		'keeps rules and the topic row fixed through the window, exchange-row, id-row, and statement cuts, then cuts the topic row, rules, and previous: at capacity %i the shown messages %j and the keys %j',
-		async (capacity, shown, keys) => {
-			// The window's exchanges, the exchange rows past `previous`, the id rows, and the statements
-			// go first while `rules` and `refunds` stay, so both are fixed rows; with every statement
-			// cut, the topic row goes, then `rules`, then `previous`.
+		'keeps rules and the topic row fixed through the id-row cuts while recall stays, and below that serves the plan without recall: at capacity %i the shown messages %j, the keys %j, and the tools %j',
+		async (capacity, shown, keys, tools) => {
+			// The id rows go first while `rules` and `refunds` stay, so both are fixed rows. Below 405 no
+			// layout of the plan with `recall` leaves its room and shows as many requests as the plan
+			// without it, which prices no index and shows the window whole, then the statements alone,
+			// cut oldest first.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -11176,28 +11225,44 @@ describe('Ledger — the lean opening', () => {
 			await ledger.respond('Which crates are ready?')
 			const sent = requireValue(provider.calls[0])
 			expect(readLedgerOpening(sent.messages)).toEqual({ shown, keys })
-			expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+			expect(sent.tools?.map((tool) => tool.name)).toEqual(tools)
 		},
 	)
 
-	it('keeps cutting rows until the first turn leaves recall its room, and else takes the first fit', async () => {
+	it('keeps cutting rows until the first turn leaves recall its room, and else serves the plan without recall', async () => {
 		const openings = await Promise.all(
-			[335, 340].map(async (capacity) => {
+			[350, 385, 390].map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 				const ledger = createLedger(
 					provider,
 					buildLedgerOptions({ capacity, snapshot: LEDGER_CUT_SNAPSHOT, topics: [] }),
 				)
 				await ledger.respond('Which crates are ready?')
-				return readLedgerOpening(requireValue(provider.calls[0]).messages)
+				const sent = requireValue(provider.calls[0])
+				return {
+					...readLedgerOpening(sent.messages),
+					tools: sent.tools?.map((tool) => tool.name),
+				}
 			}),
 		)
-		const shown = ['crate-1', 'crate-2', 'crate-3']
-		// At 335 no window or row step leaves twice the reply reserve, so the first step that fits wins;
-		// at 340 cutting every exchange and id row does, and that step wins over the earlier ones that fit.
+		const shown = [
+			'first',
+			'noted',
+			'second',
+			'noted-2',
+			'third',
+			'noted-3',
+			'crate-1',
+			'crate-2',
+			'crate-3',
+		]
+		// At 390 cutting the id rows down to AX-3 leaves twice the reply reserve, and at 385 only cutting
+		// every row does; at 350 no layout of the plan with recall both leaves that room and shows as
+		// many requests as the plan without it, which serves the request.
 		expect(openings).toEqual([
-			{ shown, keys: ['previous-2', 'previous', 'AX-3', 'AX-2', 'AX-1'] },
-			{ shown, keys: ['previous'] },
+			{ shown, keys: [], tools: ['lookup'] },
+			{ shown, keys: [], tools: ['lookup', 'recall'] },
+			{ shown, keys: ['AX-3'], tools: ['lookup', 'recall'] },
 		])
 	})
 
@@ -11209,12 +11274,24 @@ describe('Ledger — the lean opening', () => {
 			],
 			{ recorded: true },
 		)
+		// A statement is cut only past every exchange, which leaves the plan with `recall` without the
+		// newest exchange; with the crate statements alone stored there is no exchange, so that plan
+		// cuts the oldest statement and keeps `recall`.
 		const ledger = createLedger(
 			provider,
 			buildLedgerOptions({
 				capacity: 4096,
-				share: { prompt: 0.05 },
-				snapshot: LEDGER_CUT_SNAPSHOT,
+				share: { prompt: 0.04 },
+				snapshot: {
+					...LEDGER_CUT_SNAPSHOT,
+					conversation: {
+						...LEDGER_CUT_SNAPSHOT.conversation,
+						messages: LEDGER_CUT_SNAPSHOT.conversation.messages.filter((message) =>
+							message.id.startsWith('crate-'),
+						),
+					},
+					requests: [],
+				},
 				topics: [],
 			}),
 		)
@@ -11513,7 +11590,7 @@ describe('Ledger — the recent window', () => {
 		expect(sent.messages.some((message) => message.call === 'read')).toBe(true)
 	})
 
-	it('prices a window exchange with its call turns and results against the share', async () => {
+	it("prices the newest exchange with its call turns and results against the window's tiers, so a long result within 0.45 of the budget shows whole", async () => {
 		const result = `Account BW-20931: Brightwater Studio. ${'z'.repeat(6000)}`
 		const provider = createScriptedProvider(
 			[
@@ -11546,23 +11623,26 @@ describe('Ledger — the recent window', () => {
 		)
 		await ledger.respond('Check BW-20931.')
 		await ledger.respond('Make that shorter.')
-		// The long result takes the exchange past 0.3 of the budget, though its request and reply are short:
-		// the window holds nothing, and the request retrieves the earlier request alone, by the id it
-		// inherits, as a labeled copy.
+		// The long result prices the exchange past 0.3 of the budget but within the newest exchange's
+		// 0.45 of it, so the window shows it whole, its call turn and result with it, and no row.
 		const sent = requireValue(provider.calls[2]).messages
 		const opening = readLedgerOpening(sent)
 		const asked = requireValue(
 			ledger.conversation.messages().find((message) => message.content === 'Check BW-20931.'),
 		)
-		expect(opening.shown).toEqual([asked.id])
-		expect(sent.find((message) => message.id === asked.id)?.content).toBe(
-			'Earlier request: Check BW-20931.',
-		)
-		expect(opening.keys).toContain('previous')
+		expect(opening.shown).toHaveLength(4)
+		expect(opening.shown[0]).toBe(asked.id)
+		expect(
+			sent.filter((message) => opening.shown.includes(message.id)).map((message) => message.role),
+		).toEqual(['user', 'assistant', 'tool', 'assistant'])
+		expect(sent.some((message) => message.content === result)).toBe(true)
+		expect(opening.keys).not.toContain('previous')
 	})
 
 	it('lists an exchange the share left out of the window through recall in the request that planned it', async () => {
-		const reply = `Long reply. ${'x'.repeat(6000)}`
+		// The long reply prices the newest exchange and its pair past 0.45 of the budget, so it leaves
+		// the window as a keyed copy of its request, while recall keeps twice that reply's room.
+		const reply = `Long reply. ${'x'.repeat(7600)}`
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'cut', name: 'recall', arguments: { key: 'previous' } }] },
@@ -11579,7 +11659,11 @@ describe('Ledger — the recent window', () => {
 			}),
 		)
 		await ledger.respond('Next request.')
-		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([])
+		const sent = requireValue(provider.calls[0]).messages
+		expect(readLedgerOpening(sent).shown).toEqual(['ask-1', 'reply-1', 'ask-2'])
+		expect(sent.find((message) => message.id === 'ask-2')?.content).toBe(
+			'previous: Earlier request: Note item 2.',
+		)
 		expect(ledger.conversation.messages().find((message) => message.call === 'cut')?.content).toBe(
 			`previous: Earlier request: Note item 2.\nEarlier reply: ${reply}`,
 		)
@@ -11601,27 +11685,31 @@ describe('Ledger — the recent window', () => {
 		)
 		// Each larger capacity shows at least the exchanges a smaller one shows.
 		expect(windows.slice(1).filter((count, at) => count < (windows[at] ?? 0))).toEqual([])
-		// The pair where the recall-room preference once dropped the window at the larger capacity.
-		expect([windows[2], windows[3]]).toEqual([1, 1])
+		// The pair where the recall-room preference once dropped the window at the larger capacity: both
+		// show two exchanges whole and the third request as a copy.
+		expect([windows[2], windows[3]]).toEqual([2.5, 2.5])
 	})
 
 	it.each([
 		[
 			4096,
 			Array.from({ length: 8 }, (_unused, at) => [`batch-${at + 1}`, `batched-${at + 1}`]).flat(),
-			['previous-11', 'previous-10', 'previous-9'],
+			['previous-11', 'previous-10', 'previous-9', 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
+			['lookup', 'recall'],
 		],
 		[
 			480,
-			['batch-7', 'batched-7', 'batch-8', 'batched-8'],
-			['previous-7', 'previous-6', 'previous-5', 'previous-4', 'previous-3'],
+			Array.from({ length: 8 }, (_unused, at) => [`batch-${at + 1}`, `batched-${at + 1}`]).flat(),
+			[],
+			['lookup'],
 		],
 	])(
-		'shows at capacity %i the newest exchanges whole and contiguous, oldest first, %j, and starts the rows past them with stable depths, %j',
-		async (capacity, window, rows) => {
-			// At 4096 the count bound stops the window at 8 exchanges with room for more; at 480 the
-			// window keeps the newest 2, its rows start at previous-3, and recall's room cut the deepest
-			// three. Retrieval shows `third` first, the earlier request the word `crates` matches.
+		'shows at capacity %i the newest exchanges whole and contiguous, oldest first, %j, with the rows %j and the tools %j',
+		async (capacity, window, keys, tools) => {
+			// At 4096 the count bound stops the window at 8 exchanges with room for more, and the rows
+			// past them keep stable depths; at 480 the 8 short exchanges fill the window's tiers, and the
+			// plan without recall, which prices no index, shows them all. Retrieval shows `third` first,
+			// the earlier request the word `crates` matches.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -11635,14 +11723,14 @@ describe('Ledger — the recent window', () => {
 			const sent = requireValue(provider.calls[0])
 			expect(readLedgerOpening(sent.messages)).toEqual({
 				shown: ['third', ...window, 'crate-1', 'crate-2', 'crate-3'],
-				keys: [...rows, 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
+				keys,
 			})
-			expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+			expect(sent.tools?.map((tool) => tool.name)).toEqual(tools)
 		},
 	)
 
-	it('stops the window at its share of the budget, so an oversize last exchange gives no window and a previous row, and more room shows it', async () => {
-		const replies = ['Short reply.', `Long reply. ${'x'.repeat(6000)}`]
+	it("takes an oversize newest exchange out of the window as a copy of its request and a previous row, keeps the older exchange in the window's share, and shows it whole with more room", async () => {
+		const replies = ['Short reply.', `Long reply. ${'x'.repeat(7600)}`]
 		const openings = await Promise.all(
 			[4096, 16_384].map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
@@ -11658,11 +11746,11 @@ describe('Ledger — the recent window', () => {
 				}
 			}),
 		)
-		// At 4096 the long exchange prices past 0.3 of the budget though the opening has room for it,
-		// so the window stops before it and shows nothing, not even the short exchange behind it. At
-		// 16384 the share holds both, nothing is left behind, and recall leaves the scope.
+		// At 4096 the long exchange and its pair price past 0.45 of the budget, so its request shows as a
+		// copy beside a previous row, and the short exchange behind it fills the window's share. At
+		// 16384 the window holds both, nothing is left behind, and recall leaves the scope.
 		expect(openings).toEqual([
-			{ shown: [], keys: ['previous-2', 'previous'], tools: ['lookup', 'recall'] },
+			{ shown: ['ask-1', 'reply-1', 'ask-2'], keys: ['previous'], tools: ['lookup', 'recall'] },
 			{ shown: ['ask-1', 'reply-1', 'ask-2', 'reply-2'], keys: [], tools: ['lookup'] },
 		])
 	})
@@ -11692,7 +11780,7 @@ describe('Ledger — the recent window', () => {
 		)
 	})
 
-	it('keeps recall and lists the rows of the exchanges a step cuts from the window, though the whole window leaves nothing behind', async () => {
+	it('narrows recall out where the whole window leaves nothing behind, and serves a long request the plan without recall, which shows more requests', async () => {
 		const replies = ['one', 'two', 'three'].map((word) => `Reply ${word}. ${'r'.repeat(300)}`)
 		const openings = await Promise.all(
 			['Next request.', `Next request. ${'q'.repeat(3200)}`].map(async (content) => {
@@ -11714,8 +11802,9 @@ describe('Ledger — the recent window', () => {
 			}),
 		)
 		// At 1090 the window's share holds all three exchanges: under a short request the whole window
-		// fits and leaves nothing behind, so recall leaves the scope. The long request leaves room for
-		// the newest exchange alone, and the step that cuts the other two keeps recall and their rows.
+		// fits and leaves nothing behind, so recall leaves the scope. Under the long request the plan
+		// without recall, which prices no index, keeps the newest two exchanges whole and the oldest
+		// request as a copy, more requests than the plan with recall shows.
 		expect(openings).toEqual([
 			{
 				shown: ['ask-1', 'reply-1', 'ask-2', 'reply-2', 'ask-3', 'reply-3'],
@@ -11723,24 +11812,372 @@ describe('Ledger — the recent window', () => {
 				tools: ['lookup'],
 			},
 			{
-				shown: ['ask-3', 'reply-3'],
-				keys: ['previous-3', 'previous-2'],
-				tools: ['lookup', 'recall'],
+				shown: ['ask-1', 'ask-2', 'reply-2', 'ask-3', 'reply-3'],
+				keys: [],
+				tools: ['lookup'],
 			},
 		])
 	})
 })
 
+describe("Ledger — the newest exchange's ladder", () => {
+	it.each([
+		[200, 'copy', ['ask-1']],
+		[300, 'pair', ['ask-1', 'reply-1']],
+		[1200, 'partial', ['ask-1', 'turn-1-2', 'result-1-2', 'reply-1']],
+		[2500, 'whole', ['ask-1', 'turn-1-1', 'result-1-1', 'turn-1-2', 'result-1-2', 'reply-1']],
+	] as const)(
+		'climbs the ladder as the capacity grows: at capacity %i the newest exchange shows as the %s form, %j',
+		async (capacity, form, shown) => {
+			// Whole while it fits 0.45 of the budget, then less its `recall` group, then its request and
+			// reply alone, then its request as a copy; no group is ever split.
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ capacity, snapshot: LEDGER_LADDER_SNAPSHOT, topics: [] }),
+			)
+			await ledger.respond('Make that shorter.')
+			const sent = requireValue(provider.calls[0]).messages
+			expect(readLedgerOpening(sent).shown).toEqual(shown)
+			expect(readLedgerWindow(sent, LEDGER_LADDER_SNAPSHOT).form).toBe(form)
+		},
+	)
+
+	it.each([
+		[0, 'whole', ['ask-1', 'turn-1-1', 'result-1-1', 'turn-1-2', 'result-1-2', 'reply-1']],
+		[5500, 'partial', ['ask-1', 'turn-1-2', 'result-1-2', 'reply-1']],
+		[7750, 'pair', ['ask-1', 'reply-1']],
+		[9000, 'copy', ['ask-1']],
+	] as const)(
+		'steps the newest exchange down its ladder past the budget before it leaves: under a request padded with %i characters it shows as the %s form, %j',
+		async (padding, form, shown) => {
+			// At 2500 the whole exchange fits 0.45 of the budget; a longer request leaves the opening
+			// less of the budget, so the cut takes the newest exchange less its `recall` group, then its
+			// request and reply alone, then a copy of its request.
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ capacity: 2500, snapshot: LEDGER_LADDER_SNAPSHOT, topics: [] }),
+			)
+			await ledger.respond(`Make that shorter. ${'q'.repeat(padding)}`)
+			const sent = requireValue(provider.calls[0]).messages
+			expect(readLedgerOpening(sent).shown).toEqual(shown)
+			expect(readLedgerWindow(sent, LEDGER_LADDER_SNAPSHOT).form).toBe(form)
+		},
+	)
+
+	it('shows a copy-rung newest exchange as its request under its label, and none of its traffic', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 200, snapshot: LEDGER_LADDER_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Make that shorter.')
+		const sent = requireValue(provider.calls[0])
+		expect(sent.messages.slice(1, -1).map((message) => [message.id, message.content])).toEqual([
+			['ask-1', 'Earlier request: Check BW-20931.'],
+		])
+		expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+	})
+
+	it("shows the pair where it fits the window's tier, and loses the other requests it leaves no room for", async () => {
+		const capacity = 1000
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity, snapshot: LEDGER_RUNG_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Which items are open?')
+		const sent = requireValue(provider.calls[0]).messages
+		const stored = LEDGER_RUNG_SNAPSHOT.conversation.messages
+		const pair = stored.filter((message) => message.id === 'ask-5' || message.id === 'reply-5')
+		// The pair fits 0.45 of the budget, so the newest exchange shows; beside it the four other
+		// requests find no room in the window or as copies, and none of them shows.
+		expect(estimateMessages(pair)).toBeLessThanOrEqual(
+			(0.45 * (capacity - 1)) / (1 + LEDGER_SCALE_DRIFT),
+		)
+		expect(readLedgerOpening(sent).shown).toEqual(['ask-5', 'reply-5'])
+		expect(readLedgerWindow(sent, LEDGER_RUNG_SNAPSHOT)).toEqual({
+			form: 'whole',
+			requests: 1,
+			whole: 1,
+		})
+	})
+
+	it('shows a pair-form newest exchange as its stored request and reply, with no previous row, and answers a recall of previous from the messages it can see', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'pair', name: 'recall', arguments: { key: 'previous' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 600, snapshot: LEDGER_LADDER_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Make that shorter.')
+		const sent = requireValue(provider.calls[0])
+		const opening = readLedgerOpening(sent.messages)
+		expect(readLedgerWindow(sent.messages, LEDGER_LADDER_SNAPSHOT).form).toBe('pair')
+		expect(opening.keys).not.toContain(LEDGER_PREVIOUS_KEY)
+		expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+		expect(ledger.conversation.messages().find((message) => message.call === 'pair')?.content).toBe(
+			'"previous" is in the messages you can see; answer from them',
+		)
+		// The pair's two messages are the request and the reply a recall of `previous` lists.
+		const listed = await recallLedger(
+			createLedger(
+				createScriptedProvider([]),
+				buildLedgerOptions({ snapshot: LEDGER_LADDER_SNAPSHOT, topics: [] }),
+			),
+			'previous',
+		)
+		expect(
+			sent.messages
+				.filter((message) => opening.shown.includes(message.id))
+				.map((message) => message.content),
+		).toEqual(
+			listed
+				.split('\n')
+				.map((line) => line.replace(/^(?:previous: )?Earlier (?:request|reply): /, '')),
+		)
+	})
+
+	it("retires no older finding through a pair-form newest exchange's hidden lookup, so the older group shows", async () => {
+		const openings = await Promise.all(
+			[4096, 16_384].map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, snapshot: LEDGER_RETIRE_SNAPSHOT, topics: [] }),
+				)
+				await ledger.respond('Is the refund settled?')
+				return readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+			}),
+		)
+		// At 4096 the newer lookup hides with its pair-form exchange, so the older finding stands and
+		// its group shows; at 16384 the newer lookup shows and retires it.
+		expect(openings).toEqual([
+			['ask-1', 'turn-1-1', 'result-1-1', 'reply-1', 'ask-2', 'reply-2'],
+			['ask-1', 'reply-1', 'ask-2', 'turn-2-1', 'result-2-1', 'reply-2'],
+		])
+	})
+
+	it('offers recall only where its plan shows the newest exchange', async () => {
+		const rows = await Promise.all(
+			[
+				...Array.from(
+					{ length: 26 },
+					(_unused, at) => [LEDGER_STATED_SNAPSHOT, 190 + at * 20] as const,
+				),
+				...Array.from(
+					{ length: 20 },
+					(_unused, at) => [LEDGER_LADDER_SNAPSHOT, 200 + at * 50] as const,
+				),
+			].map(async ([snapshot, capacity]) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, snapshot, topics: [] }),
+				)
+				await ledger.respond('Which dock holds the crates?')
+				const sent = requireValue(provider.calls[0])
+				return {
+					recall: (sent.tools ?? []).some((tool) => tool.name === 'recall'),
+					form: readLedgerWindow(sent.messages, snapshot).form,
+				}
+			}),
+		)
+		// Both fixtures reach openings that cut the newest exchange and openings that offer recall.
+		expect(rows.some((row) => row.form === 'none')).toBe(true)
+		expect(rows.some((row) => row.recall)).toBe(true)
+		expect(rows.filter((row) => row.recall && row.form === 'none')).toEqual([])
+	})
+
+	it('never shows fewer requests or fewer whole exchanges as the capacity grows while the newest exchange keeps its form', async () => {
+		const rows = await Promise.all(
+			Array.from({ length: 40 }, (_unused, at) => 150 + at * 75).map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, snapshot: LEDGER_SWEEP_SNAPSHOT, topics: [] }),
+				)
+				await ledger.respond('Make that shorter.')
+				return readLedgerWindow(requireValue(provider.calls[0]).messages, LEDGER_SWEEP_SNAPSHOT)
+			}),
+		)
+		// A change of form can cost requests; within one form neither count falls.
+		const falls = rows.slice(1).filter((row, at) => {
+			const before = requireValue(rows[at])
+			return (
+				row.form === before.form && (row.requests < before.requests || row.whole < before.whole)
+			)
+		})
+		expect(falls).toEqual([])
+		// The sweep reaches every form of the ladder.
+		expect(new Set(rows.map((row) => row.form))).toEqual(
+			new Set(['copy', 'pair', 'partial', 'whole']),
+		)
+	})
+
+	it('sends the first pass at the tight chat capacity with no recall and no cue, keeping lookup, and shows every window request whole or as an unkeyed copy', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 1600,
+				predict: 1024,
+				gauge: LEDGER_TIGHT_GAUGE,
+				snapshot: LEDGER_TIGHT_SNAPSHOT,
+				topics: [],
+			}),
+		)
+		await ledger.respond('Which order ships last?')
+		const sent = requireValue(provider.calls[0])
+		expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+		expect(
+			provider.calls.some((call) =>
+				call.messages.some((message) => message.content === LEDGER_NOTES.cue),
+			),
+		).toBe(false)
+		const stored = new Map(
+			LEDGER_TIGHT_SNAPSHOT.conversation.messages.map((message) => [message.id, message.content]),
+		)
+		const latest = LEDGER_TIGHT_SNAPSHOT.requests.slice(-LEDGER_RECENT_LIMIT)
+		expect(
+			latest.map((id) => {
+				const content = sent.messages.find((message) => message.id === id)?.content
+				return content === stored.get(id) || content === `Earlier request: ${stored.get(id)}`
+			}),
+		).toEqual(latest.map(() => true))
+	})
+
+	it('shows no fewer requests at a capacity just over the tight chat capacity', async () => {
+		const counts = await Promise.all(
+			[1600, 1650, 1700].map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({
+						capacity,
+						predict: 1024,
+						gauge: LEDGER_TIGHT_GAUGE,
+						snapshot: LEDGER_TIGHT_SNAPSHOT,
+						topics: [],
+					}),
+				)
+				await ledger.respond('Which order ships last?')
+				return readLedgerWindow(requireValue(provider.calls[0]).messages, LEDGER_TIGHT_SNAPSHOT)
+					.requests
+			}),
+		)
+		expect(counts).toEqual([8, 8, 8])
+	})
+
+	it('keys every request copy exactly when the opening advertises recall', async () => {
+		const rows = await Promise.all(
+			Array.from({ length: 9 }, (_unused, at) => 1600 + at * 100).map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({
+						capacity,
+						predict: 1024,
+						gauge: LEDGER_TIGHT_GAUGE,
+						snapshot: LEDGER_TIGHT_SNAPSHOT,
+						topics: [],
+					}),
+				)
+				await ledger.respond('Which order ships last?')
+				const sent = requireValue(provider.calls[0])
+				const copies = sent.messages
+					.slice(1, -1)
+					.filter((message) => message.content.includes('Earlier request: '))
+				return {
+					recall: (sent.tools ?? []).some((tool) => tool.name === 'recall'),
+					keyed: copies.filter((message) => /^previous(?:-\d+)?: /.test(message.content)).length,
+					copies: copies.length,
+				}
+			}),
+		)
+		expect(rows.some((row) => row.recall && row.copies > 0)).toBe(true)
+		expect(rows.some((row) => !row.recall && row.copies > 0)).toBe(true)
+		expect(rows.filter((row) => row.keyed !== (row.recall ? row.copies : 0))).toEqual([])
+	})
+
+	it("lists a copied exchange's request and reply when recall names its key", async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'copied', name: 'recall', arguments: { key: 'previous-8' } }],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 2000,
+				predict: 1024,
+				gauge: LEDGER_TIGHT_GAUGE,
+				snapshot: LEDGER_TIGHT_SNAPSHOT,
+				topics: [],
+			}),
+		)
+		await ledger.respond('Which order ships last?')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(sent.find((message) => message.id === 'ask-2')?.content).toBe(
+			'previous-8: Earlier request: Note item 2.',
+		)
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'copied')?.content,
+		).toBe(
+			`previous-8: Earlier request: Note item 2.\nEarlier reply: ${requireValue(LEDGER_TIGHT_SNAPSHOT.conversation.messages.find((message) => message.id === 'reply-2')).content}`,
+		)
+	})
+
+	it('sends every stored message as stored at a capacity the window never binds, with no copy', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 16_384, snapshot: LEDGER_SWEEP_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Make that shorter.')
+		const sent = requireValue(provider.calls[0])
+		expect(sent.messages.slice(1, -1)).toEqual(LEDGER_SWEEP_SNAPSHOT.conversation.messages)
+		expect(sent.messages.at(-1)?.content).toBe('Make that shorter.')
+		expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+	})
+})
+
 describe('Ledger — relevance', () => {
 	it.each([
-		[500, ['third', 'batch-7', 'batched-7', 'batch-8', 'batched-8']],
-		[460, ['third', 'batch-8', 'batched-8']],
-		[455, ['batch-8', 'batched-8']],
-		[445, []],
+		[280, ['third', 'batch-4', 'batch-5', 'batch-6', 'batch-7', 'batch-8', 'batched-8']],
+		[
+			270,
+			[
+				'batch-5',
+				'batched-5',
+				'batch-6',
+				'batched-6',
+				'batch-7',
+				'batched-7',
+				'batch-8',
+				'batched-8',
+			],
+		],
+		[210, ['batch-8', 'batched-8']],
+		[200, []],
 	])(
-		'cuts the window down to its newest exchange, then the retrieved messages, then that exchange: at capacity %i the opening shows %j before the statements',
+		'cuts the recent copies first, then the other matches, then the window oldest first, then the newest exchange: at capacity %i the opening shows %j before the statements',
 		async (capacity, shown) => {
-			// `third` is the earlier request the word `crates` matches, past the window.
+			// `third` is the earlier request the word `crates` matches, past the window. At 280 the window
+			// shows the newest exchange whole and the oldest copies leave first while `third` stays; at 270
+			// `third` leaves while four exchanges stay whole; at 210 the newest alone stays, and at 200 it
+			// leaves too, before any statement. The plan without recall serves every row.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -11758,7 +12195,7 @@ describe('Ledger — relevance', () => {
 				'crate-2',
 				'crate-3',
 			])
-			expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
+			expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup'])
 		},
 	)
 
@@ -11785,8 +12222,8 @@ describe('Ledger — relevance', () => {
 		},
 	)
 
-	it('retrieves an earlier request turn as a labeled copy, keeps its exchange row while its reply is behind, and lists that exchange through recall', async () => {
-		const long = `Long reply. ${'x'.repeat(6000)}`
+	it('shows a cut request turn as a copy keyed and labeled, keeps its exchange row while its reply is behind, and lists that exchange through recall', async () => {
+		const long = `Long reply. ${'x'.repeat(7600)}`
 		const provider = createScriptedProvider(
 			[
 				{ content: '', tools: [{ id: 'cut', name: 'recall', arguments: { key: 'previous' } }] },
@@ -11817,14 +12254,15 @@ describe('Ledger — relevance', () => {
 		)
 		await ledger.respond('And OR-1?')
 		const sent = requireValue(provider.calls[0])
-		// The long reply leaves the window empty; the request turns come in as copies under their label,
-		// the own id's first and the inherited one's after it, in conversation order.
+		// The long reply takes the newest exchange and its pair past 0.45 of the budget, so its request
+		// comes in as a copy under its exchange key and label, and the older exchange fills the window.
 		expect(sent.messages.slice(1, -1).map((message) => [message.id, message.content])).toEqual([
-			['ask-1', 'Earlier request: Check OR-1.'],
-			['ask-2', 'Earlier request: Check OR-2.'],
+			['ask-1', 'Check OR-1.'],
+			['reply-1', 'OR-1 ships Friday.'],
+			['ask-2', 'previous: Earlier request: Check OR-2.'],
 		])
-		// A shown request without its reply leaves its exchange's row, and its id row counts the reply.
-		expect(readLedgerOpening(sent.messages).keys).toEqual(['previous-2', 'previous', 'OR-1'])
+		// A shown request without its reply leaves its exchange's row.
+		expect(readLedgerOpening(sent.messages).keys).toEqual(['previous'])
 		expect(ledger.conversation.messages().find((message) => message.call === 'cut')?.content).toBe(
 			`previous: Earlier request: Check OR-2.\nEarlier reply: ${long}`,
 		)
@@ -11858,7 +12296,7 @@ describe('Ledger — superseded values in the window', () => {
 		])
 	})
 
-	it("prices a span's amenders against the window's share, so a long one cuts the window to the newest exchange", async () => {
+	it("prices a span's amenders against the window's share, so a long one cuts the older exchange to a copy of its request", async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(
 			provider,
@@ -11874,8 +12312,10 @@ describe('Ledger — superseded values in the window', () => {
 			}),
 		)
 		await ledger.respond('Anything else?')
-		// Both exchanges fit the share alone, but not with the correction between them.
+		// Both exchanges fit the share alone, but not with the correction between them, so the older
+		// exchange shows as a copy of its request.
 		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
 			'ask-2',
 			'reply-2',
 		])
@@ -12415,7 +12855,7 @@ describe('Ledger — the newest statement of each recurrence', () => {
 								...[1, 2, 3, 4].map((at) => ({
 									id: `match-${at}`,
 									role: 'user' as const,
-									content: `Crate OR-9 shelf ${String.fromCharCode(96 + at)}: ${'w'.repeat(460)}`,
+									content: `Crate OR-9 shelf ${String.fromCharCode(96 + at)}: ${'w'.repeat(1600)}`,
 								})),
 								{ id: 'marker-2', role: 'user', content: `Current workday: 2031-03-12.${filler}` },
 								{ id: 'ask-2', role: 'user', content: 'Check the van.' },
@@ -12470,7 +12910,7 @@ describe('Ledger — the newest statement of each recurrence', () => {
 		expect(shown.filter((id) => id.startsWith('match-'))).toHaveLength(LEDGER_RELEVANT_LIMIT)
 	})
 
-	it('keeps the newest marker through the cut to the newest exchange', async () => {
+	it('keeps the newest marker through the cut that shows the older request as a copy', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(
 			provider,
@@ -12496,8 +12936,10 @@ describe('Ledger — the newest statement of each recurrence', () => {
 			}),
 		)
 		await ledger.respond('Anything else?')
-		// Both exchanges fit the window's share, but the budget keeps the newest one beside the manifest.
+		// Both exchanges fit the window's share, but beside the manifest the budget keeps the newest one
+		// whole and the older request as a copy.
 		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
 			'marker-2',
 			'ask-2',
 			'reply-2',
@@ -12597,7 +13039,15 @@ describe('Ledger — the newest statement of each recurrence', () => {
 			}),
 		)
 		await ledger.respond('Anything else?')
-		// The last reply takes the window past its share, so nothing shows; no request recurs.
-		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([])
+		// The window holds all three exchanges, the last within the newest exchange's 0.45 of the
+		// budget; no request recurs, so nothing else shows.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'reply-1',
+			'ask-2',
+			'reply-2',
+			'ask-3',
+			'reply-3',
+		])
 	})
 })

@@ -31,13 +31,16 @@ import type {
 	LedgerInterface,
 	LedgerKey,
 	LedgerLookupFinding,
+	LedgerMember,
 	LedgerOptions,
+	LedgerPlanResult,
 	LedgerProjection,
 	LedgerProjectionInput,
 	LedgerResult,
 	LedgerRecovery,
 	LedgerShare,
 	LedgerSnapshot,
+	LedgerSurvey,
 } from './types.js'
 import type { AbortInterface } from '@orkestrel/abort'
 import type { TokenUsage } from '@orkestrel/budget'
@@ -127,6 +130,7 @@ import {
 	collectLedgerRecurrences,
 	collectLedgerStatements,
 	filterLedgerShown,
+	filterRecallGroups,
 	collectRecallMessages,
 	buildLedgerIndex,
 	buildRecallMessage,
@@ -1331,21 +1335,13 @@ export class Ledger implements LedgerInterface {
 		return (this.#gauge?.scale ?? 1) * estimateMessages(messages)
 	}
 
-	// Plans a request's opening: the recent window, the newest exchanges that have a reply, each with
-	// its call turns and results but a group every result of which is retired, and the amenders inside
-	// its span, the earlier user messages retrieval ranks best, the newest member of each recurrence,
-	// and the current statements whole, in conversation order and without a statement a shown successor
-	// supersedes, then the request copy, which carries the Earlier index of what the opening leaves
-	// behind while `recall` is advertised. Past the budget the steps cut the window's exchanges oldest
-	// first down to the newest one, then the retrieved messages lowest rank first, then the newest
-	// exchange, then the exchange rows from the deepest down to `previous-2`, then the id rows
-	// last-ranked first, then the recurrence, then the statements oldest first, then the topic rows last
-	// first, `rules`, `previous`, and the rest of the index. Each step reads its own shown messages, its
-	// index, and whether it leaves anything behind; a statement it leaves out for a shown successor
-	// counts as shown. The first window or retrieval step that fits stays, so it never shrinks as the
-	// budget grows; then the first cut of its rows that leaves `recall` its room wins, else that step as
-	// it fits. With no such step that fits, the first bare row cut that leaves the room wins, else the
-	// first that fits, else the recurrence and statement cuts.
+	// Plans a request's opening: the recent window, the newest exchanges that have a reply, the earlier
+	// user messages retrieval ranks best, the newest member of each recurrence, and the current
+	// statements whole, in conversation order and without a statement a shown successor supersedes,
+	// then the request copy, which carries the Earlier index of what the opening leaves behind while
+	// `recall` is advertised. It plans at the price without `recall` and, while the scope admits it, at
+	// the price with it, and keeps `recall` only when that plan shows the newest exchange in the form
+	// its rung gave it, leaves `recall` its room, and shows no fewer requests than the plan without it.
 	#plan(
 		request: Message,
 		scan: LedgerScan,
@@ -1355,22 +1351,14 @@ export class Ledger implements LedgerInterface {
 		const at = scan.position(request.id) ?? scan.messages.length
 		const before = scan.messages.slice(0, at)
 		const current = collectLedgerStatements(before, this.#requests, this.#annotations)
-		// The plan prices what the first turn advertises under the pass's run scope, with `recall`
-		// offered, and the skills the thread shows: the context scope can move inside that bound after
-		// the plan, so it never lowers the price. While that turn advertises `load`, it holds back the
-		// largest skill a later load can show and one result.
+		// The plans price what the first turn advertises under the pass's run scope, with `recall`
+		// offered, or with it left out when the scope admits it and the plan goes without it, and the
+		// skills the thread shows: the context scope can move inside that bound after the plan, so it
+		// never lowers the price. While that turn advertises `load`, it holds back the largest skill a
+		// later load can show and one result.
 		const lists = intersectFilters(undefined, filter)
 		const disclosure = this.#show(lists)
 		const advertised = this.#advertise(lists, disclosure.skills)
-		const price = computeToolPrice(this.#measuredSet(), advertised, this.#priced())
-		const total =
-			Math.max(
-				0,
-				(this.#options.capacity - this.#predict) * this.#share.prompt -
-					(this.#priced().overhead - price.spared + price.added) -
-					this.#holdback(lists, disclosure, advertised, []),
-			) /
-			(1 + LEDGER_SCALE_DRIFT)
 		const built = this.#agent.context.build({
 			selection: { messages: [request], judgments: [] },
 			disclosure,
@@ -1382,36 +1370,40 @@ export class Ledger implements LedgerInterface {
 		const recallable = collectRecallMessages(input, this.#requests, this.#annotations).filter(
 			(message) => (scan.position(message.id) ?? at) < at,
 		)
-		// The window: the newest exchanges that have a reply, within the count bound, up to the first
-		// whose messages, the amenders inside its span included, would price past the window's share of
-		// the budget.
-		const exchanges = collectLedgerExchanges(before, this.#requests, this.#annotations).slice(
-			0,
-			LEDGER_RECENT_LIMIT,
-		)
+		// The window: the newest exchanges that have a reply, within the count bound, newest first, each
+		// with its call groups whose every call has its result.
+		const exchanges = collectLedgerExchanges(before, this.#requests, this.#annotations)
+		const latest = exchanges.slice(0, LEDGER_RECENT_LIMIT)
+		const groups = latest.map((exchange) => this.#collectGroups(scan, exchange))
+		const findings = scan.findings.filter((finding) => finding.result !== undefined)
 		// The findings a later shown finding that holds a result replaced or a write superseded. A finding
-		// is replaced only by a newer one, which every window that shows it shows too, so one reading
-		// over the largest window serves every step; a lookup that found nothing replaces nothing here.
+		// is replaced only by a newer one, which every window that shows it shows too, but for the newest
+		// exchange, whose lookups show only in a form that keeps a call group: one reading over the whole
+		// window serves a newest that shows its groups, and one over the exchanges past it serves a
+		// newest that shows none. A lookup that found nothing replaces nothing here.
 		const retired = collectRetiredFindings(
-			this.#collectWindow(scan, exchanges, exchanges.length, new Set()),
-			scan.findings.filter((finding) => finding.result !== undefined),
+			latest
+				.map((exchange, index) => this.#formExchange(scan, exchange, groups[index] ?? []))
+				.toReversed()
+				.flat(),
+			findings,
 		)
-		const over = exchanges.findIndex(
-			(_exchange, index) =>
-				this.#price(
-					stripThinking(
-						[...this.#collectRecent(scan, input, before, exchanges, index + 1, retired), request],
-						this.#replay,
-					).slice(0, -1),
-				) >
-				total * LEDGER_RECENT_SHARE,
+		const past = collectRetiredFindings(
+			latest
+				.slice(1)
+				.map((exchange, index) => this.#formExchange(scan, exchange, groups[index + 1] ?? []))
+				.toReversed()
+				.flat(),
+			findings,
 		)
-		const size = over < 0 ? exchanges.length : over
+		const forms = latest.map((exchange, index) =>
+			this.#formMember(scan, exchange, index + 1, groups[index] ?? [], retired),
+		)
+		const newest = latest[0]
 		const supersessions = input.classification.supersessions
 		const stated = new Set(current.map((message) => message.id))
 		// The recurrence: the newest member of each recurrence that is no current statement and that
-		// nothing supersedes, newest first, as many as fit the retrieval's share of the budget; the
-		// retrieved matches fit in what they leave. A superseded member never stands alone: its successor
+		// nothing supersedes, newest first. A superseded member never stands alone: its successor
 		// reaches the opening on its own paths.
 		const recurring = collectLedgerRecurrences(
 			before,
@@ -1421,9 +1413,162 @@ export class Ledger implements LedgerInterface {
 		).filter(
 			(message) => !stated.has(message.id) && (supersessions.get(message.id) ?? []).length === 0,
 		)
-		const recurrence = recurring.filter(
+		const survey: LedgerSurvey = {
+			request,
+			input,
+			projection,
+			before,
+			current,
+			recurring,
+			built,
+			recallable,
+			lists,
+			disclosure,
+			depths: new Map(exchanges.map((exchange, index) => [exchange.request.id, index + 1])),
+			// The newest exchange's forms, fullest first, ending with the pair where it differs.
+			ladder: (newest === undefined
+				? []
+				: [
+						...(forms[0] ?? []),
+						{ exchange: newest, depth: 1, messages: [newest.request, newest.reply] },
+					]
+			).filter(
+				(member, index, all) =>
+					index === 0 || member.messages.length !== all[index - 1]?.messages.length,
+			),
+			older: forms.slice(1),
+			spared: latest
+				.slice(1)
+				.map((exchange, index) =>
+					this.#formMember(scan, exchange, index + 2, groups[index + 1] ?? [], past),
+				),
+		}
+		const plain = this.#arrange(
+			survey,
+			scan,
+			admits ? advertised.filter((tool) => tool.name !== 'recall') : advertised,
+			false,
+		)
+		const offered = admits ? this.#arrange(survey, scan, advertised, true) : undefined
+		const plan =
+			offered !== undefined && offered.intact && offered.roomy && offered.requests >= plain.requests
+				? offered
+				: plain
+		// The plan without `recall` won, or nothing is left behind at the chosen step: `recall` leaves
+		// the scope for this request.
+		if (admits && (plan === plain || !plan.others)) {
+			const tools = this.#definitions()
+				.filter((tool) => tool.name !== 'recall')
+				.map((tool) => tool.name)
+			const host = this.#agent.context.scope
+			const narrowed = host?.narrow({ tools }) ?? createScope({ name: 'ledger', tools })
+			this.#current()?.apply(narrowed)
+			this.#agent.context.apply(narrowed)
+		}
+		return { messages: this.#buildOpening(request, built, plan.shown, plan.keys).messages }
+	}
+
+	// One plan of an opening at one advertised set, whose price sets the plan's `total`. The newest
+	// exchange takes the first form of its ladder that fits the window's and the retrieval's shares
+	// together, whole, then less its all-`recall` groups, then the pair; when even the pair is over,
+	// it leaves the window and its request is a `recent` copy.
+	#arrange(
+		survey: LedgerSurvey,
+		scan: LedgerScan,
+		advertised: readonly ToolDefinition[],
+		admits: boolean,
+	): LedgerPlanResult {
+		const price = computeToolPrice(this.#measuredSet(), advertised, this.#priced())
+		const total =
+			Math.max(
+				0,
+				(this.#options.capacity - this.#predict) * this.#share.prompt -
+					(this.#priced().overhead - price.spared + price.added) -
+					this.#holdback(survey.lists, survey.disclosure, advertised, []),
+			) /
+			(1 + LEDGER_SCALE_DRIFT)
+		const form = survey.ladder.find(
+			(rung) =>
+				this.#priceRecent(scan, survey, [rung]) <=
+				total * (LEDGER_RECENT_SHARE + LEDGER_RELEVANT_SHARE),
+		)
+		return this.#settleRung(survey, scan, advertised, admits, total, form)
+	}
+
+	// One rung's plan with the most exchanges past the newest that shows no fewer of the window's
+	// requests than the plan with none of them, so an exchange the window shows whole never costs a
+	// request a copy would show: the plan the shares fill, else fewer of those exchanges, newest
+	// first, down to none. Those exchanges take the forms the newest exchange's shown lookups leave
+	// them: retired by them only when the rung's form shows a call group.
+	#settleRung(
+		survey: LedgerSurvey,
+		scan: LedgerScan,
+		advertised: readonly ToolDefinition[],
+		admits: boolean,
+		total: number,
+		form: LedgerMember | undefined,
+	): LedgerPlanResult {
+		const older =
+			form !== undefined && form.messages.some((message) => message.role === 'tool')
+				? survey.older
+				: survey.spared
+		const most = this.#settle(survey, scan, advertised, admits, total, form, older)
+		if (most.recent === survey.older.length + 1) return most
+		const least = this.#settle(survey, scan, advertised, admits, total, form, [])
+		if (most.recent >= least.recent) return most
+		const filled =
+			this.#fillWindow(scan, survey, total, older, form === undefined ? [] : [form]).length -
+			(form === undefined ? 0 : 1)
+		for (const limit of Array.from(
+			{ length: Math.max(0, filled - 1) },
+			(_unused, at) => filled - 1 - at,
+		)) {
+			const plan = this.#settle(
+				survey,
+				scan,
+				advertised,
+				admits,
+				total,
+				form,
+				older.slice(0, limit),
+			)
+			if (plan.recent >= least.recent) return plan
+		}
+		return least
+	}
+
+	// One rung's plan: the newest exchange in `form`, or out of the window as a `recent` copy when
+	// `form` is undefined, the exchanges `older` offers past it newest first, each whole or less its
+	// all-`recall` groups, within the window's share and the whole window within the window's and the
+	// retrieval's shares together, up to the first that neither form fits, with the amenders inside
+	// their span; every other exchange of the window offers its request to retrieval as `recent`;
+	// the recurrence within the retrieval's share; and the retrieved matches within those two shares
+	// less the recurrence and the shown window. Past the budget the steps cut the `recent` copies and
+	// the other matches lowest rank first, then the window's exchanges oldest first down to the newest
+	// one, then the newest exchange down its ladder, less its all-`recall` groups, then its request
+	// and reply alone, then a copy of its request, then out, then the exchange rows from the deepest
+	// down to `previous-2`,
+	// then the id rows last-ranked first, then the recurrence, then the statements oldest first, then
+	// the topic rows last first, `rules`, `previous`, and the rest of the index. Each step reads its
+	// own shown messages, its index, and whether it leaves anything behind; a statement it leaves out
+	// for a shown successor counts as shown. The first window or retrieval step that fits stays, so it
+	// never shrinks as the budget grows; then the first cut of its rows that leaves `recall` its room
+	// wins, else that step as it fits. With no such step that fits, the first bare row cut that leaves
+	// the room wins, else the first that fits, else the recurrence and statement cuts.
+	#settle(
+		survey: LedgerSurvey,
+		scan: LedgerScan,
+		advertised: readonly ToolDefinition[],
+		admits: boolean,
+		total: number,
+		form: LedgerMember | undefined,
+		older: ReadonlyArray<readonly LedgerMember[]>,
+	): LedgerPlanResult {
+		const { request, input, projection, built, recallable, current } = survey
+		const supersessions = input.classification.supersessions
+		const recurrence = survey.recurring.filter(
 			(_message, index) =>
-				this.#price(recurring.slice(0, index + 1)) <= total * LEDGER_RELEVANT_SHARE,
+				this.#price(survey.recurring.slice(0, index + 1)) <= total * LEDGER_RELEVANT_SHARE,
 		)
 		const statements = [...current, ...recurrence]
 		// The statements each bare stage keeps: every current statement with the recurrence, then the
@@ -1451,10 +1596,24 @@ export class Ledger implements LedgerInterface {
 				? stage
 				: undefined,
 		)
-		const newest = Math.min(size, 1)
-		// The retrieved messages, each match's in rank order, from none the whole window, the amenders
-		// of the newest exchange's span, which every layout with a match shows, the current statements,
-		// a statement a shown successor supersedes included, or the recurrence show.
+		// The window: the newest exchange in this rung's form, then the exchanges `older` offers as the
+		// shares fill.
+		const shown = this.#fillWindow(scan, survey, total, older, form === undefined ? [] : [form])
+		const depths = new Set(shown.map((member) => member.depth))
+		// Every exchange of the window, newest first; those its shares cut offer their requests to
+		// retrieval as `recent` matches.
+		const members = [
+			...survey.ladder.slice(0, 1),
+			...survey.older.flatMap((one) => one.slice(0, 1)),
+		]
+		const recent = new Set(
+			members
+				.filter((member) => !depths.has(member.depth))
+				.map((member) => member.exchange.request.id),
+		)
+		// The retrieved messages, each match's in rank order, from none the window, the amenders of the
+		// newest exchange's span, which every layout with a match shows, the current statements, a
+		// statement a shown successor supersedes included, or the recurrence show.
 		const retrieved =
 			floor === 0
 				? this.#collectRetrieved(
@@ -1463,27 +1622,54 @@ export class Ledger implements LedgerInterface {
 						request,
 						new Set([
 							request.id,
-							...this.#collectWindow(scan, exchanges, size, retired).map((message) => message.id),
-							...this.#collectRecent(scan, input, before, exchanges, newest, retired).map(
-								(message) => message.id,
-							),
+							...shown.flatMap((member) => member.messages).map((message) => message.id),
+							...this.#collectSpan(
+								scan,
+								survey,
+								shown.filter((member) => member.depth === 1),
+							).map((message) => message.id),
 							...statements.map((message) => message.id),
 						]),
-						total * LEDGER_RELEVANT_SHARE - this.#price(recurrence),
+						Math.max(
+							0,
+							total * (LEDGER_RECENT_SHARE + LEDGER_RELEVANT_SHARE) -
+								this.#price(recurrence) -
+								this.#priceRecent(scan, survey, shown),
+						),
+						recent,
+						admits ? survey.depths : undefined,
 					)
 				: []
-		// Every statement kept: the window from the largest down to the newest exchange with every
-		// retrieved match, then the retrieved matches cut lowest rank first, then no window.
+		// Every statement kept: the whole window with the retrieved matches cut lowest rank first, the
+		// `recent` copies first, then the window's exchanges cut oldest first down to the newest one,
+		// then the newest exchange down the forms of its ladder past its own and then as a copy of its
+		// request, a copy no cut of the retrieved matches reaches, then none.
 		const layouts = [
-			...Array.from({ length: size - newest + 1 }, (_unused, index) => ({
-				window: size - index,
-				matches: retrieved.length,
+			...Array.from({ length: retrieved.length + 1 }, (_unused, index) => ({
+				members: shown,
+				matches: retrieved.length - index,
+				copies: [],
 			})),
-			...Array.from({ length: retrieved.length }, (_unused, index) => ({
-				window: newest,
-				matches: retrieved.length - 1 - index,
+			...Array.from({ length: Math.max(0, shown.length - 1) }, (_unused, index) => ({
+				members: shown.slice(0, shown.length - 1 - index),
+				matches: 0,
+				copies: [],
 			})),
-			...(newest === 0 ? [] : [{ window: 0, matches: 0 }]),
+			...(form === undefined
+				? []
+				: [
+						...survey.ladder
+							.slice(survey.ladder.indexOf(form) + 1)
+							.map((member) => ({ members: [member], matches: 0, copies: [] })),
+						{
+							members: [],
+							matches: 0,
+							copies: [
+								this.#copyRequest(form.exchange.request, admits ? survey.depths : undefined),
+							],
+						},
+					]),
+			...(shown.length === 0 ? [] : [{ members: [], matches: 0, copies: [] }]),
 		]
 		const windows =
 			floor === 0
@@ -1497,8 +1683,9 @@ export class Ledger implements LedgerInterface {
 							this.#collectShown(
 								scan,
 								[
-									...this.#collectRecent(scan, input, before, exchanges, layout.window, retired),
+									...this.#collectSpan(scan, survey, layout.members),
 									...retrieved.slice(0, layout.matches).flat(),
+									...layout.copies,
 								],
 								statements,
 							),
@@ -1587,7 +1774,7 @@ export class Ledger implements LedgerInterface {
 		// The statements a cut keeps, a superseded one included, count as shown, so one a shown successor
 		// supersedes leaves nothing behind.
 		const kept = cut === undefined ? [] : (stages[cut] ?? [])
-		const shown = chosen?.shown ?? filterLedgerShown(kept, supersessions, this.#requests)
+		const sent = chosen?.shown ?? filterLedgerShown(kept, supersessions, this.#requests)
 		const keys =
 			chosen?.keys ??
 			(cut !== undefined
@@ -1598,46 +1785,103 @@ export class Ledger implements LedgerInterface {
 						(rows) => this.#price(this.#buildOpening(request, built, [], rows).probe) <= total,
 					) ?? []))
 		const ids = new Set(kept.map((message) => message.id))
-		// Nothing left behind at the chosen step: `recall` leaves the scope for this request.
-		if (admits && !(chosen?.others ?? recallable.some((message) => !ids.has(message.id)))) {
-			const tools = this.#definitions()
-				.filter((tool) => tool.name !== 'recall')
-				.map((tool) => tool.name)
-			const host = this.#agent.context.scope
-			const narrowed = host?.narrow({ tools }) ?? createScope({ name: 'ledger', tools })
-			this.#current()?.apply(narrowed)
-			this.#agent.context.apply(narrowed)
+		const visible = new Set(sent.map((message) => message.id))
+		// The newest exchange's rung form, or its request for the copy rung.
+		const marks =
+			form?.messages ?? survey.ladder.slice(0, 1).map((member) => member.exchange.request)
+		const region = new Set(members.map((member) => member.exchange.request.id))
+		const requests = sent.filter((message) => this.#requests.has(message.id))
+		return {
+			shown: sent,
+			keys,
+			others: chosen?.others ?? recallable.some((message) => !ids.has(message.id)),
+			intact: marks.every((message) => visible.has(message.id)),
+			roomy:
+				!admits ||
+				this.#leavesRecallRoom(
+					this.#buildOpening(request, built, sent, keys).probe,
+					advertised,
+					longest,
+				),
+			requests: requests.length,
+			recent: requests.filter((message) => region.has(message.id)).length,
 		}
-		return { messages: this.#buildOpening(request, built, shown, keys).messages }
+	}
+
+	// The window's exchanges past those `taken` holds, newest first, each in the first of its forms
+	// that fits: the exchanges past the newest within the window's share, and the whole window within
+	// the window's and the retrieval's shares together, up to the first that no form fits.
+	#fillWindow(
+		scan: LedgerScan,
+		survey: LedgerSurvey,
+		total: number,
+		forms: ReadonlyArray<readonly LedgerMember[]>,
+		taken: readonly LedgerMember[],
+	): readonly LedgerMember[] {
+		const [choices, ...rest] = forms
+		if (choices === undefined) return taken
+		const alone = this.#priceRecent(
+			scan,
+			survey,
+			taken.filter((member) => member.depth === 1),
+		)
+		const fitted = choices
+			.map((member) => [...taken, member])
+			.find((candidate) => {
+				const price = this.#priceRecent(scan, survey, candidate)
+				return (
+					price <= total * (LEDGER_RECENT_SHARE + LEDGER_RELEVANT_SHARE) &&
+					price - alone <= total * LEDGER_RECENT_SHARE
+				)
+			})
+		return fitted === undefined ? taken : this.#fillWindow(scan, survey, total, rest, fitted)
+	}
+
+	// The price of a window's members as the shares read it: their messages and the amenders inside
+	// their span, as the opening sends them.
+	#priceRecent(scan: LedgerScan, survey: LedgerSurvey, members: readonly LedgerMember[]): number {
+		return this.#price(
+			stripThinking(
+				[...this.#collectSpan(scan, survey, members), survey.request],
+				this.#replay,
+			).slice(0, -1),
+		)
 	}
 
 	// The retrieved messages: each match's members as the opening sends them, a request turn as a copy
-	// under its label, in rank order within the count bound, up to the first match that would price
-	// the retrieval past `room`, the share of the budget the recurrence leaves it.
+	// under its label, which opens with its exchange key while `depths` is given, in rank order: the
+	// matches within the count bound, then the requests in `recent` the bound leaves out, up to the
+	// first match that would price the retrieval past `room`.
 	#collectRetrieved(
 		input: LedgerProjectionInput,
 		scan: LedgerScan,
 		request: Message,
 		shown: ReadonlySet<string>,
 		room: number,
+		recent: ReadonlySet<string>,
+		depths: ReadonlyMap<string, number> | undefined,
 	): ReadonlyArray<readonly Message[]> {
-		const matches = collectLedgerMatches(
+		const ranked = collectLedgerMatches(
 			input,
 			request.id,
 			this.#requests,
 			this.#annotations,
 			shown,
+			recent,
 		)
+		const bounded = ranked
+			.filter((match) => match.basis !== 'recent')
 			.slice(0, LEDGER_RELEVANT_LIMIT)
-			.map((match) =>
-				match.members.flatMap((id) => {
-					const message = scan.messages[scan.position(id) ?? -1]
-					if (message === undefined) return []
-					return this.#requests.has(id)
-						? [{ ...message, content: this.#labelEarlier(message) ?? message.content }]
-						: [message]
-				}),
-			)
+		const matches = [
+			...bounded,
+			...ranked.filter((match) => !bounded.includes(match) && recent.has(match.source)),
+		].map((match) =>
+			match.members.flatMap((id) => {
+				const message = scan.messages[scan.position(id) ?? -1]
+				if (message === undefined) return []
+				return this.#requests.has(id) ? [this.#copyRequest(message, depths)] : [message]
+			}),
+		)
 		const over = matches.findIndex(
 			(_match, index) => this.#price(matches.slice(0, index + 1).flat()) > room,
 		)
@@ -1674,58 +1918,87 @@ export class Ledger implements LedgerInterface {
 		}))
 	}
 
-	// The window's messages for its newest `count` exchanges, oldest first: each request, the call turns
-	// between it and its reply whose every call has its result, with those results, in stored order,
-	// then the reply. A call turn missing a result stays out, so the window never breaks a pairing, and
-	// so does a call group whose every result `retired` holds; a group with one live result stays whole.
-	#collectWindow(
-		scan: LedgerScan,
-		exchanges: readonly LedgerExchange[],
-		count: number,
-		retired: ReadonlySet<string>,
-	): readonly Message[] {
-		return exchanges
-			.slice(0, count)
-			.toReversed()
-			.flatMap((exchange) => {
-				const from = scan.position(exchange.request.id) ?? 0
-				const traffic = collectToolGroups(
-					scan.messages.slice(from + 1, scan.position(exchange.reply.id) ?? from + 1),
-				)
-					.filter(
-						([leader, ...results]) =>
-							leader !== undefined &&
-							leader.role === 'assistant' &&
-							hasCalls(leader) &&
-							(leader.calls ?? []).every((call) =>
-								results.some((result) => result.role === 'tool' && result.call === call.id),
-							) &&
-							!(results.length > 0 && results.every((result) => retired.has(result.id))),
-					)
-					.flat()
-					.toSorted((left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0))
-				return [exchange.request, ...traffic, exchange.reply]
-			})
+	// A request turn as an opening copies it: under its label, opening with its exchange key while
+	// `depths` is given and holds its depth.
+	#copyRequest(message: Message, depths: ReadonlyMap<string, number> | undefined): Message {
+		const label = this.#labelEarlier(message) ?? message.content
+		const depth = depths?.get(message.id)
+		return {
+			...message,
+			content: depth === undefined ? label : `${nameLedgerExchange(depth)}: ${label}`,
+		}
 	}
 
-	// The recent messages of the newest `count` exchanges, in conversation order, as the share prices
-	// them: the window's, and the amenders inside its span, each after the reply it follows.
-	#collectRecent(
+	// An exchange's call groups between its request and its reply whose every call has its result. A
+	// call turn missing a result stays out, so the window never breaks a pairing.
+	#collectGroups(scan: LedgerScan, exchange: LedgerExchange): ReadonlyArray<readonly Message[]> {
+		const from = scan.position(exchange.request.id) ?? 0
+		return collectToolGroups(
+			scan.messages.slice(from + 1, scan.position(exchange.reply.id) ?? from + 1),
+		).filter(
+			([leader, ...results]) =>
+				leader !== undefined &&
+				leader.role === 'assistant' &&
+				hasCalls(leader) &&
+				(leader.calls ?? []).every((call) =>
+					results.some((result) => result.role === 'tool' && result.call === call.id),
+				),
+		)
+	}
+
+	// An exchange as the window shows it: its request, these call groups in stored order, then its reply.
+	#formExchange(
 		scan: LedgerScan,
-		input: LedgerProjectionInput,
-		before: readonly Message[],
-		exchanges: readonly LedgerExchange[],
-		count: number,
-		retired: ReadonlySet<string>,
+		exchange: LedgerExchange,
+		groups: ReadonlyArray<readonly Message[]>,
 	): readonly Message[] {
 		return [
-			...this.#collectWindow(scan, exchanges, count, retired),
+			exchange.request,
+			...groups
+				.flat()
+				.toSorted((left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0)),
+			exchange.reply,
+		]
+	}
+
+	// A window exchange's forms, fullest first: whole, but a call group whose every result `retired`
+	// holds, so a group with one live result stays whole; then that form less its all-`recall` groups
+	// where that drops one.
+	#formMember(
+		scan: LedgerScan,
+		exchange: LedgerExchange,
+		depth: number,
+		groups: ReadonlyArray<readonly Message[]>,
+		retired: ReadonlySet<string>,
+	): readonly LedgerMember[] {
+		const live = groups.filter(
+			([, ...results]) =>
+				!(results.length > 0 && results.every((result) => retired.has(result.id))),
+		)
+		const kept = filterRecallGroups(live)
+		return [
+			{ exchange, depth, messages: this.#formExchange(scan, exchange, live) },
+			...(kept.length === live.length
+				? []
+				: [{ exchange, depth, messages: this.#formExchange(scan, exchange, kept) }]),
+		]
+	}
+
+	// The messages of a window's members in conversation order: each member's form, and the amenders
+	// inside their span, each after the reply it follows.
+	#collectSpan(
+		scan: LedgerScan,
+		survey: LedgerSurvey,
+		members: readonly LedgerMember[],
+	): readonly Message[] {
+		return [
+			...members.flatMap((member) => member.messages),
 			...collectLedgerAmenders(
-				before,
-				input.classification.amendments,
+				survey.before,
+				survey.input.classification.amendments,
 				this.#requests,
 				this.#annotations,
-				exchanges.slice(0, count),
+				members.map((member) => member.exchange),
 			),
 		].toSorted((left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0))
 	}

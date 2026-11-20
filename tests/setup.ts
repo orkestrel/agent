@@ -382,6 +382,7 @@ import {
 } from '@orkestrel/contract'
 import {
 	buildRecords,
+	collectLedgerExchanges,
 	collectNames,
 	isLedgerSnapshot,
 	linkOwners,
@@ -9836,6 +9837,223 @@ export function buildLedgerWindow(replies: readonly string[], statement?: string
 	}
 }
 
+/** Describes one call of a {@link LedgerTrafficExchange}: the tool it names, its arguments, and its result. */
+export interface LedgerTrafficCall {
+	readonly name: string
+	readonly arguments: Readonly<Record<string, unknown>>
+	readonly result: string
+}
+
+/** Describes one answered request of {@link buildLedgerTraffic}: its text, its calls, and its reply. */
+export interface LedgerTrafficExchange {
+	readonly request: string
+	readonly calls: readonly LedgerTrafficCall[]
+	readonly reply: string
+}
+
+/**
+ * Builds a ledger snapshot of answered requests, oldest first, each with its own call groups, so a
+ * plan's recent window reads exchanges whose traffic a test sizes.
+ *
+ * @remarks
+ * Exchange `N`, counted from 1 at the oldest, is the request `ask-N`, then for its `M`th call the
+ * call turn `turn-N-M`, which holds the one call `call-N-M`, and its result `result-N-M`, then the
+ * reply `reply-N`. The last reply ends the snapshot, so a following request has no current
+ * statement.
+ *
+ * @param exchanges - The exchanges, oldest first
+ * @returns The snapshot, with every request marked
+ */
+export function buildLedgerTraffic(exchanges: readonly LedgerTrafficExchange[]): LedgerSnapshot {
+	return {
+		conversation: {
+			id: 'traffic',
+			messages: exchanges.flatMap((exchange, at): readonly Message[] => [
+				{ id: `ask-${at + 1}`, role: 'user', content: exchange.request },
+				...exchange.calls.flatMap((call, index): readonly Message[] => [
+					{
+						id: `turn-${at + 1}-${index + 1}`,
+						role: 'assistant',
+						content: '',
+						calls: [
+							{ id: `call-${at + 1}-${index + 1}`, name: call.name, arguments: call.arguments },
+						],
+					},
+					{
+						id: `result-${at + 1}-${index + 1}`,
+						role: 'tool',
+						content: call.result,
+						call: `call-${at + 1}-${index + 1}`,
+					},
+				]),
+				{ id: `reply-${at + 1}`, role: 'assistant', content: exchange.reply },
+			]),
+		},
+		requests: exchanges.map((_exchange, at) => `ask-${at + 1}`),
+		notes: [],
+		failures: [],
+	}
+}
+
+/**
+ * Holds one answered request whose exchange carries a `recall` call group and a lookup call group,
+ * so as the budget grows its opening shows the exchange as a copy, as the pair, less its `recall`
+ * group, and whole.
+ *
+ * @remarks
+ * The request `ask-1` reads `Check BW-20931.`; the `recall` group `turn-1-1` and `result-1-1` holds
+ * about 500 estimate units, the lookup group `turn-1-2` and `result-1-2` about 310, and the reply
+ * `reply-1` about 110.
+ */
+export const LEDGER_LADDER_SNAPSHOT = Object.freeze<LedgerSnapshot>(
+	buildLedgerTraffic([
+		{
+			request: 'Check BW-20931.',
+			calls: [
+				{
+					name: 'recall',
+					arguments: { key: 'refunds' },
+					result: `Refunds need a manager. ${'r'.repeat(2000)}`,
+				},
+				{
+					name: 'lookup',
+					arguments: { id: 'BW-20931' },
+					result: `Account BW-20931: Brightwater Studio. ${'l'.repeat(1200)}`,
+				},
+			],
+			reply: `Brightwater is due $148.50. ${'p'.repeat(400)}`,
+		},
+	]),
+)
+
+/**
+ * Holds three short answered requests, then the exchange {@link LEDGER_LADDER_SNAPSHOT} holds, so a
+ * sweep of budgets moves the newest exchange through its ladder beside exchanges that show whole.
+ *
+ * @remarks
+ * Exchange `N` of the first three is the request `ask-N`, `Note crate N.`, and the reply `reply-N`;
+ * the newest exchange is `ask-4` with the groups `turn-4-1` and `turn-4-2` and the reply `reply-4`.
+ */
+export const LEDGER_SWEEP_SNAPSHOT = Object.freeze<LedgerSnapshot>(
+	buildLedgerTraffic([
+		...[1, 2, 3].map((at) => ({
+			request: `Note crate ${at}.`,
+			calls: [],
+			reply: `Noted crate ${at}. ${'n'.repeat(120)}`,
+		})),
+		{
+			request: 'Check BW-20931.',
+			calls: [
+				{
+					name: 'recall',
+					arguments: { key: 'refunds' },
+					result: `Refunds need a manager. ${'r'.repeat(2000)}`,
+				},
+				{
+					name: 'lookup',
+					arguments: { id: 'BW-20931' },
+					result: `Account BW-20931: Brightwater Studio. ${'l'.repeat(1200)}`,
+				},
+			],
+			reply: `Brightwater is due $148.50. ${'p'.repeat(400)}`,
+		},
+	]),
+)
+
+/**
+ * Holds four short answered requests, then one whose reply runs about 410 estimate units, so at a
+ * small budget that pair fits the recent window's tier yet leaves the other requests no room.
+ *
+ * @remarks
+ * Exchange `N` of the first four is the request `ask-N`, `Note item N.`, and the reply `reply-N`; the
+ * newest is `ask-5`, `Summarize the items.`, and `reply-5`.
+ */
+export const LEDGER_RUNG_SNAPSHOT = Object.freeze<LedgerSnapshot>(
+	buildLedgerTraffic([
+		...[1, 2, 3, 4].map((at) => ({
+			request: `Note item ${at}.`,
+			calls: [],
+			reply: `Noted item ${at}.`,
+		})),
+		{ request: 'Summarize the items.', calls: [], reply: `Summary. ${'s'.repeat(1600)}` },
+	]),
+)
+
+/**
+ * Holds two answered requests that each look up account BW-20931, the newer with a different and
+ * long result, so the newer lookup retires the older finding only while its own group shows.
+ *
+ * @remarks
+ * The older exchange is `ask-1`, its lookup group `turn-1-1` and `result-1-1`, and `reply-1`; the
+ * newer is `ask-2`, its lookup group `turn-2-1` and `result-2-1` of about 2,020 estimate units, and
+ * `reply-2`.
+ */
+export const LEDGER_RETIRE_SNAPSHOT = Object.freeze<LedgerSnapshot>(
+	buildLedgerTraffic([
+		{
+			request: 'Check BW-20931.',
+			calls: [
+				{
+					name: 'lookup',
+					arguments: { id: 'BW-20931' },
+					result: 'Account BW-20931: Brightwater Studio. Refund is $148.50.',
+				},
+			],
+			reply: 'Brightwater is due $148.50.',
+		},
+		{
+			request: 'Check BW-20931 again.',
+			calls: [
+				{
+					name: 'lookup',
+					arguments: { id: 'BW-20931' },
+					result: `Account BW-20931: Brightwater Studio. Refund is $160.00. ${'z'.repeat(8000)}`,
+				},
+			],
+			reply: 'Brightwater is due $160.00.',
+		},
+	]),
+)
+
+/**
+ * Holds {@link buildLedgerWindow}'s two short exchanges, then a current statement of about 410
+ * estimate units, so a small budget keeps the statement and cuts the newest exchange.
+ */
+export const LEDGER_STATED_SNAPSHOT = Object.freeze<LedgerSnapshot>({
+	...buildLedgerWindow(['Noted one.', 'Noted two.']),
+	conversation: {
+		id: 'stated',
+		messages: [
+			...buildLedgerWindow(['Noted one.', 'Noted two.']).conversation.messages,
+			{
+				id: 'stated',
+				role: 'user',
+				content: `The north dock holds the crates. ${'d'.repeat(1600)}`,
+			},
+		],
+	},
+})
+
+/**
+ * Holds nine short answered requests, so at the tight chat capacity the recent window's eight
+ * exchanges show whole or as copies of their requests.
+ *
+ * @remarks
+ * Exchange `N` is {@link buildLedgerWindow}'s `ask-N`, `Note item N.`, and `reply-N`, a reply naming
+ * day `N` of about 25 estimate units.
+ */
+export const LEDGER_TIGHT_SNAPSHOT = Object.freeze<LedgerSnapshot>(
+	buildLedgerWindow(
+		Array.from(
+			{ length: 9 },
+			(_unused, at) => `Reply ${at + 1}: the order ships on day ${at + 1}. ${'w'.repeat(60)}`,
+		),
+	),
+)
+
+/** Holds the gauge the chat study's scenarios measured, which prices the tool definitions. */
+export const LEDGER_TIGHT_GAUGE = Object.freeze({ scale: 0.9428571428571428, overhead: 509 })
+
 /**
  * Holds one desk topic the judge files statements under and never asks of a request, so a pair of
  * statements shares a near set while a request matches no candidate on a topic.
@@ -10038,6 +10256,74 @@ export function readLedgerOpening(messages: readonly Message[]): LedgerOpening {
 			.split('\n')
 			.filter((line) => line.startsWith('- '))
 			.map((line) => line.slice(2, line.indexOf(':'))),
+	}
+}
+
+/** Names how an opening shows a snapshot's newest exchange. */
+export type LedgerWindowForm = 'whole' | 'partial' | 'pair' | 'copy' | 'none'
+
+/**
+ * Carries what an opening shows of a snapshot's exchanges: the form of the newest, the request
+ * turns it shows as stored or as copies, and the exchanges it shows with their stored request and
+ * reply.
+ */
+export interface LedgerWindowView {
+	readonly form: LedgerWindowForm
+	readonly requests: number
+	readonly whole: number
+}
+
+/**
+ * Reads what a ledger's first call shows of the exchanges a snapshot stored.
+ *
+ * @remarks
+ * The newest exchange is `whole` with every call group it stored, `partial` with some, `pair` with
+ * its request and reply alone where it stored a group, `copy` as its request under another text,
+ * and `none` when its request is absent. An exchange with no group that shows its request and reply
+ * is `whole`.
+ *
+ * @param messages - The messages of the call, the system message first and the request copy last
+ * @param snapshot - The snapshot the ledger hydrated
+ * @returns The newest exchange's form and the counts
+ */
+export function readLedgerWindow(
+	messages: readonly Message[],
+	snapshot: LedgerSnapshot,
+): LedgerWindowView {
+	const stored = snapshot.conversation.messages
+	const requests = new Set(snapshot.requests)
+	const shown = new Map(messages.slice(1, -1).map((message) => [message.id, message]))
+	const exchanges = collectLedgerExchanges(stored, requests, new Set(snapshot.notes))
+	// The shown messages that keep their stored text.
+	const kept = new Set(
+		[...shown.values()]
+			.filter((message) => message.content === stored.find((one) => one.id === message.id)?.content)
+			.map((message) => message.id),
+	)
+	const newest = exchanges[0]
+	const asked = newest === undefined ? undefined : shown.get(newest.request.id)
+	const traffic =
+		newest === undefined
+			? []
+			: stored
+					.slice(stored.indexOf(newest.request) + 1, stored.indexOf(newest.reply))
+					.filter((message) => message.role === 'tool' || (message.calls ?? []).length > 0)
+	const sent = traffic.filter((message) => shown.has(message.id)).length
+	return {
+		form:
+			newest === undefined || asked === undefined
+				? 'none'
+				: !shown.has(newest.reply.id) || !kept.has(newest.request.id)
+					? 'copy'
+					: sent === traffic.length
+						? 'whole'
+						: sent === 0
+							? 'pair'
+							: 'partial',
+		requests: [...shown.keys()].filter((id) => requests.has(id)).length,
+		whole: exchanges.filter(
+			(exchange) => kept.has(exchange.request.id) && shown.has(exchange.reply.id),
+		).length,
 	}
 }
 

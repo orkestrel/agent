@@ -13,6 +13,7 @@ import {
 } from '@src/core'
 import {
 	collectRecallMessages,
+	filterRecallGroups,
 	collectLedgerExchanges,
 	collectLedgerKeys,
 	collectLedgerAmenders,
@@ -2633,6 +2634,7 @@ describe('collectLedgerMatches', () => {
 			requests,
 			new Set(),
 			shown,
+			new Set(),
 		)
 		// The request turn on the request's own id ranks above the statement on the inherited one.
 		expect(matches.map((match) => [match.source, match.basis])).toEqual([
@@ -2648,6 +2650,7 @@ describe('collectLedgerMatches', () => {
 			requests,
 			new Set(),
 			shown,
+			new Set(),
 		)
 		expect(named.map((match) => [match.source, match.basis])).toEqual([
 			['late', 'entity'],
@@ -2674,6 +2677,7 @@ describe('collectLedgerMatches', () => {
 			new Set([...asks, 'request']),
 			new Set(),
 			new Set([...fillers.map((message) => message.id), 'request']),
+			new Set(),
 		)
 		expect(matches.map((match) => [match.source, match.basis])).toEqual([
 			['new', 'word'],
@@ -2699,6 +2703,7 @@ describe('collectLedgerMatches', () => {
 			new Set([0, 1, 2, 3].map((at) => `ask-${at}`).concat('request')),
 			new Set(),
 			new Set([...shown.map((message) => message.id), 'request']),
+			new Set(),
 		)
 		expect(matches.map((match) => [match.source, match.basis])).toEqual([['code', 'word']])
 		expect(requireValue(matches[0]).score).toBeGreaterThan(0)
@@ -2722,6 +2727,7 @@ describe('collectLedgerMatches', () => {
 			new Set([0, 1, 2, 3].map((at) => `ask-${at}`).concat('request')),
 			new Set(),
 			new Set([...shown.map((message) => message.id), 'request']),
+			new Set(),
 		)
 		// The newer word match stays behind the older id match.
 		expect(matches.map((match) => [match.source, match.basis])).toEqual([
@@ -2756,6 +2762,7 @@ describe('collectLedgerMatches', () => {
 			new Set([...asks, 'request']),
 			new Set(),
 			shown,
+			new Set(),
 		)
 		// The unfiled budget is stale beside the newer shown one; the filed rule stays; the superseded
 		// hall statement stands for its successor, which the opening doesn't show.
@@ -2768,6 +2775,7 @@ describe('collectLedgerMatches', () => {
 				new Set([...asks, 'request']),
 				new Set(),
 				new Set([...shown, 'fresh']),
+				new Set(),
 			).map((match) => match.source),
 		).toEqual(['ruled'])
 	})
@@ -2798,6 +2806,7 @@ describe('collectLedgerMatches', () => {
 				requests,
 				new Set(),
 				new Set(['ask', 'reply', 'fixed', 'request']),
+				new Set(),
 			).map((match) => [match.source, match.members]),
 		).toEqual([['order', ['order']]])
 		// With `fixed` behind too, `moved` stands for it, the newer turn ranks first, and `order` brings
@@ -2809,11 +2818,106 @@ describe('collectLedgerMatches', () => {
 				requests,
 				new Set(),
 				new Set(['ask', 'reply', 'request']),
+				new Set(),
 			).map((match) => [match.source, match.members]),
 		).toEqual([
 			['fixed', ['fixed']],
 			['order', ['order', 'moved']],
 		])
+	})
+
+	it('ranks a recent request with no basis, a stale one, or a quiet one last as recent, keeps a stronger basis, and drops a request recent leaves out', () => {
+		const fillers = [1, 2, 3, 4].flatMap((at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', `Okay ${at}.`),
+			buildLedgerMessage(`ans-${at}`, 'assistant', 'Fine.'),
+		])
+		const messages = [
+			buildLedgerMessage('lamp', 'user', 'A cracked blue lamp needs a ready crate.'),
+			buildLedgerMessage('bare', 'user', 'Note the van.'),
+			buildLedgerMessage('bare-reply', 'assistant', 'Noted.'),
+			buildLedgerMessage('order', 'user', 'Check OR-7.'),
+			buildLedgerMessage('order-reply', 'assistant', 'Checked.'),
+			buildLedgerMessage('stale', 'user', 'Is the blue lamp boxed?'),
+			buildLedgerMessage('stale-reply', 'assistant', 'Boxed.'),
+			buildLedgerMessage('hush', 'user', 'Thanks a lot.'),
+			buildLedgerMessage('hush-reply', 'assistant', 'Welcome.'),
+			buildLedgerMessage('left', 'user', 'Note the cart.'),
+			buildLedgerMessage('left-reply', 'assistant', 'Noted.'),
+			...fillers,
+			buildLedgerMessage('newer', 'user', 'The blue lamp is in bay 2.'),
+			buildLedgerMessage('request', 'user', 'Is the OR-7 blue lamp ready?'),
+		]
+		const asks = [
+			'bare',
+			'order',
+			'stale',
+			'hush',
+			'left',
+			...[1, 2, 3, 4].map((at) => `ask-${at}`),
+		]
+		const input = buildLedgerInput({
+			messages,
+			classification: { quiet: ['hush'] },
+		})
+		const matches = collectLedgerMatches(
+			input,
+			'request',
+			new Set([...asks, 'request']),
+			new Set(),
+			new Set([...fillers.map((message) => message.id), 'newer', 'request']),
+			new Set(['bare', 'order', 'stale', 'hush']),
+		)
+		// `order` keeps its id basis; `lamp` matches on words; `stale` shares only words the newer shown
+		// statement carries, `bare` matches nothing, and `hush` is quiet, so all three are recent copies,
+		// newest first, after every other match; `left` is no recent request and matches nothing.
+		expect(matches.map((match) => [match.source, match.basis])).toEqual([
+			['order', 'entity'],
+			['lamp', 'word'],
+			['hush', 'recent'],
+			['stale', 'recent'],
+			['bare', 'recent'],
+		])
+	})
+})
+
+describe('filterRecallGroups', () => {
+	it('drops a group whose every call is recall, keeps a lookup group and a group that mixes both whole, and keeps the order', () => {
+		const recalled = buildLedgerMessage('recalled', 'assistant', '')
+		const looked = buildLedgerMessage('looked', 'assistant', '')
+		const mixed = buildLedgerMessage('mixed', 'assistant', '')
+		const groups: ReadonlyArray<readonly Message[]> = [
+			[
+				{ ...looked, calls: [{ id: 'one', name: 'lookup', arguments: { id: 'OR-7' } }] },
+				{ id: 'one-result', role: 'tool', content: 'OR-7 ships Monday.', call: 'one' },
+			],
+			[
+				{
+					...recalled,
+					calls: [
+						{ id: 'two', name: 'recall', arguments: { key: 'previous' } },
+						{ id: 'three', name: 'recall', arguments: { key: 'rules' } },
+					],
+				},
+				{ id: 'two-result', role: 'tool', content: 'Earlier request: Check OR-7.', call: 'two' },
+				{ id: 'three-result', role: 'tool', content: 'Refunds need a manager.', call: 'three' },
+			],
+			[
+				{
+					...mixed,
+					calls: [
+						{ id: 'four', name: 'recall', arguments: { key: 'OR-8' } },
+						{ id: 'five', name: 'lookup', arguments: { id: 'OR-8' } },
+					],
+				},
+				{ id: 'four-result', role: 'tool', content: 'Earlier request: Check OR-8.', call: 'four' },
+				{ id: 'five-result', role: 'tool', content: 'OR-8 ships Friday.', call: 'five' },
+			],
+		]
+		expect(filterRecallGroups(groups).map((group) => group.map((message) => message.id))).toEqual([
+			['looked', 'one-result'],
+			['mixed', 'four-result', 'five-result'],
+		])
+		expect(filterRecallGroups([])).toEqual([])
 	})
 })
 

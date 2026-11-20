@@ -1571,6 +1571,7 @@ describe('Classifier', () => {
 				new Set([request.id]),
 				new Set(),
 				new Set([request.id]),
+				new Set(),
 			)
 			// The refused pair leaves the earlier order standing for itself, so the request's own id finds it.
 			expect(matches.map((match) => [match.source, match.basis])).toEqual([['earlier', 'entity']])

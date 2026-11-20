@@ -173,29 +173,40 @@ export const LEDGER_EXCHANGE_LIMIT = 8
  * Caps at 8 the recent exchanges a request's opening shows as messages, each a request, its call turns and results, and its reply.
  *
  * @remarks
- * The recent window holds the newest exchanges that have a reply, newest first and contiguous, and
- * stops at the first that `LEDGER_RECENT_SHARE` leaves no room for. A shown exchange gets no row in
- * the Earlier index.
+ * The recent window holds the newest exchanges that have a reply, newest first. The newest shows
+ * whole, less its all-`recall` call groups, or as its request and reply alone, as its share allows,
+ * else its request shows as a `recent` copy; each later one shows whole or less its all-`recall`
+ * groups, and the window stops at the first that `LEDGER_RECENT_SHARE` leaves no room for. A shown
+ * exchange gets no row in the Earlier index.
  */
 export const LEDGER_RECENT_LIMIT = 8
 
 /**
- * Caps the recent window at 0.3 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift.
+ * Caps the recent window past its newest exchange at 0.3 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift.
  *
  * @remarks
- * The window's messages are priced as the opening sends them, through the gauge's scale, and the
- * window stops at the first exchange that would take it past this share.
+ * The window's messages are priced as the opening sends them, through the gauge's scale. The newest
+ * exchange takes at most 0.45 of `total`, the sum of this share and `LEDGER_RELEVANT_SHARE`, and so
+ * does the whole window; the exchanges past the newest stop at the first that would take them past
+ * this share or the window past that sum.
  */
 export const LEDGER_RECENT_SHARE = 0.3
 
 /**
- * Lists the bases a retrieved match rests on, strongest first: an id the request names, an id it inherits from the last answered request, a desk topic, then shared words — the one list the {@link LedgerMatchBasis} union derives from.
+ * Lists the bases a retrieved match rests on, strongest first: an id the request names, an id it inherits from the last answered request, a desk topic, shared words, then a request of the recent window that its shares cut — the one list the {@link LedgerMatchBasis} union derives from.
  *
  * @remarks
  * A match on an inherited id ranks below one on the request's own ids, and shared words fill only
- * the places the stronger bases leave.
+ * the places the stronger bases leave. A `recent` match is exempt from the stale test and from
+ * `LEDGER_RELEVANT_LIMIT`, and comes after the other matches.
  */
-export const LEDGER_MATCH_BASES = Object.freeze(['entity', 'inherited', 'topic', 'word'] as const)
+export const LEDGER_MATCH_BASES = Object.freeze([
+	'entity',
+	'inherited',
+	'topic',
+	'word',
+	'recent',
+] as const)
 
 /**
  * Caps at 8 the earlier user messages a request's opening retrieves by relevance, each with its amenders.
@@ -206,11 +217,12 @@ export const LEDGER_MATCH_BASES = Object.freeze(['entity', 'inherited', 'topic',
 export const LEDGER_RELEVANT_LIMIT = 8
 
 /**
- * Caps the retrieved messages at 0.15 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift.
+ * Caps the recurrence at 0.15 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift, and with `LEDGER_RECENT_SHARE` caps the retrieved messages.
  *
  * @remarks
- * The matches are taken in rank order, priced as the opening sends them, up to the first that would
- * take them past this share.
+ * The retrieved matches are taken in rank order, priced as the opening sends them, up to the first
+ * that would take them past 0.45 of `total`, the sum of this share and `LEDGER_RECENT_SHARE`, less
+ * the recurrence and the shown window, and never below 0.
  */
 export const LEDGER_RELEVANT_SHARE = 0.15
 

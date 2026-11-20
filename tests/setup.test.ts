@@ -139,6 +139,15 @@ import {
 	LEDGER_CUT_RULED_SNAPSHOT,
 	LEDGER_PLAN_REMARK,
 	readLedgerOpening,
+	readLedgerWindow,
+	buildLedgerTraffic,
+	LEDGER_LADDER_SNAPSHOT,
+	LEDGER_RETIRE_SNAPSHOT,
+	LEDGER_RUNG_SNAPSHOT,
+	LEDGER_STATED_SNAPSHOT,
+	LEDGER_SWEEP_SNAPSHOT,
+	LEDGER_TIGHT_GAUGE,
+	LEDGER_TIGHT_SNAPSHOT,
 	recallLedger,
 	readWireFrames,
 	seedCanaryContext,
@@ -1549,6 +1558,109 @@ describe('system boundary canary fixtures', () => {
 		])
 		expect(stored.slice(at + 16)).toEqual(ruled.slice(at))
 		expect(stored).toHaveLength(ruled.length + 16)
+	})
+
+	it('builds answered requests with one call group per call, each result answering its own call', () => {
+		const traffic = buildLedgerTraffic([
+			{
+				request: 'Check OR-7.',
+				calls: [{ name: 'lookup', arguments: { id: 'OR-7' }, result: 'OR-7 ships Monday.' }],
+				reply: 'It ships Monday.',
+			},
+			{ request: 'Thanks.', calls: [], reply: 'Welcome.' },
+		])
+
+		expect(isLedgerSnapshot(traffic)).toBe(true)
+		expect(traffic.requests).toEqual(['ask-1', 'ask-2'])
+		expect(traffic.conversation.messages).toEqual([
+			{ id: 'ask-1', role: 'user', content: 'Check OR-7.' },
+			{
+				id: 'turn-1-1',
+				role: 'assistant',
+				content: '',
+				calls: [{ id: 'call-1-1', name: 'lookup', arguments: { id: 'OR-7' } }],
+			},
+			{ id: 'result-1-1', role: 'tool', content: 'OR-7 ships Monday.', call: 'call-1-1' },
+			{ id: 'reply-1', role: 'assistant', content: 'It ships Monday.' },
+			{ id: 'ask-2', role: 'user', content: 'Thanks.' },
+			{ id: 'reply-2', role: 'assistant', content: 'Welcome.' },
+		])
+	})
+
+	it('holds the ladder, sweep, rung, retire, stated, and tight snapshots as valid snapshots of the sizes they describe', () => {
+		for (const snapshot of [
+			LEDGER_LADDER_SNAPSHOT,
+			LEDGER_SWEEP_SNAPSHOT,
+			LEDGER_RUNG_SNAPSHOT,
+			LEDGER_RETIRE_SNAPSHOT,
+			LEDGER_STATED_SNAPSHOT,
+			LEDGER_TIGHT_SNAPSHOT,
+		])
+			expect(isLedgerSnapshot(snapshot)).toBe(true)
+		expect(LEDGER_LADDER_SNAPSHOT.conversation.messages.map((message) => message.id)).toEqual([
+			'ask-1',
+			'turn-1-1',
+			'result-1-1',
+			'turn-1-2',
+			'result-1-2',
+			'reply-1',
+		])
+		expect(LEDGER_LADDER_SNAPSHOT.conversation.messages[1]?.calls?.[0]?.name).toBe('recall')
+		expect(LEDGER_LADDER_SNAPSHOT.conversation.messages[3]?.calls?.[0]?.name).toBe('lookup')
+		expect(LEDGER_SWEEP_SNAPSHOT.conversation.messages.slice(-6)).toEqual(
+			LEDGER_LADDER_SNAPSHOT.conversation.messages.map((message) => ({
+				...message,
+				id: message.id.replace('-1', '-4'),
+				...(message.call === undefined ? {} : { call: message.call.replace('-1', '-4') }),
+				...(message.calls === undefined
+					? {}
+					: {
+							calls: message.calls.map((call) => ({ ...call, id: call.id.replace('-1', '-4') })),
+						}),
+			})),
+		)
+		expect(
+			(
+				[
+					[LEDGER_RUNG_SNAPSHOT, 'reply-5'],
+					[LEDGER_RETIRE_SNAPSHOT, 'result-2-1'],
+					[LEDGER_STATED_SNAPSHOT, 'stated'],
+				] as const
+			).map(([snapshot, id]) =>
+				Math.round(
+					estimateMessages(snapshot.conversation.messages.filter((message) => message.id === id)) /
+						10,
+				),
+			),
+		).toEqual([41, 202, 41])
+		expect(LEDGER_STATED_SNAPSHOT.conversation.messages.at(-1)?.id).toBe('stated')
+		expect(LEDGER_TIGHT_SNAPSHOT.requests).toHaveLength(9)
+		expect(LEDGER_TIGHT_GAUGE.overhead).toBeGreaterThan(0)
+	})
+
+	it('reads how an opening shows the newest exchange and counts its requests and whole exchanges', () => {
+		const stored = LEDGER_LADDER_SNAPSHOT.conversation.messages
+		const head: Message = { id: 'system', role: 'system', content: 'Serve the desk.' }
+		const copy: Message = { id: 'copy', role: 'user', content: 'Make that shorter.' }
+		const cases: ReadonlyArray<readonly Message[]> = [
+			stored,
+			stored.filter((message) =>
+				['ask-1', 'turn-1-2', 'result-1-2', 'reply-1'].includes(message.id),
+			),
+			stored.filter((message) => ['ask-1', 'reply-1'].includes(message.id)),
+			[{ id: 'ask-1', role: 'user', content: 'Earlier request: Check BW-20931.' }],
+			[],
+		]
+
+		expect(
+			cases.map((shown) => readLedgerWindow([head, ...shown, copy], LEDGER_LADDER_SNAPSHOT)),
+		).toEqual([
+			{ form: 'whole', requests: 1, whole: 1 },
+			{ form: 'partial', requests: 1, whole: 1 },
+			{ form: 'pair', requests: 1, whole: 1 },
+			{ form: 'copy', requests: 1, whole: 0 },
+			{ form: 'none', requests: 0, whole: 0 },
+		])
 	})
 
 	it('builds day packets of four sources and the goals after them, the last day stopping before its fourth goal', () => {

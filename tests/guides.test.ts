@@ -1822,10 +1822,11 @@ await new GuideCommand({
 				requireValue(child.calls[0], 'Missing hydrated prompt').messages,
 			)
 			// At this capacity only the larger hydrated reserve needs row cuts to leave recall its room: the
-			// exchange row past `previous` goes first, then the id rows last-ranked first.
+			// exchange row past `previous` goes first, then the id rows last-ranked first, down to
+			// `previous`.
 			expect(hydrated.shown).toEqual(live.shown)
 			expect(live.keys).toEqual(['previous-2', 'previous', 'AX-4', 'AX-3', 'AX-2', 'AX-1'])
-			expect(hydrated.keys).toEqual(['previous', 'AX-4'])
+			expect(hydrated.keys).toEqual(['previous'])
 			expect(guideText).toContain(
 				'when the two reserves differ, the close test can stop at a different row step, which moves rows of the Earlier index and never a window exchange or a statement.',
 			)
@@ -2681,7 +2682,8 @@ await new GuideCommand({
 		})
 
 		it('returns the overhead a scope hides to the plan, so a ledger whose request entered under a scope that hides every definition plans as one with no overhead, as the plan claims', async () => {
-			const capacity = 600
+			const capacity = 1200
+			// At this capacity the plan with `recall` leaves its room, so it keeps `recall` wherever the scope admits it.
 			const tails: number[] = []
 			// A lookup whose definition prices well under the overhead, so hiding it alone spares part of it.
 			const catalog = createTool({
@@ -2714,7 +2716,7 @@ await new GuideCommand({
 				)
 				if (tools !== undefined) ledger.agent.context.apply(createScope({ name: 'host', tools }))
 				ledger.conversation.add(
-					Array.from({ length: 40 }, (_unused, at): MessageInput => ({
+					Array.from({ length: 80 }, (_unused, at): MessageInput => ({
 						role: 'user',
 						content: `Delivery ${at} arrived Tuesday with a completed receipt.`,
 					})),

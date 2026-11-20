@@ -5,7 +5,7 @@ import type {
 	AgentResult,
 	StreamInterface,
 } from '../agents/index.js'
-import type { ScopeInterface, Selection } from '../contexts/index.js'
+import type { AgentDisclosure, ScopeFilter, ScopeInterface, Selection } from '../contexts/index.js'
 import type { ConversationInterface, ConversationSnapshot } from '../conversations/index.js'
 import type { ThinkingReplay } from '../types.js'
 import type {
@@ -988,6 +988,76 @@ export interface LedgerMatch {
 	readonly members: readonly string[]
 	readonly basis: LedgerMatchBasis
 	readonly score: number
+}
+
+/**
+ * Carries one exchange of a request's recent window in the form an opening shows it.
+ *
+ * @remarks
+ * `depth` is 1 for the last exchange that has a reply and N for the one N exchanges back, as the
+ * exchange key `previous-N` names it. `messages` is the form, in stored order: the whole exchange,
+ * its request, the call groups whose every call has its result and whose results no shown later
+ * lookup retired, and its reply; that form less the groups whose every call is `recall`; or the
+ * pair, its request and its reply alone.
+ */
+export interface LedgerMember {
+	readonly exchange: LedgerExchange
+	readonly depth: number
+	readonly messages: readonly Message[]
+}
+
+/**
+ * Carries what a request's plan reads before it prices a layout: the request, its projection, the
+ * statements and recurrence it can keep, and the recent window's forms.
+ *
+ * @remarks
+ * `before` holds the messages stored before the request, `current` its current statements, and
+ * `recurring` the newest member of each recurrence that no current statement is and nothing
+ * supersedes, newest first. `built` is the head the first turn renders, `recallable` what `recall`
+ * can list from before the request, and `lists` and `disclosure` the run scope and the shown skills
+ * the plan prices. `depths` maps each exchange's request id to its depth. `ladder` holds the newest
+ * exchange's forms, fullest first: whole, less its all-`recall` groups, and the pair, each only
+ * where it differs from the one before. `older` holds the forms of each exchange past the newest,
+ * newest first and each whole then less its all-`recall` groups, when the newest exchange shows
+ * its lookups; `spared` holds them when it shows none, so no lookup of the newest retires a group.
+ */
+export interface LedgerSurvey {
+	readonly request: Message
+	readonly input: LedgerProjectionInput
+	readonly projection: LedgerProjection
+	readonly before: readonly Message[]
+	readonly current: readonly Message[]
+	readonly recurring: readonly Message[]
+	readonly built: readonly Message[]
+	readonly recallable: readonly Message[]
+	readonly lists: ScopeFilter
+	readonly disclosure: AgentDisclosure
+	readonly depths: ReadonlyMap<string, number>
+	readonly ladder: readonly LedgerMember[]
+	readonly older: ReadonlyArray<readonly LedgerMember[]>
+	readonly spared: ReadonlyArray<readonly LedgerMember[]>
+}
+
+/**
+ * Carries one plan of a request's opening at one advertised tool set: what it shows, its Earlier
+ * index, and the readings that choose between the plan with `recall` and the plan without it.
+ *
+ * @remarks
+ * `shown` holds the messages the opening sends before the request copy, and `keys` the copy's index
+ * rows. `others` is true when the plan leaves behind something `recall` can list. `intact` is true
+ * when it shows the newest exchange in the form the window's rung gave it, or there is no exchange.
+ * `roomy` is true when its first turn leaves `recall` the close rule's room. `requests` counts the
+ * request turns it shows, in the window or as copies, and `recent` those of the recent window's
+ * exchanges.
+ */
+export interface LedgerPlanResult {
+	readonly shown: readonly Message[]
+	readonly keys: readonly LedgerKey[]
+	readonly others: boolean
+	readonly intact: boolean
+	readonly roomy: boolean
+	readonly requests: number
+	readonly recent: number
 }
 
 /** Identifies an accepted direct message amendment whose sentence scope remains unresolved. */
