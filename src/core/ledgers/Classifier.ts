@@ -156,7 +156,7 @@ export class Classifier implements ClassifierInterface {
 
 	/**
 	 * Reads the whole filing from the recorded judgments.
-	 * @returns The quiet ids, categories, topics, and the amendment and supersession marks; an `amends` answer marks a pair amended when the two messages share an id or a number, and a `supersedes` answer marks it superseded and amended when they share an id that holds a letter or a registry id the entities handler names
+	 * @returns The quiet ids, categories, topics, and the amendment and supersession marks; an `amends` answer marks a pair amended when the two messages share an id or a number, and a `supersedes` answer marks it superseded and amended when they share an id that holds a letter, read from the text or named by the entities handler
 	 */
 	classification(): LedgerClassification {
 		const messages = this.#options.conversation.messages()
@@ -422,19 +422,20 @@ export class Classifier implements ClassifierInterface {
 		)
 	}
 
-	// Reports whether two messages share an id: a literal id that holds a letter, as `extractLiterals`
-	// reads it from the text, or a registry id the entities handler names. A number, a date, or a range
-	// shares nothing, so two sources that carry one clock time or one day never pair.
+	// Reports whether two messages share an id that holds a letter, whether `extractLiterals` reads it
+	// from the text or the entities handler names it from the registry. A number, a date, or a range
+	// shares nothing on either path, so two sources that carry one clock time or one day never pair.
 	#sharesId(before: Message, after: Message, entities: Map<string, ReadonlySet<string>>): boolean {
 		const own = this.#collectIds(before, entities)
 		return [...this.#collectIds(after, entities)].some((id) => own.has(id))
 	}
 
 	#collectIds(message: Message, entities: Map<string, ReadonlySet<string>>): ReadonlySet<string> {
-		return new Set([
-			...[...extractLiterals(message.content).ids].filter((id) => /\p{L}/u.test(id)),
-			...this.#readEntities(message, entities),
-		])
+		return new Set(
+			[...extractLiterals(message.content).ids, ...this.#readEntities(message, entities)].filter(
+				(id) => /\p{L}/u.test(id),
+			),
+		)
 	}
 
 	// Reports whether a correction is compared against an earlier message: the message is not quiet

@@ -20,6 +20,7 @@ import {
 	collectLedgerRecurrences,
 	collectLedgerStatements,
 	filterLedgerShown,
+	matchesShownSuccessor,
 	nameLedgerExchange,
 	parseLedgerExchange,
 	renderLedgerKeys,
@@ -2236,6 +2237,24 @@ describe('filterLedgerShown', () => {
 			),
 		).toEqual(['old', 'ask', 'reply'])
 		expect(filterLedgerShown(shown, new Map(), new Set(['ask']))).toEqual(shown)
+	})
+})
+
+describe('matchesShownSuccessor', () => {
+	const supersessions = new Map([
+		['old', ['mid']],
+		['mid', ['new']],
+	])
+
+	it('reports a successor, or a successor of a successor, that the set holds', () => {
+		expect(matchesShownSuccessor(supersessions, 'old', new Set(['mid']))).toBe(true)
+		expect(matchesShownSuccessor(supersessions, 'old', new Set(['new']))).toBe(true)
+	})
+
+	it('reports no successor the set lacks, and never the message itself', () => {
+		expect(matchesShownSuccessor(supersessions, 'old', new Set(['other']))).toBe(false)
+		expect(matchesShownSuccessor(supersessions, 'old', new Set(['old']))).toBe(false)
+		expect(matchesShownSuccessor(supersessions, 'new', new Set(['old', 'mid', 'new']))).toBe(false)
 	})
 })
 

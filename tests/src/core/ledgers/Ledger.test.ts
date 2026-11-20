@@ -2251,20 +2251,21 @@ describe('Ledger', () => {
 				...(thinking === undefined ? {} : { predict: 1024 }),
 			})
 			seedLedgerRecall(ledger)
+			// Each delivery's handoff word carries its own two letters at one length, so no two deliveries
+			// recur.
 			ledger.conversation.add(
-				buildDeliverySeed(20).map((message) => ({
+				buildDeliverySeed(20).map((message, at) => ({
 					...message,
-					content: message.content + ' Completed handoff.',
+					content: `${message.content} Completed hand${String.fromCharCode(97 + Math.floor(at / 26), 97 + (at % 26))}f.`,
 				})),
 			)
-			// An answered request leaves the deliveries earlier, where recall reads them; they differ in
-			// their numbers alone, so the opening shows the newest and recall starts at the one before.
+			// An answered request leaves the deliveries earlier, where recall reads them.
 			await ledger.respond('Note the deliveries.')
 			await ledger.respond('Review.' + 'q'.repeat(10600))
 			const recalled = requireValue(
 				provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
 			)
-			expect(recalled).toContain('Delivery 18')
+			expect(recalled).toContain('Delivery 19')
 			expect(recalled).toContain('older items not shown')
 			results.push(recalled)
 		}
@@ -2357,20 +2358,21 @@ describe('Ledger', () => {
 			const ledger = createLedger(provider, { ...uncalibrated, predict })
 			await ledger.calibrate(new AbortController().signal)
 			seedLedgerRecall(ledger)
+			// Each delivery's handoff word carries its own two letters at one length, so no two deliveries
+			// recur.
 			ledger.conversation.add(
-				buildDeliverySeed(20).map((message) => ({
+				buildDeliverySeed(20).map((message, at) => ({
 					...message,
-					content: message.content + ' Completed handoff.',
+					content: `${message.content} Completed hand${String.fromCharCode(97 + Math.floor(at / 26), 97 + (at % 26))}f.`,
 				})),
 			)
-			// An answered request leaves the deliveries earlier, where recall reads them; they differ in
-			// their numbers alone, so the opening shows the newest and recall starts at the one before.
+			// An answered request leaves the deliveries earlier, where recall reads them.
 			await ledger.respond('Note the deliveries.')
 			await ledger.respond('Review.' + 'q'.repeat(10600))
 			const recalled = requireValue(
 				provider.calls[4]?.messages.findLast((message) => message.role === 'tool')?.content,
 			)
-			expect(recalled).toContain('Delivery 18 arrived Tuesday with a completed receipt.')
+			expect(recalled).toContain('Delivery 19 arrived Tuesday with a completed receipt.')
 			expect(recalled).not.toBe(LEDGER_NOTES.closure)
 			expect(recalled.includes('Delivery 0 arrived')).toBe(predict === 1)
 			expect(recalled.includes('older items not shown')).toBe(predict === 1024)
@@ -7205,9 +7207,24 @@ describe('Ledger — host turns', () => {
 	})
 
 	it('spends the request recall limit on a recall a host calls by hand during a turn', async () => {
-		// Three blocks: the newest block's statements recur and show, the first block's match the
-		// request, and the middle block's stay behind, so the opening offers recall.
-		const seed = await seedLedgerPrefix(26, 'correction')
+		const seeded = await seedLedgerPrefix(18, 'correction')
+		// The second block's statements are reworded at one length, so none recurs with the first
+		// block's and they stay behind, which keeps recall offered.
+		const seed = {
+			snapshot: {
+				...seeded.snapshot,
+				conversation: {
+					...seeded.snapshot.conversation,
+					messages: seeded.snapshot.conversation.messages.map((message) => ({
+						...message,
+						content: message.content
+							.replace('Customer OR-1001 ships', 'Customer OR-1001 sails')
+							.replace('The refund for OR-1001 is', 'The rebate for OR-1001 is')
+							.replace('OR-1001 asked for an update', 'OR-1001 asked for an answer'),
+					})),
+				},
+			},
+		}
 		const gate = Promise.withResolvers<void>()
 		const scheduler = createGatedScheduler(gate)
 		const recalled = {
@@ -9075,20 +9092,23 @@ describe('Ledger — disclosure: the shown set in every build', () => {
 			description: 'The drawer manual',
 			content: 'Read the drawer manual before you open one. '.repeat(40),
 		})
+		// Each drawer's vault word carries its own two letters at one length, so no two drawers recur.
 		ledger.conversation.add(
 			Array.from({ length: 60 }, (_, at): MessageInput => ({
 				role: 'user',
-				content: `The zephyr drawer ${at} holds spare keys and the vault ledger. `.repeat(3),
+				content:
+					`The zephyr drawer ${at} holds spare keys and the v${String.fromCharCode(97 + Math.floor(at / 26), 97 + (at % 26))}lt ledger. `.repeat(
+						3,
+					),
 			})),
 		)
-		// A first request leaves the drawers earlier; they differ in their numbers alone, so the second's
-		// opening sends only the newest, and recall lists from the one before.
+		// A first request leaves the drawers earlier, so the second's opening sends none of them.
 		await ledger.respond('Note the drawers.')
 		await ledger.respond('Where are the spare keys?')
 		const listing = requireValue(
 			ledger.conversation.messages().find((message) => message.call === 'q'),
 		)
-		expect(listing.content).toContain('zephyr drawer 58 ')
+		expect(listing.content).toContain('zephyr drawer 59 ')
 		expect(listing.content).not.toContain('zephyr drawer 0 ')
 		expect(estimateMessages(requireValue(provider.calls[3]).messages)).toBeLessThanOrEqual(
 			3000 - 100,
@@ -9553,8 +9573,7 @@ describe('Ledger — disclosure: the room repair', () => {
 	)
 
 	it('sizes a recall on the turn after a load at the rate the calls before the load measured', async () => {
-		// The sources differ in their numbers alone, so the opening shows the newest and recall lists the rest.
-		expect(await serveLedgerWideRecall(20)).toEqual({ listed: 19, cut: false })
+		expect(await serveLedgerWideRecall(20)).toEqual({ listed: 20, cut: false })
 	})
 
 	it.each([
@@ -11275,7 +11294,7 @@ describe('Ledger — the lean opening', () => {
 		])
 	})
 
-	it('lists the correction of a message the prompt shows when the key matches only that message and the opening leaves the correction out', async () => {
+	it('lists no superseded correction alone for a key that matches only a shown message whose correction the opening leaves out for its shown successor', async () => {
 		const provider = createScriptedProvider(
 			[
 				{
@@ -11319,8 +11338,9 @@ describe('Ledger — the lean opening', () => {
 		])
 		await ledger.respond('When does the order ship?')
 		// The window shows the request the key matches; its correction sits inside the window's span, but
-		// the current statement supersedes it, so the opening leaves it out and recall lists it; the stray
-		// statement behind keeps recall offered.
+		// the current statement supersedes it, so the opening leaves it out, and recall's chain skips it
+		// rather than list it alone beside its shown successor. The stray statement behind keeps recall
+		// offered.
 		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
 			'ask',
 			'noted',
@@ -11330,7 +11350,7 @@ describe('Ledger — the lean opening', () => {
 		])
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'amended')?.content,
-		).toBe('Correction: order AX-7 ships on Tuesday.')
+		).toBe('"Monday morning" is in the messages you can see; answer from them')
 	})
 
 	it('carries the request in place of the copy in the answer pass, so no Earlier block reaches it', async () => {
@@ -11395,11 +11415,9 @@ describe('Ledger — the lean opening', () => {
 			`${LEDGER_PREVIOUS_KEY}-${LEDGER_RECENT_LIMIT + 1}`,
 		)
 		expect(keys.slice(LEDGER_EXCHANGE_LIMIT)).toHaveLength(LEDGER_KEY_LIMIT)
-		// The request's own ids lead the id rows; AC-7 has none, since retrieval shows the orders that
-		// carry it. The orders recur in two wordings, so the opening shows the newest of each, GL-98's
-		// and GL-99's, and the recurring ids row from GL-97 down, newest first.
-		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-7', 'GL-97'])
-		expect(keys).not.toContain('AC-7')
+		// The request's own ids lead the id rows; AC-7 has none, since retrieval shows the 8 orders that
+		// carry it.
+		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-7', 'GL-94'])
 		// Four recalls, the request's limit, run inside the request that planned the index.
 		const recalled = [
 			keys[LEDGER_EXCHANGE_LIMIT - 1],
@@ -12212,7 +12230,142 @@ describe('Ledger — superseded values in the window', () => {
 	})
 })
 
+describe('Ledger — superseded values in the window: the registry date and the recall chain', () => {
+	it('files no supersession for two statements that share only a date a lookup registered', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: {
+					conversation: {
+						id: 'dated',
+						messages: [
+							{ id: 'ask-1', role: 'user', content: 'Check the schedule.' },
+							{
+								id: 'call-1',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'c1', name: 'lookup', arguments: { date: '2031-02-15' } }],
+							},
+							{
+								id: 'res-1',
+								role: 'tool',
+								call: 'c1',
+								content: 'Schedule for 2031-02-15: two pallets.',
+							},
+							{ id: 'reply-1', role: 'assistant', content: 'Two pallets.' },
+							{ id: 'old', role: 'user', content: 'Pallets for 2031-02-15 are stacked.' },
+							{ id: 'new', role: 'user', content: 'Correction: pallets for 2031-02-15 are loose.' },
+						],
+					},
+					requests: ['ask-1'],
+					notes: [],
+					failures: [],
+				},
+				judge: createCorrectionJudge(createRecorder(), new Set(['new']), {
+					amends: 0.9,
+					supersedes: 0.9,
+				}),
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// The lookup's argument registers the date, so both statements name it as a registry id; a date
+		// holds no letter, so the pair stays amended alone and the earlier statement keeps its place.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'call-1',
+			'res-1',
+			'reply-1',
+			'old',
+			'new',
+		])
+	})
+
+	it('lists a matched statement without an amender whose supersessions reach a shown message', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'rests', name: 'recall', arguments: { key: 'rests' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'chain',
+						messages: [
+							{ id: 'rests', role: 'user', content: 'Crate LC-7 rests in bay 4.' },
+							{ id: 'moved', role: 'user', content: 'Correction: crate LC-7 moved to bay 5.' },
+							{ id: 'ask-1', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-1', role: 'assistant', content: 'The van is ready.' },
+							{ id: 'final', role: 'user', content: 'Correction: crate LC-7 moved to bay 6.' },
+						],
+					},
+					requests: ['ask-1'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		const [rests, moved, final] = ['rests', 'moved', 'final'].map((id) =>
+			requireValue(ledger.conversation.message(id)),
+		)
+		ledger.conversation.judgments.add([
+			buildLedgerPairJudgment('amends', requireValue(rests), requireValue(moved), 1),
+			buildLedgerPairJudgment('supersedes', requireValue(moved), requireValue(final), 1),
+		])
+		await ledger.respond('Anything else?')
+		// `moved` amends the statement the key matches, but the shown `final` supersedes it, so the chain
+		// skips it.
+		const listing = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'rests')?.content,
+		)
+		expect(listing).toContain('Crate LC-7 rests in bay 4.')
+		expect(listing).not.toContain('Correction: crate LC-7 moved to bay 5.')
+	})
+})
+
 describe('Ledger — the newest statement of each recurrence', () => {
+	it('leaves out the newest member of a recurrence that a correction before the window supersedes', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: {
+					conversation: {
+						id: 'superseded',
+						messages: [
+							{ id: 'bc-1', role: 'user', content: 'Order BC-1 shipped.' },
+							{ id: 'bc-2', role: 'user', content: 'Order BC-2 shipped.' },
+							{ id: 'held', role: 'user', content: 'Correction: BC-2 is held at the dock.' },
+							{ id: 'ask-1', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-1', role: 'assistant', content: 'The van is ready.' },
+						],
+					},
+					requests: ['ask-1'],
+					notes: [],
+					failures: [],
+				},
+				judge: createCorrectionJudge(createRecorder(), new Set(['held']), {
+					amends: 0.9,
+					supersedes: 0.9,
+				}),
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// The shipped orders recur, but the correction supersedes the newer one and sits before the
+		// window, so the opening shows neither rather than the stale statement alone.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'reply-1',
+		])
+	})
+
 	it('shows the newest day marker on a later goal that shares no id or word with it, and no older one', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(

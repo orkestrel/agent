@@ -418,9 +418,7 @@ export function filterLedgerShown(
 		(message) =>
 			message.role !== 'user' ||
 			requests.has(message.id) ||
-			!scanAmendments(supersessions, message.id, () => true).some(
-				(id) => id !== message.id && ids.has(id),
-			),
+			!matchesShownSuccessor(supersessions, message.id, ids),
 	)
 }
 
@@ -925,9 +923,7 @@ export function collectLedgerMatches(
 				(id) =>
 					eligible.has(id) &&
 					!state.claimed.has(id) &&
-					!scanAmendments(classification.supersessions, id, () => true).some(
-						(later) => later !== id && excluded.has(later),
-					),
+					!matchesShownSuccessor(classification.supersessions, id, excluded),
 			)
 			return {
 				claimed: new Set([...state.claimed, ...members]),
@@ -968,6 +964,33 @@ export function scanAmendments(
 		for (const later of amendments.get(id) ?? []) queue.push(later)
 	}
 	return admitted
+}
+
+/**
+ * Checks whether a chain of supersessions links a message to another message a set holds.
+ *
+ * @remarks
+ * The chain follows `supersessions` as {@link scanAmendments} walks it, so a successor's successor
+ * counts, and the message itself never does. The plan's filter, retrieval's members, and the
+ * `recall` tool's amendment chains read this one test against the messages the opening shows.
+ *
+ * @param supersessions - The later messages that supersede each earlier message
+ * @param id - The message id
+ * @param shown - The ids to look for, such as those of the messages an opening shows
+ * @returns True if the chain reaches a message `shown` holds; false otherwise
+ * @example
+ * ```ts
+ * matchesShownSuccessor(new Map([['old', ['mid']], ['mid', ['new']]]), 'old', new Set(['new'])) // true
+ * ```
+ */
+export function matchesShownSuccessor(
+	supersessions: ReadonlyMap<string, readonly string[]>,
+	id: string,
+	shown: ReadonlySet<string>,
+): boolean {
+	return scanAmendments(supersessions, id, () => true).some(
+		(later) => later !== id && shown.has(later),
+	)
 }
 
 /**

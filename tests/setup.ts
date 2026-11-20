@@ -10047,8 +10047,9 @@ export function readLedgerOpening(messages: readonly Message[]): LedgerOpening {
  *
  * @remarks
  * Goal `N` names order `GL-N` and account `AC-M`, where `M` is `N` modulo 50, so account ids recur
- * across goals and order ids do not. The last goal ends with its reply, so a following request has
- * no current statement.
+ * across goals and order ids do not. Each goal's statements carry two letters of their own inside
+ * one word, at one length, so no two statements recur. The last goal ends with its reply, so a
+ * following request has no current statement.
  *
  * @param count - The earlier messages the snapshot holds, rounded down to whole goals of 4
  * @returns The snapshot, with every goal's request marked
@@ -10062,12 +10063,12 @@ export function buildLedgerGoals(count: number): LedgerSnapshot {
 				{
 					id: `order-${at}`,
 					role: 'user' as const,
-					content: `Order GL-${at} for account AC-${at % 50} needs a ${at % 2 === 0 ? 'refund' : 'reship'}.`,
+					content: `Order GL-${at} for account AC-${at % 50} n${String.fromCharCode(97 + Math.floor(at / 26), 97 + (at % 26))}ds a ${at % 2 === 0 ? 'refund' : 'reship'}.`,
 				},
 				{
 					id: `day-${at}`,
 					role: 'user' as const,
-					content: `The customer called on day ${at} about the ${at % 3 === 0 ? 'lamp' : 'vase'}.`,
+					content: `The customer c${String.fromCharCode(97 + Math.floor(at / 26), 97 + (at % 26))}led on day ${at} about the ${at % 3 === 0 ? 'lamp' : 'vase'}.`,
 				},
 				{ id: `ask-${at}`, role: 'user' as const, content: `What do we do for GL-${at}?` },
 				{
@@ -15410,7 +15411,8 @@ export async function bisectLedgerPadding(
 /**
  * Serves a `recall` on the turn after a load of the `wide` skill, whose ten tools carry long
  * descriptions, over a number of stored sources a first request left earlier, and reads how many
- * sources the listing names.
+ * sources the listing names. Each source's vault word carries its own two letters at one length, so
+ * no two sources recur.
  *
  * @param sources - The stored sources the recall can list
  * @returns The listed count, and whether the listing was cut
@@ -15466,7 +15468,10 @@ export async function serveLedgerWideRecall(
 	ledger.conversation.add(
 		Array.from({ length: sources }, (_, at): MessageInput => ({
 			role: 'user',
-			content: `The zephyr drawer ${at} holds spare keys and the vault ledger. `.repeat(3),
+			content:
+				`The zephyr drawer ${at} holds spare keys and the v${String.fromCharCode(97 + Math.floor(at / 26), 97 + (at % 26))}lt ledger. `.repeat(
+					3,
+				),
 		})),
 	)
 	await ledger.respond('Note the drawers.')

@@ -3317,7 +3317,7 @@ await new GuideCommand({
 			)
 		})
 
-		it('marks an amends pair only on a shared id or number and a supersedes pair only on a shared id with a letter or a registry id, as the filing claims', async () => {
+		it('marks an amends pair only on a shared id or number and a supersedes pair only on a shared id that holds a letter, from the text or the registry, as the filing claims', async () => {
 			// Each amends answer of 0.9 reaches its cutoff; only the shared number marks the pair.
 			expect(
 				await classifyLedgerCorrection('Correction: refunds need a manager over $250.', 0.1),
@@ -3346,7 +3346,7 @@ await new GuideCommand({
 				supersessions: false,
 			})
 			expect(guideText).toContain(
-				'an `amends` answer at its cutoff marks a pair amended only when the two messages share an id or a number, and a `supersedes` answer at its cutoff marks the pair superseded and amended only when they share an id that holds a letter, as `extractLiterals` reads it, or a registry id the entities handler names, so a shared number, date, or range never marks a supersession.',
+				'an `amends` answer at its cutoff marks a pair amended only when the two messages share an id or a number, and a `supersedes` answer at its cutoff marks the pair superseded and amended only when they share an id that holds a letter, whether `extractLiterals` reads it from the text or the entities handler names it from the registry, so a shared number, date, or range never marks a supersession, whichever path brings it in.',
 			)
 		})
 

@@ -146,6 +146,7 @@ import {
 	cutListing,
 	cutWorkspaceSample,
 	matchEntities,
+	matchesShownSuccessor,
 	nameLedgerExchange,
 	parseLedgerExchange,
 	requirePredict,
@@ -1408,14 +1409,18 @@ export class Ledger implements LedgerInterface {
 		const size = over < 0 ? exchanges.length : over
 		const supersessions = input.classification.supersessions
 		const stated = new Set(current.map((message) => message.id))
-		// The recurrence: the newest member of each recurrence that is no current statement, newest first,
-		// as many as fit the retrieval's share of the budget; the retrieved matches fit in what they leave.
+		// The recurrence: the newest member of each recurrence that is no current statement and that
+		// nothing supersedes, newest first, as many as fit the retrieval's share of the budget; the
+		// retrieved matches fit in what they leave. A superseded member never stands alone: its successor
+		// reaches the opening on its own paths.
 		const recurring = collectLedgerRecurrences(
 			before,
 			this.#requests,
 			this.#annotations,
 			input.classification.quiet,
-		).filter((message) => !stated.has(message.id))
+		).filter(
+			(message) => !stated.has(message.id) && (supersessions.get(message.id) ?? []).length === 0,
+		)
 		const recurrence = recurring.filter(
 			(_message, index) =>
 				this.#price(recurring.slice(0, index + 1)) <= total * LEDGER_RELEVANT_SHARE,
@@ -2325,8 +2330,8 @@ export class Ledger implements LedgerInterface {
 	// its words, newest first with their amenders, then the labeled requests and replies carrying its
 	// words. It matches every message before the request and the lookups of the request's own passes,
 	// and lists only those the request left behind: a match the prompt shows lists nothing itself but
-	// still brings the amenders it left behind, and the search is shown when nothing lists and such a
-	// match was found.
+	// still brings the amenders it left behind, none whose supersessions reach a shown message, and the
+	// search is shown when nothing lists and such a match was found.
 	#search(
 		parts: readonly string[],
 		scan: LedgerScan,
@@ -2374,6 +2379,14 @@ export class Ledger implements LedgerInterface {
 		const listable = new Set(
 			[...matchable.keys()].filter((id) => behind.has(id) || (scan.position(id) ?? 0) > start),
 		)
+		// What the opening shows. An amendment chain skips a message whose supersessions reach one of
+		// these, so a key never lists a superseded amender alone beside a shown successor.
+		const sent = new Set(
+			input.messages
+				.slice(0, Math.max(0, start))
+				.filter((message) => !behind.has(message.id))
+				.map((message) => message.id),
+		)
 		const matched = new Set(searches.flatMap((search) => [...search.matched]))
 		const unmatched = searches.filter(
 			(search) => search.matched.size === 0 && search.words.length > 0,
@@ -2413,7 +2426,11 @@ export class Ledger implements LedgerInterface {
 				const visited = scanAmendments(
 					input.classification.amendments,
 					message.id,
-					(candidate) => matchable.has(candidate) && !state.done.has(candidate),
+					(candidate) =>
+						matchable.has(candidate) &&
+						!state.done.has(candidate) &&
+						(candidate === message.id ||
+							!matchesShownSuccessor(input.classification.supersessions, candidate, sent)),
 				)
 				const items = this.#listItems(
 					visited.filter((id) => listable.has(id)),
@@ -2457,7 +2474,10 @@ export class Ledger implements LedgerInterface {
 					input.classification.amendments,
 					message.id,
 					(candidate) =>
-						candidate === message.id || (matchable.has(candidate) && !state.done.has(candidate)),
+						candidate === message.id ||
+						(matchable.has(candidate) &&
+							!state.done.has(candidate) &&
+							!matchesShownSuccessor(input.classification.supersessions, candidate, sent)),
 				).filter((id) => id !== message.id)
 				const items = this.#listItems(
 					visited.filter((id) => listable.has(id)),
