@@ -14,7 +14,9 @@ import {
 	computeStudyMemoryShare,
 	readStudyMemoryGrade,
 	readStudyMemoryJudge,
+	readStudyMemoryProgress,
 	readStudyMemoryProvenance,
+	STUDY_MEMORY_ABSTENTION,
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_LOOKUPS,
 	resolveStudyMemoryObservation,
@@ -25,6 +27,7 @@ import {
 	buildMemoryGradeFixture,
 	buildMemoryProfile,
 	buildMemoryRecordProfile,
+	MEMORY_ABSTENTION_REPLIES,
 	MEMORY_CARRIAGE,
 	MEMORY_TRIAGE_POLICIES,
 	MEMORY_TRIAGE_REQUEST,
@@ -491,7 +494,7 @@ describe('memory measurement instruments', () => {
 		expect([...counts.keys()]).toEqual(['g1', 'g2'])
 	})
 
-	it('summarizes found and missing lookups for every scheduled goal and sums each arm', () => {
+	it('summarizes lookups, abstention, and arrival for every scheduled goal and sums each arm', () => {
 		const scenarios = [
 			{
 				id: 's',
@@ -506,26 +509,50 @@ describe('memory measurement instruments', () => {
 			{ id: 't1', scenario: 's', arm: 'records', repetition: 1 },
 			{ id: 't2', scenario: 's', arm: 'full', repetition: 1 },
 		]
+		const [refusal] = MEMORY_ABSTENTION_REPLIES.abstained
+		if (refusal === undefined) throw new Error('The fixture needs a refusal')
 		const summary = buildStudyMemorySummary({
 			schedule,
 			scenarios,
 			evidence: new Map([
 				['t1', MEMORY_EVIDENCE],
-				['t2', [{ event: 'lookup', goal: 'g2', value: { id: 'x', found: false } }]],
+				[
+					't2',
+					[
+						{ event: 'lookup', goal: 'g2', value: { id: 'x', found: false } },
+						{ event: 'result', goal: 'g3', value: { content: refusal, partial: false } },
+					],
+				],
 			]),
 		})
+		const none = { found: 0, missing: 0 }
 		expect(summary.goals).toEqual([
-			{ trial: 't1', arm: 'records', goal: 'g1', lookups: { found: 1, missing: 1 } },
-			{ trial: 't1', arm: 'records', goal: 'g2', lookups: { found: 0, missing: 0 } },
-			{ trial: 't1', arm: 'records', goal: 'g3', lookups: { found: 0, missing: 0 } },
-			{ trial: 't2', arm: 'full', goal: 'g1', lookups: { found: 0, missing: 0 } },
-			{ trial: 't2', arm: 'full', goal: 'g2', lookups: { found: 0, missing: 1 } },
-			{ trial: 't2', arm: 'full', goal: 'g3', lookups: { found: 0, missing: 0 } },
+			{
+				trial: 't1',
+				arm: 'records',
+				goal: 'g1',
+				lookups: { found: 1, missing: 1 },
+				abstained: false,
+				arrival: true,
+			},
+			{ trial: 't1', arm: 'records', goal: 'g2', lookups: none, abstained: false, arrival: true },
+			{ trial: 't1', arm: 'records', goal: 'g3', lookups: none, abstained: false, arrival: false },
+			{ trial: 't2', arm: 'full', goal: 'g1', lookups: none, abstained: false, arrival: false },
+			{
+				trial: 't2',
+				arm: 'full',
+				goal: 'g2',
+				lookups: { found: 0, missing: 1 },
+				abstained: false,
+				arrival: false,
+			},
+			{ trial: 't2', arm: 'full', goal: 'g3', lookups: none, abstained: true, arrival: false },
 		])
 		expect(summary.arms).toEqual({
 			records: { found: 1, missing: 1 },
 			full: { found: 0, missing: 1 },
 		})
+		expect(summary.abstained).toEqual({ records: 0, full: 1 })
 		expect(() =>
 			buildStudyMemorySummary({
 				schedule: [{ id: 't1', scenario: 'absent', arm: 'records', repetition: 1 }],
@@ -533,6 +560,32 @@ describe('memory measurement instruments', () => {
 				evidence: new Map(),
 			}),
 		).toThrow(/absent/)
+	})
+
+	it('flags each validated refusal opening and no refusal that follows the start of an answer', () => {
+		for (const reply of MEMORY_ABSTENTION_REPLIES.abstained)
+			expect([reply, STUDY_MEMORY_ABSTENTION.test(reply)]).toEqual([reply, true])
+		for (const reply of MEMORY_ABSTENTION_REPLIES.attempted)
+			expect([reply, STUDY_MEMORY_ABSTENTION.test(reply)]).toEqual([reply, false])
+	})
+
+	it('reads an empty reply as empty and not abstained, and a refusal as abstained and not empty', () => {
+		const [refusal] = MEMORY_ABSTENTION_REPLIES.abstained
+		if (refusal === undefined) throw new Error('The fixture needs a refusal')
+		expect(
+			readStudyMemoryProgress([
+				{ event: 'result', goal: 'g', value: { content: ' \n', partial: false } },
+			]),
+		).toEqual({ partial: false, empty: true, abstained: false })
+		expect(
+			readStudyMemoryProgress([
+				{ event: 'result', goal: 'g', value: { content: refusal, partial: false } },
+			]),
+		).toEqual({ partial: false, empty: false, abstained: true })
+		// A product with no text holds neither cell.
+		expect(
+			readStudyMemoryProgress([{ event: 'result', goal: 'g', value: { partial: false } }]),
+		).toEqual({ partial: false })
 	})
 
 	it('derives a share from a tally and reads undefined for an empty population', () => {

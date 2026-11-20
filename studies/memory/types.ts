@@ -89,6 +89,8 @@ export interface StudyMemoryProgress {
 	readonly partial?: boolean
 	/** Reports that the product's content holds nothing but whitespace. */
 	readonly empty?: boolean
+	/** Reports that the product's content opens with a refusal `STUDY_MEMORY_ABSTENTION` matches. */
+	readonly abstained?: boolean
 	readonly lookups?: StudyMemoryLookups
 	/** Counts the `denial` rows whose reason is a repeat reason; absent when the goal denied nothing. */
 	readonly repeats?: number
@@ -104,12 +106,16 @@ export interface StudyMemoryLookups {
 	readonly missing: number
 }
 
-/** Holds one scheduled goal's lookups, with the trial and arm that ran it. */
-export interface StudyMemoryGoalLookups {
+/** Holds one scheduled goal's lookups, abstention, and arrival, with the trial and arm that ran it. */
+export interface StudyMemoryGoalSummary {
 	readonly trial: string
 	readonly arm: string
 	readonly goal: string
 	readonly lookups: StudyMemoryLookups
+	/** Reports that the goal's reply opens with a refusal `STUDY_MEMORY_ABSTENTION` matches; false when the goal holds no reply. */
+	readonly abstained: boolean
+	/** Reports that the goal holds an `arrival` row. */
+	readonly arrival: boolean
 }
 
 /** Holds a sealed memory result's schedule, scenarios, and verified evidence by trial id. */
@@ -119,12 +125,14 @@ export interface StudyMemorySummaryInput {
 	readonly evidence: ReadonlyMap<string, readonly StudyEvidence[]>
 }
 
-/** Holds a memory result's lookups for every scheduled goal and each arm's totals. */
+/** Holds a memory result's reading of every scheduled goal and each arm's totals. */
 export interface StudyMemorySummary {
 	/** Lists every scheduled goal in schedule and scenario order; a goal with no `lookup` row reads 0 and 0. */
-	readonly goals: readonly StudyMemoryGoalLookups[]
-	/** Sums each arm's goals. */
+	readonly goals: readonly StudyMemoryGoalSummary[]
+	/** Sums each arm's lookups. */
 	readonly arms: Readonly<Record<string, StudyMemoryLookups>>
+	/** Counts each arm's abstained goals; an arm with none reads 0. */
+	readonly abstained: Readonly<Record<string, number>>
 }
 
 /** Holds the admitted Agent runtime capabilities every memory arm invokes, beyond the shared instrumentation's own. */

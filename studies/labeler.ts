@@ -3,7 +3,9 @@
  * @remarks
  * The user runs it, outside every agent session:
  * `node studies/labeler.ts RESULT --assessment SHA256 [--sample N] [--human PATH] [--closure DIRECTORY]`.
- * It reads the study's authored instruction and controls from `tmp/studies/authored`.
+ * It reads the study's authored instruction and controls from `tmp/studies/authored`. For a memory
+ * result it reads each goal's abstention and arrival through `study progress` on this repository's
+ * entry before it asks the model, and counts every row of an abstained goal as abstained.
  * The model is Claude Haiku 5.5 through Claude Code headless, under the user's own login: one call
  * per request, spawned without a shell from an empty directory, with no tools. Every file holding a
  * row, reason, criterion, or identity stays under `tmp/studies/labels`; the one file beside the
@@ -23,6 +25,7 @@ import type {
 	StudyLabelPool,
 	StudyLabelRow,
 } from '@orkestrel/study/server'
+import { isArray, isNumber, isRecord, isString } from '@orkestrel/contract'
 import { spawnSync } from 'node:child_process'
 import {
 	existsSync,
@@ -82,6 +85,14 @@ export const STUDY_LABELER_VERDICTS: readonly StudyVerdict[] = Object.freeze([
 	'unsuccessful',
 	'unknown',
 ])
+/** Names the driver whose adapter reports each goal's abstention to `study progress`.
+ * @example STUDY_LABELER_DRIVER // 'memory'
+ */
+export const STUDY_LABELER_DRIVER = 'memory'
+/** Names the arm a memory study measures; the one other arm the study lists is its control.
+ * @example STUDY_LABELER_STRATEGY // 'records'
+ */
+export const STUDY_LABELER_STRATEGY = 'records'
 
 /** Holds the labeler's resolved command line. */
 export interface StudyLabelerOptions {
@@ -125,12 +136,47 @@ export interface StudyLabelerRows {
 	readonly omitted: number
 }
 
-/** Counts one arm's answered rows by verdict. */
-export interface StudyLabelerVerdicts {
-	readonly arm: string
+/** Names what one answered row counts as: `abstained` for every row of an abstained goal, whatever its label, and the labeled verdict otherwise. */
+export type StudyLabelerOutcome = StudyVerdict | 'abstained'
+
+/** Counts answered rows by outcome, so `achieved` counts an abstained goal's rows as not achieved. */
+export interface StudyLabelerOutcomes {
 	readonly achieved: number
 	readonly unsuccessful: number
+	readonly abstained: number
 	readonly unknown: number
+}
+
+/** Counts one arm's answered rows by outcome. */
+export interface StudyLabelerVerdicts extends StudyLabelerOutcomes {
+	readonly arm: string
+}
+
+/** Counts one arm's answered rows of one criterion class by outcome. */
+export interface StudyLabelerClass extends StudyLabelerOutcomes {
+	readonly arm: string
+	readonly class: string
+}
+
+/** Counts each arm's answered rows at arrival goals by outcome, split by whether the control arm abstained at the goal. */
+export interface StudyLabelerSplit {
+	readonly control: string
+	/** Counts the rows at arrival goals the control arm abstained at. */
+	readonly declined: readonly StudyLabelerVerdicts[]
+	/** Counts the rows at the other arrival goals. */
+	readonly attempted: readonly StudyLabelerVerdicts[]
+}
+
+/** Holds one answered row's arm and outcome, the two facts a per-arm count reads. */
+export interface StudyLabelerEntry {
+	readonly arm: string
+	readonly outcome: StudyLabelerOutcome
+}
+
+/** Holds the goals `study progress` lists, each as `TRIAL/GOAL`: the ones whose reply abstained and the ones holding an `arrival` row. */
+export interface StudyLabelerGoals {
+	readonly abstained: ReadonlySet<string>
+	readonly arrivals: ReadonlySet<string>
 }
 
 /** Counts the controls of one authored verdict and the ones the lane omitted or answered otherwise. */
@@ -180,6 +226,10 @@ export interface StudyLabelerTally {
 	/** Counts answered rows the labeler flagged as revealing their arm. */
 	readonly revealed: number
 	readonly verdicts: readonly StudyLabelerVerdicts[]
+	/** Counts each arm's rows per criterion class, in arm then class order. */
+	readonly classes: readonly StudyLabelerClass[]
+	/** Splits the rows at arrival goals; absent when the input names no control arm. */
+	readonly split: StudyLabelerSplit | undefined
 	readonly controls: readonly StudyLabelerControls[]
 	/** Repeats the labels sheet's own count of the lane's missed controls. */
 	readonly missed: number
@@ -202,6 +252,12 @@ export interface StudyLabelerTallyInput {
 	readonly arms: ReadonlyMap<string, string>
 	/** Maps `TRIAL/GOAL` to that goal's lookups. */
 	readonly lookups: ReadonlyMap<string, StudyLabelerLookups>
+	/** Holds `TRIAL/GOAL` of every goal whose reply abstained. */
+	readonly abstained: ReadonlySet<string>
+	/** Holds `TRIAL/GOAL` of every goal holding an `arrival` row. */
+	readonly arrivals: ReadonlySet<string>
+	/** Names the arm whose abstention at a goal splits the arrival goals; absent leaves the tally without a split. */
+	readonly control: string | undefined
 	readonly scores: readonly StudyScore[] | undefined
 }
 
@@ -408,6 +464,89 @@ export function resolveStudyLabelerPartition(
 }
 
 /**
+ * Resolves a memory study's control arm: the one arm it lists beside `STUDY_LABELER_STRATEGY`.
+ * @param arms - The arms the study lists
+ * @returns The control arm, or `undefined` when the study lists no strategy arm, or not exactly one arm beside it
+ * @example resolveStudyLabelerControl(['records', 'plain']) // 'plain'
+ */
+export function resolveStudyLabelerControl(arms: readonly string[]): string | undefined {
+	const others = arms.filter((arm) => arm !== STUDY_LABELER_STRATEGY)
+	return arms.includes(STUDY_LABELER_STRATEGY) && others.length === 1 ? others[0] : undefined
+}
+
+/**
+ * Collects, from the `progress` member `study progress` prints, every listed goal whose adapter reading reports `abstained: true` and every listed goal holding an `arrival` row.
+ * @param progress - The `progress` member of the command's output
+ * @returns Both sets, each goal written `TRIAL/GOAL`
+ * @throws Error - Thrown when the value lists no trials, or lists a malformed trial or goal
+ * @example collectStudyLabelerGoals({ trials: [] }).abstained.size // 0
+ */
+export function collectStudyLabelerGoals(progress: unknown): StudyLabelerGoals {
+	if (!isRecord(progress) || !isArray(progress.trials))
+		throw new Error('study progress listed no trials')
+	const listed = progress.trials.flatMap((entry) => {
+		if (
+			!isRecord(entry) ||
+			!isRecord(entry.trial) ||
+			!isString(entry.trial.id) ||
+			!isArray(entry.goals)
+		)
+			throw new Error('study progress listed a malformed trial')
+		const trial = entry.trial.id
+		return entry.goals.map((goal) => {
+			if (!isRecord(goal) || !isString(goal.goal) || !isRecord(goal.events))
+				throw new Error('study progress listed a malformed goal')
+			const arrivals = goal.events.arrival
+			return {
+				key: `${trial}/${goal.goal}`,
+				abstained: isRecord(goal.projection) && goal.projection.abstained === true,
+				arrival: isNumber(arrivals) && arrivals > 0,
+			}
+		})
+	})
+	return {
+		abstained: new Set(listed.filter((goal) => goal.abstained).map((goal) => goal.key)),
+		arrivals: new Set(listed.filter((goal) => goal.arrival).map((goal) => goal.key)),
+	}
+}
+
+/**
+ * Counts outcomes by kind, so the four counts sum to the outcomes given.
+ * @param outcomes - One outcome per answered row
+ * @returns The count of each outcome
+ * @example computeStudyLabelerOutcomes(['achieved', 'abstained']).abstained // 1
+ */
+export function computeStudyLabelerOutcomes(
+	outcomes: readonly StudyLabelerOutcome[],
+): StudyLabelerOutcomes {
+	return {
+		achieved: outcomes.filter((outcome) => outcome === 'achieved').length,
+		unsuccessful: outcomes.filter((outcome) => outcome === 'unsuccessful').length,
+		abstained: outcomes.filter((outcome) => outcome === 'abstained').length,
+		unknown: outcomes.filter((outcome) => outcome === 'unknown').length,
+	}
+}
+
+/**
+ * Counts each arm's entries by outcome, one count per arm in the order given.
+ * @param arms - The arms to count, each listed even when no entry names it
+ * @param entries - One entry per answered row
+ * @returns One count per arm
+ * @example computeStudyLabelerVerdicts(['plain'], [{ arm: 'plain', outcome: 'abstained' }])[0]?.abstained // 1
+ */
+export function computeStudyLabelerVerdicts(
+	arms: readonly string[],
+	entries: readonly StudyLabelerEntry[],
+): readonly StudyLabelerVerdicts[] {
+	return arms.map((arm) => ({
+		arm,
+		...computeStudyLabelerOutcomes(
+			entries.filter((entry) => entry.arm === arm).map((entry) => entry.outcome),
+		),
+	}))
+}
+
+/**
  * Draws a blind spot-check from every row of a pool, controls among them, in a repeatable order.
  * @param pool - The pool
  * @param count - The rows to draw, at most every row
@@ -454,19 +593,36 @@ export function compareStudyLabelerHuman(
 
 /**
  * Builds the counts beside a labeled result, joining each answered row to its arm and goal through the map alone.
- * @param input - The pool's map, the lane, the labels sheet, each trial's arm, each goal's lookups, and the report
+ * @remarks
+ * Every row of an abstained goal counts as `abstained`, whatever its label, so `achieved` counts
+ * an abstention as not achieved and the four outcomes sum to the answered rows. `recall` keeps the
+ * labeled verdicts. The split reads arrival goals only, each on the side the control arm's
+ * abstention at that goal puts it.
+ * @param input - The pool's map, the lane, the labels sheet, each trial's arm, each goal's lookups, abstention, and arrival, the control arm, and the report
  * @returns The counts: no row, reason, criterion, or identity
  * @example buildStudyLabelerTally(input).rows.asked // the pool's rows, controls aside
  */
 export function buildStudyLabelerTally(input: StudyLabelerTallyInput): StudyLabelerTally {
 	const answers = new Map(input.run.lane.rows.map((row) => [row.row, row]))
+	const controls = [...input.arms].flatMap(([trial, arm]) => (arm === input.control ? [trial] : []))
 	const answered = input.map.links.flatMap((link) => {
 		const answer = answers.get(link.row)
-		return answer === undefined
-			? []
-			: [{ arm: input.arms.get(link.source.trial) ?? 'unscheduled', link, answer }]
+		if (answer === undefined) return []
+		const key = `${link.source.trial}/${link.goal}`
+		const outcome: StudyLabelerOutcome = input.abstained.has(key) ? 'abstained' : answer.verdict
+		return [
+			{
+				arm: input.arms.get(link.source.trial) ?? 'unscheduled',
+				link,
+				answer,
+				outcome,
+				arrival: input.arrivals.has(key),
+				declined: controls.some((trial) => input.abstained.has(`${trial}/${link.goal}`)),
+			},
+		]
 	})
 	const arms = [...new Set(answered.map((entry) => entry.arm))].toSorted()
+	const arrived = answered.filter((entry) => entry.arrival)
 	return {
 		study: input.study,
 		labeler: input.run.lane.labeler,
@@ -479,15 +635,31 @@ export function buildStudyLabelerTally(input: StudyLabelerTallyInput): StudyLabe
 		},
 		batches: input.run.batches,
 		revealed: answered.filter((entry) => entry.answer.revealed === true).length,
-		verdicts: arms.map((arm) => {
+		verdicts: computeStudyLabelerVerdicts(arms, answered),
+		classes: arms.flatMap((arm) => {
 			const selected = answered.filter((entry) => entry.arm === arm)
-			return {
+			return [...new Set(selected.map((entry) => entry.link.class))].toSorted().map((name) => ({
 				arm,
-				achieved: selected.filter((entry) => entry.answer.verdict === 'achieved').length,
-				unsuccessful: selected.filter((entry) => entry.answer.verdict === 'unsuccessful').length,
-				unknown: selected.filter((entry) => entry.answer.verdict === 'unknown').length,
-			}
+				class: name,
+				...computeStudyLabelerOutcomes(
+					selected.filter((entry) => entry.link.class === name).map((entry) => entry.outcome),
+				),
+			}))
 		}),
+		split:
+			input.control === undefined
+				? undefined
+				: {
+						control: input.control,
+						declined: computeStudyLabelerVerdicts(
+							arms,
+							arrived.filter((entry) => entry.declined),
+						),
+						attempted: computeStudyLabelerVerdicts(
+							arms,
+							arrived.filter((entry) => !entry.declined),
+						),
+					},
 		controls: STUDY_LABELER_VERDICTS.flatMap((verdict) => {
 			const checks = input.map.checks.filter((check) => check.verdict === verdict)
 			return checks.length === 0
@@ -802,6 +974,17 @@ export async function labelStudyResult(
 		writeFileSync(paths.tally, compared)
 		return compared
 	}
+	// This repository's adapter reads each goal's abstention, so a re-label applies the detector it holds; the read precedes any model call.
+	const definition = result.manifest.definition
+	const [first] = goals
+	const progress =
+		definition.driver === STUDY_LABELER_DRIVER && first !== undefined
+			? runStudyLabelerCommand(['progress', options.result, '--from', first], undefined)
+			: undefined
+	const marks =
+		progress === undefined
+			? { abstained: new Set<string>(), arrivals: new Set<string>() }
+			: collectStudyLabelerGoals(progress.progress)
 	const run = saved ?? (await labelStudyPool(pool, dependencies.call))
 	if (saved === undefined) writeFileSync(paths.lane, encodeStudyJSON(run.lane))
 	const sheet = createStudyLabelSheet(pool.map, [run.lane], {
@@ -850,6 +1033,12 @@ export async function labelStudyResult(
 		sheet,
 		arms: new Map(result.manifest.schedule.map((trial) => [trial.id, trial.arm])),
 		lookups,
+		abstained: marks.abstained,
+		arrivals: marks.arrivals,
+		control:
+			definition.driver === STUDY_LABELER_DRIVER
+				? resolveStudyLabelerControl(definition.arms)
+				: undefined,
 		scores,
 	})
 	const text = `${JSON.stringify(tally, null, '\t')}\n`

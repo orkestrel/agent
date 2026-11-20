@@ -24,7 +24,7 @@ import type {
 	StudyMemoryProgress,
 	StudyMemoryProvenanceSource,
 	StudyMemoryTally,
-	StudyMemoryGoalLookups,
+	StudyMemoryGoalSummary,
 	StudyMemoryLookups,
 	StudyMemorySummary,
 	StudyMemorySummaryInput,
@@ -33,6 +33,7 @@ import { canonicalStringify, isArray, isRecord, parseJSON } from '@orkestrel/con
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
 import { collectStudyRows } from '@orkestrel/study/server'
 import {
+	STUDY_MEMORY_ABSTENTION,
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_PARAMETERS,
 	STUDY_MEMORY_POLICY,
@@ -414,7 +415,10 @@ export function readStudyMemoryProgress(evidence: readonly StudyEvidence[]): Stu
 			? { partial: product.partial }
 			: {}),
 		...(isRecord(product) && typeof product.content === 'string'
-			? { empty: product.content.trim() === '' }
+			? {
+					empty: product.content.trim() === '',
+					abstained: STUDY_MEMORY_ABSTENTION.test(product.content),
+				}
 			: {}),
 		...(lookups.length === 0
 			? {}
@@ -435,28 +439,31 @@ export function readStudyMemoryProgress(evidence: readonly StudyEvidence[]): Stu
 }
 
 /**
- * Reads a sealed memory result's lookups for every scheduled goal, and each arm's totals.
- * @remarks Pass evidence verified by Study's `collectStudyEvidence`. Each goal's count is the one `readStudyMemoryProgress` reports for its rows.
+ * Reads a sealed memory result's lookups, abstention, and arrival for every scheduled goal, and each arm's totals.
+ * @remarks Pass evidence verified by Study's `collectStudyEvidence`. Each goal's lookups and abstention are the ones `readStudyMemoryProgress` reports for its rows.
  * @param input - The result's schedule, its scenarios, and its evidence by trial id.
  * @returns Every scheduled goal in schedule and scenario order, with each arm's sums.
  * @throws StudyError - Thrown with code `CONFIG` when a scheduled trial names a scenario the input does not hold.
- * @example buildStudyMemorySummary(input).arms.records?.missing // 2
+ * @example buildStudyMemorySummary(input).abstained.plain // 61
  */
 export function buildStudyMemorySummary(input: StudyMemorySummaryInput): StudyMemorySummary {
-	const goals = input.schedule.flatMap((trial): StudyMemoryGoalLookups[] => {
+	const goals = input.schedule.flatMap((trial): StudyMemoryGoalSummary[] => {
 		const scenario = input.scenarios.find((entry) => entry.id === trial.scenario)
 		if (scenario === undefined)
 			throw new StudyError('CONFIG', `Memory summary has no scenario ${trial.scenario}`)
 		const rows = input.evidence.get(trial.id) ?? []
-		return scenario.goals.map((goal) => ({
-			trial: trial.id,
-			arm: trial.arm,
-			goal: goal.id,
-			lookups: readStudyMemoryProgress(rows.filter((row) => row.goal === goal.id)).lookups ?? {
-				found: 0,
-				missing: 0,
-			},
-		}))
+		return scenario.goals.map((goal) => {
+			const held = rows.filter((row) => row.goal === goal.id)
+			const progress = readStudyMemoryProgress(held)
+			return {
+				trial: trial.id,
+				arm: trial.arm,
+				goal: goal.id,
+				lookups: progress.lookups ?? { found: 0, missing: 0 },
+				abstained: progress.abstained === true,
+				arrival: held.some((row) => row.event === 'arrival'),
+			}
+		})
 	})
 	const arms = new Map<string, StudyMemoryLookups>()
 	for (const entry of goals) {
@@ -466,7 +473,16 @@ export function buildStudyMemorySummary(input: StudyMemorySummaryInput): StudyMe
 			missing: held.missing + entry.lookups.missing,
 		})
 	}
-	return { goals, arms: Object.fromEntries(arms) }
+	return {
+		goals,
+		arms: Object.fromEntries(arms),
+		abstained: Object.fromEntries(
+			[...arms.keys()].map((arm) => [
+				arm,
+				goals.filter((entry) => entry.arm === arm && entry.abstained).length,
+			]),
+		),
+	}
 }
 
 /** Counts re-acquisitions per goal. @param evidence - Study evidence rows. @param events - Event names that count. @returns One entry per goal in first-seen row order with the count of its rows whose event is listed; a goal with none reads 0. */

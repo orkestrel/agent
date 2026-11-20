@@ -1,4 +1,9 @@
 import type { StudyLabelControl, StudyLabelPool } from '@orkestrel/study/server'
+import type {
+	StudyLabelerOutcomes,
+	StudyLabelerTally,
+	StudyLabelerTallyInput,
+} from '../../studies/labeler.js'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -13,8 +18,11 @@ import {
 	STUDY_LABELER_AUTHORED,
 	STUDY_LABELER_LABELS,
 	STUDY_LABELER_MODEL,
+	STUDY_LABELER_VERDICTS,
 	buildStudyLabelerTally,
+	collectStudyLabelerGoals,
 	compareStudyLabelerHuman,
+	computeStudyLabelerOutcomes,
 	drawStudyLabelerSample,
 	isStudyLabelerScore,
 	labelStudyPool,
@@ -25,6 +33,7 @@ import {
 	readStudyLabelerSaved,
 	readStudyLabelerAnswers,
 	readStudyLabelerControls,
+	resolveStudyLabelerControl,
 	resolveStudyLabelerPartition,
 } from '../../studies/labeler.js'
 
@@ -51,9 +60,9 @@ const CONTROLS: readonly StudyLabelControl[] = Object.freeze([
 	},
 ])
 
-function buildPool(order = 'fictional-order'): StudyLabelPool {
+function buildPool(order = 'fictional-order', goals: readonly string[] = GOALS): StudyLabelPool {
 	const entries = TRIALS.flatMap(([neutral, , arm]) =>
-		GOALS.flatMap((goal) =>
+		goals.flatMap((goal) =>
 			CLASSES.map((name) => ({
 				neutral,
 				criterion: `neutral-${goal}-${name}`,
@@ -92,7 +101,7 @@ function buildPool(order = 'fictional-order'): StudyLabelPool {
 		{
 			order,
 			controls: CONTROLS,
-			partition: resolveStudyLabelerPartition(GOALS),
+			partition: resolveStudyLabelerPartition(goals),
 		},
 	)
 }
@@ -128,6 +137,51 @@ function answerAll(prompt: string): unknown {
 			reason: `REASON ${String(row)}`,
 		})),
 	)
+}
+
+// Cycles each row's verdict through the three by its number, so every verdict appears.
+function answerMixed(prompt: string): unknown {
+	return buildOutput(
+		readPromptRows(prompt).map((row) => ({
+			row,
+			verdict: STUDY_LABELER_VERDICTS[row % STUDY_LABELER_VERDICTS.length] ?? 'unknown',
+			reason: `REASON ${String(row)}`,
+		})),
+	)
+}
+
+// Sums every outcome of every count, which the answered rows bound.
+function sumOutcomes(counts: readonly StudyLabelerOutcomes[]): number {
+	return counts.reduce(
+		(sum, count) => sum + count.achieved + count.unsuccessful + count.abstained + count.unknown,
+		0,
+	)
+}
+
+// Labels a pool over the goals given and tallies it under the abstention, arrival, and control given.
+async function buildAbstentionTally(
+	answer: (prompt: string) => unknown,
+	goals: readonly string[],
+	marks: Pick<StudyLabelerTallyInput, 'abstained' | 'arrivals' | 'control'>,
+): Promise<StudyLabelerTally> {
+	const pool = buildPool('fictional-order', goals)
+	const run = await labelStudyPool(pool, (prompt) => Promise.resolve(answer(prompt)))
+	return buildStudyLabelerTally({
+		study: 'endurance',
+		assessment: 'a'.repeat(64),
+		labeled: 'b'.repeat(64),
+		map: pool.map,
+		run,
+		sheet: createStudyLabelSheet(pool.map, [run.lane], {
+			created: '2026-11-20T00:00:00.000Z',
+			version: '1',
+			partial: true,
+		}),
+		arms: new Map(TRIALS.map(([, trial, arm]) => [trial, arm])),
+		lookups: new Map(),
+		scores: undefined,
+		...marks,
+	})
 }
 
 describe('labeler runner over a synthetic pool', () => {
@@ -283,6 +337,9 @@ describe('labeler runner over a synthetic pool', () => {
 			}),
 			arms: new Map(TRIALS.map(([, trial, arm]) => [trial, arm])),
 			lookups: new Map([['r1-s1-a1/g-1', { found: 2, missing: 1 }]]),
+			abstained: new Set(),
+			arrivals: new Set(),
+			control: undefined,
 			scores: undefined,
 		})
 		const text = JSON.stringify(tally)
@@ -303,9 +360,22 @@ describe('labeler runner over a synthetic pool', () => {
 			omitted: 0,
 		})
 		expect(tally.verdicts).toEqual([
-			{ arm: 'plain', achieved: 4, unsuccessful: 0, unknown: 0 },
-			{ arm: 'records', achieved: 4, unsuccessful: 0, unknown: 0 },
+			{ arm: 'plain', achieved: 4, unsuccessful: 0, abstained: 0, unknown: 0 },
+			{ arm: 'records', achieved: 4, unsuccessful: 0, abstained: 0, unknown: 0 },
 		])
+		expect(tally.classes).toEqual(
+			['plain', 'records'].flatMap((arm) =>
+				CLASSES.map((name) => ({
+					arm,
+					class: name,
+					achieved: 2,
+					unsuccessful: 0,
+					abstained: 0,
+					unknown: 0,
+				})),
+			),
+		)
+		expect(tally.split).toBeUndefined()
 		// Every answer read achieved, so the one unsuccessful control is the one missed.
 		expect(tally.controls).toEqual([
 			{ verdict: 'achieved', count: 1, missed: 0 },
@@ -317,6 +387,130 @@ describe('labeler runner over a synthetic pool', () => {
 			{ arm: 'plain', verdict: 'achieved', rows: 4, found: 0, missing: 0 },
 			{ arm: 'records', verdict: 'achieved', rows: 4, found: 4, missing: 2 },
 		])
+	})
+})
+
+describe('labeler tally under the abstention ruling', () => {
+	it('counts every row of an abstained goal as abstained, an achieved label included', async () => {
+		const tally = await buildAbstentionTally(answerAll, GOALS, {
+			abstained: new Set(['r1-s1-a2/g-1']),
+			arrivals: new Set(),
+			control: undefined,
+		})
+		expect(
+			tally.verdicts.map(({ arm, achieved, abstained }) => ({ arm, achieved, abstained })),
+		).toEqual([
+			{ arm: 'plain', achieved: 2, abstained: 2 },
+			{ arm: 'records', achieved: 4, abstained: 0 },
+		])
+	})
+
+	it('leaves the rows of a goal that did not abstain as labeled, the same goal of another trial included', async () => {
+		const marks = { arrivals: new Set<string>(), control: undefined }
+		const labeled = await buildAbstentionTally(answerMixed, GOALS, {
+			...marks,
+			abstained: new Set(),
+		})
+		const tally = await buildAbstentionTally(answerMixed, GOALS, {
+			...marks,
+			abstained: new Set(['r1-s1-a2/g-1']),
+		})
+		expect(tally.verdicts.find((entry) => entry.arm === 'records')).toEqual(
+			labeled.verdicts.find((entry) => entry.arm === 'records'),
+		)
+		expect(tally.classes.filter((entry) => entry.arm === 'records')).toEqual(
+			labeled.classes.filter((entry) => entry.arm === 'records'),
+		)
+	})
+
+	it('sums the four outcomes to the answered rows in every block', async () => {
+		const tally = await buildAbstentionTally(answerMixed, GOALS, {
+			abstained: new Set(['r1-s1-a2/g-1', 'r1-s1-a1/g-2']),
+			arrivals: new Set(['r1-s1-a1/g-1', 'r1-s1-a2/g-1']),
+			control: 'plain',
+		})
+		expect(tally.rows.answered).toBe(TRIALS.length * GOALS.length * CLASSES.length)
+		expect(sumOutcomes(tally.verdicts)).toBe(tally.rows.answered)
+		expect(sumOutcomes(tally.classes)).toBe(tally.rows.answered)
+		// The arrival goal g-1 holds one row per class in each trial.
+		expect(sumOutcomes([...(tally.split?.declined ?? []), ...(tally.split?.attempted ?? [])])).toBe(
+			TRIALS.length * CLASSES.length,
+		)
+		expect(tally.verdicts.map(({ arm, abstained }) => ({ arm, abstained }))).toEqual([
+			{ arm: 'plain', abstained: 2 },
+			{ arm: 'records', abstained: 2 },
+		])
+	})
+
+	it('splits the arrival goals alone by whether the control arm abstained there', async () => {
+		const tally = await buildAbstentionTally(answerAll, [...GOALS, 'g-3'], {
+			abstained: new Set(['r1-s1-a2/g-1']),
+			arrivals: new Set(['r1-s1-a1/g-1', 'r1-s1-a2/g-1', 'r1-s1-a1/g-2', 'r1-s1-a2/g-2']),
+			control: 'plain',
+		})
+		const counts = { unsuccessful: 0, unknown: 0 }
+		expect(tally.split).toEqual({
+			control: 'plain',
+			declined: [
+				{ arm: 'plain', achieved: 0, abstained: 2, ...counts },
+				{ arm: 'records', achieved: 2, abstained: 0, ...counts },
+			],
+			attempted: [
+				{ arm: 'plain', achieved: 2, abstained: 0, ...counts },
+				{ arm: 'records', achieved: 2, abstained: 0, ...counts },
+			],
+		})
+		// Goal g-3 took no arrival, so its rows count in the verdicts and in no side of the split.
+		expect(tally.verdicts).toEqual([
+			{ arm: 'plain', achieved: 4, abstained: 2, ...counts },
+			{ arm: 'records', achieved: 6, abstained: 0, ...counts },
+		])
+	})
+
+	it('counts outcomes by kind', () => {
+		expect(
+			computeStudyLabelerOutcomes(['achieved', 'abstained', 'abstained', 'unknown', 'achieved']),
+		).toEqual({ achieved: 2, unsuccessful: 0, abstained: 2, unknown: 1 })
+		expect(computeStudyLabelerOutcomes([])).toEqual({
+			achieved: 0,
+			unsuccessful: 0,
+			abstained: 0,
+			unknown: 0,
+		})
+	})
+
+	it('collects the abstained and arrival goals study progress lists and refuses a malformed listing', () => {
+		const goals = collectStudyLabelerGoals({
+			id: 'fictional-result',
+			trials: [
+				{
+					trial: { id: 'r1-s1-a1' },
+					goals: [
+						{ goal: 'g-1', events: { arrival: 2, result: 1 }, projection: { abstained: false } },
+						{ goal: 'g-2', events: { result: 1 }, projection: { abstained: true } },
+						{ goal: 'g-3', events: { arrival: 0 } },
+					],
+				},
+				{ trial: { id: 'r1-s1-a2' }, goals: [] },
+			],
+		})
+		expect([...goals.abstained]).toEqual(['r1-s1-a1/g-2'])
+		expect([...goals.arrivals]).toEqual(['r1-s1-a1/g-1'])
+		expect(() => collectStudyLabelerGoals({})).toThrow(/no trials/)
+		expect(() => collectStudyLabelerGoals({ trials: [{ trial: {}, goals: [] }] })).toThrow(
+			/malformed trial/,
+		)
+		expect(() =>
+			collectStudyLabelerGoals({ trials: [{ trial: { id: 't' }, goals: [{ goal: 'g' }] }] }),
+		).toThrow(/malformed goal/)
+	})
+
+	it('resolves the one arm a memory study lists beside records as its control', () => {
+		expect(resolveStudyLabelerControl(['records', 'plain'])).toBe('plain')
+		expect(resolveStudyLabelerControl(['full', 'records'])).toBe('full')
+		expect(resolveStudyLabelerControl(['records', 'full', 'plain'])).toBeUndefined()
+		expect(resolveStudyLabelerControl(['records'])).toBeUndefined()
+		expect(resolveStudyLabelerControl(['full', 'plain'])).toBeUndefined()
 	})
 })
 

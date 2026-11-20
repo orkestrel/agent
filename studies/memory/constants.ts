@@ -73,6 +73,18 @@ export const STUDY_MEMORY_PARAMETERS: Readonly<Record<'agent' | 'judge', StudyMe
 			repeat_penalty: 1,
 		}),
 	})
+/**
+ * Detects an abstention: a reply that opens with a refusal, such as "I cannot", "I don't have", or "unable to", after any leading punctuation or space.
+ * @remarks
+ * Validated on 2026-11-20 against blind attempted, partial, and abstained labels of every final
+ * reply of run 4's plain arm: it flagged 61 replies, 58 of them labeled abstained (precision 58 of
+ * 61), and it caught 58 of the 59 labeled abstentions (recall 58 of 59). It flagged no reply of the
+ * records arm in run 4 or in variant b. A refusal later in a reply, such as "I have reviewed the
+ * notes, but I cannot confirm the refund", matches nothing, and only a straight apostrophe matches.
+ * @example STUDY_MEMORY_ABSTENTION.test("I don't have the original order on record.") // true
+ */
+export const STUDY_MEMORY_ABSTENTION =
+	/^\W*(?:i cannot|i can't|i am unable|i'm unable|unable to|i do not have|i don't have|i could not|i couldn't)/iu
 /** Holds the text of `LEDGER_NOTES.repeat`, because `progress` holds no admitted Agent namespace; a case compares the two. */
 export const STUDY_MEMORY_LEDGER_REPEAT =
 	'You already have this result earlier in this request; give your complete answer now as your final message.'

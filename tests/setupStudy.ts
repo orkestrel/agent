@@ -2012,6 +2012,32 @@ export const STUDY_MEMORY_PROGRESS_ROWS: readonly StudyEvidence[] = Object.freez
 )
 
 /**
+ * Pins fictional replies for the abstention detector: `abstained` opens with each validated refusal, in another case and after leading markup or space too, and `attempted` holds a refusal only after an answer begins, or none.
+ */
+export const MEMORY_ABSTENTION_REPLIES = Object.freeze({
+	abstained: Object.freeze([
+		'I cannot confirm the refund without the order number.',
+		"I can't see a delivery date for that order.",
+		'I am unable to find that customer.',
+		"I'm unable to verify the replacement.",
+		'Unable to locate the earlier handoff note.',
+		'I do not have the original invoice.',
+		"I don't have the notes from the earlier shift.",
+		'I could not find a record of that order.',
+		"I couldn't match the refund to an order.",
+		'**I cannot** answer from the arrivals alone.',
+		' \n"I CANNOT confirm that."',
+	]),
+	attempted: Object.freeze([
+		'I have reviewed the arrivals, but I cannot compare them with the earlier work.',
+		"The refund is approved. I don't have the earlier note.",
+		'I can confirm the delivery.',
+		'Unable',
+		'',
+	]),
+})
+
+/**
  * Builds the replies of a seed trajectory's first two goals: one lookup call, then two answers, with a records trial's calibration ahead of them.
  * @param arm - The treatment.
  * @returns The script; the later goals take the fixture's default replies.

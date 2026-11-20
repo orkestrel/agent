@@ -112,7 +112,7 @@ cd ABSOLUTE_CLOSURE_PATH
 node --experimental-strip-types node_modules/@orkestrel/study/dist/bin/main.js grade ABSOLUTE_RESULT_PATH --rubric ABSOLUTE_CLOSURE_PATH/studies/qualification/rubric.json
 ```
 
-For recall per goal, pass the verified result to `buildStudyMemorySummary` in `memory/helpers.ts`. It reports each scheduled goal's lookups, found and missing, and each arm's totals.
+For recall and abstention per goal, pass the verified result to `buildStudyMemorySummary` in `memory/helpers.ts`. It reports each scheduled goal's lookups, found and missing, whether its reply abstained, and whether it holds an `arrival` row, with each arm's lookup totals and abstained goals. A reply abstains when it opens with a refusal `STUDY_MEMORY_ABSTENTION` matches; `study progress` reports the same reading as each goal's `abstained` cell.
 
 The profile declares `record` allowances of 512 MiB, 4096 calls, and 9600000 ms per trial. Both judge legs and inventory verification enter custody. Offline replay checks the retained request bytes and makes no sends; message ids are local to each Agent run.
 
@@ -153,7 +153,8 @@ node studies/labeler.ts ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID [--closu
 
 - **Inputs.** It reads the grading's packet and mapping, and the study's authored controls and instruction, `controls.STUDY.json` and `instruction.STUDY.md` in `tmp/studies/authored`, chosen by the result's own study name.
 - **The model.** It asks Haiku through Claude Code headless (`claude -p`) under your own login: one call per request, from an empty directory, with no tools. It refuses an answer that reports any other model. A malformed answer is asked one more time, then counted as omitted, so it never reaches a sheet.
-- **Outputs.** The pool, the lane, the labels sheets, and any sample stay under `tmp/studies/labels`. It imports each sheet with `study label`, reports the labeled grading, and writes `ABSOLUTE_RESULT_PATH.tally.json` beside the result. The tally holds counts only: rows asked, answered, and omitted; verdicts per arm; controls and misses per authored verdict; lookups by verdict; and the labeled report's scores.
+- **Abstention.** For a memory result, it runs `study progress` through this repository's entry before it asks the model, so a re-label applies the detector this repository holds. It reads each goal's `abstained` cell and whether the goal holds an `arrival` row. Every row of an abstained goal counts as `abstained`, whatever its label, so `achieved` counts an abstention as not achieved.
+- **Outputs.** The pool, the lane, the labels sheets, and any sample stay under `tmp/studies/labels`. It imports each sheet with `study label`, reports the labeled grading, and writes `ABSOLUTE_RESULT_PATH.tally.json` beside the result. The tally holds counts only: rows asked, answered, and omitted; outcomes per arm, achieved, unsuccessful, abstained, and unknown; the same outcomes per arm and criterion class; for a memory result with one control arm, the outcomes at arrival goals, split by whether the control arm abstained at the goal; controls and misses per authored verdict; lookups by labeled verdict; and the labeled report's scores.
 - **Spot-check.** `--sample N` also writes a blind sheet of N drawn rows and an answers template under the labels folder. Fill the template and pass it with `--human PATH` to compare it with the saved model lane, per class and on the sampled controls. The human lane is compared only, never imported.
 
 ## Running the chat instrument

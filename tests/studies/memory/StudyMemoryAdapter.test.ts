@@ -76,6 +76,7 @@ describe('memory declaration and mechanical evidence', () => {
 			usage: { prompt: 70, cached: 19, completion: 12, total: 600 },
 			partial: true,
 			empty: true,
+			abstained: false,
 			lookups: { found: 1, missing: 1 },
 			repeats: 2,
 			system: { count: 2, bytes: 8 },
