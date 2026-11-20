@@ -38,6 +38,7 @@ import {
 	planLedgerDelivery,
 	serveAmendedDesk,
 	classifyLedgerCorrection,
+	classifyLedgerPair,
 	exerciseThinkingReplay,
 	collectMessageThinking,
 	createBoundedRelay,
@@ -127,6 +128,8 @@ import {
 	extractLedgerIndex,
 	buildLedgerGoals,
 	buildLedgerPackets,
+	buildLedgerAmended,
+	buildLedgerHall,
 	buildLedgerWindow,
 	countLedgerPlanFit,
 	LEDGER_CUT_DEEP_SNAPSHOT,
@@ -1567,6 +1570,41 @@ describe('system boundary canary fixtures', () => {
 		expect(packets.conversation.messages).toHaveLength(2 * 4 + 7 * 2)
 	})
 
+	it('builds two answered requests with the given correction between them and another before them', () => {
+		const amended = buildLedgerAmended('Correction: OR-7 ships Monday.')
+		expect(isLedgerSnapshot(amended)).toBe(true)
+		expect(amended.requests).toEqual(['ask-1', 'ask-2'])
+		expect(amended.conversation.messages.map((message) => message.id)).toEqual([
+			'stated',
+			'early',
+			'ask-1',
+			'reply-1',
+			'fixed',
+			'ask-2',
+			'reply-2',
+		])
+		expect(amended.conversation.messages.find((message) => message.id === 'fixed')?.content).toBe(
+			'Correction: OR-7 ships Monday.',
+		)
+	})
+
+	it('builds one answered request and two statements about the hall, opening with a stray one when asked', () => {
+		const plain = buildLedgerHall(false)
+		const stray = buildLedgerHall(true)
+		expect(isLedgerSnapshot(plain) && isLedgerSnapshot(stray)).toBe(true)
+		expect(plain.requests).toEqual(['ask-1'])
+		expect(plain.conversation.messages.map((message) => message.id)).toEqual([
+			'ask-1',
+			'reply-1',
+			'old',
+			'new',
+		])
+		expect(stray.conversation.messages.map((message) => message.id)).toEqual([
+			'stray',
+			...plain.conversation.messages.map((message) => message.id),
+		])
+	})
+
 	it('builds a snapshot of one answered request per reply, with a statement before the last request when given', () => {
 		const plain = buildLedgerWindow(['One.', 'Two.'])
 		const stated = buildLedgerWindow(['One.', 'Two.'], 'Item 2 is in bay 9.')
@@ -2735,9 +2773,36 @@ describe('guide scenario fixtures', () => {
 		expect(
 			await classifyLedgerCorrection('Correction: refunds over $100 need two managers.', 0.1),
 		).toEqual({ amendments: true, supersessions: false })
+		// A supersedes answer at its cutoff files nothing for a pair that shares no id, and a pair that
+		// shares only a number stays amended through its amends answer alone.
 		expect(
 			await classifyLedgerCorrection('Correction: refunds need a manager over $250.', 0.9),
-		).toEqual({ amendments: true, supersessions: true })
+		).toEqual({ amendments: false, supersessions: false })
+		expect(
+			await classifyLedgerCorrection('Correction: refunds over $100 need two managers.', 0.9),
+		).toEqual({ amendments: true, supersessions: false })
+	})
+	it('reads the filing of one recorded pair under the ids earlier and later', () => {
+		const filed = classifyLedgerPair(
+			'Order BW-5512 ships Friday.',
+			'Correction: BW-5512 ships Monday.',
+			{
+				amends: 0.9,
+				supersedes: 0.1,
+			},
+		)
+		expect(filed.messages.map((message) => [message.id, message.content])).toEqual([
+			['earlier', 'Order BW-5512 ships Friday.'],
+			['later', 'Correction: BW-5512 ships Monday.'],
+		])
+		expect(filed.classification.categories).toEqual(
+			new Map([
+				['earlier', 'fact'],
+				['later', 'correction'],
+			]),
+		)
+		expect(filed.classification.amendments).toEqual(new Map([['earlier', ['later']]]))
+		expect(filed.classification.supersessions).toEqual(new Map())
 	})
 	it('returns independently recorded thinking and budget-consumer prompts', async () => {
 		const outcome = await exerciseThinkingReplay('turn')

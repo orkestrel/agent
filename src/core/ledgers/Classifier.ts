@@ -156,7 +156,7 @@ export class Classifier implements ClassifierInterface {
 
 	/**
 	 * Reads the whole filing from the recorded judgments.
-	 * @returns The quiet ids, categories, topics, and the amendment and supersession marks
+	 * @returns The quiet ids, categories, topics, and the amendment and supersession marks; an `amends` answer marks a pair amended when the two messages share an id or a number, and a `supersedes` answer marks it superseded and amended when they share an id that holds a letter or a registry id the entities handler names
 	 */
 	classification(): LedgerClassification {
 		const messages = this.#options.conversation.messages()
@@ -168,6 +168,7 @@ export class Classifier implements ClassifierInterface {
 			category: this.category(message.id),
 			topics: [...this.topics(message.id)],
 		}))
+		const entities = new Map<string, ReadonlySet<string>>()
 		const pairs = this.#options.conversation.judgments.judgments().flatMap((judgment) => {
 			const key = parseJSONAs(judgment.id, isArray)
 			if (key === undefined) return []
@@ -184,10 +185,11 @@ export class Classifier implements ClassifierInterface {
 				this.quiet(later)
 			)
 				return []
-			return head === 'amends' &&
-				!this.#sharesLiteral(extractLiterals(before.content), extractLiterals(after.content))
-				? []
-				: [{ head, earlier, later }]
+			const shared =
+				head === 'amends'
+					? this.#sharesLiteral(extractLiterals(before.content), extractLiterals(after.content))
+					: this.#sharesId(before, after, entities)
+			return shared ? [{ head, earlier, later }] : []
 		})
 		return {
 			quiet: new Set(filed.filter((one) => one.quiet).map((one) => one.id)),
@@ -418,6 +420,21 @@ export class Classifier implements ClassifierInterface {
 			[...own.ids].some((id) => other.ids.has(id)) ||
 			[...own.numbers].some((number) => other.numbers.has(number))
 		)
+	}
+
+	// Reports whether two messages share an id: a literal id that holds a letter, as `extractLiterals`
+	// reads it from the text, or a registry id the entities handler names. A number, a date, or a range
+	// shares nothing, so two sources that carry one clock time or one day never pair.
+	#sharesId(before: Message, after: Message, entities: Map<string, ReadonlySet<string>>): boolean {
+		const own = this.#collectIds(before, entities)
+		return [...this.#collectIds(after, entities)].some((id) => own.has(id))
+	}
+
+	#collectIds(message: Message, entities: Map<string, ReadonlySet<string>>): ReadonlySet<string> {
+		return new Set([
+			...[...extractLiterals(message.content).ids].filter((id) => /\p{L}/u.test(id)),
+			...this.#readEntities(message, entities),
+		])
 	}
 
 	// Reports whether a correction is compared against an earlier message: the message is not quiet

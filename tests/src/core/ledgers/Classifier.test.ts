@@ -25,6 +25,7 @@ import {
 import { extractLiterals } from '../../../../src/core/helpers.js'
 import {
 	buildLedgerIndex,
+	collectLedgerMatches,
 	collectLive,
 	matchEntities,
 } from '../../../../src/core/ledgers/helpers.js'
@@ -46,6 +47,7 @@ import {
 	buildLedgerResponse,
 	buildLedgerTopicJudgment,
 	buildAttemptSummaries,
+	classifyLedgerPair,
 	CLASSIFIER_PINNED_ASKS,
 	createDeafScheduler,
 	createFailingScheduler,
@@ -1512,6 +1514,66 @@ describe('Classifier', () => {
 			expect(read).toHaveLength(6)
 			expect(new Set(read).size).toBe(6)
 			expect(read).not.toContain(quiet.content)
+		})
+	})
+
+	describe('the supersedes gate', () => {
+		it('files neither map for a supersedes pair that shares no id', () => {
+			const { classification } = classifyLedgerPair(
+				'Refunds over $100 need a manager.',
+				'Correction: refunds need a manager over $250.',
+				{ amends: 0.9, supersedes: 0.9 },
+			)
+			expect(classification.supersessions).toEqual(new Map())
+			expect(classification.amendments).toEqual(new Map())
+		})
+
+		it.each([
+			['a number', 'The refund desk shut at 1730.', 'Correction: the desk shut at 1730 on Friday.'],
+			[
+				'a date',
+				'Delivery is set for 2031-02-15.',
+				'Correction: delivery leaves after 2031-02-15.',
+			],
+			['a range', 'Pallets 3-4 hold the lamps.', 'Correction: pallets 3-4 hold the vases.'],
+		])(
+			'files no supersession for a pair that shares only %s, which stays amended through its amends answer',
+			(_shared, earlier, later) => {
+				const { classification } = classifyLedgerPair(earlier, later, {
+					amends: 0.9,
+					supersedes: 0.9,
+				})
+				expect(classification.supersessions).toEqual(new Map())
+				expect(classification.amendments).toEqual(new Map([['earlier', ['later']]]))
+			},
+		)
+
+		it('files both maps on a supersedes answer alone for a pair that shares a literal id, in any case', () => {
+			const { classification } = classifyLedgerPair(
+				'Order BW-5512 ships Friday.',
+				'Correction: order bw-5512 ships Monday.',
+				{ amends: 0.1, supersedes: 0.9 },
+			)
+			expect(classification.supersessions).toEqual(new Map([['earlier', ['later']]]))
+			expect(classification.amendments).toEqual(new Map([['earlier', ['later']]]))
+		})
+
+		it('leaves a candidate whose only supersession it refused to retrieval on its own ids', () => {
+			const { messages, classification } = classifyLedgerPair(
+				'Order BC-7305 needs a call back.',
+				'Correction: order BC-7302 ships to the north dock.',
+				{ amends: 0.9, supersedes: 0.9 },
+			)
+			const request = buildLedgerMessage('request', 'user', 'What about BC-7305?')
+			const matches = collectLedgerMatches(
+				{ ...buildLedgerInput({ messages: [...messages, request] }), classification },
+				request.id,
+				new Set([request.id]),
+				new Set(),
+				new Set([request.id]),
+			)
+			// The refused pair leaves the earlier order standing for itself, so the request's own id finds it.
+			expect(matches.map((match) => [match.source, match.basis])).toEqual([['earlier', 'entity']])
 		})
 	})
 

@@ -8269,6 +8269,33 @@ export async function classifyLedgerCorrection(
 		supersessions: filedRecords.supersessions.has(earlier.id),
 	}
 }
+
+/**
+ * Reads the filing of one recorded pair of user statements: `earlier`, filed a fact, then `later`,
+ * filed a correction, with the given answers recorded for the pair's `amends` and `supersedes`
+ * questions and an entities handler that names no registry id.
+ * @param earlier - The earlier statement's text, stored under the id `earlier`
+ * @param later - The later statement's text, stored under the id `later`
+ * @param pairs - The recorded answers to the pair's questions
+ * @returns The two messages, earlier first, and the classification read back at the desk cutoffs
+ */
+export function classifyLedgerPair(
+	earlier: string,
+	later: string,
+	pairs: LedgerPairAnswer,
+): { readonly messages: readonly Message[]; readonly classification: LedgerClassification } {
+	const before: Message = { id: 'earlier', role: 'user', content: earlier }
+	const after: Message = { id: 'later', role: 'user', content: later }
+	const conversation = createConversation({ snapshot: { id: 'pair', messages: [before, after] } })
+	conversation.judgments.add([
+		buildLedgerJudgment(before),
+		buildLedgerJudgment(after, { answer: buildCategoryAnswer({ correction: 1 }) }),
+		buildLedgerPairJudgment('amends', before, after, pairs.amends),
+		buildLedgerPairJudgment('supersedes', before, after, pairs.supersedes),
+	])
+	const classifier = new Classifier(buildClassifierOptions({ conversation }))
+	return { messages: [before, after], classification: classifier.classification() }
+}
 /**
  * Executes a tool turn under a thinking replay policy.
  * @param replay - The provider replay policy; omission uses the agent default
@@ -9804,6 +9831,76 @@ export function buildLedgerWindow(replies: readonly string[], statement?: string
 			]),
 		},
 		requests: replies.map((_reply, at) => `ask-${at + 1}`),
+		notes: [],
+		failures: [],
+	}
+}
+
+/**
+ * Holds one desk topic the judge files statements under and never asks of a request, so a pair of
+ * statements shares a near set while a request matches no candidate on a topic.
+ */
+export const LEDGER_STATEMENT_TOPICS: readonly LedgerTopic[] = Object.freeze([
+	Object.freeze({ name: 'orders', criterion: 'Orders, bookings, and shipping', requested: false }),
+])
+
+/**
+ * Builds a ledger snapshot of two answered requests with a correction stored between them, so a
+ * window over both exchanges holds that correction inside its span.
+ *
+ * @remarks
+ * The statement `stated` says OR-7 ships Friday, and the correction `early` follows it before the
+ * first request `ask-1`, so it sits before every window's span. The reply `reply-1` follows, then
+ * the correction `fixed` with the given text, then the request `ask-2` about the van and its reply
+ * `reply-2`, which ends the snapshot, so a following request has no current statement.
+ *
+ * @param fixed - The text of the correction between the two exchanges
+ * @returns The snapshot, with both requests marked
+ */
+export function buildLedgerAmended(fixed: string): LedgerSnapshot {
+	return {
+		conversation: {
+			id: 'amended',
+			messages: [
+				{ id: 'stated', role: 'user', content: 'OR-7 ships Friday.' },
+				{ id: 'early', role: 'user', content: 'Correction: OR-7 ships Sunday.' },
+				{ id: 'ask-1', role: 'user', content: 'Check OR-7.' },
+				{ id: 'reply-1', role: 'assistant', content: 'OR-7 ships Friday.' },
+				{ id: 'fixed', role: 'user', content: fixed },
+				{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+				{ id: 'reply-2', role: 'assistant', content: 'The van is ready.' },
+			],
+		},
+		requests: ['ask-1', 'ask-2'],
+		notes: [],
+		failures: [],
+	}
+}
+
+/**
+ * Builds a ledger snapshot of one answered request followed by two current statements about hall
+ * H-12: `old`, which says it is booked for Friday, then the correction `new`, which says it is free.
+ *
+ * @remarks
+ * The request `ask-1` and its reply `reply-1` come first. With `stray`, the unrelated statement
+ * `stray` opens the snapshot, so an opening that shows the rest still leaves it behind.
+ *
+ * @param stray - If `true`, the snapshot opens with the unrelated statement; if `false`, it does not
+ * @returns The snapshot, with the request marked
+ */
+export function buildLedgerHall(stray: boolean): LedgerSnapshot {
+	return {
+		conversation: {
+			id: 'hall',
+			messages: [
+				...(stray ? [{ id: 'stray', role: 'user' as const, content: 'The van is blue.' }] : []),
+				{ id: 'ask-1', role: 'user', content: 'Note the hall.' },
+				{ id: 'reply-1', role: 'assistant', content: 'Noted.' },
+				{ id: 'old', role: 'user', content: 'Hall H-12 is booked for Friday.' },
+				{ id: 'new', role: 'user', content: 'Correction: hall H-12 is free on Friday.' },
+			],
+		},
+		requests: ['ask-1'],
 		notes: [],
 		failures: [],
 	}

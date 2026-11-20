@@ -221,7 +221,10 @@ import {
 	LEDGER_CUT_SNAPSHOT,
 	LEDGER_PACKET_FACTS,
 	LEDGER_CUT_RULED_SNAPSHOT,
+	LEDGER_STATEMENT_TOPICS,
+	buildLedgerAmended,
 	buildLedgerGoals,
+	buildLedgerHall,
 	buildLedgerPackets,
 	buildLedgerWindow,
 	recallLedger,
@@ -4198,15 +4201,14 @@ describe('Ledger — what a write retires', () => {
 		await ledger.respond("Change Mara Quill's phone to 555-0102.")
 		await ledger.respond("What is Mara Quill's phone?")
 		const sent = requireValue(provider.calls[4]).messages
-		// The window shows both exchanges as stored: the read and the reply with the old phone, then the
-		// write that changed it.
+		// The window shows both exchanges, the reply with the old phone included, but not the read the
+		// write retired: its call group's every result is retired, and the write that replaced it shows.
 		expect(
 			sent
 				.filter((message) => message.content.includes('555-0101'))
 				.map((message) => message.content),
-		).toEqual(['Contact C-12: Mara Quill. Phone 555-0101.', 'Mara Quill is on 555-0101.'])
+		).toEqual(['Mara Quill is on 555-0101.'])
 		expect(sent.flatMap((message) => (message.call === undefined ? [] : [message.call]))).toEqual([
-			'read-1',
 			'write-1',
 		])
 		// Recall still retires the stale read: a host's recall lists the new value and not the read.
@@ -11265,7 +11267,7 @@ describe('Ledger — the lean opening', () => {
 		])
 	})
 
-	it('lists the correction of a message the prompt shows when the key matches only that message', async () => {
+	it('lists the correction of a message the prompt shows when the key matches only that message and the opening leaves the correction out', async () => {
 		const provider = createScriptedProvider(
 			[
 				{
@@ -11285,11 +11287,13 @@ describe('Ledger — the lean opening', () => {
 					conversation: {
 						id: 'amended',
 						messages: [
+							{ id: 'stray', role: 'user', content: 'Vans park outside.' },
 							{ id: 'ask', role: 'user', content: 'Ship order AX-7 on Monday morning.' },
 							{ id: 'noted', role: 'assistant', content: 'Noted.' },
 							{ id: 'fixed', role: 'user', content: 'Correction: order AX-7 ships on Tuesday.' },
 							{ id: 'thanks', role: 'user', content: 'Thanks.' },
 							{ id: 'done', role: 'assistant', content: 'Done.' },
+							{ id: 'final', role: 'user', content: 'Correction: order AX-7 ships on Wednesday.' },
 						],
 					},
 					requests: ['ask', 'thanks'],
@@ -11298,21 +11302,23 @@ describe('Ledger — the lean opening', () => {
 				},
 			}),
 		)
-		ledger.conversation.judgments.add(
-			buildLedgerPairJudgment(
-				'amends',
-				requireValue(ledger.conversation.message('ask')),
-				requireValue(ledger.conversation.message('fixed')),
-				1,
-			),
+		const [ask, fixed, final] = ['ask', 'fixed', 'final'].map((id) =>
+			requireValue(ledger.conversation.message(id)),
 		)
+		ledger.conversation.judgments.add([
+			buildLedgerPairJudgment('amends', requireValue(ask), requireValue(fixed), 1),
+			buildLedgerPairJudgment('supersedes', requireValue(fixed), requireValue(final), 1),
+		])
 		await ledger.respond('When does the order ship?')
-		// The window shows the request the key matches; its correction is behind, so recall lists it.
+		// The window shows the request the key matches; its correction sits inside the window's span, but
+		// the current statement supersedes it, so the opening leaves it out and recall lists it; the stray
+		// statement behind keeps recall offered.
 		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
 			'ask',
 			'noted',
 			'thanks',
 			'done',
+			'final',
 		])
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'amended')?.content,
@@ -11796,5 +11802,402 @@ describe('Ledger — relevance', () => {
 		)
 		// The stored requests keep their own content.
 		expect(ledger.conversation.message('ask-1')?.content).toBe('Check OR-1.')
+	})
+})
+
+describe('Ledger — superseded values in the window', () => {
+	it('shows a correction inside the window span after the reply it follows, and none from before the oldest shown request', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: buildLedgerAmended('Correction: OR-7 ships Monday.'),
+				judge: createCorrectionJudge(createRecorder(), new Set(['early', 'fixed']), {
+					amends: 0.9,
+					supersedes: 0.1,
+				}),
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// `fixed` amends `stated` between the two shown exchanges; `early` amends it before them both.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'reply-1',
+			'fixed',
+			'ask-2',
+			'reply-2',
+		])
+	})
+
+	it("prices a span's amenders against the window's share, so a long one cuts the window to the newest exchange", async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: buildLedgerAmended(
+					`Correction: OR-7 ships Monday. ${'Later details follow. '.repeat(300)}`,
+				),
+				judge: createCorrectionJudge(createRecorder(), new Set(['early', 'fixed']), {
+					amends: 0.9,
+					supersedes: 0.1,
+				}),
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// Both exchanges fit the share alone, but not with the correction between them.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-2',
+			'reply-2',
+		])
+	})
+
+	it('drops a current statement its shown successor supersedes, gives it no row, and narrows recall out when nothing else is behind', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: buildLedgerHall(false),
+				judge: createCorrectionJudge(createRecorder(), new Set(['new']), {
+					amends: 0.9,
+					supersedes: 0.9,
+				}),
+			}),
+		)
+		await ledger.respond('Is the hall free?')
+		const sent = requireValue(provider.calls[0])
+		expect(readLedgerOpening(sent.messages)).toEqual({
+			shown: ['ask-1', 'reply-1', 'new'],
+			keys: [],
+		})
+		expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup'])
+	})
+
+	it('keeps a partly amended statement beside its amender', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: buildLedgerHall(false),
+				judge: createCorrectionJudge(createRecorder(), new Set(['new']), {
+					amends: 0.9,
+					supersedes: 0.1,
+				}),
+			}),
+		)
+		await ledger.respond('Is the hall free?')
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'reply-1',
+			'old',
+			'new',
+		])
+	})
+
+	it('lists a dropped statement to an in-request recall by its words', async () => {
+		const provider = createScriptedProvider(
+			[
+				{ content: '', tools: [{ id: 'words', name: 'recall', arguments: { key: 'booked' } }] },
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: buildLedgerHall(true),
+				judge: createCorrectionJudge(createRecorder(), new Set(['new']), {
+					amends: 0.9,
+					supersedes: 0.9,
+				}),
+			}),
+		)
+		await ledger.respond('Is the hall free?')
+		// The stray statement keeps recall open; the opening leaves `old` out, so recall lists it.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'reply-1',
+			'new',
+		])
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'words')?.content,
+		).toContain('Hall H-12 is booked for Friday.')
+	})
+
+	it('drops an amender its current successor supersedes, so it never comes back inside the span', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: {
+					conversation: {
+						id: 'held',
+						messages: [
+							{ id: 'stated', role: 'user', content: 'Hall H-12 is booked.' },
+							{ id: 'ask-1', role: 'user', content: 'Check the hall.' },
+							{ id: 'reply-1', role: 'assistant', content: 'It is booked.' },
+							{ id: 'fixed', role: 'user', content: 'Correction: hall H-12 is held for Monday.' },
+							{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-2', role: 'assistant', content: 'The van is ready.' },
+							{ id: 'newest', role: 'user', content: 'Correction: hall H-12 is free.' },
+						],
+					},
+					requests: ['ask-1', 'ask-2'],
+					notes: [],
+					failures: [],
+				},
+				judge: createCorrectionJudge(createRecorder(), new Set(['fixed', 'newest']), {
+					amends: 0.9,
+					supersedes: 0.9,
+				}),
+			}),
+		)
+		await ledger.respond('Anything else?')
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'reply-1',
+			'ask-2',
+			'reply-2',
+			'newest',
+		])
+	})
+
+	it('leaves out a window call group every result of which a later shown lookup replaced, and keeps a group with one live result whole', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'retired',
+						messages: [
+							{ id: 'ask-1', role: 'user', content: 'Check BW-5512.' },
+							{
+								id: 'call-1',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } }],
+							},
+							{ id: 'res-1', role: 'tool', call: 'c1', content: 'Order BW-5512 ships Friday.' },
+							{ id: 'reply-1', role: 'assistant', content: 'It ships Friday.' },
+							{ id: 'ask-2', role: 'user', content: 'Check BW-5512 and BW-7777.' },
+							{
+								id: 'call-2',
+								role: 'assistant',
+								content: '',
+								calls: [
+									{ id: 'c2', name: 'lookup', arguments: { id: 'BW-5512' } },
+									{ id: 'c2b', name: 'lookup', arguments: { id: 'BW-7777' } },
+								],
+							},
+							{ id: 'res-2', role: 'tool', call: 'c2', content: 'Order BW-5512 ships Sunday.' },
+							{
+								id: 'res-2b',
+								role: 'tool',
+								call: 'c2b',
+								content: 'Order BW-7777 ships Tuesday.',
+							},
+							{ id: 'reply-2', role: 'assistant', content: 'Sunday and Tuesday.' },
+							{ id: 'ask-3', role: 'user', content: 'Check BW-5512 once more.' },
+							{
+								id: 'call-3',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'c3', name: 'lookup', arguments: { id: 'BW-5512' } }],
+							},
+							{ id: 'res-3', role: 'tool', call: 'c3', content: 'Order BW-5512 ships Monday.' },
+							{ id: 'reply-3', role: 'assistant', content: 'It ships Monday.' },
+						],
+					},
+					requests: ['ask-1', 'ask-2', 'ask-3'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Anything else?')
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'reply-1',
+			'ask-2',
+			'call-2',
+			'res-2',
+			'res-2b',
+			'reply-2',
+			'ask-3',
+			'call-3',
+			'res-3',
+			'reply-3',
+		])
+	})
+
+	it('keeps a window call group whose results are a recall or an unknown tool beside a retired lookup', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'kept',
+						messages: [
+							{ id: 'ask-1', role: 'user', content: 'Check BW-5512.' },
+							{
+								id: 'call-1',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } }],
+							},
+							{ id: 'res-1', role: 'tool', call: 'c1', content: 'Order BW-5512 ships Friday.' },
+							{
+								id: 'call-r',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'r1', name: 'recall', arguments: { key: 'BW-5512' } }],
+							},
+							{ id: 'res-r', role: 'tool', call: 'r1', content: 'BW-5512 ships Friday.' },
+							{
+								id: 'call-u',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'u1', name: 'weather', arguments: { city: 'Oslo' } }],
+							},
+							{ id: 'res-u', role: 'tool', call: 'u1', content: 'Sunny.' },
+							{ id: 'reply-1', role: 'assistant', content: 'It ships Friday.' },
+							{ id: 'ask-2', role: 'user', content: 'Check BW-5512 again.' },
+							{
+								id: 'call-2',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'c2', name: 'lookup', arguments: { id: 'BW-5512' } }],
+							},
+							{ id: 'res-2', role: 'tool', call: 'c2', content: 'Order BW-5512 ships Monday.' },
+							{ id: 'reply-2', role: 'assistant', content: 'It ships Monday.' },
+						],
+					},
+					requests: ['ask-1', 'ask-2'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Anything else?')
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'call-r',
+			'res-r',
+			'call-u',
+			'res-u',
+			'reply-1',
+			'ask-2',
+			'call-2',
+			'res-2',
+			'reply-2',
+		])
+	})
+
+	it.each([
+		['before', 'bw-5512', 'No record', 'BW-5512', 'Order BW-5512 ships Monday.'],
+		['after', 'BW-5512', 'Order BW-5512 ships Monday.', 'bw-5512', 'No record'],
+	])(
+		'keeps both lookup groups when a lookup that found nothing comes %s one of the same id in another case',
+		async (_order, first, found, second, again) => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({
+					topics: [],
+					snapshot: {
+						conversation: {
+							id: 'cases',
+							messages: [
+								{ id: 'ask-1', role: 'user', content: `Check ${first}.` },
+								{
+									id: 'call-1',
+									role: 'assistant',
+									content: '',
+									calls: [{ id: 'c1', name: 'lookup', arguments: { id: first } }],
+								},
+								{ id: 'res-1', role: 'tool', call: 'c1', content: found },
+								{ id: 'reply-1', role: 'assistant', content: 'Checked.' },
+								{ id: 'ask-2', role: 'user', content: `Check ${second}.` },
+								{
+									id: 'call-2',
+									role: 'assistant',
+									content: '',
+									calls: [{ id: 'c2', name: 'lookup', arguments: { id: second } }],
+								},
+								{ id: 'res-2', role: 'tool', call: 'c2', content: again },
+								{ id: 'reply-2', role: 'assistant', content: 'Checked again.' },
+							],
+						},
+						requests: ['ask-1', 'ask-2'],
+						notes: [],
+						failures: [],
+					},
+				}),
+			)
+			await ledger.respond('Anything else?')
+			expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+				'ask-1',
+				'call-1',
+				'res-1',
+				'reply-1',
+				'ask-2',
+				'call-2',
+				'res-2',
+				'reply-2',
+			])
+		},
+	)
+
+	it('keeps a window call group whose replacing lookup no window shows', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'host',
+						messages: [
+							{ id: 'ask-1', role: 'user', content: 'Check BW-5512.' },
+							{
+								id: 'call-1',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'c1', name: 'lookup', arguments: { id: 'BW-5512' } }],
+							},
+							{ id: 'res-1', role: 'tool', call: 'c1', content: 'Order BW-5512 ships Friday.' },
+							{ id: 'reply-1', role: 'assistant', content: 'It ships Friday.' },
+							{
+								id: 'call-h',
+								role: 'assistant',
+								content: '',
+								calls: [{ id: 'ch', name: 'lookup', arguments: { id: 'BW-5512' } }],
+							},
+							{ id: 'res-h', role: 'tool', call: 'ch', content: 'Order BW-5512 ships Monday.' },
+						],
+					},
+					requests: ['ask-1'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// The host's lookup after the reply replaced the shown one, but no window shows it.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'ask-1',
+			'call-1',
+			'res-1',
+			'reply-1',
+		])
 	})
 })

@@ -15,8 +15,10 @@ import {
 	collectRecallMessages,
 	collectLedgerExchanges,
 	collectLedgerKeys,
+	collectLedgerAmenders,
 	collectLedgerMatches,
 	collectLedgerStatements,
+	filterLedgerShown,
 	nameLedgerExchange,
 	parseLedgerExchange,
 	renderLedgerKeys,
@@ -2155,6 +2157,87 @@ describe('collectLedgerStatements', () => {
 	})
 })
 
+describe('collectLedgerAmenders', () => {
+	const messages = [
+		buildLedgerMessage('stated', 'user', 'OR-7 ships Friday.'),
+		buildLedgerMessage('early', 'user', 'Correction: OR-7 ships Sunday.'),
+		buildLedgerMessage('ask-1', 'user', 'Check OR-7.'),
+		buildLedgerMessage('mid', 'user', 'Correction: OR-7 ships Tuesday.'),
+		buildLedgerMessage('reply-1', 'assistant', 'OR-7 ships Friday.'),
+		buildLedgerMessage('fixed', 'user', 'Correction: OR-7 ships Monday.'),
+		buildLedgerMessage('plain', 'user', 'The van is blue.'),
+		buildLedgerMessage('note', 'user', 'Correction note.'),
+		buildLedgerMessage('ask-2', 'user', 'Check OR-8.'),
+		buildLedgerMessage('reply-2', 'assistant', 'OR-8 ships Tuesday.'),
+		buildLedgerMessage('late', 'user', 'Correction: OR-8 ships Wednesday.'),
+	]
+	const requests = new Set(['ask-1', 'ask-2'])
+	const notes = new Set(['note'])
+	const amendments = new Map([
+		['stated', ['early', 'mid', 'fixed', 'note']],
+		['ask-2', ['ask-1', 'late']],
+	])
+	const exchanges = collectLedgerExchanges(messages, requests, notes)
+
+	it("collects the later sides inside the span, from the oldest exchange's request to the newest's reply, in conversation order", () => {
+		// `early` precedes the oldest request and `late` follows the newest reply; a request, a note, and
+		// a statement no amendment names are no amenders.
+		expect(
+			collectLedgerAmenders(messages, amendments, requests, notes, exchanges).map(
+				(message) => message.id,
+			),
+		).toEqual(['mid', 'fixed'])
+	})
+
+	it('narrows the span to the exchanges given, and collects nothing for none', () => {
+		expect(
+			collectLedgerAmenders(messages, amendments, requests, notes, exchanges.slice(0, 1)).map(
+				(message) => message.id,
+			),
+		).toEqual([])
+		expect(collectLedgerAmenders(messages, amendments, requests, notes, [])).toEqual([])
+	})
+})
+
+describe('filterLedgerShown', () => {
+	const shown = [
+		buildLedgerMessage('old', 'user', 'The hall is booked.'),
+		buildLedgerMessage('ask', 'user', 'Is the hall booked?'),
+		buildLedgerMessage('reply', 'assistant', 'It is booked.'),
+		buildLedgerMessage('mid', 'user', 'Correction: the hall is held.'),
+		buildLedgerMessage('new', 'user', 'Correction: the hall is free.'),
+	]
+
+	it('drops a statement a chain of supersessions links to another shown message, and keeps the rest in order', () => {
+		// `old` is superseded by `mid`, which `new` supersedes in turn; `ask` is a request.
+		const supersessions = new Map([
+			['old', ['mid']],
+			['mid', ['new']],
+			['ask', ['new']],
+		])
+		expect(
+			filterLedgerShown(shown, supersessions, new Set(['ask'])).map((message) => message.id),
+		).toEqual(['ask', 'reply', 'new'])
+		// Without `mid` shown, `old` still reaches `new` through it.
+		expect(
+			filterLedgerShown(
+				shown.filter((message) => message.id !== 'mid'),
+				supersessions,
+				new Set(['ask']),
+			).map((message) => message.id),
+		).toEqual(['ask', 'reply', 'new'])
+	})
+
+	it('keeps a statement whose successors are not shown, and a statement no supersession names', () => {
+		expect(
+			filterLedgerShown(shown.slice(0, 3), new Map([['old', ['new']]]), new Set(['ask'])).map(
+				(message) => message.id,
+			),
+		).toEqual(['old', 'ask', 'reply'])
+		expect(filterLedgerShown(shown, new Map(), new Set(['ask']))).toEqual(shown)
+	})
+})
+
 describe('collectLedgerKeys', () => {
 	it('orders previous, rules, the ids of the statements left behind, the named, looked-up, and recurring ids, then the filed topics', () => {
 		const { input, requests, notes } = buildLedgerKeyScenario(true)
@@ -2621,6 +2704,50 @@ describe('collectLedgerMatches', () => {
 				new Set([...shown, 'fresh']),
 			).map((match) => match.source),
 		).toEqual(['ruled'])
+	})
+
+	it('leaves out of a match the member a chain of supersessions links to a shown message, and keeps one whose successor is behind', () => {
+		const messages = [
+			buildLedgerMessage('order', 'user', 'Order OR-5 ships Friday.'),
+			buildLedgerMessage('moved', 'user', 'Correction: OR-5 ships Saturday.'),
+			buildLedgerMessage('ask', 'user', 'Check the van.'),
+			buildLedgerMessage('reply', 'assistant', 'The van is ready.'),
+			buildLedgerMessage('fixed', 'user', 'Correction: OR-5 ships Monday.'),
+			buildLedgerMessage('request', 'user', 'Where is OR-5?'),
+		]
+		// `order` is amended by both corrections, and `fixed` supersedes `moved`.
+		const input = buildLedgerInput({
+			messages,
+			classification: {
+				amendments: { order: ['moved', 'fixed'], moved: ['fixed'] },
+				supersessions: { moved: ['fixed'] },
+			},
+		})
+		const requests = new Set(['ask', 'request'])
+		// The opening shows `fixed`, so `order` brings no `moved` beside it.
+		expect(
+			collectLedgerMatches(
+				input,
+				'request',
+				requests,
+				new Set(),
+				new Set(['ask', 'reply', 'fixed', 'request']),
+			).map((match) => [match.source, match.members]),
+		).toEqual([['order', ['order']]])
+		// With `fixed` behind too, `moved` stands for it, the newer turn ranks first, and `order` brings
+		// `moved`, whose successor the opening doesn't show.
+		expect(
+			collectLedgerMatches(
+				input,
+				'request',
+				requests,
+				new Set(),
+				new Set(['ask', 'reply', 'request']),
+			).map((match) => [match.source, match.members]),
+		).toEqual([
+			['fixed', ['fixed']],
+			['order', ['order', 'moved']],
+		])
 	})
 })
 

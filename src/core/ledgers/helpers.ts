@@ -266,6 +266,114 @@ export function collectLedgerStatements(
 }
 
 /**
+ * Collects the amenders inside a window's span: the statements after the request of the window's
+ * oldest exchange and before the reply of its newest that are the later side of an accepted
+ * amendment.
+ *
+ * @remarks
+ * A statement is a user message with no calls that is neither a request nor a note. `amendments` is
+ * the classification's, so a supersession counts, as the classifier files every supersession as an
+ * amendment too. A statement after the newest reply is a current statement, and one before the
+ * oldest request comes before everything the window shows, so the span holds neither. No exchange
+ * has no span.
+ *
+ * @param messages - The messages stored before a request, in conversation order
+ * @param amendments - The later messages attached to each earlier message
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @param exchanges - The window's exchanges, newest first, as {@link collectLedgerExchanges} returns them
+ * @returns The amenders in conversation order
+ * @example
+ * ```ts
+ * const messages: readonly Message[] = [
+ * 	{ id: 'first', role: 'user', content: 'Check OR-7.' },
+ * 	{ id: 'reply', role: 'assistant', content: 'OR-7 ships Friday.' },
+ * 	{ id: 'fixed', role: 'user', content: 'Correction: OR-7 ships Monday.' },
+ * 	{ id: 'second', role: 'user', content: 'And OR-8?' },
+ * 	{ id: 'answer', role: 'assistant', content: 'OR-8 ships Tuesday.' },
+ * ]
+ * const requests = new Set(['first', 'second'])
+ * collectLedgerAmenders(
+ * 	messages,
+ * 	new Map([['reply', ['fixed']]]),
+ * 	requests,
+ * 	new Set(),
+ * 	collectLedgerExchanges(messages, requests, new Set()),
+ * ).map((message) => message.id) // ['fixed']
+ * ```
+ */
+export function collectLedgerAmenders(
+	messages: readonly Message[],
+	amendments: ReadonlyMap<string, readonly string[]>,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+	exchanges: readonly LedgerExchange[],
+): readonly Message[] {
+	const oldest = exchanges.at(-1)?.request.id
+	const newest = exchanges[0]?.reply.id
+	if (oldest === undefined || newest === undefined) return []
+	const laters = new Set([...amendments.values()].flat())
+	return messages
+		.slice(
+			messages.findIndex((message) => message.id === oldest) + 1,
+			Math.max(
+				0,
+				messages.findIndex((message) => message.id === newest),
+			),
+		)
+		.filter(
+			(message) =>
+				message.role === 'user' &&
+				!hasCalls(message) &&
+				!requests.has(message.id) &&
+				!notes.has(message.id) &&
+				laters.has(message.id),
+		)
+}
+
+/**
+ * Filters the messages an opening shows down to those it sends: every one but a statement that a
+ * chain of supersessions links to another of them.
+ *
+ * @remarks
+ * A statement is a user message that is no request. The chain follows `supersessions` as
+ * {@link scanAmendments} walks it, so a statement whose successor's successor is shown drops too.
+ * A partly amended statement has no supersession, so it stays beside its amender. A request, a
+ * reply, and a tool result always stay.
+ *
+ * @param shown - The messages the opening shows, in conversation order
+ * @param supersessions - The later messages that supersede each earlier message
+ * @param requests - The marked request ids
+ * @returns The messages it sends, in their order
+ * @example
+ * ```ts
+ * filterLedgerShown(
+ * 	[
+ * 		{ id: 'old', role: 'user', content: 'The hall is booked.' },
+ * 		{ id: 'new', role: 'user', content: 'Correction: the hall is free.' },
+ * 	],
+ * 	new Map([['old', ['new']]]),
+ * 	new Set(),
+ * ).map((message) => message.id) // ['new']
+ * ```
+ */
+export function filterLedgerShown(
+	shown: readonly Message[],
+	supersessions: ReadonlyMap<string, readonly string[]>,
+	requests: ReadonlySet<string>,
+): readonly Message[] {
+	const ids = new Set(shown.map((message) => message.id))
+	return shown.filter(
+		(message) =>
+			message.role !== 'user' ||
+			requests.has(message.id) ||
+			!scanAmendments(supersessions, message.id, () => true).some(
+				(id) => id !== message.id && ids.has(id),
+			),
+	)
+}
+
+/**
  * Collects the exchanges among messages, newest first: each marked request with the final call-free
  * reply {@link collectLedgerReplies} selects for it.
  *
@@ -614,8 +722,9 @@ export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
  *   `excluded` or is no candidate;
  * - a candidate the judge filed no category for drops when a newer message `excluded` holds carries
  *   every word it counts;
- * - a candidate brings the amenders {@link scanAmendments} admits, and a message one match brings is
- *   no match of its own.
+ * - a candidate brings the amenders {@link scanAmendments} admits, but none that a chain of
+ *   supersessions links to a message `excluded` holds, and a message one match brings is no match of
+ *   its own.
  *
  * A word counts when fewer than half of the user messages up to and including the request carry it,
  * shown ones too, and a candidate's score sums `log(carried / carriers)` over the counted words it
@@ -757,10 +866,17 @@ export function collectLedgerMatches(
 	}>(
 		(state, item) => {
 			if (state.claimed.has(item.source)) return state
+			// A member the opening shows a successor of stays out, so a retrieved match never brings a
+			// superseded statement back beside its successor.
 			const members = scanAmendments(
 				classification.amendments,
 				item.source,
-				(id) => eligible.has(id) && !state.claimed.has(id),
+				(id) =>
+					eligible.has(id) &&
+					!state.claimed.has(id) &&
+					!scanAmendments(classification.supersessions, id, () => true).some(
+						(later) => later !== id && excluded.has(later),
+					),
 			)
 			return {
 				claimed: new Set([...state.claimed, ...members]),

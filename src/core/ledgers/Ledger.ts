@@ -122,8 +122,10 @@ import {
 	collectWriteSupersessions,
 	mergeSupersessions,
 	digestLedgerTools,
+	collectLedgerAmenders,
 	collectLedgerExchanges,
 	collectLedgerStatements,
+	filterLedgerShown,
 	collectRecallMessages,
 	buildLedgerIndex,
 	buildRecallMessage,
@@ -1328,14 +1330,16 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// Plans a request's opening: the recent window, the newest exchanges that have a reply, each with
-	// its call turns and results, the earlier user messages retrieval ranks best, and the current
-	// statements whole, in conversation order, then the request copy, which carries the Earlier index of
-	// what the opening leaves behind while `recall` is advertised. Past the budget the steps cut the
-	// window's exchanges oldest first down to the newest one, then the retrieved messages lowest rank
-	// first, then the newest exchange, then the exchange rows from the deepest down to `previous-2`,
-	// then the id rows last-ranked first, then the statements oldest first, then the topic rows last
-	// first, `rules`, `previous`, and the rest of the index. Each step reads its own shown messages, its
-	// index, and whether it leaves anything behind. The first window or retrieval step that fits stays,
+	// its call turns and results but a group every result of which is retired, and the amenders inside
+	// its span, the earlier user messages retrieval ranks best, and the current statements whole, in
+	// conversation order and without a statement a shown successor supersedes, then the request copy,
+	// which carries the Earlier index of what the opening leaves behind while `recall` is advertised.
+	// Past the budget the steps cut the window's exchanges oldest first down to the newest one, then the
+	// retrieved messages lowest rank first, then the newest exchange, then the exchange rows from the
+	// deepest down to `previous-2`, then the id rows last-ranked first, then the statements oldest
+	// first, then the topic rows last first, `rules`, `previous`, and the rest of the index. Each step
+	// reads its own shown messages, its index, and whether it leaves anything behind; a statement it
+	// leaves out for a shown successor counts as shown. The first window or retrieval step that fits stays,
 	// so it never shrinks as the budget grows; then the first cut of its rows that leaves `recall` its
 	// room wins, else that step as it fits. With no such step that fits, the first bare row cut that
 	// leaves the room wins, else the first that fits, else the statement cuts.
@@ -1376,32 +1380,50 @@ export class Ledger implements LedgerInterface {
 			(message) => (scan.position(message.id) ?? at) < at,
 		)
 		// The window: the newest exchanges that have a reply, within the count bound, up to the first
-		// whose messages would price past the window's share of the budget.
+		// whose messages, the amenders inside its span included, would price past the window's share of
+		// the budget.
 		const exchanges = collectLedgerExchanges(before, this.#requests, this.#annotations).slice(
 			0,
 			LEDGER_RECENT_LIMIT,
+		)
+		// The findings a later shown finding that holds a result replaced or a write superseded. A finding
+		// is replaced only by a newer one, which every window that shows it shows too, so one reading
+		// over the largest window serves every step; a lookup that found nothing replaces nothing here.
+		const retired = collectRetiredFindings(
+			this.#collectWindow(scan, exchanges, exchanges.length, new Set()),
+			scan.findings.filter((finding) => finding.result !== undefined),
 		)
 		const over = exchanges.findIndex(
 			(_exchange, index) =>
 				this.#price(
 					stripThinking(
-						[...this.#collectWindow(scan, exchanges, index + 1), request],
+						[...this.#collectRecent(scan, input, before, exchanges, index + 1, retired), request],
 						this.#replay,
 					).slice(0, -1),
 				) >
 				total * LEDGER_RECENT_SHARE,
 		)
 		const size = over < 0 ? exchanges.length : over
+		const supersessions = input.classification.supersessions
 		// Cutting a statement only lowers the price of an opening with no window and no index, and both
 		// only add to it, so no step before the first count that fits bare can fit, and no statement is
 		// cut while a window stays.
 		const floor = findLedgerCut(0, current.length + 1, (count) =>
-			this.#price(this.#buildOpening(request, built, current.slice(count), []).probe) <= total
+			this.#price(
+				this.#buildOpening(
+					request,
+					built,
+					filterLedgerShown(current.slice(count), supersessions, this.#requests),
+					[],
+				).probe,
+			) <= total
 				? count
 				: undefined,
 		)
-		// The retrieved messages, each match's in rank order, from none the whole window or the current
-		// statements show.
+		const newest = Math.min(size, 1)
+		// The retrieved messages, each match's in rank order, from none the whole window, the amenders
+		// of the newest exchange's span, which every layout with a match shows, or the current statements
+		// show, a statement a shown successor supersedes included.
 		const retrieved =
 			floor === 0
 				? this.#collectRetrieved(
@@ -1410,7 +1432,10 @@ export class Ledger implements LedgerInterface {
 						request,
 						new Set([
 							request.id,
-							...this.#collectWindow(scan, exchanges, size).map((message) => message.id),
+							...this.#collectWindow(scan, exchanges, size, retired).map((message) => message.id),
+							...this.#collectRecent(scan, input, before, exchanges, newest, retired).map(
+								(message) => message.id,
+							),
 							...current.map((message) => message.id),
 						]),
 						total,
@@ -1418,7 +1443,6 @@ export class Ledger implements LedgerInterface {
 				: []
 		// Every statement kept: the window from the largest down to the newest exchange with every
 		// retrieved match, then the retrieved matches cut lowest rank first, then no window.
-		const newest = Math.min(size, 1)
 		const layouts = [
 			...Array.from({ length: size - newest + 1 }, (_unused, index) => ({
 				window: size - index,
@@ -1442,7 +1466,7 @@ export class Ledger implements LedgerInterface {
 							this.#collectShown(
 								scan,
 								[
-									...this.#collectWindow(scan, exchanges, layout.window),
+									...this.#collectRecent(scan, input, before, exchanges, layout.window, retired),
 									...retrieved.slice(0, layout.matches).flat(),
 								],
 								current,
@@ -1495,7 +1519,7 @@ export class Ledger implements LedgerInterface {
 									this.#buildOpening(
 										request,
 										built,
-										current.slice(count),
+										filterLedgerShown(current.slice(count), supersessions, this.#requests),
 										admits ? this.#collectCutKeys(input, projection, request, current, count) : [],
 									).probe,
 								) <= total,
@@ -1522,7 +1546,10 @@ export class Ledger implements LedgerInterface {
 			),
 			[],
 		]
-		const shown = chosen?.shown ?? current.slice(cut ?? current.length)
+		// The statements a cut keeps, a superseded one included, count as shown, so one a shown successor
+		// supersedes leaves nothing behind.
+		const kept = current.slice(cut ?? current.length)
+		const shown = chosen?.shown ?? filterLedgerShown(kept, supersessions, this.#requests)
 		const keys =
 			chosen?.keys ??
 			(cut !== undefined
@@ -1532,9 +1559,9 @@ export class Ledger implements LedgerInterface {
 				: (emptied.find(
 						(rows) => this.#price(this.#buildOpening(request, built, [], rows).probe) <= total,
 					) ?? []))
-		const ids = new Set(shown.map((message) => message.id))
+		const ids = new Set(kept.map((message) => message.id))
 		// Nothing left behind at the chosen step: `recall` leaves the scope for this request.
-		if (admits && !recallable.some((message) => !ids.has(message.id))) {
+		if (admits && !(chosen?.others ?? recallable.some((message) => !ids.has(message.id)))) {
 			const tools = this.#definitions()
 				.filter((tool) => tool.name !== 'recall')
 				.map((tool) => tool.name)
@@ -1612,11 +1639,13 @@ export class Ledger implements LedgerInterface {
 
 	// The window's messages for its newest `count` exchanges, oldest first: each request, the call turns
 	// between it and its reply whose every call has its result, with those results, in stored order,
-	// then the reply. A call turn missing a result stays out, so the window never breaks a pairing.
+	// then the reply. A call turn missing a result stays out, so the window never breaks a pairing, and
+	// so does a call group whose every result `retired` holds; a group with one live result stays whole.
 	#collectWindow(
 		scan: LedgerScan,
 		exchanges: readonly LedgerExchange[],
 		count: number,
+		retired: ReadonlySet<string>,
 	): readonly Message[] {
 		return exchanges
 			.slice(0, count)
@@ -1633,7 +1662,8 @@ export class Ledger implements LedgerInterface {
 							hasCalls(leader) &&
 							(leader.calls ?? []).every((call) =>
 								results.some((result) => result.role === 'tool' && result.call === call.id),
-							),
+							) &&
+							!(results.length > 0 && results.every((result) => retired.has(result.id))),
 					)
 					.flat()
 					.toSorted((left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0))
@@ -1641,19 +1671,46 @@ export class Ledger implements LedgerInterface {
 			})
 	}
 
-	// The messages a step shows, in conversation order: the window's and the kept statements.
+	// The recent messages of the newest `count` exchanges, in conversation order, as the share prices
+	// them: the window's, and the amenders inside its span, each after the reply it follows.
+	#collectRecent(
+		scan: LedgerScan,
+		input: LedgerProjectionInput,
+		before: readonly Message[],
+		exchanges: readonly LedgerExchange[],
+		count: number,
+		retired: ReadonlySet<string>,
+	): readonly Message[] {
+		return [
+			...this.#collectWindow(scan, exchanges, count, retired),
+			...collectLedgerAmenders(
+				before,
+				input.classification.amendments,
+				this.#requests,
+				this.#annotations,
+				exchanges.slice(0, count),
+			),
+		].toSorted((left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0))
+	}
+
+	// The messages a step shows, in conversation order and each once: the recent and retrieved ones and
+	// the kept statements. A message given twice keeps its first copy.
 	#collectShown(
 		scan: LedgerScan,
 		window: readonly Message[],
 		kept: readonly Message[],
 	): readonly Message[] {
-		return [...window, ...kept].toSorted(
-			(left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0),
-		)
+		return [
+			...new Map(
+				[...window, ...kept].toReversed().map((message) => [message.id, message]),
+			).values(),
+		].toSorted((left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0))
 	}
 
-	// A step's own bookkeeping from the messages it shows: its index while `recall` is admitted, which
-	// excludes them, and whether it leaves anything `recall` can list behind.
+	// A step's own bookkeeping from the messages it shows: the messages it sends, every one but a
+	// statement a chain of supersessions links to another it shows, its index while `recall` is
+	// admitted, which excludes every message it shows, the superseded ones included, and whether it
+	// leaves anything `recall` can list behind, which a superseded one it shows never is.
 	#collectStep(
 		input: LedgerProjectionInput,
 		projection: LedgerProjection,
@@ -1668,7 +1725,7 @@ export class Ledger implements LedgerInterface {
 	} {
 		const ids = new Set(shown.map((message) => message.id))
 		return {
-			shown,
+			shown: filterLedgerShown(shown, input.classification.supersessions, this.#requests),
 			keys: admits
 				? collectLedgerKeys(
 						input,
