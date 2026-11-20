@@ -15,6 +15,7 @@ import {
 	collectRecallMessages,
 	collectLedgerExchanges,
 	collectLedgerKeys,
+	collectLedgerMatches,
 	collectLedgerStatements,
 	nameLedgerExchange,
 	parseLedgerExchange,
@@ -2168,7 +2169,8 @@ describe('collectLedgerKeys', () => {
 				new Set(['request']),
 			),
 		).toEqual([
-			{ name: 'previous', description: 'your last answered request and your reply to it' },
+			// The earlier request's statements hold the rule, so its row carries that category.
+			{ name: 'previous', description: 'your last answered request and your reply to it; rule' },
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'BW-5512', description: '3 earlier messages' },
 			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
@@ -2191,7 +2193,8 @@ describe('collectLedgerKeys', () => {
 				new Set(['quiet', 'refund', 'request']),
 			),
 		).toEqual([
-			{ name: 'previous', description: 'your last answered request and your reply to it' },
+			// The earlier request's statements hold the rule, so its row carries that category.
+			{ name: 'previous', description: 'your last answered request and your reply to it; rule' },
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'TK-1', description: '1 earlier message' },
 			{ name: 'BW-5512', description: '2 earlier messages' },
@@ -2236,7 +2239,8 @@ describe('collectLedgerKeys', () => {
 			),
 		).toEqual([
 			// The last request has no reply, so `previous` reads the last exchange that has one.
-			{ name: 'previous', description: 'your last answered request and your reply to it' },
+			// The earlier request's statements hold the rule, so its row carries that category.
+			{ name: 'previous', description: 'your last answered request and your reply to it; rule' },
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
 			{ name: 'BW-5512', description: '3 earlier messages' },
@@ -2386,6 +2390,55 @@ describe('collectLedgerKeys', () => {
 		).toEqual(['previous-2', 'previous'])
 	})
 
+	it('tags an exchange row with its registry ids and owner names once, its topics, and the category of its statements alone', () => {
+		const input = buildLedgerInput({
+			owners: { 'BC-4101': ['Mara Ellison'] },
+			messages: [
+				buildLedgerMessage('fixed', 'user', 'Correction: BC-7301 is due $150.'),
+				buildLedgerMessage('first', 'user', 'Check BC-7301 for Mara Ellison.'),
+				buildLedgerMessage('call', 'assistant', ''),
+				buildLedgerMessage('read', 'tool', 'Order BC-7301 for customer BC-4101: Mara Ellison.'),
+				buildLedgerMessage('reply', 'assistant', 'It is due $150.'),
+				buildLedgerMessage('second', 'user', 'Note the rule.'),
+				buildLedgerMessage('noted', 'assistant', 'Noted.'),
+				buildLedgerMessage('request', 'user', 'Anything else?'),
+			],
+			findings: [
+				buildLedgerFinding(
+					'read',
+					'lookup_order',
+					{ id: 'BC-7301' },
+					'Order BC-7301 for customer BC-4101: Mara Ellison.',
+					{ ids: ['BC-7301'], owners: [{ id: 'BC-4101', names: ['Mara Ellison'] }] },
+				),
+			],
+			entities: { first: ['BC-7301', 'BC-4101'] },
+			classification: {
+				categories: { fixed: 'correction', second: 'rule' },
+				topics: { first: ['refunds'] },
+			},
+		})
+		const keys = collectLedgerKeys(
+			input,
+			buildRecords(input),
+			LEDGER_KEY_TOPICS,
+			'request',
+			new Set(['first', 'second', 'request']),
+			new Set(),
+			new Set(['request']),
+		)
+		// The request filed as a rule tags nothing: only a statement's category does.
+		expect(keys.slice(0, 2)).toEqual([
+			{
+				name: 'previous-2',
+				description:
+					'your request and reply 2 exchanges ago; BC-7301 (Mara Ellison), BC-4101; refunds; correction',
+			},
+			{ name: 'previous', description: 'your last answered request and your reply to it' },
+		])
+		expect(estimateTokens(`- previous-2: ${requireValue(keys[0]).description}`)).toBe(27)
+	})
+
 	it('leaves an id that reads as an exchange key out of the id rows', () => {
 		const input = buildLedgerInput({
 			exclusions: ['first', 'request'],
@@ -2410,6 +2463,164 @@ describe('collectLedgerKeys', () => {
 				new Set(['request']),
 			).map((key) => key.name),
 		).toEqual(['previous', 'XB-1'])
+	})
+})
+
+describe('collectLedgerMatches', () => {
+	it('adds the last answered request ids when no statement left out carries one the request names, and ranks a match on them below one on its own', () => {
+		const messages = [
+			buildLedgerMessage('ask-0', 'user', 'Check OR-9 status.'),
+			buildLedgerMessage('ans-0', 'assistant', 'Checked.'),
+			buildLedgerMessage('stated', 'user', 'OR-5 ships Friday.'),
+			buildLedgerMessage('ask-1', 'user', 'What about OR-5?'),
+			buildLedgerMessage('ans-1', 'assistant', 'It ships Friday.'),
+			buildLedgerMessage('request', 'user', 'And OR-9?'),
+		]
+		const requests = new Set(['ask-0', 'ask-1', 'request'])
+		const shown = new Set(['ask-1', 'ans-1', 'request'])
+		const matches = collectLedgerMatches(
+			buildLedgerInput({ messages }),
+			'request',
+			requests,
+			new Set(),
+			shown,
+		)
+		// The request turn on the request's own id ranks above the statement on the inherited one.
+		expect(matches.map((match) => [match.source, match.basis])).toEqual([
+			['ask-0', 'entity'],
+			['stated', 'inherited'],
+		])
+		// A statement left out that carries the request's own id stops the inheritance.
+		const named = collectLedgerMatches(
+			buildLedgerInput({
+				messages: [buildLedgerMessage('late', 'user', 'OR-9 is late.'), ...messages],
+			}),
+			'request',
+			requests,
+			new Set(),
+			shown,
+		)
+		expect(named.map((match) => [match.source, match.basis])).toEqual([
+			['late', 'entity'],
+			['ask-0', 'entity'],
+		])
+	})
+
+	it('ranks a newer statement ahead of an older one with the higher word score', () => {
+		const fillers = [1, 2, 3, 4].flatMap((at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', 'Okay.'),
+			buildLedgerMessage(`ans-${at}`, 'assistant', 'Fine.'),
+		])
+		const messages = [
+			buildLedgerMessage('old', 'user', 'Lamp crate rests in bay 4 of the blue hall.'),
+			...fillers.slice(0, 2),
+			buildLedgerMessage('new', 'user', 'Lamp crate moved.'),
+			...fillers.slice(2),
+			buildLedgerMessage('request', 'user', 'Where is the lamp crate in the blue hall?'),
+		]
+		const asks = [1, 2, 3, 4].map((at) => `ask-${at}`)
+		const matches = collectLedgerMatches(
+			buildLedgerInput({ messages }),
+			'request',
+			new Set([...asks, 'request']),
+			new Set(),
+			new Set([...fillers.map((message) => message.id), 'request']),
+		)
+		expect(matches.map((match) => [match.source, match.basis])).toEqual([
+			['new', 'word'],
+			['old', 'word'],
+		])
+		expect(requireValue(matches[1]).score).toBeGreaterThan(requireValue(matches[0]).score)
+	})
+
+	it('scores a lone candidate against the words of every user message, the shown ones too', () => {
+		const shown = ['Thanks.', 'Okay.', 'Fine.', 'Sure.'].flatMap((content, at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', content),
+			buildLedgerMessage(`ans-${at}`, 'assistant', 'Noted.'),
+		])
+		const matches = collectLedgerMatches(
+			buildLedgerInput({
+				messages: [
+					buildLedgerMessage('code', 'user', 'The vault code is 7391.'),
+					...shown,
+					buildLedgerMessage('request', 'user', 'What is the vault code?'),
+				],
+			}),
+			'request',
+			new Set([0, 1, 2, 3].map((at) => `ask-${at}`).concat('request')),
+			new Set(),
+			new Set([...shown.map((message) => message.id), 'request']),
+		)
+		expect(matches.map((match) => [match.source, match.basis])).toEqual([['code', 'word']])
+		expect(requireValue(matches[0]).score).toBeGreaterThan(0)
+	})
+
+	it('fills the places id matches leave with word matches, ranked after them', () => {
+		const shown = ['Thanks.', 'Okay.', 'Fine.', 'Sure.'].flatMap((content, at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', content),
+			buildLedgerMessage(`ans-${at}`, 'assistant', 'Noted.'),
+		])
+		const matches = collectLedgerMatches(
+			buildLedgerInput({
+				messages: [
+					buildLedgerMessage('order', 'user', 'OR-7 ships Monday.'),
+					...shown,
+					buildLedgerMessage('lamp', 'user', 'The blue lamp is cracked.'),
+					buildLedgerMessage('request', 'user', 'Is the OR-7 blue lamp ready?'),
+				],
+			}),
+			'request',
+			new Set([0, 1, 2, 3].map((at) => `ask-${at}`).concat('request')),
+			new Set(),
+			new Set([...shown.map((message) => message.id), 'request']),
+		)
+		// The newer word match stays behind the older id match.
+		expect(matches.map((match) => [match.source, match.basis])).toEqual([
+			['order', 'entity'],
+			['lamp', 'word'],
+		])
+	})
+
+	it('drops an unfiled candidate whose counted words a newer shown message carries, and a superseded one whose successor is shown', () => {
+		const fillers = [1, 2, 3, 4, 5].flatMap((at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', `Okay ${at}.`),
+			buildLedgerMessage(`ans-${at}`, 'assistant', 'Fine.'),
+		])
+		const messages = [
+			buildLedgerMessage('budget', 'user', 'My budget is 500 pounds.'),
+			buildLedgerMessage('ruled', 'user', 'My budget needs pounds.'),
+			buildLedgerMessage('stale', 'user', 'The hall is booked.'),
+			buildLedgerMessage('fresh', 'user', 'The hall is free.'),
+			...fillers,
+			buildLedgerMessage('newer', 'user', 'Actually my budget is 700 pounds.'),
+			buildLedgerMessage('request', 'user', 'What is my budget in pounds for the hall?'),
+		]
+		const asks = [1, 2, 3, 4, 5].map((at) => `ask-${at}`)
+		const shown = new Set([...fillers.map((message) => message.id), 'newer', 'request'])
+		const input = buildLedgerInput({
+			messages,
+			classification: { categories: { ruled: 'rule' }, supersessions: { stale: ['fresh'] } },
+		})
+		const matches = collectLedgerMatches(
+			input,
+			'request',
+			new Set([...asks, 'request']),
+			new Set(),
+			shown,
+		)
+		// The unfiled budget is stale beside the newer shown one; the filed rule stays; the superseded
+		// hall statement stands for its successor, which the opening doesn't show.
+		expect(matches.map((match) => match.source).toSorted()).toEqual(['fresh', 'ruled'])
+		// With the successor shown, the superseded statement drops rather than adding it again.
+		expect(
+			collectLedgerMatches(
+				input,
+				'request',
+				new Set([...asks, 'request']),
+				new Set(),
+				new Set([...shown, 'fresh']),
+			).map((match) => match.source),
+		).toEqual(['ruled'])
 	})
 })
 

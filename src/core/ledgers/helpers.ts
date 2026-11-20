@@ -9,6 +9,8 @@ import type {
 	LedgerIndex,
 	LedgerKey,
 	LedgerLine,
+	LedgerMatch,
+	LedgerMatchBasis,
 	LedgerLookupFinding,
 	LedgerProjection,
 	LedgerProjectionInput,
@@ -31,9 +33,11 @@ import { isPositiveSafeInteger } from '../validators.js'
 import {
 	LEDGER_EXCHANGE_LIMIT,
 	LEDGER_KEY_LIMIT,
+	LEDGER_MATCH_BASES,
 	LEDGER_OWNER_PREFIX,
 	LEDGER_PREVIOUS_KEY,
 	LEDGER_RULES_KEY,
+	LEDGER_TAG_LIMIT,
 	LEDGER_WORD,
 	PLACED_CATEGORIES,
 } from './constants.js'
@@ -359,10 +363,14 @@ export function nameLedgerExchange(depth: number): string {
  * message as before it. Every key lists at least one earlier message. The keys come in this order:
  *
  * - at most `LEDGER_EXCHANGE_LIMIT` exchange keys, one per exchange {@link collectLedgerExchanges}
- *   returns whose request and reply `excluded` does not both hold, oldest first: the deepest `previous-N` first and
- *   `previous`, the last exchange that has a reply, last, each named by its depth among all the
- *   exchanges, so a shown exchange leaves a gap and the names stay stable, and each with a fixed
- *   description that names no request text;
+ *   returns whose request and reply `excluded` does not both hold, oldest first: the deepest
+ *   `previous-N` first and `previous`, the last exchange that has a reply, last, each named by its
+ *   depth among all the exchanges, so a shown exchange leaves a gap and the names stay stable. Each
+ *   description names no request text: how far back the exchange is, then the tags of its user side,
+ *   its request and the statements before it that are not quiet: up to `LEDGER_TAG_LIMIT` registry
+ *   ids `input.entities` names, each with its owner's first name unless an earlier id of the row gave
+ *   that name, then the desk topics filed for them, then `rule` or `correction` when a statement was
+ *   filed so;
  * - `rules`, when a line of the rules record comes from an earlier message;
  * - at most `LEDGER_KEY_LIMIT` ids an earlier message carries, as `extractLiterals` reads them, but
  *   none that reads as an exchange key: first the ids of the current statements that are earlier,
@@ -479,6 +487,7 @@ export function collectLedgerKeys(
 			({ exchange }) => !excluded.has(exchange.request.id) || !excluded.has(exchange.reply.id),
 		)
 		.slice(0, LEDGER_EXCHANGE_LIMIT)
+	const links = linkOwners(input.findings, registry.owners)
 	const held = new Set(earlier.map((message) => message.id))
 	const ruled = projection.records.some(
 		(record) =>
@@ -492,13 +501,53 @@ export function collectLedgerKeys(
 	const taken = new Set(ids)
 	return [
 		...exchanges
-			.map(({ depth }) => ({
-				name: nameLedgerExchange(depth),
-				description:
-					depth === 1
-						? 'your last answered request and your reply to it'
-						: `your request and reply ${depth} exchanges ago`,
-			}))
+			.map(({ exchange, depth }) => {
+				// The exchange's user side: the statements before its request that are not quiet, then the request.
+				const stated = collectLedgerStatements(
+					before.slice(0, positions.get(exchange.request.id) ?? 0),
+					requests,
+					notes,
+				).filter((message) => !quiet.has(message.id))
+				const side = [...stated, exchange.request]
+				const tagged = [...new Set(side.flatMap((message) => input.entities.get(message.id) ?? []))]
+					.slice(0, LEDGER_TAG_LIMIT)
+					.reduce<{ readonly named: ReadonlySet<string>; readonly tags: readonly string[] }>(
+						(state, id) => {
+							const name = input.owners.get(
+								registry.owners.has(id) ? id : (links.get(id) ?? ''),
+							)?.[0]
+							return name === undefined || state.named.has(name)
+								? { named: state.named, tags: [...state.tags, id] }
+								: {
+										named: new Set([...state.named, name]),
+										tags: [...state.tags, `${id} (${name})`],
+									}
+						},
+						{ named: new Set(), tags: [] },
+					).tags
+				const filedSide = new Set(
+					side.flatMap((message) => input.classification.topics.get(message.id) ?? []),
+				)
+				const categories = PLACED_CATEGORIES.filter((category) =>
+					stated.some((message) => input.classification.categories.get(message.id) === category),
+				)
+				return {
+					name: nameLedgerExchange(depth),
+					description: [
+						depth === 1
+							? 'your last answered request and your reply to it'
+							: `your request and reply ${depth} exchanges ago`,
+						tagged.join(', '),
+						topics
+							.filter((topic) => filedSide.has(topic.name))
+							.map((topic) => topic.name)
+							.join(', '),
+						categories.join(', '),
+					]
+						.filter((part) => part !== '')
+						.join('; '),
+				}
+			})
 			.reverse(),
 		...(ruled
 			? [
@@ -549,6 +598,180 @@ export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
 		...keys.map((key) => renderIndexEntry(key)),
 		'Other ids, names, and words from a message work too.',
 	].join('\n')
+}
+
+/**
+ * Collects the earlier user messages that match a request, best first: the statements and request turns `excluded` does not show, each matched on the request's ids, the ids it inherits, its desk topics, or the words it shares.
+ *
+ * @remarks
+ * The query is the request's own ids, the literal ids its text carries and the registry ids and
+ * owners `input.entities` names, its filed topics, and its words. When no statement left out carries
+ * an id the request names, the query adds the ids of the last answered request, and a match on them
+ * ranks below one on the request's own. A candidate is a user message before the request that is no
+ * note, not quiet, and not in `excluded`:
+ *
+ * - a superseded candidate stands for its newest successor, and drops when that successor is in
+ *   `excluded` or is no candidate;
+ * - a candidate the judge filed no category for drops when a newer message `excluded` holds carries
+ *   every word it counts;
+ * - a candidate brings the amenders {@link scanAmendments} admits, and a message one match brings is
+ *   no match of its own.
+ *
+ * A word counts when fewer than half of the user messages up to and including the request carry it,
+ * shown ones too, and a candidate's score sums `log(carried / carriers)` over the counted words it
+ * shares with the request. The matches rank by basis in `LEDGER_MATCH_BASES` order, then statements
+ * before request turns, then newest first by the request each one precedes, so one turn's
+ * statements are equally new, then rules and corrections first, then the higher score, then the
+ * later message. Shared words rank last, so they fill only the places the other bases leave.
+ *
+ * @param input - The messages, owners, entities, and classification
+ * @param request - The request id; only messages before it are candidates
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @param excluded - The ids of the messages the opening already shows, the request's among them
+ * @returns The matches, best first
+ * @example
+ * ```ts
+ * collectLedgerMatches(input, 'request', new Set(['first', 'request']), new Set(), new Set(['request']))
+ * // [{ source: 'stated', members: ['stated'], basis: 'entity', score: 0 }, …]
+ * ```
+ */
+export function collectLedgerMatches(
+	input: LedgerProjectionInput,
+	request: string,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+	excluded: ReadonlySet<string>,
+): readonly LedgerMatch[] {
+	const at = input.messages.findIndex((message) => message.id === request)
+	const before = at < 0 ? input.messages : input.messages.slice(0, at)
+	const asked = at < 0 ? [] : input.messages.slice(at, at + 1)
+	const classification = input.classification
+	const positions = new Map(before.map((message, index) => [message.id, index]))
+	const users = before.filter(
+		(message) => message.role === 'user' && !hasCalls(message) && !notes.has(message.id),
+	)
+	const carried = new Map(
+		[...users, ...asked].map((message) => [
+			message.id,
+			new Set([...extractLiterals(message.content).ids, ...(input.entities.get(message.id) ?? [])]),
+		]),
+	)
+	const own = carried.get(request) ?? new Set<string>()
+	const candidates = users.filter(
+		(message) => !excluded.has(message.id) && !classification.quiet.has(message.id),
+	)
+	const eligible = new Set(candidates.map((message) => message.id))
+	// The last answered request's ids join the query only when no statement left out carries one the
+	// request names.
+	const named = candidates.some(
+		(message) =>
+			!requests.has(message.id) && [...(carried.get(message.id) ?? [])].some((id) => own.has(id)),
+	)
+	const last = named ? undefined : collectLedgerExchanges(before, requests, notes)[0]?.request
+	const inherited = new Set(
+		[...(last === undefined ? [] : (carried.get(last.id) ?? []))].filter((id) => !own.has(id)),
+	)
+	const topics = new Set(classification.topics.get(request) ?? [])
+	// Each user message's words, up to and including the request, shown ones too.
+	const words = new Map(
+		[...users, ...asked].map((message) => [
+			message.id,
+			new Set((message.content.match(LEDGER_WORD) ?? []).map((run) => normalizeWord(run))),
+		]),
+	)
+	const carriers = new Map(
+		[
+			...Map.groupBy(
+				[...words.values()].flatMap((set) => [...set]),
+				(word) => word,
+			),
+		].map(([word, all]) => [word, all.length]),
+	)
+	const query = [...(words.get(request) ?? [])].filter(
+		(word) => (carriers.get(word) ?? 0) < words.size / 2,
+	)
+	const shown = users.filter((message) => excluded.has(message.id))
+	const starts = before.flatMap((message, index) => (requests.has(message.id) ? [index] : []))
+	const found = candidates.flatMap((message) => {
+		// A superseded candidate stands for its newest successor.
+		const source = classification.supersessions.has(message.id)
+			? Array.from({ length: before.length }).reduce<string>(
+					(id) => classification.supersessions.get(id)?.at(-1) ?? id,
+					message.id,
+				)
+			: message.id
+		if (source !== message.id && !eligible.has(source)) return []
+		const ids = [...(carried.get(source) ?? [])]
+		const counted = query.filter((word) => words.get(source)?.has(word) === true)
+		const score = counted.reduce(
+			(sum, word) => sum + Math.log(words.size / (carriers.get(word) ?? 1)),
+			0,
+		)
+		const basis: LedgerMatchBasis | undefined = ids.some((id) => own.has(id))
+			? 'entity'
+			: ids.some((id) => inherited.has(id))
+				? 'inherited'
+				: (classification.topics.get(source) ?? []).some((topic) => topics.has(topic))
+					? 'topic'
+					: score > 0
+						? 'word'
+						: undefined
+		const position = positions.get(source) ?? 0
+		// An unfiled candidate whose counted words a newer shown message carries is stale.
+		const stale =
+			!classification.categories.has(source) &&
+			counted.length > 0 &&
+			shown.some(
+				(newer) =>
+					(positions.get(newer.id) ?? 0) > position &&
+					counted.every((word) => words.get(newer.id)?.has(word) === true),
+			)
+		if (basis === undefined || stale) return []
+		const category = classification.categories.get(source)
+		return [
+			{
+				source,
+				basis,
+				score,
+				position,
+				statement: !requests.has(source),
+				turn: starts.filter((start) => start < position).length,
+				ruled: category !== undefined && PLACED_CATEGORIES.includes(category),
+			},
+		]
+	})
+	const ranked = [...new Map(found.map((item) => [item.source, item])).values()].toSorted(
+		(left, right) =>
+			LEDGER_MATCH_BASES.indexOf(left.basis) - LEDGER_MATCH_BASES.indexOf(right.basis) ||
+			Number(right.statement) - Number(left.statement) ||
+			right.turn - left.turn ||
+			Number(right.ruled) - Number(left.ruled) ||
+			right.score - left.score ||
+			right.position - left.position,
+	)
+	// Best first, each match claims its amenders, so a lower match never shows them again.
+	return ranked.reduce<{
+		readonly claimed: ReadonlySet<string>
+		readonly matches: readonly LedgerMatch[]
+	}>(
+		(state, item) => {
+			if (state.claimed.has(item.source)) return state
+			const members = scanAmendments(
+				classification.amendments,
+				item.source,
+				(id) => eligible.has(id) && !state.claimed.has(id),
+			)
+			return {
+				claimed: new Set([...state.claimed, ...members]),
+				matches: [
+					...state.matches,
+					{ source: item.source, members, basis: item.basis, score: item.score },
+				],
+			}
+		},
+		{ claimed: new Set(), matches: [] },
+	).matches
 }
 
 /**

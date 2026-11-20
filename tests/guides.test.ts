@@ -1815,11 +1815,11 @@ await new GuideCommand({
 			const hydrated = readLedgerOpening(
 				requireValue(child.calls[0], 'Missing hydrated prompt').messages,
 			)
-			// At this capacity only the larger hydrated reserve needs a row cut to leave recall its room, and
-			// the exchange row past `previous` goes first.
+			// At this capacity only the larger hydrated reserve needs row cuts to leave recall its room: the
+			// exchange row past `previous` goes first, then the id rows last-ranked first.
 			expect(hydrated.shown).toEqual(live.shown)
 			expect(live.keys).toEqual(['previous-2', 'previous', 'AX-4', 'AX-3', 'AX-2', 'AX-1'])
-			expect(hydrated.keys).toEqual(['previous', 'AX-4', 'AX-3', 'AX-2', 'AX-1'])
+			expect(hydrated.keys).toEqual(['previous', 'AX-4'])
 			expect(guideText).toContain(
 				'when the two reserves differ, the close test can stop at a different row step, which moves rows of the Earlier index and never a window exchange or a statement.',
 			)
@@ -3576,17 +3576,9 @@ await new GuideCommand({
 
 		it('sends a host statement between requests whole after the window, which shows the previous exchange', async () => {
 			const later = 'The Northgate courier brings refund forms on 2026-10-12.'
-			const provider = createScriptedProvider(
-				[
-					{ content: 'Done.' },
-					{
-						content: '',
-						tools: [{ id: 'previous', name: 'recall', arguments: { key: 'previous' } }],
-					},
-					{ content: 'Done.' },
-				],
-				{ recorded: true },
-			)
+			const provider = createScriptedProvider([{ content: 'Done.' }, { content: 'Done.' }], {
+				recorded: true,
+			})
 			const ledger = createLedger(
 				provider,
 				buildGuideLedgerOptions({
@@ -3605,20 +3597,19 @@ await new GuideCommand({
 
 			await ledger.respond('When do the refund forms arrive?')
 
-			const sent = requireValue(provider.calls[1], 'Missing second request').messages
-			const index = extractLedgerIndex(sent)
-			expect(sent.map(({ content }) => content)).toEqual([
+			// The opening retrieves the refund rule the request is filed beside, shows the previous exchange
+			// in its window, then the host statement whole; nothing is left behind, so the request goes bare
+			// and recall leaves the scope.
+			const sent = requireValue(provider.calls[1], 'Missing second request')
+			expect(sent.messages.map(({ content }) => content)).toEqual([
 				'Serve the desk.',
+				'Refunds over $100 need a manager.',
 				'Review the desk.',
 				'Done.',
 				later,
-				`${index}\n\n## Request\nWhen do the refund forms arrive?`,
+				'When do the refund forms arrive?',
 			])
-			expect(index).not.toContain('\n- previous: ')
-			expect(index).toContain('\n- rules: ')
-			expect(
-				ledger.conversation.messages().find((message) => message.call === 'previous')?.content,
-			).toBe('"previous" is in the messages you can see; answer from them')
+			expect(sent.tools?.map(({ name }) => name) ?? []).not.toContain('recall')
 			expect(guideText).toContain(
 				'A host statement added between requests goes whole into the next opening as a current statement, and neither that statement nor a host lookup after the reply changes what `previous` lists.',
 			)

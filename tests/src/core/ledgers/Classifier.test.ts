@@ -148,8 +148,9 @@ describe('Classifier', () => {
 			buildLedgerOptions({ judge: againJudge, topics, snapshot: restored.snapshot() }),
 		)
 		await again.respond(request)
-		// The statement is earlier now: recall by the owner's name lists it only while the floor keeps it
-		// from being quiet, since a matched owner leaves no word search.
+		// The statement is earlier now: retrieval shows it by the id the request names, and a host's
+		// recall by the owner's name lists it, each only while the floor keeps it from being quiet, since
+		// a matched owner leaves no word search.
 		const recalled = await again.agent.context.tools.execute({
 			id: 'host',
 			name: 'recall',
@@ -157,7 +158,7 @@ describe('Classifier', () => {
 		})
 		expect(
 			requireValue(againProvider.calls[0]).messages.map((message) => message.content),
-		).not.toContain(text)
+		).toContain(text)
 		expect(recalled.success ? String(recalled.value) : recalled.error).toContain(text)
 		expect(
 			againJudge.requests

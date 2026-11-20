@@ -16,7 +16,7 @@ import type {
 	MessageRole,
 	NoulQuestion,
 } from '../types.js'
-import type { LEDGER_CATEGORIES } from './constants.js'
+import type { LEDGER_CATEGORIES, LEDGER_MATCH_BASES } from './constants.js'
 import type { LedgerError } from './errors.js'
 import type { TokenUsage } from '@orkestrel/budget'
 import type { ToolInterface } from '@orkestrel/tool'
@@ -24,6 +24,9 @@ import type { SchedulerInterface } from '@orkestrel/workflow'
 
 /** Names the category the ledger files a message under, one of {@link LEDGER_CATEGORIES}. */
 export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number]
+
+/** Names what a retrieved match rests on, one of {@link LEDGER_MATCH_BASES}. */
+export type LedgerMatchBasis = (typeof LEDGER_MATCH_BASES)[number]
 
 /**
  * Carries the wording of every question the ledger asks its judge.
@@ -969,6 +972,22 @@ export interface LedgerKey {
 export interface LedgerExchange {
 	readonly request: Message
 	readonly reply: Message
+}
+
+/**
+ * Carries one earlier user message a request's opening can retrieve: its id, the messages it shows, what it matched on, and its word score.
+ *
+ * @remarks
+ * `source` is a statement or a request turn the opening doesn't show, or the newest successor of a
+ * superseded one. `members` is `source` with the amenders it brings, in the order
+ * the `scanAmendments` helper visits them. `basis` is the strongest of {@link LEDGER_MATCH_BASES} the
+ * source meets, and `score` sums the log inverse frequency of the words it shares with the request.
+ */
+export interface LedgerMatch {
+	readonly source: string
+	readonly members: readonly string[]
+	readonly basis: LedgerMatchBasis
+	readonly score: number
 }
 
 /** Identifies an accepted direct message amendment whose sentence scope remains unresolved. */

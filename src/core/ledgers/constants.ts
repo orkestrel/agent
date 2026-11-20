@@ -189,6 +189,40 @@ export const LEDGER_RECENT_LIMIT = 8
 export const LEDGER_RECENT_SHARE = 0.3
 
 /**
+ * Lists the bases a retrieved match rests on, strongest first: an id the request names, an id it inherits from the last answered request, a desk topic, then shared words — the one list the {@link LedgerMatchBasis} union derives from.
+ *
+ * @remarks
+ * A match on an inherited id ranks below one on the request's own ids, and shared words fill only
+ * the places the stronger bases leave.
+ */
+export const LEDGER_MATCH_BASES = Object.freeze(['entity', 'inherited', 'topic', 'word'] as const)
+
+/**
+ * Caps at 8 the earlier user messages a request's opening retrieves by relevance, each with its amenders.
+ *
+ * @remarks
+ * `LEDGER_RELEVANT_SHARE` binds first on most budgets, so the count is a ceiling.
+ */
+export const LEDGER_RELEVANT_LIMIT = 8
+
+/**
+ * Caps the retrieved messages at 0.15 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift.
+ *
+ * @remarks
+ * The matches are taken in rank order, priced as the opening sends them, up to the first that would
+ * take them past this share.
+ */
+export const LEDGER_RELEVANT_SHARE = 0.15
+
+/**
+ * Caps at 3 the registry ids an exchange row's tags name.
+ *
+ * @remarks
+ * Each id carries its owner's first name once per row, so two ids of one owner name it once.
+ */
+export const LEDGER_TAG_LIMIT = 3
+
+/**
  * Sets the 5 milliseconds a paced classifier files between host turns.
  *
  * @remarks

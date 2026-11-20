@@ -109,6 +109,8 @@ import {
 	LEDGER_RECALL_LABELS,
 	LEDGER_RECENT_LIMIT,
 	LEDGER_RECENT_SHARE,
+	LEDGER_RELEVANT_LIMIT,
+	LEDGER_RELEVANT_SHARE,
 	LEDGER_RULES_KEY,
 	LEDGER_SAMPLE_BYTES,
 	LEDGER_SCALE_DRIFT,
@@ -127,6 +129,7 @@ import {
 	buildRecallMessage,
 	buildRequestMessage,
 	collectLedgerKeys,
+	collectLedgerMatches,
 	findLedgerCut,
 	renderLedgerKeys,
 	renderTopicNames,
@@ -1325,14 +1328,16 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// Plans a request's opening: the recent window, the newest exchanges that have a reply, each with
-	// its call turns and results, and the current statements whole, in conversation order, then the request copy, which carries the Earlier
-	// index of what the opening leaves behind while `recall` is advertised. Past the budget the steps
-	// cut the window's exchanges oldest first, then the exchange rows from the deepest down to
-	// `previous-2`, then the id rows last-ranked first, then the statements oldest first, then the topic
-	// rows last first, `rules`, `previous`, and the rest of the index. Each step reads its own shown
-	// messages, its index, and whether it leaves anything behind. The window is the largest that fits,
+	// its call turns and results, the earlier user messages retrieval ranks best, and the current
+	// statements whole, in conversation order, then the request copy, which carries the Earlier index of
+	// what the opening leaves behind while `recall` is advertised. Past the budget the steps cut the
+	// window's exchanges oldest first down to the newest one, then the retrieved messages lowest rank
+	// first, then the newest exchange, then the exchange rows from the deepest down to `previous-2`,
+	// then the id rows last-ranked first, then the statements oldest first, then the topic rows last
+	// first, `rules`, `previous`, and the rest of the index. Each step reads its own shown messages, its
+	// index, and whether it leaves anything behind. The first window or retrieval step that fits stays,
 	// so it never shrinks as the budget grows; then the first cut of its rows that leaves `recall` its
-	// room wins, else the window as it fits. With no window that fits, the first bare row cut that
+	// room wins, else that step as it fits. With no such step that fits, the first bare row cut that
 	// leaves the room wins, else the first that fits, else the statement cuts.
 	#plan(
 		request: Message,
@@ -1395,23 +1400,60 @@ export class Ledger implements LedgerInterface {
 				? count
 				: undefined,
 		)
-		// Every statement kept, and each window size from the largest down to none.
+		// The retrieved messages, each match's in rank order, from none the whole window or the current
+		// statements show.
+		const retrieved =
+			floor === 0
+				? this.#collectRetrieved(
+						input,
+						scan,
+						request,
+						new Set([
+							request.id,
+							...this.#collectWindow(scan, exchanges, size).map((message) => message.id),
+							...current.map((message) => message.id),
+						]),
+						total,
+					)
+				: []
+		// Every statement kept: the window from the largest down to the newest exchange with every
+		// retrieved match, then the retrieved matches cut lowest rank first, then no window.
+		const newest = Math.min(size, 1)
+		const layouts = [
+			...Array.from({ length: size - newest + 1 }, (_unused, index) => ({
+				window: size - index,
+				matches: retrieved.length,
+			})),
+			...Array.from({ length: retrieved.length }, (_unused, index) => ({
+				window: newest,
+				matches: retrieved.length - 1 - index,
+			})),
+			...(newest === 0 ? [] : [{ window: 0, matches: 0 }]),
+		]
 		const windows =
 			floor === 0
-				? Array.from({ length: size + 1 }, (_unused, index) =>
+				? layouts.map((layout) =>
 						this.#collectStep(
 							input,
 							projection,
 							request,
 							recallable,
 							admits,
-							this.#collectShown(scan, this.#collectWindow(scan, exchanges, size - index), current),
+							this.#collectShown(
+								scan,
+								[
+									...this.#collectWindow(scan, exchanges, layout.window),
+									...retrieved.slice(0, layout.matches).flat(),
+								],
+								current,
+							),
 						),
 					)
 				: []
 		const bare = windows.at(-1)
 		const fixed = this.#readFixedKeys()
-		// The window first: the largest that fits, so a larger budget never shows fewer exchanges.
+		// The window and retrieval first: the first of their steps that fits, so a larger budget never
+		// shows fewer exchanges.
 		const fitted = windows.find(
 			(step) =>
 				this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <= total,
@@ -1433,7 +1475,7 @@ export class Ledger implements LedgerInterface {
 		})
 		// The first step that also leaves `recall` its room, else the window as it fits, else the first
 		// row cut that fits.
-		const kept =
+		const chosen =
 			roomy ??
 			fitted ??
 			steps.find(
@@ -1442,7 +1484,7 @@ export class Ledger implements LedgerInterface {
 			)
 		// Statements cut oldest first, each with the rows its cut leaves.
 		const cut =
-			kept !== undefined || floor === undefined
+			chosen !== undefined || floor === undefined
 				? undefined
 				: [...current.keys()]
 						.map((index) => index + 1)
@@ -1459,7 +1501,7 @@ export class Ledger implements LedgerInterface {
 								) <= total,
 						)
 		const last =
-			admits && kept === undefined && cut === undefined
+			admits && chosen === undefined && cut === undefined
 				? this.#collectCutKeys(input, projection, request, current, current.length)
 				: []
 		const topics = last.filter(
@@ -1480,9 +1522,9 @@ export class Ledger implements LedgerInterface {
 			),
 			[],
 		]
-		const shown = kept?.shown ?? current.slice(cut ?? current.length)
+		const shown = chosen?.shown ?? current.slice(cut ?? current.length)
 		const keys =
-			kept?.keys ??
+			chosen?.keys ??
 			(cut !== undefined
 				? admits
 					? this.#collectCutKeys(input, projection, request, current, cut)
@@ -1502,6 +1544,40 @@ export class Ledger implements LedgerInterface {
 			this.#agent.context.apply(narrowed)
 		}
 		return { messages: this.#buildOpening(request, built, shown, keys).messages }
+	}
+
+	// The retrieved messages: each match's members as the opening sends them, a request turn as a copy
+	// under its label, in rank order within the count bound, up to the first match that would price
+	// the retrieval past its share of the budget.
+	#collectRetrieved(
+		input: LedgerProjectionInput,
+		scan: LedgerScan,
+		request: Message,
+		shown: ReadonlySet<string>,
+		total: number,
+	): ReadonlyArray<readonly Message[]> {
+		const matches = collectLedgerMatches(
+			input,
+			request.id,
+			this.#requests,
+			this.#annotations,
+			shown,
+		)
+			.slice(0, LEDGER_RELEVANT_LIMIT)
+			.map((match) =>
+				match.members.flatMap((id) => {
+					const message = scan.messages[scan.position(id) ?? -1]
+					if (message === undefined) return []
+					return this.#requests.has(id)
+						? [{ ...message, content: this.#labelEarlier(message) ?? message.content }]
+						: [message]
+				}),
+			)
+		const over = matches.findIndex(
+			(_match, index) =>
+				this.#price(matches.slice(0, index + 1).flat()) > total * LEDGER_RELEVANT_SHARE,
+		)
+		return over < 0 ? matches : matches.slice(0, over)
 	}
 
 	// The cuts of a step's rows, one more row each, from the end: the exchange rows past `previous`

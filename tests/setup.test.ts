@@ -126,10 +126,12 @@ import {
 	createWireHeaders,
 	extractLedgerIndex,
 	buildLedgerGoals,
+	buildLedgerPackets,
 	buildLedgerWindow,
 	countLedgerPlanFit,
 	LEDGER_CUT_DEEP_SNAPSHOT,
 	LEDGER_CUT_SNAPSHOT,
+	LEDGER_PACKET_FACTS,
 	LEDGER_CUT_RULED_SNAPSHOT,
 	LEDGER_PLAN_REMARK,
 	readLedgerOpening,
@@ -1543,6 +1545,26 @@ describe('system boundary canary fixtures', () => {
 		])
 		expect(stored.slice(at + 16)).toEqual(ruled.slice(at))
 		expect(stored).toHaveLength(ruled.length + 16)
+	})
+
+	it('builds day packets of four sources and the goals after them, the last day stopping before its fourth goal', () => {
+		const packets = buildLedgerPackets(2)
+
+		expect(isLedgerSnapshot(packets)).toBe(true)
+		expect(packets.requests).toEqual([
+			'goal-1-1',
+			'goal-1-2',
+			'goal-1-3',
+			'goal-1-4',
+			'goal-2-1',
+			'goal-2-2',
+			'goal-2-3',
+		])
+		expect(packets.conversation.messages.slice(0, 4).map((message) => message.content)).toEqual(
+			LEDGER_PACKET_FACTS.map((fact) => `For OR-1111: it ${fact}.`),
+		)
+		expect(packets.conversation.messages.at(-2)?.content).toBe('G2-3 Who signed for OR-2222?')
+		expect(packets.conversation.messages).toHaveLength(2 * 4 + 7 * 2)
 	})
 
 	it('builds a snapshot of one answered request per reply, with a statement before the last request when given', () => {

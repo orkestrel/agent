@@ -8147,6 +8147,8 @@ export const LEDGER_AMENDED_TEXT =
 /**
  * Serves a request that recalls a desk topic and its amended owner record, after a first request
  * that leaves the seed earlier, so `recall` lists it.
+ * @remarks The second request names no owner and shares no word with the seed, so retrieval leaves the
+ * seed behind for `recall`.
  * @returns The second request's pass result and each provider prompt it recorded
  */
 export async function serveAmendedDesk(): Promise<{
@@ -8203,7 +8205,7 @@ export async function serveAmendedDesk(): Promise<{
 		{ role: 'user', content: LEDGER_AMENDED_CORRECTION },
 	])
 	await ledger.respond('Note the desk.')
-	const result = await ledger.respond('Review the Brightwater Studio refund.')
+	const result = await ledger.respond('Review the desk notes.')
 	return { result, prompts: provider.calls.slice(1).map(({ messages }) => messages) }
 }
 
@@ -9802,6 +9804,58 @@ export function buildLedgerWindow(replies: readonly string[], statement?: string
 			]),
 		},
 		requests: replies.map((_reply, at) => `ask-${at + 1}`),
+		notes: [],
+		failures: [],
+	}
+}
+
+/** Holds the four facts a day's source statements state about that day's order, one per source. */
+export const LEDGER_PACKET_FACTS = Object.freeze([
+	'left the north dock on Monday',
+	'travels with the Northline carrier',
+	'weighs twelve kilos',
+	'keeps its seal number intact',
+])
+
+/**
+ * Builds a ledger snapshot of day packets: each day's four source statements about that day's order,
+ * then that day's goals as answered requests, the last day stopping before its fourth goal.
+ *
+ * @remarks
+ * Day `D`'s order is `OR-DDDD`, its sources are `source-D-1` to `source-D-4`, one fact of
+ * {@link LEDGER_PACKET_FACTS} each, and its goals are the requests `goal-D-1` to `goal-D-4`, each
+ * answered by `reply-D-G`. The first goal asks what is open, the second and third name the order, and
+ * the fourth, which the last day leaves for the request, names only its goal id `GD-4`. No source
+ * shares a word with a fourth goal's request, so only the ids it inherits can reach a day's sources.
+ *
+ * @param days - The days, at least 1
+ * @returns The snapshot, with every goal's request marked
+ */
+export function buildLedgerPackets(days: number): LedgerSnapshot {
+	const plan = Array.from({ length: days }, (_unused, at) => at + 1).flatMap((day) => {
+		const order = `OR-${String(day).repeat(4)}`
+		return [
+			...LEDGER_PACKET_FACTS.map((fact, at) => ({
+				id: `source-${day}-${at + 1}`,
+				role: 'user' as const,
+				content: `For ${order}: it ${fact}.`,
+			})),
+			...[
+				`G${day}-1 What is open today?`,
+				`G${day}-2 Where is ${order} now?`,
+				`G${day}-3 Who signed for ${order}?`,
+				`G${day}-4 Summarize everything.`,
+			]
+				.slice(0, day === days ? 3 : 4)
+				.flatMap((content, at) => [
+					{ id: `goal-${day}-${at + 1}`, role: 'user' as const, content },
+					{ id: `reply-${day}-${at + 1}`, role: 'assistant' as const, content: 'Noted.' },
+				]),
+		]
+	})
+	return {
+		conversation: { id: 'packets', messages: plan },
+		requests: plan.filter((message) => message.id.startsWith('goal-')).map((message) => message.id),
 		notes: [],
 		failures: [],
 	}
