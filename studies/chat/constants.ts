@@ -50,11 +50,18 @@ export const STUDY_CHAT_SYSTEM = Object.freeze({
 	orders:
 		'You operate a support desk. Answer the current request from the available conversation and references. Be brief.',
 })
-/** Detects the battery's denial diagnostic independently of primary matching.
- * @example STUDY_CHAT_DENIAL.test('No record.') // true
+/** Detects a memory denial in a reply, apart from primary matching: a claim that the person never said what the reply needs, or that nothing on record holds it.
+ * @remarks A floor of five claim shapes, each about what the person said or what the record holds:
+ * "you didn't" or "haven't" mention, specify, say, or tell; something "not specified", "mentioned",
+ * or "provided"; "no record" or "no information"; "I don't have that detail, information, or
+ * record"; and "I don't know which, what, or where". A capability statement, such as "Since I cannot
+ * book tickets" or "unable to make bookings", says what the assistant can do, not what the person
+ * said, so it matches none of them, and a denial worded any other way reads as no denial. A curly
+ * apostrophe reads as a straight one.
+ * @example STUDY_CHAT_DENIAL.test("You didn't specify a price range.") // true
  */
 export const STUDY_CHAT_DENIAL =
-	/(don't|do not|doesn't|does not|cannot|can't|couldn't|could not|unable|no record|no information|not have)/iu
+	/\byou\s+(?:didn[’']t|did\s+not|haven[’']t|have\s+not)\s+(?:mention(?:ed)?|specif(?:y|ied)|sa(?:y|id)|t(?:ell|old))\b|(?:\bnot|n[’']t)\s+(?:been\s+)?(?:specified|mentioned|provided)\b|\bno\s+(?:record|information)\b|\bi\s+(?:don[’']t|do\s+not)\s+have\s+(?:(?:that|the|any|this)\s+)?(?:details?|information|record)\b|\bi\s+(?:don[’']t|do\s+not)\s+know\s+(?:which|what|where)\b/iu
 /** Pins each treatment name to its ledger capacity.
  * @example STUDY_CHAT_CAPACITIES.tight // 1600
  */

@@ -24,7 +24,7 @@ it('keeps primary, denial and older-value outcomes distinct and missing or parti
 				{
 					goal: 'goal',
 					product: {
-						value: { content: 'I cannot confirm Cambridge; the old value was Norwich.' },
+						value: { content: "You didn't mention Cambridge; the old value was Norwich." },
 						partial: false,
 					},
 					failure: undefined,

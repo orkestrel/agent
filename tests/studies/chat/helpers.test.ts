@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { parseStudyDefinition, parseStudyRubric, parseStudyScenario } from '@orkestrel/study'
 import { isRecord, parseJSON } from '@orkestrel/contract'
-import { STUDY_CHAT_SYSTEM } from '../../../studies/chat/constants.js'
+import { STUDY_CHAT_DENIAL, STUDY_CHAT_SYSTEM } from '../../../studies/chat/constants.js'
 import { isStudyChatSeal } from '../../../studies/chat/validators.js'
 import { describe, expect, it } from 'vitest'
 import {
@@ -85,6 +85,36 @@ describe('sealed chat conversion', () => {
 			}),
 		).toThrow(/conversion/i)
 	})
+})
+
+it.each([
+	["You didn't specify a price range.", true],
+	['You didn\u2019t specify a price range.', true],
+	["I don't have information about which day you want to travel.", true],
+	['You did not mention how many people are coming.', true],
+	["You haven't said where you are leaving from.", true],
+	["You haven't told me the time.", true],
+	['The departure time was not specified.', true],
+	["The area wasn't mentioned.", true],
+	['A reference number has not been provided.', true],
+	['No record.', true],
+	['There is no information about that in our conversation.', true],
+	["I don't have that detail.", true],
+	['I do not have any record of a booking.', true],
+	["I don't know which hotel you chose.", true],
+	['I do not know where you are departing from.', true],
+	['Since I cannot provide specific addresses, please check the venue website.', false],
+	['Since I cannot book tickets, please check National Rail.', false],
+	["I'm unable to make bookings, but the train leaves at 16:30.", false],
+	["I can't search for hotels, but you wanted the centre.", false],
+	["I don't have a booking system, but you asked for Cambridge.", false],
+	['I cannot confirm Cambridge; the old value was Norwich.', false],
+	["I can't provide the reference number, but your train leaves at 16:30.", false],
+	["I don't have access to live train times.", false],
+	['You mentioned Cambridge earlier.', false],
+	['As you said, the hotel is in the north.', false],
+])('reads %j as a memory denial: %s', (reply, denial) => {
+	expect(STUDY_CHAT_DENIAL.test(reply)).toBe(denial)
 })
 
 it('preserves boundary matching and shortening without treating denials as primary failures', () => {
