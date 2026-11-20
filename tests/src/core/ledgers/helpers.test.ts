@@ -2370,6 +2370,20 @@ describe('collectLedgerKeys', () => {
 			'previous-3',
 		])
 		expect(keys.at(-1)?.description).toBe('your request and reply 3 exchanges ago')
+		// An exchange whose reply the opening doesn't show keeps its row, its request shown or not.
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				[],
+				'request',
+				new Set([...asks, 'request']),
+				new Set(),
+				new Set(['request', 'ask-11', 'answer-10']),
+			)
+				.map((key) => key.name)
+				.slice(-2),
+		).toEqual(['previous-2', 'previous'])
 	})
 
 	it('leaves an id that reads as an exchange key out of the id rows', () => {

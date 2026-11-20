@@ -1238,11 +1238,21 @@ describe('passive observation of actual memory requests', () => {
 		if (!isRecord(row) || !isRecord(row.ledger) || !Array.isArray(row.ledger.failures))
 			throw new Error('Missing checkpoint ledger')
 		expect(row.ledger.failures.length).toBeGreaterThan(0)
-		// A request that names the record selects its lookup results, which is where a mark can show.
+		// The recent window shows the last 8 exchanges with their lookups, so 8 answered filler goals put
+		// the failed lookup behind it; a request that names the record then reads its lookup results,
+		// which is where a mark can show.
+		const fillers = Array.from({ length: 8 }, (_unused, at) => ({
+			id: `filler-${at + 1}`,
+			input: { prompt: `Note filler ${at + 1}`, arrivals: [], records: [] },
+		}))
 		const trial: MemoryTrialFixture = {
 			arm: 'records',
-			responses: [],
+			responses: fillers.map(() => ({
+				path: '/api/chat',
+				body: buildMemoryReply({ content: 'Noted' }),
+			})),
 			goals: [
+				...fillers,
 				{ id: 'closure', input: { prompt: 'Close order-1 handoff', arrivals: [], records: [] } },
 			],
 			settings: STUDY_MEMORY_SEED_SETTINGS,

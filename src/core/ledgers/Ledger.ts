@@ -315,7 +315,7 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Read earlier items that are stored, not shown. Your newest exchanges are already in the messages you see; the ${LEDGER_PREVIOUS_KEY}-N keys in the Earlier list reach older ones. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"BW-5512"} or {"key":"${LEDGER_RULES_KEY}"}; join keys with commas, like {"key":"BW-5512, ${LEDGER_RULES_KEY}"}. Keys: ${LEDGER_PREVIOUS_KEY}-N (an older request and your reply, N exchanges back from your last answered one), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. A key for something already in the messages you see says so. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
+				description: `Read earlier items that are stored, not shown. The newest exchanges are often in the messages you see; the Earlier list names each one you can't see as ${LEDGER_PREVIOUS_KEY} or ${LEDGER_PREVIOUS_KEY}-N. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"BW-5512"} or {"key":"Odile Marlow"}; join keys with commas, like {"key":"BW-5512, Odile Marlow"}. Keys: ${LEDGER_PREVIOUS_KEY}-N (your request and reply N exchanges ago, counting your last answered one as 1), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. A key for something already in the messages you see says so. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
 				contract: objectShape({
 					key: stringShape({
 						min: 1,
@@ -1324,14 +1324,16 @@ export class Ledger implements LedgerInterface {
 		return (this.#gauge?.scale ?? 1) * estimateMessages(messages)
 	}
 
-	// Plans a request's opening: the recent window, the newest exchanges that have a reply, and the
-	// current statements whole, in conversation order, then the request copy, which carries the Earlier
+	// Plans a request's opening: the recent window, the newest exchanges that have a reply, each with
+	// its call turns and results, and the current statements whole, in conversation order, then the request copy, which carries the Earlier
 	// index of what the opening leaves behind while `recall` is advertised. Past the budget the steps
 	// cut the window's exchanges oldest first, then the exchange rows from the deepest down to
 	// `previous-2`, then the id rows last-ranked first, then the statements oldest first, then the topic
 	// rows last first, `rules`, `previous`, and the rest of the index. Each step reads its own shown
-	// messages, its index, and whether it leaves anything behind. The search takes the first window or
-	// row step that fits and leaves `recall` its room, else the first step that fits, else the last.
+	// messages, its index, and whether it leaves anything behind. The window is the largest that fits,
+	// so it never shrinks as the budget grows; then the first cut of its rows that leaves `recall` its
+	// room wins, else the window as it fits. With no window that fits, the first bare row cut that
+	// leaves the room wins, else the first that fits, else the statement cuts.
 	#plan(
 		request: Message,
 		scan: LedgerScan,
@@ -1378,7 +1380,7 @@ export class Ledger implements LedgerInterface {
 			(_exchange, index) =>
 				this.#price(
 					stripThinking(
-						[...this.#collectWindow(exchanges, index + 1), request],
+						[...this.#collectWindow(scan, exchanges, index + 1), request],
 						this.#replay,
 					).slice(0, -1),
 				) >
@@ -1403,34 +1405,24 @@ export class Ledger implements LedgerInterface {
 							request,
 							recallable,
 							admits,
-							this.#collectShown(scan, this.#collectWindow(exchanges, size - index), current),
+							this.#collectShown(scan, this.#collectWindow(scan, exchanges, size - index), current),
 						),
 					)
 				: []
 		const bare = windows.at(-1)
-		const whole = bare?.keys ?? []
 		const fixed = this.#readFixedKeys()
-		// The rows a step cuts from the end: the id rows, then the exchange rows past `previous` by depth,
-		// so the deepest exchange row goes first and the last-ranked id row after `previous-2`.
-		const deeper = whole
-			.filter((row) => !fixed.has(row.name) && parseLedgerExchange(row.name) !== undefined)
-			.toSorted(
-				(left, right) =>
-					(parseLedgerExchange(left.name) ?? 0) - (parseLedgerExchange(right.name) ?? 0),
-			)
-		const cuttable = [
-			...whole.filter((row) => !fixed.has(row.name) && !deeper.includes(row)),
-			...deeper,
-		]
-		// Every statement kept and no window, and the rows cut from the end.
-		const trimmed =
-			bare === undefined
+		// The window first: the largest that fits, so a larger budget never shows fewer exchanges.
+		const fitted = windows.find(
+			(step) =>
+				this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <= total,
+		)
+		// Then the rows: that window with its rows cut from the end, never its exchanges. With no window
+		// that fits, not even none, the bare step's row cuts.
+		const base = fitted ?? bare
+		const steps =
+			base === undefined
 				? []
-				: [...cuttable.keys()].map((index) => ({
-						...bare,
-						keys: whole.filter((row) => !cuttable.slice(cuttable.length - index - 1).includes(row)),
-					}))
-		const steps = [...windows, ...trimmed]
+				: [...(fitted === undefined ? [] : [fitted]), ...this.#trimRows(base, fixed)]
 		const longest = this.#findLongest()
 		const roomy = steps.find((step) => {
 			const probe = this.#buildOpening(request, built, step.shown, step.keys).probe
@@ -1439,8 +1431,11 @@ export class Ledger implements LedgerInterface {
 				(!admits || !step.others || this.#leavesRecallRoom(probe, advertised, longest))
 			)
 		})
+		// The first step that also leaves `recall` its room, else the window as it fits, else the first
+		// row cut that fits.
 		const kept =
 			roomy ??
+			fitted ??
 			steps.find(
 				(step) =>
 					this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <= total,
@@ -1509,12 +1504,65 @@ export class Ledger implements LedgerInterface {
 		return { messages: this.#buildOpening(request, built, shown, keys).messages }
 	}
 
-	// The window's messages for its newest `count` exchanges: each request with its reply, oldest first.
-	#collectWindow(exchanges: readonly LedgerExchange[], count: number): readonly Message[] {
+	// The cuts of a step's rows, one more row each, from the end: the exchange rows past `previous`
+	// deepest first, then the id rows last-ranked first. The step's shown messages stay.
+	#trimRows(
+		step: {
+			readonly shown: readonly Message[]
+			readonly keys: readonly LedgerKey[]
+			readonly others: boolean
+		},
+		fixed: ReadonlySet<string>,
+	): ReadonlyArray<{
+		readonly shown: readonly Message[]
+		readonly keys: readonly LedgerKey[]
+		readonly others: boolean
+	}> {
+		const deeper = step.keys
+			.filter((row) => !fixed.has(row.name) && parseLedgerExchange(row.name) !== undefined)
+			.toSorted(
+				(left, right) =>
+					(parseLedgerExchange(left.name) ?? 0) - (parseLedgerExchange(right.name) ?? 0),
+			)
+		const cuttable = [
+			...step.keys.filter((row) => !fixed.has(row.name) && !deeper.includes(row)),
+			...deeper,
+		]
+		return [...cuttable.keys()].map((index) => ({
+			...step,
+			keys: step.keys.filter((row) => !cuttable.slice(cuttable.length - index - 1).includes(row)),
+		}))
+	}
+
+	// The window's messages for its newest `count` exchanges, oldest first: each request, the call turns
+	// between it and its reply whose every call has its result, with those results, in stored order,
+	// then the reply. A call turn missing a result stays out, so the window never breaks a pairing.
+	#collectWindow(
+		scan: LedgerScan,
+		exchanges: readonly LedgerExchange[],
+		count: number,
+	): readonly Message[] {
 		return exchanges
 			.slice(0, count)
 			.toReversed()
-			.flatMap((exchange) => [exchange.request, exchange.reply])
+			.flatMap((exchange) => {
+				const from = scan.position(exchange.request.id) ?? 0
+				const traffic = collectToolGroups(
+					scan.messages.slice(from + 1, scan.position(exchange.reply.id) ?? from + 1),
+				)
+					.filter(
+						([leader, ...results]) =>
+							leader !== undefined &&
+							leader.role === 'assistant' &&
+							hasCalls(leader) &&
+							(leader.calls ?? []).every((call) =>
+								results.some((result) => result.role === 'tool' && result.call === call.id),
+							),
+					)
+					.flat()
+					.toSorted((left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0))
+				return [exchange.request, ...traffic, exchange.reply]
+			})
 	}
 
 	// The messages a step shows, in conversation order: the window's and the kept statements.
@@ -1865,7 +1913,7 @@ export class Ledger implements LedgerInterface {
 		const gauge = this.#gauge
 		const calls = request?.calls ?? []
 		request?.recall()
-		const guidance = `${LEDGER_PREVIOUS_KEY}, ${LEDGER_PREVIOUS_KEY}-2, ${LEDGER_PREVIOUS_KEY}-3, …, ${LEDGER_RULES_KEY}, an owner name, an id, or one of ${renderTopicNames(this.#options.topics)}`
+		const guidance = `${LEDGER_PREVIOUS_KEY}-2, ${LEDGER_PREVIOUS_KEY}-3, …, ${LEDGER_RULES_KEY}, ${this.#options.topics.length === 0 ? 'an owner name, or an id' : `an owner name, an id, or one of ${renderTopicNames(this.#options.topics)}`}`
 		if (key === '') throw new Error(`recall needs a key: ${guidance}`)
 		const { rate, extra, slack: drift } = this.#carry(request, calls)
 		const siblings = estimateMessages(
@@ -1898,9 +1946,9 @@ export class Ledger implements LedgerInterface {
 			)
 			// Each part of the key resolves by its family: an exchange key to that exchange, `rules` to the
 			// rules record, and every other part to the search, which reads them together and lists newest
-			// first at the first searched part. Each exchange and `rules` resolve once, at their first
-			// part, and the results join in that order. A family whose only matches the prompt shows
-			// lists nothing and marks the key shown.
+			// first at the first searched part. Each exchange, `rules`, and each searched part resolve
+			// once, at their first part, and the listings join in that order. Each part also reads its own
+			// state: it lists, the prompt shows every match it has, or it misses.
 			const parts = splitKey(key)
 			const searched = parts.filter(
 				(part) =>
@@ -1912,61 +1960,120 @@ export class Ledger implements LedgerInterface {
 				searched.length === 0
 					? undefined
 					: this.#search(searched, scan, input, projection, behind, start)
-			const search =
-				found === undefined
-					? undefined
-					: {
-							...found,
-							shown:
-								found.listed.length === 0 &&
-								this.#search(searched, scan, input, projection, visible, start).listed.length > 0,
-						}
 			const exchanges = collectLedgerExchanges(before, this.#requests, this.#annotations)
 			const first = parts.findIndex((part) => searched.includes(part))
 			const resolved = parts.flatMap((part, at) => {
 				const depth = parseLedgerExchange(part)
 				const earlier = parts.slice(0, at)
 				if (depth !== undefined) {
+					if (earlier.some((one) => parseLedgerExchange(one) === depth)) return []
 					const exchange = exchanges[depth - 1]
-					const shown = exchange !== undefined && excluded.has(exchange.request.id)
-					return earlier.some((one) => parseLedgerExchange(one) === depth)
-						? []
-						: [
-								{
-									listed: shown ? [] : this.#listExchange(exchange, depth),
-									recalled: new Map<string, string>(),
-									kind: 'more' as const,
-									shown,
-								},
-							]
+					// An exchange is shown only when the prompt holds both its request and its reply.
+					const shown =
+						exchange !== undefined &&
+						excluded.has(exchange.request.id) &&
+						excluded.has(exchange.reply.id)
+					const listed = shown ? [] : this.#listExchange(exchange, depth)
+					return [
+						{
+							part,
+							listed,
+							recalled: new Map<string, string>(),
+							kind: 'more' as const,
+							state:
+								listed.length > 0
+									? ('listed' as const)
+									: shown
+										? ('shown' as const)
+										: ('missed' as const),
+						},
+					]
 				}
 				if (part.toLowerCase() === LEDGER_RULES_KEY) {
+					if (earlier.some((one) => one.toLowerCase() === LEDGER_RULES_KEY)) return []
 					const rules = this.#listRules(projection, behind)
-					return earlier.some((one) => one.toLowerCase() === LEDGER_RULES_KEY)
-						? []
-						: [
-								{
-									listed: rules,
-									recalled: new Map<string, string>(),
-									kind: 'older' as const,
-									shown: rules.length === 0 && this.#listRules(projection, visible).length > 0,
-								},
-							]
+					return [
+						{
+							part,
+							listed: rules,
+							recalled: new Map<string, string>(),
+							kind: 'older' as const,
+							state:
+								rules.length > 0
+									? ('listed' as const)
+									: this.#listRules(projection, visible).length > 0
+										? ('shown' as const)
+										: ('missed' as const),
+						},
+					]
 				}
-				return at === first && search !== undefined ? [search] : []
+				if (earlier.some((one) => one.toLowerCase() === part.toLowerCase())) return []
+				const own =
+					searched.length === 1
+						? found
+						: this.#search([part], scan, input, projection, behind, start)
+				return [
+					{
+						part,
+						listed: at === first ? (found?.listed ?? []) : [],
+						recalled:
+							at === first
+								? (found?.recalled ?? new Map<string, string>())
+								: new Map<string, string>(),
+						kind: found?.kind ?? ('older' as const),
+						state:
+							(own?.listed.length ?? 0) > 0
+								? ('listed' as const)
+								: own?.shown === true
+									? ('shown' as const)
+									: ('missed' as const),
+					},
+				]
 			})
 			const listed = resolved.flatMap((one) => one.listed)
 			const recalled = new Map(resolved.flatMap((one) => [...one.recalled]))
 			const kind = resolved.some((one) => one.listed.length > 0 && one.kind === 'more')
 				? 'more'
 				: 'older'
-			// A key whose only matches are in the prompt is no miss: the model reads them there.
+			// A part whose every match is in the prompt is no miss: the model reads it there. Each part
+			// says so for itself, so a shown part never hides another part's listing or miss.
+			const shownParts = resolved.filter((one) => one.state === 'shown').map((one) => one.part)
+			const missedParts = resolved.filter((one) => one.state === 'missed').map((one) => one.part)
+			const requestId = request?.message?.id ?? ''
+			const notes = [
+				...(shownParts.length === 0
+					? []
+					: [
+							`${shownParts.map((part) => JSON.stringify(part.slice(0, 64))).join(', ')} ${shownParts.length === 1 ? 'is' : 'are'} in the messages you can see; answer from them`,
+						]),
+				...(missedParts.length === 0
+					? []
+					: [
+							this.#miss(
+								missedParts.map((part) => JSON.stringify(part.slice(0, 64))).join(', '),
+								input,
+								projection,
+								requestId,
+								excluded,
+							),
+						]),
+			].join('\n')
 			const result =
-				listed.length === 0
-					? resolved.some((one) => one.shown)
+				listed.length > 0
+					? [
+							cutListing(
+								listed,
+								room - (notes === '' ? 0 : estimateTokens(`\n${notes}`)),
+								kind,
+								gauge === undefined,
+							),
+							...(notes === '' ? [] : [notes]),
+						].join('\n')
+					: shownParts.length > 0 && missedParts.length === 0
 						? `${JSON.stringify(key.slice(0, 64))} is in the messages you can see; answer from them`
-						: this.#miss(key, input, projection, request?.message?.id ?? '', excluded)
-					: cutListing(listed, room, kind, gauge === undefined)
+						: shownParts.length === 0
+							? this.#miss(JSON.stringify(key.slice(0, 64)), input, projection, requestId, excluded)
+							: notes
 			request?.list(result, recalled, listed)
 			return result
 		} finally {
@@ -1994,10 +2101,10 @@ export class Ledger implements LedgerInterface {
 			.reverse()
 	}
 
-	// What a missed recall returns: the key, JSON-encoded and length-capped, and the first stored keys
-	// the request left behind, which the model can recall instead.
+	// What a missed recall returns: the quoted key or parts, each JSON-encoded and length-capped, and
+	// the first stored keys the request left behind, which the model can recall instead.
 	#miss(
-		key: string,
+		quoted: string,
 		input: LedgerProjectionInput,
 		projection: LedgerProjection,
 		request: string,
@@ -2027,7 +2134,6 @@ export class Ledger implements LedgerInterface {
 		]
 			.slice(0, LEDGER_MISS_LIMIT)
 			.map((one) => one.name)
-		const quoted = JSON.stringify(key.slice(0, 64))
 		return keys.length === 0
 			? `nothing earlier matches ${quoted}; answer from the messages you can see`
 			: `nothing earlier matches ${quoted}; stored keys: ${keys.join(', ')}; or answer from the messages you can see`
@@ -2047,7 +2153,11 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// Lists what a key names: the statements and findings on its ids, owners, and topics, or carrying
-	// its words, newest first with their amenders, then the labeled requests and replies carrying its words.
+	// its words, newest first with their amenders, then the labeled requests and replies carrying its
+	// words. It matches every message before the request and the lookups of the request's own passes,
+	// and lists only those the request left behind: a match the prompt shows lists nothing itself but
+	// still brings the amenders it left behind, and the search is shown when nothing lists and such a
+	// match was found.
 	#search(
 		parts: readonly string[],
 		scan: LedgerScan,
@@ -2059,6 +2169,7 @@ export class Ledger implements LedgerInterface {
 		readonly listed: readonly string[]
 		readonly recalled: ReadonlyMap<string, string>
 		readonly kind: 'older' | 'more'
+		readonly shown: boolean
 	} {
 		const registry = scan.registry
 		const searches = parts.map((part) => {
@@ -2078,26 +2189,32 @@ export class Ledger implements LedgerInterface {
 			return { words, matched }
 		})
 		const retired = collectRetiredFindings(scan.messages, scan.findings)
-		// The messages the request left behind, and the lookups its own passes made.
-		const listable = new Map(
+		// The messages a search matches: every one before the request but the requests, which list under
+		// their labels, and the lookups the request's own passes made.
+		const matchable = new Map(
 			input.messages
 				.filter(
 					(message, at) =>
 						!this.#requests.has(message.id) &&
 						!retired.has(message.id) &&
-						(behind.has(message.id) || (message.role === 'tool' && at > start)),
+						(at < start || (message.role === 'tool' && at > start)),
 				)
 				.map((message) => [message.id, message]),
+		)
+		// The ones it lists: those the request left behind, and the lookups of its own passes.
+		const listable = new Set(
+			[...matchable.keys()].filter((id) => behind.has(id) || (scan.position(id) ?? 0) > start),
 		)
 		const matched = new Set(searches.flatMap((search) => [...search.matched]))
 		const unmatched = searches.filter(
 			(search) => search.matched.size === 0 && search.words.length > 0,
 		)
 		// Newest first; each item's amenders are claimed by it, so an older item never lists them again.
-		const gathered = [...listable.values()].reverse().reduce<{
+		const gathered = [...matchable.values()].reverse().reduce<{
 			readonly done: ReadonlySet<string>
 			readonly listed: readonly string[]
 			readonly recalled: ReadonlyMap<string, string>
+			readonly seen: boolean
 		}>(
 			(state, message) => {
 				const finding = scan.finding(message.id)
@@ -2122,40 +2239,64 @@ export class Ledger implements LedgerInterface {
 						search.words.every((word) => message.content.toLowerCase().includes(word)),
 					)
 				if (!onTopic && !worded) return state
-				const items = scanAmendments(
+				// A shown member is visited, so the amenders after it are reached, but only the members the
+				// request left behind list.
+				const visited = scanAmendments(
 					input.classification.amendments,
 					message.id,
-					(candidate) => listable.has(candidate) && !state.done.has(candidate),
-				).flatMap((id) => {
-					const source = listable.get(id)
-					if (source === undefined) return []
-					const lookup = scan.finding(id)
-					const content = source.content.replace(
-						/(^|[\n\v\f\r\u0085\u2028\u2029])(?=Earlier (?:request|reply):)/g,
-						'$1  ',
-					)
-					const text =
-						lookup === undefined
-							? content
-							: `${renderLookupCall(lookup.name, lookup.arguments)}: ${content}`
-					return [
-						{
-							id,
-							text,
-							stored:
-								lookup === undefined
-									? []
-									: [
-											[
-												splitResultLines(text)[0] ?? '',
-												splitResultLines(content)[0] ?? '',
-											] as const,
-										],
-						},
-					]
-				})
+					(candidate) => matchable.has(candidate) && !state.done.has(candidate),
+				)
+				const items = this.#listItems(
+					visited.filter((id) => listable.has(id)),
+					matchable,
+					scan,
+				)
 				return {
-					done: new Set([...state.done, ...items.map((item) => item.id)]),
+					done: new Set([...state.done, ...visited]),
+					listed:
+						items.length === 0
+							? state.listed
+							: [...state.listed, items.map((item) => item.text).join('\n')],
+					recalled: new Map([...state.recalled, ...items.flatMap((item) => item.stored)]),
+					seen: state.seen || (visited.length > 0 && !listable.has(message.id)),
+				}
+			},
+			{ done: new Set(), listed: [], recalled: new Map(), seen: false },
+		)
+		// The labeled requests and replies carrying a part's words, newest first.
+		const conversation = input.messages
+			.slice(0, Math.max(0, start))
+			.reverse()
+			.filter(
+				(message) =>
+					!gathered.done.has(message.id) &&
+					this.#labelEarlier(message) !== undefined &&
+					searches.some(
+						(search) =>
+							search.words.length > 0 &&
+							search.words.every((word) => message.content.toLowerCase().includes(word)),
+					),
+			)
+		// Each one's amenders the request left behind list after the statements, a shown one's included.
+		const followed = conversation.reduce<{
+			readonly done: ReadonlySet<string>
+			readonly listed: readonly string[]
+			readonly recalled: ReadonlyMap<string, string>
+		}>(
+			(state, message) => {
+				const visited = scanAmendments(
+					input.classification.amendments,
+					message.id,
+					(candidate) =>
+						candidate === message.id || (matchable.has(candidate) && !state.done.has(candidate)),
+				).filter((id) => id !== message.id)
+				const items = this.#listItems(
+					visited.filter((id) => listable.has(id)),
+					matchable,
+					scan,
+				)
+				return {
+					done: new Set([...state.done, ...visited]),
 					listed:
 						items.length === 0
 							? state.listed
@@ -2163,29 +2304,58 @@ export class Ledger implements LedgerInterface {
 					recalled: new Map([...state.recalled, ...items.flatMap((item) => item.stored)]),
 				}
 			},
-			{ done: new Set(), listed: [], recalled: new Map() },
+			{ done: gathered.done, listed: [], recalled: new Map() },
 		)
-		const earlier = input.messages
-			.slice(0, Math.max(0, start))
-			.reverse()
-			.flatMap((message) => {
-				if (gathered.done.has(message.id) || !behind.has(message.id)) return []
-				const line = this.#labelEarlier(message)
-				return line === undefined ||
-					!searches.some(
-						(search) =>
-							search.words.length > 0 &&
-							search.words.every((word) => message.content.toLowerCase().includes(word)),
-					)
-					? []
-					: [line]
-			})
+		const earlier = conversation.flatMap((message) =>
+			behind.has(message.id) ? [this.#labelEarlier(message) ?? ''] : [],
+		)
+		const listed = [...gathered.listed, ...followed.listed, ...earlier]
 		// Statements list ahead of conversation messages, so an omitted message can be newer than a kept one.
 		return {
-			listed: [...gathered.listed, ...earlier],
-			recalled: gathered.recalled,
+			listed,
+			recalled: new Map([...gathered.recalled, ...followed.recalled]),
 			kind: earlier.length > 0 ? 'more' : 'older',
+			shown:
+				listed.length === 0 &&
+				(gathered.seen || conversation.some((message) => !behind.has(message.id))),
 		}
+	}
+
+	// The listing items of stored messages, in the order given: each one's text, a lookup's after its
+	// call, with every stored line that opens like a label indented, and the first line a listed lookup
+	// stores.
+	#listItems(
+		ids: readonly string[],
+		messages: ReadonlyMap<string, Message>,
+		scan: LedgerScan,
+	): ReadonlyArray<{
+		readonly id: string
+		readonly text: string
+		readonly stored: ReadonlyArray<readonly [string, string]>
+	}> {
+		return ids.flatMap((id) => {
+			const source = messages.get(id)
+			if (source === undefined) return []
+			const lookup = scan.finding(id)
+			const content = source.content.replace(
+				/(^|[\n\v\f\r\u0085\u2028\u2029])(?=Earlier (?:request|reply):)/g,
+				'$1  ',
+			)
+			const text =
+				lookup === undefined
+					? content
+					: `${renderLookupCall(lookup.name, lookup.arguments)}: ${content}`
+			return [
+				{
+					id,
+					text,
+					stored:
+						lookup === undefined
+							? []
+							: [[splitResultLines(text)[0] ?? '', splitResultLines(content)[0] ?? ''] as const],
+				},
+			]
+		})
 	}
 
 	#buildDigest(request: LedgerRequest, entered: Message): LedgerRecovery {

@@ -170,7 +170,7 @@ export const LEDGER_KEY_LIMIT = 20
 export const LEDGER_EXCHANGE_LIMIT = 8
 
 /**
- * Caps at 8 the recent exchanges a request's opening shows as messages, each a request and its reply.
+ * Caps at 8 the recent exchanges a request's opening shows as messages, each a request, its call turns and results, and its reply.
  *
  * @remarks
  * The recent window holds the newest exchanges that have a reply, newest first and contiguous, and
