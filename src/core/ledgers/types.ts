@@ -90,8 +90,8 @@ export interface LedgerTopic {
  *
  * @remarks
  * `prompt` is a share of the ledger's `capacity`; the overhead tokens of the gauge come out of it
- * before the opening takes the rest: the current statements and the request copy with its Earlier
- * index. `skills` is the share of the prompt budget, `(capacity - predict) * prompt`, that a thread's shown
+ * before the opening takes the rest: the recent window, the current statements, and the request
+ * copy with its Earlier index. `skills` is the share of the prompt budget, `(capacity - predict) * prompt`, that a thread's shown
  * skills can take: their bodies and the definitions they add beyond the calibrated set. A `load`
  * that would take the shown skills, the loads its batch already admitted, and its own skill past it
  * is denied with the {@link LedgerNote} `overflow` text.
@@ -400,7 +400,7 @@ export type LedgerAgentOptions = Pick<
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
- * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it. Each request sends the current statements whole and then a copy of the request turn, which carries the Earlier index of what `recall` can read. `topics` lists the desk
+ * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it. Each request sends the recent window, its newest exchanges, and the current statements whole, in conversation order, and then a copy of the request turn, which carries the Earlier index of what `recall` can read. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions under the same provider `model`, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
@@ -428,9 +428,9 @@ export type LedgerAgentOptions = Pick<
  * does not fit ends with the agent's `abort` reason `overflow`, and the answer pass answers; an
  * answer pass that does not fit with its note left out rejects `respond` with `LedgerError` code
  * `'OVERFLOW'`.
- * While the plan cuts id rows from the Earlier index it keeps cutting until the first turn leaves
- * `remainder - predict >= 2 * reserve`, and it never withdraws `recall` while something is left
- * behind. Runtime recall fits whole results to measured remaining capacity at the larger of the
+ * While the plan cuts the recent window's exchanges and the Earlier index's rows, it keeps cutting
+ * until the first turn leaves `remainder - predict >= 2 * reserve` or nothing is left behind, and
+ * it never withdraws `recall` while something is left behind. Runtime recall fits whole results to measured remaining capacity at the larger of the
  * gauge rate and the request's measured rate, allowing `LEDGER_SCALE_DRIFT` for new text. Lack of
  * room omits results without closing recall.
  * `writes` lists the {@link LedgerWrite} entries the model can call; a ledger with writes requires
@@ -750,8 +750,9 @@ export type LedgerAgentInterface = Pick<
  *
  * @remarks
  * The ledger files every message of its conversation through the injected judge, projects the
- * owner records and the rules record from that filing, and sends the current statements whole and
- * a copy of the request turn carrying the Earlier index of what `recall` reads. It owns its agent:
+ * owner records and the rules record from that filing, and sends the recent window of the newest
+ * exchanges, the current statements whole, and a copy of the request turn carrying the Earlier index
+ * of what `recall` reads. It owns its agent:
  * applying a scope that carries `select` displaces the ledger's selection handler. A message
  * removed from `conversation`, one by one or by `clear`, takes the ledger's marks of it at the
  * removal. A request in flight at the removal files no tool result onto another message, so neither
@@ -950,8 +951,8 @@ export interface LedgerRecord {
  * back, `rules`, an id, or a desk topic's name, as the `recall` tool reads it. `description` says
  * what the key lists: how far back the exchange is, the rules record, how many earlier messages
  * carry the id and the names of its owner, or the topic's criterion. The Earlier index of a request
- * copy lists these keys, and a `recall` call that lists nothing names up to `LEDGER_MISS_LIMIT` of
- * them back.
+ * copy lists these keys, an exchange key only for an exchange the recent window leaves out, and a
+ * `recall` call that lists nothing names up to `LEDGER_MISS_LIMIT` of them back.
  */
 export interface LedgerKey {
 	readonly name: string

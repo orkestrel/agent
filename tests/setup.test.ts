@@ -126,7 +126,9 @@ import {
 	createWireHeaders,
 	extractLedgerIndex,
 	buildLedgerGoals,
+	buildLedgerWindow,
 	countLedgerPlanFit,
+	LEDGER_CUT_DEEP_SNAPSHOT,
 	LEDGER_CUT_SNAPSHOT,
 	LEDGER_CUT_RULED_SNAPSHOT,
 	LEDGER_PLAN_REMARK,
@@ -1451,11 +1453,14 @@ describe('system boundary canary fixtures', () => {
 			expect(recorded.at(-1)?.role).toBe('user')
 		}
 		expect(RECORDED_ANSWER_REQUEST[1]).toEqual(RECORDED_FIRST_REQUEST.at(-1))
-		// A late request keeps the first request's head and sends its copy with the Earlier index last.
-		expect(RECORDED_LATE_REQUEST.slice(0, -1)).toEqual(RECORDED_FIRST_REQUEST.slice(0, -1))
-		expect(RECORDED_LATE_REQUEST.at(-1)?.content).toMatch(
-			/^## Earlier\n[\s\S]*\n\n## Request\nCheck Brightwater Studio again\.$/,
-		)
+		// A late request keeps the first request's head and request as its window, then the reply, then
+		// sends its own request bare.
+		expect(RECORDED_LATE_REQUEST.slice(0, 2)).toEqual(RECORDED_FIRST_REQUEST)
+		expect(RECORDED_LATE_REQUEST.slice(2).map((message) => message.role)).toEqual([
+			'assistant',
+			'user',
+		])
+		expect(RECORDED_LATE_REQUEST.at(-1)?.content).toBe('Check Brightwater Studio again.')
 	})
 
 	it('reads the Earlier index of the last request copy and empty text when no copy carries one', () => {
@@ -1478,7 +1483,7 @@ describe('system boundary canary fixtures', () => {
 		).toBe('Later.')
 	})
 
-	it('reads the statement ids and the index key names of an opening', () => {
+	it('reads the shown message ids and the index key names of an opening', () => {
 		const opening = readLedgerOpening([
 			{ id: 'system', role: 'system', content: 'Serve the desk.' },
 			{ id: 'statement', role: 'user', content: 'Crate CR-1 holds lamps.' },
@@ -1490,9 +1495,9 @@ describe('system boundary canary fixtures', () => {
 			},
 		])
 
-		expect(opening).toEqual({ statements: ['statement'], keys: ['previous', 'AX-1'] })
+		expect(opening).toEqual({ shown: ['statement'], keys: ['previous', 'AX-1'] })
 		expect(readLedgerOpening([{ id: 'copy', role: 'user', content: 'Next?' }])).toEqual({
-			statements: [],
+			shown: [],
 			keys: [],
 		})
 	})
@@ -1519,6 +1524,47 @@ describe('system boundary canary fixtures', () => {
 			'Refund requests go to the north desk.',
 		])
 		expect(stored.slice(2)).toEqual(LEDGER_CUT_SNAPSHOT.conversation.messages)
+	})
+
+	it('holds the ruled cut snapshot with 8 batch exchanges after its three, before the crates', () => {
+		const stored = LEDGER_CUT_DEEP_SNAPSHOT.conversation.messages
+		const ruled = LEDGER_CUT_RULED_SNAPSHOT.conversation.messages
+		const at = ruled.findIndex((message) => message.id === 'noted-3') + 1
+
+		expect(isLedgerSnapshot(LEDGER_CUT_DEEP_SNAPSHOT)).toBe(true)
+		expect(LEDGER_CUT_DEEP_SNAPSHOT.requests).toEqual([
+			...LEDGER_CUT_RULED_SNAPSHOT.requests,
+			...Array.from({ length: 8 }, (_unused, index) => `batch-${index + 1}`),
+		])
+		expect(stored.slice(0, at)).toEqual(ruled.slice(0, at))
+		expect(stored.slice(at, at + 2)).toEqual([
+			{ id: 'batch-1', role: 'user', content: 'Note crate batch 1.' },
+			{ id: 'batched-1', role: 'assistant', content: 'Noted batch 1.' },
+		])
+		expect(stored.slice(at + 16)).toEqual(ruled.slice(at))
+		expect(stored).toHaveLength(ruled.length + 16)
+	})
+
+	it('builds a snapshot of one answered request per reply, with a statement before the last request when given', () => {
+		const plain = buildLedgerWindow(['One.', 'Two.'])
+		const stated = buildLedgerWindow(['One.', 'Two.'], 'Item 2 is in bay 9.')
+
+		expect(isLedgerSnapshot(plain)).toBe(true)
+		expect(plain.conversation.messages).toEqual([
+			{ id: 'ask-1', role: 'user', content: 'Note item 1.' },
+			{ id: 'reply-1', role: 'assistant', content: 'One.' },
+			{ id: 'ask-2', role: 'user', content: 'Note item 2.' },
+			{ id: 'reply-2', role: 'assistant', content: 'Two.' },
+		])
+		expect(plain.requests).toEqual(['ask-1', 'ask-2'])
+		expect(stated.conversation.messages.map((message) => message.id)).toEqual([
+			'ask-1',
+			'reply-1',
+			'stated',
+			'ask-2',
+			'reply-2',
+		])
+		expect(stated.requests).toEqual(plain.requests)
 	})
 
 	it('builds a snapshot of a goal for every four earlier messages, each a request answered', () => {

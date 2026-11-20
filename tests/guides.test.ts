@@ -1624,11 +1624,11 @@ await new GuideCommand({
 			).toBe('Refunds over $100 need a manager.')
 			expect(copies).toEqual([
 				'Can Brightwater Studio get a refund on order BW-5512?',
-				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous: your last answered request and your reply to it\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 3 earlier messages\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\nDoes the Brightwater Studio refund need a manager?",
+				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 1 earlier message\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\nDoes the Brightwater Studio refund need a manager?",
 			])
 			// Every scripted reply was taken: two calibration calls and four turns.
 			expect(replies.next()).toEqual({ done: true, value: undefined })
-			// The first request sends the rule whole; the second sends only its copy.
+			// The first request sends the rule whole; the second shows the first exchange, then its copy.
 			expect(prompts.count).toBe(4)
 			expect(
 				requireValue(prompts.calls[0]?.[0], 'Missing prompt').map(({ role, content }) => [
@@ -1647,6 +1647,8 @@ await new GuideCommand({
 				]),
 			).toEqual([
 				['system', system],
+				['user', 'Can Brightwater Studio get a refund on order BW-5512?'],
+				['assistant', 'Order BW-5512 qualifies for a $148.50 refund.'],
 				['user', copies[1]],
 			])
 			expect(guideText).toContain('const replies = script.values()')
@@ -1668,7 +1670,7 @@ await new GuideCommand({
 				"// 'Can Brightwater Studio get a refund on order BW-5512?' — the rule went whole before it, and nothing is stored behind it",
 			)
 			expect(guideText).toContain(
-				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- previous: your last answered request and your reply to it\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 3 earlier messages\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?' — the rule, the lookup result, and the first exchange stay stored",
+				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 1 earlier message\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?' — the window shows the first exchange, and the rule and the lookup result stay stored",
 			)
 		})
 
@@ -1738,7 +1740,7 @@ await new GuideCommand({
 			expect(third.content).toBe(answer)
 			expect(replies.next()).toEqual({ done: true, value: undefined })
 			expect(copies).toEqual([
-				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous-2: your request and reply 2 exchanges ago\n- previous: your last answered request and your reply to it\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 3 earlier messages\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\n" +
+				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- rules: the standing rules and corrections stated earlier\n- BW-5512: 1 earlier message\n- BW-20931: Brightwater Studio; 1 earlier message\nOther ids, names, and words from a message work too.\n\n## Request\n" +
 					request,
 			])
 			expect(uninterrupted).toEqual(copies)
@@ -1772,7 +1774,7 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain("third.content // 'Not yet. A manager must approve it.'")
 			expect(guideText).toContain(
-				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- previous-2: your request and reply 2 exchanges ago\\n- previous: your last answered request and your reply to it\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 3 earlier messages\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
+				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- rules: the standing rules and corrections stated earlier\\n- BW-5512: 1 earlier message\\n- BW-20931: Brightwater Studio; 1 earlier message\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
 			)
 		})
 
@@ -1812,11 +1814,11 @@ await new GuideCommand({
 			)
 			// At this capacity only the larger hydrated reserve needs a row cut to leave recall its room, and
 			// the exchange row past `previous` goes first.
-			expect(hydrated.statements).toEqual(live.statements)
+			expect(hydrated.shown).toEqual(live.shown)
 			expect(live.keys).toEqual(['previous-2', 'previous', 'AX-4', 'AX-3', 'AX-2', 'AX-1'])
 			expect(hydrated.keys).toEqual(['previous', 'AX-4', 'AX-3', 'AX-2', 'AX-1'])
 			expect(guideText).toContain(
-				'when the two reserves differ, the close test can stop at a different row step, which moves rows of the Earlier index and never a statement.',
+				'when the two reserves differ, the close test can stop at a different window or row step, which moves window exchanges or rows of the Earlier index and never a statement.',
 			)
 		})
 
@@ -2174,10 +2176,11 @@ await new GuideCommand({
 				await ledger.respond(text)
 			}
 
-			// The first request leaves nothing behind; the second leaves the first, so it offers recall.
+			// Neither request leaves anything behind: the second's window shows the first exchange, so
+			// neither offers recall.
 			expect(advertised).toEqual([
 				['lookup_order', 'lookup_refund'],
-				['lookup_order', 'lookup_invoice', 'recall'],
+				['lookup_order', 'lookup_invoice'],
 			])
 			// Two calibration calls, then one call a request: no calibration call came between them.
 			expect(provider.calls).toHaveLength(4)
@@ -2197,7 +2200,9 @@ await new GuideCommand({
 			ledger.agent.context.apply(undefined)
 			await ledger.respond('Does order BW-5513 need a manager?')
 
-			expect(advertised.at(-3)).toEqual(['lookup_order', 'lookup_refund', 'recall', 'load'])
+			// The third request's window shows both earlier exchanges, so it offers no recall; the
+			// fourth and fifth leave its refund lookup behind.
+			expect(advertised.at(-3)).toEqual(['lookup_order', 'lookup_refund', 'load'])
 			expect(advertised.at(-2)).toEqual(['lookup_order', 'lookup_invoice', 'recall'])
 			expect(advertised.at(-1)).toEqual(['lookup_order', 'lookup_refund', 'recall', 'load'])
 			expect(advertised).toHaveLength(7)
@@ -2612,7 +2617,8 @@ await new GuideCommand({
 				ledger.conversation.snapshot().judgments?.every(({ model }) => model === judge.model),
 			).toBe(true)
 			// The opening and the offer took no option: the first request sends the seed whole and leaves
-			// nothing behind, so it offers no recall; the second leaves the first behind and offers it.
+			// nothing behind, so it offers no recall; the second shows the first exchange in its window and
+			// leaves the seed behind, so it offers recall.
 			const [first, next] = provider.calls
 			expect(
 				requireValue(first)
@@ -2623,7 +2629,11 @@ await new GuideCommand({
 				requireValue(next)
 					.messages.slice(1)
 					.map(({ content }) => content),
-			).toEqual([expect.stringMatching(/^## Earlier\n[\s\S]*\n\n## Request\nMake that shorter\.$/)])
+			).toEqual([
+				'Does a refund need a manager?',
+				'First reply.',
+				expect.stringMatching(/^## Earlier\n[\s\S]*\n\n## Request\nMake that shorter\.$/),
+			])
 			expect(provider.calls.map((call) => call.tools?.map(({ name }) => name))).toEqual([
 				['lookup_order'],
 				['lookup_order', 'recall'],
@@ -2816,12 +2826,11 @@ await new GuideCommand({
 			const contents = requireValue(provider.calls[3], 'Missing recall turn').messages.map(
 				({ content }) => content,
 			)
-			// The opening sends neither the earlier request nor its result: recall reads both.
-			expect(contents).not.toContain('Look up order BW-5512.')
+			// The window shows the earlier request and its reply, and the opening never sends its lookup
+			// result: recall reads that.
+			expect(contents).toContain('Look up order BW-5512.')
 			expect(contents).not.toContain(result)
-			expect(contents.at(-1)).toBe(
-				`lookup_order {"id":"BW-5512"}: ${result}\nEarlier request: Look up order BW-5512.`,
-			)
+			expect(contents.at(-1)).toBe(`lookup_order {"id":"BW-5512"}: ${result}`)
 			expect(guideText).toContain(
 				"the model reads it through the `recall` tool, which takes a key from the Earlier index, and what a request's lookups returned reaches a later request the same way.",
 			)
@@ -3458,7 +3467,7 @@ await new GuideCommand({
 			// The fit's refusal stores the request alone: no note and no cue.
 			expect(ledger.conversation.messages().map(({ content }) => content)).toEqual([request])
 			expect(guideText).toContain(
-				"The plan prices the built head, the statements, and the copy with its index and images; runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
+				"The plan prices the built head, the window, the statements, and the copy with its index and images; runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
 			)
 			expect(guideText).toContain(
 				'so a request, a lookup result, or the whole view a faulted selection builds from can exceed the room the `capacity` option leaves, and the ledger then sends no request that carries it',
@@ -3558,14 +3567,14 @@ await new GuideCommand({
 			expect(direct).toEqual(view)
 			expect(estimateMessages(direct)).toBeGreaterThan(budget)
 			expect(guideText).toContain(
-				"The plan prices the built head, the statements, and the copy with its index and images; runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
+				"The plan prices the built head, the window, the statements, and the copy with its index and images; runtime recall and recovery fit their result groups separately. A request, a lookup result, or a faulted selection's whole view can still exceed the budget.",
 			)
 			expect(guideText).toContain(
 				"A later turn that doesn't fit, for example after a large lookup result, isn't sent, and the answer pass answers from the results note.",
 			)
 		})
 
-		it('sends a host statement between requests whole and keeps the previous exchange to recall', async () => {
+		it('sends a host statement between requests whole after the window, which shows the previous exchange', async () => {
 			const later = 'The Northgate courier brings refund forms on 2026-10-12.'
 			const provider = createScriptedProvider(
 				[
@@ -3589,6 +3598,10 @@ await new GuideCommand({
 			ledger.conversation.add({ role: 'user', content: 'Refunds over $100 need a manager.' })
 			await ledger.respond('Review the desk.')
 			ledger.conversation.add({ role: 'user', content: later })
+			// The statement changes nothing `previous` lists.
+			expect(await recallLedger(ledger, 'previous')).toBe(
+				'previous: Earlier request: Review the desk.\nEarlier reply: Done.',
+			)
 
 			await ledger.respond('When do the refund forms arrive?')
 
@@ -3596,14 +3609,16 @@ await new GuideCommand({
 			const index = extractLedgerIndex(sent)
 			expect(sent.map(({ content }) => content)).toEqual([
 				'Serve the desk.',
+				'Review the desk.',
+				'Done.',
 				later,
 				`${index}\n\n## Request\nWhen do the refund forms arrive?`,
 			])
-			expect(index).toContain('\n- previous: ')
+			expect(index).not.toContain('\n- previous: ')
 			expect(index).toContain('\n- rules: ')
 			expect(
 				ledger.conversation.messages().find((message) => message.call === 'previous')?.content,
-			).toBe('previous: Earlier request: Review the desk.\nEarlier reply: Done.')
+			).toBe('"previous" is in the messages you can see; answer from them')
 			expect(guideText).toContain(
 				'A host statement added between requests goes whole into the next opening as a current statement, and neither that statement nor a host lookup after the reply changes what `previous` lists.',
 			)

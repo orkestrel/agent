@@ -2339,6 +2339,39 @@ describe('collectLedgerKeys', () => {
 		expect(keys.filter((key) => key.description.includes('Question'))).toEqual([])
 	})
 
+	it('gives an exchange the opening shows no row and keeps the depths of the rows past it', () => {
+		const exchanges = Array.from({ length: 12 }, (_unused, at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', `Question ${at} about the desk?`),
+			buildLedgerMessage(`answer-${at}`, 'assistant', `Answer ${at}.`),
+		]).flat()
+		const asks = Array.from({ length: 12 }, (_unused, at) => `ask-${at}`)
+		const input = buildLedgerInput({
+			exclusions: [...asks, 'request'],
+			messages: [...exchanges, buildLedgerMessage('request', 'user', 'Which are late?')],
+		})
+		// The opening shows the newest two exchanges, so the rows start at previous-3.
+		const keys = collectLedgerKeys(
+			input,
+			buildRecords(input),
+			[],
+			'request',
+			new Set([...asks, 'request']),
+			new Set(),
+			new Set(['request', 'ask-11', 'answer-11', 'ask-10', 'answer-10']),
+		)
+		expect(keys.map((key) => key.name)).toEqual([
+			'previous-10',
+			'previous-9',
+			'previous-8',
+			'previous-7',
+			'previous-6',
+			'previous-5',
+			'previous-4',
+			'previous-3',
+		])
+		expect(keys.at(-1)?.description).toBe('your request and reply 3 exchanges ago')
+	})
+
 	it('leaves an id that reads as an exchange key out of the id rows', () => {
 		const input = buildLedgerInput({
 			exclusions: ['first', 'request'],

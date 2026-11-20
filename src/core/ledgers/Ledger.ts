@@ -107,6 +107,8 @@ import {
 	LEDGER_OWNER_PREFIX,
 	LEDGER_PREVIOUS_KEY,
 	LEDGER_RECALL_LABELS,
+	LEDGER_RECENT_LIMIT,
+	LEDGER_RECENT_SHARE,
 	LEDGER_RULES_KEY,
 	LEDGER_SAMPLE_BYTES,
 	LEDGER_SCALE_DRIFT,
@@ -149,7 +151,7 @@ import { ledgerSnapshotContract } from './contracts.js'
 import { isFraction, isLedgerQuestion, isLedgerSnapshot } from './validators.js'
 
 /**
- * Serves one conversation through classified records: each request sends the current statements whole and a copy of the request turn carrying the Earlier index `recall` reads, and a final answer pass.
+ * Serves one conversation through classified records: each request sends the recent window of its newest exchanges, the current statements whole, a copy of the request turn carrying the Earlier index `recall` reads, and a final answer pass.
  * @example
  * ```ts
  * const ledger = new Ledger(provider, options)
@@ -313,7 +315,7 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Read earlier exchanges and items that are stored, not shown. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"${LEDGER_PREVIOUS_KEY}"} or {"key":"BW-5512"}; join keys with commas, like {"key":"${LEDGER_PREVIOUS_KEY}-3, ${LEDGER_PREVIOUS_KEY}-2"}. Keys: ${LEDGER_PREVIOUS_KEY} (your last answered request and your reply), ${LEDGER_PREVIOUS_KEY}-2, ${LEDGER_PREVIOUS_KEY}-3, … (the exchanges before it, counting back), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
+				description: `Read earlier items that are stored, not shown. Your newest exchanges are already in the messages you see; the ${LEDGER_PREVIOUS_KEY}-N keys in the Earlier list reach older ones. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"BW-5512"} or {"key":"${LEDGER_RULES_KEY}"}; join keys with commas, like {"key":"BW-5512, ${LEDGER_RULES_KEY}"}. Keys: ${LEDGER_PREVIOUS_KEY}-N (an older request and your reply, N exchanges back from your last answered one), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. A key for something already in the messages you see says so. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
 				contract: objectShape({
 					key: stringShape({
 						min: 1,
@@ -1322,12 +1324,14 @@ export class Ledger implements LedgerInterface {
 		return (this.#gauge?.scale ?? 1) * estimateMessages(messages)
 	}
 
-	// Plans a request's opening: the current statements whole, then the request copy, which carries the
-	// Earlier index of what the opening leaves behind while `recall` is advertised. Past the budget the
-	// steps cut the exchange rows from the oldest down to `previous-2`, then the id rows last-ranked
-	// first, then the statements oldest first, then the topic rows last first, `rules`, `previous`,
-	// and the rest of the index. The search takes the first row step that fits and leaves `recall` its
-	// room, else the first step that fits, else the last step.
+	// Plans a request's opening: the recent window, the newest exchanges that have a reply, and the
+	// current statements whole, in conversation order, then the request copy, which carries the Earlier
+	// index of what the opening leaves behind while `recall` is advertised. Past the budget the steps
+	// cut the window's exchanges oldest first, then the exchange rows from the deepest down to
+	// `previous-2`, then the id rows last-ranked first, then the statements oldest first, then the topic
+	// rows last first, `rules`, `previous`, and the rest of the index. Each step reads its own shown
+	// messages, its index, and whether it leaves anything behind. The search takes the first window or
+	// row step that fits and leaves `recall` its room, else the first step that fits, else the last.
 	#plan(
 		request: Message,
 		scan: LedgerScan,
@@ -1335,11 +1339,8 @@ export class Ledger implements LedgerInterface {
 	): Pick<Selection, 'messages'> {
 		const { input, projection } = this.#project(scan)
 		const at = scan.position(request.id) ?? scan.messages.length
-		const current = collectLedgerStatements(
-			scan.messages.slice(0, at),
-			this.#requests,
-			this.#annotations,
-		)
+		const before = scan.messages.slice(0, at)
+		const current = collectLedgerStatements(before, this.#requests, this.#annotations)
 		// The plan prices what the first turn advertises under the pass's run scope, with `recall`
 		// offered, and the skills the thread shows: the context scope can move inside that bound after
 		// the plan, so it never lowers the price. While that turn advertises `load`, it holds back the
@@ -1363,29 +1364,51 @@ export class Ledger implements LedgerInterface {
 		})
 		const ceiling = intersectKeys(this.#agent.context.scope?.tools, lists.tools)
 		const admits = ceiling === undefined || ceiling.includes('recall')
-		const sent = new Set(current.map((message) => message.id))
-		// An earlier message the opening never sends is left behind at every step.
-		const others = collectRecallMessages(input, this.#requests, this.#annotations).some(
-			(message) => (scan.position(message.id) ?? at) < at && !sent.has(message.id),
+		// What `recall` can list from before the request; a step leaves behind each one it doesn't show.
+		const recallable = collectRecallMessages(input, this.#requests, this.#annotations).filter(
+			(message) => (scan.position(message.id) ?? at) < at,
 		)
-		// Cutting a statement only lowers the price of an opening with no index, and an index only adds
-		// to it, so no step before the first count that fits bare can fit.
+		// The window: the newest exchanges that have a reply, within the count bound, up to the first
+		// whose messages would price past the window's share of the budget.
+		const exchanges = collectLedgerExchanges(before, this.#requests, this.#annotations).slice(
+			0,
+			LEDGER_RECENT_LIMIT,
+		)
+		const over = exchanges.findIndex(
+			(_exchange, index) =>
+				this.#price(
+					stripThinking(
+						[...this.#collectWindow(exchanges, index + 1), request],
+						this.#replay,
+					).slice(0, -1),
+				) >
+				total * LEDGER_RECENT_SHARE,
+		)
+		const size = over < 0 ? exchanges.length : over
+		// Cutting a statement only lowers the price of an opening with no window and no index, and both
+		// only add to it, so no step before the first count that fits bare can fit, and no statement is
+		// cut while a window stays.
 		const floor = findLedgerCut(0, current.length + 1, (count) =>
 			this.#price(this.#buildOpening(request, built, current.slice(count), []).probe) <= total
 				? count
 				: undefined,
 		)
-		const whole = admits
-			? collectLedgerKeys(
-					input,
-					projection,
-					this.#options.topics,
-					request.id,
-					this.#requests,
-					this.#annotations,
-					new Set([request.id, ...sent]),
-				)
-			: []
+		// Every statement kept, and each window size from the largest down to none.
+		const windows =
+			floor === 0
+				? Array.from({ length: size + 1 }, (_unused, index) =>
+						this.#collectStep(
+							input,
+							projection,
+							request,
+							recallable,
+							admits,
+							this.#collectShown(scan, this.#collectWindow(exchanges, size - index), current),
+						),
+					)
+				: []
+		const bare = windows.at(-1)
+		const whole = bare?.keys ?? []
 		const fixed = this.#readFixedKeys()
 		// The rows a step cuts from the end: the id rows, then the exchange rows past `previous` by depth,
 		// so the deepest exchange row goes first and the last-ranked id row after `previous-2`.
@@ -1399,25 +1422,28 @@ export class Ledger implements LedgerInterface {
 			...whole.filter((row) => !fixed.has(row.name) && !deeper.includes(row)),
 			...deeper,
 		]
-		// Every statement kept, and the rows cut from the end.
+		// Every statement kept and no window, and the rows cut from the end.
 		const trimmed =
-			floor === 0
-				? [...cuttable.keys(), cuttable.length].map((count) =>
-						whole.filter((row) => !cuttable.slice(cuttable.length - count).includes(row)),
-					)
-				: []
+			bare === undefined
+				? []
+				: [...cuttable.keys()].map((index) => ({
+						...bare,
+						keys: whole.filter((row) => !cuttable.slice(cuttable.length - index - 1).includes(row)),
+					}))
+		const steps = [...windows, ...trimmed]
 		const longest = this.#findLongest()
-		const roomy = trimmed.find((keys) => {
-			const probe = this.#buildOpening(request, built, current, keys).probe
+		const roomy = steps.find((step) => {
+			const probe = this.#buildOpening(request, built, step.shown, step.keys).probe
 			return (
 				this.#price(probe) <= total &&
-				(!admits || !others || this.#leavesRecallRoom(probe, advertised, longest))
+				(!admits || !step.others || this.#leavesRecallRoom(probe, advertised, longest))
 			)
 		})
 		const kept =
 			roomy ??
-			trimmed.find(
-				(keys) => this.#price(this.#buildOpening(request, built, current, keys).probe) <= total,
+			steps.find(
+				(step) =>
+					this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <= total,
 			)
 		// Statements cut oldest first, each with the rows its cut leaves.
 		const cut =
@@ -1446,7 +1472,7 @@ export class Ledger implements LedgerInterface {
 				row.name !== LEDGER_PREVIOUS_KEY && row.name !== LEDGER_RULES_KEY && fixed.has(row.name),
 		)
 		// Every statement cut: the topic rows cut from the last, then `rules`, `previous`, and the rest.
-		const bare = [
+		const emptied = [
 			...[...topics.keys()].map((index) =>
 				last.filter((row) => !topics.slice(topics.length - 1 - index).includes(row)),
 			),
@@ -1459,18 +1485,19 @@ export class Ledger implements LedgerInterface {
 			),
 			[],
 		]
-		const count = kept !== undefined ? 0 : (cut ?? current.length)
+		const shown = kept?.shown ?? current.slice(cut ?? current.length)
 		const keys =
-			kept ??
+			kept?.keys ??
 			(cut !== undefined
 				? admits
 					? this.#collectCutKeys(input, projection, request, current, cut)
 					: []
-				: (bare.find(
+				: (emptied.find(
 						(rows) => this.#price(this.#buildOpening(request, built, [], rows).probe) <= total,
 					) ?? []))
-		// Nothing left behind: the request goes bare and `recall` leaves the scope for this request.
-		if (admits && !others && count === 0) {
+		const ids = new Set(shown.map((message) => message.id))
+		// Nothing left behind at the chosen step: `recall` leaves the scope for this request.
+		if (admits && !recallable.some((message) => !ids.has(message.id))) {
 			const tools = this.#definitions()
 				.filter((tool) => tool.name !== 'recall')
 				.map((tool) => tool.name)
@@ -1479,7 +1506,58 @@ export class Ledger implements LedgerInterface {
 			this.#current()?.apply(narrowed)
 			this.#agent.context.apply(narrowed)
 		}
-		return { messages: this.#buildOpening(request, built, current.slice(count), keys).messages }
+		return { messages: this.#buildOpening(request, built, shown, keys).messages }
+	}
+
+	// The window's messages for its newest `count` exchanges: each request with its reply, oldest first.
+	#collectWindow(exchanges: readonly LedgerExchange[], count: number): readonly Message[] {
+		return exchanges
+			.slice(0, count)
+			.toReversed()
+			.flatMap((exchange) => [exchange.request, exchange.reply])
+	}
+
+	// The messages a step shows, in conversation order: the window's and the kept statements.
+	#collectShown(
+		scan: LedgerScan,
+		window: readonly Message[],
+		kept: readonly Message[],
+	): readonly Message[] {
+		return [...window, ...kept].toSorted(
+			(left, right) => (scan.position(left.id) ?? 0) - (scan.position(right.id) ?? 0),
+		)
+	}
+
+	// A step's own bookkeeping from the messages it shows: its index while `recall` is admitted, which
+	// excludes them, and whether it leaves anything `recall` can list behind.
+	#collectStep(
+		input: LedgerProjectionInput,
+		projection: LedgerProjection,
+		request: Message,
+		recallable: readonly Message[],
+		admits: boolean,
+		shown: readonly Message[],
+	): {
+		readonly shown: readonly Message[]
+		readonly keys: readonly LedgerKey[]
+		readonly others: boolean
+	} {
+		const ids = new Set(shown.map((message) => message.id))
+		return {
+			shown,
+			keys: admits
+				? collectLedgerKeys(
+						input,
+						projection,
+						this.#options.topics,
+						request.id,
+						this.#requests,
+						this.#annotations,
+						new Set([request.id, ...ids]),
+					)
+				: [],
+			others: recallable.some((message) => !ids.has(message.id)),
+		}
 	}
 
 	// The names of the index rows that are no id: `previous`, `rules`, and the desk topics, which
@@ -1516,21 +1594,21 @@ export class Ledger implements LedgerInterface {
 		).filter((row) => fixed.has(row.name) || carried.has(row.name))
 	}
 
-	// The opening a step sends, the kept statements then the request copy with the index of these keys,
+	// The opening a step sends, its shown messages then the request copy with the index of these keys,
 	// and the probe the plan prices: the built head with the same messages as the first turn renders them.
 	#buildOpening(
 		request: Message,
 		built: readonly Message[],
-		kept: readonly Message[],
+		shown: readonly Message[],
 		keys: readonly LedgerKey[],
 	): { readonly messages: readonly Message[]; readonly probe: readonly Message[] } {
 		const text = renderLedgerKeys(keys)
 		return {
-			messages: [...kept, buildRequestMessage(request, text)],
+			messages: [...shown, buildRequestMessage(request, text)],
 			probe: [
 				...built.slice(0, -1),
 				...stripThinking(
-					[...kept, buildRequestMessage(built.at(-1) ?? request, text)],
+					[...shown, buildRequestMessage(built.at(-1) ?? request, text)],
 					this.#replay,
 				),
 			],
@@ -1821,41 +1899,60 @@ export class Ledger implements LedgerInterface {
 			// Each part of the key resolves by its family: an exchange key to that exchange, `rules` to the
 			// rules record, and every other part to the search, which reads them together and lists newest
 			// first at the first searched part. Each exchange and `rules` resolve once, at their first
-			// part, and the results join in that order.
+			// part, and the results join in that order. A family whose only matches the prompt shows
+			// lists nothing and marks the key shown.
 			const parts = splitKey(key)
 			const searched = parts.filter(
 				(part) =>
 					parseLedgerExchange(part) === undefined && part.toLowerCase() !== LEDGER_RULES_KEY,
 			)
-			const search =
+			// What the request could see: every message before it, the shown ones included.
+			const visible = new Set(before.map((message) => message.id))
+			const found =
 				searched.length === 0
 					? undefined
 					: this.#search(searched, scan, input, projection, behind, start)
+			const search =
+				found === undefined
+					? undefined
+					: {
+							...found,
+							shown:
+								found.listed.length === 0 &&
+								this.#search(searched, scan, input, projection, visible, start).listed.length > 0,
+						}
 			const exchanges = collectLedgerExchanges(before, this.#requests, this.#annotations)
 			const first = parts.findIndex((part) => searched.includes(part))
 			const resolved = parts.flatMap((part, at) => {
 				const depth = parseLedgerExchange(part)
 				const earlier = parts.slice(0, at)
-				if (depth !== undefined)
+				if (depth !== undefined) {
+					const exchange = exchanges[depth - 1]
+					const shown = exchange !== undefined && excluded.has(exchange.request.id)
 					return earlier.some((one) => parseLedgerExchange(one) === depth)
 						? []
 						: [
 								{
-									listed: this.#listExchange(exchanges[depth - 1], depth),
+									listed: shown ? [] : this.#listExchange(exchange, depth),
 									recalled: new Map<string, string>(),
 									kind: 'more' as const,
+									shown,
 								},
 							]
-				if (part.toLowerCase() === LEDGER_RULES_KEY)
+				}
+				if (part.toLowerCase() === LEDGER_RULES_KEY) {
+					const rules = this.#listRules(projection, behind)
 					return earlier.some((one) => one.toLowerCase() === LEDGER_RULES_KEY)
 						? []
 						: [
 								{
-									listed: this.#listRules(projection, behind),
+									listed: rules,
 									recalled: new Map<string, string>(),
 									kind: 'older' as const,
+									shown: rules.length === 0 && this.#listRules(projection, visible).length > 0,
 								},
 							]
+				}
 				return at === first && search !== undefined ? [search] : []
 			})
 			const listed = resolved.flatMap((one) => one.listed)
@@ -1863,9 +1960,12 @@ export class Ledger implements LedgerInterface {
 			const kind = resolved.some((one) => one.listed.length > 0 && one.kind === 'more')
 				? 'more'
 				: 'older'
+			// A key whose only matches are in the prompt is no miss: the model reads them there.
 			const result =
 				listed.length === 0
-					? this.#miss(key, input, projection, request?.message?.id ?? '', excluded)
+					? resolved.some((one) => one.shown)
+						? `${JSON.stringify(key.slice(0, 64))} is in the messages you can see; answer from them`
+						: this.#miss(key, input, projection, request?.message?.id ?? '', excluded)
 					: cutListing(listed, room, kind, gauge === undefined)
 			request?.list(result, recalled, listed)
 			return result
@@ -1912,17 +2012,19 @@ export class Ledger implements LedgerInterface {
 			this.#annotations,
 			excluded,
 		)
-		// `previous`, `rules`, the ids, and the topics come first, then the exchange keys past `previous`,
-		// shallowest first.
-		const deeper = collected
-			.filter(
-				(one) => one.name !== LEDGER_PREVIOUS_KEY && parseLedgerExchange(one.name) !== undefined,
-			)
+		// The nearest exchange key the prompt doesn't show comes first, in the place `previous` holds
+		// when it isn't shown, then `rules`, the ids, and the topics, then the deeper exchange keys.
+		const exchanged = collected
+			.filter((one) => parseLedgerExchange(one.name) !== undefined)
 			.toSorted(
 				(left, right) =>
 					(parseLedgerExchange(left.name) ?? 0) - (parseLedgerExchange(right.name) ?? 0),
 			)
-		const keys = [...collected.filter((one) => !deeper.includes(one)), ...deeper]
+		const keys = [
+			...exchanged.slice(0, 1),
+			...collected.filter((one) => !exchanged.includes(one)),
+			...exchanged.slice(1),
+		]
 			.slice(0, LEDGER_MISS_LIMIT)
 			.map((one) => one.name)
 		const quoted = JSON.stringify(key.slice(0, 64))

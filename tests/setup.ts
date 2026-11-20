@@ -4630,16 +4630,15 @@ export const RECORDED_ANSWER_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Objec
  * {@link serveRecordsDesk} serves, every field except the stored `id`.
  *
  * @remarks
- * Written by hand from the opening layout: the first request and its reply are now earlier, so the
- * request copy carries the Earlier index with the `previous` key, then `## Request` and the prompt.
+ * Written by hand from the opening layout: the recent window shows the first request and its reply,
+ * so no exchange key is left for the Earlier index, and the seed lookups' text carries no id. The
+ * request goes bare after the window, as the first request's did.
  */
 export const RECORDED_LATE_REQUEST: ReadonlyArray<Omit<Message, 'id'>> = Object.freeze([
 	{ role: 'system', content: 'Serve the desk.' },
-	{
-		role: 'user',
-		content:
-			"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous: your last answered request and your reply to it\nOther ids, names, and words from a message work too.\n\n## Request\nCheck Brightwater Studio again.",
-	},
+	{ role: 'user', content: 'Check Brightwater Studio.' },
+	{ role: 'assistant', content: 'Done.' },
+	{ role: 'user', content: 'Check Brightwater Studio again.' },
 ])
 
 /** Carries the manager-options `open` override that {@link resolveSectionOpen} reads, when one applies. */
@@ -9682,7 +9681,7 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	notes: ['note'],
 	failures: ['failure'],
 	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-19.
-	gauge: { scale: 2, overhead: 10, digest: '20115ba0b807c9c2', model: SCRIPTED_MODEL },
+	gauge: { scale: 2, overhead: 10, digest: 'e577ba40ab5f2c1a', model: SCRIPTED_MODEL },
 })
 
 /**
@@ -9691,10 +9690,10 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
  * characters, oldest first.
  *
  * @remarks
- * The answered requests give the Earlier index the exchange rows `previous-3`, `previous-2`, and
- * `previous`, oldest first, and the earlier orders three recurring id rows, `AX-3`, `AX-2`, and
- * `AX-1`, after them. Each crate statement carries its own id, `CR-1` to `CR-3`, which gets a row
- * only once its statement is cut.
+ * A roomy opening shows the answered requests in its recent window; each one the window cuts gets
+ * its exchange row, `previous-3`, `previous-2`, or `previous`, oldest first. The earlier orders give
+ * three recurring id rows, `AX-3`, `AX-2`, and `AX-1`, after them. Each crate statement carries its
+ * own id, `CR-1` to `CR-3`, which gets a row only once its statement is cut.
  */
 export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 	conversation: {
@@ -9727,7 +9726,7 @@ export const LEDGER_CUT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 /**
  * Holds {@link LEDGER_CUT_SNAPSHOT} with a rule statement and a statement under the `refunds` desk
  * topic first among its earlier messages, so the Earlier index carries the `rules` row and the topic
- * row beside `previous`.
+ * row beside the id rows.
  *
  * @remarks
  * A {@link createPhraseJudge} built on `needs a signature` files the rule as a rule, and its topic
@@ -9745,9 +9744,75 @@ export const LEDGER_CUT_RULED_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 	},
 })
 
-/** Carries what a lean opening sent: the ids of its statements and the names its Earlier index lists. */
+/**
+ * Holds {@link LEDGER_CUT_RULED_SNAPSHOT} with 8 more answered requests, one batch note each, after its
+ * three, so a roomy opening shows those 8 in its recent window and leaves the first three behind.
+ *
+ * @remarks
+ * The batch exchanges are `previous` through `previous-8`, newest first, and the snapshot's first
+ * three exchanges are `previous-9`, `previous-10`, and `previous-11`. The current crate statements
+ * still follow the last reply.
+ */
+export const LEDGER_CUT_DEEP_SNAPSHOT = Object.freeze<LedgerSnapshot>({
+	...LEDGER_CUT_RULED_SNAPSHOT,
+	conversation: {
+		...LEDGER_CUT_RULED_SNAPSHOT.conversation,
+		messages: LEDGER_CUT_RULED_SNAPSHOT.conversation.messages.flatMap((message) =>
+			message.id === 'noted-3'
+				? [
+						message,
+						...Array.from({ length: 8 }, (_unused, at): readonly Message[] => [
+							{ id: `batch-${at + 1}`, role: 'user', content: `Note crate batch ${at + 1}.` },
+							{ id: `batched-${at + 1}`, role: 'assistant', content: `Noted batch ${at + 1}.` },
+						]).flat(),
+					]
+				: [message],
+		),
+	},
+	requests: [
+		...LEDGER_CUT_RULED_SNAPSHOT.requests,
+		...Array.from({ length: 8 }, (_unused, at) => `batch-${at + 1}`),
+	],
+})
+
+/**
+ * Builds a ledger snapshot of answered requests, one per reply given, oldest first, so a plan's
+ * recent window reads exchanges of the sizes a test sets.
+ *
+ * @remarks
+ * Exchange `N`, counted from 1 at the oldest, is the request `ask-N`, `Note item N.`, and the reply
+ * `reply-N` with the `N`th text given. With `statement`, the user message `stated` carries it right
+ * before the last request, so it belongs to the last exchange. The last reply ends the snapshot, so
+ * a following request has no current statement.
+ *
+ * @param replies - The replies, oldest first
+ * @param statement - The text of a statement before the last request, when one is wanted
+ * @returns The snapshot, with every request marked
+ */
+export function buildLedgerWindow(replies: readonly string[], statement?: string): LedgerSnapshot {
+	return {
+		conversation: {
+			id: 'window',
+			messages: replies.flatMap((reply, at): readonly Message[] => [
+				...(statement !== undefined && at === replies.length - 1
+					? [{ id: 'stated', role: 'user' as const, content: statement }]
+					: []),
+				{ id: `ask-${at + 1}`, role: 'user', content: `Note item ${at + 1}.` },
+				{ id: `reply-${at + 1}`, role: 'assistant', content: reply },
+			]),
+		},
+		requests: replies.map((_reply, at) => `ask-${at + 1}`),
+		notes: [],
+		failures: [],
+	}
+}
+
+/**
+ * Carries what a lean opening sent: the ids of the messages it shows, the recent window's and the
+ * current statements, and the names its Earlier index lists.
+ */
 export interface LedgerOpening {
-	readonly statements: readonly string[]
+	readonly shown: readonly string[]
 	readonly keys: readonly string[]
 }
 
@@ -9756,12 +9821,12 @@ export interface LedgerOpening {
  * and the request copy, and the key names of the copy's Earlier index, in order.
  *
  * @param messages - The messages of the first call, its system message first and its request copy last
- * @returns The statement ids and the index's key names
+ * @returns The shown message ids and the index's key names
  */
 export function readLedgerOpening(messages: readonly Message[]): LedgerOpening {
 	const copy = messages.at(-1)?.content ?? ''
 	return {
-		statements: messages.slice(1, -1).map((message) => message.id),
+		shown: messages.slice(1, -1).map((message) => message.id),
 		keys: copy
 			.split('\n')
 			.filter((line) => line.startsWith('- '))

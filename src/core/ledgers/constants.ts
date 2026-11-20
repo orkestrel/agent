@@ -161,13 +161,32 @@ export const LEDGER_MISS_LIMIT = 8
 export const LEDGER_KEY_LIMIT = 20
 
 /**
- * Caps at 8 the exchange keys the Earlier index of a request copy lists, `previous` included.
+ * Caps at 8 the exchange keys the Earlier index of a request copy lists, for the exchanges the recent window leaves out.
  *
  * @remarks
  * The cap is apart from `LEDGER_KEY_LIMIT`, so an exchange key never takes an id key's place. A
  * deeper `previous-N` still resolves when that exchange exists.
  */
 export const LEDGER_EXCHANGE_LIMIT = 8
+
+/**
+ * Caps at 8 the recent exchanges a request's opening shows as messages, each a request and its reply.
+ *
+ * @remarks
+ * The recent window holds the newest exchanges that have a reply, newest first and contiguous, and
+ * stops at the first that `LEDGER_RECENT_SHARE` leaves no room for. A shown exchange gets no row in
+ * the Earlier index.
+ */
+export const LEDGER_RECENT_LIMIT = 8
+
+/**
+ * Caps the recent window at 0.3 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift.
+ *
+ * @remarks
+ * The window's messages are priced as the opening sends them, through the gauge's scale, and the
+ * window stops at the first exchange that would take it past this share.
+ */
+export const LEDGER_RECENT_SHARE = 0.3
 
 /**
  * Sets the 5 milliseconds a paced classifier files between host turns.

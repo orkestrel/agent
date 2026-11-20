@@ -359,8 +359,10 @@ export function nameLedgerExchange(depth: number): string {
  * message as before it. Every key lists at least one earlier message. The keys come in this order:
  *
  * - at most `LEDGER_EXCHANGE_LIMIT` exchange keys, one per exchange {@link collectLedgerExchanges}
- *   returns, oldest first: the deepest `previous-N` first and `previous`, the last exchange that has
- *   a reply, last, each with a fixed description that names no request text;
+ *   returns whose request `excluded` does not hold, oldest first: the deepest `previous-N` first and
+ *   `previous`, the last exchange that has a reply, last, each named by its depth among all the
+ *   exchanges, so a shown exchange leaves a gap and the names stay stable, and each with a fixed
+ *   description that names no request text;
  * - `rules`, when a line of the rules record comes from an earlier message;
  * - at most `LEDGER_KEY_LIMIT` ids an earlier message carries, as `extractLiterals` reads them, but
  *   none that reads as an exchange key: first the ids of the current statements that are earlier,
@@ -469,7 +471,12 @@ export function collectLedgerKeys(
 	const ids = [...new Set([...cut, ...named, ...looked, ...recurring])]
 		.filter((id) => (listed.get(id) ?? 0) > 0 && parseLedgerExchange(id) === undefined)
 		.slice(0, LEDGER_KEY_LIMIT)
-	const exchanges = collectLedgerExchanges(before, requests, notes).slice(0, LEDGER_EXCHANGE_LIMIT)
+	// Exchange rows cover only the exchanges the prompt doesn't carry, each named by its depth among all
+	// of them, so a shown exchange leaves its depth unused and the names stay stable.
+	const exchanges = collectLedgerExchanges(before, requests, notes)
+		.map((exchange, index) => ({ exchange, depth: index + 1 }))
+		.filter(({ exchange }) => !excluded.has(exchange.request.id))
+		.slice(0, LEDGER_EXCHANGE_LIMIT)
 	const held = new Set(earlier.map((message) => message.id))
 	const ruled = projection.records.some(
 		(record) =>
@@ -483,12 +490,12 @@ export function collectLedgerKeys(
 	const taken = new Set(ids)
 	return [
 		...exchanges
-			.map((_exchange, index) => ({
-				name: nameLedgerExchange(index + 1),
+			.map(({ depth }) => ({
+				name: nameLedgerExchange(depth),
 				description:
-					index === 0
+					depth === 1
 						? 'your last answered request and your reply to it'
-						: `your request and reply ${index + 1} exchanges ago`,
+						: `your request and reply ${depth} exchanges ago`,
 			}))
 			.reverse(),
 		...(ruled
