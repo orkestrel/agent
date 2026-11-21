@@ -2604,7 +2604,7 @@ export class Ledger implements LedgerInterface {
 				...(shownParts.length === 0
 					? []
 					: [
-							`${shownParts.map((part) => JSON.stringify(part.slice(0, 64))).join(', ')} ${shownParts.length === 1 ? 'is' : 'are'} in the messages you can see; answer from them`,
+							`nothing else stored matches ${shownParts.map((part) => JSON.stringify(part.slice(0, 64))).join(', ')}; use the messages you can see`,
 						]),
 				...(missedParts.length === 0
 					? []
@@ -2630,7 +2630,7 @@ export class Ledger implements LedgerInterface {
 							...(notes === '' ? [] : [notes]),
 						].join('\n')
 					: shownParts.length > 0 && missedParts.length === 0
-						? `${JSON.stringify(key.slice(0, 64))} is in the messages you can see; answer from them`
+						? `nothing else stored matches ${JSON.stringify(key.slice(0, 64))}; use the messages you can see`
 						: shownParts.length === 0
 							? this.#miss(JSON.stringify(key.slice(0, 64)), input, projection, requestId, excluded)
 							: notes
@@ -2695,8 +2695,8 @@ export class Ledger implements LedgerInterface {
 			.slice(0, LEDGER_MISS_LIMIT)
 			.map((one) => one.name)
 		return keys.length === 0
-			? `nothing earlier matches ${quoted}; answer from the messages you can see`
-			: `nothing earlier matches ${quoted}; stored keys: ${keys.join(', ')}; or answer from the messages you can see`
+			? `nothing stored matches ${quoted}. Use the messages you can see.`
+			: `nothing stored matches ${quoted}. Keys you can use: ${keys.join(', ')}. Otherwise use the messages you can see.`
 	}
 
 	// A stored request or reply under its origin label, every later line indented, so only a label

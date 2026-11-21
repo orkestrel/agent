@@ -2203,7 +2203,7 @@ export function splitKey(key: string): readonly string[] {
  * By default the cut keeps at least one entry. With `first: false`, it keeps whole entries only
  * when the joined result, tool framing, and omission line fit, and considers later entries after
  * an oversized group. When it leaves some entries out, its last line reads
- * `N older items not shown; name a narrower key to narrow the recall`, which
+ * `N older items not shown; pass a narrower key to see them`, which
  * {@link matchesCutLine} recognizes. Pass `more` when the entries aren't in age order, so the line
  * doesn't claim an omitted entry is older than a kept one. A fitted cut also uses `more` when it
  * skips an entry before a kept one. With no kept entry it reads
@@ -2217,7 +2217,7 @@ export function splitKey(key: string): readonly string[] {
  *
  * @example
  * ```ts
- * cutListing(['first entry', 'second entry'], 1) // 'first entry\n1 older item not shown; name a narrower key to narrow the recall'
+ * cutListing(['first entry', 'second entry'], 1) // 'first entry\n1 older item not shown; pass a narrower key to see them'
  * ```
  */
 export function cutListing(
@@ -2237,7 +2237,7 @@ export function cutListing(
 				entry,
 				...(left > 0
 					? [
-							`${left} ${omitted} item${left === 1 ? '' : 's'} not shown; name a narrower key to narrow the recall`,
+							`${left} ${omitted} item${left === 1 ? '' : 's'} not shown; pass a narrower key to see them`,
 						]
 					: []),
 			].join('\n')
@@ -2251,7 +2251,7 @@ export function cutListing(
 			...kept.map((at) => entries[at]),
 			...(left > 0
 				? [
-						`${left} ${omitted} item${left === 1 ? '' : 's'} ${kept.length === 0 ? "didn't fit in this request; answer from the messages you can see" : 'not shown; name a narrower key to narrow the recall'}`,
+						`${left} ${omitted} item${left === 1 ? '' : 's'} ${kept.length === 0 ? "didn't fit in this request; answer from the messages you can see" : 'not shown; pass a narrower key to see them'}`,
 					]
 				: []),
 		].join('\n')
@@ -2273,9 +2273,7 @@ export function cutListing(
 	return [
 		...kept,
 		...(left > 0
-			? [
-					`${left} ${kind} item${left === 1 ? '' : 's'} not shown; name a narrower key to narrow the recall`,
-				]
+			? [`${left} ${kind} item${left === 1 ? '' : 's'} not shown; pass a narrower key to see them`]
 			: []),
 	].join('\n')
 }
@@ -2288,7 +2286,7 @@ export function cutListing(
  *
  * @example
  * ```ts
- * matchesCutLine('2 older items not shown; name a narrower key to narrow the recall') // true
+ * matchesCutLine('2 older items not shown; pass a narrower key to see them') // true
  * ```
  */
 export function matchesCutLine(line: string): boolean {

@@ -115,8 +115,7 @@ export const LEDGER_NOTES: LedgerNote = Object.freeze({
 	results: 'Your lookups and recalls in this request returned:',
 	repeat:
 		'You already have this result earlier in this request; give your complete answer now as your final message.',
-	closure:
-		'recall is closed for the rest of this request; give your final answer from what you have',
+	closure: 'recall is closed for the rest of this request; continue without it',
 	overflow:
 		'there is no room left for it in this request. Unload a skill you no longer need before you call it again, or answer with what you have.',
 })

@@ -353,7 +353,7 @@ describe('Ledger', () => {
 		// names it shown: recall stays open after the omitted group.
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-1')?.content,
-		).toBe('"code" is in the messages you can see; answer from them')
+		).toBe('nothing else stored matches "code"; use the messages you can see')
 	})
 	it('fits the union of lookup result groups in recovery', async () => {
 		const first = 'The vault code is 7391. ' + 'v'.repeat(7000) + '\nCorrection: use 7392.'
@@ -553,7 +553,7 @@ describe('Ledger', () => {
 		expect(asked.tools?.map((tool) => tool.name) ?? []).toContain('recall')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-1')?.content,
-		).toBe('"vault" is in the messages you can see; answer from them')
+		).toBe('nothing else stored matches "vault"; use the messages you can see')
 		expect(result.partial).toBe(false)
 	})
 	it('drops a partial from the recovery prompt while retaining its stored text', async () => {
@@ -583,9 +583,7 @@ describe('Ledger', () => {
 		})
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-0')?.content,
-		).toBe(
-			'The old vault code is 7391.\n1 more item not shown; name a narrower key to narrow the recall',
-		)
+		).toBe('The old vault code is 7391.\n1 more item not shown; pass a narrower key to see them')
 	})
 
 	it('preserves literal omission lines in accepted source groups live and hydrated', async () => {
@@ -912,7 +910,7 @@ describe('Ledger', () => {
 		await ledger.respond('Check.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'empty')?.content,
-		).toBe('nothing earlier matches "absent"; answer from the messages you can see')
+		).toBe('nothing stored matches "absent". Use the messages you can see.')
 		expect(provider.calls).toHaveLength(3)
 		expect(
 			provider.calls
@@ -924,6 +922,25 @@ describe('Ledger', () => {
 				message.content.startsWith(LEDGER_NOTES.results),
 			),
 		).toBe(false)
+	})
+
+	it('misses a joined key whole, quoted once, when every part misses and no stored key is left to name', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'joined', name: 'recall', arguments: { key: 'absent, missing' } }],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(provider, buildLedgerOptions())
+		seedLedgerRecall(ledger)
+		await ledger.respond('Check.')
+		expect(
+			ledger.conversation.messages().find((message) => message.call === 'joined')?.content,
+		).toBe('nothing stored matches "absent, missing". Use the messages you can see.')
 	})
 
 	it('offers recall equally on uninterrupted and hydrated ledgers once a statement is earlier', async () => {
@@ -1260,14 +1277,16 @@ describe('Ledger', () => {
 		await ledger.respond('Find the earlier exchange.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'history')?.content,
-		).toBe('"refund OR-7 and delivery code" is in the messages you can see; answer from them')
+		).toBe(
+			'nothing else stored matches "refund OR-7 and delivery code"; use the messages you can see',
+		)
 		await ledger.respond('Check OR-7 again.')
 		// The window sends each exchange as stored: the reply once, as itself, and the second exchange's
 		// recall call with its result.
 		const sent = requireValue(provider.calls.at(-1)).messages
 		expect(sent.filter((message) => message.content === reply)).toHaveLength(1)
 		expect(sent.find((message) => message.call === 'history')?.content).toBe(
-			'"refund OR-7 and delivery code" is in the messages you can see; answer from them',
+			'nothing else stored matches "refund OR-7 and delivery code"; use the messages you can see',
 		)
 		expect(judge.requests).toHaveLength(0)
 		const restored = createLedger(createScriptedProvider([{ content: 'Answered.' }]), {
@@ -1349,7 +1368,7 @@ describe('Ledger', () => {
 		await ledger.respond('Find the parcel code.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'current')?.content,
-		).toBe('nothing earlier matches "parcel code"; answer from the messages you can see')
+		).toBe('nothing stored matches "parcel code". Use the messages you can see.')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'repeat')?.content,
 		).toBe(LEDGER_NOTES.repeat)
@@ -1402,7 +1421,7 @@ describe('Ledger', () => {
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'removed')?.content,
 		).toBe(
-			'nothing earlier matches "delivery code"; stored keys: BW-20931; or answer from the messages you can see',
+			'nothing stored matches "delivery code". Keys you can use: BW-20931. Otherwise use the messages you can see.',
 		)
 	})
 
@@ -1525,9 +1544,9 @@ describe('Ledger', () => {
 			partial: false,
 		})
 		const read = 'Account BW-20931: Brightwater Studio. Refund is $148.50.'
-		const recalled = 'nothing earlier matches "refunds"; answer from the messages you can see'
+		const recalled = 'nothing stored matches "refunds". Use the messages you can see.'
 		// The later request's window shows the settled exchange with its lookup, so its miss names no key.
-		const keyed = 'nothing earlier matches "refunds"; answer from the messages you can see'
+		const keyed = 'nothing stored matches "refunds". Use the messages you can see.'
 		// The later request's calls repeat the settled request's, and neither returns the repeat note.
 		expect(
 			ledger.conversation
@@ -1875,7 +1894,7 @@ describe('Ledger', () => {
 				// `last` each name one subject, so none of them joins the brief, and recall lists the chain.
 				expect(recalled).toBe(
 					omitted
-						? `${older.content}\nEarlier reply: ${quiet.content}\n1 more item not shown; name a narrower key to narrow the recall`
+						? `${older.content}\nEarlier reply: ${quiet.content}\n1 more item not shown; pass a narrower key to see them`
 						: `${source.content}\n${first.content}\n${second.content}\n${last.content}\n${older.content}\nEarlier reply: ${quiet.content}`,
 				)
 				expect(
@@ -2396,7 +2415,7 @@ describe('Ledger', () => {
 		// The window shows the one exchange, so the miss names no key.
 		expect(
 			provider.calls[2]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing earlier matches "absent"; answer from the messages you can see')
+		).toBe('nothing stored matches "absent". Use the messages you can see.')
 	})
 
 	it('passes predict to a calibrated gauge while recall remains open', async () => {
@@ -3149,9 +3168,9 @@ describe('Ledger', () => {
 				.map((message) => message.content),
 		).toEqual([
 			'recall needs a key: previous-2, previous-3, …, rules, an owner name, an id, or one of refunds',
-			'nothing earlier matches "delivery"; answer from the messages you can see',
-			'nothing earlier matches "refunds"; answer from the messages you can see',
-			'nothing earlier matches "parcel"; answer from the messages you can see',
+			'nothing stored matches "delivery". Use the messages you can see.',
+			'nothing stored matches "refunds". Use the messages you can see.',
+			'nothing stored matches "parcel". Use the messages you can see.',
 			LEDGER_NOTES.closure,
 		])
 		const short = createLedger(createScriptedProvider([]), { ...options, capacity: 2 })
@@ -3160,7 +3179,7 @@ describe('Ledger', () => {
 		])
 		expect(result[0]).toMatchObject({
 			success: true,
-			value: 'nothing earlier matches "absent"; answer from the messages you can see',
+			value: 'nothing stored matches "absent". Use the messages you can see.',
 		})
 	})
 
@@ -3465,7 +3484,7 @@ describe('Ledger', () => {
 		expect(
 			provider.calls[5]?.messages.findLast((message) => message.role === 'tool')?.content,
 		).toBe(
-			'nothing earlier matches "Brightwater unknown"; stored keys: BW-20931; or answer from the messages you can see',
+			'nothing stored matches "Brightwater unknown". Keys you can use: BW-20931. Otherwise use the messages you can see.',
 		)
 	})
 
@@ -3495,7 +3514,7 @@ describe('Ledger', () => {
 		// The window shows the one exchange, so the miss names no key.
 		expect(
 			provider.calls[3]?.messages.findLast((message) => message.role === 'tool')?.content,
-		).toBe('nothing earlier matches "absent"; answer from the messages you can see')
+		).toBe('nothing stored matches "absent". Use the messages you can see.')
 	})
 
 	it('uses the measured default turn limit and the default recall limit', async () => {
@@ -3532,11 +3551,11 @@ describe('Ledger', () => {
 				.filter((message) => message.role === 'tool')
 				.map((message) => message.content),
 		).toEqual([
-			'nothing earlier matches "one"; answer from the messages you can see',
-			'nothing earlier matches "two"; answer from the messages you can see',
-			'nothing earlier matches "three"; answer from the messages you can see',
-			'nothing earlier matches "four"; answer from the messages you can see',
-			LEDGER_NOTES.closure,
+			'nothing stored matches "one". Use the messages you can see.',
+			'nothing stored matches "two". Use the messages you can see.',
+			'nothing stored matches "three". Use the messages you can see.',
+			'nothing stored matches "four". Use the messages you can see.',
+			'recall is closed for the rest of this request; continue without it',
 		])
 	})
 
@@ -5501,7 +5520,7 @@ describe('Ledger — a call in the answer pass', () => {
 			requireValue(stray.provider.calls[2]).messages.map((message) => message.content),
 		).toContain('The receipt is in the blue folder.')
 		expect(requireValue(from.find((message) => message.call === 'recall-1')).content).toBe(
-			'"receipt" is in the messages you can see; answer from them',
+			'nothing else stored matches "receipt"; use the messages you can see',
 		)
 	})
 
@@ -10697,7 +10716,7 @@ describe('Ledger — recall by key', () => {
 			{ recorded: true },
 		)
 		const ledger = createLedger(provider, buildLedgerOptions())
-		const miss = 'nothing earlier matches "previous"; answer from the messages you can see'
+		const miss = 'nothing stored matches "previous". Use the messages you can see.'
 		expect(await recallLedger(ledger, 'previous')).toBe(miss)
 		await ledger.respond('Check the parcel.')
 		await ledger.respond('Check it again.')
@@ -10706,7 +10725,7 @@ describe('Ledger — recall by key', () => {
 			'previous: Earlier request: Check the parcel.\nEarlier reply: It shipped.',
 		)
 		expect(await recallLedger(ledger, 'previous-2')).toBe(
-			'nothing earlier matches "previous-2"; stored keys: previous; or answer from the messages you can see',
+			'nothing stored matches "previous-2". Keys you can use: previous. Otherwise use the messages you can see.',
 		)
 	})
 
@@ -10805,7 +10824,7 @@ describe('Ledger — recall by key', () => {
 		await ledger.respond('Which crates are ready?')
 		// The window shows `previous` through `previous-8`, so `previous-9` takes the first place.
 		expect(ledger.conversation.messages().find((message) => message.call === 'deep')?.content).toBe(
-			'nothing earlier matches "previous-12"; stored keys: previous-9, rules, AX-3, AX-2, AX-1, refunds, previous-10, previous-11; or answer from the messages you can see',
+			'nothing stored matches "previous-12". Keys you can use: previous-9, rules, AX-3, AX-2, AX-1, refunds, previous-10, previous-11. Otherwise use the messages you can see.',
 		)
 	})
 
@@ -10865,7 +10884,7 @@ describe('Ledger — recall by key', () => {
 			buildUncalibratedOptions(buildLedgerOptions({ snapshot: LEDGER_CUT_SNAPSHOT, topics: [] })),
 		)
 		expect(await recallLedger(ungauged, 'AX-1, previous-2, AX-2')).toBe(
-			'Order AX-2 came in late.\n5 more items not shown; name a narrower key to narrow the recall',
+			'Order AX-2 came in late.\n5 more items not shown; pass a narrower key to see them',
 		)
 	})
 
@@ -10921,7 +10940,7 @@ describe('Ledger — recall by key', () => {
 		)
 		await ledger.respond('Check the parcel.')
 		expect(await recallLedger(ledger, 'previous')).toBe(
-			'nothing earlier matches "previous"; answer from the messages you can see',
+			'nothing stored matches "previous". Use the messages you can see.',
 		)
 	})
 
@@ -10987,7 +11006,7 @@ describe('Ledger — recall by key', () => {
 		// The window shows both exchanges, and the request inherits BW-20931 from the last one, so the
 		// refund statement is retrieved too; the rule alone is behind.
 		expect(ledger.conversation.messages().find((message) => message.call === 'miss')?.content).toBe(
-			`nothing earlier matches "\\"${'x'.repeat(63)}"; stored keys: rules; or answer from the messages you can see`,
+			`nothing stored matches "\\"${'x'.repeat(63)}". Keys you can use: rules. Otherwise use the messages you can see.`,
 		)
 	})
 
@@ -11033,7 +11052,9 @@ describe('Ledger — recall by key', () => {
 			ledger.conversation.messages().find((message) => message.call === 'recalled'),
 		)
 		// The opening retrieved the statement the key names, so the recall result says it is shown.
-		expect(result.content).toBe('"BW-20931" is in the messages you can see; answer from them')
+		expect(result.content).toBe(
+			'nothing else stored matches "BW-20931"; use the messages you can see',
+		)
 		const correction = ledger.conversation.add({
 			role: 'user',
 			content: 'Correction: BW-20931 is due $150.',
@@ -11071,7 +11092,9 @@ describe('Ledger — recall by key', () => {
 		const result = requireValue(
 			ledger.conversation.messages().find((message) => message.call === 'recalled'),
 		)
-		expect(result.content).toBe('"BW-20931" is in the messages you can see; answer from them')
+		expect(result.content).toBe(
+			'nothing else stored matches "BW-20931"; use the messages you can see',
+		)
 		// The hydrated ledger stored no tool result, so it reads the recall's name from the conversation.
 		const hydrated = createLedger(createScriptedProvider([{ content: 'Confirmed.' }]), {
 			...options,
@@ -11447,10 +11470,10 @@ describe('Ledger — the lean opening', () => {
 					ledger.conversation.messages().find((message) => message.call === `key ${at}`)?.content,
 			),
 		).toEqual([
-			'"CR-2" is in the messages you can see; answer from them',
-			'"previous" is in the messages you can see; answer from them',
-			'"crates" is in the messages you can see; answer from them',
-			'Order AX-1 arrived late.\nOrder AX-1 shipped Monday.\n"crates" is in the messages you can see; answer from them',
+			'nothing else stored matches "CR-2"; use the messages you can see',
+			'nothing else stored matches "previous"; use the messages you can see',
+			'nothing else stored matches "crates"; use the messages you can see',
+			'Order AX-1 arrived late.\nOrder AX-1 shipped Monday.\nnothing else stored matches "crates"; use the messages you can see',
 		])
 	})
 
@@ -11472,7 +11495,7 @@ describe('Ledger — the lean opening', () => {
 		)
 		await ledger.respond('Which crates are ready?')
 		const miss =
-			'nothing earlier matches "absent"; stored keys: AX-3, AX-2, AX-1; or answer from the messages you can see'
+			'nothing stored matches "absent". Keys you can use: AX-3, AX-2, AX-1. Otherwise use the messages you can see.'
 		expect(
 			keys.map(
 				(_key, at) =>
@@ -11482,10 +11505,49 @@ describe('Ledger — the lean opening', () => {
 			[
 				'Order AX-1 arrived late.',
 				'Order AX-1 shipped Monday.',
-				'"CR-2" is in the messages you can see; answer from them',
+				'nothing else stored matches "CR-2"; use the messages you can see',
 				miss,
 			].join('\n'),
-			['"crates" is in the messages you can see; answer from them', miss].join('\n'),
+			['nothing else stored matches "crates"; use the messages you can see', miss].join('\n'),
+		])
+	})
+
+	it('names several shown parts in one line and several missed parts in one miss line, and quotes a joined key whole when every part shows or every part misses', async () => {
+		const keys = ['CR-2, crates, AX-1', 'AX-2, absent, missing', 'CR-2, crates', 'absent, missing']
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: keys.map((key, at) => ({ id: `key ${at}`, name: 'recall', arguments: { key } })),
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity: 4096, snapshot: LEDGER_CUT_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Which crates are ready?')
+		const keyed = 'Keys you can use: AX-3, AX-2, AX-1. Otherwise use the messages you can see.'
+		expect(
+			keys.map(
+				(_key, at) =>
+					ledger.conversation.messages().find((message) => message.call === `key ${at}`)?.content,
+			),
+		).toEqual([
+			[
+				'Order AX-1 arrived late.',
+				'Order AX-1 shipped Monday.',
+				'nothing else stored matches "CR-2", "crates"; use the messages you can see',
+			].join('\n'),
+			[
+				'Order AX-2 came in late.',
+				'Order AX-2 shipped Tuesday.',
+				`nothing stored matches "absent", "missing". ${keyed}`,
+			].join('\n'),
+			'nothing else stored matches "CR-2, crates"; use the messages you can see',
+			`nothing stored matches "absent, missing". ${keyed}`,
 		])
 	})
 
@@ -11547,7 +11609,7 @@ describe('Ledger — the lean opening', () => {
 		])
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'amended')?.content,
-		).toBe('"Monday morning" is in the messages you can see; answer from them')
+		).toBe('nothing else stored matches "Monday morning"; use the messages you can see')
 	})
 
 	it('carries the request in place of the copy in the answer pass, so no Earlier block reaches it', async () => {
@@ -11648,7 +11710,7 @@ describe('Ledger — the lean opening', () => {
 				ledger.conversation.messages().find((message) => message.call === `in ${at}`)?.content,
 			),
 		)
-		expect(listings.filter((listing) => listing.startsWith('nothing earlier matches'))).toEqual([])
+		expect(listings.filter((listing) => listing.startsWith('nothing stored matches'))).toEqual([])
 		// The opening sent goal 99's request and reply, so the in-request recall of GL-99 lists the order
 		// it leaves behind and not the request.
 		expect(listings[1]).toContain('Order GL-99 for account AC-49')
@@ -11661,7 +11723,7 @@ describe('Ledger — the lean opening', () => {
 			listed.filter(
 				(result) =>
 					!result.success ||
-					(isString(result.value) && result.value.startsWith('nothing earlier matches')),
+					(isString(result.value) && result.value.startsWith('nothing stored matches')),
 			),
 		).toEqual([])
 	})
@@ -12260,7 +12322,7 @@ describe("Ledger — the newest exchange's ladder", () => {
 		expect(opening.keys).not.toContain(LEDGER_PREVIOUS_KEY)
 		expect(sent.tools?.map((tool) => tool.name)).toEqual(['lookup', 'recall'])
 		expect(ledger.conversation.messages().find((message) => message.call === 'pair')?.content).toBe(
-			'"previous" is in the messages you can see; answer from them',
+			'nothing else stored matches "previous"; use the messages you can see',
 		)
 		// The pair's two messages are the request and the reply a recall of `previous` lists.
 		const listed = await recallLedger(

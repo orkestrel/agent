@@ -1921,7 +1921,7 @@ describe('cutListing and matchesCutLine', () => {
 	const items = ['first recalled line', 'second recalled line', 'third recalled line']
 	it('omits an oversized first group and keeps a later fitting group with its marker', () => {
 		const short = 'The vault is closed.\nCorrection: the vault is open.'
-		const expected = `${short}\n1 more item not shown; name a narrower key to narrow the recall`
+		const expected = `${short}\n1 more item not shown; pass a narrower key to see them`
 		const room = measureRoom([expected])
 		expect(cutListing(['v'.repeat(4000), short], room, 'older', false)).toBe(expected)
 		expect(cutListing(['v'.repeat(4000), short], room - 1, 'older', false)).toBe(
@@ -1935,6 +1935,19 @@ describe('cutListing and matchesCutLine', () => {
 		expect(cutListing([], -1, 'older', false)).toBe('')
 	})
 
+	it('keeps a fitting group between two oversized groups and names both omitted groups more', () => {
+		const short = 'The vault is closed.\nCorrection: the vault is open.'
+		const expected = `${short}\n2 more items not shown; pass a narrower key to see them`
+		expect(
+			cutListing(
+				['v'.repeat(4000), short, 'w'.repeat(4000)],
+				measureRoom([expected]),
+				'older',
+				false,
+			),
+		).toBe(expected)
+	})
+
 	it('keeps every item that fits and adds no cut line', () => {
 		expect(cutListing(items, measureRoom(items))).toBe(items.join('\n'))
 		expect(cutListing([], 10)).toBe('')
@@ -1942,16 +1955,16 @@ describe('cutListing and matchesCutLine', () => {
 
 	it('cuts at the first item that overflows and names how many it left out', () => {
 		expect(cutListing(items, measureRoom(items.slice(0, 2)))).toBe(
-			'first recalled line\nsecond recalled line\n1 older item not shown; name a narrower key to narrow the recall',
+			'first recalled line\nsecond recalled line\n1 older item not shown; pass a narrower key to see them',
 		)
 		expect(cutListing(items, measureRoom(items.slice(0, 1)))).toBe(
-			'first recalled line\n2 older items not shown; name a narrower key to narrow the recall',
+			'first recalled line\n2 older items not shown; pass a narrower key to see them',
 		)
 	})
 
 	it('keeps at least one item whatever the room', () => {
 		expect(cutListing(items, 0)).toBe(
-			'first recalled line\n2 older items not shown; name a narrower key to narrow the recall',
+			'first recalled line\n2 older items not shown; pass a narrower key to see them',
 		)
 		expect(cutListing(items, -5).startsWith('first recalled line\n')).toBe(true)
 	})
@@ -1967,7 +1980,7 @@ describe('cutListing and matchesCutLine', () => {
 
 	it('names an omitted item more when the entries are not in age order, and matches that line too', () => {
 		expect(cutListing(items, 0, 'more')).toBe(
-			'first recalled line\n2 more items not shown; name a narrower key to narrow the recall',
+			'first recalled line\n2 more items not shown; pass a narrower key to see them',
 		)
 		expect(cutListing(items, 0, 'more').split('\n').map(matchesCutLine)).toEqual([false, true])
 		expect(matchesCutLine('1 more item not shown; add a topic')).toBe(true)

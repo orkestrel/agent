@@ -237,7 +237,7 @@ describe('LedgerRequest', () => {
 		expect(request.lines('other result')).toBeUndefined()
 		expect(request.listings.at(-1)?.groups).toEqual(['first result'])
 		request.list(
-			'second group\n1 older item not shown; name a narrower key to narrow the recall',
+			'second group\n1 older item not shown; pass a narrower key to see them',
 			new Map(),
 			['first oversized group', 'second group'],
 		)

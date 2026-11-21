@@ -2945,7 +2945,7 @@ await new GuideCommand({
 			expect(kept.length).toBeGreaterThan(0)
 			expect(kept).toEqual(seeds.slice(-kept.length).reverse())
 			expect(lines.at(-1)).toBe(
-				`${seeds.length - kept.length} older items not shown; name a narrower key to narrow the recall`,
+				`${seeds.length - kept.length} older items not shown; pass a narrower key to see them`,
 			)
 			expect(guideText).toContain(
 				"The tool fits whole items, including each source's amenders, into what the measured request leaves below capacity less predict, and names how many items it left out.",
