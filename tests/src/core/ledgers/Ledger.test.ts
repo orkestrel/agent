@@ -4,6 +4,7 @@ import type {
 	ConversationInterface,
 	LedgerInterface,
 	LedgerSnapshot,
+	Message,
 	MessageInput,
 	ProviderRequest,
 	Selection,
@@ -227,6 +228,7 @@ import {
 	buildLedgerDays,
 	buildLedgerGoals,
 	buildLedgerHall,
+	buildLedgerOpened,
 	buildLedgerPackets,
 	buildLedgerWindow,
 	recallLedger,
@@ -526,16 +528,28 @@ describe('Ledger', () => {
 	})
 	it('keeps recall open for a distinct short topic after a long topic', async () => {
 		const source = 'The vault code is 7391.'
-		const { ledger } = await serveLedgerFit({
+		const { ledger, provider, result } = await serveLedgerFit({
 			capacity: 4096,
 			predict: 1024,
 			reply: 2,
 			sources: [source],
 			topics: ['vault '.repeat(1000), 'vault'],
 		})
+		// The request's first call offers recall, and after the long topic the short one still runs.
+		// The fixture's answered first request is one more user message, so `vault` counts as a rare
+		// word, retrieval shows the source, and the short topic answers that it is shown.
+		const asked = requireValue(
+			provider.calls.find(
+				(call) =>
+					call.messages.some((message) => message.content.includes('Find the vault code.')) &&
+					!call.messages.some((message) => message.content === LEDGER_NOTES.cue),
+			),
+		)
+		expect(asked.tools?.map((tool) => tool.name) ?? []).toContain('recall')
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-1')?.content,
-		).toBe(source)
+		).toBe('"vault" is in the messages you can see; answer from them')
+		expect(result.partial).toBe(false)
 	})
 	it('drops a partial from the recovery prompt while retaining its stored text', async () => {
 		const source = 'The vault code is 7391. ' + 'v'.repeat(6000)
@@ -630,10 +644,13 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		// A ledger priced as the provider charges answers one request, so the source is earlier when
-		// the underpricing ledger hydrates from its snapshot; that ledger would send it whole.
+		// A ledger priced as the provider charges answers a request before the source and one after it,
+		// so the source is earlier, and neither a brief member nor a current statement, when the
+		// underpricing ledger hydrates from its snapshot; that ledger would send it whole.
 		const warm = createLedger(
-			new PricedLedgerProvider([{ content: 'Noted.' }], { recorded: true }),
+			new PricedLedgerProvider([{ content: 'Started.' }, { content: 'Noted.' }], {
+				recorded: true,
+			}),
 			buildLedgerOptions({
 				capacity: 4096,
 				predict: 1024,
@@ -642,9 +659,10 @@ describe('Ledger', () => {
 				gauge: { scale: 1.16, overhead: 150 },
 			}),
 		)
+		warm.conversation.add({ role: 'assistant', content: 'R'.repeat(60000) })
+		await warm.respond('Start the shift.')
 		const hidden = warm.conversation.add({ role: 'user', content: source })
 		warm.conversation.judgments.add(buildLedgerJudgment(hidden))
-		warm.conversation.add({ role: 'assistant', content: 'R'.repeat(60000) })
 		await warm.respond('Note this.')
 		const ledger = createLedger(
 			provider,
@@ -908,7 +926,9 @@ describe('Ledger', () => {
 			recorded: true,
 		})
 		const options = buildLedgerOptions({ share: { prompt: 1 } })
-		const ledger = createLedger(provider, options)
+		// A first answered request opens the conversation, so the statement is no brief member and a
+		// later request leaves it behind; the first request's window shows that exchange whole.
+		const ledger = createLedger(provider, { ...options, snapshot: buildLedgerWindow(['Noted.']) })
 		ledger.conversation.add({
 			role: 'user',
 			content: 'Saffron archive keeps an old parcel receipt.',
@@ -1846,6 +1866,8 @@ describe('Ledger', () => {
 					.messages()
 					.find((message) => message.role === 'tool' && message.call === 'recall')?.content
 				const omitted = padding === 300 && capacity === 800
+				// The seed is stored before the first request, but `last` amends `first` and `second` and
+				// `last` each name one subject, so none of them joins the brief, and recall lists the chain.
 				expect(recalled).toBe(
 					omitted
 						? `${older.content}\nEarlier reply: ${quiet.content}\n1 more item not shown; name a narrower key to narrow the recall`
@@ -3173,7 +3195,8 @@ describe('Ledger', () => {
 			],
 			{ recorded: true },
 		)
-		const ledger = createLedger(provider, options)
+		// A first answered request opens the conversation, so the statement is no brief member.
+		const ledger = createLedger(provider, { ...options, snapshot: buildLedgerWindow(['Noted.']) })
 		ledger.conversation.add([
 			{ role: 'user', content: 'The delivery arrived on Tuesday.' },
 			...buildLedgerLookupCall('Account BW-20931: Brightwater Studio. Refund is $148.50.'),
@@ -10763,11 +10786,13 @@ describe('Ledger — recall by key', () => {
 			],
 			{ recorded: true },
 		)
+		// A first request with no reply opens the conversation, so the rule and the refund statement
+		// stay behind for recall rather than show as the brief.
 		const ledger = createLedger(
 			provider,
 			buildLedgerOptions({
 				capacity: 4096,
-				snapshot: LEDGER_CUT_DEEP_SNAPSHOT,
+				snapshot: buildLedgerOpened(LEDGER_CUT_DEEP_SNAPSHOT),
 				judge: createPhraseJudge(['needs a signature']),
 			}),
 		)
@@ -10792,11 +10817,13 @@ describe('Ledger — recall by key', () => {
 			],
 			{ recorded: true },
 		)
+		// A first request with no reply opens the conversation, so the rule and the refund statement
+		// stay behind for recall rather than show as the brief.
 		const ledger = createLedger(
 			provider,
 			buildLedgerOptions({
 				capacity: 4096,
-				snapshot: LEDGER_CUT_DEEP_SNAPSHOT,
+				snapshot: buildLedgerOpened(LEDGER_CUT_DEEP_SNAPSHOT),
 				judge: createPhraseJudge(['needs a signature']),
 			}),
 		)
@@ -10854,11 +10881,13 @@ describe('Ledger — recall by key', () => {
 			],
 			{ recorded: true },
 		)
+		// A first request with no reply opens the conversation, so the rule stays behind for recall
+		// rather than show as the brief.
 		const ledger = createLedger(
 			provider,
 			buildLedgerOptions({
 				capacity: 4096,
-				snapshot: LEDGER_CUT_DEEP_SNAPSHOT,
+				snapshot: buildLedgerOpened(LEDGER_CUT_DEEP_SNAPSHOT),
 				judge: createPhraseJudge(['needs a signature']),
 			}),
 		)
@@ -10931,7 +10960,9 @@ describe('Ledger — recall by key', () => {
 			{ recorded: true },
 		)
 		const options = buildLedgerOptions()
-		const ledger = createLedger(provider, options)
+		// A first answered request opens the conversation, so the rule stays behind for recall rather
+		// than show as the brief.
+		const ledger = createLedger(provider, { ...options, snapshot: buildLedgerWindow(['Noted.']) })
 		const rule = ledger.conversation.add({
 			role: 'user',
 			content: 'Refunds over $200 need a manager.',
@@ -11209,26 +11240,46 @@ describe('Ledger — the lean opening', () => {
 	it.each([
 		[
 			500,
-			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
-			['rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
+			[
+				'rule',
+				'refund',
+				'first',
+				'noted',
+				'second',
+				'noted-2',
+				'third',
+				'noted-3',
+				'crate-1',
+				'crate-2',
+				'crate-3',
+			],
+			['AX-3', 'AX-2', 'AX-1'],
 			['lookup', 'recall'],
 		] as const,
 		[
 			420,
-			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
-			['rules', 'AX-3', 'AX-2', 'refunds'],
+			[
+				'rule',
+				'refund',
+				'first',
+				'noted',
+				'second',
+				'noted-2',
+				'third',
+				'noted-3',
+				'crate-1',
+				'crate-2',
+				'crate-3',
+			],
+			['AX-3'],
 			['lookup', 'recall'],
 		] as const,
-		[
-			405,
-			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
-			['rules', 'refunds'],
-			['lookup', 'recall'],
-		] as const,
-		...[400, 375, 370, 360, 355, 315, 280].map(
+		...[405, 400, 375, 370, 360, 355, 315].map(
 			(capacity): readonly [number, readonly string[], readonly string[], readonly string[]] => [
 				capacity,
 				[
+					'rule',
+					'refund',
 					'first',
 					'noted',
 					'second',
@@ -11240,21 +11291,40 @@ describe('Ledger — the lean opening', () => {
 					'crate-3',
 				],
 				[],
-				['lookup'],
+				capacity >= 400 ? ['lookup', 'recall'] : ['lookup'],
 			],
 		),
+		[
+			280,
+			[
+				'rule',
+				'refund',
+				'first',
+				'second',
+				'noted-2',
+				'third',
+				'noted-3',
+				'crate-1',
+				'crate-2',
+				'crate-3',
+			],
+			[],
+			['lookup'],
+		] as const,
 		[180, ['crate-2', 'crate-3'], [], ['lookup']] as const,
 		[155, ['crate-2', 'crate-3'], [], ['lookup']] as const,
 		[150, ['crate-2', 'crate-3'], [], ['lookup']] as const,
 		[130, ['crate-3'], [], ['lookup']] as const,
 		[100, ['crate-3'], [], ['lookup']] as const,
 	])(
-		'keeps rules and the topic row fixed through the id-row cuts while recall stays, and below that serves the plan without recall: at capacity %i the shown messages %j, the keys %j, and the tools %j',
+		'shows the rule and the refund as the brief, cuts the id rows last-ranked first while recall stays, and below that serves the plan without recall: at capacity %i the shown messages %j, the keys %j, and the tools %j',
 		async (capacity, shown, keys, tools) => {
-			// The id rows go first while `rules` and `refunds` stay, so both are fixed rows. Below 405 no
-			// layout of the plan with `recall` leaves its room and shows as many requests as the plan
-			// without it, which prices no index and shows the window whole, then the statements alone,
-			// cut oldest first.
+			// The rule and the refund statement come before the first request and carry no id, so they
+			// show as the brief and leave the `rules` and `refunds` rows nothing to list. The id rows go
+			// last-ranked first while recall stays, down to an empty index at 405 and 400. Below 385 no
+			// layout of the plan with `recall` leaves its room, so the plan without it, which prices no
+			// index, shows the window whole, then the oldest exchange as a copy of its request, then past
+			// the window the brief cut last stored first, then the current statements cut oldest first.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -11424,12 +11494,14 @@ describe('Ledger — the lean opening', () => {
 			],
 			{ recorded: true },
 		)
+		// A first request with no reply opens the conversation, so the stray statement stays behind for
+		// recall rather than show as the brief.
 		const ledger = createLedger(
 			provider,
 			buildLedgerOptions({
 				capacity: 4096,
 				topics: [],
-				snapshot: {
+				snapshot: buildLedgerOpened({
 					conversation: {
 						id: 'amended',
 						messages: [
@@ -11445,7 +11517,7 @@ describe('Ledger — the lean opening', () => {
 					requests: ['ask', 'thanks'],
 					notes: [],
 					failures: [],
-				},
+				}),
 			}),
 		)
 		const [ask, fixed, final] = ['ask', 'fixed', 'final'].map((id) =>
@@ -11736,7 +11808,7 @@ describe('Ledger — the recent window', () => {
 		[
 			4096,
 			Array.from({ length: 8 }, (_unused, at) => [`batch-${at + 1}`, `batched-${at + 1}`]).flat(),
-			['previous-11', 'previous-10', 'previous-9', 'rules', 'AX-3', 'AX-2', 'AX-1', 'refunds'],
+			['previous-11', 'previous-10', 'previous-9', 'AX-3', 'AX-2', 'AX-1'],
 			['lookup', 'recall'],
 		],
 		[
@@ -11750,8 +11822,9 @@ describe('Ledger — the recent window', () => {
 		async (capacity, window, keys, tools) => {
 			// At 4096 the count bound stops the window at 8 exchanges with room for more, and the rows
 			// past them keep stable depths; at 480 the 8 short exchanges fill the window's tiers, and the
-			// plan without recall, which prices no index, shows them all. Retrieval shows `third` first,
-			// the earlier request the word `crates` matches.
+			// plan without recall, which prices no index, shows them all. The rule and the refund statement
+			// show first as the brief, so the `rules` and `refunds` rows list nothing; retrieval shows
+			// `third` next, the earlier request the word `crates` matches.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -11764,7 +11837,7 @@ describe('Ledger — the recent window', () => {
 			await ledger.respond('Which crates are ready?')
 			const sent = requireValue(provider.calls[0])
 			expect(readLedgerOpening(sent.messages)).toEqual({
-				shown: ['third', ...window, 'crate-1', 'crate-2', 'crate-3'],
+				shown: ['rule', 'refund', 'third', ...window, 'crate-1', 'crate-2', 'crate-3'],
 				keys,
 			})
 			expect(sent.tools?.map((tool) => tool.name)).toEqual(tools)
@@ -12037,7 +12110,15 @@ describe("Ledger — the newest exchange's ladder", () => {
 		expect(rows.filter((row) => row.recall && row.form === 'none')).toEqual([])
 	})
 
-	it('never shows fewer requests as the capacity grows while the newest exchange keeps its form', async () => {
+	it('never shows fewer requests as the capacity grows while the newest exchange keeps its form and the brief and the recurrence show the same members', async () => {
+		const statements = new Set(
+			LEDGER_SWEEP_SNAPSHOT.conversation.messages
+				.filter(
+					(message) =>
+						message.role === 'user' && !LEDGER_SWEEP_SNAPSHOT.requests.includes(message.id),
+				)
+				.map((message) => message.id),
+		)
 		const rows = await Promise.all(
 			Array.from({ length: 40 }, (_unused, at) => 150 + at * 75).map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
@@ -12046,13 +12127,20 @@ describe("Ledger — the newest exchange's ladder", () => {
 					buildLedgerOptions({ capacity, snapshot: LEDGER_SWEEP_SNAPSHOT, topics: [] }),
 				)
 				await ledger.respond('Make that shorter.')
-				return readLedgerWindow(requireValue(provider.calls[0]).messages, LEDGER_SWEEP_SNAPSHOT)
+				const sent = requireValue(provider.calls[0]).messages
+				return {
+					...readLedgerWindow(sent, LEDGER_SWEEP_SNAPSHOT),
+					held: readLedgerOpening(sent)
+						.shown.filter((id) => statements.has(id))
+						.join(','),
+				}
 			}),
 		)
-		// A change of form can cost requests; within one form they never fall.
+		// A change of form, or of the statements the brief and the recurrence show, can cost requests;
+		// within one form and one set of those statements they never fall.
 		const falls = rows.slice(1).filter((row, at) => {
 			const before = requireValue(rows[at])
-			return row.form === before.form && row.requests < before.requests
+			return row.form === before.form && row.held === before.held && row.requests < before.requests
 		})
 		expect(falls).toEqual([])
 		// The sweep reaches every form of the ladder.
@@ -12061,7 +12149,15 @@ describe("Ledger — the newest exchange's ladder", () => {
 		)
 	})
 
-	it('trades whole older exchanges for copies of more requests as the capacity grows, and never shows fewer requests while the newest exchange keeps its form', async () => {
+	it('trades whole older exchanges for copies of more requests as the capacity grows, and never shows fewer requests while the newest exchange keeps its form and the brief and the recurrence show the same members', async () => {
+		const statements = new Set(
+			LEDGER_TRADE_SNAPSHOT.conversation.messages
+				.filter(
+					(message) =>
+						message.role === 'user' && !LEDGER_TRADE_SNAPSHOT.requests.includes(message.id),
+				)
+				.map((message) => message.id),
+		)
 		const rows = await Promise.all(
 			Array.from({ length: 120 }, (_unused, at) => 150 + at * 10).map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
@@ -12070,12 +12166,21 @@ describe("Ledger — the newest exchange's ladder", () => {
 					buildLedgerOptions({ capacity, snapshot: LEDGER_TRADE_SNAPSHOT, topics: [] }),
 				)
 				await ledger.respond('Which crates are ready?')
-				return readLedgerWindow(requireValue(provider.calls[0]).messages, LEDGER_TRADE_SNAPSHOT)
+				const sent = requireValue(provider.calls[0]).messages
+				return {
+					...readLedgerWindow(sent, LEDGER_TRADE_SNAPSHOT),
+					held: readLedgerOpening(sent)
+						.shown.filter((id) => statements.has(id))
+						.join(','),
+				}
 			}),
 		)
 		const steps = rows.slice(1).map((row, at) => ({ before: requireValue(rows[at]), row }))
 		expect(
-			steps.filter(({ before, row }) => row.form === before.form && row.requests < before.requests),
+			steps.filter(
+				({ before, row }) =>
+					row.form === before.form && row.held === before.held && row.requests < before.requests,
+			),
 		).toEqual([])
 		// A copy of a request costs most of its whole exchange, so somewhere a larger capacity shows
 		// fewer exchanges whole and more requests in the same form.
@@ -12270,20 +12375,25 @@ describe("Ledger — the newest exchange's ladder", () => {
 
 describe('Ledger — relevance', () => {
 	it.each([
-		[250, ['batch-6', 'batched-6', 'batch-7', 'batched-7', 'batch-8', 'batched-8']],
-		[260, ['third', 'batch-6', 'batch-7', 'batched-7', 'batch-8', 'batched-8']],
-		[270, ['third', 'batch-5', 'batch-6', 'batch-7', 'batch-8', 'batched-8']],
-		[280, ['third', 'batch-4', 'batch-5', 'batch-6', 'batch-7', 'batch-8', 'batched-8']],
-		[210, ['batch-8', 'batched-8']],
+		[250, ['rule', 'refund', 'batch-8', 'batched-8']],
+		[260, ['rule', 'refund', 'batch-7', 'batched-7', 'batch-8', 'batched-8']],
+		[270, ['rule', 'refund', 'third', 'batch-7', 'batch-8', 'batched-8']],
+		[
+			280,
+			['rule', 'refund', 'batch-6', 'batched-6', 'batch-7', 'batched-7', 'batch-8', 'batched-8'],
+		],
+		[210, ['rule']],
 		[200, []],
 	])(
-		'trades whole window exchanges for copies of more requests as the capacity grows from 250 to 270, and cuts the window down to none before any statement: at capacity %i the opening shows %j before the statements',
+		'trades whole window exchanges for copies of more requests as the capacity grows from 250 to 270, and cuts the window down to none before any statement: at capacity %i the opening shows %j before the current statements',
 		async (capacity, shown) => {
-			// `third` is the earlier request the word `crates` matches, past the window. At 250 the bound
-			// keeps three exchanges whole, three requests; at 260 one of them goes to a copy beside `third`,
-			// four requests, and at 270 the newest alone stays whole beside `third` and three copies, five
-			// requests; at 280 a fourth copy joins. At 210 the newest alone stays, and at 200 it leaves
-			// too, before any statement. The plan without recall serves every row.
+			// The rule and the refund statement show as the brief, charged to the budget ahead of the
+			// window. `third` is the earlier request the word `crates` matches, past the window. At 250
+			// the newest exchange alone stays whole, one request; at 260 two exchanges stay whole, two
+			// requests; at 270 the older of them goes to a copy beside `third`, three requests; at 280
+			// three exchanges stay whole, three requests. At 210 the window is gone and the brief's last
+			// member with it, and at 200 the brief leaves too, before any current statement. The plan
+			// without recall serves every row.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,
@@ -12479,11 +12589,13 @@ describe('Ledger — superseded values in the window', () => {
 			],
 			{ recorded: true },
 		)
+		// A first request with no reply opens the conversation, so the stray statement stays behind for
+		// recall rather than show as the brief.
 		const ledger = createLedger(
 			provider,
 			buildLedgerOptions({
 				topics: LEDGER_STATEMENT_TOPICS,
-				snapshot: buildLedgerHall(true),
+				snapshot: buildLedgerOpened(buildLedgerHall(true)),
 				judge: createCorrectionJudge(createRecorder(), new Set(['new']), {
 					amends: 0.9,
 					supersedes: 0.9,
@@ -12836,25 +12948,30 @@ describe('Ledger — superseded values in the window: the registry date and the 
 			],
 			{ recorded: true },
 		)
+		// A first answered request opens the conversation, so the matched statement stays behind for
+		// recall rather than show as the brief.
 		const ledger = createLedger(
 			provider,
 			buildLedgerOptions({
 				topics: [],
-				snapshot: {
-					conversation: {
-						id: 'chain',
-						messages: [
-							{ id: 'rests', role: 'user', content: 'Crate LC-7 rests in bay 4.' },
-							{ id: 'moved', role: 'user', content: 'Correction: crate LC-7 moved to bay 5.' },
-							{ id: 'ask-1', role: 'user', content: 'Check the van.' },
-							{ id: 'reply-1', role: 'assistant', content: 'The van is ready.' },
-							{ id: 'final', role: 'user', content: 'Correction: crate LC-7 moved to bay 6.' },
-						],
+				snapshot: buildLedgerOpened(
+					{
+						conversation: {
+							id: 'chain',
+							messages: [
+								{ id: 'rests', role: 'user', content: 'Crate LC-7 rests in bay 4.' },
+								{ id: 'moved', role: 'user', content: 'Correction: crate LC-7 moved to bay 5.' },
+								{ id: 'ask-1', role: 'user', content: 'Check the van.' },
+								{ id: 'reply-1', role: 'assistant', content: 'The van is ready.' },
+								{ id: 'final', role: 'user', content: 'Correction: crate LC-7 moved to bay 6.' },
+							],
+						},
+						requests: ['ask-1'],
+						notes: [],
+						failures: [],
 					},
-					requests: ['ask-1'],
-					notes: [],
-					failures: [],
-				},
+					'Begun.',
+				),
 			}),
 		)
 		const [rests, moved, final] = ['rests', 'moved', 'final'].map((id) =>
@@ -12876,7 +12993,7 @@ describe('Ledger — superseded values in the window: the registry date and the 
 })
 
 describe('Ledger — the newest statement of each recurrence', () => {
-	it('leaves out the newest member of a recurrence that a correction before the window supersedes', async () => {
+	it('leaves out the newest member of a recurrence that a correction before the window supersedes, and shows the correction as the brief, the newest statement of its kind', async () => {
 		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 		const ledger = createLedger(
 			provider,
@@ -12905,8 +13022,13 @@ describe('Ledger — the newest statement of each recurrence', () => {
 		)
 		await ledger.respond('Anything else?')
 		// The shipped orders recur, but the correction supersedes the newer one and sits before the
-		// window, so the opening shows neither rather than the stale statement alone.
+		// window, so the opening shows neither rather than the stale statement alone. The recurrence
+		// sets aside the ids its members carry, BC-2 among them, so the correction, stored before the
+		// first request, carries no known id and shows as the brief. That is intended: the user's ruling
+		// shows the newest statement of each kind, and in a real run the lookups register BC-2, which
+		// keeps it known, since the registry wins over the set-aside.
 		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'held',
 			'ask-1',
 			'reply-1',
 		])
@@ -12920,7 +13042,14 @@ describe('Ledger — the newest statement of each recurrence', () => {
 		)
 		await ledger.respond('G2-2 Which van stops next?')
 		const shown = readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+		// The day-1 sources carry no id and come before the first request, so under the bounded-share
+		// ruling they show as the brief, within its share, beside the newest marker; the older marker is
+		// a recurrence member and stays out of the brief.
 		expect(shown.filter((id) => !id.startsWith('goal-') && !id.startsWith('reply-'))).toEqual([
+			'source-1-1',
+			'source-1-2',
+			'source-1-3',
+			'source-1-4',
 			'marker-2',
 		])
 	})
@@ -13155,5 +13284,260 @@ describe('Ledger — the newest statement of each recurrence', () => {
 			'ask-3',
 			'reply-3',
 		])
+	})
+})
+
+describe('Ledger — the brief', () => {
+	it('shows the brief in conversation order while it fits its share, stops at the first member past it, and leaves the rest to retrieval', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'share',
+						messages: [
+							{ id: 'brief-1', role: 'user', content: `Desk memo one: ${'a'.repeat(800)}` },
+							{ id: 'brief-2', role: 'user', content: `Desk memo two: ${'b'.repeat(800)}` },
+							{ id: 'brief-3', role: 'user', content: `Desk memo three: ${'c'.repeat(1200)}` },
+							{ id: 'brief-4', role: 'user', content: 'Desk memo four: keep a gate shut.' },
+							{
+								id: 'brief-5',
+								role: 'user',
+								content: `A forklift battery sits in bay 9. ${'f'.repeat(6000)}`,
+							},
+							{ id: 'ask-1', role: 'user', content: 'Open the shift.' },
+							{ id: 'reply-1', role: 'assistant', content: 'Opened.' },
+						],
+					},
+					requests: ['ask-1'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Where is the forklift?')
+		// The first two memos fit 0.15 of the budget and the third doesn't, so the brief stops there and
+		// the short fourth stays behind; the fifth shows only because retrieval matches its word, in a
+		// room the brief takes nothing from, which it would no longer fit if the brief were charged to it.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'brief-1',
+			'brief-2',
+			'brief-5',
+			'ask-1',
+			'reply-1',
+		])
+	})
+
+	it.each([
+		['shows a brief member the budget holds', 1000, ['register', 'big']],
+		[
+			'cuts the brief member before the current statement and keeps the row of its id',
+			3500,
+			['big'],
+		],
+	])('%s', async (_case, size, shown) => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'cut',
+						messages: [
+							{
+								id: 'register',
+								role: 'user',
+								content: `Register: BC-7301 and BC-7312 are open. ${'r'.repeat(1900)}`,
+							},
+							{ id: 'ask-1', role: 'user', content: 'Check BC-7301 at the dock.' },
+							{
+								id: 'big',
+								role: 'user',
+								content: `The manifest follows. ${'m'.repeat(size * 4)}`,
+							},
+						],
+					},
+					requests: ['ask-1'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond('Anything else?')
+		// The earlier request has no reply, so it makes no exchange, and BC-7301, which it and the
+		// register both carry, earns an id row; a cut keeps only the rows of the ids its cut statements
+		// carry, so the row stays only because the cut brief member carries the id.
+		const opening = readLedgerOpening(requireValue(provider.calls[0]).messages)
+		expect(opening.shown).toEqual(shown)
+		expect(opening.keys).toContain('BC-7301')
+	})
+
+	it('never shows a rule stated before the first request without the correction stated there after it', async () => {
+		const openings = await Promise.all(
+			Array.from({ length: 61 }, (_unused, at) => 400 + at * 20).map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({
+						capacity,
+						topics: [],
+						snapshot: {
+							conversation: {
+								id: 'corrected',
+								messages: [
+									{
+										id: 'rule',
+										role: 'user',
+										content: `Refunds over $200 need a manager. ${'r'.repeat(400)}`,
+									},
+									{
+										id: 'fix',
+										role: 'user',
+										content: `Correction: refunds over $200 need two managers. ${'f'.repeat(400)}`,
+									},
+									{ id: 'ask-1', role: 'user', content: 'Check the dock.' },
+									{ id: 'reply-1', role: 'assistant', content: 'Checked.' },
+									{
+										id: 'big',
+										role: 'user',
+										content: `The manifest follows. ${'m'.repeat(2000)}`,
+									},
+								],
+							},
+							requests: ['ask-1'],
+							notes: [],
+							failures: [],
+						},
+					}),
+				)
+				ledger.conversation.judgments.add(
+					buildLedgerPairJudgment(
+						'amends',
+						requireValue(ledger.conversation.message('rule')),
+						requireValue(ledger.conversation.message('fix')),
+						1,
+					),
+				)
+				await ledger.respond('Anything else?')
+				return readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+			}),
+		)
+		// The correction amends the rule, so the rule leaves the brief. Wherever the brief's share or
+		// its cut keeps only part of it, the correction may show alone, and the rule never does.
+		expect(openings.filter((shown) => shown.includes('rule') && !shown.includes('fix'))).toEqual([])
+		expect(openings.some((shown) => shown.includes('fix') && !shown.includes('rule'))).toBe(true)
+	})
+
+	it('shows no fewer requests as the capacity grows while the brief keeps its members, and at most one fewer where it admits a note priced near its share', async () => {
+		const exchanges = Array.from({ length: 8 }, (_unused, at): readonly Message[] => [
+			{ id: `ask-${at + 1}`, role: 'user', content: `Note crate ${at + 1}. ${'q'.repeat(260)}` },
+			{
+				id: `reply-${at + 1}`,
+				role: 'assistant',
+				content: `Crate ${at + 1} noted. ${'r'.repeat(20)}`,
+			},
+		]).flat()
+		const snapshot: LedgerSnapshot = {
+			conversation: {
+				id: 'crossing',
+				messages: [
+					{
+						id: 'note',
+						role: 'user',
+						content: `Opening note: BC-7301 and BC-7312 need a callback. ${'n'.repeat(560)}`,
+					},
+					...exchanges,
+					{ id: 'big', role: 'user', content: `The manifest follows. ${'m'.repeat(2000)}` },
+				],
+			},
+			requests: exchanges.filter((message) => message.role === 'user').map((message) => message.id),
+			notes: [],
+			failures: [],
+		}
+		const rows = await Promise.all(
+			Array.from({ length: 51 }, (_unused, at) => 900 + at * 10).map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, snapshot, topics: [] }),
+				)
+				await ledger.respond('Anything else?')
+				const sent = requireValue(provider.calls[0]).messages
+				return {
+					...readLedgerWindow(sent, snapshot),
+					note: readLedgerOpening(sent).shown.includes('note'),
+				}
+			}),
+		)
+		const steps = rows.slice(1).map((row, at) => ({ before: requireValue(rows[at]), row }))
+		expect(
+			steps.filter(
+				({ before, row }) =>
+					row.form === before.form && row.note === before.note && row.requests < before.requests,
+			),
+		).toEqual([])
+		// The note names two cases with no known id, so it briefs; where the share first admits it, the
+		// window's requests and the current statement already fill the budget, so it costs one request.
+		const crossing = requireValue(steps.find(({ before, row }) => row.note && !before.note))
+		expect(crossing.before.requests - crossing.row.requests).toBe(1)
+	})
+
+	it("cuts a first request's statements oldest first, as current statements and never as the brief", async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ topics: [], system: `Serve the desk. ${'s'.repeat(13800)}` }),
+		)
+		const added = ['one', 'two', 'three'].map((word) =>
+			ledger.conversation.add({ role: 'user', content: `Desk memo ${word}: ${'w'.repeat(600)}` }),
+		)
+		await ledger.respond('Anything else?')
+		// The long head leaves room for two memos. Every memo is a current statement of the first
+		// request, so the cut takes them oldest first and keeps the two newest; as the brief, cut last
+		// stored first, it would keep the two oldest.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual(
+			added.slice(1).map((message) => message.id),
+		)
+	})
+
+	it('keeps a shown brief member out of retrieval, so it takes no place among the matches', async () => {
+		const words = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel']
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: {
+					conversation: {
+						id: 'excluded',
+						messages: [
+							{ id: 'note', role: 'user', content: 'Opening note: OR-9 needs a recount.' },
+							{ id: 'ask-1', role: 'user', content: 'Open the shift.' },
+							{ id: 'reply-1', role: 'assistant', content: 'Opened.' },
+							...words.map((word, at) => ({
+								id: `match-${at + 1}`,
+								role: 'user' as const,
+								content: `Bay ${word} is clear.`,
+							})),
+							{ id: 'ask-2', role: 'user', content: 'Check the van.' },
+							{ id: 'reply-2', role: 'assistant', content: 'Checked.' },
+						],
+					},
+					requests: ['ask-1', 'ask-2'],
+					notes: [],
+					failures: [],
+				},
+			}),
+		)
+		await ledger.respond(`Where is OR-9? ${words.join(' ')}`)
+		// The matches sit behind the second answered request, so only retrieval shows them. The note
+		// names the request's id, so as a match it would rank first and take one of the matches'
+		// places; shown as the brief, it leaves all of them to the word matches.
+		const shown = readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+		expect(shown).toContain('note')
+		expect(shown.filter((id) => id.startsWith('match-'))).toHaveLength(LEDGER_RELEVANT_LIMIT)
 	})
 })

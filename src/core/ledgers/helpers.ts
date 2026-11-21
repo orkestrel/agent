@@ -333,12 +333,63 @@ export function collectLedgerAmenders(
 }
 
 /**
- * Collects the newest member of each recurrence among the statements before a request: two or more
- * statements whose texts {@link maskLiterals} masks alike.
+ * Collects the recurrence groups among the statements before a request: each group of two or more
+ * statements whose texts {@link maskLiterals} masks alike, its members in conversation order.
  *
  * @remarks
  * A statement is a user message with no calls that is neither a request, a note, nor quiet. The masked
  * texts compare exactly, with no case, space, or punctuation folded, so statements recur only when
+ * they differ in their ids and numbers alone, as a day marker that names each day's date does. A lone
+ * statement makes no group. The groups come in the order of their first members, and
+ * {@link collectLedgerRecurrences} reads the newest member of each.
+ *
+ * @param messages - The messages stored before a request, in conversation order
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @param quiet - The ids the judge filed quiet
+ * @returns Each group's members, in conversation order
+ * @example
+ * ```ts
+ * collectLedgerRecurrenceGroups(
+ * 	[
+ * 		{ id: 'monday', role: 'user', content: 'Current workday: 2031-02-03.' },
+ * 		{ id: 'van', role: 'user', content: 'The van is blue.' },
+ * 		{ id: 'tuesday', role: 'user', content: 'Current workday: 2031-02-04.' },
+ * 	],
+ * 	new Set(),
+ * 	new Set(),
+ * 	new Set(),
+ * ).map((members) => members.map((message) => message.id)) // [['monday', 'tuesday']]
+ * ```
+ */
+export function collectLedgerRecurrenceGroups(
+	messages: readonly Message[],
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+	quiet: ReadonlySet<string>,
+): ReadonlyArray<readonly Message[]> {
+	return [
+		...Map.groupBy(
+			messages.filter(
+				(message) =>
+					message.role === 'user' &&
+					!hasCalls(message) &&
+					!requests.has(message.id) &&
+					!notes.has(message.id) &&
+					!quiet.has(message.id),
+			),
+			(message) => maskLiterals(message.content),
+		).values(),
+	].filter((members) => members.length > 1)
+}
+
+/**
+ * Collects the newest member of each recurrence among the statements before a request: two or more
+ * statements whose texts {@link maskLiterals} masks alike.
+ *
+ * @remarks
+ * The recurrences are the groups {@link collectLedgerRecurrenceGroups} collects, so a statement is a user
+ * message with no calls that is neither a request, a note, nor quiet, and statements recur only when
  * they differ in their ids and numbers alone, as a day marker that names each day's date does. A lone
  * statement is no recurrence, and an older member is never collected.
  *
@@ -368,18 +419,224 @@ export function collectLedgerRecurrences(
 	notes: ReadonlySet<string>,
 	quiet: ReadonlySet<string>,
 ): readonly Message[] {
-	const statements = messages.filter(
+	const positions = new Map(messages.map((message, at) => [message, at]))
+	return collectLedgerRecurrenceGroups(messages, requests, notes, quiet)
+		.flatMap((members) => members.slice(-1))
+		.toSorted((left, right) => (positions.get(right) ?? 0) - (positions.get(left) ?? 0))
+}
+
+/**
+ * Collects the known ids of each request and statement up to a request.
+ *
+ * @remarks
+ * A message carries the literal ids `extractLiterals` reads in it and the registry ids
+ * `input.entities` names for it. An id it carries is known when the registry holds it. Otherwise it
+ * is known when another statement that is neither quiet nor a recurrence member carries it and no
+ * recurrence member does, as {@link collectLedgerRecurrenceGroups} collects their groups: an id only
+ * its own statement carries, such as a source tag, scopes nothing, and a day marker's date, which
+ * that day's sources carry too, is set aside. A statement is a user message with no calls that is
+ * neither a request nor a note, and the messages after the request take no part.
+ *
+ * @param input - The messages, findings, entities, and classification
+ * @param request - The request id; the messages up to it count, and every message when no message has it
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @returns Each request's and statement's known ids, quiet statements and recurrence members included, keyed by message id
+ * @example
+ * ```ts
+ * // `input` holds a note naming BC-7301 and BC-7312, a register naming both, and the request.
+ * collectLedgerKnown(input, 'request', new Set(['request']), new Set()).get('note') // ['BC-7301', 'BC-7312']
+ * ```
+ */
+export function collectLedgerKnown(
+	input: LedgerProjectionInput,
+	request: string,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): ReadonlyMap<string, readonly string[]> {
+	const at = input.messages.findIndex((message) => message.id === request)
+	const scope = at < 0 ? input.messages : input.messages.slice(0, at + 1)
+	const quiet = input.classification.quiet
+	const members = new Set(collectLedgerRecurrenceGroups(scope, requests, notes, quiet).flat())
+	const carried = new Map(
+		scope.map((message) => [
+			message.id,
+			[
+				...new Set([
+					...extractLiterals(message.content).ids,
+					...(input.entities.get(message.id) ?? []),
+				]),
+			],
+		]),
+	)
+	const aside = new Set([...members].flatMap((message) => carried.get(message.id) ?? []))
+	const holders = Map.groupBy(
+		scope
+			.filter(
+				(message) =>
+					message.role === 'user' &&
+					!hasCalls(message) &&
+					!requests.has(message.id) &&
+					!notes.has(message.id) &&
+					!members.has(message) &&
+					!quiet.has(message.id),
+			)
+			.flatMap((message) =>
+				(carried.get(message.id) ?? []).map((id) => ({ id, holder: message.id })),
+			),
+		(entry) => entry.id,
+	)
+	const registry = collectRegistry(input.findings)
+	return new Map(
+		scope
+			.filter((message) => message.role === 'user' && !hasCalls(message) && !notes.has(message.id))
+			.map((message) => [
+				message.id,
+				(carried.get(message.id) ?? []).filter(
+					(id) =>
+						registry.ids.has(id) ||
+						(!aside.has(id) &&
+							(holders.get(id) ?? []).some((entry) => entry.holder !== message.id)),
+				),
+			]),
+	)
+}
+
+/**
+ * Links ids into groups and labels each linked id with its group's first id in sorted order.
+ *
+ * @remarks
+ * Ids link through the registry the findings name, where owners that share a name link, an argument
+ * links to the owner {@link linkOwners} gives it, and a registry id links to each other literal id
+ * inside it; and through each of `groups`, whose ids link together. An id no link reaches has no
+ * label and is its own group.
+ *
+ * @param findings - The lookup findings in conversation order
+ * @param groups - The id lists whose members link together, such as the known ids of one statement
+ * @returns Each linked id's group label
+ * @example
+ * ```ts
+ * linkLedgerIds([], [['BC-7301', 'BC-4101']]).get('BC-7301') // 'BC-4101'
+ * ```
+ */
+export function linkLedgerIds(
+	findings: readonly LedgerLookupFinding[],
+	groups: ReadonlyArray<readonly string[]>,
+): ReadonlyMap<string, string> {
+	const registry = collectRegistry(findings)
+	const edges = [
+		...[
+			...Map.groupBy(
+				[...registry.owners].flatMap(([id, names]) => names.map((name) => ({ id, name }))),
+				(entry) => entry.name,
+			).values(),
+		].flatMap((group) =>
+			group.slice(1).map((entry) => [group[0]?.id ?? entry.id, entry.id] as const),
+		),
+		...linkOwners(findings, registry.owners),
+		...[...registry.ids].flatMap((id) =>
+			[...extractLiterals(id).ids]
+				.filter((inner) => inner !== id)
+				.map((inner) => [id, inner] as const),
+		),
+		...groups.flatMap((ids) => ids.slice(1).map((id) => [ids[0] ?? id, id] as const)),
+	]
+	const neighbors = new Map(
+		[
+			...Map.groupBy(
+				edges.flatMap(([left, right]) => [
+					{ from: left, to: right },
+					{ from: right, to: left },
+				]),
+				(edge) => edge.from,
+			),
+		].map(([id, links]) => [id, links.map((edge) => edge.to)]),
+	)
+	// Each group takes the first of its ids in sorted order as its label; the walk reads the labels
+	// it has written to skip an id a group already holds.
+	const labels = new Map<string, string>()
+	for (const id of [...neighbors.keys()].toSorted()) {
+		if (labels.has(id)) continue
+		for (const linked of scanAmendments(neighbors, id, () => true)) labels.set(linked, id)
+	}
+	return labels
+}
+
+/**
+ * Collects the brief before a request: the statements stored before the first request that are no
+ * recurrence member, not quiet, amended by nothing, and not of one subject.
+ *
+ * @remarks
+ * A statement is a user message with no calls that is neither a request nor a note. Its subject is
+ * its known ids, as {@link collectLedgerKnown} reads them, each read as the registry group
+ * {@link linkLedgerIds} links it into. Those groups link further through each statement stored after
+ * the first request and before `request` that is not quiet, which links only the groups of the
+ * candidate it carries: an id the candidate doesn't carry, such as a date, a shared SKU, or an agent
+ * id, links nothing. A statement whose known ids all fall in one group belongs to that subject and
+ * reaches an opening through the subject's own paths; one with no known id, or with ids in several
+ * groups, such as a desk rule, an opening note, or a register, briefs every request. The candidates
+ * are the statements stored before the first request, and which of them brief is read again at each
+ * request, as later statements make their ids known or link them. A recurrence member reaches an opening through its recurrence. An amended
+ * statement, a superseded one included, because the classification files every supersession as an
+ * amendment, reaches it when retrieval matches it, with its amendment chain, so the brief never shows
+ * it without its correction. The brief carries no amender. With no request before `request`,
+ * every statement before it is before the first request.
+ *
+ * @param input - The messages, findings, entities, and classification
+ * @param request - The request id; the messages before it count, and every message when no message has it
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @returns The brief in conversation order
+ * @example
+ * ```ts
+ * // `input` holds a desk rule, an opening note naming two cases, a register, a source of one case, and the request.
+ * collectLedgerBrief(input, 'request', new Set(['request']), new Set()).map((message) => message.id)
+ * // ['desk', 'note', 'register']
+ * ```
+ */
+export function collectLedgerBrief(
+	input: LedgerProjectionInput,
+	request: string,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): readonly Message[] {
+	const at = input.messages.findIndex((message) => message.id === request)
+	const before = at < 0 ? input.messages : input.messages.slice(0, at)
+	const quiet = input.classification.quiet
+	const amendments = input.classification.amendments
+	const known = collectLedgerKnown(input, request, requests, notes)
+	const members = new Set(collectLedgerRecurrenceGroups(before, requests, notes, quiet).flat())
+	const first = before.findIndex((message) => requests.has(message.id))
+	const beforeFirst = new Set(first < 0 ? before : before.slice(0, first))
+	const statements = before.filter(
 		(message) =>
 			message.role === 'user' &&
 			!hasCalls(message) &&
 			!requests.has(message.id) &&
-			!notes.has(message.id) &&
-			!quiet.has(message.id),
+			!notes.has(message.id),
 	)
-	const positions = new Map(statements.map((message, at) => [message, at]))
-	return [...Map.groupBy(statements, (message) => maskLiterals(message.content)).values()]
-		.flatMap((members) => (members.length < 2 ? [] : members.slice(-1)))
-		.toSorted((left, right) => (positions.get(right) ?? 0) - (positions.get(left) ?? 0))
+	const registry = linkLedgerIds(input.findings, [])
+	const later = statements
+		.filter((message) => !beforeFirst.has(message) && !quiet.has(message.id))
+		.map((message) => (known.get(message.id) ?? []).map((id) => registry.get(id) ?? id))
+	return statements.filter((message) => {
+		if (
+			!beforeFirst.has(message) ||
+			members.has(message) ||
+			quiet.has(message.id) ||
+			(amendments.get(message.id) ?? []).length > 0
+		)
+			return false
+		const own = new Set((known.get(message.id) ?? []).map((id) => registry.get(id) ?? id))
+		if (own.size < 2) return own.size === 0
+		// A later statement links only the candidate's own groups, so an id it doesn't carry, such as a
+		// date, links nothing.
+		const linked = linkLedgerIds(
+			[],
+			later.map((ids) => ids.filter((id) => own.has(id))),
+		)
+		return new Set([...own].map((id) => linked.get(id) ?? id)).size > 1
+	})
 }
 
 /**
@@ -989,18 +1246,23 @@ export function collectLedgerMatches(
 }
 
 /**
- * Scans admitted amendments in breadth-first order without revisiting a message.
- * @param amendments - The later messages attached to each earlier message
- * @param start - The first message to visit
- * @param admit - The predicate that admits a message and its descendants
- * @returns The admitted message ids in visit order
+ * Scans the admitted ids that links reach from a start in breadth-first order without revisiting an id.
+ *
+ * @remarks
+ * The links can be the later messages attached to each earlier message, as an amendment chain reads
+ * them, or the ids linked to each id in both directions, as {@link linkLedgerIds} walks a group.
+ *
+ * @param links - The ids each id links to
+ * @param start - The first id to visit
+ * @param admit - The predicate that admits an id and the ids it links to
+ * @returns The admitted ids in visit order
  * @example
  * ```ts
  * scanAmendments(new Map([['first', ['second']]]), 'first', () => true) // ['first', 'second']
  * ```
  */
 export function scanAmendments(
-	amendments: ReadonlyMap<string, readonly string[]>,
+	links: ReadonlyMap<string, readonly string[]>,
 	start: string,
 	admit: (id: string) => boolean,
 ): readonly string[] {
@@ -1012,7 +1274,7 @@ export function scanAmendments(
 		seen.add(id)
 		if (!admit(id)) continue
 		admitted.push(id)
-		for (const later of amendments.get(id) ?? []) queue.push(later)
+		for (const linked of links.get(id) ?? []) queue.push(linked)
 	}
 	return admitted
 }

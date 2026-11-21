@@ -131,7 +131,10 @@ import {
 	buildLedgerAmended,
 	buildLedgerHall,
 	buildLedgerDays,
+	buildLedgerOpened,
+	buildLedgerBriefInput,
 	buildLedgerWindow,
+	LEDGER_BRIEF_REQUESTS,
 	countLedgerPlanFit,
 	LEDGER_CUT_DEEP_SNAPSHOT,
 	LEDGER_CUT_SNAPSHOT,
@@ -1788,6 +1791,80 @@ describe('system boundary canary fixtures', () => {
 			'reply-2',
 		])
 		expect(stated.requests).toEqual(plain.requests)
+	})
+
+	it('opens a snapshot with a first request, answered when a reply is given, marked before its own requests', () => {
+		const window = buildLedgerWindow(['One.'])
+		const opened = buildLedgerOpened(window)
+		const answered = buildLedgerOpened(window, 'Begun.')
+
+		expect(isLedgerSnapshot(opened)).toBe(true)
+		expect(opened.conversation.messages).toEqual([
+			{ id: 'opening', role: 'user', content: 'Begin.' },
+			...window.conversation.messages,
+		])
+		expect(opened.requests).toEqual(['opening', ...window.requests])
+		expect(isLedgerSnapshot(answered)).toBe(true)
+		expect(answered.conversation.messages.slice(0, 2)).toEqual([
+			{ id: 'opening', role: 'user', content: 'Begin.' },
+			{ id: 'opened', role: 'assistant', content: 'Begun.' },
+		])
+		expect(answered.requests).toEqual(opened.requests)
+		expect(buildLedgerOpened().conversation.messages.map((message) => message.id)).toEqual([
+			'opening',
+		])
+		expect(buildLedgerOpened().requests).toEqual(['opening'])
+	})
+
+	it('builds the brief scenario around its two requests, with its marker, quiet, supersession, amendment, later, and finding variations', () => {
+		const input = buildLedgerBriefInput()
+		const ids = input.messages.map((message) => message.id)
+
+		expect([...LEDGER_BRIEF_REQUESTS]).toEqual(['ask-1', 'ask-2'])
+		expect(ids.slice(0, ids.indexOf('ask-1'))).toEqual([
+			'desk',
+			'note',
+			'register',
+			'marker-1',
+			'source-1',
+			'source-2',
+			'source-3',
+			'source-4',
+			'thanks',
+			'hours',
+		])
+		expect(ids.slice(ids.indexOf('ask-1'))).toEqual([
+			'ask-1',
+			'reply-1',
+			'marker-2',
+			'update-1',
+			'update-2',
+			'hours-fix',
+			'ask-2',
+		])
+		expect([...input.classification.quiet]).toEqual(['thanks'])
+		expect([...input.classification.supersessions]).toEqual([['hours', ['hours-fix']]])
+		// The supersession is an amendment too, as the classifier files one.
+		expect([...input.classification.amendments]).toEqual([['hours', ['hours-fix']]])
+		expect(input.findings).toEqual([])
+		const varied = buildLedgerBriefInput({
+			marked: false,
+			later: [{ id: 'later', role: 'user', content: 'BC-7301 is closed.' }],
+			quiet: [],
+			supersessions: {},
+			amendments: { desk: ['later'] },
+			findings: [buildLedgerFinding('lookup', 'lookup', { id: 'BC-7301' }, 'Case BC-7301.')],
+		})
+		expect(varied.messages.map((message) => message.id).slice(-3)).toEqual([
+			'hours-fix',
+			'later',
+			'ask-2',
+		])
+		expect(varied.messages.some((message) => message.id === 'marker-2')).toBe(false)
+		expect(varied.classification.quiet.size).toBe(0)
+		expect(varied.classification.supersessions.size).toBe(0)
+		expect([...varied.classification.amendments]).toEqual([['desk', ['later']]])
+		expect(varied.findings.map((finding) => finding.id)).toEqual(['lookup'])
 	})
 
 	it('builds a snapshot of a goal for every four earlier messages, each a request answered', () => {

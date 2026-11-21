@@ -2880,7 +2880,13 @@ export async function serveLedgerThread(arm: LedgerThreadArm): Promise<LedgerThr
 	}
 }
 
-/** Serves whole hidden sources through measured recall and its optional answer pass. */
+/**
+ * Serves whole hidden sources through measured recall and its optional answer pass.
+ *
+ * @remarks
+ * The sources follow a first answered request, the one exchange {@link buildLedgerWindow} builds,
+ * so none joins the brief, and the warm request leaves them behind for recall.
+ */
 export async function serveLedgerFit(options: {
 	readonly capacity: number
 	readonly predict: number
@@ -2914,6 +2920,7 @@ export async function serveLedgerFit(options: {
 			lookups: [],
 			share: { prompt: 1 },
 			gauge: { scale: 1.16, overhead: 150 },
+			snapshot: buildLedgerWindow(['Noted.']),
 		}),
 	)
 	for (const content of options.sources) {
@@ -5980,6 +5987,84 @@ export function buildLedgerKeyScenario(replied: boolean): LedgerKeyScenario {
 		requests: new Set(['first', 'request']),
 		notes: new Set(['note']),
 	}
+}
+
+/** Holds the requests of the brief scenario {@link buildLedgerBriefInput} builds, the first answered and the second the one planned. */
+export const LEDGER_BRIEF_REQUESTS: ReadonlySet<string> = new Set(['ask-1', 'ask-2'])
+
+/** Configures the brief scenario {@link buildLedgerBriefInput} builds; an absent option takes its default. */
+export interface LedgerBriefOptions {
+	readonly marked?: boolean
+	readonly later?: readonly Message[]
+	readonly quiet?: readonly string[]
+	readonly supersessions?: Readonly<Record<string, readonly string[]>>
+	readonly amendments?: Readonly<Record<string, readonly string[]>>
+	readonly findings?: readonly LedgerLookupFinding[]
+}
+
+/**
+ * Builds the brief scenario, shaped as the first goal of an endurance shift's second day: before the
+ * first request a desk rule with no id, an opening note naming two cases, a register naming three,
+ * a day marker, four sources of one case sharing that day's date, a quiet thanks, and the desk hours;
+ * after it the reply, a second day marker, one update per case the note names, and a correction of
+ * the hours; then the planned request `ask-2`.
+ *
+ * @remarks
+ * The note names `BC-7301` and `BC-7312`, which the register and the updates also carry, and the
+ * register adds `BC-7320`, the case the sources `source-1` to `source-4` name. `thanks` is filed quiet
+ * and `hours-fix` supersedes `hours` by default. Every supersession is filed as an amendment too, as
+ * the classifier files one, beside the `amendments` given. `later` holds statements stored after the
+ * updates, before the planned request.
+ *
+ * @param options - The variations; `marked` defaults to true, `quiet` to `thanks`, `supersessions` to `hours` superseded by `hours-fix`, and `amendments`, `later`, and `findings` to none
+ * @returns The projection input
+ */
+export function buildLedgerBriefInput(options: LedgerBriefOptions = {}): LedgerProjectionInput {
+	const messages: readonly Message[] = [
+		buildLedgerMessage('desk', 'user', 'Desk rule: confirm each callback before you close a case.'),
+		buildLedgerMessage('note', 'user', 'Opening note: BC-7301 and BC-7312 need a callback today.'),
+		buildLedgerMessage(
+			'register',
+			'user',
+			'Register: BC-7301 Mara Ellison, BC-7312 Dev Patel, BC-7320 Ana Ruiz.',
+		),
+		buildLedgerMessage('marker-1', 'user', 'Current workday: 2031-03-11.'),
+		buildLedgerMessage(
+			'source-1',
+			'user',
+			'Source email on 2031-03-11: BC-7320 filed the roof claim.',
+		),
+		buildLedgerMessage(
+			'source-2',
+			'user',
+			'Source call on 2031-03-11: BC-7320 asked for an adjuster.',
+		),
+		buildLedgerMessage('source-3', 'user', 'Source letter on 2031-03-11: BC-7320 sent the photos.'),
+		buildLedgerMessage('source-4', 'user', 'Source fax on 2031-03-11: BC-7320 signed the form.'),
+		buildLedgerMessage('thanks', 'user', 'Thanks, everyone.'),
+		buildLedgerMessage('hours', 'user', 'The desk closes at 17:00.'),
+		buildLedgerMessage('ask-1', 'user', 'What needs a callback today?'),
+		buildLedgerMessage('reply-1', 'assistant', 'Two cases need a callback.'),
+		...(options.marked === false
+			? []
+			: [buildLedgerMessage('marker-2', 'user', 'Current workday: 2031-03-12.')]),
+		buildLedgerMessage('update-1', 'user', 'BC-7301 called back about the roof.'),
+		buildLedgerMessage('update-2', 'user', 'BC-7312 sent the signed form.'),
+		buildLedgerMessage('hours-fix', 'user', 'Correction: the desk closes at 18:00.'),
+		...(options.later ?? []),
+		buildLedgerMessage('ask-2', 'user', 'What is open on BC-7320?'),
+	]
+	const supersessions = options.supersessions ?? { hours: ['hours-fix'] }
+	return buildLedgerInput({
+		exclusions: [...LEDGER_BRIEF_REQUESTS],
+		messages,
+		findings: options.findings ?? [],
+		classification: {
+			quiet: options.quiet ?? ['thanks'],
+			supersessions,
+			amendments: { ...supersessions, ...options.amendments },
+		},
+	})
 }
 
 /**
@@ -9804,6 +9889,45 @@ export const LEDGER_CUT_DEEP_SNAPSHOT = Object.freeze<LedgerSnapshot>({
 		...Array.from({ length: 8 }, (_unused, at) => `batch-${at + 1}`),
 	],
 })
+
+/**
+ * Builds a ledger snapshot that opens with a first request, then the messages of the snapshot given,
+ * so every statement it holds follows a first request and none joins the brief.
+ *
+ * @remarks
+ * The opening request is `opening`, `Begin.`, marked first. With `reply`, the assistant message
+ * `opened` answers it, an exchange older than every exchange the snapshot holds. With no reply it
+ * makes no exchange, so the snapshot's exchanges, their depths, and its current statements stay as
+ * they were.
+ *
+ * @param snapshot - The snapshot to open; default an empty conversation
+ * @param reply - The text of the reply that answers the opening request; default none
+ * @returns The snapshot, with `opening` marked before its own requests
+ */
+export function buildLedgerOpened(
+	snapshot: LedgerSnapshot = {
+		conversation: { id: 'opened', messages: [] },
+		requests: [],
+		notes: [],
+		failures: [],
+	},
+	reply?: string,
+): LedgerSnapshot {
+	const answered: readonly Message[] =
+		reply === undefined ? [] : [{ id: 'opened', role: 'assistant', content: reply }]
+	return {
+		...snapshot,
+		conversation: {
+			...snapshot.conversation,
+			messages: [
+				{ id: 'opening', role: 'user', content: 'Begin.' },
+				...answered,
+				...snapshot.conversation.messages,
+			],
+		},
+		requests: ['opening', ...snapshot.requests],
+	}
+}
 
 /**
  * Builds a ledger snapshot of answered requests, one per reply given, oldest first, so a plan's
@@ -15788,7 +15912,8 @@ export async function bisectLedgerPadding(
  * Serves a `recall` on the turn after a load of the `wide` skill, whose ten tools carry long
  * descriptions, over a number of stored sources a first request left earlier, and reads how many
  * sources the listing names. Each source's vault word carries its own two letters at one length, so
- * no two sources recur.
+ * no two sources recur. The sources follow a first answered request, the one exchange
+ * {@link buildLedgerWindow} builds, so none joins the brief.
  *
  * @param sources - The stored sources the recall can list
  * @returns The listed count, and whether the listing was cut
@@ -15838,6 +15963,7 @@ export async function serveLedgerWideRecall(
 				share: { prompt: 1 },
 				lookups: [...(buildLedgerOptions().lookups ?? []), ...wide],
 				agent: { builtins: ['load', 'unload'], skills, authority: AGENT_AUTHORITY },
+				snapshot: buildLedgerWindow(['Noted.']),
 			}),
 		),
 	)

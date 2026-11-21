@@ -126,6 +126,7 @@ import {
 	mergeSupersessions,
 	digestLedgerTools,
 	collectLedgerAmenders,
+	collectLedgerBrief,
 	collectLedgerExchanges,
 	collectLedgerRecurrences,
 	collectLedgerStatements,
@@ -1336,8 +1337,8 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// Plans a request's opening: the recent window, the newest exchanges that have a reply, the earlier
-	// user messages retrieval ranks best, the newest member of each recurrence, and the current
-	// statements whole, in conversation order and without a statement a shown successor supersedes,
+	// user messages retrieval ranks best, the brief, the newest member of each recurrence, and the
+	// current statements whole, in conversation order and without a statement a shown successor supersedes,
 	// then the request copy, which carries the Earlier index of what the opening leaves behind while
 	// `recall` is advertised. It plans at the price without `recall` and, while the scope admits it, at
 	// the price with it, and keeps `recall` only when that plan shows the newest exchange in the form
@@ -1402,6 +1403,10 @@ export class Ledger implements LedgerInterface {
 		const newest = latest[0]
 		const supersessions = input.classification.supersessions
 		const stated = new Set(current.map((message) => message.id))
+		// The brief, but a current statement, which shows as one, in conversation order.
+		const brief = collectLedgerBrief(input, request.id, this.#requests, this.#annotations).filter(
+			(message) => !stated.has(message.id),
+		)
 		// The recurrence: the newest member of each recurrence that is no current statement and that
 		// nothing supersedes, newest first. A superseded member never stands alone: its successor
 		// reaches the opening on its own paths.
@@ -1419,6 +1424,7 @@ export class Ledger implements LedgerInterface {
 			projection,
 			before,
 			current,
+			brief,
 			recurrences: recurring,
 			built,
 			recallable,
@@ -1547,20 +1553,23 @@ export class Ledger implements LedgerInterface {
 	// offers past it newest first, each whole or less its all-`recall` groups, within the window's
 	// share and the whole window within the window's and the retrieval's shares together, up to the
 	// first that neither form fits, with the amenders inside their span; every other exchange of the
-	// window past the newest offers its request to retrieval as `recent`; the recurrence within the
-	// retrieval's share; and the retrieved matches within those two shares less the recurrence and
-	// the shown window. Past the budget the steps cut the `recent` copies and the other matches lowest
-	// rank first, then the window's exchanges oldest first down to the newest one, then the newest
-	// exchange down its ladder, less its all-`recall` groups, then its request and reply alone, then a
-	// copy of its request, then out, then the exchange rows from the deepest down to `previous-2`,
-	// then the id rows last-ranked first, then the recurrence, then the statements oldest first, then
-	// the topic rows last first, `rules`, `previous`, and the rest of the index. Each step reads its
-	// own shown messages, its index, and whether it leaves anything behind; a statement it leaves out
-	// for a shown successor counts as shown. The first window or retrieval step that fits stays, so it
-	// never shows fewer requests as the budget grows; then the first cut of its rows that leaves
-	// `recall` its room wins, else that step as it fits. With no such step that fits, the first bare
-	// row cut that leaves the room wins, else the first that fits, else the recurrence and statement
-	// cuts.
+	// window past the newest offers its request to retrieval as `recent`; the brief's members in
+	// conversation order up to the first that would price them past the retrieval's share, charged to
+	// the budget and never to the retrieval; the recurrence within the retrieval's share; and the
+	// retrieved matches within those two shares less the recurrence and the shown window. Past the
+	// budget the steps cut the `recent` copies and the other matches lowest rank first, then the
+	// window's exchanges oldest first down to the newest one, then the newest exchange down its ladder,
+	// less its all-`recall` groups, then its request and reply alone, then a copy of its request, then
+	// out, then the exchange rows from the deepest down to `previous-2`, then the id rows last-ranked
+	// first, then the recurrence, then the brief last stored first, then the statements oldest first,
+	// then the topic rows last first, `rules`, `previous`, and the rest of the index. Each step reads
+	// its own shown messages, its index, and whether it leaves anything behind; a statement it leaves
+	// out for a shown successor counts as shown. The first window or retrieval step that fits stays, so
+	// it never shows fewer requests as the budget grows while the brief and the recurrence show the
+	// same members; then the first cut of its rows that leaves `recall` its room wins, else that step
+	// as it fits. With no such step that fits, the first bare
+	// row cut that leaves the room wins, else the first that fits, else the recurrence, brief, and
+	// statement cuts.
 	#settle(
 		survey: LedgerSurvey,
 		scan: LedgerScan,
@@ -1576,12 +1585,26 @@ export class Ledger implements LedgerInterface {
 			(_message, index) =>
 				this.#price(survey.recurrences.slice(0, index + 1)) <= total * LEDGER_RELEVANT_SHARE,
 		)
-		const statements = [...current, ...recurrence]
-		// The statements each bare stage keeps: every current statement with the recurrence, then the
-		// recurrence cut, then the current statements cut oldest first; with no recurrence, the cuts alone.
+		// The brief's members up to the first that would price them past the retrieval's share; the
+		// members past it stay retrieval's candidates.
+		const over = survey.brief.findIndex(
+			(_message, index) =>
+				this.#price(survey.brief.slice(0, index + 1)) > total * LEDGER_RELEVANT_SHARE,
+		)
+		const pinned = over < 0 ? survey.brief : survey.brief.slice(0, over)
+		// Every brief member comes before the first request and every current statement after the last
+		// reply, so the brief then the current statements stand in conversation order.
+		const statements = [...pinned, ...current, ...recurrence]
+		// The statements each bare stage keeps: every current statement with the brief and the
+		// recurrence, then the recurrence cut, then the brief cut last stored first, then the current
+		// statements cut oldest first; with no recurrence and no brief, the current cuts alone.
 		const stages = [
 			...(recurrence.length === 0 ? [] : [statements]),
-			...Array.from({ length: current.length + 1 }, (_unused, count) => current.slice(count)),
+			...Array.from({ length: pinned.length + 1 }, (_unused, count) => [
+				...pinned.slice(0, pinned.length - count),
+				...current,
+			]),
+			...Array.from({ length: current.length }, (_unused, count) => current.slice(count + 1)),
 		]
 		// Cutting a statement only lowers the price of an opening with no window and no index, and both
 		// only add to it, so no step before the first stage that fits bare can fit, and nothing is cut
@@ -1626,7 +1649,8 @@ export class Ledger implements LedgerInterface {
 			)
 		// The retrieved messages, each match's in rank order, from none the window, the amenders of the
 		// newest exchange's span, which every layout with a match shows, the current statements, a
-		// statement a shown successor supersedes included, or the recurrence show.
+		// statement a shown successor supersedes included, the brief's shown members, or the recurrence
+		// show; the brief takes nothing from retrieval's room.
 		const retrieved =
 			floor === 0
 				? this.#collectRetrieved(
@@ -1735,7 +1759,8 @@ export class Ledger implements LedgerInterface {
 				(step) =>
 					this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <= total,
 			)
-		// The recurrence cut, then the statements cut oldest first, each with the rows its cut leaves.
+		// The recurrence cut, then the brief cut last stored first, then the statements cut oldest first,
+		// each with the rows its cut leaves.
 		const cut =
 			chosen !== undefined || floor === undefined
 				? undefined
@@ -2107,8 +2132,8 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// The index rows once a cut keeps only `kept` of the `statements` a bare opening shows, the current
-	// statements and the recurrence: `previous`, `rules`, the topic rows, and the ids the cut statements
-	// carry, the earlier steps having cut every other id row.
+	// statements, the brief's shown members, and the recurrence: `previous`, `rules`, the topic rows,
+	// and the ids the cut statements carry, the earlier steps having cut every other id row.
 	#collectCutKeys(
 		input: LedgerProjectionInput,
 		projection: LedgerProjection,

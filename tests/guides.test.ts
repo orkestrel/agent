@@ -1586,7 +1586,6 @@ await new GuideCommand({
 					tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
 				},
 				{ content: 'Order BW-5512 qualifies for a $148.50 refund.' },
-				{ content: '', tools: [{ id: 'call-2', name: 'recall', arguments: { key: 'rules' } }] },
 				{ content: 'Yes. Refunds over $100 need a manager.' },
 			]
 			const replies = script.values()
@@ -1619,18 +1618,15 @@ await new GuideCommand({
 			expect(first.passes).toHaveLength(1)
 			expect(second.content).toBe('Yes. Refunds over $100 need a manager.')
 			expect(second.passes).toHaveLength(1)
-			expect(
-				ledger.conversation.messages().find((message) => message.call === 'call-2')?.content,
-			).toBe('Refunds over $100 need a manager.')
 			expect(copies).toEqual([
 				'Can Brightwater Studio get a refund on order BW-5512?',
-				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- rules: the standing rules and corrections stated earlier\nOther ids, names, and words from a message work too.\n\n## Request\nDoes the Brightwater Studio refund need a manager?",
+				'Does the Brightwater Studio refund need a manager?',
 			])
-			// Every scripted reply was taken: two calibration calls and four turns.
+			// Every scripted reply was taken: two calibration calls and three turns.
 			expect(replies.next()).toEqual({ done: true, value: undefined })
-			// The first request sends the rule whole; the second shows the first exchange with its lookup,
-			// then its copy.
-			expect(prompts.count).toBe(4)
+			// The first request sends the rule whole; the second shows the rule again as the brief, then
+			// the first exchange with its lookup, then its copy.
+			expect(prompts.count).toBe(3)
 			expect(
 				requireValue(prompts.calls[0]?.[0], 'Missing prompt').map(({ role, content }) => [
 					role,
@@ -1648,6 +1644,7 @@ await new GuideCommand({
 				]),
 			).toEqual([
 				['system', system],
+				['user', 'Refunds over $100 need a manager.'],
 				['user', 'Can Brightwater Studio get a refund on order BW-5512?'],
 				['assistant', ''],
 				['tool', 'Order BW-5512 for account BW-20931: Brightwater Studio. Refund due $148.50.'],
@@ -1667,13 +1664,10 @@ await new GuideCommand({
 				"ledger.agent.emitter.on('select', (selection) => copies.push(selection.messages.at(-1)?.content))",
 			)
 			expect(guideText).toContain(
-				"// 'Refunds over $100 need a manager.' — what `recall` read under the rules key",
-			)
-			expect(guideText).toContain(
 				"// 'Can Brightwater Studio get a refund on order BW-5512?' — the rule went whole before it, and nothing is stored behind it",
 			)
 			expect(guideText).toContain(
-				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- rules: the standing rules and corrections stated earlier\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nDoes the Brightwater Studio refund need a manager?' — the window shows the first exchange with its lookup, and the rule stays stored",
+				"// 'Does the Brightwater Studio refund need a manager?' — the rule shows again as the brief, and the window shows the first exchange with its lookup, so nothing is stored behind it",
 			)
 		})
 
@@ -1691,7 +1685,6 @@ await new GuideCommand({
 					tools: [{ id: 'call-1', name: 'lookup_order', arguments: { id: 'BW-5512' } }],
 				},
 				{ content: 'Order BW-5512 qualifies for a $148.50 refund.' },
-				{ content: '', tools: [{ id: 'call-2', name: 'recall', arguments: { key: 'rules' } }] },
 				{ content: 'Yes. Refunds over $100 need a manager.' },
 				{ content: answer },
 			]
@@ -1742,10 +1735,7 @@ await new GuideCommand({
 			})
 			expect(third.content).toBe(answer)
 			expect(replies.next()).toEqual({ done: true, value: undefined })
-			expect(copies).toEqual([
-				"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- rules: the standing rules and corrections stated earlier\nOther ids, names, and words from a message work too.\n\n## Request\n" +
-					request,
-			])
+			expect(copies).toEqual([request])
 			expect(uninterrupted).toEqual(copies)
 			// The whole prompt matches the uninterrupted ledger's.
 			expect(snapshot).not.toHaveProperty('window')
@@ -1755,7 +1745,7 @@ await new GuideCommand({
 					content,
 				]),
 			).toEqual(
-				requireValue(parent.calls[4]?.[0], 'Missing uninterrupted prompt').map(
+				requireValue(parent.calls[3]?.[0], 'Missing uninterrupted prompt').map(
 					({ role, content }) => [role, content],
 				),
 			)
@@ -1777,7 +1767,7 @@ await new GuideCommand({
 			)
 			expect(guideText).toContain("third.content // 'Not yet. A manager must approve it.'")
 			expect(guideText).toContain(
-				"// '## Earlier\\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can\\'t see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\\n- rules: the standing rules and corrections stated earlier\\nOther ids, names, and words from a message work too.\\n\\n## Request\\nIs the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
+				"// 'Is the Brightwater Studio refund approved yet?' — what the first ledger writes for the same request",
 			)
 		})
 
@@ -2626,8 +2616,9 @@ await new GuideCommand({
 				ledger.conversation.snapshot().judgments?.every(({ model }) => model === judge.model),
 			).toBe(true)
 			// The opening and the offer took no option: the first request sends the seed whole and leaves
-			// nothing behind, so it offers no recall; the second shows the first exchange in its window and
-			// leaves the seed behind, so it offers recall.
+			// nothing behind, so it offers no recall; the seed came before the first request and names no
+			// id, so the second shows it again as the brief beside the first exchange, leaves nothing behind
+			// either, and offers no recall.
 			const [first, next] = provider.calls
 			expect(
 				requireValue(first)
@@ -2639,13 +2630,16 @@ await new GuideCommand({
 					.messages.slice(1)
 					.map(({ content }) => content),
 			).toEqual([
+				rule,
+				unsure,
+				correction,
 				'Does a refund need a manager?',
 				'First reply.',
-				expect.stringMatching(/^## Earlier\n[\s\S]*\n\n## Request\nMake that shorter\.$/),
+				'Make that shorter.',
 			])
 			expect(provider.calls.map((call) => call.tools?.map(({ name }) => name))).toEqual([
 				['lookup_order'],
-				['lookup_order', 'recall'],
+				['lookup_order'],
 			])
 			expect(guideText).toContain(
 				"The lean opening and the `recall` offer are the ledger's own behavior and need no configuration.",

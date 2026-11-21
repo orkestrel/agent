@@ -1008,12 +1008,13 @@ export interface LedgerMember {
 
 /**
  * Carries what a request's plan reads before it prices a layout: the request, its projection, the
- * statements and recurrence it can keep, and the recent window's forms.
+ * statements, brief, and recurrence it can keep, and the recent window's forms.
  *
  * @remarks
- * `before` holds the messages stored before the request, `current` its current statements, and
- * `recurrences` the newest member of each recurrence that no current statement is and nothing
- * supersedes, newest first. `built` is the head the first turn renders, `recallable` what `recall`
+ * `before` holds the messages stored before the request, `current` its current statements, `brief`
+ * the statements the `collectLedgerBrief` helper keeps that no current statement is, in conversation
+ * order, and `recurrences` the newest member of each recurrence that no current statement is and
+ * nothing supersedes, newest first. `built` is the head the first turn renders, `recallable` what `recall`
  * can list from before the request, and `lists` and `disclosure` the run scope and the shown skills
  * the plan prices. `depths` maps each exchange's request id to its depth. `ladder` holds the newest
  * exchange's forms, fullest first: whole, less its all-`recall` groups, and the pair, each only
@@ -1027,6 +1028,7 @@ export interface LedgerSurvey {
 	readonly projection: LedgerProjection
 	readonly before: readonly Message[]
 	readonly current: readonly Message[]
+	readonly brief: readonly Message[]
 	readonly recurrences: readonly Message[]
 	readonly built: readonly Message[]
 	readonly recallable: readonly Message[]

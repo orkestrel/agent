@@ -217,12 +217,15 @@ export const LEDGER_MATCH_BASES = Object.freeze([
 export const LEDGER_RELEVANT_LIMIT = 8
 
 /**
- * Caps the recurrence at 0.15 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift, and with `LEDGER_RECENT_SHARE` caps the retrieved messages.
+ * Caps the recurrence and, apart, the brief at 0.15 of the plan's `total`, the prompt budget net of the head's overhead, the skill holdback, and the scale drift, and with `LEDGER_RECENT_SHARE` caps the retrieved messages.
  *
  * @remarks
  * The retrieved matches are taken in rank order, priced as the opening sends them, up to the first
  * that would take them past 0.45 of `total`, the sum of this share and `LEDGER_RECENT_SHARE`, less
- * the recurrence and the shown window, and never below 0.
+ * the recurrence and the shown window, and never below 0. The brief's members are taken in
+ * conversation order up to the first that would take them past this share; the brief is charged to
+ * `total` and never to the retrieved matches' room, and the members past the share stay retrieval
+ * candidates.
  */
 export const LEDGER_RELEVANT_SHARE = 0.15
 
