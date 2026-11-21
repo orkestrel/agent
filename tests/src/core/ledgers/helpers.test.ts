@@ -22,7 +22,9 @@ import {
 	collectLedgerMatches,
 	collectLedgerRecurrences,
 	collectLedgerStatements,
+	collectLedgerSubjects,
 	collectLedgerRecurrenceGroups,
+	matchesLedgerSubject,
 	linkLedgerIds,
 	filterLedgerShown,
 	matchesShownSuccessor,
@@ -2206,6 +2208,40 @@ describe('collectLedgerAmenders', () => {
 		).toEqual([])
 		expect(collectLedgerAmenders(messages, amendments, requests, notes, [])).toEqual([])
 	})
+
+	it("collects the amenders inside each run's span and none between two runs", () => {
+		const runs = [
+			buildLedgerMessage('ask-1', 'user', 'Check OR-1.'),
+			buildLedgerMessage('inside-1', 'user', 'Correction: OR-1 ships Monday.'),
+			buildLedgerMessage('reply-1', 'assistant', 'OR-1 ships Friday.'),
+			buildLedgerMessage('between', 'user', 'Correction: OR-2 ships Monday.'),
+			buildLedgerMessage('ask-2', 'user', 'Check OR-2.'),
+			buildLedgerMessage('reply-2', 'assistant', 'OR-2 ships Friday.'),
+			buildLedgerMessage('ask-3', 'user', 'Check OR-3.'),
+			buildLedgerMessage('reply-3', 'assistant', 'OR-3 ships Friday.'),
+			buildLedgerMessage('inside-3', 'user', 'Correction: OR-3 ships Monday.'),
+			buildLedgerMessage('ask-4', 'user', 'Check OR-4.'),
+			buildLedgerMessage('reply-4', 'assistant', 'OR-4 ships Friday.'),
+		]
+		const asks = new Set(['ask-1', 'ask-2', 'ask-3', 'ask-4'])
+		const laters = new Map([['stated', ['inside-1', 'between', 'inside-3']]])
+		const all = collectLedgerExchanges(runs, asks, new Set())
+		// Exchanges 4, 3, and 1 make two runs, 4 and 3, then 1: `inside-3` sits inside the first run's
+		// span and `inside-1` inside the second's, while `between` sits between the runs.
+		expect(
+			collectLedgerAmenders(
+				runs,
+				laters,
+				asks,
+				new Set(),
+				all.filter((exchange) => exchange.request.id !== 'ask-2'),
+			).map((message) => message.id),
+		).toEqual(['inside-1', 'inside-3'])
+		// With every exchange the window is one run, whose span holds all three.
+		expect(
+			collectLedgerAmenders(runs, laters, asks, new Set(), all).map((message) => message.id),
+		).toEqual(['inside-1', 'between', 'inside-3'])
+	})
 })
 
 describe('filterLedgerShown', () => {
@@ -2721,6 +2757,146 @@ describe('collectLedgerBrief', () => {
 	})
 })
 
+describe('collectLedgerSubjects', () => {
+	it("reads a statement's subject as its known ids' groups, linked through each carrier, and a request's as its own or, naming none, the newest answered request's", () => {
+		const messages = [
+			buildLedgerMessage('opening', 'user', 'Begin.'),
+			buildLedgerMessage('register', 'user', 'Register: BC-7301, BC-7302.'),
+			buildLedgerMessage('link', 'user', 'BC-7301 opened claim CS-7305.'),
+			buildLedgerMessage('claim', 'user', 'CS-7305 needs the adjuster report.'),
+			buildLedgerMessage('ask-1', 'user', 'Check BC-7301.'),
+			buildLedgerMessage('reply-1', 'assistant', 'Open.'),
+			buildLedgerMessage('ask-2', 'user', 'Check BC-7302.'),
+			buildLedgerMessage('ask-3', 'user', 'And the deadline?'),
+		]
+		const requests = new Set(['opening', 'ask-1', 'ask-2', 'ask-3'])
+		// `link` knows both its ids, so it links BC-7301 and CS-7305 into one group under the first in
+		// sorted order. The register knows BC-7301 alone, because no other statement carries BC-7302.
+		// `ask-2` has no reply, so `ask-3`, which names no id, takes the subject of `ask-1`.
+		expect(
+			collectLedgerSubjects(buildLedgerInput({ messages }), 'ask-3', requests, new Set()),
+		).toEqual(
+			new Map([
+				['register', new Set(['BC-7301'])],
+				['link', new Set(['BC-7301'])],
+				['claim', new Set(['BC-7301'])],
+				['opening', new Set()],
+				['ask-1', new Set(['BC-7301'])],
+				['ask-2', new Set(['BC-7302'])],
+				['ask-3', new Set(['BC-7301'])],
+			]),
+		)
+	})
+
+	it('links nothing through a brief member, and links through it when an amendment takes it out of the brief', () => {
+		const messages = [
+			buildLedgerMessage('note', 'user', 'Opening note: BC-7301 and BC-7312 need a callback.'),
+			buildLedgerMessage('ask-1', 'user', 'What is open?'),
+			buildLedgerMessage('reply-1', 'assistant', 'Two callbacks.'),
+			buildLedgerMessage('one', 'user', 'BC-7301 called back.'),
+			buildLedgerMessage('two', 'user', 'BC-7312 sent the form.'),
+			buildLedgerMessage('fix', 'user', 'Correction: BC-7301 alone needs a callback.'),
+			buildLedgerMessage('ask-2', 'user', 'Anything else?'),
+		]
+		const requests = new Set(['ask-1', 'ask-2'])
+		const briefed = collectLedgerSubjects(
+			buildLedgerInput({ messages }),
+			'ask-2',
+			requests,
+			new Set(),
+		)
+		expect([briefed.get('one'), briefed.get('two')]).toEqual([
+			new Set(['BC-7301']),
+			new Set(['BC-7312']),
+		])
+		const amended = collectLedgerSubjects(
+			buildLedgerInput({ messages, classification: { amendments: { note: ['fix'] } } }),
+			'ask-2',
+			requests,
+			new Set(),
+		)
+		expect([amended.get('one'), amended.get('two'), amended.get('ask-2')]).toEqual([
+			new Set(['BC-7301']),
+			new Set(['BC-7301']),
+			new Set(),
+		])
+	})
+
+	it.each([
+		['a quiet statement', { quiet: ['both'] }, false],
+		['a loud statement', {}, true],
+	])('links the cases %s names: %s', (_case, classification, linked) => {
+		const messages = [
+			buildLedgerMessage('ask-1', 'user', 'What is open?'),
+			buildLedgerMessage('reply-1', 'assistant', 'Two callbacks.'),
+			buildLedgerMessage('one', 'user', 'BC-7301 called back.'),
+			buildLedgerMessage('one-again', 'user', 'BC-7301 asked about the roof.'),
+			buildLedgerMessage('two', 'user', 'BC-7312 sent the form.'),
+			buildLedgerMessage('two-again', 'user', 'BC-7312 mailed a photo.'),
+			buildLedgerMessage('both', 'user', 'BC-7301 and BC-7312 share one adjuster.'),
+			buildLedgerMessage('ask-2', 'user', 'Anything else?'),
+		]
+		const subjects = collectLedgerSubjects(
+			buildLedgerInput({ messages, classification }),
+			'ask-2',
+			new Set(['ask-1', 'ask-2']),
+			new Set(),
+		)
+		expect(subjects.get('two')).toEqual(new Set([linked ? 'BC-7301' : 'BC-7312']))
+	})
+
+	it('links nothing through recurrence members that the registry gives two cases, and links through one such statement alone', () => {
+		const findings = ['BC-7301', 'BC-7312'].map((id) =>
+			buildLedgerFinding(`lookup-${id}`, 'lookup', { id }, `Case ${id}.`, {
+				ids: [id],
+				owners: [],
+			}),
+		)
+		const recurring = [
+			buildLedgerMessage('pair-1', 'user', 'Duty pair BC-7301 and BC-7312 on 2031-03-11.'),
+			buildLedgerMessage('pair-2', 'user', 'Duty pair BC-7301 and BC-7312 on 2031-03-12.'),
+		]
+		const around = [
+			buildLedgerMessage('ask-1', 'user', 'What is open?'),
+			buildLedgerMessage('reply-1', 'assistant', 'Two callbacks.'),
+			buildLedgerMessage('two', 'user', 'BC-7312 sent the form.'),
+		]
+		const request = buildLedgerMessage('ask-2', 'user', 'Anything else?')
+		const requests = new Set(['ask-1', 'ask-2'])
+		const members = collectLedgerSubjects(
+			buildLedgerInput({ messages: [...around, ...recurring, request], findings }),
+			'ask-2',
+			requests,
+			new Set(),
+		)
+		// The registry keeps both cases known in each member, but a member carries for its recurrence
+		// alone, so neither links them.
+		expect([members.get('pair-1'), members.get('two')]).toEqual([
+			new Set(['BC-7301', 'BC-7312']),
+			new Set(['BC-7312']),
+		])
+		const lone = collectLedgerSubjects(
+			buildLedgerInput({ messages: [...around, ...recurring.slice(0, 1), request], findings }),
+			'ask-2',
+			requests,
+			new Set(),
+		)
+		expect(lone.get('two')).toEqual(new Set(['BC-7301']))
+	})
+})
+
+describe('matchesLedgerSubject', () => {
+	it.each([
+		[[], [], true],
+		[['BC-7301'], [], true],
+		[[], ['BC-7301'], true],
+		[['BC-7301', 'BC-7312'], ['BC-7312'], true],
+		[['BC-7301'], ['BC-7302'], false],
+	])('reads %j and %j as one subject: %s', (own, other, expected) => {
+		expect(matchesLedgerSubject(new Set(own), new Set(other))).toBe(expected)
+	})
+})
+
 describe('collectLedgerKeys', () => {
 	it('orders previous, rules, the ids of the statements left behind, the named, looked-up, and recurring ids, then the filed topics', () => {
 		const { input, requests, notes } = buildLedgerKeyScenario(true)
@@ -3050,6 +3226,7 @@ describe('collectLedgerMatches', () => {
 			requests,
 			new Set(),
 			shown,
+			new Map(),
 			new Set(),
 		)
 		// The request turn on the request's own id ranks above the statement on the inherited one.
@@ -3066,6 +3243,7 @@ describe('collectLedgerMatches', () => {
 			requests,
 			new Set(),
 			shown,
+			new Map(),
 			new Set(),
 		)
 		expect(named.map((match) => [match.source, match.basis])).toEqual([
@@ -3093,6 +3271,7 @@ describe('collectLedgerMatches', () => {
 			new Set([...asks, 'request']),
 			new Set(),
 			new Set([...fillers.map((message) => message.id), 'request']),
+			new Map(),
 			new Set(),
 		)
 		expect(matches.map((match) => [match.source, match.basis])).toEqual([
@@ -3119,6 +3298,7 @@ describe('collectLedgerMatches', () => {
 			new Set([0, 1, 2, 3].map((at) => `ask-${at}`).concat('request')),
 			new Set(),
 			new Set([...shown.map((message) => message.id), 'request']),
+			new Map(),
 			new Set(),
 		)
 		expect(matches.map((match) => [match.source, match.basis])).toEqual([['code', 'word']])
@@ -3143,6 +3323,7 @@ describe('collectLedgerMatches', () => {
 			new Set([0, 1, 2, 3].map((at) => `ask-${at}`).concat('request')),
 			new Set(),
 			new Set([...shown.map((message) => message.id), 'request']),
+			new Map(),
 			new Set(),
 		)
 		// The newer word match stays behind the older id match.
@@ -3178,6 +3359,7 @@ describe('collectLedgerMatches', () => {
 			new Set([...asks, 'request']),
 			new Set(),
 			shown,
+			new Map(),
 			new Set(),
 		)
 		// The unfiled budget is stale beside the newer shown one; the filed rule stays; the superseded
@@ -3191,6 +3373,7 @@ describe('collectLedgerMatches', () => {
 				new Set([...asks, 'request']),
 				new Set(),
 				new Set([...shown, 'fresh']),
+				new Map(),
 				new Set(),
 			).map((match) => match.source),
 		).toEqual(['ruled'])
@@ -3222,6 +3405,7 @@ describe('collectLedgerMatches', () => {
 				requests,
 				new Set(),
 				new Set(['ask', 'reply', 'fixed', 'request']),
+				new Map(),
 				new Set(),
 			).map((match) => [match.source, match.members]),
 		).toEqual([['order', ['order']]])
@@ -3234,6 +3418,7 @@ describe('collectLedgerMatches', () => {
 				requests,
 				new Set(),
 				new Set(['ask', 'reply', 'request']),
+				new Map(),
 				new Set(),
 			).map((match) => [match.source, match.members]),
 		).toEqual([
@@ -3281,6 +3466,7 @@ describe('collectLedgerMatches', () => {
 			new Set([...asks, 'request']),
 			new Set(),
 			new Set([...fillers.map((message) => message.id), 'newer', 'request']),
+			new Map(),
 			new Set(['bare', 'order', 'stale', 'hush']),
 		)
 		// `order` keeps its id basis; `lamp` matches on words; `stale` shares only words the newer shown
@@ -3294,6 +3480,190 @@ describe('collectLedgerMatches', () => {
 			['bare', 'recent'],
 		])
 	})
+
+	it('drops a word or topic match on another subject, keeps an entity match whatever its subject, and passes a recent request on another subject', () => {
+		const messages = [
+			buildLedgerMessage('roof-1', 'user', 'BC-7301 sent the roof photos.'),
+			buildLedgerMessage('call-1', 'user', 'BC-7301 called.'),
+			buildLedgerMessage('roof-2', 'user', 'BC-7302 mailed the roof photos at noon.'),
+			buildLedgerMessage('call-2', 'user', 'BC-7302 phoned twice.'),
+			buildLedgerMessage('claim-1', 'user', 'BC-7301 filed a claim.'),
+			buildLedgerMessage('invoice', 'user', 'BC-7301 owes invoice IN-9.'),
+			buildLedgerMessage('ask-1', 'user', 'Check BC-7301.'),
+			buildLedgerMessage('reply-1', 'assistant', 'Open.'),
+			buildLedgerMessage(
+				'request',
+				'user',
+				'Which roof photos and invoice IN-9 came in for BC-7302?',
+			),
+		]
+		const requests = new Set(['ask-1', 'request'])
+		const input = buildLedgerInput({
+			messages,
+			classification: { topics: { 'claim-1': ['claims'], request: ['claims'] } },
+		})
+		const [scoped, unscoped] = [
+			collectLedgerSubjects(input, 'request', requests, new Set()),
+			new Map<string, ReadonlySet<string>>(),
+		].map((subjects) =>
+			collectLedgerMatches(
+				input,
+				'request',
+				requests,
+				new Set(),
+				new Set(['request']),
+				subjects,
+				new Set(['ask-1']),
+			)
+				.map((match) => `${match.source}:${match.basis}`)
+				.toSorted(),
+		)
+		// `roof-1` shares words and `claim-1` a topic with the request, both on BC-7301; `invoice` is on
+		// BC-7301 too, but names IN-9, which the request names; `ask-1` is a cut request on BC-7301.
+		expect(scoped).toEqual(['ask-1:recent', 'call-2:entity', 'invoice:entity', 'roof-2:entity'])
+		// With no subjects, nothing scopes the weak matches.
+		expect(unscoped).toEqual([
+			'ask-1:recent',
+			'call-2:entity',
+			'claim-1:topic',
+			'invoice:entity',
+			'roof-1:word',
+			'roof-2:entity',
+		])
+	})
+
+	it('drops an older day marker matched on shared words, with the subjects or with none, and keeps the newest one on any basis', () => {
+		const fillers = [1, 2, 3, 4].flatMap((at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', `Okay ${at}.`),
+			buildLedgerMessage(`ans-${at}`, 'assistant', 'Fine.'),
+		])
+		const messages = [
+			buildLedgerMessage('marker-1', 'user', 'Current workday: 2031-03-11.'),
+			...fillers,
+			buildLedgerMessage('marker-2', 'user', 'Current workday: 2031-03-12.'),
+			buildLedgerMessage('request', 'user', 'Which workday is it?'),
+		]
+		const requests = new Set([...[1, 2, 3, 4].map((at) => `ask-${at}`), 'request'])
+		const input = buildLedgerInput({ messages })
+		const excluded = new Set([...fillers.map((message) => message.id), 'request'])
+		// The id-free host passes no subjects; the date each marker carries is set aside, so its
+		// subject is empty either way.
+		expect(
+			[
+				collectLedgerSubjects(input, 'request', requests, new Set()),
+				new Map<string, ReadonlySet<string>>(),
+			].map((subjects) =>
+				collectLedgerMatches(
+					input,
+					'request',
+					requests,
+					new Set(),
+					excluded,
+					subjects,
+					new Set(),
+				).map((match) => [match.source, match.basis]),
+			),
+		).toEqual([[['marker-2', 'word']], [['marker-2', 'word']]])
+	})
+
+	it('matches a templated correction the request names by id on its entity basis, and not its sibling', () => {
+		const messages = [
+			buildLedgerMessage('fix-11', 'user', 'Correction: order AX-11 ships Monday.'),
+			buildLedgerMessage('fix-12', 'user', 'Correction: order BZ-12 ships Monday.'),
+			buildLedgerMessage('request', 'user', 'What about AX-11?'),
+		]
+		const requests = new Set(['request'])
+		const input = buildLedgerInput({ messages })
+		expect(
+			collectLedgerMatches(
+				input,
+				'request',
+				requests,
+				new Set(),
+				new Set(['request']),
+				collectLedgerSubjects(input, 'request', requests, new Set()),
+				new Set(),
+			).map((match) => [match.source, match.basis]),
+		).toEqual([['fix-11', 'entity']])
+	})
+
+	it('brings an older templated correction as the amender of a match although its own word match drops', () => {
+		const fillers = [1, 2, 3, 4, 5].flatMap((at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', `Okay ${at}.`),
+			buildLedgerMessage(`ans-${at}`, 'assistant', 'Fine.'),
+		])
+		const messages = [
+			buildLedgerMessage('crate', 'user', 'Crate AX-11 rides the Friday barge.'),
+			buildLedgerMessage('fix-11', 'user', 'Correction: freight AX-11 rides Monday.'),
+			...fillers,
+			buildLedgerMessage('fix-12', 'user', 'Correction: freight BZ-12 rides Monday.'),
+			buildLedgerMessage('request', 'user', 'Which barge rides Monday?'),
+		]
+		const requests = new Set([...[1, 2, 3, 4, 5].map((at) => `ask-${at}`), 'request'])
+		const input = buildLedgerInput({
+			messages,
+			classification: { amendments: { crate: ['fix-11'] } },
+		})
+		const matches = collectLedgerMatches(
+			input,
+			'request',
+			requests,
+			new Set(),
+			new Set([...fillers.map((message) => message.id), 'request']),
+			collectLedgerSubjects(input, 'request', requests, new Set()),
+			new Set(),
+		)
+		expect(
+			matches
+				.map((match) => `${match.source}:${match.basis}:${match.members.join('+')}`)
+				.toSorted(),
+		).toEqual(['crate:word:crate+fix-11', 'fix-12:word:fix-12'])
+	})
+
+	it.each([
+		['BC-7301', ['lead-1:inherited']],
+		['BC-7302', ['lead-2:inherited']],
+	])(
+		'scopes an older recurrence member the registry gives a case by the ordinary subject test: after a check of %s it keeps %j',
+		(checked, expected) => {
+			const fillers = [1, 2, 3, 4].flatMap((at) => [
+				buildLedgerMessage(`ask-${at}`, 'user', `Okay ${at}.`),
+				buildLedgerMessage(`ans-${at}`, 'assistant', 'Fine.'),
+			])
+			const messages = [
+				buildLedgerMessage('lead-1', 'user', 'Duty lead BC-7301 on 2031-03-11.'),
+				buildLedgerMessage('lead-2', 'user', 'Duty lead BC-7302 on 2031-03-12.'),
+				...fillers,
+				buildLedgerMessage('check', 'user', `Check ${checked}.`),
+				buildLedgerMessage('checked', 'assistant', 'Open.'),
+				buildLedgerMessage('request', 'user', 'Who is the duty lead?'),
+			]
+			const requests = new Set([...[1, 2, 3, 4].map((at) => `ask-${at}`), 'check', 'request'])
+			const input = buildLedgerInput({
+				messages,
+				findings: ['BC-7301', 'BC-7302'].map((id) =>
+					buildLedgerFinding(`lookup-${id}`, 'lookup', { id }, `Case ${id}.`, {
+						ids: [id],
+						owners: [],
+					}),
+				),
+			})
+			// The request names no id, so it inherits the checked case and its subject; the member on that
+			// case matches on the inherited id, and the member on the other case shares only words, on
+			// another subject.
+			expect(
+				collectLedgerMatches(
+					input,
+					'request',
+					requests,
+					new Set(),
+					new Set([...fillers.map((message) => message.id), 'check', 'checked', 'request']),
+					collectLedgerSubjects(input, 'request', requests, new Set()),
+					new Set(),
+				).map((match) => `${match.source}:${match.basis}`),
+			).toEqual(expected)
+		},
+	)
 })
 
 describe('filterRecallGroups', () => {

@@ -10019,6 +10019,156 @@ export function buildLedgerTraffic(exchanges: readonly LedgerTrafficExchange[]):
 }
 
 /**
+ * Builds a ledger snapshot of answered requests about registered cases: an unanswered opening
+ * request, a register statement that names the cases, then the exchanges {@link buildLedgerTraffic}
+ * builds, so a request that names a case knows it and its subject is that case.
+ *
+ * @remarks
+ * {@link buildLedgerOpened} adds the opening request `opening` with no reply, so it makes no exchange,
+ * every statement follows a first request, and none joins the brief. The register `register`, which
+ * comes right after it, is the one statement that carries each case. The exchanges keep the ids and
+ * depths {@link buildLedgerTraffic} gives them.
+ *
+ * @param cases - The case ids the register names
+ * @param exchanges - The exchanges, oldest first
+ * @returns The snapshot, with `opening` and every exchange's request marked
+ */
+export function buildLedgerCases(
+	cases: readonly string[],
+	exchanges: readonly LedgerTrafficExchange[],
+): LedgerSnapshot {
+	const traffic = buildLedgerTraffic(exchanges)
+	return buildLedgerOpened({
+		...traffic,
+		conversation: {
+			id: 'cases',
+			messages: [
+				{ id: 'register', role: 'user', content: `Register: ${cases.join(', ')}.` },
+				...traffic.conversation.messages,
+			],
+		},
+	})
+}
+
+/**
+ * Builds the far-member scenario over {@link buildLedgerCases}: the oldest exchange checks BC-7301
+ * through a lookup, the next `between` exchanges check other cases, one each, and the two newest
+ * check BC-7301 again, so a request on BC-7301 reads the oldest exchange as a far member of its
+ * subject window and the two newest as its contiguous run.
+ *
+ * @remarks
+ * Exchange 1 is `ask-1`, `Check BC-7301.`, with the lookup call turn `turn-1-1` and its result
+ * `result-1-1`, then the reply `reply-1` with the text `far` gives. Exchanges 2 to `between + 1`
+ * check `BC-7302` onward, one case each, and reply `Fine.`. The second newest exchange checks
+ * `BC-7301 status.` and replies with the text `status` gives; the newest checks `BC-7301 again.` and
+ * replies `Still open.`. The far member's depth is `between + 3`.
+ *
+ * @param between - The exchanges on other cases between the far member and the contiguous run
+ * @param far - The far member's reply
+ * @param status - The reply of the contiguous run's older member
+ * @returns The snapshot, with `opening` and every exchange's request marked
+ */
+export function buildLedgerFar(between: number, far: string, status: string): LedgerSnapshot {
+	const others = Array.from({ length: between }, (_unused, at) => `BC-${7302 + at}`)
+	return buildLedgerCases(
+		['BC-7301', ...others],
+		[
+			{
+				request: 'Check BC-7301.',
+				calls: [{ name: 'lookup', arguments: { id: 'BC-7301' }, result: 'Case BC-7301: open.' }],
+				reply: far,
+			},
+			...others.map((id) => ({ request: `Check ${id}.`, calls: [], reply: 'Fine.' })),
+			{ request: 'Check BC-7301 status.', calls: [], reply: status },
+			{ request: 'Check BC-7301 again.', calls: [], reply: 'Still open.' },
+		],
+	)
+}
+
+/**
+ * Builds a far run whose span holds an amender, beside an amender between the runs, over
+ * {@link buildLedgerCases}: exchange 1 checks BC-7301, exchange 2 checks BC-7302, and exchange 3
+ * checks BC-7301 again, so a request on BC-7301 reads exchange 1 as a far run of its own.
+ *
+ * @remarks
+ * Before exchange 1, `crate` states that crate ZX-9 ships Friday and `van` that van VN-4 leaves at 10.
+ * Inside exchange 1, between `ask-1` and `reply-1`, the correction `fixed` moves crate ZX-9 to Monday;
+ * between `reply-1` and `ask-2` the correction `moved` moves van VN-4 to 12. Each correction shares
+ * only its own id with its statement, and neither shares a word with a request on BC-7301.
+ *
+ * @returns The snapshot, with `opening` and every exchange's request marked
+ */
+export function buildLedgerFarAmended(): LedgerSnapshot {
+	const base = buildLedgerCases(
+		['BC-7301', 'BC-7302'],
+		[
+			{ request: 'Check BC-7301.', calls: [], reply: 'BC-7301 is open.' },
+			{ request: 'Check BC-7302.', calls: [], reply: 'Fine.' },
+			{ request: 'Check BC-7301 again.', calls: [], reply: 'Still open.' },
+		],
+	)
+	return {
+		...base,
+		conversation: {
+			...base.conversation,
+			messages: base.conversation.messages.flatMap((message): readonly Message[] =>
+				message.id === 'ask-1'
+					? [
+							{ id: 'crate', role: 'user', content: 'Crate ZX-9 ships Friday.' },
+							{ id: 'van', role: 'user', content: 'Van VN-4 leaves at 10.' },
+							message,
+							{ id: 'fixed', role: 'user', content: 'Correction: crate ZX-9 ships Monday.' },
+						]
+					: message.id === 'reply-1'
+						? [
+								message,
+								{ id: 'moved', role: 'user', content: 'Correction: van VN-4 leaves at 12.' },
+							]
+						: [message],
+			),
+		},
+	}
+}
+
+/**
+ * Builds a claim scenario over {@link buildLedgerCases} with no lookup, so no registry links a claim to
+ * its case: the register names BC-7311 and BC-7306, the claim statements name CS-7305 alone, and one
+ * answered request checks BC-7306.
+ *
+ * @remarks
+ * After the register, `link` states that BC-7311 opened claim CS-7305 when `linked` is true; `claim`
+ * says CS-7305 needs the adjuster report and `adjuster` names the claim's adjuster, so CS-7305 is a
+ * known id. The exchange is `ask-1`, `Check BC-7306.`, with the reply `reply-1`.
+ *
+ * @param linked - If `true`, the statement naming both the case and the claim is stored; if `false`, it is not
+ * @returns The snapshot, with `opening` and `ask-1` marked
+ */
+export function buildLedgerClaim(linked: boolean): LedgerSnapshot {
+	const base = buildLedgerCases(
+		['BC-7311', 'BC-7306'],
+		[{ request: 'Check BC-7306.', calls: [], reply: 'Fine.' }],
+	)
+	return {
+		...base,
+		conversation: {
+			...base.conversation,
+			messages: base.conversation.messages.flatMap((message): readonly Message[] =>
+				message.id === 'register'
+					? [
+							message,
+							...(linked
+								? [{ id: 'link', role: 'user' as const, content: 'BC-7311 opened claim CS-7305.' }]
+								: []),
+							{ id: 'claim', role: 'user', content: 'CS-7305 needs the adjuster report.' },
+							{ id: 'adjuster', role: 'user', content: 'CS-7305 adjuster is Ana Ruiz.' },
+						]
+					: [message],
+			),
+		},
+	}
+}
+
+/**
  * Holds one answered request whose exchange carries a `recall` call group and a lookup call group,
  * so as the budget grows its opening shows the exchange as a copy, as the pair, less its `recall`
  * group, and whole.

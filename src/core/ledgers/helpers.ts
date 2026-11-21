@@ -267,16 +267,18 @@ export function collectLedgerStatements(
 }
 
 /**
- * Collects the amenders inside a window's span: the statements after the request of the window's
+ * Collects the amenders inside a window's spans: for each run of window exchanges that sit one
+ * behind another among the exchanges of the messages, the statements after the request of the run's
  * oldest exchange and before the reply of its newest that are the later side of an accepted
  * amendment.
  *
  * @remarks
  * A statement is a user message with no calls that is neither a request nor a note. `amendments` is
  * the classification's, so a supersession counts, as the classifier files every supersession as an
- * amendment too. A statement after the newest reply is a current statement, and one before the
- * oldest request comes before everything the window shows, so the span holds neither. No exchange
- * has no span.
+ * amendment too. A statement after the newest reply is a current statement, and one before a run's
+ * oldest request comes before everything that run shows, so no span holds either, and an amender
+ * between two runs stays out. A window whose exchanges sit one behind another is one run, whose span
+ * is the window's. No exchange has no span.
  *
  * @param messages - The messages stored before a request, in conversation order
  * @param amendments - The later messages attached to each earlier message
@@ -310,26 +312,46 @@ export function collectLedgerAmenders(
 	notes: ReadonlySet<string>,
 	exchanges: readonly LedgerExchange[],
 ): readonly Message[] {
-	const oldest = exchanges.at(-1)?.request.id
-	const newest = exchanges[0]?.reply.id
-	if (oldest === undefined || newest === undefined) return []
 	const laters = new Set([...amendments.values()].flat())
-	return messages
-		.slice(
-			messages.findIndex((message) => message.id === oldest) + 1,
-			Math.max(
-				0,
-				messages.findIndex((message) => message.id === newest),
-			),
-		)
-		.filter(
-			(message) =>
-				message.role === 'user' &&
-				!hasCalls(message) &&
-				!requests.has(message.id) &&
-				!notes.has(message.id) &&
-				laters.has(message.id),
-		)
+	const depths = new Map(
+		collectLedgerExchanges(messages, requests, notes).map((exchange, index) => [
+			exchange.request.id,
+			index,
+		]),
+	)
+	// A run opens at the newest exchange and at each one that doesn't sit right behind the one before it.
+	const starts = exchanges.flatMap((exchange, index) => {
+		const depth = depths.get(exchange.request.id)
+		const previous = depths.get(exchanges[index - 1]?.request.id ?? '')
+		return index === 0 || depth === undefined || previous === undefined || depth !== previous + 1
+			? [index]
+			: []
+	})
+	const spans = new Set(
+		starts.flatMap((start, index) => {
+			const run = exchanges.slice(start, starts[index + 1] ?? exchanges.length)
+			const oldest = run.at(-1)?.request.id
+			const newest = run[0]?.reply.id
+			return messages
+				.slice(
+					messages.findIndex((message) => message.id === oldest) + 1,
+					Math.max(
+						0,
+						messages.findIndex((message) => message.id === newest),
+					),
+				)
+				.map((message) => message.id)
+		}),
+	)
+	return messages.filter(
+		(message) =>
+			spans.has(message.id) &&
+			message.role === 'user' &&
+			!hasCalls(message) &&
+			!requests.has(message.id) &&
+			!notes.has(message.id) &&
+			laters.has(message.id),
+	)
 }
 
 /**
@@ -637,6 +659,100 @@ export function collectLedgerBrief(
 		)
 		return new Set([...own].map((id) => linked.get(id) ?? id)).size > 1
 	})
+}
+
+/**
+ * Collects the subject of each request and statement up to a request: its known ids, each read as
+ * the linked group that holds it.
+ *
+ * @remarks
+ * The known ids are what {@link collectLedgerKnown} returns. Ids link as {@link linkLedgerIds} links
+ * them, through the registry and through each carrier, a statement that is neither quiet nor a
+ * recurrence member, as {@link collectLedgerRecurrenceGroups} collects their groups, and that
+ * {@link collectLedgerBrief} leaves out, an amended statement included, whose known ids link
+ * together. A statement is a user message with no calls that is neither a request nor a note. A
+ * statement's subject is its known ids' groups. A request's subject is its own known ids' groups, or,
+ * when it carries none, the subject of the newest earlier request that has a reply. The messages
+ * after the request take no part.
+ *
+ * @param input - The messages, findings, entities, and classification
+ * @param request - The request id; the messages up to it count, and every message when no message has it
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @returns Each request's and statement's subject, quiet statements and recurrence members included, keyed by message id; an empty subject names no known id
+ * @example
+ * ```ts
+ * // `input` holds a statement naming BC-7301, a request naming it, its reply, and a request naming no id.
+ * collectLedgerSubjects(input, 'request', new Set(['ask', 'request']), new Set()).get('request') // Set { 'BC-7301' }
+ * ```
+ */
+export function collectLedgerSubjects(
+	input: LedgerProjectionInput,
+	request: string,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): ReadonlyMap<string, ReadonlySet<string>> {
+	const at = input.messages.findIndex((message) => message.id === request)
+	const scope = at < 0 ? input.messages : input.messages.slice(0, at + 1)
+	const quiet = input.classification.quiet
+	const known = collectLedgerKnown(input, request, requests, notes)
+	const members = new Set(collectLedgerRecurrenceGroups(scope, requests, notes, quiet).flat())
+	const brief = new Set(collectLedgerBrief(input, request, requests, notes))
+	const statements = scope.filter(
+		(message) =>
+			message.role === 'user' &&
+			!hasCalls(message) &&
+			!requests.has(message.id) &&
+			!notes.has(message.id),
+	)
+	const asked = scope.filter((message) => requests.has(message.id))
+	const labels = linkLedgerIds(
+		input.findings,
+		statements
+			.filter((message) => !quiet.has(message.id) && !members.has(message) && !brief.has(message))
+			.map((message) => known.get(message.id) ?? []),
+	)
+	const own = new Map(
+		[...statements, ...asked].map((message) => [
+			message.id,
+			new Set((known.get(message.id) ?? []).map((id) => labels.get(id) ?? id)),
+		]),
+	)
+	const replies = collectLedgerReplies(scope, requests, notes)
+	return new Map([
+		...statements.map((message) => [message.id, own.get(message.id) ?? new Set<string>()] as const),
+		...asked.map((message, index) => {
+			const mine = own.get(message.id) ?? new Set<string>()
+			// The newest earlier request that has a reply passes on its own subject, or what it took the
+			// same way, so the source is the newest such request that names a known id.
+			const source = asked
+				.slice(0, index)
+				.findLast((earlier) => replies.has(earlier.id) && (own.get(earlier.id)?.size ?? 0) > 0)
+			return [
+				message.id,
+				mine.size > 0 || source === undefined ? mine : (own.get(source.id) ?? mine),
+			] as const
+		}),
+	])
+}
+
+/**
+ * Checks whether two subjects can be one: true unless both name a known id and they share no group.
+ *
+ * @param own - A subject, as {@link collectLedgerSubjects} returns it
+ * @param other - Another subject
+ * @returns True if either subject is empty or they share a group; false otherwise
+ * @example
+ * ```ts
+ * matchesLedgerSubject(new Set(['BC-7301']), new Set(['BC-7302'])) // false
+ * matchesLedgerSubject(new Set(['BC-7301']), new Set()) // true
+ * ```
+ */
+export function matchesLedgerSubject(
+	own: ReadonlySet<string>,
+	other: ReadonlySet<string>,
+): boolean {
+	return own.size === 0 || other.size === 0 || [...own].some((label) => other.has(label))
 }
 
 /**
@@ -1076,20 +1192,27 @@ export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
  * later message. Shared words rank below the other id and topic bases, so they fill only the places
  * those leave.
  *
- * A request turn in `recent`, the requests of the recent window's exchanges that its shares cut, is
- * a candidate even when it is quiet. One with no basis above, or only a stale one, or a quiet one, is
- * a `recent` match, which ranks last.
+ * The subject scope: an `inherited`, `topic`, or `word` match drops when the source's subject can't
+ * be the request's, as {@link matchesLedgerSubject} reads the two in `subjects`, and when the source
+ * is an older member of a recurrence, any member of a group {@link collectLedgerRecurrenceGroups}
+ * collects before the request but its newest, whose subject is empty. An `entity` match stays, and
+ * the candidate stays either way, so a dropped source can still arrive as another match's amender.
+ *
+ * A request turn in `recent`, the requests of the subject window's contiguous members that its shares
+ * cut, is a candidate even when it is quiet. One with none of those bases, or only a stale,
+ * out-of-scope, or quiet one, is a `recent` match, which ranks last.
  *
  * @param input - The messages, owners, entities, and classification
  * @param request - The request id; only messages before it are candidates
  * @param requests - The marked request ids
  * @param notes - The ledger note ids
  * @param excluded - The ids of the messages the opening already shows, the request's among them
- * @param recent - The request ids of the recent window's exchanges that its shares cut
+ * @param subjects - The subjects {@link collectLedgerSubjects} returns for the request
+ * @param recent - The request ids of the subject window's contiguous members that its shares cut
  * @returns The matches, best first
  * @example
  * ```ts
- * collectLedgerMatches(input, 'request', new Set(['first', 'request']), new Set(), new Set(['request']), new Set())
+ * collectLedgerMatches(input, 'request', new Set(['first', 'request']), new Set(), new Set(['request']), new Map(), new Set())
  * // [{ source: 'stated', members: ['stated'], basis: 'entity', score: 0 }, …]
  * ```
  */
@@ -1099,12 +1222,20 @@ export function collectLedgerMatches(
 	requests: ReadonlySet<string>,
 	notes: ReadonlySet<string>,
 	excluded: ReadonlySet<string>,
+	subjects: ReadonlyMap<string, ReadonlySet<string>>,
 	recent: ReadonlySet<string>,
 ): readonly LedgerMatch[] {
 	const at = input.messages.findIndex((message) => message.id === request)
 	const before = at < 0 ? input.messages : input.messages.slice(0, at)
 	const asked = at < 0 ? [] : input.messages.slice(at, at + 1)
 	const classification = input.classification
+	const subject = subjects.get(request) ?? new Set<string>()
+	// Every member of each recurrence but its newest.
+	const older = new Set(
+		collectLedgerRecurrenceGroups(before, requests, notes, classification.quiet)
+			.flatMap((members) => members.slice(0, -1))
+			.map((message) => message.id),
+	)
 	const positions = new Map(before.map((message, index) => [message.id, index]))
 	const users = before.filter(
 		(message) => message.role === 'user' && !hasCalls(message) && !notes.has(message.id),
@@ -1187,8 +1318,14 @@ export function collectLedgerMatches(
 					(positions.get(newer.id) ?? 0) > position &&
 					counted.every((word) => words.get(newer.id)?.has(word) === true),
 			)
+		const theirs = subjects.get(source) ?? new Set<string>()
+		// A weak basis holds only on the request's subject, and never for an older recurrence member
+		// with no known id.
+		const scoped =
+			strong === 'entity' ||
+			(!(older.has(source) && theirs.size === 0) && matchesLedgerSubject(subject, theirs))
 		const basis: LedgerMatchBasis | undefined =
-			strong !== undefined && !stale && !classification.quiet.has(source)
+			strong !== undefined && !stale && scoped && !classification.quiet.has(source)
 				? strong
 				: recent.has(source)
 					? 'recent'

@@ -225,7 +225,11 @@ import {
 	LEDGER_CUT_RULED_SNAPSHOT,
 	LEDGER_STATEMENT_TOPICS,
 	buildLedgerAmended,
+	buildLedgerCases,
+	buildLedgerClaim,
 	buildLedgerDays,
+	buildLedgerFar,
+	buildLedgerFarAmended,
 	buildLedgerGoals,
 	buildLedgerHall,
 	buildLedgerOpened,
@@ -10756,16 +10760,17 @@ describe('Ledger — recall by key', () => {
 		)
 		await ledger.respond('What is still open?')
 		const keys = readLedgerOpening(requireValue(provider.calls[0]).messages).keys
-		// The window shows the newest 8 exchanges, so the rows run from previous-16 to previous-9.
+		// Every goal names its own order, so the subject window shows the newest exchange alone and the
+		// rows run from previous-9 to previous-2.
 		expect(keys.slice(0, 8)).toEqual([
-			'previous-16',
-			'previous-15',
-			'previous-14',
-			'previous-13',
-			'previous-12',
-			'previous-11',
-			'previous-10',
 			'previous-9',
+			'previous-8',
+			'previous-7',
+			'previous-6',
+			'previous-5',
+			'previous-4',
+			'previous-3',
+			'previous-2',
 		])
 		expect(keys.filter((key) => key.startsWith('previous'))).toHaveLength(LEDGER_EXCHANGE_LIMIT)
 		// The rows carry no request text, so no request's words appear in the index.
@@ -11599,16 +11604,19 @@ describe('Ledger — the lean opening', () => {
 		const first = createLedger(planned, options)
 		first.conversation.add({ role: 'user', content: statement })
 		await first.respond(request)
-		const keys = readLedgerOpening(requireValue(planned.calls[0]).messages).keys
-		// The exchange rows take their own 8 places past the window, oldest first, and leave the id
-		// rows' cap whole.
-		expect(keys.slice(0, LEDGER_EXCHANGE_LIMIT).at(-1)).toBe(
-			`${LEDGER_PREVIOUS_KEY}-${LEDGER_RECENT_LIMIT + 1}`,
-		)
+		const opened = readLedgerOpening(requireValue(planned.calls[0]).messages)
+		const keys = opened.keys
+		// The request's subject is GL-7's, so the subject window shows the newest exchange and GL-7's goal
+		// as a far member. GL-57's order is the one statement that carries GL-57, so it knows AC-7 alone
+		// and links GL-57 to nothing. The exchange rows take their own 8 places from previous-9 to
+		// previous-2, oldest first, and leave the id rows' cap whole.
+		expect(['ask-7', 'answer-7'].filter((id) => !opened.shown.includes(id))).toEqual([])
+		expect(opened.shown).not.toContain('answer-57')
+		expect(keys.slice(0, LEDGER_EXCHANGE_LIMIT).at(-1)).toBe(`${LEDGER_PREVIOUS_KEY}-2`)
 		expect(keys.slice(LEDGER_EXCHANGE_LIMIT)).toHaveLength(LEDGER_KEY_LIMIT)
-		// The request's own ids lead the id rows; AC-7 has none, since retrieval shows the 8 orders that
-		// carry it.
-		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-7', 'GL-94'])
+		// The request's own ids leave nothing behind, so the recurring ids lead the id rows, newest
+		// first: GL-99, whose order the newest exchange leaves behind, then GL-98.
+		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-99', 'GL-98'])
 		// Four recalls, the request's limit, run inside the request that planned the index.
 		const recalled = [
 			keys[LEDGER_EXCHANGE_LIMIT - 1],
@@ -11640,10 +11648,10 @@ describe('Ledger — the lean opening', () => {
 			),
 		)
 		expect(listings.filter((listing) => listing.startsWith('nothing earlier matches'))).toEqual([])
-		// The opening sent the statement and retrieved the order, so the in-request recall of its id lists
-		// neither.
-		expect(listings[1]).not.toContain(statement)
-		expect(listings[1]).not.toContain('Order GL-7 for account AC-7')
+		// The opening sent goal 99's request and reply, so the in-request recall of GL-99 lists the order
+		// it leaves behind and not the request.
+		expect(listings[1]).toContain('Order GL-99 for account AC-49')
+		expect(listings[1]).not.toContain('What do we do for GL-99?')
 		// Between requests nothing is left out, and every key the index named still lists a line.
 		const listed = await ledger.agent.context.tools.execute(
 			keys.map((key) => ({ id: `host ${key}`, name: 'recall', arguments: { key } })),
@@ -11933,6 +11941,184 @@ describe('Ledger — the recent window', () => {
 			},
 		])
 	})
+})
+
+describe('Ledger — the subject window', () => {
+	it("counts its members after the subject filter, so a far exchange on the request's case past eight exchanges on other cases shows as its request and reply, with no traffic and no index row", async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				snapshot: buildLedgerFar(8, 'BC-7301 is open.', 'Open.'),
+				topics: [],
+			}),
+		)
+		await ledger.respond('What else on BC-7301?')
+		const sent = requireValue(provider.calls[0]).messages
+		const opening = readLedgerOpening(sent)
+		// The far member sits at depth 11, past the 8 depths a count bound before the filter reaches, and
+		// shows its stored request and reply without its lookup. The register is stale: the shown
+		// requests carry the one word of it the request counts.
+		expect(opening.shown).toEqual(['ask-1', 'reply-1', 'ask-10', 'reply-10', 'ask-11', 'reply-11'])
+		expect(sent.find((message) => message.id === 'ask-1')?.content).toBe('Check BC-7301.')
+		expect(opening.keys).toContain('previous-3')
+		expect(opening.keys).not.toContain('previous-11')
+	})
+
+	it("shows no copy of a far member the shares cut, keeps its index row, and never retrieves its request, which names the request's case", async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				snapshot: buildLedgerFar(1, `BC-7301 is open. ${'x'.repeat(6000)}`, 'Open.'),
+				topics: [],
+			}),
+		)
+		await ledger.respond('What else on BC-7301?')
+		const opening = readLedgerOpening(requireValue(provider.calls[0]).messages)
+		// The far member at depth 4 prices past the window's share. Its request names BC-7301, so
+		// retrieval would match it on the request's own id, but a cut far member stays behind whole.
+		expect(opening.shown).toEqual(['register', 'ask-3', 'reply-3', 'ask-4', 'reply-4'])
+		expect(opening.keys).toContain('previous-4')
+	})
+
+	it('returns a member of the contiguous run the shares cut as a keyed recent copy, and stops the window there', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				snapshot: buildLedgerCases(
+					['BC-7301'],
+					[
+						{ request: 'Check BC-7301.', calls: [], reply: 'BC-7301 is open.' },
+						{ request: 'Make it shorter.', calls: [], reply: `Shorter. ${'x'.repeat(6000)}` },
+						{ request: 'And the deadline?', calls: [], reply: 'Friday.' },
+					],
+				),
+				topics: [],
+			}),
+		)
+		await ledger.respond('Anything else?')
+		const sent = requireValue(provider.calls[0]).messages
+		// Every request takes the subject of BC-7301; the long middle exchange fits no form, so the window
+		// stops there, and both requests behind the newest come back as recent copies under their keys.
+		expect(readLedgerOpening(sent).shown).toEqual(['ask-1', 'ask-2', 'ask-3', 'reply-3'])
+		expect(
+			['ask-1', 'ask-2'].map((id) => sent.find((message) => message.id === id)?.content),
+		).toEqual([
+			'previous-3: Earlier request: Check BC-7301.',
+			'previous-2: Earlier request: Make it shorter.',
+		])
+	})
+
+	it('stops the window at the first member no form fits, so a far member past a cut contiguous member stays out with no copy', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				snapshot: buildLedgerFar(1, 'BC-7301 is open.', `Open. ${'x'.repeat(6000)}`),
+				topics: [],
+			}),
+		)
+		await ledger.respond('What else on BC-7301?')
+		const sent = requireValue(provider.calls[0]).messages
+		expect(readLedgerOpening(sent).shown).toEqual(['register', 'ask-3', 'ask-4', 'reply-4'])
+		expect(sent.find((message) => message.id === 'ask-3')?.content).toBe(
+			'previous-2: Earlier request: Check BC-7301 status.',
+		)
+	})
+
+	it("shows an amender inside a far run's span with that run, and none between the runs", async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: LEDGER_STATEMENT_TOPICS,
+				snapshot: buildLedgerFarAmended(),
+				judge: createCorrectionJudge(createRecorder(), new Set(['fixed', 'moved']), {
+					amends: 0.9,
+					supersedes: 0.1,
+				}),
+			}),
+		)
+		await ledger.respond('What else on BC-7301?')
+		// `fixed` sits inside the far member's own span; `moved` sits between the far run and the newest.
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			'register',
+			'ask-1',
+			'fixed',
+			'reply-1',
+			'ask-3',
+			'reply-3',
+		])
+	})
+
+	it('cuts the far members before the contiguous ones as the request outgrows the budget', async () => {
+		const snapshot = buildLedgerFar(
+			1,
+			`BC-7301 is open. ${'f'.repeat(800)}`,
+			`Open. ${'s'.repeat(800)}`,
+		)
+		const rows = await Promise.all(
+			Array.from({ length: 40 }, (_unused, at) => 10_000 + at * 100).map(async (size) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+				await ledger.respond(`What else on BC-7301? ${'q'.repeat(size)}`)
+				const shown = readLedgerOpening(requireValue(provider.calls[0]).messages).shown
+				return { far: shown.includes('reply-1'), contiguous: shown.includes('reply-3') }
+			}),
+		)
+		// A contiguous member never leaves while a far member stays, and the sweep reaches the far cut.
+		expect(rows.filter((row) => row.far && !row.contiguous)).toEqual([])
+		expect(rows.some((row) => row.far && row.contiguous)).toBe(true)
+		expect(rows.some((row) => !row.far && row.contiguous)).toBe(true)
+	})
+
+	it('never shows fewer requests as the capacity grows while the newest exchange keeps its form, far members included', async () => {
+		const snapshot = buildLedgerFar(
+			1,
+			`BC-7301 is open. ${'f'.repeat(800)}`,
+			`Open. ${'s'.repeat(800)}`,
+		)
+		const rows = await Promise.all(
+			Array.from({ length: 60 }, (_unused, at) => 200 + at * 40).map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, snapshot, topics: [] }),
+				)
+				await ledger.respond('What else on BC-7301?')
+				const sent = requireValue(provider.calls[0]).messages
+				return {
+					...readLedgerWindow(sent, snapshot),
+					far: readLedgerOpening(sent).shown.includes('reply-1'),
+				}
+			}),
+		)
+		const falls = rows.slice(1).filter((row, at) => {
+			const before = requireValue(rows[at])
+			return row.form === before.form && row.requests < before.requests
+		})
+		expect(falls).toEqual([])
+		// The sweep shows the far member as its pair somewhere, and leaves it out somewhere.
+		expect(new Set(rows.map((row) => row.far))).toEqual(new Set([true, false]))
+	})
+
+	it.each([
+		[true, ['register', 'link', 'claim', 'adjuster', 'ask-1', 'reply-1']],
+		[false, ['register', 'ask-1', 'reply-1']],
+	])(
+		'keeps the claim statements on their case with no registry link while a statement names both, as CS-7305 at ev-17-1 (linked: %s)',
+		async (linked, shown) => {
+			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+			const ledger = createLedger(
+				provider,
+				buildLedgerOptions({ snapshot: buildLedgerClaim(linked), topics: [] }),
+			)
+			await ledger.respond('Does BC-7311 have the adjuster report?')
+			expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual(shown)
+		},
+	)
 })
 
 describe("Ledger — the newest exchange's ladder", () => {
@@ -13262,6 +13448,26 @@ describe('Ledger — the newest statement of each recurrence', () => {
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'older')?.content,
 		).toContain('Current workday: 2031-03-11.')
+	})
+
+	it('shows exactly the newest day marker when the request shares words with every marker', async () => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				topics: [],
+				snapshot: buildLedgerDays(2, 1),
+				judge: createCorrectionJudge(createRecorder(), new Set(), { amends: 0, supersedes: 0 }),
+			}),
+		)
+		await ledger.respond('G2-2 Which workday is it?')
+		// Both markers share the word `workday` with the request, and the judge files them, so neither is
+		// stale; the older one carries no known id, so retrieval leaves it to `recall`.
+		expect(
+			readLedgerOpening(requireValue(provider.calls[0]).messages).shown.filter((id) =>
+				id.startsWith('marker-'),
+			),
+		).toEqual(['marker-2'])
 	})
 
 	it('keeps the opening of a conversation of requests alone, though the requests mask alike', async () => {

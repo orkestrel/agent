@@ -991,14 +991,14 @@ export interface LedgerMatch {
 }
 
 /**
- * Carries one exchange of a request's recent window in the form an opening shows it.
+ * Carries one exchange of a request's subject window in the form an opening shows it.
  *
  * @remarks
  * `depth` is 1 for the last exchange that has a reply and N for the one N exchanges back, as the
  * exchange key `previous-N` names it. `messages` is the form, in stored order: the whole exchange,
  * its request, the call groups whose every call has its result and whose results no shown later
  * lookup retired, and its reply; that form less the groups whose every call is `recall`; or the
- * pair, its request and its reply alone.
+ * pair, its request and its reply alone, the one form of a far member.
  */
 export interface LedgerMember {
 	readonly exchange: LedgerExchange
@@ -1008,7 +1008,7 @@ export interface LedgerMember {
 
 /**
  * Carries what a request's plan reads before it prices a layout: the request, its projection, the
- * statements, brief, and recurrence it can keep, and the recent window's forms.
+ * statements, brief, and recurrence it can keep, the subjects, and the subject window's forms.
  *
  * @remarks
  * `before` holds the messages stored before the request, `current` its current statements, `brief`
@@ -1016,11 +1016,16 @@ export interface LedgerMember {
  * order, and `recurrences` the newest member of each recurrence that no current statement is and
  * nothing supersedes, newest first. `built` is the head the first turn renders, `recallable` what `recall`
  * can list from before the request, and `lists` and `disclosure` the run scope and the shown skills
- * the plan prices. `depths` maps each exchange's request id to its depth. `ladder` holds the newest
+ * the plan prices. `subjects` is what the `collectLedgerSubjects` helper returns for the request, and
+ * `depths` maps each exchange's request id to its depth. The subject window is the newest exchange,
+ * then the newest exchanges whose subject the `matchesLedgerSubject` helper matches to the request's,
+ * at most `LEDGER_RECENT_LIMIT` in all; its contiguous run is the members whose depths run unbroken
+ * back from the newest, and every member past the first gap is far. `ladder` holds the newest
  * exchange's forms, fullest first: whole, less its all-`recall` groups, and the pair, each only
- * where it differs from the one before. `older` holds the forms of each exchange past the newest,
- * newest first and each whole then less its all-`recall` groups, when the newest exchange shows
- * its lookups; `spared` holds them when it shows none, so no lookup of the newest retires a group.
+ * where it differs from the one before. `older` holds the forms of each member of the contiguous run
+ * past the newest, newest first and each whole then less its all-`recall` groups, when the newest
+ * exchange shows its lookups; `spared` holds them when it shows none, so no lookup of the newest
+ * retires a group. `far` holds each far member as its pair, newest first.
  */
 export interface LedgerSurvey {
 	readonly request: Message
@@ -1034,10 +1039,12 @@ export interface LedgerSurvey {
 	readonly recallable: readonly Message[]
 	readonly lists: ScopeFilter
 	readonly disclosure: AgentDisclosure
+	readonly subjects: ReadonlyMap<string, ReadonlySet<string>>
 	readonly depths: ReadonlyMap<string, number>
 	readonly ladder: readonly LedgerMember[]
 	readonly older: ReadonlyArray<readonly LedgerMember[]>
 	readonly spared: ReadonlyArray<readonly LedgerMember[]>
+	readonly far: readonly LedgerMember[]
 }
 
 /**
@@ -1049,8 +1056,10 @@ export interface LedgerSurvey {
  * rows. `withheld` is true when the plan leaves behind something `recall` can list. `intact` is true
  * when it shows the newest exchange in the form the window's rung gave it, or there is no exchange.
  * `roomy` is true when its first turn leaves `recall` the close rule's room. `requests` counts the
- * request turns it shows, in the window or as copies, and `recent` those of the recent window's
- * exchanges.
+ * request turns it shows, in the window or as copies, and `recent` those of the subject window's
+ * members: the newest exchange's in its form or as a copy, each contiguous member's whole, less its
+ * all-`recall` groups, or as a copy, and each far member's in its pair. A far member the shares cut
+ * shows no copy, so it counts nothing.
  */
 export interface LedgerPlanResult {
 	readonly shown: readonly Message[]
