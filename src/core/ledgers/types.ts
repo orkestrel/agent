@@ -1012,7 +1012,7 @@ export interface LedgerMember {
  *
  * @remarks
  * `before` holds the messages stored before the request, `current` its current statements, and
- * `recurring` the newest member of each recurrence that no current statement is and nothing
+ * `recurrences` the newest member of each recurrence that no current statement is and nothing
  * supersedes, newest first. `built` is the head the first turn renders, `recallable` what `recall`
  * can list from before the request, and `lists` and `disclosure` the run scope and the shown skills
  * the plan prices. `depths` maps each exchange's request id to its depth. `ladder` holds the newest
@@ -1027,7 +1027,7 @@ export interface LedgerSurvey {
 	readonly projection: LedgerProjection
 	readonly before: readonly Message[]
 	readonly current: readonly Message[]
-	readonly recurring: readonly Message[]
+	readonly recurrences: readonly Message[]
 	readonly built: readonly Message[]
 	readonly recallable: readonly Message[]
 	readonly lists: ScopeFilter
@@ -1044,7 +1044,7 @@ export interface LedgerSurvey {
  *
  * @remarks
  * `shown` holds the messages the opening sends before the request copy, and `keys` the copy's index
- * rows. `others` is true when the plan leaves behind something `recall` can list. `intact` is true
+ * rows. `withheld` is true when the plan leaves behind something `recall` can list. `intact` is true
  * when it shows the newest exchange in the form the window's rung gave it, or there is no exchange.
  * `roomy` is true when its first turn leaves `recall` the close rule's room. `requests` counts the
  * request turns it shows, in the window or as copies, and `recent` those of the recent window's
@@ -1053,7 +1053,7 @@ export interface LedgerSurvey {
 export interface LedgerPlanResult {
 	readonly shown: readonly Message[]
 	readonly keys: readonly LedgerKey[]
-	readonly others: boolean
+	readonly withheld: boolean
 	readonly intact: boolean
 	readonly roomy: boolean
 	readonly requests: number

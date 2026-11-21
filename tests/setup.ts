@@ -9820,20 +9820,19 @@ export const LEDGER_CUT_DEEP_SNAPSHOT = Object.freeze<LedgerSnapshot>({
  * @returns The snapshot, with every request marked
  */
 export function buildLedgerWindow(replies: readonly string[], statement?: string): LedgerSnapshot {
+	const traffic = buildLedgerTraffic(
+		replies.map((reply, at) => ({ request: `Note item ${at + 1}.`, calls: [], reply })),
+	)
 	return {
+		...traffic,
 		conversation: {
 			id: 'window',
-			messages: replies.flatMap((reply, at): readonly Message[] => [
-				...(statement !== undefined && at === replies.length - 1
-					? [{ id: 'stated', role: 'user' as const, content: statement }]
-					: []),
-				{ id: `ask-${at + 1}`, role: 'user', content: `Note item ${at + 1}.` },
-				{ id: `reply-${at + 1}`, role: 'assistant', content: reply },
-			]),
+			messages: traffic.conversation.messages.flatMap((message): readonly Message[] =>
+				statement !== undefined && message.id === `ask-${replies.length}`
+					? [{ id: 'stated', role: 'user', content: statement }, message]
+					: [message],
+			),
 		},
-		requests: replies.map((_reply, at) => `ask-${at + 1}`),
-		notes: [],
-		failures: [],
 	}
 }
 
@@ -10050,6 +10049,97 @@ export const LEDGER_TIGHT_SNAPSHOT = Object.freeze<LedgerSnapshot>(
 		),
 	),
 )
+
+/**
+ * Holds six answered requests whose five older requests run about 70 estimate units and replies
+ * about 25, so a copy of a request costs most of its whole exchange, and as the budget grows the
+ * recent window's bound trades whole older exchanges for copies of more requests.
+ *
+ * @remarks
+ * Exchange `N` of the first five is the request `ask-N`, `Note crate N.` and its padding, and the
+ * reply `reply-N`; the newest, `ask-6`, `Note the van.`, has a short reply.
+ */
+export const LEDGER_TRADE_SNAPSHOT = Object.freeze<LedgerSnapshot>(
+	buildLedgerTraffic([
+		...Array.from({ length: 5 }, (_unused, at) => ({
+			request: `Note crate ${at + 1}. ${'q'.repeat(240)}`,
+			calls: [],
+			reply: `Crate ${at + 1} noted. ${'r'.repeat(60)}`,
+		})),
+		{ request: 'Note the van.', calls: [], reply: 'Noted the van.' },
+	]),
+)
+
+/**
+ * Holds five older statements on order OR-7 of about 100 estimate units each, then an exchange of
+ * about 210 and a newest exchange of about 610, so at a budget of 1000 the newest exchange's pair
+ * is over the window's and the retrieval's shares together and the statements fill retrieval's room.
+ *
+ * @remarks
+ * The statements are `note-1` through `note-5`; the older exchange is `ask-1`, `Check OR-7.`, and
+ * `reply-1`, and the newest is `ask-2`, `Check OR-7 again.`, and `reply-2`.
+ */
+export const LEDGER_CARRIED_SNAPSHOT = Object.freeze<LedgerSnapshot>({
+	requests: ['ask-1', 'ask-2'],
+	notes: [],
+	failures: [],
+	conversation: {
+		id: 'carried',
+		messages: [
+			...[1, 2, 3, 4, 5].map((at): Message => ({
+				id: `note-${at}`,
+				role: 'user',
+				content: `Order OR-7 note ${at}: ${'s'.repeat(370)}`,
+			})),
+			...buildLedgerTraffic([
+				{ request: 'Check OR-7.', calls: [], reply: `OR-7 is packed. ${'r'.repeat(760)}` },
+				{
+					request: 'Check OR-7 again.',
+					calls: [],
+					reply: `OR-7 ships Monday. ${'p'.repeat(2380)}`,
+				},
+			]).conversation.messages,
+		],
+	},
+})
+
+/**
+ * Holds six statements on order OR-7, two refund statements, three exchanges whose requests name
+ * OR-7 and whose replies run past the recent window's share, and a short newest exchange, so a
+ * request on the OR-7 refund matches six statements and three cut window requests on the id and two
+ * statements on the `refunds` topic.
+ *
+ * @remarks
+ * The statements are `case-1` through `case-6` and `topic-1` and `topic-2`; the exchanges are
+ * `ask-1` through `ask-3`, `Check OR-7 part N.`, with replies of about 1300 estimate units, and the
+ * newest is `ask-4`, `Thanks.`, and `reply-4`. A {@link createPhraseJudge} files every message that
+ * names a refund under `refunds`.
+ */
+export const LEDGER_EXEMPT_SNAPSHOT = Object.freeze<LedgerSnapshot>({
+	notes: [],
+	failures: [],
+	conversation: {
+		id: 'exempt',
+		messages: [
+			...[1, 2, 3, 4, 5, 6].map((at): Message => ({
+				id: `case-${at}`,
+				role: 'user',
+				content: `Order OR-7 holds crate ${at}.`,
+			})),
+			{ id: 'topic-1', role: 'user', content: 'Each refund needs a signed slip.' },
+			{ id: 'topic-2', role: 'user', content: 'A refund over $50 needs a manager.' },
+			...buildLedgerTraffic([
+				...[1, 2, 3].map((at) => ({
+					request: `Check OR-7 part ${at}.`,
+					calls: [],
+					reply: `Part ${at} noted. ${'x'.repeat(5200)}`,
+				})),
+				{ request: 'Thanks.', calls: [], reply: 'Welcome.' },
+			]).conversation.messages,
+		],
+	},
+	requests: ['ask-1', 'ask-2', 'ask-3', 'ask-4'],
+})
 
 /** Holds the gauge the chat study's scenarios measured, which prices the tool definitions. */
 export const LEDGER_TIGHT_GAUGE = Object.freeze({ scale: 0.9428571428571428, overhead: 509 })

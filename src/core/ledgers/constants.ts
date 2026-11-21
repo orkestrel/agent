@@ -175,7 +175,7 @@ export const LEDGER_EXCHANGE_LIMIT = 8
  * @remarks
  * The recent window holds the newest exchanges that have a reply, newest first. The newest shows
  * whole, less its all-`recall` call groups, or as its request and reply alone, as its share allows,
- * else its request shows as a `recent` copy; each later one shows whole or less its all-`recall`
+ * else its request shows as a copy; each later one shows whole or less its all-`recall`
  * groups, and the window stops at the first that `LEDGER_RECENT_SHARE` leaves no room for. A shown
  * exchange gets no row in the Earlier index.
  */

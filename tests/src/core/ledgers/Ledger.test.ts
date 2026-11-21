@@ -239,6 +239,9 @@ import {
 	LEDGER_SWEEP_SNAPSHOT,
 	LEDGER_TIGHT_GAUGE,
 	LEDGER_TIGHT_SNAPSHOT,
+	LEDGER_TRADE_SNAPSHOT,
+	LEDGER_CARRIED_SNAPSHOT,
+	LEDGER_EXEMPT_SNAPSHOT,
 } from '../../../setup.js'
 
 describe('Ledger', () => {
@@ -401,17 +404,29 @@ describe('Ledger', () => {
 	})
 	it('withdraws recall after a long reply when the measured request leaves it no room, and fits every call', async () => {
 		const source = 'The vault code is 7391.'
-		const { ledger, provider } = await serveLedgerFit({
+		const { ledger, provider, result } = await serveLedgerFit({
 			capacity: 19968,
 			predict: 8192,
 			reply: 2100,
 			fraction: 0.7,
 			sources: [source],
 		})
-		// No layout of the plan with `recall` leaves its room, so the plan without it serves the request.
+		// No layout of the plan with `recall` leaves its room, so the plan without it serves the request:
+		// its first call goes out without `recall`, and the gate refuses no pass.
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-0'),
 		).toBeUndefined()
+		// The first pass sends the request copy without the answer cue; a first pass the gate refused
+		// makes no call, and only the answer pass carries the request.
+		const asked = requireValue(
+			provider.calls.find(
+				(call) =>
+					call.messages.some((message) => message.content.includes('Find the vault code.')) &&
+					!call.messages.some((message) => message.content === LEDGER_NOTES.cue),
+			),
+		)
+		expect(asked.tools?.map((tool) => tool.name) ?? []).not.toContain('recall')
+		expect(result.partial).toBe(false)
 		expect(
 			provider.calls.every(
 				(call) =>
@@ -478,16 +493,28 @@ describe('Ledger', () => {
 			{ length: 12 },
 			(_, index) => `The vault code is ${7391 + index}. ` + 'vault detail '.repeat(35),
 		)
-		const { ledger, provider } = await serveLedgerFit({
+		const { ledger, provider, result } = await serveLedgerFit({
 			capacity: 1600,
 			predict: 1024,
 			reply: 153.6,
 			sources,
 		})
-		// No layout of the plan with `recall` leaves its room, so the plan without it serves the request.
+		// No layout of the plan with `recall` leaves its room, so the plan without it serves the request:
+		// its first call goes out without `recall`, and the gate refuses no pass.
 		expect(
 			ledger.conversation.messages().find((message) => message.call === 'fit-0'),
 		).toBeUndefined()
+		// The first pass sends the request copy without the answer cue; a first pass the gate refused
+		// makes no call, and only the answer pass carries the request.
+		const asked = requireValue(
+			provider.calls.find(
+				(call) =>
+					call.messages.some((message) => message.content.includes('Find the vault code.')) &&
+					!call.messages.some((message) => message.content === LEDGER_NOTES.cue),
+			),
+		)
+		expect(asked.tools?.map((tool) => tool.name) ?? []).not.toContain('recall')
+		expect(result.partial).toBe(false)
 		expect(
 			provider.calls.every(
 				(call) =>
@@ -630,10 +657,22 @@ describe('Ledger', () => {
 				snapshot: warm.snapshot(),
 			}),
 		)
-		await ledger.respond('Find the vault code.')
+		const result = await ledger.respond('Find the vault code.')
 		// The long stored reply sizes the reply reserve, so no layout of the plan with `recall` leaves
-		// its room, and the plan without it serves the request.
+		// its room, and the plan without it serves the request: its first call goes out without
+		// `recall`, and the gate refuses no pass.
 		expect(ledger.conversation.messages().find((message) => message.call === 'r1')).toBeUndefined()
+		// The first pass sends the request copy without the answer cue; a first pass the gate refused
+		// makes no call, and only the answer pass carries the request.
+		const asked = requireValue(
+			provider.calls.find(
+				(call) =>
+					call.messages.some((message) => message.content.includes('Find the vault code.')) &&
+					!call.messages.some((message) => message.content === LEDGER_NOTES.cue),
+			),
+		)
+		expect(asked.tools?.map((tool) => tool.name) ?? []).not.toContain('recall')
+		expect(result.partial).toBe(false)
 		expect(
 			provider.calls.every(
 				(call) =>
@@ -7742,19 +7781,29 @@ describe('Ledger — subset pricing', () => {
 			['lookup', 'recall', 'desk_east', 'desk_west', 'desk_north', 'desk_south'],
 			false,
 			5,
+			900 - (900 * 323) / 783,
 		],
 		[
 			'narrows before the plan and widens back inside the entry scope at the turn',
 			['lookup', 'recall', 'desk_east', 'desk_west', 'desk_north', 'desk_south'],
 			true,
 			6,
+			900,
 		],
-		['narrows before the plan and clears at the turn, with no entry scope', undefined, true, 6],
+		[
+			'narrows before the plan and clears at the turn, with no entry scope',
+			undefined,
+			true,
+			6,
+			900,
+		],
 	] as const)(
 		'keeps the dispatched request inside the capacity when the context scope %s',
-		async (_title, tools, moved, count) => {
+		async (_title, tools, moved, count, overhead) => {
 			// Where the scope stays, no layout of the plan with `recall` leaves its room, so the plan
 			// without it narrows `recall` out; a host that applies a scope at the turn advertises all six.
+			// The six definitions estimate 783 units and `recall` 323 of them, so at 900 / 783 per unit,
+			// under the 1.25 scale, the five without `recall` carry 900 less its 371.3.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const options = buildLedgerOptions()
 			const ledger = createLedger(provider, {
@@ -7777,14 +7826,7 @@ describe('Ledger — subset pricing', () => {
 			await ledger.respond('Check the desk.')
 			const sent = requireValue(provider.calls[0])
 			expect(sent.tools).toHaveLength(count)
-			// The overhead the call carries is the price of the definitions it advertises.
-			const price = computeToolPrice(ledger.agent.context.tools.definitions(), sent.tools ?? [], {
-				scale: 1.25,
-				overhead: 900,
-			})
-			expect(
-				900 - price.spared + price.added + 1.25 * estimateMessages(sent.messages),
-			).toBeLessThanOrEqual(1200)
+			expect(overhead + 1.25 * estimateMessages(sent.messages)).toBeLessThanOrEqual(1200)
 		},
 	)
 
@@ -11995,7 +12037,7 @@ describe("Ledger — the newest exchange's ladder", () => {
 		expect(rows.filter((row) => row.recall && row.form === 'none')).toEqual([])
 	})
 
-	it('never shows fewer requests or fewer whole exchanges as the capacity grows while the newest exchange keeps its form', async () => {
+	it('never shows fewer requests as the capacity grows while the newest exchange keeps its form', async () => {
 		const rows = await Promise.all(
 			Array.from({ length: 40 }, (_unused, at) => 150 + at * 75).map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
@@ -12007,18 +12049,91 @@ describe("Ledger — the newest exchange's ladder", () => {
 				return readLedgerWindow(requireValue(provider.calls[0]).messages, LEDGER_SWEEP_SNAPSHOT)
 			}),
 		)
-		// A change of form can cost requests; within one form neither count falls.
+		// A change of form can cost requests; within one form they never fall.
 		const falls = rows.slice(1).filter((row, at) => {
 			const before = requireValue(rows[at])
-			return (
-				row.form === before.form && (row.requests < before.requests || row.whole < before.whole)
-			)
+			return row.form === before.form && row.requests < before.requests
 		})
 		expect(falls).toEqual([])
 		// The sweep reaches every form of the ladder.
 		expect(new Set(rows.map((row) => row.form))).toEqual(
 			new Set(['copy', 'pair', 'partial', 'whole']),
 		)
+	})
+
+	it('trades whole older exchanges for copies of more requests as the capacity grows, and never shows fewer requests while the newest exchange keeps its form', async () => {
+		const rows = await Promise.all(
+			Array.from({ length: 120 }, (_unused, at) => 150 + at * 10).map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, snapshot: LEDGER_TRADE_SNAPSHOT, topics: [] }),
+				)
+				await ledger.respond('Which crates are ready?')
+				return readLedgerWindow(requireValue(provider.calls[0]).messages, LEDGER_TRADE_SNAPSHOT)
+			}),
+		)
+		const steps = rows.slice(1).map((row, at) => ({ before: requireValue(rows[at]), row }))
+		expect(
+			steps.filter(({ before, row }) => row.form === before.form && row.requests < before.requests),
+		).toEqual([])
+		// A copy of a request costs most of its whole exchange, so somewhere a larger capacity shows
+		// fewer exchanges whole and more requests in the same form.
+		expect(
+			steps.some(
+				({ before, row }) =>
+					row.form === before.form && row.whole < before.whole && row.requests > before.requests,
+			),
+		).toBe(true)
+	})
+
+	it('carries a newest exchange whose pair is over its tier as a copy of its request past the cut of the retrieved matches', async () => {
+		// The budget is 1000: the newest pair prices past its 450, the older exchange shows whole, and
+		// the statements on OR-7 fill retrieval's room, which the copy no longer shares.
+		const capacity = 1061
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ capacity, snapshot: LEDGER_CARRIED_SNAPSHOT, topics: [] }),
+		)
+		await ledger.respond('Where is OR-7?')
+		const sent = requireValue(provider.calls[0]).messages
+		const newest = LEDGER_CARRIED_SNAPSHOT.conversation.messages.filter(
+			(message) => message.id === 'ask-2' || message.id === 'reply-2',
+		)
+		expect(estimateMessages(newest)).toBeGreaterThan(
+			(0.45 * (capacity - 1)) / (1 + LEDGER_SCALE_DRIFT),
+		)
+		expect(readLedgerOpening(sent).shown).toEqual(['note-4', 'note-5', 'ask-1', 'reply-1', 'ask-2'])
+		expect(sent.find((message) => message.id === 'ask-2')?.content).toBe(
+			'Earlier request: Check OR-7 again.',
+		)
+	})
+
+	it('exempts every request the window cuts from the count bound, whatever its basis, so the matches past the id statements still show', async () => {
+		// Six statements and three cut window requests name OR-7, and two statements share the refunds
+		// topic: the six statements and the two topic matches take the bound's 8 places, and the three
+		// copies follow them.
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				capacity: 4096,
+				snapshot: LEDGER_EXEMPT_SNAPSHOT,
+				judge: createPhraseJudge([]),
+			}),
+		)
+		await ledger.respond('What refund does OR-7 get?')
+		expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual([
+			...[1, 2, 3, 4, 5, 6].map((at) => `case-${at}`),
+			'topic-1',
+			'topic-2',
+			'ask-1',
+			'ask-2',
+			'ask-3',
+			'ask-4',
+			'reply-4',
+		])
 	})
 
 	it('sends the first pass at the tight chat capacity with no recall and no cue, keeping lookup, and shows every window request whole or as an unkeyed copy', async () => {
@@ -12155,29 +12270,20 @@ describe("Ledger — the newest exchange's ladder", () => {
 
 describe('Ledger — relevance', () => {
 	it.each([
+		[250, ['batch-6', 'batched-6', 'batch-7', 'batched-7', 'batch-8', 'batched-8']],
+		[260, ['third', 'batch-6', 'batch-7', 'batched-7', 'batch-8', 'batched-8']],
+		[270, ['third', 'batch-5', 'batch-6', 'batch-7', 'batch-8', 'batched-8']],
 		[280, ['third', 'batch-4', 'batch-5', 'batch-6', 'batch-7', 'batch-8', 'batched-8']],
-		[
-			270,
-			[
-				'batch-5',
-				'batched-5',
-				'batch-6',
-				'batched-6',
-				'batch-7',
-				'batched-7',
-				'batch-8',
-				'batched-8',
-			],
-		],
 		[210, ['batch-8', 'batched-8']],
 		[200, []],
 	])(
-		'cuts the recent copies first, then the other matches, then the window oldest first, then the newest exchange: at capacity %i the opening shows %j before the statements',
+		'trades whole window exchanges for copies of more requests as the capacity grows from 250 to 270, and cuts the window down to none before any statement: at capacity %i the opening shows %j before the statements',
 		async (capacity, shown) => {
-			// `third` is the earlier request the word `crates` matches, past the window. At 280 the window
-			// shows the newest exchange whole and the oldest copies leave first while `third` stays; at 270
-			// `third` leaves while four exchanges stay whole; at 210 the newest alone stays, and at 200 it
-			// leaves too, before any statement. The plan without recall serves every row.
+			// `third` is the earlier request the word `crates` matches, past the window. At 250 the bound
+			// keeps three exchanges whole, three requests; at 260 one of them goes to a copy beside `third`,
+			// four requests, and at 270 the newest alone stays whole beside `third` and three copies, five
+			// requests; at 280 a fourth copy joins. At 210 the newest alone stays, and at 200 it leaves
+			// too, before any statement. The plan without recall serves every row.
 			const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 			const ledger = createLedger(
 				provider,

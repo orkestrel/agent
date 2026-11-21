@@ -148,6 +148,9 @@ import {
 	LEDGER_SWEEP_SNAPSHOT,
 	LEDGER_TIGHT_GAUGE,
 	LEDGER_TIGHT_SNAPSHOT,
+	LEDGER_TRADE_SNAPSHOT,
+	LEDGER_CARRIED_SNAPSHOT,
+	LEDGER_EXEMPT_SNAPSHOT,
 	recallLedger,
 	readWireFrames,
 	seedCanaryContext,
@@ -1636,6 +1639,38 @@ describe('system boundary canary fixtures', () => {
 		expect(LEDGER_STATED_SNAPSHOT.conversation.messages.at(-1)?.id).toBe('stated')
 		expect(LEDGER_TIGHT_SNAPSHOT.requests).toHaveLength(9)
 		expect(LEDGER_TIGHT_GAUGE.overhead).toBeGreaterThan(0)
+	})
+
+	it('holds the trade, carried, and exempt snapshots as valid snapshots of the sizes they describe', () => {
+		for (const snapshot of [LEDGER_TRADE_SNAPSHOT, LEDGER_CARRIED_SNAPSHOT, LEDGER_EXEMPT_SNAPSHOT])
+			expect(isLedgerSnapshot(snapshot)).toBe(true)
+		const trade = LEDGER_TRADE_SNAPSHOT.conversation.messages
+		expect(LEDGER_TRADE_SNAPSHOT.requests).toHaveLength(6)
+		expect(
+			[['ask-1'], ['reply-1']].map(
+				(ids) =>
+					Math.round(estimateMessages(trade.filter((message) => ids.includes(message.id))) / 5) * 5,
+			),
+		).toEqual([70, 25])
+		const carried = LEDGER_CARRIED_SNAPSHOT.conversation.messages
+		expect(
+			[['note-1'], ['ask-1', 'reply-1'], ['ask-2', 'reply-2']].map(
+				(ids) =>
+					Math.round(estimateMessages(carried.filter((message) => ids.includes(message.id))) / 10) *
+					10,
+			),
+		).toEqual([100, 210, 610])
+		expect(LEDGER_CARRIED_SNAPSHOT.requests).toEqual(['ask-1', 'ask-2'])
+		const exempt = LEDGER_EXEMPT_SNAPSHOT.conversation.messages
+		expect(exempt.map((message) => message.id).slice(0, 8)).toEqual([
+			...[1, 2, 3, 4, 5, 6].map((at) => `case-${at}`),
+			'topic-1',
+			'topic-2',
+		])
+		expect(LEDGER_EXEMPT_SNAPSHOT.requests).toEqual(['ask-1', 'ask-2', 'ask-3', 'ask-4'])
+		expect(estimateMessages(exempt.filter((message) => message.id === 'reply-1'))).toBeGreaterThan(
+			1300,
+		)
 	})
 
 	it('reads how an opening shows the newest exchange and counts its requests and whole exchanges', () => {

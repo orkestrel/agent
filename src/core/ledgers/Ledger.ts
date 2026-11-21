@@ -1419,7 +1419,7 @@ export class Ledger implements LedgerInterface {
 			projection,
 			before,
 			current,
-			recurring,
+			recurrences: recurring,
 			built,
 			recallable,
 			lists,
@@ -1456,7 +1456,7 @@ export class Ledger implements LedgerInterface {
 				: plain
 		// The plan without `recall` won, or nothing is left behind at the chosen step: `recall` leaves
 		// the scope for this request.
-		if (admits && (plan === plain || !plan.others)) {
+		if (admits && (plan === plain || !plan.withheld)) {
 			const tools = this.#definitions()
 				.filter((tool) => tool.name !== 'recall')
 				.map((tool) => tool.name)
@@ -1471,7 +1471,7 @@ export class Ledger implements LedgerInterface {
 	// One plan of an opening at one advertised set, whose price sets the plan's `total`. The newest
 	// exchange takes the first form of its ladder that fits the window's and the retrieval's shares
 	// together, whole, then less its all-`recall` groups, then the pair; when even the pair is over,
-	// it leaves the window and its request is a `recent` copy.
+	// it leaves the window and its request goes as a copy.
 	#arrange(
 		survey: LedgerSurvey,
 		scan: LedgerScan,
@@ -1496,10 +1496,11 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// One rung's plan with the most exchanges past the newest that shows no fewer of the window's
-	// requests than the plan with none of them, so an exchange the window shows whole never costs a
-	// request a copy would show: the plan the shares fill, else fewer of those exchanges, newest
-	// first, down to none. Those exchanges take the forms the newest exchange's shown lookups leave
-	// them: retired by them only when the rung's form shows a call group.
+	// requests than the plan with none of them, and, where it shows as many, no fewer requests in
+	// all, so an exchange the window shows whole never costs a request a copy would show: the plan
+	// the shares fill, else fewer of those exchanges, newest first, down to none. Those exchanges take
+	// the forms the newest exchange's shown lookups leave them: retired by them only when the rung's
+	// form shows a call group.
 	#settleRung(
 		survey: LedgerSurvey,
 		scan: LedgerScan,
@@ -1515,46 +1516,51 @@ export class Ledger implements LedgerInterface {
 		const most = this.#settle(survey, scan, advertised, admits, total, form, older)
 		if (most.recent === survey.older.length + 1) return most
 		const least = this.#settle(survey, scan, advertised, admits, total, form, [])
-		if (most.recent >= least.recent) return most
 		const filled =
 			this.#fillWindow(scan, survey, total, older, form === undefined ? [] : [form]).length -
 			(form === undefined ? 0 : 1)
-		for (const limit of Array.from(
-			{ length: Math.max(0, filled - 1) },
-			(_unused, at) => filled - 1 - at,
-		)) {
-			const plan = this.#settle(
-				survey,
-				scan,
-				advertised,
-				admits,
-				total,
-				form,
-				older.slice(0, limit),
-			)
-			if (plan.recent >= least.recent) return plan
-		}
-		return least
+		// The first plan, from the most exchanges down, that shows more of the window's requests than
+		// none of them, or as many and no fewer requests in all.
+		return (
+			[
+				older,
+				...Array.from({ length: Math.max(0, filled - 1) }, (_unused, at) =>
+					older.slice(0, filled - 1 - at),
+				),
+			]
+				.values()
+				.map((offered) =>
+					offered === older
+						? most
+						: this.#settle(survey, scan, advertised, admits, total, form, offered),
+				)
+				.find(
+					(plan) =>
+						plan.recent > least.recent ||
+						(plan.recent === least.recent && plan.requests >= least.requests),
+				) ?? least
+		)
 	}
 
-	// One rung's plan: the newest exchange in `form`, or out of the window as a `recent` copy when
-	// `form` is undefined, the exchanges `older` offers past it newest first, each whole or less its
-	// all-`recall` groups, within the window's share and the whole window within the window's and the
-	// retrieval's shares together, up to the first that neither form fits, with the amenders inside
-	// their span; every other exchange of the window offers its request to retrieval as `recent`;
-	// the recurrence within the retrieval's share; and the retrieved matches within those two shares
-	// less the recurrence and the shown window. Past the budget the steps cut the `recent` copies and
-	// the other matches lowest rank first, then the window's exchanges oldest first down to the newest
-	// one, then the newest exchange down its ladder, less its all-`recall` groups, then its request
-	// and reply alone, then a copy of its request, then out, then the exchange rows from the deepest
-	// down to `previous-2`,
+	// One rung's plan: the newest exchange in `form`, or, when `form` is undefined, as a copy of its
+	// request that every layout carries and that is priced with the window, the exchanges `older`
+	// offers past it newest first, each whole or less its all-`recall` groups, within the window's
+	// share and the whole window within the window's and the retrieval's shares together, up to the
+	// first that neither form fits, with the amenders inside their span; every other exchange of the
+	// window past the newest offers its request to retrieval as `recent`; the recurrence within the
+	// retrieval's share; and the retrieved matches within those two shares less the recurrence and
+	// the shown window. Past the budget the steps cut the `recent` copies and the other matches lowest
+	// rank first, then the window's exchanges oldest first down to the newest one, then the newest
+	// exchange down its ladder, less its all-`recall` groups, then its request and reply alone, then a
+	// copy of its request, then out, then the exchange rows from the deepest down to `previous-2`,
 	// then the id rows last-ranked first, then the recurrence, then the statements oldest first, then
 	// the topic rows last first, `rules`, `previous`, and the rest of the index. Each step reads its
 	// own shown messages, its index, and whether it leaves anything behind; a statement it leaves out
 	// for a shown successor counts as shown. The first window or retrieval step that fits stays, so it
-	// never shrinks as the budget grows; then the first cut of its rows that leaves `recall` its room
-	// wins, else that step as it fits. With no such step that fits, the first bare row cut that leaves
-	// the room wins, else the first that fits, else the recurrence and statement cuts.
+	// never shows fewer requests as the budget grows; then the first cut of its rows that leaves
+	// `recall` its room wins, else that step as it fits. With no such step that fits, the first bare
+	// row cut that leaves the room wins, else the first that fits, else the recurrence and statement
+	// cuts.
 	#settle(
 		survey: LedgerSurvey,
 		scan: LedgerScan,
@@ -1566,9 +1572,9 @@ export class Ledger implements LedgerInterface {
 	): LedgerPlanResult {
 		const { request, input, projection, built, recallable, current } = survey
 		const supersessions = input.classification.supersessions
-		const recurrence = survey.recurring.filter(
+		const recurrence = survey.recurrences.filter(
 			(_message, index) =>
-				this.#price(survey.recurring.slice(0, index + 1)) <= total * LEDGER_RELEVANT_SHARE,
+				this.#price(survey.recurrences.slice(0, index + 1)) <= total * LEDGER_RELEVANT_SHARE,
 		)
 		const statements = [...current, ...recurrence]
 		// The statements each bare stage keeps: every current statement with the recurrence, then the
@@ -1600,17 +1606,24 @@ export class Ledger implements LedgerInterface {
 		// shares fill.
 		const shown = this.#fillWindow(scan, survey, total, older, form === undefined ? [] : [form])
 		const depths = new Set(shown.map((member) => member.depth))
-		// Every exchange of the window, newest first; those its shares cut offer their requests to
-		// retrieval as `recent` matches.
+		// Every exchange of the window, newest first; those past the newest that its shares cut offer
+		// their requests to retrieval as `recent` matches.
 		const members = [
 			...survey.ladder.slice(0, 1),
 			...survey.older.flatMap((one) => one.slice(0, 1)),
 		]
 		const recent = new Set(
 			members
-				.filter((member) => !depths.has(member.depth))
+				.filter((member) => member.depth !== 1 && !depths.has(member.depth))
 				.map((member) => member.exchange.request.id),
 		)
+		// A newest exchange out of the window goes as a copy of its request in every layout, priced
+		// with the window and never in retrieval's room.
+		const carried = survey.ladder
+			.slice(0, form === undefined ? 1 : 0)
+			.map((member) =>
+				this.#copyRequest(member.exchange.request, admits ? survey.depths : undefined),
+			)
 		// The retrieved messages, each match's in rank order, from none the window, the amenders of the
 		// newest exchange's span, which every layout with a match shows, the current statements, a
 		// statement a shown successor supersedes included, or the recurrence show.
@@ -1622,6 +1635,7 @@ export class Ledger implements LedgerInterface {
 						request,
 						new Set([
 							request.id,
+							...carried.map((message) => message.id),
 							...shown.flatMap((member) => member.messages).map((message) => message.id),
 							...this.#collectSpan(
 								scan,
@@ -1634,7 +1648,8 @@ export class Ledger implements LedgerInterface {
 							0,
 							total * (LEDGER_RECENT_SHARE + LEDGER_RELEVANT_SHARE) -
 								this.#price(recurrence) -
-								this.#priceRecent(scan, survey, shown),
+								this.#priceRecent(scan, survey, shown) -
+								this.#price(carried),
 						),
 						recent,
 						admits ? survey.depths : undefined,
@@ -1643,20 +1658,22 @@ export class Ledger implements LedgerInterface {
 		// Every statement kept: the whole window with the retrieved matches cut lowest rank first, the
 		// `recent` copies first, then the window's exchanges cut oldest first down to the newest one,
 		// then the newest exchange down the forms of its ladder past its own and then as a copy of its
-		// request, a copy no cut of the retrieved matches reaches, then none.
+		// request, or the copy it already is, a copy no cut of the retrieved matches reaches, then none.
 		const layouts = [
 			...Array.from({ length: retrieved.length + 1 }, (_unused, index) => ({
 				members: shown,
 				matches: retrieved.length - index,
-				copies: [],
+				copies: carried,
 			})),
 			...Array.from({ length: Math.max(0, shown.length - 1) }, (_unused, index) => ({
 				members: shown.slice(0, shown.length - 1 - index),
 				matches: 0,
-				copies: [],
+				copies: carried,
 			})),
 			...(form === undefined
-				? []
+				? shown.length === 0
+					? []
+					: [{ members: [], matches: 0, copies: carried }]
 				: [
 						...survey.ladder
 							.slice(survey.ladder.indexOf(form) + 1)
@@ -1669,37 +1686,31 @@ export class Ledger implements LedgerInterface {
 							],
 						},
 					]),
-			...(shown.length === 0 ? [] : [{ members: [], matches: 0, copies: [] }]),
+			...(shown.length === 0 && carried.length === 0
+				? []
+				: [{ members: [], matches: 0, copies: [] }]),
 		]
-		const windows =
-			floor === 0
-				? layouts.map((layout) =>
-						this.#collectStep(
-							input,
-							projection,
-							request,
-							recallable,
-							admits,
-							this.#collectShown(
-								scan,
-								[
-									...this.#collectSpan(scan, survey, layout.members),
-									...retrieved.slice(0, layout.matches).flat(),
-									...layout.copies,
-								],
-								statements,
-							),
-						),
-					)
-				: []
-		const bare = windows.at(-1)
 		const fixed = this.#readFixedKeys()
 		// The window and retrieval first: the first of their steps that fits, so a larger budget never
-		// shows fewer exchanges.
-		const fitted = windows.find(
-			(step) =>
-				this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <= total,
-		)
+		// shows fewer requests; each step's index is built only while no earlier step fits.
+		const fitted =
+			floor === 0
+				? layouts
+						.values()
+						.map((layout) =>
+							this.#collectLayout(survey, scan, admits, statements, retrieved, layout),
+						)
+						.find(
+							(step) =>
+								this.#price(this.#buildOpening(request, built, step.shown, step.keys).probe) <=
+								total,
+						)
+				: undefined
+		const final = layouts.at(-1)
+		const bare =
+			floor !== 0 || fitted !== undefined || final === undefined
+				? undefined
+				: this.#collectLayout(survey, scan, admits, statements, retrieved, final)
 		// Then the rows: that window with its rows cut from the end, never its exchanges. With no window
 		// that fits, not even none, the bare step's row cuts.
 		const base = fitted ?? bare
@@ -1712,7 +1723,7 @@ export class Ledger implements LedgerInterface {
 			const probe = this.#buildOpening(request, built, step.shown, step.keys).probe
 			return (
 				this.#price(probe) <= total &&
-				(!admits || !step.others || this.#leavesRecallRoom(probe, advertised, longest))
+				(!admits || !step.withheld || this.#leavesRecallRoom(probe, advertised, longest))
 			)
 		})
 		// The first step that also leaves `recall` its room, else the window as it fits, else the first
@@ -1794,7 +1805,7 @@ export class Ledger implements LedgerInterface {
 		return {
 			shown: sent,
 			keys,
-			others: chosen?.others ?? recallable.some((message) => !ids.has(message.id)),
+			withheld: chosen?.withheld ?? recallable.some((message) => !ids.has(message.id)),
 			intact: marks.every((message) => visible.has(message.id)),
 			roomy:
 				!admits ||
@@ -1806,6 +1817,42 @@ export class Ledger implements LedgerInterface {
 			requests: requests.length,
 			recent: requests.filter((message) => region.has(message.id)).length,
 		}
+	}
+
+	// One layout's step: the members it keeps with the amenders inside their span, its first
+	// `matches` retrieved matches, and its copies, beside the statements it keeps.
+	#collectLayout(
+		survey: LedgerSurvey,
+		scan: LedgerScan,
+		admits: boolean,
+		statements: readonly Message[],
+		retrieved: ReadonlyArray<readonly Message[]>,
+		layout: {
+			readonly members: readonly LedgerMember[]
+			readonly matches: number
+			readonly copies: readonly Message[]
+		},
+	): {
+		readonly shown: readonly Message[]
+		readonly keys: readonly LedgerKey[]
+		readonly withheld: boolean
+	} {
+		return this.#collectStep(
+			survey.input,
+			survey.projection,
+			survey.request,
+			survey.recallable,
+			admits,
+			this.#collectShown(
+				scan,
+				[
+					...this.#collectSpan(scan, survey, layout.members),
+					...retrieved.slice(0, layout.matches).flat(),
+					...layout.copies,
+				],
+				statements,
+			),
+		)
 	}
 
 	// The window's exchanges past those `taken` holds, newest first, each in the first of its forms
@@ -1850,8 +1897,9 @@ export class Ledger implements LedgerInterface {
 
 	// The retrieved messages: each match's members as the opening sends them, a request turn as a copy
 	// under its label, which opens with its exchange key while `depths` is given, in rank order: the
-	// matches within the count bound, then the requests in `recent` the bound leaves out, up to the
-	// first match that would price the retrieval past `room`.
+	// matches of sources outside `recent` within the count bound, then every request in `recent`,
+	// whatever its basis, which the bound never counts, up to the first match that would price the
+	// retrieval past `room`.
 	#collectRetrieved(
 		input: LedgerProjectionInput,
 		scan: LedgerScan,
@@ -1869,12 +1917,9 @@ export class Ledger implements LedgerInterface {
 			shown,
 			recent,
 		)
-		const bounded = ranked
-			.filter((match) => match.basis !== 'recent')
-			.slice(0, LEDGER_RELEVANT_LIMIT)
 		const matches = [
-			...bounded,
-			...ranked.filter((match) => !bounded.includes(match) && recent.has(match.source)),
+			...ranked.filter((match) => !recent.has(match.source)).slice(0, LEDGER_RELEVANT_LIMIT),
+			...ranked.filter((match) => recent.has(match.source)),
 		].map((match) =>
 			match.members.flatMap((id) => {
 				const message = scan.messages[scan.position(id) ?? -1]
@@ -1894,13 +1939,13 @@ export class Ledger implements LedgerInterface {
 		step: {
 			readonly shown: readonly Message[]
 			readonly keys: readonly LedgerKey[]
-			readonly others: boolean
+			readonly withheld: boolean
 		},
 		fixed: ReadonlySet<string>,
 	): ReadonlyArray<{
 		readonly shown: readonly Message[]
 		readonly keys: readonly LedgerKey[]
-		readonly others: boolean
+		readonly withheld: boolean
 	}> {
 		const deeper = step.keys
 			.filter((row) => !fixed.has(row.name) && parseLedgerExchange(row.name) !== undefined)
@@ -2031,7 +2076,7 @@ export class Ledger implements LedgerInterface {
 	): {
 		readonly shown: readonly Message[]
 		readonly keys: readonly LedgerKey[]
-		readonly others: boolean
+		readonly withheld: boolean
 	} {
 		const ids = new Set(shown.map((message) => message.id))
 		return {
@@ -2047,7 +2092,7 @@ export class Ledger implements LedgerInterface {
 						new Set([request.id, ...ids]),
 					)
 				: [],
-			others: recallable.some((message) => !ids.has(message.id)),
+			withheld: recallable.some((message) => !ids.has(message.id)),
 		}
 	}
 
