@@ -15,6 +15,7 @@ import {
 	collectRecallMessages,
 	filterRecallGroups,
 	collectLedgerExchanges,
+	collectLedgerGroups,
 	collectLedgerKeys,
 	collectLedgerAmenders,
 	collectLedgerBrief,
@@ -2788,7 +2789,7 @@ describe('collectLedgerSubjects', () => {
 		)
 	})
 
-	it('links nothing through a brief member, and links through it when an amendment takes it out of the brief', () => {
+	it('links nothing through a brief member, nor through a two-case note an amendment takes out of the brief', () => {
 		const messages = [
 			buildLedgerMessage('note', 'user', 'Opening note: BC-7301 and BC-7312 need a callback.'),
 			buildLedgerMessage('ask-1', 'user', 'What is open?'),
@@ -2815,9 +2816,11 @@ describe('collectLedgerSubjects', () => {
 			requests,
 			new Set(),
 		)
+		// The note is stored before the first request and names two cases, so it is no carrier, amended
+		// or not.
 		expect([amended.get('one'), amended.get('two'), amended.get('ask-2')]).toEqual([
 			new Set(['BC-7301']),
-			new Set(['BC-7301']),
+			new Set(['BC-7312']),
 			new Set(),
 		])
 	})
@@ -2882,6 +2885,76 @@ describe('collectLedgerSubjects', () => {
 			new Set(),
 		)
 		expect(lone.get('two')).toEqual(new Set(['BC-7301']))
+	})
+})
+
+describe('collectLedgerGroups', () => {
+	it('labels each known id with the group its carriers link, each other known id its own group, and no id that is not known', () => {
+		const messages = [
+			buildLedgerMessage('ask', 'user', 'Check BC-7302.'),
+			buildLedgerMessage('reply', 'assistant', 'Open.'),
+			buildLedgerMessage('link', 'user', 'BC-7301 opened claim CS-7305.'),
+			buildLedgerMessage('claim', 'user', 'CS-7305 needs the adjuster report.'),
+			buildLedgerMessage('tag', 'user', 'Source SRC-1 filed the roof photos.'),
+			buildLedgerMessage('request', 'user', 'What about BC-7301?'),
+		]
+		const input = buildLedgerInput({
+			messages,
+			findings: ['BC-7301', 'BC-7302'].map((id) =>
+				buildLedgerFinding(`lookup-${id}`, 'lookup', { id }, `Case ${id}.`, {
+					ids: [id],
+					owners: [],
+				}),
+			),
+		})
+		// `link` knows both its ids, so CS-7305 joins BC-7301's group; SRC-1 only `tag` carries.
+		expect(collectLedgerGroups(input, 'request', new Set(['ask', 'request']), new Set())).toEqual(
+			new Map([
+				['BC-7302', 'BC-7302'],
+				['BC-7301', 'BC-7301'],
+				['CS-7305', 'BC-7301'],
+			]),
+		)
+	})
+
+	it('links nothing through a statement stored before the first request that names two registry groups', () => {
+		const findings = ['BC-7301', 'BC-7312'].map((id) =>
+			buildLedgerFinding(`lookup-${id}`, 'lookup', { id }, `Case ${id}.`, {
+				ids: [id],
+				owners: [],
+			}),
+		)
+		const messages = [
+			buildLedgerMessage('note', 'user', 'Opening note: BC-7301 and BC-7312 share an adjuster.'),
+			buildLedgerMessage('ask-1', 'user', 'What is open?'),
+			buildLedgerMessage('reply-1', 'assistant', 'Two callbacks.'),
+			buildLedgerMessage('both', 'user', 'BC-7301 and BC-7312 share a roofer.'),
+			buildLedgerMessage('ask-2', 'user', 'Anything else?'),
+		]
+		const requests = new Set(['ask-1', 'ask-2'])
+		const amended = { amendments: { note: ['both'] } }
+		// The amended note is no carrier; a statement after the first request links both cases.
+		expect(
+			collectLedgerGroups(
+				buildLedgerInput({ messages: messages.slice(0, 3), findings, classification: amended }),
+				'ask-1',
+				requests,
+				new Set(),
+			),
+		).toEqual(
+			new Map([
+				['BC-7301', 'BC-7301'],
+				['BC-7312', 'BC-7312'],
+			]),
+		)
+		expect(
+			collectLedgerGroups(
+				buildLedgerInput({ messages, findings, classification: amended }),
+				'ask-2',
+				requests,
+				new Set(),
+			).get('BC-7312'),
+		).toBe('BC-7301')
 	})
 })
 
@@ -3618,14 +3691,29 @@ describe('collectLedgerMatches', () => {
 				.map((match) => `${match.source}:${match.basis}:${match.members.join('+')}`)
 				.toSorted(),
 		).toEqual(['crate:word:crate+fix-11', 'fix-12:word:fix-12'])
+		// Without the amendment, the older member's own word match drops, so it arrives nowhere.
+		const alone = buildLedgerInput({ messages })
+		expect(
+			collectLedgerMatches(
+				alone,
+				'request',
+				requests,
+				new Set(),
+				new Set([...fillers.map((message) => message.id), 'request']),
+				collectLedgerSubjects(alone, 'request', requests, new Set()),
+				new Set(),
+			)
+				.map((match) => `${match.source}:${match.basis}:${match.members.join('+')}`)
+				.toSorted(),
+		).toEqual(['crate:word:crate', 'fix-12:word:fix-12'])
 	})
 
 	it.each([
-		['BC-7301', ['lead-1:inherited']],
-		['BC-7302', ['lead-2:inherited']],
+		['BC-7301', ['claim:entity', 'lead-1:word', 'link:entity']],
+		['BC-7302', ['claim:entity', 'lead-2:word', 'link:entity']],
 	])(
-		'scopes an older recurrence member the registry gives a case by the ordinary subject test: after a check of %s it keeps %j',
-		(checked, expected) => {
+		'scopes an older recurrence member the registry gives a case by the ordinary subject test: with the claim on %s it keeps %j',
+		(linked, expected) => {
 			const fillers = [1, 2, 3, 4].flatMap((at) => [
 				buildLedgerMessage(`ask-${at}`, 'user', `Okay ${at}.`),
 				buildLedgerMessage(`ans-${at}`, 'assistant', 'Fine.'),
@@ -3634,11 +3722,11 @@ describe('collectLedgerMatches', () => {
 				buildLedgerMessage('lead-1', 'user', 'Duty lead BC-7301 on 2031-03-11.'),
 				buildLedgerMessage('lead-2', 'user', 'Duty lead BC-7302 on 2031-03-12.'),
 				...fillers,
-				buildLedgerMessage('check', 'user', `Check ${checked}.`),
-				buildLedgerMessage('checked', 'assistant', 'Open.'),
-				buildLedgerMessage('request', 'user', 'Who is the duty lead?'),
+				buildLedgerMessage('link', 'user', `${linked} opened claim CS-7305.`),
+				buildLedgerMessage('claim', 'user', 'CS-7305 needs the adjuster report.'),
+				buildLedgerMessage('request', 'user', 'Who is the duty lead on CS-7305?'),
 			]
-			const requests = new Set([...[1, 2, 3, 4].map((at) => `ask-${at}`), 'check', 'request'])
+			const requests = new Set([...[1, 2, 3, 4].map((at) => `ask-${at}`), 'request'])
 			const input = buildLedgerInput({
 				messages,
 				findings: ['BC-7301', 'BC-7302'].map((id) =>
@@ -3648,19 +3736,21 @@ describe('collectLedgerMatches', () => {
 					}),
 				),
 			})
-			// The request names no id, so it inherits the checked case and its subject; the member on that
-			// case matches on the inherited id, and the member on the other case shares only words, on
-			// another subject.
+			// The request's claim links to the case `link` names, so its subject is that case's. A
+			// statement names the claim, so nothing is inherited, and each member matches on its words
+			// alone: the member on the request's case keeps that `word` match, and the other drops.
 			expect(
 				collectLedgerMatches(
 					input,
 					'request',
 					requests,
 					new Set(),
-					new Set([...fillers.map((message) => message.id), 'check', 'checked', 'request']),
+					new Set([...fillers.map((message) => message.id), 'request']),
 					collectLedgerSubjects(input, 'request', requests, new Set()),
 					new Set(),
-				).map((match) => `${match.source}:${match.basis}`),
+				)
+					.map((match) => `${match.source}:${match.basis}`)
+					.toSorted(),
 			).toEqual(expected)
 		},
 	)

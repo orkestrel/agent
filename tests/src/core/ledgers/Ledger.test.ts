@@ -234,6 +234,7 @@ import {
 	buildLedgerHall,
 	buildLedgerOpened,
 	buildLedgerPackets,
+	buildLedgerTraffic,
 	buildLedgerWindow,
 	recallLedger,
 	readLedgerOpening,
@@ -12119,6 +12120,41 @@ describe('Ledger — the subject window', () => {
 			expect(readLedgerOpening(requireValue(provider.calls[0]).messages).shown).toEqual(shown)
 		},
 	)
+
+	it("keeps the entity match of an unfiled statement whose words a cut far member's request repeats", async () => {
+		const traffic = buildLedgerTraffic([
+			{
+				request: 'Check BC-7301 skylight warranty.',
+				calls: [],
+				reply: `Open. ${'x'.repeat(6000)}`,
+			},
+			{ request: 'Check BC-7302.', calls: [], reply: 'Fine.' },
+			{ request: 'Check BC-7301 status.', calls: [], reply: 'Open.' },
+			{ request: 'Check BC-7301 again.', calls: [], reply: 'Still open.' },
+		])
+		const snapshot = buildLedgerOpened({
+			...traffic,
+			conversation: {
+				...traffic.conversation,
+				messages: [
+					{ id: 'case-1', role: 'user', content: 'Case BC-7301 covers the roof.' },
+					{ id: 'case-2', role: 'user', content: 'Case BC-7302 covers the porch.' },
+					{ id: 'note', role: 'user', content: 'BC-7301 filed a skylight warranty claim.' },
+					...traffic.conversation.messages,
+				],
+			},
+		})
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+		await ledger.respond('Which BC-7301 skylight warranty is open?')
+		const opening = readLedgerOpening(requireValue(provider.calls[0]).messages)
+		// The far member `ask-1` prices past the window's share, so it shows nothing; `note` counts only
+		// the words skylight and warranty, which `ask-1` repeats, but `ask-1` isn't shown, so `note`
+		// isn't stale and keeps its match on BC-7301.
+		expect(opening.shown).toContain('note')
+		expect(opening.shown).not.toContain('ask-1')
+		expect(opening.keys).toContain('previous-4')
+	})
 })
 
 describe("Ledger — the newest exchange's ladder", () => {

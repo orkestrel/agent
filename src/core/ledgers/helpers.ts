@@ -662,18 +662,76 @@ export function collectLedgerBrief(
 }
 
 /**
+ * Collects the group of each known id up to a request: the label of the linked group that holds it.
+ *
+ * @remarks
+ * The known ids are what {@link collectLedgerKnown} returns for the requests and statements up to the
+ * request. Ids link as {@link linkLedgerIds} links them, through the registry and through each
+ * carrier, whose known ids link together. A carrier is a statement that is neither quiet nor a
+ * recurrence member, as
+ * {@link collectLedgerRecurrenceGroups} collects their groups, that {@link collectLedgerBrief} leaves
+ * out, and that, when stored before the first request, has its known ids in fewer than two registry
+ * groups, so an amended note or register that names several cases links none of them. A
+ * statement is a user message with no calls that is neither a request nor a note. An id no link
+ * reaches is its own group. The messages after the request take no part.
+ *
+ * @param input - The messages, findings, entities, and classification
+ * @param request - The request id; the messages up to it count, and every message when no message has it
+ * @param requests - The marked request ids
+ * @param notes - The ledger note ids
+ * @returns Each known id's group label, keyed by id; an id that is not known has no entry
+ * @example
+ * ```ts
+ * // `input` holds a statement linking BC-7301 to CS-7305, a statement naming CS-7305, and the request.
+ * collectLedgerGroups(input, 'request', new Set(['request']), new Set()).get('CS-7305') // 'BC-7301'
+ * ```
+ */
+export function collectLedgerGroups(
+	input: LedgerProjectionInput,
+	request: string,
+	requests: ReadonlySet<string>,
+	notes: ReadonlySet<string>,
+): ReadonlyMap<string, string> {
+	const at = input.messages.findIndex((message) => message.id === request)
+	const scope = at < 0 ? input.messages : input.messages.slice(0, at + 1)
+	const quiet = input.classification.quiet
+	const known = collectLedgerKnown(input, request, requests, notes)
+	const members = new Set(collectLedgerRecurrenceGroups(scope, requests, notes, quiet).flat())
+	const brief = new Set(collectLedgerBrief(input, request, requests, notes))
+	const registry = linkLedgerIds(input.findings, [])
+	const first = scope.findIndex((message) => requests.has(message.id))
+	const beforeFirst = new Set(first < 0 ? scope : scope.slice(0, first))
+	const labels = linkLedgerIds(
+		input.findings,
+		scope
+			.filter(
+				(message) =>
+					message.role === 'user' &&
+					!hasCalls(message) &&
+					!requests.has(message.id) &&
+					!notes.has(message.id) &&
+					!quiet.has(message.id) &&
+					!members.has(message) &&
+					!brief.has(message) &&
+					// A statement before the first request whose known ids span registry groups is no carrier.
+					(!beforeFirst.has(message) ||
+						new Set((known.get(message.id) ?? []).map((id) => registry.get(id) ?? id)).size < 2),
+			)
+			.map((message) => known.get(message.id) ?? []),
+	)
+	return new Map([...known.values()].flat().map((id) => [id, labels.get(id) ?? id]))
+}
+
+/**
  * Collects the subject of each request and statement up to a request: its known ids, each read as
  * the linked group that holds it.
  *
  * @remarks
- * The known ids are what {@link collectLedgerKnown} returns. Ids link as {@link linkLedgerIds} links
- * them, through the registry and through each carrier, a statement that is neither quiet nor a
- * recurrence member, as {@link collectLedgerRecurrenceGroups} collects their groups, and that
- * {@link collectLedgerBrief} leaves out, an amended statement included, whose known ids link
- * together. A statement is a user message with no calls that is neither a request nor a note. A
- * statement's subject is its known ids' groups. A request's subject is its own known ids' groups, or,
- * when it carries none, the subject of the newest earlier request that has a reply. The messages
- * after the request take no part.
+ * The known ids are what {@link collectLedgerKnown} returns, and each id's group is what
+ * {@link collectLedgerGroups} returns for it. A statement is a user message with no calls that is
+ * neither a request nor a note. A statement's subject is its known ids' groups. A request's subject
+ * is its own known ids' groups, or, when it carries none, the subject of the newest earlier request
+ * that has a reply. The messages after the request take no part.
  *
  * @param input - The messages, findings, entities, and classification
  * @param request - The request id; the messages up to it count, and every message when no message has it
@@ -694,10 +752,8 @@ export function collectLedgerSubjects(
 ): ReadonlyMap<string, ReadonlySet<string>> {
 	const at = input.messages.findIndex((message) => message.id === request)
 	const scope = at < 0 ? input.messages : input.messages.slice(0, at + 1)
-	const quiet = input.classification.quiet
 	const known = collectLedgerKnown(input, request, requests, notes)
-	const members = new Set(collectLedgerRecurrenceGroups(scope, requests, notes, quiet).flat())
-	const brief = new Set(collectLedgerBrief(input, request, requests, notes))
+	const groups = collectLedgerGroups(input, request, requests, notes)
 	const statements = scope.filter(
 		(message) =>
 			message.role === 'user' &&
@@ -706,33 +762,32 @@ export function collectLedgerSubjects(
 			!notes.has(message.id),
 	)
 	const asked = scope.filter((message) => requests.has(message.id))
-	const labels = linkLedgerIds(
-		input.findings,
-		statements
-			.filter((message) => !quiet.has(message.id) && !members.has(message) && !brief.has(message))
-			.map((message) => known.get(message.id) ?? []),
-	)
 	const own = new Map(
 		[...statements, ...asked].map((message) => [
 			message.id,
-			new Set((known.get(message.id) ?? []).map((id) => labels.get(id) ?? id)),
+			new Set((known.get(message.id) ?? []).map((id) => groups.get(id) ?? id)),
 		]),
 	)
 	const replies = collectLedgerReplies(scope, requests, notes)
+	// Each request in order with its subject and the subject it passes on: the own subject of the
+	// newest request up to it that has a reply and names a known id. Each step reads the one before it.
+	const passed: Array<{
+		readonly id: string
+		readonly subject: ReadonlySet<string>
+		readonly passes: ReadonlySet<string> | undefined
+	}> = []
+	for (const message of asked) {
+		const mine = own.get(message.id) ?? new Set<string>()
+		const inherited = passed.at(-1)?.passes
+		passed.push({
+			id: message.id,
+			subject: mine.size > 0 || inherited === undefined ? mine : inherited,
+			passes: replies.has(message.id) && mine.size > 0 ? mine : inherited,
+		})
+	}
 	return new Map([
 		...statements.map((message) => [message.id, own.get(message.id) ?? new Set<string>()] as const),
-		...asked.map((message, index) => {
-			const mine = own.get(message.id) ?? new Set<string>()
-			// The newest earlier request that has a reply passes on its own subject, or what it took the
-			// same way, so the source is the newest such request that names a known id.
-			const source = asked
-				.slice(0, index)
-				.findLast((earlier) => replies.has(earlier.id) && (own.get(earlier.id)?.size ?? 0) > 0)
-			return [
-				message.id,
-				mine.size > 0 || source === undefined ? mine : (own.get(source.id) ?? mine),
-			] as const
-		}),
+		...passed.map((entry) => [entry.id, entry.subject] as const),
 	])
 }
 

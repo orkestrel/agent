@@ -1668,9 +1668,11 @@ export class Ledger implements LedgerInterface {
 				.filter((member) => !depths.has(member.depth))
 				.map((member) => member.exchange.request.id),
 		)
-		const dropped = survey.far
-			.filter((member) => !depths.has(member.depth))
-			.map((member) => member.exchange.request.id)
+		const dropped = new Set(
+			survey.far
+				.filter((member) => !depths.has(member.depth))
+				.map((member) => member.exchange.request.id),
+		)
 		// Every member of the window, newest first.
 		const members = [...survey.ladder.slice(0, 1), ...contiguous, ...survey.far]
 		// A newest exchange out of the window goes as a copy of its request in every layout, priced
@@ -1682,8 +1684,9 @@ export class Ledger implements LedgerInterface {
 			)
 		// The retrieved messages, each match's in rank order, from none the window, the amenders of the
 		// newest exchange's span, which every layout with a match shows, the current statements, a
-		// statement a shown successor supersedes included, the brief's shown members, the recurrence, or
-		// the cut far members' requests show; the brief takes nothing from retrieval's room.
+		// statement a shown successor supersedes included, the brief's shown members, or the recurrence
+		// show, and with no match whose source is a cut far member's request, which shows nothing and so
+		// never counts as shown; the brief takes nothing from retrieval's room.
 		const retrieved =
 			floor === 0
 				? this.#collectRetrieved(
@@ -1700,8 +1703,8 @@ export class Ledger implements LedgerInterface {
 								shown.filter((member) => member.depth === 1),
 							).map((message) => message.id),
 							...statements.map((message) => message.id),
-							...dropped,
 						]),
+						dropped,
 						Math.max(
 							0,
 							total * (LEDGER_RECENT_SHARE + LEDGER_RELEVANT_SHARE) -
@@ -1960,12 +1963,14 @@ export class Ledger implements LedgerInterface {
 	// under its label, which opens with its exchange key while `depths` is given, in rank order: the
 	// matches of sources outside `recent` within the count bound, then every request in `recent`,
 	// whatever its basis, which the bound never counts, up to the first match that would price the
-	// retrieval past `room`. The matches are scoped to the request's subject in `subjects`.
+	// retrieval past `room`. The matches are scoped to the request's subject in `subjects`, and none
+	// has its source in `dropped`, which `shown` never holds.
 	#collectRetrieved(
 		input: LedgerProjectionInput,
 		scan: LedgerScan,
 		request: Message,
 		shown: ReadonlySet<string>,
+		dropped: ReadonlySet<string>,
 		room: number,
 		subjects: ReadonlyMap<string, ReadonlySet<string>>,
 		recent: ReadonlySet<string>,
@@ -1979,7 +1984,7 @@ export class Ledger implements LedgerInterface {
 			shown,
 			subjects,
 			recent,
-		)
+		).filter((match) => !dropped.has(match.source))
 		const matches = [
 			...ranked.filter((match) => !recent.has(match.source)).slice(0, LEDGER_RELEVANT_LIMIT),
 			...ranked.filter((match) => recent.has(match.source)),
