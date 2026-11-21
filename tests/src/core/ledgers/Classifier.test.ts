@@ -1382,7 +1382,7 @@ describe('Classifier', () => {
 			entities: (text, partial) => matchEntities(index, text, partial),
 		})
 
-		it('asks the entity, shared-literal, and topic-only pairs, and leaves a refused literal pair unasked', async () => {
+		it("asks only the pairs that carry the correction's registry id, and leaves the shared-number, topic-only, and refused pairs unasked", async () => {
 			const judge = new SilentJudge()
 			const classifier = new Classifier({
 				...options,
@@ -1393,8 +1393,6 @@ describe('Classifier', () => {
 			expect(judge.requests.map((request) => Object.keys(request.questions)[0])).toEqual([
 				'["amends","whole","later"]',
 				'["amends","call","later"]',
-				'["amends","number","later"]',
-				'["amends","desk","later"]',
 			])
 		})
 
@@ -1442,8 +1440,6 @@ describe('Classifier', () => {
 				'["amends","whole","later"]',
 				'["supersedes","whole","later"]',
 				'["amends","call","later"]',
-				'["amends","number","later"]',
-				'["amends","desk","later"]',
 			])
 			expect(classifier.classification().supersessions).toEqual(new Map([['whole', ['later']]]))
 		})
@@ -1514,6 +1510,92 @@ describe('Classifier', () => {
 			expect(read).toHaveLength(6)
 			expect(new Set(read).size).toBe(6)
 			expect(read).not.toContain(quiet.content)
+		})
+	})
+
+	describe('the earlier messages a correction is compared with', () => {
+		// Every message but `distant` concerns refunds; `fixed` names BX-88 and `closed` names no id.
+		const carried = buildLedgerMessage('carried', 'user', 'Refund BX-88 is 20.')
+		const topical = buildLedgerMessage('topical', 'user', 'The refund desk stayed open.')
+		const distant = buildLedgerMessage('distant', 'user', 'Parcel BX-88 left the dock.')
+		const ask = buildLedgerMessage('ask', 'user', 'What is refund BX-88?')
+		const fixed = buildLedgerMessage('fixed', 'user', 'Correction: refund BX-88 is 25.')
+		const closed = buildLedgerMessage('closed', 'user', 'Correction: the refund desk closed.')
+		const seeded = createConversation({
+			snapshot: { id: 'compared', messages: [carried, topical, distant, ask, fixed, closed] },
+		})
+		// The rows sit recorded, so the judge receives only pair questions while `ask` is a request.
+		for (const message of [carried, topical, distant, fixed, closed])
+			seeded.judgments.add(
+				buildLedgerJudgment(message, {
+					answer: buildCategoryAnswer(
+						message === fixed || message === closed ? { correction: 1 } : { fact: 1 },
+					),
+				}),
+			)
+		for (const message of [carried, topical, distant, ask, fixed, closed])
+			seeded.judgments.add(
+				buildLedgerTopicJudgment(message, LEDGER_REFUNDS_TOPIC, message === distant ? 0 : 1),
+			)
+		const snapshot = seeded.snapshot()
+
+		it('compares a correction naming an id only with the near earlier messages that carry it', async () => {
+			const judge = new SilentJudge()
+			const classifier = new Classifier(
+				buildClassifierOptions({
+					conversation: createConversation({ snapshot }),
+					judge,
+					topics: [LEDGER_REFUNDS_TOPIC],
+				}),
+			)
+			await classifier.classify(new Set([ask.id]), new AbortController().signal)
+			// `topical` shares the topic and no id; `distant` shares the id and no topic.
+			expect(
+				judge.requests
+					.map((request) => Object.keys(request.questions)[0])
+					.filter((key) => key?.endsWith('"fixed"]')),
+			).toEqual(['["amends","carried","fixed"]'])
+		})
+
+		it('compares a correction naming no id with every near earlier message, ids or not', async () => {
+			const judge = new SilentJudge()
+			const classifier = new Classifier(
+				buildClassifierOptions({
+					conversation: createConversation({ snapshot }),
+					judge,
+					topics: [LEDGER_REFUNDS_TOPIC],
+				}),
+			)
+			await classifier.classify(new Set([ask.id]), new AbortController().signal)
+			expect(
+				judge.requests
+					.map((request) => Object.keys(request.questions)[0])
+					.filter((key) => key?.endsWith('"closed"]')),
+			).toEqual([
+				'["amends","carried","closed"]',
+				'["amends","topical","closed"]',
+				'["amends","fixed","closed"]',
+			])
+		})
+
+		it('never compares a correction with an earlier request, which pairs as a statement', async () => {
+			const asks = await Promise.all(
+				[new Set<string>(), new Set([ask.id])].map(async (requests) => {
+					const judge = new SilentJudge()
+					const classifier = new Classifier(
+						buildClassifierOptions({
+							conversation: createConversation({ snapshot }),
+							judge,
+							topics: [LEDGER_REFUNDS_TOPIC],
+						}),
+					)
+					await classifier.classify(requests, new AbortController().signal)
+					return judge.requests
+						.map((request) => Object.keys(request.questions)[0])
+						.filter((key) => key?.startsWith('["amends","ask"'))
+				}),
+			)
+			expect(asks).toEqual([['["amends","ask","fixed"]', '["amends","ask","closed"]'], []])
 		})
 	})
 

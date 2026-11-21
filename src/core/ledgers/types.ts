@@ -1129,7 +1129,10 @@ export type LedgerEntityHandler = (text: string, partial: boolean) => ReadonlySe
  *
  * @remarks
  * `assign` decides the category of a message the ledger wrote or a tool returned, without a
- * question. `entities` names the registry ids a text carries, which decide the pairs it asks about.
+ * question. `entities` names the registry ids a text carries, which decide the pairs it asks about:
+ * a correction pairs with an earlier message that isn't quiet or a request and shares a registry
+ * id, an owner, or a desk topic with it, and a correction carrying an id that holds a letter, read
+ * from its text or named by `entities`, pairs only with such a message that carries one of its ids.
  * While it pairs corrections, the `classify` method reads each message's quiet flag and near set at
  * most once per call and reuses them for every later correction, so a change to the conversation,
  * its judgments, or the judge's model made while the call waits on the judge or a host turn reaches

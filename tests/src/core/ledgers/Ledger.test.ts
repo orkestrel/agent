@@ -7107,10 +7107,10 @@ describe('Ledger — snapshot and hydrate', () => {
 				renderLedgerPositions({ keys: [firstKeys, secondKeys], judgments }, to),
 			),
 		}).toEqual({
-			keys: [89, 1],
-			amends: [26, 26],
-			supersedes: [26, 26],
-			digest: '3de616f2fcb02d1242c3e03824247fa8643ad4e30e45e5678b7c1c73d2aa348a',
+			keys: [57, 1],
+			amends: [10, 10],
+			supersedes: [10, 10],
+			digest: '23a2ecdd8bc6f2baad67df63af86ab35940a39bf9ac8691f0db625a4b7b2130e',
 		})
 	})
 

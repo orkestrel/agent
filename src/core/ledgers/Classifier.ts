@@ -260,7 +260,11 @@ export class Classifier implements ClassifierInterface {
 			for (const earlier of messages) {
 				if (earlier.id === later.id) break
 				if (this.#spent()) await this.#turn(signal)
-				if (!this.#eligible(earlier, near, quiets, nears, entities)) continue
+				if (
+					requests.has(earlier.id) ||
+					!this.#eligible(earlier, later, near, quiets, nears, entities)
+				)
+					continue
 				const spec = this.#buildPair('amends', earlier.id, later.id)
 				results.push(await this.#ask(spec, 'amends', signal, results))
 				if ((this.#readNoul(spec) ?? 0) >= this.#options.thresholds.amends)
@@ -438,11 +442,14 @@ export class Classifier implements ClassifierInterface {
 		)
 	}
 
-	// Reports whether a correction is compared against an earlier message: the message is not quiet
-	// and its near set shares a member with the correction's. The quiet flag is read first, so a
-	// quiet message's near set is never read.
+	// Reports whether a correction is compared against an earlier message: the message is not quiet,
+	// its near set shares a member with the correction's, and, when the correction carries an id that
+	// holds a letter, the message carries one of those ids, as `#sharesId` reads them. The quiet flag
+	// is read first, so a quiet message's near set is never read, and the id test only narrows the
+	// near test.
 	#eligible(
 		earlier: Message,
+		later: Message,
 		near: ReadonlySet<string>,
 		quiets: Map<string, boolean>,
 		nears: Map<string, ReadonlySet<string>>,
@@ -450,7 +457,8 @@ export class Classifier implements ClassifierInterface {
 	): boolean {
 		return (
 			!this.#readQuiet(earlier.id, quiets) &&
-			[...this.#readNear(earlier, nears, entities)].some((topic) => near.has(topic))
+			[...this.#readNear(earlier, nears, entities)].some((topic) => near.has(topic)) &&
+			(this.#collectIds(later, entities).size === 0 || this.#sharesId(earlier, later, entities))
 		)
 	}
 
