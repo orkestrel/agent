@@ -2998,7 +2998,10 @@ describe('collectLedgerKeys', () => {
 			),
 		).toEqual([
 			// The earlier request's statements hold the rule, so its row carries that category.
-			{ name: 'previous', description: 'your last answered request and your reply to it; rule' },
+			{
+				name: 'previous',
+				description: 'the last request you answered, and your reply; states: rule',
+			},
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'BW-5512', description: '3 earlier messages' },
 			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
@@ -3022,7 +3025,10 @@ describe('collectLedgerKeys', () => {
 			),
 		).toEqual([
 			// The earlier request's statements hold the rule, so its row carries that category.
-			{ name: 'previous', description: 'your last answered request and your reply to it; rule' },
+			{
+				name: 'previous',
+				description: 'the last request you answered, and your reply; states: rule',
+			},
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'TK-1', description: '1 earlier message' },
 			{ name: 'BW-5512', description: '2 earlier messages' },
@@ -3068,7 +3074,10 @@ describe('collectLedgerKeys', () => {
 		).toEqual([
 			// The last request has no reply, so `previous` reads the last exchange that has one.
 			// The earlier request's statements hold the rule, so its row carries that category.
-			{ name: 'previous', description: 'your last answered request and your reply to it; rule' },
+			{
+				name: 'previous',
+				description: 'the last request you answered, and your reply; states: rule',
+			},
 			{ name: 'rules', description: 'the standing rules and corrections stated earlier' },
 			{ name: 'BW-20931', description: 'Brightwater Studio; 1 earlier message' },
 			{ name: 'BW-5512', description: '3 earlier messages' },
@@ -3163,12 +3172,15 @@ describe('collectLedgerKeys', () => {
 			'previous',
 			...orders.toReversed().slice(0, LEDGER_KEY_LIMIT),
 		])
+		// Each row's key carries its depth, so the description names none.
 		expect(keys.slice(0, 8).map((key) => key.description)).toEqual([
-			...[8, 7, 6, 5, 4, 3, 2].map((depth) => `your request and reply ${depth} exchanges ago`),
-			'your last answered request and your reply to it',
+			...Array.from({ length: 7 }, () => 'request and reply'),
+			'the last request you answered, and your reply',
 		])
 		// No row names request text: the rows are unlabeled.
 		expect(keys.filter((key) => key.description.includes('Question'))).toEqual([])
+		// No statement was filed a rule or a correction, so no row carries a bare `states:` part.
+		expect(keys.filter((key) => key.description.includes('states:'))).toEqual([])
 	})
 
 	it('gives an exchange the opening shows no row and keeps the depths of the rows past it', () => {
@@ -3201,7 +3213,7 @@ describe('collectLedgerKeys', () => {
 			'previous-4',
 			'previous-3',
 		])
-		expect(keys.at(-1)?.description).toBe('your request and reply 3 exchanges ago')
+		expect(keys.at(-1)).toEqual({ name: 'previous-3', description: 'request and reply' })
 		// An exchange whose reply the opening doesn't show keeps its row, its request shown or not.
 		expect(
 			collectLedgerKeys(
@@ -3216,6 +3228,40 @@ describe('collectLedgerKeys', () => {
 				.map((key) => key.name)
 				.slice(-2),
 		).toEqual(['previous-2', 'previous'])
+	})
+
+	it('renders no previous row for a shown newest exchange and ends the rows at previous-2', () => {
+		const exchanges = Array.from({ length: 4 }, (_unused, at) => [
+			buildLedgerMessage(`ask-${at}`, 'user', `Question ${at} about the desk?`),
+			buildLedgerMessage(`answer-${at}`, 'assistant', `Answer ${at}.`),
+		]).flat()
+		const asks = Array.from({ length: 4 }, (_unused, at) => `ask-${at}`)
+		const input = buildLedgerInput({
+			exclusions: [...asks, 'request'],
+			messages: [...exchanges, buildLedgerMessage('request', 'user', 'Which are late?')],
+		})
+		expect(
+			renderLedgerKeys(
+				collectLedgerKeys(
+					input,
+					buildRecords(input),
+					[],
+					'request',
+					new Set([...asks, 'request']),
+					new Set(),
+					new Set(['request', 'ask-3', 'answer-3']),
+				),
+			),
+		).toBe(
+			[
+				'## Earlier',
+				'Stored messages you cannot see. If the request needs one, call recall with its key. Otherwise answer without recall.',
+				'- previous-4: request and reply',
+				'- previous-3: request and reply',
+				'- previous-2: request and reply',
+				'Other ids, names, and words also work as keys.',
+			].join('\n'),
+		)
 	})
 
 	it('tags an exchange row with its registry ids and owner names once, its topics, and the category of its statements alone', () => {
@@ -3260,11 +3306,39 @@ describe('collectLedgerKeys', () => {
 			{
 				name: 'previous-2',
 				description:
-					'your request and reply 2 exchanges ago; BC-7301 (Mara Ellison), BC-4101; refunds; correction',
+					'request and reply; BC-7301 (Mara Ellison), BC-4101; refunds; states: correction',
 			},
-			{ name: 'previous', description: 'your last answered request and your reply to it' },
+			{ name: 'previous', description: 'the last request you answered, and your reply' },
 		])
-		expect(estimateTokens(`- previous-2: ${requireValue(keys[0]).description}`)).toBe(27)
+		expect(estimateTokens(`- previous-2: ${requireValue(keys[0]).description}`)).toBe(24)
+	})
+
+	it('names the categories a row states, leaving out a fact among them', () => {
+		const input = buildLedgerInput({
+			messages: [
+				buildLedgerMessage('fact', 'user', 'Crate CR-1 holds lamps.'),
+				buildLedgerMessage('rule', 'user', 'Ship lamps only on Mondays.'),
+				buildLedgerMessage('fixed', 'user', 'Correction: ship lamps on Tuesdays.'),
+				buildLedgerMessage('first', 'user', 'When do the lamps ship?'),
+				buildLedgerMessage('reply', 'assistant', 'On Tuesdays.'),
+				buildLedgerMessage('request', 'user', 'Anything else?'),
+			],
+			classification: { categories: { fact: 'fact', rule: 'rule', fixed: 'correction' } },
+		})
+		expect(
+			collectLedgerKeys(
+				input,
+				buildRecords(input),
+				[],
+				'request',
+				new Set(['first', 'request']),
+				new Set(),
+				new Set(['request']),
+			)[0],
+		).toEqual({
+			name: 'previous',
+			description: 'the last request you answered, and your reply; states: rule, correction',
+		})
 	})
 
 	it('leaves an id that reads as an exchange key out of the id rows', () => {
@@ -3874,16 +3948,16 @@ describe('renderLedgerKeys', () => {
 	it('renders the Earlier heading, how to read it, one line per key, and a closing line with no count', () => {
 		expect(
 			renderLedgerKeys([
-				{ name: 'previous', description: 'your last answered request and your reply to it' },
+				{ name: 'previous', description: 'the last request you answered, and your reply' },
 				{ name: 'BW-20931', description: 'Brightwater\nStudio; 2 earlier messages' },
 			]),
 		).toBe(
 			[
 				'## Earlier',
-				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.",
-				'- previous: your last answered request and your reply to it',
+				'Stored messages you cannot see. If the request needs one, call recall with its key. Otherwise answer without recall.',
+				'- previous: the last request you answered, and your reply',
 				'- BW-20931: Brightwater Studio; 2 earlier messages',
-				'Other ids, names, and words from a message work too.',
+				'Other ids, names, and words also work as keys.',
 			].join('\n'),
 		)
 	})

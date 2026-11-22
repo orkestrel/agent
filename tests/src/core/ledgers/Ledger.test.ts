@@ -1311,7 +1311,7 @@ describe('Ledger', () => {
 				},
 				{ content: 'Answered.' },
 			]),
-			buildLedgerOptions({ capacity: 800, snapshot: parent.snapshot() }),
+			buildLedgerOptions({ capacity: 650, snapshot: parent.snapshot() }),
 		)
 		await ledger.respond('Warm the reply reserve.')
 		await ledger.respond('Find it again.')
@@ -3242,11 +3242,56 @@ describe('Ledger', () => {
 		expect(description).not.toMatch(/handle/)
 		expect(description?.match(LEDGER_HANDLE) ?? []).toEqual([])
 		expect(description).toBe(
-			`Read earlier items that are stored, not shown. The newest exchanges are often in the messages you see; the Earlier list names each one you can't see as previous or previous-N. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"BW-5512"} or {"key":"Odile Marlow"}; join keys with commas, like {"key":"BW-5512, Odile Marlow"}. Keys: previous-N (your request and reply N exchanges ago, counting your last answered one as 1), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds). Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. A key for something already in the messages you see says so. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
+			'Reads earlier messages that are stored but not shown. Call it only when the request needs an earlier message you cannot see. Pass one key from the Earlier list, or several joined with commas. Example: {"key":"BW-5512, previous-2"}. Keys: previous-N (the request and your reply N exchanges back; previous is the last one you answered), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds). Words from the message also match. Returns matches in the order of your keys; ids, names, topics, and words list together, newest first. It does not query lookup sources; for the current record, call a lookup tool.',
 		)
 		const parameters = provider.calls[1]?.tools?.find((tool) => tool.name === 'recall')?.parameters
 		expect(JSON.stringify(parameters)).toBe(
-			'{"type":"object","properties":{"key":{"type":"string","minLength":1,"description":"One key from the Earlier list, keys joined with commas, or words to match"}},"required":["key"],"additionalProperties":false}',
+			'{"type":"object","properties":{"key":{"type":"string","minLength":1,"description":"One key, or several joined with commas"}},"required":["key"],"additionalProperties":false}',
+		)
+	})
+
+	// With no topic the keys end at an owner name; with no lookup tool the order sentence ends it.
+	it.each([
+		[
+			'no topic and no lookup tool',
+			[],
+			false,
+			'Reads earlier messages that are stored but not shown. Call it only when the request needs an earlier message you cannot see. Pass one key from the Earlier list, or several joined with commas. Example: {"key":"BW-5512, previous-2"}. Keys: previous-N (the request and your reply N exchanges back; previous is the last one you answered), rules (the standing rules and corrections), an id, or an owner name. Words from the message also match. Returns matches in the order of your keys; ids, names, topics, and words list together, newest first.',
+		],
+		[
+			'no topic and a lookup tool',
+			[],
+			true,
+			'Reads earlier messages that are stored but not shown. Call it only when the request needs an earlier message you cannot see. Pass one key from the Earlier list, or several joined with commas. Example: {"key":"BW-5512, previous-2"}. Keys: previous-N (the request and your reply N exchanges back; previous is the last one you answered), rules (the standing rules and corrections), an id, or an owner name. Words from the message also match. Returns matches in the order of your keys; ids, names, topics, and words list together, newest first. It does not query lookup sources; for the current record, call a lookup tool.',
+		],
+		[
+			'two topics and no lookup tool',
+			[
+				{ name: 'refunds', criterion: 'Refund amounts' },
+				{ name: 'deliveries', criterion: 'Delivery dates' },
+			],
+			false,
+			'Reads earlier messages that are stored but not shown. Call it only when the request needs an earlier message you cannot see. Pass one key from the Earlier list, or several joined with commas. Example: {"key":"BW-5512, previous-2"}. Keys: previous-N (the request and your reply N exchanges back; previous is the last one you answered), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds, deliveries). Words from the message also match. Returns matches in the order of your keys; ids, names, topics, and words list together, newest first.',
+		],
+		[
+			'two topics and a lookup tool',
+			[
+				{ name: 'refunds', criterion: 'Refund amounts' },
+				{ name: 'deliveries', criterion: 'Delivery dates' },
+			],
+			true,
+			'Reads earlier messages that are stored but not shown. Call it only when the request needs an earlier message you cannot see. Pass one key from the Earlier list, or several joined with commas. Example: {"key":"BW-5512, previous-2"}. Keys: previous-N (the request and your reply N exchanges back; previous is the last one you answered), rules (the standing rules and corrections), an id, an owner name, or a topic (refunds, deliveries). Words from the message also match. Returns matches in the order of your keys; ids, names, topics, and words list together, newest first. It does not query lookup sources; for the current record, call a lookup tool.',
+		],
+	] as const)('words the recall description for %s', async (_name, topics, lookup, expected) => {
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({ topics, ...(lookup ? {} : { lookups: [] }) }),
+		)
+		seedLedgerRecall(ledger)
+		await ledger.respond('Check the desk.')
+		expect(provider.calls[0]?.tools?.find((tool) => tool.name === 'recall')?.description).toBe(
+			expected,
 		)
 	})
 
@@ -11149,11 +11194,11 @@ describe('Ledger — the lean opening', () => {
 		expect(sent.at(-1)?.content).toBe(
 			[
 				'## Earlier',
-				"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.",
+				'Stored messages you cannot see. If the request needs one, call recall with its key. Otherwise answer without recall.',
 				'- AX-3: 2 earlier messages',
 				'- AX-2: 2 earlier messages',
 				'- AX-1: 2 earlier messages',
-				'Other ids, names, and words from a message work too.',
+				'Other ids, names, and words also work as keys.',
 				'',
 				'## Request',
 				'Which crates are ready?',
@@ -11196,17 +11241,17 @@ describe('Ledger — the lean opening', () => {
 			['AX-3', 'AX-2', 'AX-1'],
 		],
 		[
-			400,
+			370,
 			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
 			['AX-3', 'AX-2'],
 		],
 		[
-			390,
+			365,
 			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
 			['AX-3'],
 		],
 		[
-			385,
+			355,
 			['first', 'noted', 'second', 'noted-2', 'third', 'noted-3', 'crate-1', 'crate-2', 'crate-3'],
 			[],
 		],
@@ -11227,7 +11272,7 @@ describe('Ledger — the lean opening', () => {
 	)
 
 	it.each([
-		...[350, 345, 340, 335, 320, 305, 300, 290, 260].map(
+		...[320, 315, 310, 305, 300, 290, 275, 260, 255].map(
 			(capacity): readonly [number, readonly string[]] => [
 				capacity,
 				[
@@ -11250,7 +11295,7 @@ describe('Ledger — the lean opening', () => {
 	])(
 		'cuts at capacity %i to the shown messages %j with no index, the plan without recall serving the request',
 		async (capacity, shown) => {
-			// Below 385 no layout of the plan with `recall` both leaves its room and shows the newest
+			// Below 325 no layout of the plan with `recall` both leaves its room and shows the newest
 			// exchange and as many requests as the plan without it, which prices no index: that plan shows
 			// the window whole, then past the budget the newest exchange as a copy of its request, then the
 			// statements alone, cut oldest first.
@@ -11286,7 +11331,7 @@ describe('Ledger — the lean opening', () => {
 			['lookup', 'recall'],
 		] as const,
 		[
-			420,
+			390,
 			[
 				'rule',
 				'refund',
@@ -11303,7 +11348,7 @@ describe('Ledger — the lean opening', () => {
 			['AX-3'],
 			['lookup', 'recall'],
 		] as const,
-		...[405, 400, 375, 370, 360, 355, 315].map(
+		...[385, 380, 350, 345, 335, 330, 315].map(
 			(capacity): readonly [number, readonly string[], readonly string[], readonly string[]] => [
 				capacity,
 				[
@@ -11320,7 +11365,7 @@ describe('Ledger — the lean opening', () => {
 					'crate-3',
 				],
 				[],
-				capacity >= 400 ? ['lookup', 'recall'] : ['lookup'],
+				capacity >= 355 ? ['lookup', 'recall'] : ['lookup'],
 			],
 		),
 		[
@@ -11350,7 +11395,7 @@ describe('Ledger — the lean opening', () => {
 		async (capacity, shown, keys, tools) => {
 			// The rule and the refund statement come before the first request and carry no id, so they
 			// show as the brief and leave the `rules` and `refunds` rows nothing to list. The id rows go
-			// last-ranked first while recall stays, down to an empty index at 405 and 400. Below 385 no
+			// last-ranked first while recall stays, down to an empty index at 385 and 380. Below 355 no
 			// layout of the plan with `recall` leaves its room, so the plan without it, which prices no
 			// index, shows the window whole, then the oldest exchange as a copy of its request, then past
 			// the window the brief cut last stored first, then the current statements cut oldest first.
@@ -11372,7 +11417,7 @@ describe('Ledger — the lean opening', () => {
 
 	it('keeps cutting rows until the first turn leaves recall its room, and else serves the plan without recall', async () => {
 		const openings = await Promise.all(
-			[350, 385, 390].map(async (capacity) => {
+			[320, 355, 365].map(async (capacity) => {
 				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
 				const ledger = createLedger(
 					provider,
@@ -11397,8 +11442,8 @@ describe('Ledger — the lean opening', () => {
 			'crate-2',
 			'crate-3',
 		]
-		// At 390 cutting the id rows down to AX-3 leaves twice the reply reserve, and at 385 only cutting
-		// every row does; at 350 no layout of the plan with recall both leaves that room and shows as
+		// At 365 cutting the id rows down to AX-3 leaves twice the reply reserve, and at 355 only cutting
+		// every row does; at 320 no layout of the plan with recall both leaves that room and shows as
 		// many requests as the plan without it, which serves the request.
 		expect(openings).toEqual([
 			{ shown, keys: [], tools: ['lookup'] },
@@ -11669,16 +11714,17 @@ describe('Ledger — the lean opening', () => {
 		await first.respond(request)
 		const opened = readLedgerOpening(requireValue(planned.calls[0]).messages)
 		const keys = opened.keys
-		// The request's subject is GL-7's, so the subject window shows the newest exchange and GL-7's goal
-		// as a far member. GL-57's order is the one statement that carries GL-57, so it knows AC-7 alone
-		// and links GL-57 to nothing. The exchange rows take their own 8 places from previous-9 to
-		// previous-2, oldest first, and leave the id rows' cap whole.
+		// The request's subject is GL-7's, so the subject window leaves out the newest exchange, goal 99's
+		// on GL-99, and shows GL-7's goal as a far member. GL-57's order is the one statement that carries
+		// GL-57, so it knows AC-7 alone and links GL-57 to nothing. The exchange rows take their own 8
+		// places from previous-8 to previous, oldest first, and leave the id rows' cap whole.
 		expect(['ask-7', 'answer-7'].filter((id) => !opened.shown.includes(id))).toEqual([])
 		expect(opened.shown).not.toContain('answer-57')
-		expect(keys.slice(0, LEDGER_EXCHANGE_LIMIT).at(-1)).toBe(`${LEDGER_PREVIOUS_KEY}-2`)
+		expect(opened.shown.filter((id) => id === 'ask-99' || id === 'answer-99')).toEqual([])
+		expect(keys.slice(0, LEDGER_EXCHANGE_LIMIT).at(-1)).toBe(LEDGER_PREVIOUS_KEY)
 		expect(keys.slice(LEDGER_EXCHANGE_LIMIT)).toHaveLength(LEDGER_KEY_LIMIT)
 		// The request's own ids leave nothing behind, so the recurring ids lead the id rows, newest
-		// first: GL-99, whose order the newest exchange leaves behind, then GL-98.
+		// first: GL-99, whose order and exchange the opening leaves behind, then GL-98.
 		expect(keys.slice(LEDGER_EXCHANGE_LIMIT, LEDGER_EXCHANGE_LIMIT + 2)).toEqual(['GL-99', 'GL-98'])
 		// Four recalls, the request's limit, run inside the request that planned the index.
 		const recalled = [
@@ -11711,10 +11757,10 @@ describe('Ledger — the lean opening', () => {
 			),
 		)
 		expect(listings.filter((listing) => listing.startsWith('nothing stored matches'))).toEqual([])
-		// The opening sent goal 99's request and reply, so the in-request recall of GL-99 lists the order
-		// it leaves behind and not the request.
+		// The opening sent neither goal 99's order nor its request, so the in-request recall of GL-99 lists
+		// both.
 		expect(listings[1]).toContain('Order GL-99 for account AC-49')
-		expect(listings[1]).not.toContain('What do we do for GL-99?')
+		expect(listings[1]).toContain('What do we do for GL-99?')
 		// Between requests nothing is left out, and every key the index named still lists a line.
 		const listed = await ledger.agent.context.tools.execute(
 			keys.map((key) => ({ id: `host ${key}`, name: 'recall', arguments: { key } })),
@@ -12167,9 +12213,10 @@ describe('Ledger — the subject window', () => {
 		expect(new Set(rows.map((row) => row.far))).toEqual(new Set([true, false]))
 	})
 
+	// The one exchange checks BC-7306, off the request's case, so the window shows nothing of it.
 	it.each([
-		[true, ['register', 'link', 'claim', 'adjuster', 'ask-1', 'reply-1']],
-		[false, ['register', 'ask-1', 'reply-1']],
+		[true, ['register', 'link', 'claim', 'adjuster']],
+		[false, ['register']],
 	])(
 		'keeps the claim statements on their case with no registry link while a statement names both, as CS-7305 at ev-17-1 (linked: %s)',
 		async (linked, shown) => {
@@ -12216,6 +12263,180 @@ describe('Ledger — the subject window', () => {
 		expect(opening.shown).toContain('note')
 		expect(opening.shown).not.toContain('ask-1')
 		expect(opening.keys).toContain('previous-4')
+	})
+})
+
+describe("Ledger — a newest exchange off the request's subject", () => {
+	it('shows nothing of it, no copy of its request included, and keeps its previous row', async () => {
+		const snapshot = buildLedgerCases(
+			['BC-7301', 'BC-7302'],
+			[{ request: 'Check BC-7302.', calls: [], reply: 'BC-7302 is closed.' }],
+		)
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+		await ledger.respond('What else on BC-7301?')
+		const sent = requireValue(provider.calls[0]).messages
+		const opening = readLedgerOpening(sent)
+		// The request names BC-7301 and the one exchange BC-7302: both subjects name a known id and share
+		// none, so the register, which names the request's case, is all the opening shows.
+		expect(opening.shown).toEqual(['register'])
+		expect(readLedgerWindow(sent, snapshot).form).toBe('none')
+		expect(sent.filter((message) => message.content.includes('Check BC-7302.'))).toEqual([])
+		expect(opening.keys).toContain(LEDGER_PREVIOUS_KEY)
+	})
+
+	it('offers recall in that opening, and recall of previous returns the request and reply it hides', async () => {
+		const provider = createScriptedProvider(
+			[
+				{
+					content: '',
+					tools: [{ id: 'in', name: 'recall', arguments: { key: LEDGER_PREVIOUS_KEY } }],
+				},
+				{ content: 'Done.' },
+			],
+			{ recorded: true },
+		)
+		const ledger = createLedger(
+			provider,
+			buildLedgerOptions({
+				snapshot: buildLedgerCases(
+					['BC-7301', 'BC-7302'],
+					[{ request: 'Check BC-7302.', calls: [], reply: 'BC-7302 is closed.' }],
+				),
+				topics: [],
+			}),
+		)
+		await ledger.respond('What else on BC-7301?')
+		expect(requireValue(provider.calls[0]).tools?.map((tool) => tool.name) ?? []).toContain(
+			'recall',
+		)
+		const listing = requireValue(
+			ledger.conversation.messages().find((message) => message.call === 'in')?.content,
+		)
+		expect(listing).toContain('Check BC-7302.')
+		expect(listing).toContain('BC-7302 is closed.')
+	})
+
+	it('keeps the newest exchange for a request whose subject is empty', async () => {
+		const snapshot = buildLedgerTraffic([
+			{ request: 'Check the porch light.', calls: [], reply: 'The porch light works.' },
+		])
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+		await ledger.respond('And the garage door?')
+		const sent = requireValue(provider.calls[0]).messages
+		// No message names a known id, so the request and the exchange both have an empty subject.
+		expect(readLedgerOpening(sent).shown).toEqual(['ask-1', 'reply-1'])
+		expect(readLedgerWindow(sent, snapshot).form).toBe('whole')
+	})
+
+	it('keeps a newest exchange whose subject is empty beside a request that names a case', async () => {
+		const snapshot = buildLedgerCases(
+			['BC-7301'],
+			[{ request: 'Check the porch light.', calls: [], reply: 'The porch light works.' }],
+		)
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+		await ledger.respond('What else on BC-7301?')
+		const sent = requireValue(provider.calls[0]).messages
+		// The exchange names no known id and no earlier answered request names one, so its subject is
+		// empty and can be the request's.
+		expect(readLedgerOpening(sent).shown).toEqual(['register', 'ask-1', 'reply-1'])
+		expect(readLedgerWindow(sent, snapshot).form).toBe('whole')
+		expect(readLedgerOpening(sent).keys).not.toContain(LEDGER_PREVIOUS_KEY)
+	})
+
+	it("hides a newest exchange that names no id but inherits another case's subject, as a shift's handoff", async () => {
+		const snapshot = buildLedgerCases(
+			['BC-7301', 'BC-7302'],
+			[
+				{ request: 'Check BC-7302.', calls: [], reply: 'BC-7302 is closed.' },
+				{ request: 'Write the handoff.', calls: [], reply: 'Handoff: nothing open.' },
+			],
+		)
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+		await ledger.respond('What else on BC-7301?')
+		const sent = requireValue(provider.calls[0]).messages
+		const opening = readLedgerOpening(sent)
+		// The handoff takes BC-7302's subject from the request before it, so neither exchange can be the
+		// request's, and each keeps its row.
+		expect(opening.shown).toEqual(['register'])
+		expect(readLedgerWindow(sent, snapshot).form).toBe('none')
+		expect(opening.keys).toEqual(
+			expect.arrayContaining([LEDGER_PREVIOUS_KEY, `${LEDGER_PREVIOUS_KEY}-2`]),
+		)
+	})
+
+	it('brings back no copy of its request through a literal both requests carry that is no known id', async () => {
+		const snapshot = buildLedgerCases(
+			['BC-7301', 'BC-7302'],
+			[{ request: 'Check BC-7302 under RMA-881.', calls: [], reply: 'BC-7302 is closed.' }],
+		)
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+		await ledger.respond('Does RMA-881 cover BC-7301?')
+		const sent = requireValue(provider.calls[0]).messages
+		// RMA-881 is a literal id no statement carries, so it is no known id and joins neither subject,
+		// but the request's own literals still match the hidden request; it stays behind whole.
+		expect(readLedgerOpening(sent).shown).not.toContain('ask-1')
+		expect(
+			sent.filter((message) => message.content.includes('Check BC-7302 under RMA-881.')),
+		).toEqual([])
+		expect(readLedgerOpening(sent).keys).toContain(LEDGER_PREVIOUS_KEY)
+	})
+
+	it("shows an exchange on the request's case at depth 2 behind it as its request and reply, with no call traffic", async () => {
+		const snapshot = buildLedgerCases(
+			['BC-7301', 'BC-7302'],
+			[
+				{
+					request: 'Check BC-7301.',
+					calls: [{ name: 'lookup', arguments: { id: 'BC-7301' }, result: 'Case BC-7301: open.' }],
+					reply: 'BC-7301 is open.',
+				},
+				{ request: 'Check BC-7302.', calls: [], reply: 'BC-7302 is closed.' },
+			],
+		)
+		const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+		const ledger = createLedger(provider, buildLedgerOptions({ snapshot, topics: [] }))
+		await ledger.respond('What else on BC-7301?')
+		const opening = readLedgerOpening(requireValue(provider.calls[0]).messages)
+		// With the newest exchange out of the window, its depths start past a gap, so the exchange on
+		// BC-7301 is far and shows its stored request and reply alone.
+		expect(opening.shown).toEqual(['register', 'ask-1', 'reply-1'])
+		expect(opening.keys).toContain(LEDGER_PREVIOUS_KEY)
+		expect(opening.keys).not.toContain(`${LEDGER_PREVIOUS_KEY}-2`)
+	})
+
+	it('never shows fewer requests as the capacity grows, and never shows it', async () => {
+		const snapshot = buildLedgerCases(
+			['BC-7301', 'BC-7302'],
+			[
+				{ request: 'Check BC-7301.', calls: [], reply: `BC-7301 is open. ${'a'.repeat(800)}` },
+				{ request: 'Check BC-7301 status.', calls: [], reply: `Open. ${'b'.repeat(800)}` },
+				{ request: 'Check BC-7301 again.', calls: [], reply: `Still open. ${'c'.repeat(800)}` },
+				{ request: 'Check BC-7302.', calls: [], reply: 'BC-7302 is closed.' },
+			],
+		)
+		const rows = await Promise.all(
+			Array.from({ length: 60 }, (_unused, at) => 200 + at * 40).map(async (capacity) => {
+				const provider = createScriptedProvider([{ content: 'Done.' }], { recorded: true })
+				const ledger = createLedger(
+					provider,
+					buildLedgerOptions({ capacity, snapshot, topics: [] }),
+				)
+				await ledger.respond('What else on BC-7301?')
+				return readLedgerWindow(requireValue(provider.calls[0]).messages, snapshot)
+			}),
+		)
+		expect(rows.filter((row) => row.form !== 'none')).toEqual([])
+		expect(
+			rows.slice(1).filter((row, at) => row.requests < requireValue(rows[at]).requests),
+		).toEqual([])
+		// The sweep shows every far member somewhere, and fewer somewhere.
+		expect(rows.some((row) => row.requests === 3)).toBe(true)
+		expect(rows.some((row) => row.requests < 3)).toBe(true)
 	})
 })
 

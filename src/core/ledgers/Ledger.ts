@@ -165,7 +165,7 @@ import { ledgerSnapshotContract } from './contracts.js'
 import { isFraction, isLedgerQuestion, isLedgerSnapshot } from './validators.js'
 
 /**
- * Serves one conversation through classified records: each request sends the recent window of its newest exchanges, the current statements whole, a copy of the request turn carrying the Earlier index `recall` reads, and a final answer pass.
+ * Serves one conversation through classified records: each request sends the subject window of the newest exchanges on its subject, the current statements whole, a copy of the request turn carrying the Earlier index `recall` reads, and a final answer pass.
  * @example
  * ```ts
  * const ledger = new Ledger(provider, options)
@@ -329,12 +329,11 @@ export class Ledger implements LedgerInterface {
 		tools.add(
 			createTool({
 				name: 'recall',
-				description: `Read earlier items that are stored, not shown. The newest exchanges are often in the messages you see; the Earlier list names each one you can't see as ${LEDGER_PREVIOUS_KEY} or ${LEDGER_PREVIOUS_KEY}-N. Use it only when the request depends on something said earlier that the messages you see don't hold; if they are enough, answer without it. Pass one key from the Earlier list. Example: {"key":"BW-5512"} or {"key":"Odile Marlow"}; join keys with commas, like {"key":"BW-5512, Odile Marlow"}. Keys: ${LEDGER_PREVIOUS_KEY}-N (your request and reply N exchanges ago, counting your last answered one as 1), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message you need also match. A number given as the key reads as its digits. Returns exchange keys and rules in the order given, and other keys together, newest first. A key for something already in the messages you see says so. It finds nothing this conversation never held and does not read a record a lookup tool serves. A miss names keys you can use.`,
+				description: `Reads earlier messages that are stored but not shown. Call it only when the request needs an earlier message you cannot see. Pass one key from the Earlier list, or several joined with commas. Example: {"key":"BW-5512, ${LEDGER_PREVIOUS_KEY}-2"}. Keys: ${LEDGER_PREVIOUS_KEY}-N (the request and your reply N exchanges back; ${LEDGER_PREVIOUS_KEY} is the last one you answered), ${LEDGER_RULES_KEY} (the standing rules and corrections), ${options.topics.length === 0 ? 'an id, or an owner name' : `an id, an owner name, or a topic (${renderTopicNames(options.topics)})`}. Words from the message also match. Returns matches in the order of your keys; ids, names, topics, and words list together, newest first.${(options.lookups?.length ?? 0) === 0 ? '' : ' It does not query lookup sources; for the current record, call a lookup tool.'}`,
 				contract: objectShape({
 					key: stringShape({
 						min: 1,
-						description:
-							'One key from the Earlier list, keys joined with commas, or words to match',
+						description: 'One key, or several joined with commas',
 					}),
 				}),
 				execute: (args) => this.#recall(args),
@@ -1342,12 +1341,15 @@ export class Ledger implements LedgerInterface {
 	// brief, the newest member of each recurrence, and the current statements whole, in conversation
 	// order and without a statement a shown successor supersedes, then the request copy, which carries
 	// the Earlier index of what the opening leaves behind while `recall` is advertised. The subject
-	// window is the newest exchange that has a reply, then the newest exchanges on the request's
-	// subject; a member of its contiguous run shows whole or less its all-`recall` groups, and a far
-	// member, past the first gap, shows its request and reply alone. It plans at the price without
-	// `recall` and, while the scope admits it, at the price with it, and keeps `recall` only when that
-	// plan shows the newest exchange in the form its rung gave it, leaves `recall` its room, and shows
-	// no fewer requests than the plan without it.
+	// window is the exchanges on the request's subject, newest first. The newest exchange that has a
+	// reply is among them unless the request and that exchange each have a non-empty subject, their
+	// own or inherited, and the two share none; then it shows nothing, no reply, no call traffic, and
+	// no copy of its request, keeps its `previous` row, and `recall` reaches it. A member of the
+	// window's contiguous run shows whole or less its all-`recall` groups, and a far member, past the
+	// first gap, shows its request and reply alone. It plans at the price without `recall` and, while
+	// the scope admits it, at the price with it, and keeps `recall` only when that plan shows the
+	// newest exchange in the form its rung gave it or the window leaves it out, leaves `recall` its
+	// room, and shows no fewer requests than the plan without it.
 	#plan(
 		request: Message,
 		scan: LedgerScan,
@@ -1376,19 +1378,18 @@ export class Ledger implements LedgerInterface {
 		const recallable = collectRecallMessages(input, this.#requests, this.#annotations).filter(
 			(message) => (scan.position(message.id) ?? at) < at,
 		)
-		// The subject window: the newest exchange that has a reply, then the exchanges on the request's
-		// subject, newest first, the count bound taken after the filter. Its contiguous run is the members
-		// whose depths run unbroken back from the newest, each with its call groups whose every call has
-		// its result; every member past the first gap is far and shows no traffic.
+		// The subject window: the exchanges on the request's subject, newest first, the count bound taken
+		// after the filter, so the newest exchange is among them unless both subjects are non-empty and
+		// share none. Its contiguous run is the members whose depths run unbroken back from the newest
+		// exchange, each with its call groups whose every call has its result; every member past the
+		// first gap is far and shows no traffic, so with the newest exchange out every member is far.
 		const subjects = collectLedgerSubjects(input, request.id, this.#requests, this.#annotations)
 		const own = subjects.get(request.id) ?? new Set<string>()
 		const exchanges = collectLedgerExchanges(before, this.#requests, this.#annotations)
 		const chosen = exchanges
 			.map((exchange, index) => ({ exchange, depth: index + 1 }))
-			.filter(
-				({ exchange, depth }) =>
-					depth === 1 ||
-					matchesLedgerSubject(own, subjects.get(exchange.request.id) ?? new Set<string>()),
+			.filter(({ exchange }) =>
+				matchesLedgerSubject(own, subjects.get(exchange.request.id) ?? new Set<string>()),
 			)
 			.slice(0, LEDGER_RECENT_LIMIT)
 		const gap = chosen.findIndex((member, index) => member.depth !== index + 1)
@@ -1502,7 +1503,8 @@ export class Ledger implements LedgerInterface {
 	// One plan of an opening at one advertised set, whose price sets the plan's `total`. The newest
 	// exchange takes the first form of its ladder that fits the window's and the retrieval's shares
 	// together, whole, then less its all-`recall` groups, then the pair; when even the pair is over,
-	// it leaves the window and its request goes as a copy.
+	// it leaves the window and its request goes as a copy. A newest exchange off the request's subject
+	// has no ladder and goes as nothing, not even a copy.
 	#arrange(
 		survey: LedgerSurvey,
 		scan: LedgerScan,
@@ -1548,7 +1550,7 @@ export class Ledger implements LedgerInterface {
 			...survey.far.map((member) => [member]),
 		]
 		const most = this.#settle(survey, scan, advertised, admits, total, form, older)
-		if (most.recent === older.length + 1) return most
+		if (most.recent === older.length + survey.ladder.slice(0, 1).length) return most
 		const least = this.#settle(survey, scan, advertised, admits, total, form, [])
 		const filled =
 			this.#fillWindow(scan, survey, total, older, form === undefined ? [] : [form]).length -
@@ -1577,7 +1579,8 @@ export class Ledger implements LedgerInterface {
 	}
 
 	// One rung's plan: the newest exchange in `form`, or, when `form` is undefined, as a copy of its
-	// request that every layout carries and that is priced with the window, the members `older` offers
+	// request that every layout carries and that is priced with the window, or, with no ladder because
+	// the newest exchange is off the request's subject, nothing of it at all; the members `older` offers
 	// past it newest first, a member of the contiguous run whole or less its all-`recall` groups and a
 	// far member as its pair, within the window's share and the whole window within the window's and
 	// the retrieval's shares together, up to the first that no form fits, with the amenders inside the
@@ -1661,22 +1664,27 @@ export class Ledger implements LedgerInterface {
 		const depths = new Set(shown.map((member) => member.depth))
 		// The contiguous members past the newest that the shares cut offer their requests to retrieval as
 		// `recent` matches; the far members the shares cut show no copy, and retrieval never shows their
-		// requests, so their index rows stay.
+		// requests, so their index rows stay. A newest exchange off the request's subject has no ladder:
+		// it shows nothing, and retrieval never shows its request either.
 		const contiguous = survey.older.flatMap((one) => one.slice(0, 1))
 		const recent = new Set(
 			contiguous
 				.filter((member) => !depths.has(member.depth))
 				.map((member) => member.exchange.request.id),
 		)
-		const dropped = new Set(
-			survey.far
+		const dropped = new Set([
+			...survey.far
 				.filter((member) => !depths.has(member.depth))
 				.map((member) => member.exchange.request.id),
-		)
+			...[...survey.depths]
+				.filter(([, depth]) => depth === 1 && survey.ladder.length === 0)
+				.map(([id]) => id),
+		])
 		// Every member of the window, newest first.
 		const members = [...survey.ladder.slice(0, 1), ...contiguous, ...survey.far]
-		// A newest exchange out of the window goes as a copy of its request in every layout, priced
-		// with the window and never in retrieval's room.
+		// A newest exchange no form of its ladder fits goes as a copy of its request in every layout,
+		// priced with the window and never in retrieval's room; one off the request's subject has no
+		// ladder and goes as nothing.
 		const carried = survey.ladder
 			.slice(0, form === undefined ? 1 : 0)
 			.map((member) =>
@@ -1685,8 +1693,9 @@ export class Ledger implements LedgerInterface {
 		// The retrieved messages, each match's in rank order, from none the window, the amenders of the
 		// newest exchange's span, which every layout with a match shows, the current statements, a
 		// statement a shown successor supersedes included, the brief's shown members, or the recurrence
-		// show, and with no match whose source is a cut far member's request, which shows nothing and so
-		// never counts as shown; the brief takes nothing from retrieval's room.
+		// show, and with no match whose source is a cut far member's request or the request of a newest
+		// exchange off the request's subject, which show nothing and so never count as shown; the brief
+		// takes nothing from retrieval's room.
 		const retrieved =
 			floor === 0
 				? this.#collectRetrieved(
@@ -1861,7 +1870,8 @@ export class Ledger implements LedgerInterface {
 					) ?? []))
 		const ids = new Set(kept.map((message) => message.id))
 		const visible = new Set(sent.map((message) => message.id))
-		// The newest exchange's rung form, or its request for the copy rung.
+		// The newest exchange's rung form, or its request for the copy rung; none for a newest exchange
+		// off the request's subject, so a plan that leaves it out is intact.
 		const marks =
 			form?.messages ?? survey.ladder.slice(0, 1).map((member) => member.exchange.request)
 		const region = new Set(members.map((member) => member.exchange.request.id))

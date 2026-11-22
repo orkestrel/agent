@@ -9795,8 +9795,8 @@ export const LEDGER_SNAPSHOT_SEED = Object.freeze<LedgerSnapshot>({
 	requests: ['request'],
 	notes: ['note'],
 	failures: ['failure'],
-	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-19.
-	gauge: { scale: 2, overhead: 10, digest: 'd5e3c08557f4f17b', model: SCRIPTED_MODEL },
+	// The digest of the tool definitions `buildLedgerOptions` gives a ledger, recorded 2026-11-21.
+	gauge: { scale: 2, overhead: 10, digest: '5390c1db2e145251', model: SCRIPTED_MODEL },
 })
 
 /**

@@ -987,11 +987,12 @@ export function nameLedgerExchange(depth: number): string {
  *   returns whose request and reply `excluded` does not both hold, oldest first: the deepest
  *   `previous-N` first and `previous`, the last exchange that has a reply, last, each named by its
  *   depth among all the exchanges, so a shown exchange leaves a gap and the names stay stable. Each
- *   description names no request text: how far back the exchange is, then the tags of its user side,
- *   its request and the statements before it that are not quiet: up to `LEDGER_TAG_LIMIT` registry
- *   ids `input.entities` names, each with its owner's first name unless an earlier id of the row gave
- *   that name, then the desk topics filed for them, then `rule` or `correction` when a statement was
- *   filed so;
+ *   description names no request text: what the exchange holds, the last request answered and its
+ *   reply for `previous` and a request and its reply for a deeper key, then the tags of its user
+ *   side, its request and the statements before it that are not quiet: up to `LEDGER_TAG_LIMIT`
+ *   registry ids `input.entities` names, each with its owner's first name unless an earlier id of
+ *   the row gave that name, then the desk topics filed for them, then `states:` and `rule` or
+ *   `correction` when a statement was filed so;
  * - `rules`, when a line of the rules record comes from an earlier message;
  * - at most `LEDGER_KEY_LIMIT` ids an earlier message carries, as `extractLiterals` reads them, but
  *   none that reads as an exchange key: first the ids of the current statements that are earlier,
@@ -1019,7 +1020,7 @@ export function nameLedgerExchange(depth: number): string {
  * @example
  * ```ts
  * collectLedgerKeys(input, projection, [], 'request', new Set(['first', 'request']), new Set(), new Set(['request']))
- * // [{ name: 'previous', description: 'your last answered request and your reply to it' }, …]
+ * // [{ name: 'previous', description: 'the last request you answered, and your reply' }, …]
  * ```
  */
 export function collectLedgerKeys(
@@ -1155,15 +1156,13 @@ export function collectLedgerKeys(
 				return {
 					name: nameLedgerExchange(depth),
 					description: [
-						depth === 1
-							? 'your last answered request and your reply to it'
-							: `your request and reply ${depth} exchanges ago`,
+						depth === 1 ? 'the last request you answered, and your reply' : 'request and reply',
 						tagged.join(', '),
 						topics
 							.filter((topic) => filedSide.has(topic.name))
 							.map((topic) => topic.name)
 							.join(', '),
-						categories.join(', '),
+						categories.length === 0 ? '' : `states: ${categories.join(', ')}`,
 					]
 						.filter((part) => part !== '')
 						.join('; '),
@@ -1198,26 +1197,26 @@ export function collectLedgerKeys(
  * and a closing line, or empty text for no key.
  *
  * @remarks
- * The instruction line says what the rows are, when to call `recall` with a key or with joined keys,
- * and when to answer without it. Each key renders through `renderIndexEntry`, as
- * `- NAME: DESCRIPTION` on one line. The instruction and closing lines state no count, so they never
- * disagree with the keys between them.
+ * The instruction line says what the rows are, when to call `recall` with a key, and when to answer
+ * without it. Each key renders through `renderIndexEntry`, as `- NAME: DESCRIPTION` on one line.
+ * The instruction and closing lines state no count, so they never disagree with the keys between
+ * them.
  *
  * @param keys - The keys in order, as {@link collectLedgerKeys} returns them
  * @returns The index text, or `''` when `keys` is empty
  * @example
  * ```ts
- * renderLedgerKeys([{ name: 'previous', description: 'your last answered request and your reply to it' }])
- * // "## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous: your last answered request and your reply to it\nOther ids, names, and words from a message work too."
+ * renderLedgerKeys([{ name: 'previous', description: 'the last request you answered, and your reply' }])
+ * // '## Earlier\nStored messages you cannot see. If the request needs one, call recall with its key. Otherwise answer without recall.\n- previous: the last request you answered, and your reply\nOther ids, names, and words also work as keys.'
  * ```
  */
 export function renderLedgerKeys(keys: readonly LedgerKey[]): string {
 	if (keys.length === 0) return ''
 	return [
 		'## Earlier',
-		"These earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.",
+		'Stored messages you cannot see. If the request needs one, call recall with its key. Otherwise answer without recall.',
 		...keys.map((key) => renderIndexEntry(key)),
-		'Other ids, names, and words from a message work too.',
+		'Other ids, names, and words also work as keys.',
 	].join('\n')
 }
 
@@ -1523,8 +1522,8 @@ export function buildRecallMessage(key: string): Message {
  * @returns The request with its content set to the index, a `## Request` heading, and the request content, or the request itself when the index is empty
  * @example
  * ```ts
- * buildRequestMessage({ id: 'request', role: 'user', content: 'Check BW-5512.' }, '## Earlier\n- previous: your last answered request and your reply to it').content
- * // '## Earlier\n- previous: your last answered request and your reply to it\n\n## Request\nCheck BW-5512.'
+ * buildRequestMessage({ id: 'request', role: 'user', content: 'Check BW-5512.' }, '## Earlier\n- previous: the last request you answered, and your reply').content
+ * // '## Earlier\n- previous: the last request you answered, and your reply\n\n## Request\nCheck BW-5512.'
  * ```
  */
 export function buildRequestMessage(request: Message, index: string): Message {
