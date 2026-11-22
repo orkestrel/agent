@@ -148,7 +148,7 @@ Study replays the ancestor's retained prefix and sends only the appended goals t
 `studies/labeler.ts` labels a graded result's semantic rows blind with Claude Haiku 5.5 and imports the labels. Run it yourself, outside every agent session, from the repository root. `ASSESSMENT_ID` is the grading to label, and `--closure` names the closure or install root whose entry executed the result:
 
 ```sh
-node studies/labeler.ts ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID [--closure ABSOLUTE_CLOSURE_PATH] [--sample N]
+node studies/labeler.ts ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID [--closure ABSOLUTE_CLOSURE_PATH] [--pass N] [--sample N]
 ```
 
 - **Inputs.** It reads the grading's packet and mapping, and the study's authored controls and instruction, `controls.STUDY.json` and `instruction.STUDY.md` in `tmp/studies/authored`, chosen by the result's own study name.
@@ -156,6 +156,7 @@ node studies/labeler.ts ABSOLUTE_RESULT_PATH --assessment ASSESSMENT_ID [--closu
 - **Abstention.** For a memory result, it runs `study progress` through this repository's entry before it asks the model, so a re-label applies the detector this repository holds. It reads each goal's `abstained` cell and whether the goal holds an `arrival` row. Every row of an abstained goal counts as `abstained`, whatever its label, so `achieved` counts an abstention as not achieved.
 - **Outputs.** The pool, the lane, the labels sheets, and any sample stay under `tmp/studies/labels`. It imports each sheet with `study label`, reports the labeled grading, and writes `ABSOLUTE_RESULT_PATH.tally.json` beside the result. The tally holds counts only: rows asked, answered, and omitted; outcomes per arm, achieved, unsuccessful, abstained, and unknown; the same outcomes per arm and criterion class; for a memory result with one control arm, the outcomes at arrival goals, split by whether the control arm abstained at the goal; controls and misses per authored verdict; lookups by labeled verdict; and the labeled report's scores.
 - **Spot-check.** `--sample N` also writes a blind sheet of N drawn rows and an answers template under the labels folder. Fill the template and pass it with `--human PATH` to compare it with the saved model lane, per class and on the sampled controls. The human lane is compared only, never imported.
+- **Passes.** `--pass N` labels the same pool again, with the same rows in the same requests, and keeps each pass's files apart. Pass 1, the default, writes the paths the **Outputs** bullet names. A later pass N writes its pool, lane, sheets, and sample under `pass-N` in the labels folder and its tally to `ABSOLUTE_RESULT_PATH.pass-N.tally.json`. A run reuses only the lane saved for its own pass, so the first run of a pass always asks the model, and `--human` with `--pass N` compares with that pass's lane and tally.
 
 ## Running the chat instrument
 

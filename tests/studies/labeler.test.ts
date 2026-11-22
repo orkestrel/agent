@@ -4,7 +4,7 @@ import type {
 	StudyLabelerTally,
 	StudyLabelerTallyInput,
 } from '../../studies/labeler.js'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
@@ -13,6 +13,8 @@ import {
 	encodeStudyJSON,
 	parseStudyLabelLane,
 } from '@orkestrel/study/server'
+import { createRecorder } from '@orkestrel/test'
+import { createScratch, destroyScratch } from '@orkestrel/test/server'
 import { describe, expect, it } from 'vitest'
 import {
 	STUDY_LABELER_AUTHORED,
@@ -25,6 +27,7 @@ import {
 	computeStudyLabelerOutcomes,
 	drawStudyLabelerSample,
 	isStudyLabelerScore,
+	labelStudyPass,
 	labelStudyPool,
 	parseStudyLabelerArguments,
 	planStudyLabelerPaths,
@@ -309,7 +312,7 @@ describe('labeler runner over a synthetic pool', () => {
 	it('keeps every row out of the files outside the labels folder', async () => {
 		const root = resolve('fictional-root')
 		const result = join(root, 'tmp', 'studies', 'fictional-run')
-		const paths = planStudyLabelerPaths(result, SEAL, 'a'.repeat(64), root)
+		const paths = planStudyLabelerPaths({ result, assessment: 'a'.repeat(64), pass: 1 }, SEAL, root)
 		const labels = join(root, STUDY_LABELER_LABELS)
 		for (const path of [
 			paths.labels,
@@ -533,9 +536,8 @@ describe('labeler leaves', () => {
 		const root = mkdtempSync(join(tmpdir(), 'labeler-saved-'))
 		try {
 			const paths = planStudyLabelerPaths(
-				join(root, 'tmp', 'studies', 'run'),
+				{ result: join(root, 'tmp', 'studies', 'run'), assessment: 'a'.repeat(64), pass: 1 },
 				SEAL,
-				'a'.repeat(64),
 				root,
 			)
 			expect(readStudyLabelerSaved(paths, pool)).toBeUndefined()
@@ -563,6 +565,91 @@ describe('labeler leaves', () => {
 			expect(readStudyLabelerSaved(paths, buildPool('another-order'))).toBeUndefined()
 		} finally {
 			rmSync(root, { recursive: true, force: true })
+		}
+	})
+
+	it('plans pass 1 at the assessment folder and a later pass in its own folder with its own tally', () => {
+		const root = resolve('fictional-root')
+		const result = join(root, 'tmp', 'studies', 'fictional-run')
+		const assessment = 'a'.repeat(64)
+		const folder = join(root, STUDY_LABELER_LABELS, SEAL, assessment)
+		expect(planStudyLabelerPaths({ result, assessment, pass: 1 }, SEAL, root)).toEqual({
+			labels: folder,
+			pool: join(folder, 'pool.json'),
+			lane: join(folder, 'lane.json'),
+			sheets: join(folder, 'sheets'),
+			sample: join(folder, 'sample.json'),
+			answers: join(folder, 'answers.json'),
+			tally: `${result}.tally.json`,
+		})
+		const second = join(folder, 'pass-2')
+		const planned = {
+			labels: second,
+			pool: join(second, 'pool.json'),
+			lane: join(second, 'lane.json'),
+			sheets: join(second, 'sheets'),
+			sample: join(second, 'sample.json'),
+			answers: join(second, 'answers.json'),
+			tally: `${result}.pass-2.tally.json`,
+		}
+		expect(planStudyLabelerPaths({ result, assessment, pass: 2 }, SEAL, root)).toEqual(planned)
+		// The command line carries the pass into the plan.
+		expect(
+			planStudyLabelerPaths(
+				parseStudyLabelerArguments([result, '--assessment', assessment, '--pass', '2']),
+				SEAL,
+				root,
+			),
+		).toEqual(planned)
+		expect(planStudyLabelerPaths({ result, assessment, pass: 12 }, SEAL, root)).toMatchObject({
+			labels: join(folder, 'pass-12'),
+			tally: `${result}.pass-12.tally.json`,
+		})
+	})
+
+	it('reuses a lane only within its own pass: pass 2 asks the model beside a saved pass-1 lane, then reuses its own', async () => {
+		const pool = buildPool()
+		const scratch = createScratch({ prefix: 'labeler-pass-' })
+		try {
+			const options = {
+				result: join(scratch.path, 'tmp', 'studies', 'run'),
+				assessment: 'a'.repeat(64),
+			}
+			const first = planStudyLabelerPaths({ ...options, pass: 1 }, SEAL, scratch.path)
+			const second = planStudyLabelerPaths({ ...options, pass: 2 }, SEAL, scratch.path)
+			const calls = createRecorder<readonly [string]>()
+			const saved = await labelStudyPass(first, pool, (prompt) => {
+				calls.handler(prompt)
+				return Promise.resolve(answerAll(prompt))
+			})
+			expect(calls.count).toBe(pool.requests.length)
+			const asked = await labelStudyPass(second, pool, (prompt) => {
+				calls.handler(prompt)
+				return Promise.resolve(answerMixed(prompt))
+			})
+			// Pass 2 asks every request afresh, with the same rows in the same requests as pass 1.
+			expect(calls.count).toBe(2 * pool.requests.length)
+			expect(calls.calls.slice(pool.requests.length)).toEqual(
+				calls.calls.slice(0, pool.requests.length),
+			)
+			expect(asked.batches).toEqual({ asked: pool.requests.length, retried: 0, omitted: 0 })
+			expect(asked.lane).not.toEqual(saved.lane)
+			const reused = await labelStudyPass(second, pool, (prompt) => {
+				calls.handler(prompt)
+				return Promise.resolve(answerAll(prompt))
+			})
+			// A second pass-2 run reuses pass 2's lane and asks nothing.
+			expect(calls.count).toBe(2 * pool.requests.length)
+			expect(reused.lane).toEqual(asked.lane)
+			expect(reused.batches).toEqual({
+				asked: pool.requests.length,
+				retried: undefined,
+				omitted: 0,
+			})
+			expect(readStudyLabelerLane(readFileSync(first.lane))).toEqual(saved.lane)
+			expect(readStudyLabelerLane(readFileSync(second.lane))).toEqual(asked.lane)
+		} finally {
+			await destroyScratch(scratch)
 		}
 	})
 
@@ -633,6 +720,7 @@ describe('labeler leaves', () => {
 		).toMatchObject({
 			result: resolve('run'),
 			assessment,
+			pass: 1,
 			sample: 5,
 			human: undefined,
 			closure: undefined,
@@ -653,6 +741,29 @@ describe('labeler leaves', () => {
 		).toThrow(/Repeated/)
 		expect(() => parseStudyLabelerArguments(['run', '--assessment'])).toThrow(/needs a value/)
 	})
+
+	it('reads the labeling pass, 1 by default', () => {
+		const assessment = 'a'.repeat(64)
+		expect(parseStudyLabelerArguments(['run', '--assessment', assessment]).pass).toBe(1)
+		expect(
+			parseStudyLabelerArguments(['run', '--pass', '2', '--assessment', assessment]).pass,
+		).toBe(2)
+		expect(() => parseStudyLabelerArguments(['run', '--assessment', assessment, '--pass'])).toThrow(
+			/--pass needs a value/,
+		)
+		expect(() =>
+			parseStudyLabelerArguments(['run', '--pass', '2', '--assessment', assessment, '--pass', '3']),
+		).toThrow(/Repeated labeler flag: --pass/)
+	})
+
+	it.each([['0'], ['-1'], ['1.5'], ['x'], ['01'], ['9007199254740992']])(
+		'refuses --pass %s, which is no whole number of at least 1',
+		(value) => {
+			expect(() =>
+				parseStudyLabelerArguments(['run', '--assessment', 'a'.repeat(64), '--pass', value]),
+			).toThrow(/--pass needs a whole number of at least 1/)
+		},
+	)
 
 	it('reads authored controls and refuses one without a verdict', () => {
 		const encoder = new TextEncoder()

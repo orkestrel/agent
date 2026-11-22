@@ -2,15 +2,18 @@
  * Labels a graded result's semantic rows blind with one model lane, imports the labels, and writes counts only.
  * @remarks
  * The user runs it, outside every agent session:
- * `node studies/labeler.ts RESULT --assessment SHA256 [--sample N] [--human PATH] [--closure DIRECTORY]`.
+ * `node studies/labeler.ts RESULT --assessment SHA256 [--pass N] [--sample N] [--human PATH] [--closure DIRECTORY]`.
  * It reads the study's authored instruction and controls from `tmp/studies/authored`. For a memory
  * result it reads each goal's abstention and arrival through `study progress` on this repository's
  * entry before it asks the model, and counts every row of an abstained goal as abstained.
  * The model is Claude Haiku 5.5 through Claude Code headless, under the user's own login: one call
  * per request, spawned without a shell from an empty directory, with no tools. Every file holding a
- * row, reason, criterion, or identity stays under `tmp/studies/labels`; the one file beside the
- * result, `RESULT.tally.json`, holds counts only. `--human` compares a filled spot-check sheet with
- * the saved model lane and never imports it.
+ * row, reason, criterion, or identity stays under `tmp/studies/labels`; the one file a pass writes
+ * beside the result, its tally, holds counts only. `--pass N` labels the same pool again as pass N:
+ * pass 1, the default, writes `RESULT.tally.json`, and a later pass writes under `pass-N` in the
+ * labels folder and to `RESULT.pass-N.tally.json`, reusing only the lane saved for its own pass.
+ * `--human` compares a filled spot-check sheet with the named pass's saved model lane and never
+ * imports it.
  */
 import type { StudyScore, StudyVerdict } from '@orkestrel/study'
 import type {
@@ -98,6 +101,8 @@ export const STUDY_LABELER_STRATEGY = 'records'
 export interface StudyLabelerOptions {
 	readonly result: string
 	readonly assessment: string
+	/** Numbers the labeling pass, from 1; a later pass labels the same pool into its own labels folder and tally. */
+	readonly pass: number
 	/** Counts the rows a blind spot-check sheet draws; absent writes none. */
 	readonly sample: number | undefined
 	/** Names a filled spot-check sheet to compare as a human lane; absent labels with the model. */
@@ -299,14 +304,14 @@ export function parseStudyLabelerArguments(argv: readonly string[]): StudyLabele
 	const [target, ...rest] = argv
 	if (target === undefined || target.startsWith('--'))
 		throw new Error(
-			'Usage: node studies/labeler.ts RESULT --assessment SHA256 [--sample N] [--human PATH] [--closure DIRECTORY]',
+			'Usage: node studies/labeler.ts RESULT --assessment SHA256 [--pass N] [--sample N] [--human PATH] [--closure DIRECTORY]',
 		)
 	const flags = new Map<string, string>()
 	for (const [index, flag] of rest.entries()) {
 		// Each flag sits at an even index, with its value after it.
 		if (index % 2 === 1) continue
 		const value = rest[index + 1]
-		if (!['--assessment', '--sample', '--human', '--closure'].includes(flag))
+		if (!['--assessment', '--pass', '--sample', '--human', '--closure'].includes(flag))
 			throw new Error(`Unknown labeler flag: ${flag}`)
 		if (flags.has(flag)) throw new Error(`Repeated labeler flag: ${flag}`)
 		if (value === undefined || value.startsWith('--'))
@@ -316,6 +321,9 @@ export function parseStudyLabelerArguments(argv: readonly string[]): StudyLabele
 	const assessment = flags.get('--assessment')
 	if (assessment === undefined || !/^[0-9a-f]{64}$/u.test(assessment))
 		throw new Error('The labeler needs --assessment with a lowercase SHA-256')
+	const pass = flags.get('--pass')
+	if (pass !== undefined && (!/^[1-9][0-9]*$/u.test(pass) || !Number.isSafeInteger(Number(pass))))
+		throw new Error('--pass needs a whole number of at least 1')
 	const sample = flags.get('--sample')
 	if (sample !== undefined && !/^[1-9][0-9]*$/u.test(sample))
 		throw new Error('--sample needs a positive whole number')
@@ -324,6 +332,7 @@ export function parseStudyLabelerArguments(argv: readonly string[]): StudyLabele
 	return {
 		result: resolve(target),
 		assessment,
+		pass: pass === undefined ? 1 : Number(pass),
 		sample: sample === undefined ? undefined : Number(sample),
 		human: human === undefined ? undefined : resolve(human),
 		closure: closure === undefined ? undefined : resolve(closure),
@@ -703,21 +712,24 @@ export function buildStudyLabelerTally(input: StudyLabelerTallyInput): StudyLabe
 }
 
 /**
- * Plans where the labeler writes: every row-bearing file under the protected labels folder, and the counts beside the result.
- * @param result - The result's absolute directory
+ * Plans where one labeling pass writes: every row-bearing file under the protected labels folder, and the counts beside the result.
+ * @remarks
+ * Pass 1 writes under `SEAL/ASSESSMENT` in the labels folder and to `RESULT.tally.json`. A later
+ * pass N writes under `SEAL/ASSESSMENT/pass-N` and to `RESULT.pass-N.tally.json`, so no pass reads
+ * or replaces another pass's lane or tally.
+ * @param options - The result's absolute directory, the graded assessment, and the pass
  * @param seal - The sealed result's seal id
- * @param assessment - The graded assessment
  * @param root - The repository root the labels folder sits under
  * @returns The paths
- * @example planStudyLabelerPaths('/r/tmp/studies/run', 's', 'a', '/r').tally // '/r/tmp/studies/run.tally.json'
+ * @example planStudyLabelerPaths({ result: '/r/tmp/studies/run', assessment: 'a', pass: 2 }, 's', '/r').tally // '/r/tmp/studies/run.pass-2.tally.json'
  */
 export function planStudyLabelerPaths(
-	result: string,
+	options: Pick<StudyLabelerOptions, 'result' | 'assessment' | 'pass'>,
 	seal: string,
-	assessment: string,
 	root: string,
 ): StudyLabelerPaths {
-	const labels = join(root, STUDY_LABELER_LABELS, seal, assessment)
+	const assessment = join(root, STUDY_LABELER_LABELS, seal, options.assessment)
+	const labels = options.pass === 1 ? assessment : join(assessment, `pass-${String(options.pass)}`)
 	return {
 		labels,
 		pool: join(labels, 'pool.json'),
@@ -725,7 +737,10 @@ export function planStudyLabelerPaths(
 		sheets: join(labels, 'sheets'),
 		sample: join(labels, 'sample.json'),
 		answers: join(labels, 'answers.json'),
-		tally: `${result}.tally.json`,
+		tally:
+			options.pass === 1
+				? `${options.result}.tally.json`
+				: `${options.result}.pass-${String(options.pass)}.tally.json`,
 	}
 }
 
@@ -781,6 +796,33 @@ export function readStudyLabelerSaved(
 				.length,
 		},
 	}
+}
+
+/**
+ * Labels one pass of a pool: reuses the lane saved for this exact pool under the pass's paths, or asks the model and saves its lane there.
+ * @remarks
+ * Each pass keeps its own labels folder, so a run reuses only its own pass's lane: the first run of
+ * a pass asks the model, and a later run of that pass, after a failed import, asks it nothing.
+ * @param paths - The pass's paths
+ * @param pool - The pool this run built
+ * @param call - The model caller
+ * @returns The saved or fresh lane and its request counts
+ * @throws Error - Thrown when the saved lane is malformed or an output reports a model other than `STUDY_LABELER_MODEL`
+ * @example (await labelStudyPass(paths, pool, call)).batches.asked // pool.requests.length
+ */
+export async function labelStudyPass(
+	paths: StudyLabelerPaths,
+	pool: StudyLabelPool,
+	call: StudyLabelerCaller,
+): Promise<StudyLabelerRun> {
+	// The saved pool is read before this pool replaces it.
+	const saved = readStudyLabelerSaved(paths, pool)
+	mkdirSync(paths.sheets, { recursive: true })
+	writeFileSync(paths.pool, encodeStudyJSON(pool))
+	if (saved !== undefined) return saved
+	const run = await labelStudyPool(pool, call)
+	writeFileSync(paths.lane, encodeStudyJSON(run.lane))
+	return run
 }
 
 /**
@@ -933,7 +975,7 @@ export async function labelStudyResult(
 	const result = await readStudyResult(options.result)
 	if (result.status !== 'sealed') throw new Error('The labeler needs a sealed result')
 	const seal = result.seal.id
-	const paths = planStudyLabelerPaths(options.result, seal, options.assessment, dependencies.root)
+	const paths = planStudyLabelerPaths(options, seal, dependencies.root)
 	const grades = join(options.result, 'grades', options.assessment)
 	const packets = readdirSync(grades).filter((name) => name.endsWith('.packet.json'))
 	const packet = packets[0]
@@ -958,11 +1000,9 @@ export async function labelStudyResult(
 			partition: resolveStudyLabelerPartition(goals),
 		},
 	)
-	// A lane saved for this exact pool is reused, so a run that failed after labeling asks the model nothing again.
-	const saved = options.human === undefined ? readStudyLabelerSaved(paths, pool) : undefined
-	mkdirSync(paths.sheets, { recursive: true })
-	writeFileSync(paths.pool, encodeStudyJSON(pool))
 	if (options.human !== undefined) {
+		mkdirSync(paths.sheets, { recursive: true })
+		writeFileSync(paths.pool, encodeStudyJSON(pool))
 		const tally: unknown = decodeStudyJSON(readFileSync(paths.tally))
 		const model = readStudyLabelerLane(readFileSync(paths.lane))
 		const human = parseStudyLabelLane(decodeStudyJSON(readFileSync(options.human)), {
@@ -985,8 +1025,8 @@ export async function labelStudyResult(
 		progress === undefined
 			? { abstained: new Set<string>(), arrivals: new Set<string>() }
 			: collectStudyLabelerGoals(progress.progress)
-	const run = saved ?? (await labelStudyPool(pool, dependencies.call))
-	if (saved === undefined) writeFileSync(paths.lane, encodeStudyJSON(run.lane))
+	// A lane saved for this pass and this exact pool is reused, so a run that failed after labeling asks the model nothing again.
+	const run = await labelStudyPass(paths, pool, dependencies.call)
 	const sheet = createStudyLabelSheet(pool.map, [run.lane], {
 		created: dependencies.created,
 		version: STUDY_LABELER_VERSION,
