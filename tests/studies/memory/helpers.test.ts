@@ -8,10 +8,13 @@ import {
 	filterStudyMemoryResult,
 	buildStudyMemoryRoles,
 	buildStudyMemorySummary,
+	collectStudyMemoryCases,
 	computeStudyMemoryCacheShares,
 	computeStudyMemoryCarriage,
 	computeStudyMemoryReacquisition,
 	computeStudyMemoryShare,
+	filterStudyMemoryRecords,
+	inferStudyMemoryCase,
 	readStudyMemoryGrade,
 	readStudyMemoryJudge,
 	readStudyMemoryProgress,
@@ -19,6 +22,9 @@ import {
 	STUDY_MEMORY_ABSTENTION,
 	STUDY_MEMORY_LEDGER_REPEAT,
 	STUDY_MEMORY_LOOKUPS,
+	renderStudyMemoryRecord,
+	renderStudyMemoryStatement,
+	inferStudyMemoryRequestCase,
 	resolveStudyMemoryObservation,
 	validateStudyMemoryProfile,
 } from '../../../studies/memory/index.js'
@@ -29,6 +35,11 @@ import {
 	buildMemoryRecordProfile,
 	MEMORY_ABSTENTION_REPLIES,
 	MEMORY_CARRIAGE,
+	MEMORY_DESK_CHOICES,
+	MEMORY_DESK_OPENING,
+	MEMORY_DESK_RECORDS,
+	MEMORY_DESK_REGISTER,
+	MEMORY_DESK_UNMATCHED,
 	MEMORY_TRIAGE_POLICIES,
 	MEMORY_TRIAGE_REQUEST,
 	MEMORY_TRIAGE_FIRST,
@@ -586,6 +597,76 @@ describe('memory measurement instruments', () => {
 		expect(
 			readStudyMemoryProgress([{ event: 'result', goal: 'g', value: { partial: false } }]),
 		).toEqual({ partial: false })
+	})
+
+	it('collects whole, case-sensitive case ids and infers a case only from exactly one', () => {
+		expect([
+			...collectStudyMemoryCases('BC-7301, then BC-7301 and BC-7312 (BC-7313, BC-7300)'),
+		]).toEqual(['BC-7301', 'BC-7312'])
+		for (const text of MEMORY_DESK_UNMATCHED)
+			expect({ text, cases: [...collectStudyMemoryCases(text)] }).toEqual({ text, cases: [] })
+		expect([...collectStudyMemoryCases('order:BC-7302\nBC-7302.')]).toEqual(['BC-7302'])
+		expect(inferStudyMemoryCase('[Source ev-01-2] BC-7301 filter arrived cracked.')).toBe('BC-7301')
+		expect(inferStudyMemoryCase('BC-7301 again: BC-7301')).toBe('BC-7301')
+		expect(inferStudyMemoryCase(MEMORY_DESK_OPENING.content)).toBeUndefined()
+		expect(inferStudyMemoryCase(MEMORY_DESK_REGISTER.content)).toBeUndefined()
+		expect(inferStudyMemoryCase('The filter arrived cracked.')).toBeUndefined()
+		// The pattern is global, so a read must not carry its position into the next.
+		expect(inferStudyMemoryCase('BC-7305')).toBe('BC-7305')
+		expect(inferStudyMemoryCase('BC-7305')).toBe('BC-7305')
+	})
+
+	it('renders a statement in the source form the conversation uses', () => {
+		expect(renderStudyMemoryStatement('ev-01-2', 'BC-7301 filter arrived cracked.')).toBe(
+			'[Source ev-01-2] BC-7301 filter arrived cracked.',
+		)
+		expect(renderStudyMemoryStatement('ev', '')).toBe('[Source ev] ')
+	})
+
+	it('chooses the case of the last arrival that files, else the one case the request names, else none', () => {
+		for (const [arrivals, prompt, expected] of MEMORY_DESK_CHOICES)
+			expect({
+				prompt,
+				owner: inferStudyMemoryRequestCase({ prompt, arrivals, records: [] }),
+			}).toEqual({ prompt, owner: expected })
+	})
+
+	it('selects a case record from every released record whose id and content carry only that case, in release order', () => {
+		expect(
+			filterStudyMemoryRecords('BC-7301', MEMORY_DESK_RECORDS).map((record) => record.id),
+		).toEqual(['order:BC-7301', 'customer:BC-4101'])
+		expect(
+			filterStudyMemoryRecords('BC-7302', MEMORY_DESK_RECORDS).map((record) => record.id),
+		).toEqual(['order:BC-7302'])
+		expect(filterStudyMemoryRecords('BC-7303', MEMORY_DESK_RECORDS)).toEqual([])
+		// A released map's values are read in the order the map holds them.
+		const released = new Map(
+			[...MEMORY_DESK_RECORDS].reverse().map((record) => [record.id, record] as const),
+		)
+		expect(
+			filterStudyMemoryRecords('BC-7301', released.values()).map((record) => record.id),
+		).toEqual(['customer:BC-4101', 'order:BC-7301'])
+		// The record's name is not read: only its id and content place it.
+		expect(
+			filterStudyMemoryRecords('BC-7301', [{ id: 'note', name: 'BC-7302', content: 'BC-7301' }]),
+		).toHaveLength(1)
+	})
+
+	it('renders a case record: the label, the case records, then the statements oldest first', () => {
+		expect(
+			renderStudyMemoryRecord('BC-7301', MEMORY_DESK_RECORDS, [
+				{ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' },
+				{ id: 'ev-01-3', content: 'BC-7301 refund is approved.' },
+			]),
+		).toBe(
+			'Case record for BC-7301:\n\norder:BC-7301: Mara Ellison\nOrder BC-7301; ceramic filter breakage.\n\ncustomer:BC-4101: Mara Ellison\nAccount BC-4101; owner Mara Ellison; order BC-7301.\n\n[Source ev-01-2] BC-7301 filter arrived cracked.\n\n[Source ev-01-3] BC-7301 refund is approved.',
+		)
+		expect(renderStudyMemoryRecord('BC-7303', MEMORY_DESK_RECORDS, [])).toBe(
+			'Case record for BC-7303:',
+		)
+		expect(
+			renderStudyMemoryRecord('BC-7302', [], [{ id: 'ev-02-1', content: 'BC-7302 is late.' }]),
+		).toBe('Case record for BC-7302:\n\n[Source ev-02-1] BC-7302 is late.')
 	})
 
 	it('derives a share from a tally and reads undefined for an empty population', () => {

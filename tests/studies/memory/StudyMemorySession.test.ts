@@ -5,6 +5,7 @@ import { isRecord, parseJSON } from '@orkestrel/contract'
 import { waitForCondition } from '@orkestrel/test'
 import { parseStudyProfile, readStudyFailure, validateStudyInputs } from '@orkestrel/study'
 import {
+	isStudyMemoryCheckpoint,
 	isStudyMemoryProvider,
 	isStudyMemoryAgent,
 	STUDY_MEMORY_SYSTEM,
@@ -29,8 +30,11 @@ import {
 	executeMemoryGoals,
 	listMemoryKeys,
 	loadMemoryInputs,
+	MEMORY_DESK_OPENING,
+	MEMORY_DESK_REGISTER,
 	readMemoryAdmission,
 	readMemoryCheckpoint,
+	readMemoryDeskRecord,
 	readMemoryEvents,
 	readMemoryFirstChat,
 	readMemoryGoalRequests,
@@ -45,6 +49,8 @@ import {
 	totalMemoryUsage,
 	STUDY_MEMORY_CALIBRATION,
 	STUDY_MEMORY_CONTEXT_KEYS,
+	STUDY_MEMORY_DESK_GOALS,
+	STUDY_MEMORY_DESK_SETTINGS,
 	STUDY_MEMORY_ESTIMATE_KEYS,
 	STUDY_MEMORY_EVENT_KEYS,
 	STUDY_MEMORY_OBSERVED_EVENTS,
@@ -1146,8 +1152,10 @@ describe('passive observation of actual memory requests', () => {
 		})
 		const value = readMemoryCheckpoint(result.evidence, 'correction')
 		if (!isRecord(value)) throw new Error('Missing checkpoint value')
-		expect(Object.keys(value).sort()).toEqual(['arrivals', 'conversation', 'records'])
+		expect(Object.keys(value).sort()).toEqual(['arrivals', 'cases', 'conversation', 'records'])
 		expect(value.arrivals).toEqual(['source-1', 'source-2'])
+		// A control files nothing out of its conversation.
+		expect(value.cases).toEqual([])
 		expect(value.records).toEqual([
 			{ id: 'order-1', name: 'Owner', content: 'Confirmed reference' },
 		])
@@ -1184,6 +1192,125 @@ describe('passive observation of actual memory requests', () => {
 				expect(readMemoryGoalRequests(seeded, goal)).toEqual(
 					readMemoryGoalRequests(uninterrupted, goal),
 				)
+		}
+	}, 60000)
+
+	it('files a single-case statement out of the conversation and keeps a statement naming several cases in it', async () => {
+		const result = await runMemoryTrial({
+			arm: 'records',
+			responses: STUDY_MEMORY_CALIBRATION,
+			goals: STUDY_MEMORY_DESK_GOALS.slice(0, 2),
+			settings: STUDY_MEMORY_DESK_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		const arrivals = readMemoryEvents(result.evidence, 'arrival')
+		expect(arrivals.filter((row) => 'filed' in row)).toEqual([
+			{ id: 'ev-01-2', filed: 'BC-7301' },
+			{ id: 'ev-02-1', filed: 'BC-7302' },
+		])
+		expect(arrivals.filter((row) => !('filed' in row)).map((row) => row.id)).toEqual([
+			'ev-opening',
+			'ev-register',
+		])
+		const value = readMemoryCheckpoint(result.evidence, 'desk-second')
+		if (!isStudyMemoryCheckpoint(value) || value.ledger === undefined)
+			throw new Error('Missing ledger checkpoint')
+		expect(value.cases).toEqual([
+			{
+				id: 'BC-7301',
+				statements: [{ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' }],
+			},
+			{
+				id: 'BC-7302',
+				statements: [{ id: 'ev-02-1', content: 'BC-7302 meter left at the locked gate.' }],
+			},
+		])
+		const contents = value.ledger.conversation.messages.map((message) => message.content)
+		expect(contents).toContain(`[Source ev-opening] ${MEMORY_DESK_OPENING.content}`)
+		expect(contents).toContain(`[Source ev-register] ${MEMORY_DESK_REGISTER.content}`)
+		expect(contents.filter((content) => content.startsWith('[Source ev-0'))).toEqual([])
+		// Each goal's request carries the record of the case its own arrival filed; the opening goal's
+		// calibration requests come first, so its pass is its last chat request.
+		const opening = readMemoryGoalRequests(result, 'desk-opening')
+			.filter((request) => request.path === '/api/chat')
+			.at(-1)?.body
+		expect(readMemoryDeskRecord(opening ?? '')).toBe(
+			'Case record for BC-7301:\n\norder:BC-7301: Mara Ellison\nOrder BC-7301; ceramic filter breakage.\n\ncustomer:BC-4101: Mara Ellison\nAccount BC-4101; owner Mara Ellison; order BC-7301.\n\n[Source ev-01-2] BC-7301 filter arrived cracked.',
+		)
+		expect(readMemoryDeskRecord(readMemoryFirstChat(result, 'desk-second') ?? '')).toBe(
+			'Case record for BC-7302:\n\norder:BC-7302: Ivo Mercer\nOrder BC-7302; meter delivery.\n\n[Source ev-02-1] BC-7302 meter left at the locked gate.',
+		)
+	}, 60000)
+
+	it('renders the case a request names and removes the desk file when a request names none', async () => {
+		const result = await runMemoryTrial({
+			arm: 'records',
+			responses: STUDY_MEMORY_CALIBRATION,
+			goals: STUDY_MEMORY_DESK_GOALS,
+			settings: STUDY_MEMORY_DESK_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		expect(readMemoryDeskRecord(readMemoryFirstChat(result, 'desk-return') ?? '')).toBe(
+			'Case record for BC-7301:\n\norder:BC-7301: Mara Ellison\nOrder BC-7301; ceramic filter breakage.\n\ncustomer:BC-4101: Mara Ellison\nAccount BC-4101; owner Mara Ellison; order BC-7301.\n\n[Source ev-01-2] BC-7301 filter arrived cracked.',
+		)
+		const closing = readMemoryFirstChat(result, 'desk-close')
+		expect(closing).toBeDefined()
+		expect(readMemoryDeskRecord(closing ?? '')).toBeUndefined()
+		expect(closing).not.toContain('Case record for')
+	}, 60000)
+
+	it('files nothing and renders no desk on a control', async () => {
+		const result = await runMemoryTrial({
+			arm: 'full',
+			responses: [],
+			goals: STUDY_MEMORY_DESK_GOALS,
+			settings: STUDY_MEMORY_DESK_SETTINGS,
+		})
+		expect(result.failure).toBeUndefined()
+		expect(readMemoryEvents(result.evidence, 'arrival').filter((row) => 'filed' in row)).toEqual([])
+		const value = readMemoryCheckpoint(result.evidence, 'desk-close')
+		if (!isStudyMemoryCheckpoint(value)) throw new Error('Missing checkpoint')
+		expect(value.cases).toEqual([])
+		expect(readMemoryDeskRecord(readMemoryFirstChat(result, 'desk-return') ?? '')).toBeUndefined()
+	})
+
+	it('reopens a desk checkpoint and sends the record the continuous session sends', async () => {
+		const continuous = await runMemoryTrial({
+			arm: 'records',
+			responses: STUDY_MEMORY_CALIBRATION,
+			goals: STUDY_MEMORY_DESK_GOALS,
+			settings: STUDY_MEMORY_DESK_SETTINGS,
+		})
+		expect(continuous.failure).toBeUndefined()
+		const seed = readMemorySealedCheckpoint(continuous.evidence, 'desk-second')
+		const reopened = await runMemoryTrial({
+			arm: 'records',
+			responses: [],
+			goals: STUDY_MEMORY_DESK_GOALS.slice(2),
+			settings: STUDY_MEMORY_DESK_SETTINGS,
+			seed,
+		})
+		expect(reopened.failure).toBeUndefined()
+		const record = readMemoryDeskRecord(readMemoryFirstChat(continuous, 'desk-return') ?? '')
+		expect(record).toContain('[Source ev-01-2] BC-7301 filter arrived cracked.')
+		expect(readMemoryDeskRecord(readMemoryFirstChat(reopened, 'desk-return') ?? '')).toBe(record)
+		for (const goal of ['desk-return', 'desk-close']) {
+			expect(readMemoryFirstChat(reopened, goal)).toBe(readMemoryFirstChat(continuous, goal))
+			expect(readMemoryGoalRequests(reopened, goal)).toEqual(
+				readMemoryGoalRequests(continuous, goal),
+			)
+		}
+		// No filed statement returns to the reopened ledger conversation.
+		for (const goal of ['desk-return', 'desk-close']) {
+			const value = readMemoryCheckpoint(reopened.evidence, goal)
+			if (!isStudyMemoryCheckpoint(value) || value.ledger === undefined)
+				throw new Error('Missing ledger checkpoint')
+			expect(
+				value.ledger.conversation.messages.filter((message) =>
+					message.content.startsWith('[Source ev-0'),
+				),
+			).toEqual([])
+			expect(value.cases.map((entry) => entry.id)).toEqual(['BC-7301', 'BC-7302'])
 		}
 	}, 60000)
 

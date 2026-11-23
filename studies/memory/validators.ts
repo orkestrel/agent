@@ -25,6 +25,7 @@ import {
 import { isStudyAgentRuntime } from '@orkestrel/study'
 import { isStudyOllamaMetadata } from '@orkestrel/study/server'
 import { STUDY_MEMORY_ENTRIES, STUDY_MEMORY_TEXT } from './constants.js'
+import { inferStudyMemoryCase, renderStudyMemoryStatement } from './helpers.js'
 
 /** Checks the admitted Agent runtime every memory arm invokes. @param value - Admitted namespace. @returns Whether the shared runtime capabilities and the Agent, conversation and authority factories exist. */
 export function isStudyMemoryAgent(value: unknown): value is StudyMemoryAgent {
@@ -108,20 +109,47 @@ export function isStudyMemoryOptions(value: unknown): value is StudyMemoryOption
 /**
  * Checks a checkpoint's shape, because Agent stays types-only in the bundle.
  * @remarks
- * The admitted `createLedger` and `conversations.add` refuse a malformed state member with their coded `SNAPSHOT` errors; nothing later reads the released records or the arrival ids, so this guard checks each entry.
+ * The admitted `createLedger` and `conversations.add` refuse a malformed state member with their coded `SNAPSHOT` errors; nothing later reads the released records, the arrival ids or the case stores, so this guard checks each entry. A case is refused when its id is not one whole `STUDY_MEMORY_CASE` match or repeats another case's, when it holds no statement, or when a statement repeats an id, names no taken arrival, or does not carry exactly its own case id. An id or a text over `STUDY_MEMORY_TEXT` is refused.
  * @param value - The value Study hands over at `open`.
- * @returns Whether exactly one state member is a record and the records and arrivals are shaped.
+ * @returns Whether exactly one state member is a record and the records, arrivals and cases are shaped.
  */
 export function isStudyMemoryCheckpoint(value: unknown): value is StudyMemoryCheckpoint {
 	return holds(() => {
 		if (!isRecord(value)) return false
-		const { ledger, conversation, records, arrivals } = value
-		return (
-			(ledger === undefined
+		const { ledger, conversation, records, arrivals, cases } = value
+		if (
+			!(ledger === undefined
 				? isRecord(conversation)
-				: isRecord(ledger) && conversation === undefined) &&
-			arrayOf(recordOf({ id: isString, name: isString, content: isString }))(records) &&
-			arrayOf(isString)(arrivals)
+				: isRecord(ledger) && conversation === undefined) ||
+			!arrayOf(recordOf({ id: isString, name: isString, content: isString }))(records) ||
+			!arrayOf(isString)(arrivals) ||
+			!arrayOf(
+				recordOf({
+					id: isString,
+					statements: arrayOf(recordOf({ id: isString, content: isString })),
+				}),
+			)(cases)
+		)
+			return false
+		const taken = new Set(arrivals)
+		const statements = cases.flatMap((entry) => entry.statements)
+		return (
+			new Set(cases.map((entry) => entry.id)).size === cases.length &&
+			new Set(statements.map((statement) => statement.id)).size === statements.length &&
+			cases.every(
+				(entry) =>
+					entry.id.length <= STUDY_MEMORY_TEXT &&
+					inferStudyMemoryCase(entry.id) === entry.id &&
+					entry.statements.length > 0 &&
+					entry.statements.every(
+						(statement) =>
+							statement.id.length <= STUDY_MEMORY_TEXT &&
+							statement.content.length <= STUDY_MEMORY_TEXT &&
+							taken.has(statement.id) &&
+							inferStudyMemoryCase(renderStudyMemoryStatement(statement.id, statement.content)) ===
+								entry.id,
+					),
+			)
 		)
 	})
 }

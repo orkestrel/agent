@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+	STUDY_MEMORY_TEXT,
 	isStudyMemoryArm,
 	isStudyMemoryAssertion,
+	isStudyMemoryCheckpoint,
 	isStudyMemoryClassifier,
 	isStudyMemoryInput,
 	isStudyMemoryLedger,
@@ -11,7 +13,12 @@ import {
 	isStudyMemoryRuntime,
 	isStudyMemoryWire,
 } from '../../../studies/memory/index.js'
-import { STUDY_MEMORY_MODULES, MEMORY_TRIAGE_INVALID } from '../../setupStudy.js'
+import {
+	MEMORY_DESK_CHECKPOINT,
+	MEMORY_DESK_CHECKPOINT_REFUSALS,
+	STUDY_MEMORY_MODULES,
+	MEMORY_TRIAGE_INVALID,
+} from '../../setupStudy.js'
 
 describe('memory declaration and mechanical evidence', () => {
 	it('requires the triage primitives from the admitted Agent namespace', () => {
@@ -220,6 +227,39 @@ describe('memory declaration and mechanical evidence', () => {
 		expect(isStudyMemoryAssertion({ observation: 'result', partial: false })).toBe(true)
 		expect(isStudyMemoryAssertion({ observation: 'result', partial: 'false' })).toBe(false)
 		expect(isStudyMemoryAssertion({ observation: 'summary' })).toBe(false)
+	})
+})
+
+describe('memory checkpoint guard', () => {
+	it('accepts case stores that file taken arrivals by their own case id, and an empty list on a control', () => {
+		expect(isStudyMemoryCheckpoint(MEMORY_DESK_CHECKPOINT)).toBe(true)
+		expect(isStudyMemoryCheckpoint({ ...MEMORY_DESK_CHECKPOINT, cases: [] })).toBe(true)
+		expect(
+			isStudyMemoryCheckpoint({ conversation: {}, records: [], arrivals: [], cases: [] }),
+		).toBe(true)
+		// A statement text at the bound is admitted.
+		expect(
+			isStudyMemoryCheckpoint({
+				...MEMORY_DESK_CHECKPOINT,
+				cases: [
+					{
+						id: 'BC-7302',
+						statements: [
+							{
+								id: 'ev-02-1',
+								content: `BC-7302 ${'x'.repeat(STUDY_MEMORY_TEXT - 'BC-7302 '.length)}`,
+							},
+						],
+					},
+				],
+			}),
+		).toBe(true)
+	})
+
+	it('refuses each malformed case store', () => {
+		expect(MEMORY_DESK_CHECKPOINT_REFUSALS.length).toBeGreaterThan(0)
+		for (const { name, value } of MEMORY_DESK_CHECKPOINT_REFUSALS)
+			expect({ name, admitted: isStudyMemoryCheckpoint(value) }).toEqual({ name, admitted: false })
 	})
 })
 

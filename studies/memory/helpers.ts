@@ -16,6 +16,7 @@ import type {
 } from '@orkestrel/study/server'
 import type {
 	StudyMemoryArm,
+	StudyMemoryInput,
 	StudyMemoryPolicy,
 	StudyMemoryTriage,
 	StudyMemoryObservation,
@@ -29,17 +30,24 @@ import type {
 	StudyMemorySummary,
 	StudyMemorySummaryInput,
 } from './types.js'
-import { canonicalStringify, isArray, isRecord, parseJSON } from '@orkestrel/contract'
+import { canonicalStringify, isArray, isRecord, parseJSON, preview } from '@orkestrel/contract'
 import { StudyError, isStudyProvider, isStudyRoom } from '@orkestrel/study'
 import { collectStudyRows } from '@orkestrel/study/server'
 import {
 	STUDY_MEMORY_ABSTENTION,
+	STUDY_MEMORY_CASE,
 	STUDY_MEMORY_LEDGER_REPEAT,
+	STUDY_MEMORY_ORDER_PREFIX,
 	STUDY_MEMORY_PARAMETERS,
 	STUDY_MEMORY_POLICY,
 	STUDY_MEMORY_TOLERANCE,
 } from './constants.js'
-import { isStudyMemoryAssertion, isStudyMemoryOptions, isStudyMemoryWire } from './validators.js'
+import {
+	isStudyMemoryAssertion,
+	isStudyMemoryInput,
+	isStudyMemoryOptions,
+	isStudyMemoryWire,
+} from './validators.js'
 
 /** Serializes every policy and leg identity member in stable key order. */
 export function buildStudyMemoryJudgeModel(
@@ -211,6 +219,134 @@ export function validateStudyMemoryCheckpoints(
 				'CONFIG',
 				`Memory checkpoint ${checkpoint} names no goal of this study's scenarios; list a declared goal id, or select a study whose scenario holds it`,
 			)
+}
+
+/**
+ * Checks that each scenario's case ids are exactly its declared order records' ids, so the case pattern stays bound to the declared data.
+ * @param scenarios - The declaration's complete scenarios.
+ * @returns Nothing when admitted.
+ * @throws StudyError - Thrown with code `CONFIG` when a goal input is malformed, or when the case ids `STUDY_MEMORY_CASE` matches in a scenario's goal inputs differ from the ids its `order:` records declare after the prefix.
+ * @example validateStudyMemoryCases(scenarios) // throws when a scenario declares order:BC-7399, or names BC-7312 without declaring order:BC-7312
+ */
+export function validateStudyMemoryCases(scenarios: readonly StudyScenario[]): void {
+	for (const scenario of scenarios) {
+		const inputs = scenario.goals.flatMap((goal) =>
+			isStudyMemoryInput(goal.input) ? [goal.input] : [],
+		)
+		if (inputs.length !== scenario.goals.length)
+			throw new StudyError('CONFIG', 'Malformed public memory goal')
+		const declared = new Set(
+			inputs.flatMap((input) =>
+				input.records.flatMap((record) =>
+					record.id.startsWith(STUDY_MEMORY_ORDER_PREFIX)
+						? [record.id.slice(STUDY_MEMORY_ORDER_PREFIX.length)]
+						: [],
+				),
+			),
+		)
+		const named = new Set(
+			inputs.flatMap((input) => [
+				...collectStudyMemoryCases(
+					[
+						input.prompt,
+						...input.arrivals.flatMap((arrival) => [arrival.id, arrival.content]),
+						...input.records.flatMap((record) => [record.id, record.name, record.content]),
+					].join('\n'),
+				),
+			]),
+		)
+		if (named.size !== declared.size || [...named].some((id) => !declared.has(id)))
+			throw new StudyError(
+				'CONFIG',
+				`Memory scenario ${preview(scenario.id)} names cases [${[...named].sort().join(', ')}] but declares order records for [${[...declared].sort().join(', ')}]; declare an ${STUDY_MEMORY_ORDER_PREFIX} record for each case its goals name, and name no case it does not declare`,
+			)
+	}
+}
+
+/**
+ * Collects the distinct case ids a text carries.
+ * @param text - Any text.
+ * @returns The ids `STUDY_MEMORY_CASE` matches, in first-match order.
+ * @example collectStudyMemoryCases('BC-7301, then BC-7301 and BC-7302') // Set { 'BC-7301', 'BC-7302' }
+ */
+export function collectStudyMemoryCases(text: string): ReadonlySet<string> {
+	return new Set([...text.matchAll(STUDY_MEMORY_CASE)].map((match) => match[0]))
+}
+
+/**
+ * Infers the one case a text belongs to.
+ * @param text - Any text, such as a rendered statement or a request.
+ * @returns The case id when the text carries exactly one distinct case id; `undefined` when it carries none or several.
+ * @example inferStudyMemoryCase('[Source ev-1] BC-7301 is refunded.') // 'BC-7301'
+ */
+export function inferStudyMemoryCase(text: string): string | undefined {
+	const cases = collectStudyMemoryCases(text)
+	if (cases.size !== 1) return undefined
+	const [owner] = cases
+	return owner
+}
+
+/**
+ * Renders an arrival in the source form the conversation uses, so a filed statement reads as it would have arrived.
+ * @param id - The arrival id.
+ * @param content - The arrival text.
+ * @returns The `[Source <id>] <content>` text.
+ * @example renderStudyMemoryStatement('ev-1', 'Refund approved.') // '[Source ev-1] Refund approved.'
+ */
+export function renderStudyMemoryStatement(id: string, content: string): string {
+	return `[Source ${id}] ${content}`
+}
+
+/**
+ * Infers the case a request's record renders for: the case of the last arrival that files, else the one case the request names.
+ * @param input - The goal's public input.
+ * @returns The chosen case id, or `undefined` when no arrival files and the request names no single case.
+ * @example inferStudyMemoryRequestCase({ prompt: 'Check BC-7302.', arrivals: [], records: [] }) // 'BC-7302'
+ */
+export function inferStudyMemoryRequestCase(input: StudyMemoryInput): string | undefined {
+	const filed = input.arrivals.flatMap((arrival) => {
+		const owner = inferStudyMemoryCase(renderStudyMemoryStatement(arrival.id, arrival.content))
+		return owner === undefined ? [] : [owner]
+	})
+	return filed.at(-1) ?? inferStudyMemoryCase(input.prompt)
+}
+
+/**
+ * Filters released records to one case's: each record whose id and content carry exactly one distinct case id, equal to the case.
+ * @param owner - The case id.
+ * @param records - Released records in release order.
+ * @returns The case's records in release order.
+ * @example filterStudyMemoryRecords('BC-7301', records).map((record) => record.id) // ['order:BC-7301', 'customer:BC-4101']
+ */
+export function filterStudyMemoryRecords(
+	owner: string,
+	records: Iterable<StudyMemoryInput['records'][number]>,
+): StudyMemoryInput['records'] {
+	return [...records].filter(
+		(record) => inferStudyMemoryCase(`${record.id}\n${record.content}`) === owner,
+	)
+}
+
+/**
+ * Renders a case record: under one label, the case's released records in release order, then its filed statements oldest first, each block separated by a blank line.
+ * @param owner - The case id.
+ * @param records - Released records in release order.
+ * @param statements - The case's filed statements, oldest first.
+ * @returns The record text the desk file holds.
+ * @example renderStudyMemoryRecord('BC-7301', [], [{ id: 'ev-1', content: 'BC-7301 ships.' }]) // 'Case record for BC-7301:\n\n[Source ev-1] BC-7301 ships.'
+ */
+export function renderStudyMemoryRecord(
+	owner: string,
+	records: Iterable<StudyMemoryInput['records'][number]>,
+	statements: StudyMemoryInput['arrivals'],
+): string {
+	return [
+		`Case record for ${owner}:`,
+		...filterStudyMemoryRecords(owner, records).map(
+			(record) => `${record.id}: ${record.name}\n${record.content}`,
+		),
+		...statements.map((statement) => renderStudyMemoryStatement(statement.id, statement.content)),
+	].join('\n\n')
 }
 
 /** Declares the exact wire policy of every model role one arm dispatches. @param profile - Runtime profile with serving identities and room. @param arm - The treatment; only records declares the one-token judge and the triage. @returns The agent role, plus the judge role, and the triage role when declared, for records. @throws StudyError - CONFIG when the profile declares no provider, or lacks what the arm's roles need. */

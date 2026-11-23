@@ -12,6 +12,7 @@ import type {
 } from '../types.js'
 import { cloneJSONValue, isJSONValue, isObject } from '@orkestrel/contract'
 import { createTool, createToolManager } from '@orkestrel/tool'
+import { createWorkspaceManager } from '@orkestrel/workspace'
 import { StudyAgentJudge, StudyAgentObserver, StudyError } from '@orkestrel/study'
 import {
 	STUDY_CHECKPOINT_EVENT,
@@ -23,15 +24,21 @@ import {
 	buildStudyOllamaOptions,
 } from '@orkestrel/study/server'
 import {
+	STUDY_MEMORY_FILE,
 	STUDY_MEMORY_JUDGE,
 	STUDY_MEMORY_METADATA,
 	STUDY_MEMORY_SYSTEM,
 	STUDY_MEMORY_THRESHOLDS,
 	STUDY_MEMORY_TOPICS,
+	STUDY_MEMORY_WORKSPACE,
 } from '../constants.js'
 import {
 	buildStudyMemoryOrigins,
 	buildStudyMemoryRoles,
+	inferStudyMemoryCase,
+	renderStudyMemoryRecord,
+	renderStudyMemoryStatement,
+	inferStudyMemoryRequestCase,
 	resolveStudyMemoryObservation,
 } from '../helpers.js'
 import { isStudyMemoryInput, isStudyMemoryOptions, isStudyMemoryRuntime } from '../validators.js'
@@ -51,6 +58,10 @@ export class StudyMemorySession implements StudySessionInterface {
 	readonly #abort = new AbortController()
 	readonly #arrivals = new Set<string>()
 	readonly #records = new Map<string, StudyMemoryInput['records'][number]>()
+	// Each case's statements the records arm filed out of the conversation, in first-filed order, oldest first.
+	readonly #cases = new Map<string, StudyMemoryInput['arrivals']>()
+	// The records arm's desk, whose one file holds the chosen case record before each request.
+	readonly #workspaces = createWorkspaceManager()
 	// Message ids this consumer added or named, joined to their origin.
 	readonly #explicit = new Map<string, StudyMemoryProvenance>()
 	// The goal in flight: added when it starts, deleted on every path that ends it, and capped at one by the busy refusal.
@@ -68,6 +79,11 @@ export class StudyMemorySession implements StudySessionInterface {
 		for (const record of seed?.records ?? [])
 			this.#records.set(record.id, Object.freeze({ ...record }))
 		for (const arrival of seed?.arrivals ?? []) this.#arrivals.add(arrival)
+		for (const entry of seed?.cases ?? [])
+			this.#cases.set(
+				entry.id,
+				Object.freeze(entry.statements.map((statement) => Object.freeze({ ...statement }))),
+			)
 		this.#tools = createToolManager()
 		this.#observation = resolveStudyMemoryObservation(options.profile.settings)
 		const provider = options.profile.provider
@@ -168,6 +184,7 @@ export class StudyMemorySession implements StudySessionInterface {
 						}),
 				this.#transport,
 			)
+			this.#workspaces.add({ id: STUDY_MEMORY_WORKSPACE })
 			this.#ledger = options.ledger.createLedger(observer, {
 				judge,
 				system: STUDY_MEMORY_SYSTEM,
@@ -193,6 +210,8 @@ export class StudyMemorySession implements StudySessionInterface {
 				...(seed?.ledger === undefined ? {} : { snapshot: seed.ledger }),
 				agent: {
 					limit: 8,
+					workspaces: this.#workspaces,
+					workspace: STUDY_MEMORY_WORKSPACE,
 					timeout: options.profile.bounds.goal.duration,
 					on: {
 						fault: (error) => this.#transport.fail(error),
@@ -284,10 +303,26 @@ export class StudyMemorySession implements StudySessionInterface {
 				if (this.#arrivals.has(arrival.id))
 					throw new StudyError('CONFIG', 'Source arrival was replayed within a trial')
 				this.#arrivals.add(arrival.id)
-				const message = this.#conversation.add({
-					role: 'user',
-					content: `[Source ${arrival.id}] ${arrival.content}`,
-				})
+				const content = renderStudyMemoryStatement(arrival.id, arrival.content)
+				// The records arm files a statement carrying exactly one case id into that case's
+				// store, never into the conversation.
+				const owner = this.#ledger === undefined ? undefined : inferStudyMemoryCase(content)
+				if (owner !== undefined) {
+					this.#cases.set(
+						owner,
+						Object.freeze([
+							...(this.#cases.get(owner) ?? []),
+							Object.freeze({ id: arrival.id, content: arrival.content }),
+						]),
+					)
+					await context.evidence.append({
+						event: 'arrival',
+						goal,
+						value: { id: arrival.id, filed: owner },
+					})
+					continue
+				}
+				const message = this.#conversation.add({ role: 'user', content })
 				if (this.#observation.observe)
 					this.#explicit.set(message.id, { origin: 'arrival', source: arrival.id })
 				await context.evidence.append({
@@ -304,6 +339,7 @@ export class StudyMemorySession implements StudySessionInterface {
 					this.#explicit.set(prompt.id, { origin: 'input', source: goal })
 				}
 			}
+			if (this.#ledger !== undefined) this.#renderDesk(input)
 			const result: unknown =
 				this.#ledger === undefined
 					? await this.#agent?.generate({ signal })
@@ -354,6 +390,20 @@ export class StudyMemorySession implements StudySessionInterface {
 		}
 	}
 
+	// Renders the chosen case's record into the desk's one file before the request, or removes the
+	// file when no case is chosen.
+	#renderDesk(input: StudyMemoryInput): void {
+		const workspace = this.#workspaces.workspace(STUDY_MEMORY_WORKSPACE)
+		if (workspace === undefined) throw new StudyError('FAULT', 'Memory desk workspace is missing')
+		const owner = inferStudyMemoryRequestCase(input)
+		if (owner === undefined) workspace.remove(STUDY_MEMORY_FILE)
+		else
+			workspace.write(
+				STUDY_MEMORY_FILE,
+				renderStudyMemoryRecord(owner, this.#records.values(), this.#cases.get(owner) ?? []),
+			)
+	}
+
 	#provenance(): StudyMemoryProvenanceSource {
 		return {
 			explicit: this.#explicit,
@@ -378,6 +428,7 @@ export class StudyMemorySession implements StudySessionInterface {
 				: { ledger: this.#ledger.snapshot() }),
 			records: [...this.#records.values()],
 			arrivals: [...this.#arrivals],
+			cases: [...this.#cases].map(([id, statements]) => ({ id, statements })),
 		}
 		if (!isJSONValue(value)) throw new StudyError('FAULT', 'Checkpoint is not JSON')
 		return cloneJSONValue(value)
@@ -442,6 +493,7 @@ export class StudyMemorySession implements StudySessionInterface {
 		await this.#transport.close()
 		await Promise.allSettled([...this.#flights])
 		this.#tools.destroy()
+		this.#workspaces.clear()
 		this.#agent?.emitter.destroy()
 		this.#ledger?.agent.emitter.destroy()
 		this.#conversation.destroy()

@@ -56,7 +56,7 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 		this.#replay = options.replay
 	}
 
-	/** Creates one independent trial session. @param trial - Scheduled treatment. @param signal - Parent cancellation. @param seed - The checkpoint value of a seeded execution. @returns Fresh state with no previous trial messages, or the seed's state. @throws StudyError - CONFIG when the seed is no checkpoint, or holds the other strategy's state member. */
+	/** Creates one independent trial session. @param trial - Scheduled treatment. @param signal - Parent cancellation. @param seed - The checkpoint value of a seeded execution. @returns Fresh state with no previous trial messages, or the seed's state. @throws StudyError - CONFIG when the seed is no checkpoint, holds the other strategy's state member, or holds case stores on an arm that files none. */
 	async open(
 		trial: StudyTrial,
 		signal: AbortSignal,
@@ -71,6 +71,12 @@ export class StudyMemoryDriver implements StudyDriverInterface {
 			(!isStudyMemoryCheckpoint(seed) || records !== (seed.ledger !== undefined))
 		)
 			throw new StudyError('CONFIG', 'Memory seed is not a checkpoint of this arm')
+		// Only the records arm files statements out of its conversation, so a control's seed holds no case.
+		if (seed !== undefined && !records && seed.cases.length > 0)
+			throw new StudyError(
+				'CONFIG',
+				`Memory seed holds case stores on the ${trial.arm} arm, which files none; seed a ${trial.arm} checkpoint with an empty cases list`,
+			)
 		if (records && (this.#ledger === undefined || this.#classifier === undefined))
 			throw new StudyError(
 				'CONFIG',

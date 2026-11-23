@@ -1,5 +1,6 @@
 import { isRecord, parseJSON } from '@orkestrel/contract'
 import { isStudyJudgment, parseStudyProfile, parseStudyScenario } from '@orkestrel/study'
+import { captureError } from '@orkestrel/test'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { createStudyAdapter } from '../../../studies/memory/index.js'
@@ -8,7 +9,9 @@ import {
 	buildMemoryCriterion,
 	buildMemoryGradeFixture,
 	buildMemoryProfile,
+	buildMemoryScenario,
 	loadMemoryInputs,
+	MEMORY_DESK_BINDINGS,
 	omitMemoryAuxiliaries,
 	STUDY_MEMORY_PROGRESS_ROWS,
 } from '../../setupStudy.js'
@@ -62,6 +65,43 @@ describe('memory declaration and mechanical evidence', () => {
 				profile: buildMemoryProfile({ url, settings: { ...settings, checkpoints: [...declared] } }),
 			}),
 		).toThrow(/horizon of 3/)
+	})
+
+	it('binds the case pattern to the declared order records of each scenario', async () => {
+		const adapter = createStudyAdapter()
+		const profile = buildMemoryProfile({ url: 'http://127.0.0.1:7' })
+		const endurance = await loadMemoryInputs(profile, 'qualification')
+		const handoff = await loadMemoryInputs(profile)
+		expect(endurance.scenarios.map((scenario) => scenario.id)).toEqual(['endurance'])
+		expect(handoff.scenarios.map((scenario) => scenario.id)).toEqual(['handoff'])
+		// Endurance names and declares the twelve cases; handoff names and declares none.
+		expect(() => adapter.validate(endurance)).not.toThrow()
+		expect(() => adapter.validate(handoff)).not.toThrow()
+		const loaded = { endurance, handoff }
+		for (const { scenario: which, drop, suffix, added, message } of MEMORY_DESK_BINDINGS) {
+			const input = loaded[which]
+			const changed = {
+				...input,
+				scenarios: input.scenarios.map((scenario) =>
+					buildMemoryScenario(scenario, (goal) => ({
+						prompt: `${goal.prompt}${suffix}`,
+						arrivals: goal.arrivals,
+						records: [...goal.records.filter((record) => record.id !== drop), ...added],
+					})),
+				),
+			}
+			const refusal = captureError(() => adapter.validate(changed))
+			expect({
+				refused: refusal !== undefined,
+				code: refusal instanceof Error && 'code' in refusal ? refusal.code : undefined,
+				matched:
+					message === undefined || (refusal instanceof Error && message.test(refusal.message)),
+			}).toEqual({
+				refused: message !== undefined,
+				code: message === undefined ? undefined : 'CONFIG',
+				matched: true,
+			})
+		}
 	})
 
 	it('reads one goal into progress', () => {

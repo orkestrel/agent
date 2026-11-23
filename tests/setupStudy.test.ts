@@ -22,6 +22,8 @@ import {
 	buildMemoryCapture,
 	buildMemoryCriterion,
 	buildMemoryRecordProfile,
+	buildMemoryScenario,
+	buildMemorySeed,
 	buildMemoryVerdict,
 	countMemoryPairs,
 	omitMemoryAuxiliaries,
@@ -36,6 +38,7 @@ import {
 	matchesMemoryUnload,
 	readMemoryAdmission,
 	readMemoryControls,
+	readMemoryDeskRecord,
 	readMemoryEvents,
 	readMemoryModel,
 	readMemoryModels,
@@ -683,6 +686,72 @@ describe('study install fixtures', () => {
 			'{"area":3,"zone":{"early":2,"later":1}}',
 		)
 		expect(() => readMemorySealedCheckpoint(evidence, 'absent')).toThrow('Expected one absent')
+	})
+
+	it('reads the desk file text out of a chat body, and nothing when no message carries the file', () => {
+		const body = JSON.stringify({
+			model: 'model',
+			messages: [
+				{ role: 'system', content: 'Desk instructions.' },
+				{
+					role: 'user',
+					content:
+						'## Workspace\n\nFile: case.txt\n```text\nCase record for BC-7301:\n\n[Source ev-01-2] BC-7301 is late.\n```',
+				},
+				{ role: 'user', content: 'Return to BC-7301' },
+			],
+		})
+		expect(readMemoryDeskRecord(body)).toBe(
+			'Case record for BC-7301:\n\n[Source ev-01-2] BC-7301 is late.',
+		)
+		expect(
+			readMemoryDeskRecord(
+				JSON.stringify({
+					model: 'model',
+					messages: [{ role: 'user', content: 'File: other.txt\n```text\nheld\n```' }],
+				}),
+			),
+		).toBeUndefined()
+		expect(() => readMemoryDeskRecord('{"model":"model"}')).toThrow('Missing chat messages')
+	})
+
+	it('changes a checkpoint member or removes it, leaving the input unchanged', () => {
+		const value = { ledger: { requests: [] }, records: [], arrivals: ['a'], cases: [] }
+		expect(buildMemorySeed(value, { arrivals: ['a', 'b'] })).toEqual({
+			ledger: { requests: [] },
+			records: [],
+			arrivals: ['a', 'b'],
+			cases: [],
+		})
+		expect(buildMemorySeed(value, { cases: undefined })).toEqual({
+			ledger: { requests: [] },
+			records: [],
+			arrivals: ['a'],
+		})
+		expect(value.arrivals).toEqual(['a'])
+		expect(() => buildMemorySeed([], {})).toThrow('Missing checkpoint')
+	})
+
+	it('changes every goal input of a scenario and keeps its ids', () => {
+		const scenario = {
+			id: 'public',
+			goals: [
+				{ id: 'one', input: { prompt: 'Open', arrivals: [], records: [] } },
+				{ id: 'two', input: { prompt: 'Close', arrivals: [], records: [] } },
+			],
+		}
+		expect(
+			buildMemoryScenario(scenario, (input) => ({ ...input, prompt: `${input.prompt} BC-7301` })),
+		).toEqual({
+			id: 'public',
+			goals: [
+				{ id: 'one', input: { prompt: 'Open BC-7301', arrivals: [], records: [] } },
+				{ id: 'two', input: { prompt: 'Close BC-7301', arrivals: [], records: [] } },
+			],
+		})
+		expect(() =>
+			buildMemoryScenario({ id: 'public', goals: [{ id: 'bad', input: 7 }] }, (input) => input),
+		).toThrow('Malformed goal bad')
 	})
 
 	it('executes goals in order and stops at the first refusal, keeping the earlier products and the error itself', async () => {

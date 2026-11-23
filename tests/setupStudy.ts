@@ -36,7 +36,7 @@ import type { RecorderInterface } from '@orkestrel/test'
 import type { StudyAttempt, StudyFailure, StudyRole, StudyRubric } from '@orkestrel/study'
 import type { JSONValue } from '@orkestrel/contract'
 import type { StudyDeskAssertion } from '../studies/desk/types.js'
-import type { StudyMemoryArm } from '../studies/memory/index.js'
+import type { StudyMemoryArm, StudyMemoryInput } from '../studies/memory/index.js'
 import {
 	arrayOf,
 	canonicalStringify,
@@ -76,7 +76,13 @@ import {
 	readStudyDeclaration,
 	readStudyResult,
 } from '@orkestrel/study/server'
-import { StudyMemoryDriver, StudyMemoryJudge } from '../studies/memory/index.js'
+import {
+	STUDY_MEMORY_FILE,
+	STUDY_MEMORY_TEXT,
+	StudyMemoryDriver,
+	StudyMemoryJudge,
+	isStudyMemoryInput,
+} from '../studies/memory/index.js'
 import { STUDY_DESK_TOOLS } from '../studies/desk/constants.js'
 import { isStudyDeskAssertion, isStudyDeskInput } from '../studies/desk/validators.js'
 import * as agent from '../src/core/index.js'
@@ -1936,6 +1942,406 @@ export const STUDY_MEMORY_SEED_SETTINGS = Object.freeze({
 	checkpoints: Object.freeze(STUDY_MEMORY_SEED_GOALS.map((goal) => goal.id)),
 })
 
+/** Pins released records for the desk: a case's order record, a customer record whose content names the case, a second case's order, a policy naming two cases, and one naming none. */
+export const MEMORY_DESK_RECORDS = Object.freeze([
+	Object.freeze({
+		id: 'order:BC-7301',
+		name: 'Mara Ellison',
+		content: 'Order BC-7301; ceramic filter breakage.',
+	}),
+	Object.freeze({
+		id: 'customer:BC-4101',
+		name: 'Mara Ellison',
+		content: 'Account BC-4101; owner Mara Ellison; order BC-7301.',
+	}),
+	Object.freeze({
+		id: 'order:BC-7302',
+		name: 'Ivo Mercer',
+		content: 'Order BC-7302; meter delivery.',
+	}),
+	Object.freeze({
+		id: 'policy:refunds',
+		name: 'Refund policy',
+		content: 'Refunds need case approval, as on BC-7301 and BC-7302.',
+	}),
+	Object.freeze({ id: 'policy:money', name: 'Money policy', content: 'Round money to cents.' }),
+])
+
+/** Pins an arrival shaped like the battery's opening note: it names two cases, so it stays in the conversation. */
+export const MEMORY_DESK_OPENING = Object.freeze({
+	id: 'ev-opening',
+	content:
+		'Desk opening note. The grant obligation on order BC-7312 outlives the claim on order BC-7301.',
+})
+
+/** Pins an arrival shaped like the battery's register: it names all twelve cases, so it stays in the conversation. */
+export const MEMORY_DESK_REGISTER = Object.freeze({
+	id: 'ev-register',
+	content: [
+		'Customer/order register.',
+		...Array.from(
+			{ length: 12 },
+			(_unused, at) =>
+				`Account BC-41${String(at + 1).padStart(2, '0')}; order BC-73${String(at + 1).padStart(2, '0')}.`,
+		),
+	].join('\n'),
+})
+
+/** Pins texts that carry no whole, case-sensitive case id. */
+export const MEMORY_DESK_UNMATCHED: readonly string[] = Object.freeze([
+	'bc-7301',
+	'BC-73010',
+	'xBC-7301',
+	'BC-7301x',
+	'BC-730',
+	'BC 7301',
+	'',
+])
+
+/** Pins the request case choice: each row's arrivals, its request text, and the case the record renders for. */
+export const MEMORY_DESK_CHOICES = Object.freeze([
+	[
+		[
+			MEMORY_DESK_OPENING,
+			MEMORY_DESK_REGISTER,
+			{ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' },
+		],
+		'Open the queue',
+		'BC-7301',
+	],
+	[
+		[
+			{ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' },
+			{ id: 'ev-02-1', content: 'BC-7302 meter left at the locked gate.' },
+		],
+		'Check BC-7301',
+		'BC-7302',
+	],
+	[
+		[{ id: 'ev-02-1', content: 'BC-7302 meter left at the locked gate.' }, MEMORY_DESK_OPENING],
+		'Check BC-7301',
+		'BC-7302',
+	],
+	[[], 'Return to BC-7301 and decide the refund', 'BC-7301'],
+	[[MEMORY_DESK_OPENING], 'Return to BC-7303', 'BC-7303'],
+	[[], 'Compare BC-7301 with BC-7302', undefined],
+	[[MEMORY_DESK_REGISTER], 'Close the shift', undefined],
+	// An arrival id that carries a second case keeps the statement in the conversation.
+	[[{ id: 'BC-7302', content: 'BC-7301 is open.' }], 'Close', undefined],
+] as const)
+
+/** Pins the adapter's case-binding rows: each changes one loaded scenario and names the CONFIG message it must raise, or none. */
+export const MEMORY_DESK_BINDINGS: ReadonlyArray<{
+	readonly scenario: 'endurance' | 'handoff'
+	readonly drop: string | undefined
+	readonly suffix: string
+	readonly added: ReadonlyArray<{
+		readonly id: string
+		readonly name: string
+		readonly content: string
+	}>
+	readonly message: RegExp | undefined
+}> = Object.freeze([
+	{
+		scenario: 'endurance',
+		drop: 'order:BC-7312',
+		suffix: '',
+		added: [],
+		message:
+			/names cases \[BC-7301, .*BC-7312\] but declares order records for \[BC-7301, .*BC-7311\]/,
+	},
+	{
+		scenario: 'handoff',
+		drop: undefined,
+		suffix: ' BC-7301',
+		added: [],
+		message: /names cases \[BC-7301\] but declares order records for \[\]/,
+	},
+	// A declared id names its own case, so the goal inputs name it too.
+	{
+		scenario: 'handoff',
+		drop: undefined,
+		suffix: '',
+		added: [{ id: 'order:BC-7301', name: 'Unnamed', content: 'Held.' }],
+		message: undefined,
+	},
+	{
+		scenario: 'handoff',
+		drop: undefined,
+		suffix: '',
+		added: [{ id: 'order:BC-7399', name: 'Unnamed', content: 'Held.' }],
+		message: /names cases \[\] but declares order records for \[BC-7399\]/,
+	},
+])
+
+/** Pins a four-goal desk trajectory: two goals that each file one case's statement beside two that stay, a request that names the first case, and a request that names none. */
+export const STUDY_MEMORY_DESK_GOALS: readonly StudyGoal[] = Object.freeze([
+	Object.freeze({
+		id: 'desk-opening',
+		input: Object.freeze({
+			prompt: 'Open the shift queue',
+			arrivals: Object.freeze([
+				MEMORY_DESK_OPENING,
+				MEMORY_DESK_REGISTER,
+				Object.freeze({ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' }),
+			]),
+			records: Object.freeze(MEMORY_DESK_RECORDS.slice(0, 2)),
+		}),
+	}),
+	Object.freeze({
+		id: 'desk-second',
+		input: Object.freeze({
+			prompt: 'Check the meter delivery',
+			arrivals: Object.freeze([
+				Object.freeze({ id: 'ev-02-1', content: 'BC-7302 meter left at the locked gate.' }),
+			]),
+			records: Object.freeze(MEMORY_DESK_RECORDS.slice(2)),
+		}),
+	}),
+	Object.freeze({
+		id: 'desk-return',
+		input: Object.freeze({
+			prompt: 'Return to BC-7301 and decide the refund',
+			arrivals: Object.freeze([]),
+			records: Object.freeze([]),
+		}),
+	}),
+	Object.freeze({
+		id: 'desk-close',
+		input: Object.freeze({
+			prompt: 'Close the shift',
+			arrivals: Object.freeze([]),
+			records: Object.freeze([]),
+		}),
+	}),
+])
+
+/** Pins the case stores of a well-formed records checkpoint: two cases in first-filed order, statements oldest first. */
+export const MEMORY_DESK_CASES = Object.freeze([
+	Object.freeze({
+		id: 'BC-7301',
+		statements: Object.freeze([
+			Object.freeze({ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' }),
+			Object.freeze({ id: 'ev-01-3', content: 'BC-7301 refund is approved.' }),
+		]),
+	}),
+	Object.freeze({
+		id: 'BC-7302',
+		statements: Object.freeze([
+			Object.freeze({ id: 'ev-02-1', content: 'BC-7302 meter left at the locked gate.' }),
+		]),
+	}),
+])
+
+/** Pins a well-formed records checkpoint whose case stores file three of its four taken arrivals. */
+export const MEMORY_DESK_CHECKPOINT = Object.freeze({
+	ledger: Object.freeze({}),
+	records: Object.freeze([]),
+	arrivals: Object.freeze(['ev-opening', 'ev-01-2', 'ev-01-3', 'ev-02-1']),
+	cases: MEMORY_DESK_CASES,
+})
+
+/** Pins checkpoints the guard refuses for their case stores alone, each a change of the well-formed one. */
+export const MEMORY_DESK_CHECKPOINT_REFUSALS = Object.freeze([
+	Object.freeze({
+		name: 'no cases member',
+		value: Object.freeze({
+			ledger: MEMORY_DESK_CHECKPOINT.ledger,
+			records: MEMORY_DESK_CHECKPOINT.records,
+			arrivals: MEMORY_DESK_CHECKPOINT.arrivals,
+		}),
+	}),
+	Object.freeze({ name: 'cases as text', value: { ...MEMORY_DESK_CHECKPOINT, cases: 'BC-7301' } }),
+	Object.freeze({
+		name: 'a case with an undeclared member',
+		value: { ...MEMORY_DESK_CHECKPOINT, cases: [{ ...MEMORY_DESK_CASES[1], note: 'held' }] },
+	}),
+	Object.freeze({
+		name: 'a repeated case id',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{
+					id: 'BC-7301',
+					statements: [{ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' }],
+				},
+				{ id: 'BC-7301', statements: [{ id: 'ev-01-3', content: 'BC-7301 refund is approved.' }] },
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a case id outside the pattern',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			arrivals: ['ev-13-1'],
+			cases: [{ id: 'BC-7313', statements: [{ id: 'ev-13-1', content: 'BC-7313 is open.' }] }],
+		},
+	}),
+	Object.freeze({
+		name: 'a case id carrying text around its match',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{
+					id: 'order:BC-7302',
+					statements: [{ id: 'ev-02-1', content: 'BC-7302 meter left at the locked gate.' }],
+				},
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a lowercase case id',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{
+					id: 'bc-7302',
+					statements: [{ id: 'ev-02-1', content: 'bc-7302 meter left at the gate.' }],
+				},
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a case with no statement',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [...MEMORY_DESK_CASES, { id: 'BC-7303', statements: [] }],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement id repeated across cases',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				MEMORY_DESK_CASES[0],
+				{ id: 'BC-7302', statements: [{ id: 'ev-01-2', content: 'BC-7302 meter is late.' }] },
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement id repeated within a case',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{
+					id: 'BC-7301',
+					statements: [
+						{ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' },
+						{ id: 'ev-01-2', content: 'BC-7301 refund is approved.' },
+					],
+				},
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement naming no taken arrival',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [{ id: 'BC-7301', statements: [{ id: 'ev-09-9', content: 'BC-7301 is closed.' }] }],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement carrying another case id',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{ id: 'BC-7302', statements: [{ id: 'ev-02-1', content: 'BC-7301 meter is late.' }] },
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement carrying two case ids',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{ id: 'BC-7302', statements: [{ id: 'ev-02-1', content: 'BC-7302 follows BC-7301.' }] },
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement carrying no case id',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [{ id: 'BC-7302', statements: [{ id: 'ev-02-1', content: 'The meter is late.' }] }],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement with non-text content',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [{ id: 'BC-7302', statements: [{ id: 'ev-02-1', content: 7 }] }],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement with an undeclared member',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{
+					id: 'BC-7302',
+					statements: [{ id: 'ev-02-1', content: 'BC-7302 meter is late.', origin: 'arrival' }],
+				},
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement text over the text bound',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			cases: [
+				{
+					id: 'BC-7302',
+					statements: [
+						{
+							id: 'ev-02-1',
+							content: `BC-7302 ${'x'.repeat(STUDY_MEMORY_TEXT - 'BC-7302 '.length + 1)}`,
+						},
+					],
+				},
+			],
+		},
+	}),
+	Object.freeze({
+		name: 'a statement id over the text bound',
+		value: {
+			...MEMORY_DESK_CHECKPOINT,
+			arrivals: ['x'.repeat(STUDY_MEMORY_TEXT + 1)],
+			cases: [
+				{
+					id: 'BC-7302',
+					statements: [{ id: 'x'.repeat(STUDY_MEMORY_TEXT + 1), content: 'BC-7302 is late.' }],
+				},
+			],
+		},
+	}),
+])
+
+/** Pins settings that list every goal of the desk trajectory. */
+export const STUDY_MEMORY_DESK_SETTINGS = Object.freeze({
+	observe: true,
+	checkpoints: Object.freeze(STUDY_MEMORY_DESK_GOALS.map((goal) => goal.id)),
+})
+
+/**
+ * Reads the desk file text a chat request carries in its context message.
+ * @param body - The exact chat request body.
+ * @returns The text inside the desk file's fenced block, or `undefined` when no message carries the file.
+ * @throws Error - Thrown when the body is not a chat request with a message list.
+ */
+export function readMemoryDeskRecord(body: string): string | undefined {
+	const parsed = parseJSON(body)
+	if (!isRecord(parsed) || !isArray(parsed.messages)) throw new Error('Missing chat messages')
+	const label = `File: ${STUDY_MEMORY_FILE}\n`
+	const text = parsed.messages
+		.map((message) =>
+			isRecord(message) && typeof message.content === 'string' ? message.content : '',
+		)
+		.find((content) => content.includes(label))
+	if (text === undefined) return undefined
+	const open = text.indexOf('\n', text.indexOf(label) + label.length) + 1
+	return text.slice(open, text.indexOf('\n```', open))
+}
+
 /** Pins one goal's rows, so each progress cell has a hand count: metadata and judge dispatches ahead of the agent's, and a denial of another reason. */
 export const STUDY_MEMORY_PROGRESS_ROWS: readonly StudyEvidence[] = Object.freeze(
 	[
@@ -2132,6 +2538,43 @@ export function buildMemorySeedLedger(
 	return cloneJSONValue(
 		parseJSON(JSON.stringify({ ...value, ledger: { ...value.ledger, ...change } })),
 	)
+}
+
+/**
+ * Builds a scenario whose every goal input takes a change, keeping the scenario and goal ids.
+ * @param scenario - A declared memory scenario.
+ * @param change - Returns the changed input of one goal.
+ * @returns The changed scenario.
+ * @throws Error - Thrown when a goal input is not a memory input, or a changed input is not JSON.
+ */
+export function buildMemoryScenario(
+	scenario: StudyScenario,
+	change: (input: StudyMemoryInput) => StudyMemoryInput,
+): StudyScenario {
+	return {
+		id: scenario.id,
+		goals: scenario.goals.map((goal) => {
+			if (!isStudyMemoryInput(goal.input)) throw new Error(`Malformed goal ${goal.id}`)
+			const input: unknown = change(goal.input)
+			if (!isJSONValue(input)) throw new Error(`Changed goal ${goal.id} is not JSON`)
+			return { id: goal.id, input }
+		}),
+	}
+}
+
+/**
+ * Builds a checkpoint whose top-level members take the given changes; an `undefined` change removes its member.
+ * @param value - A checkpoint.
+ * @param change - The members to replace.
+ * @returns The owned changed value.
+ * @throws Error - Thrown when the value is not a record.
+ */
+export function buildMemorySeed(
+	value: JSONValue,
+	change: Readonly<Record<string, JSONValue | undefined>>,
+): JSONValue {
+	if (!isRecord(value)) throw new Error('Missing checkpoint')
+	return cloneJSONValue(parseJSON(JSON.stringify({ ...value, ...change })))
 }
 
 /**
@@ -2799,6 +3242,7 @@ export function buildMemoryReplayEvidence(
 		},
 		records: [],
 		arrivals: [],
+		cases: [],
 	}
 	if (!isJSONValue(checkpoint)) throw new Error('Invalid fixture checkpoint')
 	return [

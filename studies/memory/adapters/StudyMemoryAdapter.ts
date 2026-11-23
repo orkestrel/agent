@@ -13,6 +13,7 @@ import { gradeStudyEvidence } from '@orkestrel/study/server'
 import {
 	readStudyMemoryGrade,
 	readStudyMemoryProgress,
+	validateStudyMemoryCases,
 	validateStudyMemoryCheckpoints,
 	validateStudyMemoryProfile,
 } from '../helpers.js'
@@ -21,7 +22,7 @@ import { isStudyMemoryArm, isStudyMemoryAssertion, isStudyMemoryInput } from '..
 
 /** Validates and grades the prospective memory study without exposing its rubric to execution. */
 export class StudyMemoryAdapter implements StudyAdapterInterface {
-	/** Validates public inputs, memory arms and independent criteria offline. @param input - Parsed generic declarations. */
+	/** Validates public inputs, their case ids against the declared order records, memory arms and independent criteria offline. @param input - Parsed generic declarations. */
 	validate(input: StudyValidation): void {
 		const arms = input.definition.arms.filter(isStudyMemoryArm)
 		if (input.definition.driver !== 'memory' || arms.length !== input.definition.arms.length)
@@ -43,6 +44,7 @@ export class StudyMemoryAdapter implements StudyAdapterInterface {
 			for (const goal of scenario.goals)
 				if (!isStudyMemoryInput(goal.input))
 					throw new StudyError('CONFIG', 'Malformed public memory goal')
+		validateStudyMemoryCases(input.scenarios)
 		for (const criterion of input.rubric.criteria) {
 			if (criterion.method !== 'semantic' && !isStudyMemoryAssertion(criterion.assertion))
 				throw new StudyError('CONFIG', 'Unsupported memory mechanism assertion')

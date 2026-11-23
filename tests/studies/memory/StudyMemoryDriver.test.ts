@@ -18,6 +18,7 @@ import {
 	MEMORY_TRIAGE_OPEN,
 	buildMemoryRouteAnswer,
 	buildMemoryProfile,
+	buildMemorySeed,
 	createMemoryContext,
 	createMemoryIdentity,
 	createMemoryFixture,
@@ -294,13 +295,15 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 				null,
 				[],
 				{},
-				{ records: [], arrivals: [] },
-				{ ledger: {}, conversation: {}, records: [], arrivals: [] },
-				{ conversation: 7, records: [], arrivals: [] },
-				{ conversation: {}, arrivals: [] },
-				{ conversation: {}, records: [] },
-				{ conversation: {}, records: [7], arrivals: [] },
-				{ conversation: {}, records: [], arrivals: [7] },
+				{ records: [], arrivals: [], cases: [] },
+				{ ledger: {}, conversation: {}, records: [], arrivals: [], cases: [] },
+				{ conversation: 7, records: [], arrivals: [], cases: [] },
+				{ conversation: {}, arrivals: [], cases: [] },
+				{ conversation: {}, records: [], cases: [] },
+				{ conversation: {}, records: [7], arrivals: [], cases: [] },
+				{ conversation: {}, records: [], arrivals: [7], cases: [] },
+				{ ledger: {}, records: [], arrivals: [] },
+				{ ledger: {}, records: [], arrivals: [], cases: 7 },
 				row,
 			])
 				await expect(driver.open(records, fixture.context.signal, seed)).rejects.toMatchObject({
@@ -311,9 +314,31 @@ describe('actual Agent/Ledger/Ollama memory consumer', () => {
 					ledger: {},
 					records: [],
 					arrivals: [],
+					cases: [],
 				}),
 			).rejects.toMatchObject({ code: 'CONFIG' })
+			// A control files nothing, so its seed holds no case store even when the store is well formed.
+			const filed = buildMemorySeed(row, {
+				arrivals: ['source-1', 'ev-01-2'],
+				cases: [
+					{
+						id: 'BC-7301',
+						statements: [{ id: 'ev-01-2', content: 'BC-7301 filter arrived cracked.' }],
+					},
+				],
+			})
+			expect(isStudyMemoryCheckpoint(filed)).toBe(true)
+			for (const arm of ['full', 'plain'])
+				await expect(
+					driver.open({ ...records, arm }, fixture.context.signal, filed),
+				).rejects.toMatchObject({
+					code: 'CONFIG',
+					message: expect.stringContaining(`case stores on the ${arm} arm`),
+				})
 			expect(server.requests).toEqual([])
+			// The same checkpoint with its empty cases list opens.
+			const opened = await driver.open({ ...records, arm: 'full' }, fixture.context.signal, row)
+			await opened.close()
 		} finally {
 			fixture.close()
 			await server.destroy()

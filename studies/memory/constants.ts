@@ -85,6 +85,19 @@ export const STUDY_MEMORY_PARAMETERS: Readonly<Record<'agent' | 'judge', StudyMe
  */
 export const STUDY_MEMORY_ABSTENTION =
 	/^\W*(?:i cannot|i can't|i am unable|i'm unable|unable to|i do not have|i don't have|i could not|i couldn't)/iu
+/**
+ * Matches one case id of the endurance battery, BC-7301 through BC-7312, as a whole token and case-sensitively.
+ * @remarks
+ * The records arm files an arrival that carries exactly one distinct match into that case's store. The adapter refuses a scenario whose goal inputs match a set other than the suffixes of its declared `order:` records, so the pattern stays bound to the declared data. The pattern is global, so read it through `matchAll`, which works on a copy.
+ * @example [...'BC-7301 and BC-7312'.matchAll(STUDY_MEMORY_CASE)].map((match) => match[0]) // ['BC-7301', 'BC-7312']
+ */
+export const STUDY_MEMORY_CASE = /\bBC-73(?:0[1-9]|1[0-2])\b/gu
+/** Names the prefix of a declared order record id; the rest of the id is its case id. */
+export const STUDY_MEMORY_ORDER_PREFIX = 'order:'
+/** Names the records arm's one desk workspace. */
+export const STUDY_MEMORY_WORKSPACE = 'desk'
+/** Names the one file of the desk workspace that the chosen case record renders into. */
+export const STUDY_MEMORY_FILE = 'case.txt'
 /** Holds the text of `LEDGER_NOTES.repeat`, because `progress` holds no admitted Agent namespace; a case compares the two. */
 export const STUDY_MEMORY_LEDGER_REPEAT =
 	'You already have this result earlier in this request; give your complete answer now as your final message.'

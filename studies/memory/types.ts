@@ -66,13 +66,19 @@ export interface StudyMemoryInput {
 /**
  * Holds one goal's end state as the `checkpoint` evidence row.
  * @remarks
- * The arm names which state member is present: `ledger` on `records`, and `conversation` on `full` and `plain`, where the `plain` conversation holds only the last goal run. A session opened with this value hydrates that state, its released records, and the arrival ids it already took. Provenance is not carried, so an arrival from before the seed reads origin `history`.
+ * The arm names which state member is present: `ledger` on `records`, and `conversation` on `full` and `plain`, where the `plain` conversation holds only the last goal run. A session opened with this value hydrates that state, its released records, the arrival ids it already took, and its case stores. Provenance is not carried, so an arrival from before the seed reads origin `history`.
+ *
+ * `cases` holds the statements the records arm filed out of the conversation: each case in first-filed order, its statements oldest first as they arrived. It is empty on `full` and `plain`, and no filed statement is in the `ledger` conversation. The desk file and the chosen case are not stored, because each request derives them.
  */
 export interface StudyMemoryCheckpoint {
 	readonly ledger?: LedgerSnapshot
 	readonly conversation?: ConversationSnapshot
 	readonly records: StudyMemoryInput['records']
 	readonly arrivals: readonly string[]
+	readonly cases: ReadonlyArray<{
+		readonly id: string
+		readonly statements: StudyMemoryInput['arrivals']
+	}>
 }
 
 /** Holds one goal's reading in `study progress`; a cell is absent when the goal holds none of the rows it reads. */
