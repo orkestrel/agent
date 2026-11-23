@@ -172,10 +172,9 @@ export const LEDGER_EXCHANGE_LIMIT = 8
  * Caps at 8 the exchanges of a request's subject window, the newest counted as one, each a request, its call turns and results, and its reply.
  *
  * @remarks
- * The subject window holds the newest exchanges on the request's subject, newest first, so the cap
- * counts members after that filter and never sets a depth. The newest exchange that has a reply is
- * among them unless its subject and the request's are both non-empty and share none; then it shows
- * nothing and keeps its `previous` row. The newest shows whole, less its all-`recall` call groups, or as its request and reply
+ * The subject window holds the newest exchange that has a reply, then the newest exchanges on the
+ * request's subject, newest first, so the cap counts members after that filter and never sets a
+ * depth. The newest shows whole, less its all-`recall` call groups, or as its request and reply
  * alone, as its share allows, else its request shows as a copy. Each later member whose depth runs
  * unbroken back from the newest shows whole or less its all-`recall` groups, and each member past
  * the first gap shows its request and reply alone; the window stops at the first that

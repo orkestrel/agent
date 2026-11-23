@@ -403,7 +403,7 @@ export type LedgerAgentOptions = Pick<
  *
  * @remarks
  * `judge` answers every filing question. `system` is the application's system text, a date
- * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it. Each request sends the subject window, the newest exchanges on its subject, and the current statements whole, in conversation order, and then a copy of the request turn, which carries the Earlier index of what `recall` can read. `topics` lists the desk
+ * sentence included; it opens the system message, which also holds the instructions and the skills index the `agent` option supplies. The memos index and the workspace text go into the context message after it. Each request sends the recent window, its newest exchanges, and the current statements whole, in conversation order, and then a copy of the request turn, which carries the Earlier index of what `recall` can read. `topics` lists the desk
  * topics. `questions` and `thresholds` are required with no default; pass the `LEDGER_QUESTIONS`
  * constant for the measured wording, and fit `thresholds` on the wording and the judge you pass. `capacity` is the model's context window in tokens and must be a positive safe
  * integer. Without `gauge`, or a `snapshot` gauge priced on the same calibrated definitions under the same provider `model`, the ledger calibrates before its first pass. The ledger prices with a supplied `gauge` as stated and compares it with no reported usage. `share` defaults leaf by leaf to `DEFAULT_LEDGER_SHARE`. The ledger writes the `LEDGER_NOTES` text.
@@ -753,9 +753,9 @@ export type LedgerAgentInterface = Pick<
  *
  * @remarks
  * The ledger files every message of its conversation through the injected judge, projects the
- * owner records and the rules record from that filing, and sends the subject window of the newest
- * exchanges on the request's subject, the current statements whole, and a copy of the request turn
- * carrying the Earlier index of what `recall` reads. It owns its agent:
+ * owner records and the rules record from that filing, and sends the recent window of the newest
+ * exchanges, the current statements whole, and a copy of the request turn carrying the Earlier index
+ * of what `recall` reads. It owns its agent:
  * applying a scope that carries `select` displaces the ledger's selection handler. A message
  * removed from `conversation`, one by one or by `clear`, takes the ledger's marks of it at the
  * removal. A request in flight at the removal files no tool result onto another message, so neither
@@ -1017,14 +1017,12 @@ export interface LedgerMember {
  * nothing supersedes, newest first. `built` is the head the first turn renders, `recallable` what `recall`
  * can list from before the request, and `lists` and `disclosure` the run scope and the shown skills
  * the plan prices. `subjects` is what the `collectLedgerSubjects` helper returns for the request, and
- * `depths` maps each exchange's request id to its depth. The subject window is the newest exchanges
- * whose subject the `matchesLedgerSubject` helper matches to the request's, at most
- * `LEDGER_RECENT_LIMIT`, so the newest exchange is among them unless its subject and the request's
- * are both non-empty and share none; its contiguous run is the members whose depths run unbroken
- * back from the newest exchange, and every member past the first gap is far. `ladder` holds the
- * newest exchange's forms, fullest first: whole, less its all-`recall` groups, and the pair, each
- * only where it differs from the one before, and is empty when the window leaves the newest exchange
- * out. `older` holds the forms of each member of the contiguous run
+ * `depths` maps each exchange's request id to its depth. The subject window is the newest exchange,
+ * then the newest exchanges whose subject the `matchesLedgerSubject` helper matches to the request's,
+ * at most `LEDGER_RECENT_LIMIT` in all; its contiguous run is the members whose depths run unbroken
+ * back from the newest, and every member past the first gap is far. `ladder` holds the newest
+ * exchange's forms, fullest first: whole, less its all-`recall` groups, and the pair, each only
+ * where it differs from the one before. `older` holds the forms of each member of the contiguous run
  * past the newest, newest first and each whole then less its all-`recall` groups, when the newest
  * exchange shows its lookups; `spared` holds them when it shows none, so no lookup of the newest
  * retires a group. `far` holds each far member as its pair, newest first.
@@ -1056,11 +1054,10 @@ export interface LedgerSurvey {
  * @remarks
  * `shown` holds the messages the opening sends before the request copy, and `keys` the copy's index
  * rows. `withheld` is true when the plan leaves behind something `recall` can list. `intact` is true
- * when it shows the newest exchange in the form the window's rung gave it, or the window holds no
- * newest exchange. `roomy` is true when its first turn leaves `recall` the close rule's room.
- * `requests` counts the request turns it shows, in the window or as copies, and `recent` those of the
- * subject window's members: the newest exchange's, while the window holds it, in its form or as a
- * copy, each contiguous member's whole, less its
+ * when it shows the newest exchange in the form the window's rung gave it, or there is no exchange.
+ * `roomy` is true when its first turn leaves `recall` the close rule's room. `requests` counts the
+ * request turns it shows, in the window or as copies, and `recent` those of the subject window's
+ * members: the newest exchange's in its form or as a copy, each contiguous member's whole, less its
  * all-`recall` groups, or as a copy, and each far member's in its pair. A far member the shares cut
  * shows no copy, so it counts nothing.
  */

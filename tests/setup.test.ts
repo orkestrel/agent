@@ -1489,13 +1489,13 @@ describe('system boundary canary fixtures', () => {
 			id: 'copy',
 			role: 'user',
 			content:
-				'## Earlier\n- previous: the last request you answered, and your reply\n\n## Request\nCheck BW-5512.',
+				'## Earlier\n- previous: your last answered request and your reply to it\n\n## Request\nCheck BW-5512.',
 		}
 		const cue: Message = { id: 'cue', role: 'user', content: 'Answer now.' }
 		const system: Message = { id: 'system', role: 'system', content: 'a\n\n## Request\nb' }
 
 		expect(extractLedgerIndex([system, copy, cue])).toBe(
-			'## Earlier\n- previous: the last request you answered, and your reply',
+			'## Earlier\n- previous: your last answered request and your reply to it',
 		)
 		expect(extractLedgerIndex([system, cue])).toBe('')
 		expect(extractLedgerIndex([])).toBe('')
@@ -1512,7 +1512,7 @@ describe('system boundary canary fixtures', () => {
 				id: 'copy',
 				role: 'user',
 				content:
-					'## Earlier\nStored messages you cannot see. If the request needs one, call recall with its key. Otherwise answer without recall.\n- previous: the last request you answered, and your reply\n- AX-1: 2 earlier messages\nOther ids, names, and words also work as keys.\n\n## Request\nNext?',
+					"## Earlier\nThese earlier exchanges and items are stored, not shown. If the request depends on one you can't see, call recall with its key, or join several keys with commas. If the messages you see are enough, answer without recall.\n- previous: your last answered request and your reply to it\n- AX-1: 2 earlier messages\nOther ids, names, and words from a message work too.\n\n## Request\nNext?",
 			},
 		])
 

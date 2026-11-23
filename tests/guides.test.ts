@@ -1783,7 +1783,7 @@ await new GuideCommand({
 			)
 			const options = buildGuideLedgerOptions({
 				judge: createPhraseJudge(['Refunds over']),
-				capacity: 2420,
+				capacity: 2450,
 				gauge: { scale: 1, overhead: 0 },
 			})
 			const ledger = createLedger(parent, options)
